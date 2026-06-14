@@ -5612,7 +5612,7 @@
   "AuditReportHost": "H\u00f4te",
   "AuditReportDetail": "D\u00e9tail",
   "AuditReportRawData": "Donn\u00e9es brutes",
-  "AuditReportGenerated": "G\u00e9n\u00e9r\u00e9 par Heimdall.Next",
+  "AuditReportGenerated": "G\u00e9n\u00e9r\u00e9 par Heimdall",
   "AuditReportAuditDuration": "Dur\u00e9e de l\u2019audit",
   "AuditReportHostsScanned": "H\u00f4tes analys\u00e9s",
   "AuditReportChecksPerformed": "V\u00e9rifications effectu\u00e9es",

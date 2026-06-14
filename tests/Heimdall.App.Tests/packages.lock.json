@@ -380,14 +380,7 @@
         "resolved": "16.3.0",
         "contentHash": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA=="
       },
-      "heimdall.core": {
-        "type": "Project",
-        "dependencies": {
-          "CommunityToolkit.Mvvm": "[8.4.0, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.5, )"
-        }
-      },
-      "Heimdall.Next": {
+      "Heimdall": {
         "type": "Project",
         "dependencies": {
           "AvalonEdit": "[6.3.0.90, )",
@@ -402,6 +395,13 @@
           "TwinShell.Core": "[1.0.0, )",
           "TwinShell.Infrastructure": "[1.0.0, )",
           "TwinShell.Persistence": "[1.0.0, )"
+        }
+      },
+      "heimdall.core": {
+        "type": "Project",
+        "dependencies": {
+          "CommunityToolkit.Mvvm": "[8.4.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.5, )"
         }
       },
       "heimdall.rdp": {

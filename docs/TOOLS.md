@@ -10,7 +10,7 @@
 
 # Tools Reference
 
-Developer reference for Heimdall.Next's built-in tools, external tool
+Developer reference for Heimdall's built-in tools, external tool
 providers, and tool-hosting infrastructure.
 
 ## Overview

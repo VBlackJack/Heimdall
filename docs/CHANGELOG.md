@@ -10,7 +10,7 @@
 
 # Changelog
 
-All notable changes to Heimdall.Next are documented in this file.
+All notable changes to Heimdall are documented in this file.
 
 ## 2026-06-11 — Quality audit fix pass (v2026.061101)
 
@@ -387,7 +387,7 @@ untested path falls back to external mode). Build green, zero warnings.
 - **`Release.bat` ASCII + CRLF + `REM`** (`a48d23a`) — an em dash `—` (UTF-8
   `e2 80 94`) on line 2, LF-only EOLs, and `::` comments combined to make
   `cmd.exe` misread the file under its OEM codepage, break the `::` label, and
-  eventually evaluate `Heimdall.Next` as a command. Fix: 3 comment lines
+  eventually evaluate `Heimdall` as a command. Fix: 3 comment lines
   reworded (`::` → `REM`, `—` → `-`), EOL converted to CRLF, pure ASCII, no BOM.
   No `.cs` touched, tests unchanged, build green.
 

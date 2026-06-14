@@ -42,11 +42,11 @@ function Get-HeimdallRepoRoot {
 }
 
 function Get-HeimdallExePath {
-    $matches = Get-ChildItem -Path (Join-Path $script:RepoRoot 'src\Heimdall.App\bin\Debug') -Recurse -Filter 'Heimdall.Next.exe' |
+    $matches = Get-ChildItem -Path (Join-Path $script:RepoRoot 'src\Heimdall.App\bin\Debug') -Recurse -Filter 'Heimdall.exe' |
         Sort-Object FullName -Descending
 
     if (-not $matches) {
-        throw 'Heimdall.Next.exe not found under src\Heimdall.App\bin\Debug. Run a Debug build first.'
+        throw 'Heimdall.exe not found under src\Heimdall.App\bin\Debug. Run a Debug build first.'
     }
 
     return $matches[0].FullName
@@ -103,7 +103,7 @@ function Write-HeimdallSettingsJson {
 }
 
 function Stop-HeimdallProcesses {
-    Get-Process -Name 'Heimdall.Next' -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process -Name 'Heimdall' -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Milliseconds 400
 }
 

@@ -65,12 +65,12 @@ public sealed class ShellLaunchTests
 
     private static string LocateHeimdallExe()
     {
-        var debugPath = Path.Combine(WpfTestHost.RepoRoot, "src", "Heimdall.App", "bin", "Debug", "net10.0-windows", "Heimdall.Next.exe");
+        var debugPath = Path.Combine(WpfTestHost.RepoRoot, "src", "Heimdall.App", "bin", "Debug", "net10.0-windows", "Heimdall.exe");
         if (File.Exists(debugPath))
         {
             return debugPath;
         }
 
-        return Path.Combine(WpfTestHost.RepoRoot, "src", "Heimdall.App", "bin", "Release", "net10.0-windows", "Heimdall.Next.exe");
+        return Path.Combine(WpfTestHost.RepoRoot, "src", "Heimdall.App", "bin", "Release", "net10.0-windows", "Heimdall.exe");
     }
 }

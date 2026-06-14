@@ -81,12 +81,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>Heimdall.Next</AssemblyName>
+    <AssemblyName>Heimdall</AssemblyName>
     <RootNamespace>Heimdall.App</RootNamespace>
     <Version>1.0.0611.1</Version>
     <InformationalVersion>2026.061101</InformationalVersion>
     <Authors>Julien Bombled</Authors>
-    <Product>Heimdall.Next</Product>
+    <Product>Heimdall</Product>
     <Description>Secure Connection Manager - RDP, SSH, SFTP</Description>
     <Copyright>Copyright 2026 Julien Bombled</Copyright>
     <ApplicationIcon>app.ico</ApplicationIcon>

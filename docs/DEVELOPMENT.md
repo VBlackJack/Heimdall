@@ -10,13 +10,13 @@
 
 # Development Guide
 
-Shared development reference for Heimdall.Next. This file is versioned project
+Shared development reference for Heimdall. This file is versioned project
 documentation; keep machine-local paths, credentials, editor preferences, and
 temporary workflow notes out of it.
 
 ## Project Overview
 
-Heimdall.Next is a .NET 10 WPF Windows connection manager for RDP, SSH, SFTP,
+Heimdall is a .NET 10 WPF Windows connection manager for RDP, SSH, SFTP,
 VNC, Telnet, FTP, Citrix, and local shell sessions. The app uses MVVM via
 CommunityToolkit.Mvvm, SSH.NET 2025.1.0 for SSH/SFTP, WebView2 for embedded
 terminals and VNC, and DPAPI + HMAC-SHA256 for local credential protection.

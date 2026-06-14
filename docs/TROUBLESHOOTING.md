@@ -7,7 +7,7 @@
 
       http://www.apache.org/licenses/LICENSE-2.0
 -->
-# Heimdall.Next — Troubleshooting Guide
+# Heimdall — Troubleshooting Guide
 
 Index of all issues encountered during development and their solutions.
 
@@ -324,18 +324,18 @@ Additional fixes:
 
 ---
 
-## Build — MSB3026 File Locks from Heimdall.Next / testhost
+## Build — MSB3026 File Locks from Heimdall / testhost
 
 **Symptom**: `dotnet build` or `dotnet test` emits `MSB3026: Could not copy ...` or `MSB3027: Could not copy ...` on `Heimdall.App.dll`, `Heimdall.App.Tests.dll`, or similar output assemblies. The lock persists across retries.
 
 **Root Cause**: One of two processes is holding the output file open:
-- A running `Heimdall.Next.exe` from a previous debug or run session.
+- A running `Heimdall.exe` from a previous debug or run session.
 - A lingering `testhost.exe` left behind by a previous `dotnet test` invocation (common when the suite was cancelled, crashed, or when parallel build and test runs overlapped).
 
 **Solution**:
 1. Kill the offenders:
    ```powershell
-   Get-Process Heimdall.Next, testhost -ErrorAction SilentlyContinue | Stop-Process -Force
+   Get-Process Heimdall, testhost -ErrorAction SilentlyContinue | Stop-Process -Force
    ```
 2. Rebuild explicitly:
    ```bash
@@ -346,7 +346,7 @@ Additional fixes:
    dotnet test Heimdall.slnx --no-build
    ```
 
-**Prevention**: Avoid launching `Build.ps1` or `dotnet test` while a debug instance of Heimdall.Next is still running. If the suite was cancelled mid-run, sweep `testhost.exe` before the next attempt.
+**Prevention**: Avoid launching `Build.ps1` or `dotnet test` while a debug instance of Heimdall is still running. If the suite was cancelled mid-run, sweep `testhost.exe` before the next attempt.
 
 ---
 
@@ -762,7 +762,7 @@ This is easy to miss because the repo root also has a `config\settings.json`, bu
 
 ```powershell
 & 'G:\_Projects\Tests\Heimdall-TestEnv\scripts\Inject-Gateway.ps1' `
-  -SettingsPath 'G:\_dev\SnapConnect\Heimdall.Next\src\Heimdall.App\bin\Debug\net10.0-windows\config\settings.json'
+  -SettingsPath 'G:\_dev\SnapConnect\Heimdall\src\Heimdall.App\bin\Debug\net10.0-windows\config\settings.json'
 ```
 
 Alternatively, create the gateway manually in Settings > SSH & SFTP > SSH gateways and save settings. External edits to `settings.json` are not live-reloaded; restart the app after running the script.

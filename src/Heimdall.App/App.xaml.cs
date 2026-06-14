@@ -108,7 +108,7 @@ public partial class App : System.Windows.Application
         var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
         Heimdall.Core.Logging.FileLogger.Initialize(logDir);
         Heimdall.Core.Logging.ConnectionHistory.Initialize(logDir);
-        Heimdall.Core.Logging.FileLogger.Info("Heimdall.Next starting");
+        Heimdall.Core.Logging.FileLogger.Info("Heimdall starting");
         LogMsTscAxRegistration();
 
         // Register Windows-1252 codepage for MobaXterm .ini import
@@ -889,7 +889,7 @@ public partial class App : System.Windows.Application
             _serviceProvider?.Dispose();
         }
 
-        Core.Logging.FileLogger.Info("Heimdall.Next shutdown complete");
+        Core.Logging.FileLogger.Info("Heimdall shutdown complete");
         Core.Logging.FileLogger.Flush();
         base.OnExit(e);
     }

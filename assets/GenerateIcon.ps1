@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Generates Heimdall.Next application icon (multi-size .ico) using System.Drawing.
+    Generates Heimdall application icon (multi-size .ico) using System.Drawing.
 #>
 Add-Type -AssemblyName System.Drawing
 

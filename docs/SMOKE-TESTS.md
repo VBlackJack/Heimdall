@@ -22,7 +22,7 @@ This repo now carries a small UIAutomation smoke harness for high-signal desktop
 ## Prerequisites
 
 - Windows desktop session with UIAutomation available.
-- A Debug build of Heimdall.Next under `src/Heimdall.App/bin/Debug/...`.
+- A Debug build of Heimdall under `src/Heimdall.App/bin/Debug/...`.
 - The app must be launchable without first-run dialogs blocking the main window.
 
 ### Heimdall-TestEnv SSH fixture
@@ -36,7 +36,7 @@ gateway definitions:
 
 ```powershell
 & 'G:\_Projects\Tests\Heimdall-TestEnv\scripts\Inject-Gateway.ps1' `
-  -SettingsPath 'G:\_dev\SnapConnect\Heimdall.Next\src\Heimdall.App\bin\Debug\net10.0-windows\config\settings.json'
+  -SettingsPath 'G:\_dev\SnapConnect\Heimdall\src\Heimdall.App\bin\Debug\net10.0-windows\config\settings.json'
 ```
 
 Restart Heimdall after this external settings edit. The imported server profiles reference a stable

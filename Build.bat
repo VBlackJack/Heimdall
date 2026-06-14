@@ -1,5 +1,5 @@
 @echo off
-:: Heimdall.Next — Debug build (no installer, no release)
+:: Heimdall — Debug build (no installer, no release)
 
 cd /d "%~dp0"
 powershell -ExecutionPolicy Bypass -File Build.ps1

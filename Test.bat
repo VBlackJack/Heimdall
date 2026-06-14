@@ -1,5 +1,5 @@
 @echo off
-:: Heimdall.Next — Run all tests
+:: Heimdall — Run all tests
 
 cd /d "%~dp0"
 dotnet test Heimdall.slnx --verbosity normal

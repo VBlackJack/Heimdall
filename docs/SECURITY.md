@@ -1,7 +1,7 @@
 # Security Notes
 
 This document records known security considerations, limitations, and deliberate
-defense-in-depth decisions in Heimdall.Next.
+defense-in-depth decisions in Heimdall.
 
 ## Reporting a vulnerability
 
@@ -12,7 +12,7 @@ and licensing context. Do not file public issues for security problems.
 
 ## Threat model scope
 
-Heimdall.Next is a single-user desktop application that stores SSH and RDP
+Heimdall is a single-user desktop application that stores SSH and RDP
 credentials locally using DPAPI plus HMAC-SHA256, and manages outbound
 connections. It assumes:
 

@@ -1,6 +1,6 @@
 # Security Policy
 
-Heimdall.Next accepts private security reports through the maintainer channel
+Heimdall accepts private security reports through the maintainer channel
 used to share this repository. Do not file public issues for suspected
 vulnerabilities.
 

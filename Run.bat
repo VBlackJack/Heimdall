@@ -1,5 +1,5 @@
 @echo off
-:: Heimdall.Next - Quick launch (Debug)
+:: Heimdall - Quick launch (Debug)
 ::
 :: Just run this. It fetches, auto-pulls when safe, builds and launches.
 :: You don't have to remember flags - the defaults handle the common case.
@@ -19,7 +19,7 @@
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
-title Heimdall.Next - Debug
+title Heimdall - Debug
 
 :: Detect double-click launch (Explorer wraps the call in cmd.exe /c "...").
 :: When set, all exit points hit a final pause so the user can read output.
@@ -98,7 +98,7 @@ if defined DO_PULL (
 
 :: ----- banner --------------------------------------------------------------
 echo ----------------------------------------------------------------
-echo  Heimdall.Next - Quick launch (Debug)
+echo  Heimdall - Quick launch (Debug)
 echo  Branch: !BRANCH! @ !SHA!
 if defined SUBJECT echo  Last:   !SUBJECT!
 if not "!BEHIND!"=="0" (

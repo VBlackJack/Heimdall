@@ -63,7 +63,7 @@ foreach ($p in $regPaths) {
             Write-Host ""
             Write-Host "========================================" -ForegroundColor Green
             Write-Host "  WebView2 Runtime installed: v$ver" -ForegroundColor Green
-            Write-Host "  Restart Heimdall.Next to use embedded terminals." -ForegroundColor Green
+            Write-Host "  Restart Heimdall to use embedded terminals." -ForegroundColor Green
             Write-Host "========================================" -ForegroundColor Green
             $verified = $true
             break

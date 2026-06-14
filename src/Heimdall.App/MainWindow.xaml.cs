@@ -499,7 +499,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "https://github.com/VBlackJack/Heimdall.Next",
+                FileName = "https://github.com/VBlackJack/Heimdall",
                 UseShellExecute = true
             });
         }

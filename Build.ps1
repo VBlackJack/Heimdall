@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Build script for Heimdall.Next — produces portable distributions and installers.
+    Build script for Heimdall — produces portable distributions and installers.
 
 .PARAMETER Mode
     Build mode: 'Debug' (default) or 'Release'.
@@ -81,7 +81,7 @@ if ($Version) {
     ) | Where-Object { Test-Path $_ }
 
     $existingBuilds = @($allDistDirs | ForEach-Object {
-        Get-ChildItem -Path $_ -Directory -Filter "Heimdall.Next_build.${datePrefix}*" -ErrorAction SilentlyContinue
+        Get-ChildItem -Path $_ -Directory -Filter "Heimdall_build.${datePrefix}*" -ErrorAction SilentlyContinue
     } | ForEach-Object {
         if ($_.Name -match "build\.${datePrefix}(\d{2})(?:_|$)") { [int]$Matches[1] }
     })
@@ -117,7 +117,7 @@ $totalSteps = if ($Mode -eq 'Release') { 5 } else { 4 }
 $step = 0
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Heimdall.Next Build v${buildNumber}" -ForegroundColor Cyan
+Write-Host "  Heimdall Build v${buildNumber}" -ForegroundColor Cyan
 Write-Host "  Mode: $Mode" -ForegroundColor Cyan
 if ($Publish) { Write-Host "  Publish: GitHub Release" -ForegroundColor Cyan }
 Write-Host "========================================" -ForegroundColor Cyan
@@ -191,7 +191,7 @@ function Publish-Variant {
     $suffix = if ($VariantName -eq 'SelfContained') { '_selfcontained' } else { '_standard' }
     if ($Variant -ne 'Both') { $suffix = '' }
 
-    $variantFolder = "Heimdall.Next_build.${buildNumber}${suffix}"
+    $variantFolder = "Heimdall_build.${buildNumber}${suffix}"
     $variantDir = Join-Path $distDir $variantFolder
 
     Write-Host "  Publishing $VariantName to $variantFolder..." -ForegroundColor Yellow
@@ -280,7 +280,7 @@ if ($Mode -eq 'Release') {
             Write-Host "  Building Inno Setup installer ($($o.Name))..." -ForegroundColor DarkGray
             & $iscc /DAppVersion="$buildNumber" /DVariant="$($o.Name)" /DSourceDir="$($o.Dir)" /Q $issFile 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) {
-                Write-Host "    + Heimdall.Next_${buildNumber}_$($o.Name)_Setup.exe" -ForegroundColor DarkGray
+                Write-Host "    + Heimdall_${buildNumber}_$($o.Name)_Setup.exe" -ForegroundColor DarkGray
             } else {
                 Write-Host "    [!] Inno Setup failed for $($o.Name)" -ForegroundColor DarkYellow
             }
@@ -328,7 +328,7 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     foreach ($o in $outputs) {
         $suffix = if ($o.Name -eq 'SelfContained') { '_selfcontained' } else { '_standard' }
         if ($Variant -ne 'Both') { $suffix = '' }
-        $zipPath = Join-Path $distDir "Heimdall.Next_build.${buildNumber}${suffix}.zip"
+        $zipPath = Join-Path $distDir "Heimdall_build.${buildNumber}${suffix}.zip"
         if (Test-Path $zipPath) { $artifacts += $zipPath }
     }
     $installerDir = Join-Path $ProjectRoot 'Dist\installers'
@@ -350,7 +350,7 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     }
 
     # Build release notes
-    $notes = "## Heimdall.Next v${buildNumber}`n`n"
+    $notes = "## Heimdall v${buildNumber}`n`n"
     $notes += "### Downloads`n`n"
     $notes += "| File | Description |`n|------|-------------|`n"
     foreach ($a in $artifacts) {
@@ -398,7 +398,7 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         Invoke-Expression $cmd
 
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "[$label] Release published: https://github.com/VBlackJack/Heimdall.Next/releases/tag/v${buildNumber}" -ForegroundColor Green
+            Write-Host "[$label] Release published: https://github.com/VBlackJack/Heimdall/releases/tag/v${buildNumber}" -ForegroundColor Green
         } else {
             Write-Host "[!] GitHub release creation failed." -ForegroundColor Red
             exit 1

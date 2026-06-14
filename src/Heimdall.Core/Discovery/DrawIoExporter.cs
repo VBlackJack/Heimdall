@@ -31,7 +31,7 @@ public static class DrawIoExporter
     {
         var sb = new StringBuilder();
         sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-        sb.AppendLine("<mxfile host=\"Heimdall.Next\">");
+        sb.AppendLine("<mxfile host=\"Heimdall\">");
         sb.AppendLine($"  <diagram name=\"{EscapeXml(snapshot.Profile.Subnet)} - {snapshot.Timestamp:yyyy-MM-dd HH:mm}\">");
         sb.AppendLine("    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\">");
         sb.AppendLine("      <root>");

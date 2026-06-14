@@ -17,7 +17,7 @@
 | Item | Detail |
 |---|---|
 | 🖥️ The affected machine | The PC where the slow-server RDP cutoff actually reproduces |
-| 🧩 Heimdall.Next installed | A working build that shows the bug |
+| 🧩 Heimdall installed | A working build that shows the bug |
 | 📛 The slow server profile | The exact RDP server profile that triggers the premature cutoff |
 | ⏱️ A visible clock | Phone or taskbar clock, to note times down to the second |
 | 📝 Somewhere to write notes | A text file or paper for the context notes (Step 4) |
@@ -30,7 +30,7 @@
 
 | # | Action |
 |---|---|
-| ☐ 1 | Open **Heimdall.Next** |
+| ☐ 1 | Open **Heimdall** |
 | ☐ 2 | Go to **Settings** |
 | ☐ 3 | Find the logging toggle (labelled something like **Enable logging** / **Diagnostic logging**) → make sure it is **ON** |
 | ☐ 4 | Save / close Settings so the change is applied |
@@ -43,11 +43,11 @@
 
 | # | Action |
 |---|---|
-| ☐ 1 | Close **Heimdall.Next** completely |
-| ☐ 2 | Open the log folder: it is the **`logs`** sub-folder next to the Heimdall.Next executable (right-click the app shortcut → **Open file location** if unsure) |
+| ☐ 1 | Close **Heimdall** completely |
+| ☐ 2 | Open the log folder: it is the **`logs`** sub-folder next to the Heimdall executable (right-click the app shortcut → **Open file location** if unsure) |
 | ☐ 3 | *(Optional)* Move today's existing **`heimdall_<date>.log`** file aside (a fresh one is created on next launch) |
-| ☐ 4 | Re-launch **Heimdall.Next** |
-| ☐ 5 | Confirm a file named **`heimdall_<today's date>.log`** exists and ends with a recent **`Heimdall.Next starting`** line |
+| ☐ 4 | Re-launch **Heimdall** |
+| ☐ 5 | Confirm a file named **`heimdall_<today's date>.log`** exists and ends with a recent **`Heimdall starting`** line |
 
 ### ✅ STEP 3 — Reproduce the cutoff and record the exact times
 
@@ -74,7 +74,7 @@
 | # | Action |
 |---|---|
 | ☐ 1 | Wait about **30 seconds** after the cut (let any retry/teardown finish writing to the file) |
-| ☐ 2 | Close **Heimdall.Next** normally |
+| ☐ 2 | Close **Heimdall** normally |
 | ☐ 3 | In the **`logs`** folder, take **`heimdall_<date>.log`** and copy it under a clear name, e.g. **`heimdall_rdp-slow-cutoff_<date>.log`** |
 | ☐ 4 | Write a short note next to it with: server host, **Embedded/External** mode, connect start time, **cut time**, the on-screen disconnect message, and how long the session was visibly up before it cut |
 | ☐ 5 | Bring both the renamed log file and the note back (this PC is not reachable from the assisted session) |
@@ -95,6 +95,6 @@
 |---|---|
 | No `heimdall_<date>.log` file appears | Logging is still off — re-check the Settings toggle in Step 1, then re-launch |
 | Log file exists but stops before the cut | The app was closed too quickly — wait ~30 s after the cut before closing |
-| Can't find the `logs` folder | It sits next to the Heimdall.Next executable — right-click the shortcut → **Open file location** |
+| Can't find the `logs` folder | It sits next to the Heimdall executable — right-click the shortcut → **Open file location** |
 | The server connected fine, no cutoff | The bug is intermittent — retry, and only keep logs where the cut actually happened |
 | Not sure if it was Embedded or External | External opens a separate **mstsc** window; Embedded shows the session inside a Heimdall tab |

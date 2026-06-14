@@ -1,5 +1,5 @@
 @echo off
-REM Heimdall.Next - One-click release
+REM Heimdall - One-click release
 REM Builds, tests, packages, commits version bump, pushes, and publishes to GitHub.
 REM Usage: double-click or run from terminal.
 

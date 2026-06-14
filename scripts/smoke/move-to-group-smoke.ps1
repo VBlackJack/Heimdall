@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Runs a focused move-to-group UIAutomation smoke test against Heimdall.Next.
+    Runs a focused move-to-group UIAutomation smoke test against Heimdall.
 
 .PARAMETER RunBuild
     Runs dotnet build before the smoke test.

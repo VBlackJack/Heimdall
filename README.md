@@ -8,11 +8,11 @@
       http://www.apache.org/licenses/LICENSE-2.0
 -->
 
-![Heimdall.Next](docs/readme-banner.png)
+![Heimdall](docs/readme-banner.png)
 
-# Heimdall.Next
+# Heimdall
 
-[![CI](https://github.com/VBlackJack/Heimdall.Next/actions/workflows/ci.yml/badge.svg)](https://github.com/VBlackJack/Heimdall.Next/actions/workflows/ci.yml)
+[![CI](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml/badge.svg)](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-6810%20passing-brightgreen.svg)]()
 [![Tools](https://img.shields.io/badge/tools-59%20sysops-blue.svg)]()
@@ -24,7 +24,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 
 ---
 
-## Why Heimdall.Next?
+## Why Heimdall?
 
 - **9 protocols, one interface** --- RDP, SSH, SFTP, VNC, Telnet, FTP, Citrix, WinRM, and local shell sessions in a single tabbed window
 - **Zero-trust credential storage** --- DPAPI encryption + HMAC-SHA256 integrity, PBKDF2 PIN protection, Windows ACL enforcement
@@ -316,7 +316,7 @@ Both editions are available as **installer** (.exe with shortcuts, upgrade detec
 
 ## Quick Start
 
-Download the latest release from the [Releases](../../releases) page. Run the installer or extract the zip and launch `Heimdall.Next.exe`.
+Download the latest release from the [Releases](../../releases) page. Run the installer or extract the zip and launch `Heimdall.exe`.
 
 ---
 
