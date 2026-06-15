@@ -352,6 +352,8 @@ public sealed partial class SessionCoordinatorPreMountTests
             CreateToolControlCalls++;
             return CreateToolControlBehavior?.Invoke(sessionTab, toolId, context, settings) ?? new object();
         }
+
+        public bool TrySendCommandToSession(SessionTabViewModel session, string command) => false;
     }
 
     private sealed class FakeTerminalSession : ITerminalSession

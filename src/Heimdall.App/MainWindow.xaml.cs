@@ -2404,6 +2404,47 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         if (DataContext is not MainViewModel vm) return;
 
+        // Snippet drill-in detail mode owns the keyboard: Enter=send,
+        // Ctrl+Enter=copy, Esc=back, Up/Down=move variant selection. Any other
+        // key falls through so typing in parameter TextBoxes still works.
+        if (vm.CommandPalette.IsSnippetDetailOpen)
+        {
+            if (e.Key == Key.Escape)
+            {
+                vm.CommandPalette.BackFromSnippetDetailCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                vm.CommandPalette.CopySnippetCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                vm.CommandPalette.SendSnippetCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                if (PaletteVariantsList.SelectedIndex < PaletteVariantsList.Items.Count - 1)
+                {
+                    PaletteVariantsList.SelectedIndex++;
+                    PaletteVariantsList.ScrollIntoView(PaletteVariantsList.SelectedItem);
+                }
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                if (PaletteVariantsList.SelectedIndex > 0)
+                {
+                    PaletteVariantsList.SelectedIndex--;
+                    PaletteVariantsList.ScrollIntoView(PaletteVariantsList.SelectedItem);
+                }
+                e.Handled = true;
+            }
+            return;
+        }
+
         if (e.Key == Key.Escape)
         {
             vm.CommandPalette.CloseCommand.Execute(null);
@@ -2440,6 +2481,37 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             }
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Moves keyboard focus to the snippet variants list when the drill-in detail
+    /// panel becomes visible, selecting the first variant if none is selected yet.
+    /// </summary>
+    private void OnSnippetDetailVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (!CommandPalettePopup.IsOpen || !PaletteDetailPanel.IsVisible)
+        {
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input,
+            new Action(FocusSnippetVariants));
+    }
+
+    private void FocusSnippetVariants()
+    {
+        if (!CommandPalettePopup.IsOpen || !PaletteVariantsList.IsVisible)
+        {
+            return;
+        }
+
+        if (PaletteVariantsList.SelectedIndex < 0 && PaletteVariantsList.Items.Count > 0)
+        {
+            PaletteVariantsList.SelectedIndex = 0;
+        }
+
+        _ = PaletteVariantsList.Focus();
     }
 
     /// <summary>

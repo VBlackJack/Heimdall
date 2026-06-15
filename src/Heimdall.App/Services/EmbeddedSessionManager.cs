@@ -1004,20 +1004,42 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         context = (context ?? new ToolContext()) with
         {
             SetBusyAction = busy => sessionTab.IsBusy = busy,
-            SendCommandAction = command =>
-            {
-                foreach (var pane in Core.Models.SplitTreeHelper.EnumerateLeaves(sessionTab.RootContent))
-                {
-                    if (pane.HostControl is Views.EmbeddedSshView sshView)
-                    {
-                        sshView.WriteCommand(command);
-                        return;
-                    }
-                }
-            }
+            SendCommandAction = command => TrySendCommandToSession(sessionTab, command)
         };
 
         view.Initialize(context, _localizer);
         return view;
+    }
+
+    /// <inheritdoc />
+    public bool TrySendCommandToSession(SessionTabViewModel session, string command)
+    {
+        if (session is null) return false;
+
+        return TrySendCommandToFirstSink(session.RootContent, command);
+    }
+
+    /// <summary>
+    /// Pure helper that walks the split tree and forwards the command to the
+    /// first leaf whose host control is an <see cref="ITerminalCommandSink"/>.
+    /// </summary>
+    /// <param name="root">The root of the split pane tree (may be null).</param>
+    /// <param name="command">The command to inject (forwarded as-is).</param>
+    /// <returns>
+    /// <c>true</c> when a sink was found and written to; <c>false</c> when
+    /// <paramref name="root"/> is <c>null</c> or no sink exists in the tree.
+    /// </returns>
+    internal static bool TrySendCommandToFirstSink(ISplitContent? root, string command)
+    {
+        foreach (var pane in SplitTreeHelper.EnumerateLeaves(root))
+        {
+            if (pane.HostControl is ITerminalCommandSink sink)
+            {
+                sink.WriteCommand(command);
+                return true;
+            }
+        }
+
+        return false;
     }
 }

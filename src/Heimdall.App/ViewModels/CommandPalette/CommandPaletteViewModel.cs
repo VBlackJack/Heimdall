@@ -152,6 +152,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     private void Open()
     {
         _splitPaletteSession = null;
+        CloseSnippetDetail();
         Placeholder = _localizer["PaletteSearchPlaceholder"];
         SearchText = string.Empty;
         IsOpen = true;
@@ -167,6 +168,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     /// </summary>
     public void OpenSplit(SessionTabViewModel session, SplitOrientation orientation, string? paneId = null)
     {
+        CloseSnippetDetail();
         _splitPaletteSession = session;
         _splitPaletteOrientation = orientation;
         _splitPalettePaneId = paneId;
@@ -231,16 +233,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
             a => string.Equals(a.PublicId.ToString("N"), publicId, StringComparison.OrdinalIgnoreCase));
         if (action is null) return;
 
-        var payload = ResolveSnippetCommand(action);
-        try
-        {
-            System.Windows.Clipboard.SetText(payload);
-            _main.StatusText = _localizer.Format("PaletteSnippetCopied", action.Title);
-        }
-        catch (Exception ex)
-        {
-            FileLogger.Warn($"Snippet clipboard copy failed: {ex.Message}");
-        }
+        OpenSnippetDetail(action);
     }
 
     /// <summary>Closes the palette and clears any split mode state.</summary>
@@ -248,6 +241,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     private void Close()
     {
         _splitPaletteSession = null;
+        CloseSnippetDetail();
         IsOpen = false;
     }
 
@@ -261,19 +255,19 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     /// </summary>
     public void ExecuteSelection(ServerItemViewModel item)
     {
+        // Snippets open an in-palette detail view — keep the palette open.
+        if (item.Id.StartsWith("snippet-", StringComparison.Ordinal))
+        {
+            HandleSnippetSelection(item);
+            return;
+        }
+
         var splitSession = _splitPaletteSession;
         var splitOrientation = _splitPaletteOrientation;
         var splitPaneId = _splitPalettePaneId;
         _splitPaletteSession = null;
         _splitPalettePaneId = null;
         IsOpen = false;
-
-        // Snippets are clipboard-only — never split or connect.
-        if (item.Id.StartsWith("snippet-", StringComparison.Ordinal))
-        {
-            HandleSnippetSelection(item);
-            return;
-        }
 
         if (splitSession is not null)
         {
@@ -314,19 +308,19 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     {
         if (server is null) return;
 
+        // Snippets open an in-palette detail view — keep the palette open.
+        if (server.Id.StartsWith("snippet-", StringComparison.Ordinal))
+        {
+            HandleSnippetSelection(server);
+            return;
+        }
+
         var splitSession = _splitPaletteSession;
         var splitOrientation = _splitPaletteOrientation;
         var splitPaneId = _splitPalettePaneId;
         _splitPaletteSession = null;
         _splitPalettePaneId = null;
         IsOpen = false;
-
-        // Snippets are clipboard-only — never split or connect.
-        if (server.Id.StartsWith("snippet-", StringComparison.Ordinal))
-        {
-            HandleSnippetSelection(server);
-            return;
-        }
 
         // If the palette was opened in split mode, route to split logic
         if (splitSession is not null && !server.Id.StartsWith("adhoc-", StringComparison.Ordinal))
@@ -410,14 +404,15 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     private async Task ConnectSplitFromPaletteAsync(ServerItemViewModel? server)
     {
         if (server is null) return;
-        IsOpen = false;
 
-        // Snippets are clipboard-only — never split or connect.
+        // Snippets open an in-palette detail view — keep the palette open.
         if (server.Id.StartsWith("snippet-", StringComparison.Ordinal))
         {
             HandleSnippetSelection(server);
             return;
         }
+
+        IsOpen = false;
 
         if (server.Id.StartsWith("tool-", StringComparison.Ordinal))
         {

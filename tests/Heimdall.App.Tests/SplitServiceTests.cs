@@ -1299,5 +1299,7 @@ public sealed class SplitServiceTests : IDisposable
         {
             throw new NotSupportedException();
         }
+
+        public bool TrySendCommandToSession(SessionTabViewModel session, string command) => false;
     }
 }

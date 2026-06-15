@@ -125,4 +125,18 @@ public interface IEmbeddedSessionManager
         string toolId,
         ToolContext? context,
         AppSettings? settings = null);
+
+    /// <summary>
+    /// Injects a command into the first terminal pane of the given session.
+    /// Walks the session's split tree and forwards the command to the first
+    /// leaf whose host control is an <see cref="ITerminalCommandSink"/>.
+    /// </summary>
+    /// <param name="session">The session whose terminal should receive the command.</param>
+    /// <param name="command">The command to inject (forwarded as-is).</param>
+    /// <returns>
+    /// <c>true</c> when a terminal sink was found and the command was written;
+    /// <c>false</c> when <paramref name="session"/> is <c>null</c> or no pane
+    /// can accept a command (e.g. an RDP-only session).
+    /// </returns>
+    bool TrySendCommandToSession(SessionTabViewModel session, string command);
 }

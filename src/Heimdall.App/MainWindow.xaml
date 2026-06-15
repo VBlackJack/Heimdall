@@ -3600,6 +3600,19 @@
                     <DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.4" Direction="270"/>
                 </Border.Effect>
                 <StackPanel>
+                  <!-- Search panel: the default Ctrl+K result list. Hidden while
+                       the snippet drill-in detail panel is shown. -->
+                  <StackPanel x:Name="PaletteSearchPanel">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CommandPalette.IsSnippetDetailOpen}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <TextBlock x:Name="PaletteModeLabel"
                                Text=""
                                FontSize="{StaticResource FontSizeCaption}"
@@ -3776,6 +3789,155 @@
                     <TextBlock x:Name="Mw_PaletteHints" Text="{loc:Translate QuickConnectHints}"
                                FontSize="{StaticResource FontSizeCaption}" Padding="14,6"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
+                  </StackPanel>
+                  <!-- Snippet drill-in detail: pick among related command variants,
+                       fill template parameters inline, then send/copy. Shown only in
+                       detail mode (IsSnippetDetailOpen). -->
+                  <StackPanel x:Name="PaletteDetailPanel"
+                              IsVisibleChanged="OnSnippetDetailVisibleChanged"
+                              Visibility="{Binding CommandPalette.IsSnippetDetailOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{Binding CommandPalette.SnippetDetailTitle}"
+                               FontSize="{StaticResource FontSizeSubtitle}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               Padding="14,8"/>
+                    <Border Height="1" Background="{DynamicResource BorderBrush}"/>
+
+                    <TextBlock Text="{loc:Translate PaletteSnippetVariantsHeader}"
+                               FontSize="{StaticResource FontSizeSmallCaption}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Opacity="0.85"
+                               Padding="14,8,14,4"/>
+                    <ListBox x:Name="PaletteVariantsList"
+                             ItemsSource="{Binding CommandPalette.SnippetVariants}"
+                             SelectedItem="{Binding CommandPalette.SelectedSnippetVariant}"
+                             MaxHeight="160"
+                             Margin="6,0"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.Name="{loc:Translate PaletteSnippetVariantsHeader}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="10,6">
+                                    <TextBlock Text="{Binding DisplayLabel}"
+                                               FontSize="{StaticResource FontSizeBody}"
+                                               FontWeight="Medium"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding PreviewCommand}"
+                                               FontSize="{StaticResource FontSizeCaption}"
+                                               FontFamily="{StaticResource FontFamilyMonospace}"
+                                               Foreground="{DynamicResource TextDisabledBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               HorizontalAlignment="Left"
+                                               MaxWidth="620"
+                                               Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="2,0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Bd"
+                                                    Background="{TemplateBinding Background}"
+                                                    CornerRadius="{StaticResource CornerRadiusSm}"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background"
+                                                            Value="{DynamicResource CardBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background"
+                                                            Value="{DynamicResource HighlightBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+
+                    <!-- Inline template parameters (template variants only). -->
+                    <StackPanel Visibility="{Binding CommandPalette.SnippetHasParameters, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{loc:Translate PaletteSnippetParametersHeader}"
+                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Opacity="0.85"
+                                   Padding="14,8,14,4"/>
+                        <ItemsControl ItemsSource="{Binding CommandPalette.SnippetParameters}"
+                                      Margin="14,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,4">
+                                        <TextBlock Text="{Binding DisplayLabel}"
+                                                   ToolTip="{Binding DisplayTooltip}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="0,0,0,2"/>
+                                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{Binding DisplayTooltip}"
+                                                 FontSize="{StaticResource FontSizeBody}"
+                                                 Padding="8,6"
+                                                 Background="{DynamicResource CardBrush}"
+                                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                                 BorderBrush="{DynamicResource BorderBrush}"
+                                                 BorderThickness="1"
+                                                 AutomationProperties.Name="{Binding DisplayLabel}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- Generated command preview (read-only, selectable). -->
+                    <TextBlock Text="{loc:Translate PaletteSnippetPreviewHeader}"
+                               FontSize="{StaticResource FontSizeSmallCaption}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Opacity="0.85"
+                               Padding="14,8,14,4"/>
+                    <TextBox Text="{Binding CommandPalette.SnippetGeneratedCommand, Mode=OneWay}"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
+                             FontSize="{StaticResource FontSizeBody}"
+                             Margin="14,0"
+                             Padding="8,6"
+                             Background="{DynamicResource CardBrush}"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             BorderThickness="1"
+                             AutomationProperties.Name="{loc:Translate PaletteSnippetPreviewHeader}"/>
+
+                    <TextBlock Text="{Binding CommandPalette.SnippetValidationError}"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               Foreground="{DynamicResource WarningBrush}"
+                               TextWrapping="Wrap"
+                               Margin="14,6,14,0"
+                               Visibility="{Binding CommandPalette.SnippetValidationError, Converter={StaticResource NullToVisibilityConverter}}"/>
+
+                    <TextBlock Text="{loc:Translate PaletteSnippetDetailHints}"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               Padding="14,6"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                  </StackPanel>
                 </StackPanel>
             </Border>
         </Popup>
