@@ -110,6 +110,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private DispatcherTimer? _stabilizationTimer;
     private DispatcherTimer? _reconnectElapsedTimer;
     private DispatcherTimer? _connectWatchdogTimer;
+    private bool _watchdogCredentialWaitActive;
     private RdpActiveXHost? _rdpHost;
     private RdpRedirectionOptions? _pendingRedirections;
     private ServerProfileDto? _server;
@@ -1719,6 +1720,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         Dispatcher.Invoke(() =>
         {
+            _watchdogCredentialWaitActive = false;
             CancelAutofill();
             _autofillRetryContext = null;
             UpdateAutofillState(RdpAutofillState.None);
@@ -1964,7 +1966,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
     private async Task TryAutofillCredentialsAsync(string password, string hostHint, CancellationToken cancellationToken)
     {
-        Dispatcher.Invoke(() => UpdateAutofillState(RdpAutofillState.Searching));
+        Dispatcher.Invoke(() =>
+        {
+            UpdateAutofillState(RdpAutofillState.Searching);
+            ArmStageTwoConnectWatchdog();
+        });
 
         try
         {
@@ -2201,6 +2207,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _connectionPhase = newPhase;
         if (RdpConnectWatchdogPolicy.ShouldCancel(newPhase))
         {
+            _watchdogCredentialWaitActive = false;
             StopConnectWatchdog();
         }
         else if (RdpConnectWatchdogPolicy.ShouldArm(newPhase))
@@ -3747,7 +3754,25 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         int configuredTimeoutMs = _settings?.RdpConnectWatchdogTimeoutMs
             ?? RdpConnectWatchdogPolicy.DefaultTimeoutMs;
-        int timeoutMs = RdpConnectWatchdogPolicy.ResolveTimeoutMs(configuredTimeoutMs);
+
+        int timeoutMs;
+        string stage;
+        if (_watchdogCredentialWaitActive)
+        {
+            // Stage 2: the credential-autofill watcher is searching, so the RDP stack
+            // is reachable and we are blocked on the remote NLA prompt. Extend the
+            // budget past the autofill timeout so its graceful retry runs first.
+            int autofillTimeoutMs = _settings?.RdpCredentialAutofillTimeoutMs ?? 90000;
+            timeoutMs = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(configuredTimeoutMs, autofillTimeoutMs);
+            stage = "two";
+        }
+        else
+        {
+            // Stage 1: short budget to fail fast on a dead tunnel / stalled pre-negotiation.
+            timeoutMs = RdpConnectWatchdogPolicy.ResolveTimeoutMs(configuredTimeoutMs);
+            stage = "one";
+        }
+
         if (timeoutMs == RdpConnectWatchdogPolicy.DisabledTimeoutMs)
         {
             Core.Logging.FileLogger.Info("RDP connect watchdog disabled");
@@ -3761,7 +3786,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             Dispatcher);
         _connectWatchdogTimer.Start();
         Core.Logging.FileLogger.Info(
-            $"RDP connect watchdog started phase={_connectionPhase} timeoutMs={timeoutMs}");
+            $"RDP connect watchdog started phase={_connectionPhase} stage={stage} timeoutMs={timeoutMs}");
     }
 
     private void StopConnectWatchdog()
@@ -3775,6 +3800,25 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _connectWatchdogTimer.Tick -= OnConnectWatchdogTick;
         _connectWatchdogTimer = null;
         Core.Logging.FileLogger.Info("RDP connect watchdog stopped");
+    }
+
+    /// <summary>
+    /// Promotes the connect watchdog to Stage 2 once the credential-autofill watcher
+    /// starts searching for the remote NLA prompt. Re-arms the watchdog with the
+    /// longer credential-wait budget only when one is currently armed and the phase
+    /// is still arming; otherwise it just records the credential-wait state.
+    /// </summary>
+    private void ArmStageTwoConnectWatchdog()
+    {
+        _watchdogCredentialWaitActive = true;
+
+        if (_connectWatchdogTimer is null || !RdpConnectWatchdogPolicy.ShouldArm(_connectionPhase))
+        {
+            return;
+        }
+
+        StopConnectWatchdog();
+        StartConnectWatchdog();
     }
 
     private void OnConnectWatchdogTick(object? sender, EventArgs e)
@@ -3794,6 +3838,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         RdpConnectionPhase expiredPhase = _connectionPhase;
         Core.Logging.FileLogger.Warn(
             $"EmbeddedRDP connect watchdog expired phase={expiredPhase}");
+        _watchdogCredentialWaitActive = false;
         StopConnectWatchdog();
 
         if (_rdpHost is not null)

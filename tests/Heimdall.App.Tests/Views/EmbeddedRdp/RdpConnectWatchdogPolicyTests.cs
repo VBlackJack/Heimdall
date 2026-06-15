@@ -82,4 +82,59 @@ public sealed class RdpConnectWatchdogPolicyTests
 
         Assert.Equal(expected, actual);
     }
+
+    // Producer: src/Heimdall.App/Views/EmbeddedRdp/RdpConnectWatchdogPolicy.cs:57
+    // ResolveStageTwoTimeoutMs picks max(watchdog, autofill) + grace, clamped.
+    [Fact]
+    public void ResolveStageTwoTimeoutMs_WhenAutofillExceedsWatchdog_UsesAutofillPlusGrace()
+    {
+        int actual = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(45_000, 90_000);
+
+        Assert.Equal(90_000 + RdpConnectWatchdogPolicy.CredentialWaitGraceMs, actual);
+    }
+
+    // Producer: src/Heimdall.App/Views/EmbeddedRdp/RdpConnectWatchdogPolicy.cs:57
+    [Fact]
+    public void ResolveStageTwoTimeoutMs_WhenWatchdogExceedsAutofill_UsesWatchdogPlusGrace()
+    {
+        int actual = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(120_000, 90_000);
+
+        Assert.Equal(120_000 + RdpConnectWatchdogPolicy.CredentialWaitGraceMs, actual);
+    }
+
+    // Producer: src/Heimdall.App/Views/EmbeddedRdp/RdpConnectWatchdogPolicy.cs:57
+    // The grace addition must never push the budget past MaxTimeoutMs.
+    [Fact]
+    public void ResolveStageTwoTimeoutMs_ClampsToMaxTimeoutMs()
+    {
+        int actual = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(600_000, 600_000);
+
+        Assert.Equal(RdpConnectWatchdogPolicy.MaxTimeoutMs, actual);
+    }
+
+    // Producer: src/Heimdall.App/Views/EmbeddedRdp/RdpConnectWatchdogPolicy.cs:57
+    // A disabled watchdog (configured <= 0) stays disabled and is never re-armed.
+    [Theory]
+    [InlineData(0, 90_000)]
+    [InlineData(-1, 90_000)]
+    public void ResolveStageTwoTimeoutMs_WhenWatchdogDisabled_ReturnsDisabled(int configured, int autofill)
+    {
+        int actual = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(configured, autofill);
+
+        Assert.Equal(RdpConnectWatchdogPolicy.DisabledTimeoutMs, actual);
+    }
+
+    // Producer: src/Heimdall.App/Views/EmbeddedRdp/RdpConnectWatchdogPolicy.cs:57
+    // Total over the full int range: negative autofill and overflow-prone inputs
+    // are clamped without throwing.
+    [Theory]
+    [InlineData(45_000, -1, 45_000 + 15_000)]
+    [InlineData(int.MaxValue, int.MaxValue, 600_000)]
+    [InlineData(10_000, int.MaxValue, 600_000)]
+    public void ResolveStageTwoTimeoutMs_IsTotalAndClamped(int configured, int autofill, int expected)
+    {
+        int actual = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(configured, autofill);
+
+        Assert.Equal(expected, actual);
+    }
 }
