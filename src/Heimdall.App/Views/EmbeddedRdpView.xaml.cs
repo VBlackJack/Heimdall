@@ -111,6 +111,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private DispatcherTimer? _reconnectElapsedTimer;
     private DispatcherTimer? _connectWatchdogTimer;
     private bool _watchdogCredentialWaitActive;
+    private bool _connectAbandonedByWatchdog;
     private RdpActiveXHost? _rdpHost;
     private RdpRedirectionOptions? _pendingRedirections;
     private ServerProfileDto? _server;
@@ -1433,6 +1434,9 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         try
         {
+            // Fresh attempt: clear any prior watchdog abandonment so this connect
+            // can promote normally and is not refused by the late-connect guard.
+            _connectAbandonedByWatchdog = false;
             _beginConnectAttempt++;
             Core.Logging.FileLogger.Info(
                 $"EmbeddedRDP BeginConnect attempt={_beginConnectAttempt} viewVisible={IsVisible} formsVisible={FormsHost.IsVisible} formsSize={FormsHost.ActualWidth:0.##}x{FormsHost.ActualHeight:0.##} surfaceSize={SurfaceContainer.ActualWidth:0.##}x{SurfaceContainer.ActualHeight:0.##}");
@@ -1587,6 +1591,26 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
+        // A connect that completes after the watchdog already abandoned the attempt
+        // must not be promoted to Connected (zombie session behind the error overlay).
+        // Hard-disconnect the COM and leave the timeout error state untouched.
+        if (_connectAbandonedByWatchdog)
+        {
+            Core.Logging.FileLogger.Info(
+                "EmbeddedRDP OnConnected ignored: attempt abandoned by connect watchdog");
+            try
+            {
+                _rdpHost?.Disconnect();
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"EmbeddedRDP abandoned-connect disconnect failed: {ex.Message}");
+            }
+
+            return;
+        }
+
         _comDrivenStatusActive = true;
         _lastExtendedDisconnectReason = RdpActiveXHost.NoExtendedDisconnectReason;
         TryTransitionConnectionState(ConnectionState.Connected);
@@ -1710,6 +1734,19 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             $"EmbeddedRDP OnDisconnected fired: reason={reason} extendedReason={extendedReason}");
         if (_disposed)
         {
+            return;
+        }
+
+        // This disconnect was triggered by the watchdog aborting the COM connect.
+        // The connect-timeout error UI is already shown; run no further teardown so
+        // the normal overlay/status/diagnostic path does not overwrite it. The flag
+        // stays set (reset only on a fresh BeginConnect) so a still-pending late
+        // OnConnected remains refused.
+        if (_connectAbandonedByWatchdog)
+        {
+            Core.Logging.FileLogger.Info(
+                $"EmbeddedRDP OnDisconnected from watchdog abort: reason={reason}; preserving connect-timeout error state");
+            _userInitiatedDisconnect = false;
             return;
         }
 
@@ -3861,6 +3898,20 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         SetPaneDiagnostic(RdpHostDiagnosticFactory.FromConnectTimeout());
         UpdateSessionStatus(RdpSessionStatus.Error);
         ShowReconnectOverlay();
+
+        // Abandon the attempt and abort the underlying COM connect so a late
+        // OnConnected cannot resurrect this torn-down session. The error UI above
+        // is already in place; OnRdpDisconnected preserves it for the abort path.
+        _connectAbandonedByWatchdog = true;
+        try
+        {
+            Core.Logging.FileLogger.Info("EmbeddedRDP watchdog aborting in-progress COM connect");
+            _rdpHost?.Disconnect();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedRDP watchdog abort disconnect failed: {ex.Message}");
+        }
     }
 
     [SupportedOSPlatform("windows")]
