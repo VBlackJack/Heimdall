@@ -110,6 +110,8 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private DispatcherTimer? _stabilizationTimer;
     private DispatcherTimer? _reconnectElapsedTimer;
     private DispatcherTimer? _connectWatchdogTimer;
+    private bool _watchdogCredentialWaitActive;
+    private bool _connectAbandonedByWatchdog;
     private RdpActiveXHost? _rdpHost;
     private RdpRedirectionOptions? _pendingRedirections;
     private ServerProfileDto? _server;
@@ -1432,6 +1434,9 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         try
         {
+            // Fresh attempt: clear any prior watchdog abandonment so this connect
+            // can promote normally and is not refused by the late-connect guard.
+            _connectAbandonedByWatchdog = false;
             _beginConnectAttempt++;
             Core.Logging.FileLogger.Info(
                 $"EmbeddedRDP BeginConnect attempt={_beginConnectAttempt} viewVisible={IsVisible} formsVisible={FormsHost.IsVisible} formsSize={FormsHost.ActualWidth:0.##}x{FormsHost.ActualHeight:0.##} surfaceSize={SurfaceContainer.ActualWidth:0.##}x{SurfaceContainer.ActualHeight:0.##}");
@@ -1586,6 +1591,26 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
+        // A connect that completes after the watchdog already abandoned the attempt
+        // must not be promoted to Connected (zombie session behind the error overlay).
+        // Hard-disconnect the COM and leave the timeout error state untouched.
+        if (_connectAbandonedByWatchdog)
+        {
+            Core.Logging.FileLogger.Info(
+                "EmbeddedRDP OnConnected ignored: attempt abandoned by connect watchdog");
+            try
+            {
+                _rdpHost?.Disconnect();
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"EmbeddedRDP abandoned-connect disconnect failed: {ex.Message}");
+            }
+
+            return;
+        }
+
         _comDrivenStatusActive = true;
         _lastExtendedDisconnectReason = RdpActiveXHost.NoExtendedDisconnectReason;
         TryTransitionConnectionState(ConnectionState.Connected);
@@ -1712,6 +1737,19 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
+        // This disconnect was triggered by the watchdog aborting the COM connect.
+        // The connect-timeout error UI is already shown; run no further teardown so
+        // the normal overlay/status/diagnostic path does not overwrite it. The flag
+        // stays set (reset only on a fresh BeginConnect) so a still-pending late
+        // OnConnected remains refused.
+        if (_connectAbandonedByWatchdog)
+        {
+            Core.Logging.FileLogger.Info(
+                $"EmbeddedRDP OnDisconnected from watchdog abort: reason={reason}; preserving connect-timeout error state");
+            _userInitiatedDisconnect = false;
+            return;
+        }
+
         var wasUserInitiated = _userInitiatedDisconnect;
         _userInitiatedDisconnect = false;
         var suppressOverlay = ShouldSuppressReconnectOverlay(wasUserInitiated, reason);
@@ -1719,6 +1757,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         Dispatcher.Invoke(() =>
         {
+            _watchdogCredentialWaitActive = false;
             CancelAutofill();
             _autofillRetryContext = null;
             UpdateAutofillState(RdpAutofillState.None);
@@ -1964,7 +2003,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
     private async Task TryAutofillCredentialsAsync(string password, string hostHint, CancellationToken cancellationToken)
     {
-        Dispatcher.Invoke(() => UpdateAutofillState(RdpAutofillState.Searching));
+        Dispatcher.Invoke(() =>
+        {
+            UpdateAutofillState(RdpAutofillState.Searching);
+            ArmStageTwoConnectWatchdog();
+        });
 
         try
         {
@@ -2201,6 +2244,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _connectionPhase = newPhase;
         if (RdpConnectWatchdogPolicy.ShouldCancel(newPhase))
         {
+            _watchdogCredentialWaitActive = false;
             StopConnectWatchdog();
         }
         else if (RdpConnectWatchdogPolicy.ShouldArm(newPhase))
@@ -3747,7 +3791,25 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         int configuredTimeoutMs = _settings?.RdpConnectWatchdogTimeoutMs
             ?? RdpConnectWatchdogPolicy.DefaultTimeoutMs;
-        int timeoutMs = RdpConnectWatchdogPolicy.ResolveTimeoutMs(configuredTimeoutMs);
+
+        int timeoutMs;
+        string stage;
+        if (_watchdogCredentialWaitActive)
+        {
+            // Stage 2: the credential-autofill watcher is searching, so the RDP stack
+            // is reachable and we are blocked on the remote NLA prompt. Extend the
+            // budget past the autofill timeout so its graceful retry runs first.
+            int autofillTimeoutMs = _settings?.RdpCredentialAutofillTimeoutMs ?? 90000;
+            timeoutMs = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(configuredTimeoutMs, autofillTimeoutMs);
+            stage = "two";
+        }
+        else
+        {
+            // Stage 1: short budget to fail fast on a dead tunnel / stalled pre-negotiation.
+            timeoutMs = RdpConnectWatchdogPolicy.ResolveTimeoutMs(configuredTimeoutMs);
+            stage = "one";
+        }
+
         if (timeoutMs == RdpConnectWatchdogPolicy.DisabledTimeoutMs)
         {
             Core.Logging.FileLogger.Info("RDP connect watchdog disabled");
@@ -3761,7 +3823,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             Dispatcher);
         _connectWatchdogTimer.Start();
         Core.Logging.FileLogger.Info(
-            $"RDP connect watchdog started phase={_connectionPhase} timeoutMs={timeoutMs}");
+            $"RDP connect watchdog started phase={_connectionPhase} stage={stage} timeoutMs={timeoutMs}");
     }
 
     private void StopConnectWatchdog()
@@ -3775,6 +3837,25 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _connectWatchdogTimer.Tick -= OnConnectWatchdogTick;
         _connectWatchdogTimer = null;
         Core.Logging.FileLogger.Info("RDP connect watchdog stopped");
+    }
+
+    /// <summary>
+    /// Promotes the connect watchdog to Stage 2 once the credential-autofill watcher
+    /// starts searching for the remote NLA prompt. Re-arms the watchdog with the
+    /// longer credential-wait budget only when one is currently armed and the phase
+    /// is still arming; otherwise it just records the credential-wait state.
+    /// </summary>
+    private void ArmStageTwoConnectWatchdog()
+    {
+        _watchdogCredentialWaitActive = true;
+
+        if (_connectWatchdogTimer is null || !RdpConnectWatchdogPolicy.ShouldArm(_connectionPhase))
+        {
+            return;
+        }
+
+        StopConnectWatchdog();
+        StartConnectWatchdog();
     }
 
     private void OnConnectWatchdogTick(object? sender, EventArgs e)
@@ -3794,6 +3875,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         RdpConnectionPhase expiredPhase = _connectionPhase;
         Core.Logging.FileLogger.Warn(
             $"EmbeddedRDP connect watchdog expired phase={expiredPhase}");
+        _watchdogCredentialWaitActive = false;
         StopConnectWatchdog();
 
         if (_rdpHost is not null)
@@ -3816,6 +3898,20 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         SetPaneDiagnostic(RdpHostDiagnosticFactory.FromConnectTimeout());
         UpdateSessionStatus(RdpSessionStatus.Error);
         ShowReconnectOverlay();
+
+        // Abandon the attempt and abort the underlying COM connect so a late
+        // OnConnected cannot resurrect this torn-down session. The error UI above
+        // is already in place; OnRdpDisconnected preserves it for the abort path.
+        _connectAbandonedByWatchdog = true;
+        try
+        {
+            Core.Logging.FileLogger.Info("EmbeddedRDP watchdog aborting in-progress COM connect");
+            _rdpHost?.Disconnect();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedRDP watchdog abort disconnect failed: {ex.Message}");
+        }
     }
 
     [SupportedOSPlatform("windows")]
