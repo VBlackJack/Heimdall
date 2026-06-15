@@ -449,10 +449,8 @@
                                   PreviewMouseRightButtonDown="OnTreeViewPreviewMouseRightButtonDown"
                                   PreviewKeyDown="OnSessionTreeViewPreviewKeyDown"
                                   ContextMenuOpening="OnTreeViewContextMenuOpening"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                  ScrollViewer.CanContentScroll="True"
-                                  VirtualizingPanel.IsVirtualizing="True"
-                                  VirtualizingPanel.VirtualizationMode="Recycling">
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.CanContentScroll="False">
                             <TreeView.Resources>
                                 <!-- Folder node template (recursive — unlimited nesting) -->
                                 <HierarchicalDataTemplate DataType="{x:Type vm:FolderViewModel}"
@@ -539,10 +537,9 @@
                                             </Ellipse>
                                             <!-- Server name -->
                                             <TextBlock Grid.Column="2"
-                                                       Text="{Binding SidebarDisplayName}" FontSize="{StaticResource FontSizeBody}"
+                                                       Text="{Binding DisplayName}" FontSize="{StaticResource FontSizeBody}"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis"/>
+                                                       VerticalAlignment="Center"/>
                                             <StackPanel Grid.Column="3"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center">
@@ -616,6 +613,9 @@
                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                     <Setter Property="Padding" Value="1,1"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <!-- Size each row to its content (not the panel width) so long
+                                         names overflow and the horizontal scrollbar can reveal them. -->
+                                    <Setter Property="HorizontalAlignment" Value="Left"/>
                                     <Setter Property="Template">
                                         <Setter.Value>
                                             <ControlTemplate TargetType="{x:Type TreeViewItem}">
