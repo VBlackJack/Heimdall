@@ -892,7 +892,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 **Solution**: `Services/HeimdallThemeService.cs` is Heimdall's compatibility wrapper around `ThemeForge.Theme.ThemeService`.
 
-- **Package source**: Heimdall consumes `ThemeForge.Theme` from the private GitHub Packages NuGet feed. ThemeForge owns the 16 palette dictionaries and injects the active palette into `Application.Resources.MergedDictionaries`.
+- **Package source**: Heimdall consumes `ThemeForge.Theme` from the public nuget.org feed (anonymous restore; no token). ThemeForge owns the 16 palette dictionaries and injects the active palette into `Application.Resources.MergedDictionaries`.
 - **Singleton DI**: registered once in `App.xaml.cs`, injected into `MainWindow`, `MainViewModel`, and `EmbeddedEditorView`.
 - **`ApplyTheme(string? themeName)`**: resolves the persisted value to a ThemeForge id. Unknown values fall back to `Drakul` and are persisted via `ConfigManager.MergeSettingAsync`. The swap itself is delegated to ThemeForge, then Heimdall reapplies the DWM title-bar mode on every open `Window` via `WindowThemeHelper.ApplyCurrentTheme`.
 - **Bridge refresh**: `Themes/HeimdallThemeBridge.xaml` maps 74 Heimdall brush keys onto ThemeForge color slots. `RefreshHeimdallBridge` re-merges this dictionary after each ThemeForge swap because a shared `SolidColorBrush` resource does not live-update its `DynamicResource` `Color`.

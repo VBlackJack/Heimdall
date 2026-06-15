@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-15 — ThemeForge public feed and honest CI formatting gate
+
+Dependency and CI hygiene; no application code change.
+
+- **ThemeForge dependency** — migrated to `ThemeForge.Theme` 2.0.0, restored
+  from the public nuget.org feed. The private GitHub Packages source, its NuGet
+  credentials and the `THEMEFORGE_PACKAGES_TOKEN` CI secret were removed, so the
+  restore is now anonymous. The consumed API surface was unchanged.
+- **CI formatting gate** — `dotnet format` previously ran before any build, so
+  the WPF project Heimdall.App failed to load (its XAML markup compiler needs
+  referenced assemblies on disk) and was silently skipped while the step still
+  exited 0. A Debug build now runs before the format check, and the SDK is
+  pinned via a new `global.json` (10.0.103, `rollForward` `latestPatch`) so CI
+  runs the gate under a verified feature band.
+
 ## 2026-06-11 — Quality audit fix pass (v2026.061101)
 
 Audit-fix release following the June 10, 2026 quality pass.
