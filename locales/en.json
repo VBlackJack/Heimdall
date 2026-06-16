@@ -3464,6 +3464,7 @@
   "PaletteVariantExampleLinux": "Linux example {0}",
   "PaletteSnippetVariantsHeader": "Commands",
   "PaletteSnippetParametersHeader": "Parameters",
+  "PaletteSnippetNotesHeader": "Notes",
   "PaletteSnippetPreviewHeader": "Command",
   "PaletteSnippetDetailHints": "Enter: send · Ctrl+Enter: copy · Esc: back",
   "PaletteQuickConnectHeader": "Quick Connect",

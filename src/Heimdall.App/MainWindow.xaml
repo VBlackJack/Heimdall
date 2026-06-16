@@ -3802,7 +3802,53 @@
                                Foreground="{DynamicResource AccentBrush}"
                                TextTrimming="CharacterEllipsis"
                                Padding="14,8"/>
+
+                    <!-- Action explanation: description + risk / platform badges (from CommandPresentationResolver). -->
+                    <TextBlock Text="{Binding CommandPalette.SnippetDetailDescription}"
+                               Visibility="{Binding CommandPalette.SnippetHasDescription, Converter={StaticResource BoolToVisibilityConverter}}"
+                               TextWrapping="Wrap"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Padding="14,0,14,6"/>
+                    <StackPanel Orientation="Horizontal" Margin="14,0,14,6">
+                        <Border CornerRadius="{StaticResource CornerRadiusSm}"
+                                Padding="4,1"
+                                VerticalAlignment="Center"
+                                Margin="0,0,6,0"
+                                ToolTip="{Binding CommandPalette.SnippetDetailRiskLabel}">
+                            <Border.Background>
+                                <MultiBinding Converter="{StaticResource ResourceKeyToBrushConverter}">
+                                    <Binding Path="CommandPalette.SnippetDetailRiskBrushKey"/>
+                                    <Binding Path="DataContext.ThemeRevision" ElementName="MainWindowRoot"/>
+                                </MultiBinding>
+                            </Border.Background>
+                            <TextBlock Text="{Binding CommandPalette.SnippetDetailRiskBadge}"
+                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource BadgeTextBrush}"/>
+                        </Border>
+                        <TextBlock Text="{Binding CommandPalette.SnippetDetailPlatformLabel}"
+                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
                     <Border Height="1" Background="{DynamicResource BorderBrush}"/>
+
+                    <!-- Notes (collapsed when the action has none). -->
+                    <StackPanel Visibility="{Binding CommandPalette.SnippetHasNotes, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{loc:Translate PaletteSnippetNotesHeader}"
+                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Opacity="0.85"
+                                   Padding="14,8,14,4"/>
+                        <TextBlock Text="{Binding CommandPalette.SnippetDetailNotes}"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Padding="14,0,14,4"/>
+                    </StackPanel>
 
                     <TextBlock Text="{loc:Translate PaletteSnippetVariantsHeader}"
                                FontSize="{StaticResource FontSizeSmallCaption}"

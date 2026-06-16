@@ -78,6 +78,40 @@ public sealed partial class CommandPaletteViewModel
     /// <summary>True when the active variant exposes editable template parameters.</summary>
     public bool SnippetHasParameters => SnippetParameters.Count > 0;
 
+    // ── Action explanation (from CommandPresentationResolver) ─────────
+
+    /// <summary>Localized description of the action being drilled into (empty when none).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SnippetHasDescription))]
+    private string _snippetDetailDescription = string.Empty;
+
+    /// <summary>Additional notes for the action being drilled into (empty when none).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SnippetHasNotes))]
+    private string _snippetDetailNotes = string.Empty;
+
+    /// <summary>Localized long-form risk label, shown as the risk badge tooltip.</summary>
+    [ObservableProperty]
+    private string _snippetDetailRiskLabel = string.Empty;
+
+    /// <summary>Localized short risk badge text.</summary>
+    [ObservableProperty]
+    private string _snippetDetailRiskBadge = string.Empty;
+
+    /// <summary>Theme resource key for the brush representing the risk level.</summary>
+    [ObservableProperty]
+    private string _snippetDetailRiskBrushKey = string.Empty;
+
+    /// <summary>Localized platform label (Windows / Linux / Both).</summary>
+    [ObservableProperty]
+    private string _snippetDetailPlatformLabel = string.Empty;
+
+    /// <summary>True when the drilled-in action exposes a description.</summary>
+    public bool SnippetHasDescription => !string.IsNullOrEmpty(SnippetDetailDescription);
+
+    /// <summary>True when the drilled-in action exposes notes.</summary>
+    public bool SnippetHasNotes => !string.IsNullOrEmpty(SnippetDetailNotes);
+
     // ── Variant selection ────────────────────────────────────────────
 
     /// <summary>
@@ -194,6 +228,15 @@ public sealed partial class CommandPaletteViewModel
         _snippetGenerator = _snippetScope.ServiceProvider.GetRequiredService<ICommandGeneratorService>();
 
         SnippetDetailTitle = action.Title;
+
+        var presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key]);
+        SnippetDetailDescription = presentation.Description;
+        SnippetDetailNotes = presentation.Notes;
+        SnippetDetailRiskLabel = presentation.RiskLabel;
+        SnippetDetailRiskBadge = presentation.RiskBadge;
+        SnippetDetailRiskBrushKey = presentation.RiskBrushKey;
+        SnippetDetailPlatformLabel = presentation.PlatformLabel;
+
         foreach (var variant in variants)
         {
             SnippetVariants.Add(new SnippetVariantDisplayItem
@@ -223,6 +266,12 @@ public sealed partial class CommandPaletteViewModel
         SnippetParameters.Clear();
         SnippetVariants.Clear();
         SnippetDetailTitle = string.Empty;
+        SnippetDetailDescription = string.Empty;
+        SnippetDetailNotes = string.Empty;
+        SnippetDetailRiskLabel = string.Empty;
+        SnippetDetailRiskBadge = string.Empty;
+        SnippetDetailRiskBrushKey = string.Empty;
+        SnippetDetailPlatformLabel = string.Empty;
         SnippetGeneratedCommand = string.Empty;
         SnippetValidationError = string.Empty;
         IsSnippetCommandValid = false;

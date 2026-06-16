@@ -3464,6 +3464,7 @@
   "PaletteVariantExampleLinux": "Exemple Linux {0}",
   "PaletteSnippetVariantsHeader": "Commandes",
   "PaletteSnippetParametersHeader": "Paramètres",
+  "PaletteSnippetNotesHeader": "Notes",
   "PaletteSnippetPreviewHeader": "Commande",
   "PaletteSnippetDetailHints": "Entrée : envoyer · Ctrl+Entrée : copier · Échap : retour",
   "PaletteSnippetCopied": "Snippet copié : {0}",
