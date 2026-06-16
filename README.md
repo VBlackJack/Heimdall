@@ -14,7 +14,7 @@
 
 [![CI](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml/badge.svg)](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-6854%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-6886%20passing-brightgreen.svg)]()
 [![Tools](https://img.shields.io/badge/tools-59%20sysops-blue.svg)]()
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)]()
 
@@ -140,7 +140,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - Also used as split session server and tool picker (fuzzy search scales to any inventory size)
 - Renders as a WPF `Popup` (own HWND) so it displays above RDP/VNC ActiveX surfaces
 - Empty-query view bubbles servers whose host appears in the recent-connections log to the top of the suggestion list, so reconnecting to a recently used machine is one Ctrl+K + Enter away
-- Runs Command Library snippets directly from the palette: drill into a snippet, fill its parameters inline (Windows/Linux templates and examples), and send the resolved command to the active terminal (clipboard fallback when no session is focused)
+- Runs Command Library snippets directly from the palette: drill into a snippet to see its description, risk and platform badges, notes, examples (copy or send) and documentation links; fill template parameters inline with a live command preview; matched search terms are highlighted in the results, and the detail is screen-reader and keyboard accessible (v2026.061602)
 
 ### Tunnel Panel
 - Retractable side panel showing all active SSH tunnels

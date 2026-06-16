@@ -12,6 +12,29 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-16 — Command Library explanations, accessibility and discoverability (v2026.061602)
+
+A user-facing pass making Command Library snippets self-explanatory and reachable for
+every skill level, in both the Ctrl+K palette and the picker, plus internal refactors.
+
+- **Inline explanations** — drilling into a snippet in the Ctrl+K palette now shows its
+  description, a risk badge, a platform badge and its notes, instead of only the title.
+  The picker rows also show the description and a risk badge.
+- **Examples and documentation links** — the snippet detail lists ready-made examples
+  (copy or send) and the action's documentation links (click to open).
+- **Live command preview in the picker** — the generated command is shown and updated
+  as parameters are typed, before you confirm.
+- **Accessibility** — risk and platform are announced to screen readers, parameter help
+  is no longer hover-only, and keyboard focus follows the selected variant with a visible
+  focus ring.
+- **Discoverability** — palette search now also matches snippet notes, and the matched
+  text is highlighted in the result rows.
+- **Less clutter** — the palette command list shows template variants only; examples
+  live in their own section and gain a send action.
+- **Internal** — a pure `CommandPresentation` resolver is now shared by the palette and
+  the picker, and the Git-sync result-to-dialog mapping was extracted to a pure mapper.
+  No behavior change.
+
 ## 2026-06-16 — Command Library snippets in the palette and sessions tree scrolling (v2026.061601)
 
 User-facing palette feature plus a sessions-tree readability fix and internal hygiene.
