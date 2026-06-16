@@ -24,8 +24,8 @@ using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Interfaces;
 using ActionModel = TwinShell.Core.Models.Action;
-using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 using CommandExample = TwinShell.Core.Models.CommandExample;
+using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 using ExternalLink = TwinShell.Core.Models.ExternalLink;
 
 namespace Heimdall.App.ViewModels.CommandPalette;
