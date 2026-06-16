@@ -140,6 +140,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - Also used as split session server and tool picker (fuzzy search scales to any inventory size)
 - Renders as a WPF `Popup` (own HWND) so it displays above RDP/VNC ActiveX surfaces
 - Empty-query view bubbles servers whose host appears in the recent-connections log to the top of the suggestion list, so reconnecting to a recently used machine is one Ctrl+K + Enter away
+- Runs Command Library snippets directly from the palette: drill into a snippet, fill its parameters inline (Windows/Linux templates and examples), and send the resolved command to the active terminal (clipboard fallback when no session is focused)
 
 ### Tunnel Panel
 - Retractable side panel showing all active SSH tunnels

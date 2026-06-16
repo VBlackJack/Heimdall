@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-16 — Command Library snippets in the palette and sessions tree scrolling (v2026.061601)
+
+User-facing palette feature plus a sessions-tree readability fix and internal hygiene.
+
+- **Command Library in the palette**: Ctrl+K now lists Command Library snippets,
+  drills into a selected snippet with inline parameters (Windows/Linux templates
+  and examples), and sends the resolved command to the active session terminal
+  (Enter / Ctrl+Enter), with a clipboard fallback when no terminal is focused.
+- **Sessions tree scrolling**: long session and tool names are now fully
+  reachable. The sessions tree uses pixel scrolling with an automatic horizontal
+  scrollbar and shows the full display name without ellipsis.
+- **Internal hygiene**: import/export logic was moved into a dedicated
+  `CommandLibraryTransferService`, and the Command Library action-service
+  operations now share a single operation envelope. No behavior change.
+
 ## 2026-06-15 — ThemeForge public feed and honest CI formatting gate
 
 Dependency and CI hygiene; no application code change.
