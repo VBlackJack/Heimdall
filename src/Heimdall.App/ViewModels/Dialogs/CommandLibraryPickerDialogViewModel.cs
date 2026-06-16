@@ -22,6 +22,7 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
 
@@ -68,6 +69,9 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _errorMessage;
+
+    [ObservableProperty]
+    private string _generatedCommand = string.Empty;
 
     public string DialogTitle => _localizer["DialogTitleCommandLibraryPicker"];
 
@@ -127,6 +131,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
         if (value is null)
         {
+            GeneratedCommand = string.Empty;
             OnPropertyChanged(nameof(CanConfirm));
             ConfirmCommand.NotifyCanExecuteChanged();
             return;
@@ -134,6 +139,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
         if (!value.HasLinuxTemplate)
         {
+            GeneratedCommand = string.Empty;
             ErrorMessage = _localizer["LabelCommandLibraryPickerNoLinuxTemplate"];
             OnPropertyChanged(nameof(CanConfirm));
             ConfirmCommand.NotifyCanExecuteChanged();
@@ -148,6 +154,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         }
 
         ApplyParameterValues(value);
+        RegeneratePreview();
 
         OnPropertyChanged(nameof(CanConfirm));
         ConfirmCommand.NotifyCanExecuteChanged();
@@ -167,6 +174,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
                 HasLinuxTemplate = action.LinuxCommandTemplate is not null,
                 HasWindowsTemplate = action.WindowsCommandTemplate is not null,
                 LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
+                LinuxTemplate = action.LinuxCommandTemplate,
                 Presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key])
             })
             .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
@@ -264,8 +272,44 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         }
 
         ErrorMessage = null;
+        RegeneratePreview();
         OnPropertyChanged(nameof(CanConfirm));
         ConfirmCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RegeneratePreview()
+    {
+        var template = SelectedAction?.LinuxTemplate;
+        if (template is null)
+        {
+            GeneratedCommand = string.Empty;
+            return;
+        }
+
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var parameter in Parameters)
+        {
+            values[parameter.Name] = parameter.Value;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var generator = scope.ServiceProvider.GetRequiredService<ICommandGeneratorService>();
+        try
+        {
+            if (generator.ValidateParameters(template, values, out var errors) && errors.Count == 0)
+            {
+                GeneratedCommand = generator.GenerateCommand(template, values);
+            }
+            else
+            {
+                GeneratedCommand = template.CommandPattern;
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[CommandLibraryPicker] preview generate failed: {ex.Message}");
+            GeneratedCommand = template.CommandPattern;
+        }
     }
 
     private void ApplyParameterValues(CommandLibraryPickerItem action)

@@ -28,6 +28,9 @@ public sealed class CommandLibraryPickerItem
     public required bool HasWindowsTemplate { get; init; }
     public required IReadOnlyList<TemplateParameter> LinuxParameters { get; init; }
 
+    /// <summary>Linux command template (when present), used for the live command preview.</summary>
+    public CommandTemplate? LinuxTemplate { get; init; }
+
     /// <summary>Resolved presentation (description, risk, platform labels) for this action.</summary>
     public required CommandPresentation Presentation { get; init; }
 

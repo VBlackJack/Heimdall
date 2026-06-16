@@ -2351,6 +2351,7 @@
   "LabelCommandLibraryPickerSearch": "Search",
   "LabelCommandLibraryPickerPlatform": "Platform",
   "LabelCommandLibraryPickerParameters": "Parameters",
+  "LabelCommandLibraryPickerPreview": "Preview",
   "LabelCommandLibraryPickerNoLinuxTemplate": "This action does not provide a Linux command template.",
   "ErrorCommandLibraryPickerRequiredParam": "Parameter '{0}' is required.",
   "TooltipCommandLibraryParamAutoPrefilled": "Auto-prefilled from the server profile. Edit to override.",
