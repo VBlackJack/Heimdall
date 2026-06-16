@@ -40,6 +40,14 @@ public sealed class AppSettings
     public string? PuttyPath { get; set; }
     public string? PsftpPath { get; set; }
 
+    // Updates
+    public bool UpdateCheckEnabled { get; set; } = true;
+    public int UpdateCheckIntervalHours { get; set; } = 24;
+    public string? UpdateLastCheckUtc { get; set; } = null;   // ISO 8601 round-trip (UTC)
+    public string? UpdateSkippedVersion { get; set; } = null;
+    public string UpdateRepositoryOwner { get; set; } = "VBlackJack";
+    public string UpdateRepositoryName { get; set; } = "Heimdall";
+
     // Tunnels
     public int TunnelEstablishmentDelayMs { get; set; } = 2500;
     public int TunnelRetryDelayMs { get; set; } = 1500;

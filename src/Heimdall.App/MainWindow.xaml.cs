@@ -77,6 +77,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private readonly ExternalToolLaunchService _externalToolLaunchService;
     private readonly IDialogService _dialogService;
     private readonly NetworkScannerService _networkScannerService;
+    private readonly IAppVersionProvider _appVersionProvider;
     private readonly WindowUIState _uiState = new();
     private object? _lastKeyEventSource;
     private readonly ToolsTabPopulationService _toolsTabPopulation;
@@ -141,7 +142,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         ExternalToolSettingsService externalToolSettingsService,
         ExternalToolLaunchService externalToolLaunchService,
         NetworkScannerService networkScannerService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IAppVersionProvider appVersionProvider)
     {
         _fileShareService = fileShareService;
         _foregroundWatchService = foregroundWatchService;
@@ -152,6 +154,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         _externalToolLaunchService = externalToolLaunchService;
         _networkScannerService = networkScannerService;
         _dialogService = dialogService;
+        _appVersionProvider = appVersionProvider;
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
         DataContext = viewModel;
@@ -406,10 +409,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void PopulateAboutSection()
     {
-        var asm = System.Reflection.Assembly.GetExecutingAssembly();
-        var infoVersion = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(asm)
-            ?.InformationalVersion ?? "unknown";
-        AboutVersionText.Text = string.Format(LocalizeWindowString("AboutVersion"), infoVersion);
+        AboutVersionText.Text = string.Format(LocalizeWindowString("AboutVersion"), _appVersionProvider.InformationalVersion);
         AboutRuntimeText.Text = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
         AboutPlatformText.Text = $"{System.Runtime.InteropServices.RuntimeInformation.OSDescription} ({System.Runtime.InteropServices.RuntimeInformation.OSArchitecture})";
 
@@ -429,23 +429,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         AboutSshNetText.Text = sshNetVersion is not null ? sshNetVersion.ToString() : "N/A";
 
         // Build date from informational version (format: YYYY.MMDDxx)
-        if (infoVersion.Length >= 8 && int.TryParse(infoVersion[..4], out var year)
-            && int.TryParse(infoVersion[5..7], out var month)
-            && int.TryParse(infoVersion[7..9], out var day))
-        {
-            try
-            {
-                AboutBuildDateText.Text = new DateTime(year, month, day).ToString("yyyy-MM-dd");
-            }
-            catch
-            {
-                AboutBuildDateText.Text = infoVersion;
-            }
-        }
-        else
-        {
-            AboutBuildDateText.Text = infoVersion;
-        }
+        AboutBuildDateText.Text = _appVersionProvider.BuildDate is { } buildDate
+            ? buildDate.ToString("yyyy-MM-dd")
+            : _appVersionProvider.InformationalVersion;
 
         // Data section
         PopulateAboutDataSection();

@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using Heimdall.App.Localization;
 using Heimdall.App.Services;
@@ -33,6 +34,7 @@ using Heimdall.Core.Security;
 using Heimdall.Core.SessionHealth;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
+using Heimdall.Core.Updates;
 using Heimdall.Ssh;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
@@ -51,6 +53,9 @@ public partial class App : System.Windows.Application
     private ServiceProvider? _serviceProvider;
     private MainViewModel? _mainViewModel;
     private string? _notesStoragePath;
+
+    // Timeout for the single long-lived updater HttpClient (no magic number inline).
+    private static readonly TimeSpan UpdateHttpTimeout = TimeSpan.FromSeconds(30);
 
     public IServiceProvider? Services => _serviceProvider;
 
@@ -405,6 +410,15 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ExternalToolProviderService>();
         services.AddSingleton<ToolRegistry>();
         services.AddSingleton<HeimdallThemeService>();
+
+        // Updater services (no UI wiring yet)
+        services.AddSingleton<IAppVersionProvider, AppVersionProvider>();
+        services.AddSingleton(_ => new HttpClient { Timeout = UpdateHttpTimeout });
+        services.AddSingleton<IGitHubReleaseClient>(sp => new GitHubReleaseClient(
+            sp.GetRequiredService<HttpClient>(),
+            sp.GetRequiredService<IAppVersionProvider>().Current?.ToString() ?? "unknown"));
+        services.AddSingleton<IVariantDetector>(_ => new VariantDetector());
+        services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<IConnectionService, ConnectionService>();
         services.AddSingleton<ConnectionService>(sp =>
             (ConnectionService)sp.GetRequiredService<IConnectionService>());
