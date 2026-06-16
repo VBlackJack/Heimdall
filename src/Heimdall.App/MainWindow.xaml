@@ -3852,6 +3852,7 @@
                                    Padding="14,0,14,4"/>
                     </StackPanel>
 
+                    <StackPanel Visibility="{Binding CommandPalette.SnippetHasVariants, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock Text="{loc:Translate PaletteSnippetVariantsHeader}"
                                FontSize="{StaticResource FontSizeSmallCaption}"
                                FontWeight="SemiBold"
@@ -3925,6 +3926,7 @@
                             </Style>
                         </ListBox.ItemContainerStyle>
                     </ListBox>
+                    </StackPanel>
 
                     <!-- Inline template parameters (template variants only). -->
                     <StackPanel Visibility="{Binding CommandPalette.SnippetHasParameters, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -4015,6 +4017,18 @@
                                                         Style="{DynamicResource ToolbarGhostButtonStyle}"
                                                         ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
+                                                        FontSize="11" Width="22" Height="22"
+                                                        Padding="2"
+                                                        VerticalAlignment="Top"
+                                                        Focusable="False"/>
+                                                <Button DockPanel.Dock="Right"
+                                                        Content="&#xE724;"
+                                                        FontFamily="Segoe MDL2 Assets"
+                                                        Command="{Binding DataContext.CommandPalette.SendSnippetExampleCommand, ElementName=MainWindowRoot}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                        ToolTip="{loc:Translate PaletteSnippetBtnSendExample}"
+                                                        AutomationProperties.Name="{loc:Translate PaletteSnippetBtnSendExample}"
                                                         FontSize="11" Width="22" Height="22"
                                                         Padding="2"
                                                         VerticalAlignment="Top"

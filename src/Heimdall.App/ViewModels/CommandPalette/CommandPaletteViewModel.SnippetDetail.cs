@@ -126,6 +126,10 @@ public sealed partial class CommandPaletteViewModel
     /// <summary>True when the drilled-in action exposes at least one documentation link.</summary>
     public bool SnippetHasLinks => SnippetLinks.Count > 0;
 
+    /// <summary>True when the drilled-in action exposes template (generator) variants.</summary>
+    [ObservableProperty]
+    private bool _snippetHasVariants;
+
     // ── Variant selection ────────────────────────────────────────────
 
     /// <summary>
@@ -229,8 +233,15 @@ public sealed partial class CommandPaletteViewModel
     /// </summary>
     public void OpenSnippetDetail(ActionModel action)
     {
-        var variants = SnippetVariantResolver.GetVariants(action);
-        if (variants.Count == 0)
+        var presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key]);
+        var templateVariants = SnippetVariantResolver.GetVariants(action)
+            .Where(v => v.Kind != SnippetVariantKind.Example)
+            .ToList();
+
+        // Open when there is at least one template generator or any metadata
+        // (notes / examples / links) worth showing; otherwise keep the legacy
+        // copy-to-clipboard fallback.
+        if (templateVariants.Count == 0 && !presentation.HasMetadata)
         {
             CopySnippetPayload(ResolveSnippetCommand(action), action.Title);
             return;
@@ -243,7 +254,6 @@ public sealed partial class CommandPaletteViewModel
 
         SnippetDetailTitle = action.Title;
 
-        var presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key]);
         SnippetDetailDescription = presentation.Description;
         SnippetDetailNotes = presentation.Notes;
         SnippetDetailRiskLabel = presentation.RiskLabel;
@@ -264,7 +274,9 @@ public sealed partial class CommandPaletteViewModel
         OnPropertyChanged(nameof(SnippetHasExamples));
         OnPropertyChanged(nameof(SnippetHasLinks));
 
-        foreach (var variant in variants)
+        // Variants list holds template (generator) variants only; examples live
+        // exclusively in the Examples section.
+        foreach (var variant in templateVariants)
         {
             SnippetVariants.Add(new SnippetVariantDisplayItem
             {
@@ -273,14 +285,11 @@ public sealed partial class CommandPaletteViewModel
                 Variant = variant
             });
         }
+        SnippetHasVariants = templateVariants.Count > 0;
 
         IsSnippetDetailOpen = true;
 
-        var defaultVariant = SnippetVariantResolver.GetDefault(action);
-        var defaultItem = defaultVariant is null
-            ? null
-            : SnippetVariants.FirstOrDefault(v => ReferenceEquals(v.Variant, defaultVariant));
-        SelectedSnippetVariant = defaultItem ?? SnippetVariants.FirstOrDefault();
+        SelectedSnippetVariant = SnippetVariants.FirstOrDefault();
     }
 
     /// <summary>
@@ -292,6 +301,7 @@ public sealed partial class CommandPaletteViewModel
         UnsubscribeSnippetParameters();
         SnippetParameters.Clear();
         SnippetVariants.Clear();
+        SnippetHasVariants = false;
         SnippetDetailTitle = string.Empty;
         SnippetDetailDescription = string.Empty;
         SnippetDetailNotes = string.Empty;
@@ -369,6 +379,30 @@ public sealed partial class CommandPaletteViewModel
     {
         if (example is null || string.IsNullOrEmpty(example.Command)) return;
         CopySnippetPayload(example.Command, SnippetDetailTitle);
+    }
+
+    /// <summary>
+    /// Sends a single example command to the active session (or copies it when no
+    /// session can accept it) and closes the palette, mirroring <see cref="SendSnippet"/>.
+    /// </summary>
+    [RelayCommand]
+    private void SendSnippetExample(CommandExample? example)
+    {
+        if (example is null || string.IsNullOrEmpty(example.Command)) return;
+
+        var active = _main.Connection.ActiveSession;
+        if (active is not null
+            && _embeddedSessionManager.TrySendCommandToSession(active, example.Command))
+        {
+            _main.StatusText = _localizer.Format("PaletteSnippetSent", SnippetDetailTitle);
+        }
+        else
+        {
+            CopySnippetPayload(example.Command, SnippetDetailTitle);
+        }
+
+        CloseSnippetDetail();
+        IsOpen = false;
     }
 
     /// <summary>Returns to the palette result list, keeping the palette open.</summary>
