@@ -24,6 +24,12 @@ public static class AppConstants
     /// <summary>Maximum import file size for Command Library JSON imports.</summary>
     public const long MaxImportFileSizeBytes = 50 * 1024 * 1024;
 
+    /// <summary>Maximum accepted length of an imported action Title.</summary>
+    public const int MaxImportActionTitleLength = 200;
+
+    /// <summary>Maximum accepted length of an imported action Category.</summary>
+    public const int MaxImportActionCategoryLength = 100;
+
     /// <summary>Legacy application folder name used for migration detection.</summary>
     public const string LegacyAppFolderName = "RDPManager";
 

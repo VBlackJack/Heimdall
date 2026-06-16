@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services.Import;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.App.ViewModels.Dialogs;
-using Heimdall.Core.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
-using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.ViewModels;
 
@@ -34,19 +30,6 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public sealed partial class CommandLibraryViewModel
 {
-    private static readonly JsonSerializerOptions ExportOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
-    private static readonly JsonSerializerOptions ImportOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        MaxDepth = 32,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-    };
-
     // ── Copy / Send / Clipboard helpers ───────────────────────────
 
     /// <summary>
@@ -338,22 +321,10 @@ public sealed partial class CommandLibraryViewModel
         await RunActionServiceOperationAsync(
             async actionService =>
             {
-                var actions = (await actionService.GetAllActionsAsync()).ToList();
-
-                var envelope = new
-                {
-                    schemaVersion = "1.0",
-                    exportDate = DateTime.UtcNow,
-                    totalActions = actions.Count,
-                    actions
-                };
-
-                var json = JsonSerializer.Serialize(envelope, ExportOptions);
-                await File.WriteAllTextAsync(path, json);
-
+                var count = await _transferService.ExportAsync(actionService, path);
                 _dialogService.ShowInfo(
                     LocalizeKey("ToolCmdLibExportSuccess"),
-                    string.Format(LocalizeKey("ToolCmdLibExportSuccessMessage"), actions.Count, path));
+                    string.Format(LocalizeKey("ToolCmdLibExportSuccessMessage"), count, path));
             },
             "Export",
             "ToolCmdLibExportError");
@@ -375,104 +346,31 @@ public sealed partial class CommandLibraryViewModel
         await RunActionServiceOperationAsync(
             async actionService =>
             {
-                var fileInfo = new FileInfo(path);
-                if (fileInfo.Length > AppConstants.MaxImportFileSizeBytes)
+                var result = await _transferService.ImportAsync(actionService, path);
+                switch (result.Outcome)
                 {
-                    _dialogService.ShowError(
-                        LocalizeKey("ToolCmdLibImportError"),
-                        LocalizeKey("ToolCmdLibImportFileTooLarge"));
-                    return;
+                    case CommandLibraryImportOutcome.FileTooLarge:
+                        _dialogService.ShowError(
+                            LocalizeKey("ToolCmdLibImportError"),
+                            LocalizeKey("ToolCmdLibImportFileTooLarge"));
+                        return;
+                    case CommandLibraryImportOutcome.InvalidFormat:
+                        _dialogService.ShowError(
+                            LocalizeKey("ToolCmdLibImportError"),
+                            LocalizeKey("ToolCmdLibImportInvalidFormat"));
+                        return;
+                    default:
+                        await ReloadAsync();
+                        _dialogService.ShowInfo(
+                            LocalizeKey("ToolCmdLibImportResultTitle"),
+                            string.Format(
+                                LocalizeKey("ToolCmdLibImportResultMessage"),
+                                result.Imported, result.Updated, result.Skipped));
+                        return;
                 }
-
-                var json = await File.ReadAllTextAsync(path);
-                var actions = ParseImportJson(json);
-                if (actions is null || actions.Count == 0)
-                {
-                    _dialogService.ShowError(
-                        LocalizeKey("ToolCmdLibImportError"),
-                        LocalizeKey("ToolCmdLibImportInvalidFormat"));
-                    return;
-                }
-
-                int imported = 0, updated = 0, skipped = 0;
-
-                foreach (var action in actions)
-                {
-                    if (string.IsNullOrWhiteSpace(action.Title)
-                        || string.IsNullOrWhiteSpace(action.Category)
-                        || action.Title.Length > 200
-                        || action.Category.Length > 100)
-                    {
-                        skipped++;
-                        continue;
-                    }
-
-                    var existing = await actionService.GetActionByPublicIdAsync(action.PublicId)
-                        ?? await actionService.GetActionByIdAsync(action.Id);
-                    if (existing is not null)
-                    {
-                        if (existing.IsUserCreated)
-                        {
-                            action.Id = existing.Id;
-                            action.PublicId = existing.PublicId;
-                            action.IsUserCreated = existing.IsUserCreated;
-                            action.UpdatedAt = DateTime.UtcNow;
-                            await actionService.UpdateActionAsync(action);
-                            updated++;
-                        }
-                        else
-                        {
-                            skipped++;
-                        }
-                    }
-                    else
-                    {
-                        action.IsUserCreated = true;
-                        action.CreatedAt = DateTime.UtcNow;
-                        action.UpdatedAt = DateTime.UtcNow;
-                        await actionService.CreateActionAsync(action);
-                        imported++;
-                    }
-                }
-
-                await ReloadAsync();
-                _dialogService.ShowInfo(
-                    LocalizeKey("ToolCmdLibImportResultTitle"),
-                    string.Format(
-                        LocalizeKey("ToolCmdLibImportResultMessage"), imported, updated, skipped));
             },
             "Import",
             "ToolCmdLibImportError");
-    }
-
-    private static List<ActionModel>? ParseImportJson(string json)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            // Bulk format: { "actions": [...] }
-            if (root.TryGetProperty("actions", out var actionsElement)
-                && actionsElement.ValueKind == JsonValueKind.Array)
-            {
-                return JsonSerializer.Deserialize<List<ActionModel>>(
-                    actionsElement.GetRawText(), ImportOptions);
-            }
-
-            // Single-action format: { "id": "...", "title": "..." }
-            if (root.TryGetProperty("id", out _) && root.TryGetProperty("title", out _))
-            {
-                var single = JsonSerializer.Deserialize<ActionModel>(json, ImportOptions);
-                return single is not null ? [single] : null;
-            }
-
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     // ── Git Sync ──────────────────────────────────────────────────

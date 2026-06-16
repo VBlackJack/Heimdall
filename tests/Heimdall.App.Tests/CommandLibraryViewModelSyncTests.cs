@@ -84,7 +84,8 @@ public sealed class CommandLibraryViewModelSyncTests
             configManager,
             localizer,
             dialogService,
-            gitSync);
+            gitSync,
+            new CommandLibraryTransferService());
 
         return new TestFixture(viewModel, dialogService, gitSync);
     }

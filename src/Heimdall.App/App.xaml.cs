@@ -464,6 +464,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ISessionSnapshotService, SessionSnapshotService>();
         services.AddSingleton<IRdpImportService, RdpImportService>();
         services.AddSingleton<IProfileImportService, ProfileImportService>();
+        services.AddSingleton<ICommandLibraryTransferService, CommandLibraryTransferService>();
         services.AddSingleton<IPuttySessionRegistrySource, WindowsPuttyRegistrySource>();
         services.AddTransient<OpenSshConfigImporter>();
         services.AddTransient<PuttySessionImporter>();

@@ -20,6 +20,7 @@ using System.Net;
 using System.Windows.Data;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Heimdall.App.Services.Import;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -67,6 +68,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
     private readonly IGitSyncService _gitSyncService;
+    private readonly ICommandLibraryTransferService _transferService;
 
     private IServiceScope? _sessionScope;
     private ISearchService? _searchService;
@@ -107,13 +109,15 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         IConfigManager configManager,
         LocalizationManager localizer,
         IDialogService dialogService,
-        IGitSyncService gitSyncService)
+        IGitSyncService gitSyncService,
+        ICommandLibraryTransferService transferService)
     {
         _serviceProvider = serviceProvider;
         _configManager = configManager;
         _localizer = localizer;
         _dialogService = dialogService;
         _gitSyncService = gitSyncService;
+        _transferService = transferService;
     }
 
     // ── Observable UI state ───────────────────────────────────────
