@@ -349,6 +349,24 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         Write-Host "    $(Split-Path $a -Leaf) (~${sz} MB)" -ForegroundColor DarkGray
     }
 
+    # Compute SHA-256 checksums so published downloads can be verified. The
+    # checksum lines are derived from the real build outputs (installers/zips)
+    # only, never from the checksum file itself. The file is published as an
+    # additional release asset and the same lines are embedded in the notes.
+    $checksumLines = @(foreach ($a in $artifacts) {
+        $hash = (Get-FileHash -Path $a -Algorithm SHA256).Hash.ToLowerInvariant()
+        '{0}  {1}' -f $hash, (Split-Path $a -Leaf)
+    })
+    $checksumFile = Join-Path $installerDir 'SHA256SUMS.txt'
+    if ($isDry) {
+        Write-Host "[$label] Would create $(Split-Path $checksumFile -Leaf) ($($checksumLines.Count) entries) and add it to the release assets." -ForegroundColor Magenta
+    } else {
+        # LF line endings with a single trailing newline, matching the standard
+        # sha256sum format consumed by `sha256sum -c`.
+        [System.IO.File]::WriteAllText($checksumFile, (($checksumLines -join "`n") + "`n"))
+        Write-Host "[$label] Wrote $(Split-Path $checksumFile -Leaf) ($($checksumLines.Count) entries)." -ForegroundColor DarkGray
+    }
+
     # Build release notes
     $notes = "## Heimdall v${buildNumber}`n`n"
     $notes += "### Downloads`n`n"
@@ -363,6 +381,14 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
                 else { "~${sz} MB" }
         $notes += "| ``$name`` | $desc |`n"
     }
+
+    # Embed the SHA-256 checksums and publish the checksum file as a release asset.
+    $fence = '```'
+    $notes += "`n### Checksums (SHA-256)`n`n"
+    $notes += "$fence`n"
+    $notes += (($checksumLines -join "`n") + "`n")
+    $notes += "$fence`n"
+    $artifacts += $checksumFile
 
     Write-Host "[$label] Release notes:" -ForegroundColor DarkGray
     Write-Host $notes -ForegroundColor DarkGray
