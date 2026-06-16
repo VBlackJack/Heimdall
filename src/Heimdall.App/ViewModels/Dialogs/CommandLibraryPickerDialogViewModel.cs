@@ -20,6 +20,7 @@ using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services.PostConnect;
+using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Localization;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
@@ -165,7 +166,8 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
                 Category = action.Category,
                 HasLinuxTemplate = action.LinuxCommandTemplate is not null,
                 HasWindowsTemplate = action.WindowsCommandTemplate is not null,
-                LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? []
+                LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
+                Presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key])
             })
             .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
             .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)

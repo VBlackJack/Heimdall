@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.ViewModels.CommandLibrary;
 using TwinShell.Core.Models;
 
 namespace Heimdall.App.ViewModels.Dialogs;
@@ -26,6 +27,9 @@ public sealed class CommandLibraryPickerItem
     public required bool HasLinuxTemplate { get; init; }
     public required bool HasWindowsTemplate { get; init; }
     public required IReadOnlyList<TemplateParameter> LinuxParameters { get; init; }
+
+    /// <summary>Resolved presentation (description, risk, platform labels) for this action.</summary>
+    public required CommandPresentation Presentation { get; init; }
 
     public string PlatformBadgeText => HasLinuxTemplate && HasWindowsTemplate
         ? "WIN/LIN"

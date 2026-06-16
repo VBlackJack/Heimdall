@@ -25,6 +25,7 @@
             </ResourceDictionary.MergedDictionaries>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <converters:ResourceKeyToBrushConverter x:Key="ResourceKeyToBrushConverter"/>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -94,22 +95,46 @@
                               AutomationProperties.Name="{Binding Title}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="160"/>
-                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="150"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0"
-                                       Text="{Binding Title}"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       FontWeight="SemiBold"/>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Presentation.Description}"
+                                           Visibility="{Binding Presentation.Description, Converter={StaticResource NullToVisibilityConverter}}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="{StaticResource FontSizeCaption}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
                             <TextBlock Grid.Column="1"
                                        Margin="8,0,0,0"
+                                       VerticalAlignment="Center"
                                        Text="{Binding Category}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBlock Grid.Column="2"
-                                       HorizontalAlignment="Right"
-                                       Text="{Binding PlatformBadgeText}"
-                                       Foreground="{DynamicResource AccentBrush}"
-                                       FontWeight="SemiBold"/>
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <Border CornerRadius="3"
+                                        Padding="4,1"
+                                        Margin="0,0,6,0"
+                                        VerticalAlignment="Center"
+                                        Background="{Binding Presentation.RiskBrushKey, Converter={StaticResource ResourceKeyToBrushConverter}}"
+                                        ToolTip="{Binding Presentation.RiskLabel}"
+                                        AutomationProperties.Name="{Binding Presentation.RiskLabel}">
+                                    <TextBlock Text="{Binding Presentation.RiskBadge}"
+                                               FontSize="{StaticResource FontSizeCaption}"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource BadgeTextBrush}"/>
+                                </Border>
+                                <TextBlock Text="{Binding PlatformBadgeText}"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>
