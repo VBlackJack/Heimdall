@@ -203,6 +203,40 @@ public sealed partial class CommandLibraryViewModel
         await LoadHistoryAsync();
     }
 
+    // ── Action-service envelope ───────────────────────────────────
+
+    /// <summary>
+    /// Runs an action-service operation inside a fresh DI scope with the shared
+    /// busy-state, logging, and error-dialog envelope used by the CRUD and
+    /// import/export commands. The operation receives a scoped IActionService.
+    /// Returns true when it completed without throwing, false otherwise.
+    /// </summary>
+    private async Task<bool> RunActionServiceOperationAsync(
+        Func<IActionService, Task> operation,
+        string logLabel,
+        string errorTitleKey)
+    {
+        IsBusy = true;
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
+            await operation(actionService);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandLibrary] {logLabel} failed: {ex.Message}");
+            _dialogService.ShowError(LocalizeKey(errorTitleKey), ex.Message);
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     // ── CRUD ──────────────────────────────────────────────────────
 
     /// <summary>
@@ -224,25 +258,15 @@ public sealed partial class CommandLibraryViewModel
         var saved = await ShowActionDialogAsync(vm);
         if (!saved) return;
 
-        IsBusy = true;
-        try
-        {
-            var action = vm.ToAction();
-            using var scope = _serviceProvider.CreateScope();
-            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-            await actionService.CreateActionAsync(action);
-            await ReloadAsync();
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"[CommandLibrary] Create action failed: {ex.Message}");
-            _dialogService.ShowError(LocalizeKey("ToolCmdLibErrorTitle"), ex.Message);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        await RunActionServiceOperationAsync(
+            async actionService =>
+            {
+                var action = vm.ToAction();
+                await actionService.CreateActionAsync(action);
+                await ReloadAsync();
+            },
+            "Create action",
+            "ToolCmdLibErrorTitle");
     }
 
     /// <summary>
@@ -261,25 +285,15 @@ public sealed partial class CommandLibraryViewModel
         var saved = await ShowActionDialogAsync(vm);
         if (!saved) return;
 
-        IsBusy = true;
-        try
-        {
-            var updated = vm.ToAction();
-            using var scope = _serviceProvider.CreateScope();
-            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-            await actionService.UpdateActionAsync(updated);
-            await ReloadAsync();
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"[CommandLibrary] Update action failed: {ex.Message}");
-            _dialogService.ShowError(LocalizeKey("ToolCmdLibErrorTitle"), ex.Message);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        await RunActionServiceOperationAsync(
+            async actionService =>
+            {
+                var updated = vm.ToAction();
+                await actionService.UpdateActionAsync(updated);
+                await ReloadAsync();
+            },
+            "Update action",
+            "ToolCmdLibErrorTitle");
     }
 
     /// <summary>
@@ -296,24 +310,14 @@ public sealed partial class CommandLibraryViewModel
             "warning");
         if (!confirmed) return;
 
-        IsBusy = true;
-        try
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-            await actionService.DeleteActionAsync(entry.Source.Id);
-            await ReloadAsync();
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"[CommandLibrary] Delete action failed: {ex.Message}");
-            _dialogService.ShowError(LocalizeKey("ToolCmdLibErrorTitle"), ex.Message);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        await RunActionServiceOperationAsync(
+            async actionService =>
+            {
+                await actionService.DeleteActionAsync(entry.Source.Id);
+                await ReloadAsync();
+            },
+            "Delete action",
+            "ToolCmdLibErrorTitle");
     }
 
     // ── Import / Export ──────────────────────────────────────────
@@ -331,38 +335,28 @@ public sealed partial class CommandLibraryViewModel
         var path = ShowSaveFileDialog(defaultName, "JSON files (*.json)|*.json");
         if (string.IsNullOrEmpty(path)) return;
 
-        IsBusy = true;
-        try
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-            var actions = (await actionService.GetAllActionsAsync()).ToList();
-
-            var envelope = new
+        await RunActionServiceOperationAsync(
+            async actionService =>
             {
-                schemaVersion = "1.0",
-                exportDate = DateTime.UtcNow,
-                totalActions = actions.Count,
-                actions
-            };
+                var actions = (await actionService.GetAllActionsAsync()).ToList();
 
-            var json = JsonSerializer.Serialize(envelope, ExportOptions);
-            await File.WriteAllTextAsync(path, json);
+                var envelope = new
+                {
+                    schemaVersion = "1.0",
+                    exportDate = DateTime.UtcNow,
+                    totalActions = actions.Count,
+                    actions
+                };
 
-            _dialogService.ShowInfo(
-                LocalizeKey("ToolCmdLibExportSuccess"),
-                string.Format(LocalizeKey("ToolCmdLibExportSuccessMessage"), actions.Count, path));
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"[CommandLibrary] Export failed: {ex.Message}");
-            _dialogService.ShowError(LocalizeKey("ToolCmdLibExportError"), ex.Message);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+                var json = JsonSerializer.Serialize(envelope, ExportOptions);
+                await File.WriteAllTextAsync(path, json);
+
+                _dialogService.ShowInfo(
+                    LocalizeKey("ToolCmdLibExportSuccess"),
+                    string.Format(LocalizeKey("ToolCmdLibExportSuccessMessage"), actions.Count, path));
+            },
+            "Export",
+            "ToolCmdLibExportError");
     }
 
     /// <summary>
@@ -378,87 +372,77 @@ public sealed partial class CommandLibraryViewModel
         var path = ShowOpenFileDialog("JSON files (*.json)|*.json");
         if (string.IsNullOrEmpty(path)) return;
 
-        IsBusy = true;
-        try
-        {
-            var fileInfo = new FileInfo(path);
-            if (fileInfo.Length > AppConstants.MaxImportFileSizeBytes)
+        await RunActionServiceOperationAsync(
+            async actionService =>
             {
-                _dialogService.ShowError(
-                    LocalizeKey("ToolCmdLibImportError"),
-                    LocalizeKey("ToolCmdLibImportFileTooLarge"));
-                return;
-            }
-
-            var json = await File.ReadAllTextAsync(path);
-            var actions = ParseImportJson(json);
-            if (actions is null || actions.Count == 0)
-            {
-                _dialogService.ShowError(
-                    LocalizeKey("ToolCmdLibImportError"),
-                    LocalizeKey("ToolCmdLibImportInvalidFormat"));
-                return;
-            }
-
-            int imported = 0, updated = 0, skipped = 0;
-            using var scope = _serviceProvider.CreateScope();
-            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-
-            foreach (var action in actions)
-            {
-                if (string.IsNullOrWhiteSpace(action.Title)
-                    || string.IsNullOrWhiteSpace(action.Category)
-                    || action.Title.Length > 200
-                    || action.Category.Length > 100)
+                var fileInfo = new FileInfo(path);
+                if (fileInfo.Length > AppConstants.MaxImportFileSizeBytes)
                 {
-                    skipped++;
-                    continue;
+                    _dialogService.ShowError(
+                        LocalizeKey("ToolCmdLibImportError"),
+                        LocalizeKey("ToolCmdLibImportFileTooLarge"));
+                    return;
                 }
 
-                var existing = await actionService.GetActionByPublicIdAsync(action.PublicId)
-                    ?? await actionService.GetActionByIdAsync(action.Id);
-                if (existing is not null)
+                var json = await File.ReadAllTextAsync(path);
+                var actions = ParseImportJson(json);
+                if (actions is null || actions.Count == 0)
                 {
-                    if (existing.IsUserCreated)
+                    _dialogService.ShowError(
+                        LocalizeKey("ToolCmdLibImportError"),
+                        LocalizeKey("ToolCmdLibImportInvalidFormat"));
+                    return;
+                }
+
+                int imported = 0, updated = 0, skipped = 0;
+
+                foreach (var action in actions)
+                {
+                    if (string.IsNullOrWhiteSpace(action.Title)
+                        || string.IsNullOrWhiteSpace(action.Category)
+                        || action.Title.Length > 200
+                        || action.Category.Length > 100)
                     {
-                        action.Id = existing.Id;
-                        action.PublicId = existing.PublicId;
-                        action.IsUserCreated = existing.IsUserCreated;
-                        action.UpdatedAt = DateTime.UtcNow;
-                        await actionService.UpdateActionAsync(action);
-                        updated++;
+                        skipped++;
+                        continue;
+                    }
+
+                    var existing = await actionService.GetActionByPublicIdAsync(action.PublicId)
+                        ?? await actionService.GetActionByIdAsync(action.Id);
+                    if (existing is not null)
+                    {
+                        if (existing.IsUserCreated)
+                        {
+                            action.Id = existing.Id;
+                            action.PublicId = existing.PublicId;
+                            action.IsUserCreated = existing.IsUserCreated;
+                            action.UpdatedAt = DateTime.UtcNow;
+                            await actionService.UpdateActionAsync(action);
+                            updated++;
+                        }
+                        else
+                        {
+                            skipped++;
+                        }
                     }
                     else
                     {
-                        skipped++;
+                        action.IsUserCreated = true;
+                        action.CreatedAt = DateTime.UtcNow;
+                        action.UpdatedAt = DateTime.UtcNow;
+                        await actionService.CreateActionAsync(action);
+                        imported++;
                     }
                 }
-                else
-                {
-                    action.IsUserCreated = true;
-                    action.CreatedAt = DateTime.UtcNow;
-                    action.UpdatedAt = DateTime.UtcNow;
-                    await actionService.CreateActionAsync(action);
-                    imported++;
-                }
-            }
 
-            await ReloadAsync();
-            _dialogService.ShowInfo(
-                LocalizeKey("ToolCmdLibImportResultTitle"),
-                string.Format(
-                    LocalizeKey("ToolCmdLibImportResultMessage"), imported, updated, skipped));
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"[CommandLibrary] Import failed: {ex.Message}");
-            _dialogService.ShowError(LocalizeKey("ToolCmdLibImportError"), ex.Message);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+                await ReloadAsync();
+                _dialogService.ShowInfo(
+                    LocalizeKey("ToolCmdLibImportResultTitle"),
+                    string.Format(
+                        LocalizeKey("ToolCmdLibImportResultMessage"), imported, updated, skipped));
+            },
+            "Import",
+            "ToolCmdLibImportError");
     }
 
     private static List<ActionModel>? ParseImportJson(string json)
