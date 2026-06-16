@@ -17,6 +17,7 @@
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services.Import;
+using Heimdall.App.Services.Sync;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.App.ViewModels.Dialogs;
 using Microsoft.Extensions.DependencyInjection;
@@ -399,36 +400,18 @@ public sealed partial class CommandLibraryViewModel
             var result = await Task.Run(() => _gitSyncService.FullSyncAsync());
             await ReloadAsync();
 
-            if (result.ErrorCode == GitSyncErrorCode.Cancelled)
+            var presentation = CommandLibrarySyncResultMapper.Map(result, LocalizeKey);
+            switch (presentation.Kind)
             {
-                var message = string.IsNullOrWhiteSpace(result.Message)
-                    ? LocalizeKey("ToolCmdLibSyncCancelledMessage")
-                    : result.Message;
-                _dialogService.ShowInfo(
-                    LocalizeKey("ToolCmdLibSyncCancelled"),
-                    message);
-            }
-            else if (result.Success)
-            {
-                var hasWarnings = result.Warnings?.Count > 0;
-                if (hasWarnings)
-                {
-                    _dialogService.ShowWarning(
-                        LocalizeKey("ToolCmdLibSyncPartial"),
-                        result.Message ?? LocalizeKey("ToolCmdLibSyncComplete"));
-                }
-                else
-                {
-                    _dialogService.ShowInfo(
-                        LocalizeKey("ToolCmdLibSyncComplete"),
-                        result.Message ?? LocalizeKey("ToolCmdLibSyncComplete"));
-                }
-            }
-            else
-            {
-                _dialogService.ShowError(
-                    LocalizeKey("ToolCmdLibSyncError"),
-                    result.ErrorDetails ?? result.Message ?? LocalizeKey("ToolCmdLibSyncError"));
+                case SyncDialogKind.Warning:
+                    _dialogService.ShowWarning(presentation.Title, presentation.Body);
+                    break;
+                case SyncDialogKind.Error:
+                    _dialogService.ShowError(presentation.Title, presentation.Body);
+                    break;
+                default:
+                    _dialogService.ShowInfo(presentation.Title, presentation.Body);
+                    break;
             }
         }
         catch (OperationCanceledException)
