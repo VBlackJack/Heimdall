@@ -459,6 +459,10 @@ public sealed partial class CommandPaletteViewModel
 
         best = Math.Max(best, FuzzyScoreString(action.Description, query) / 2);
         best = Math.Max(best, FuzzyScoreString(action.Category, query) / 2);
+        if (!string.IsNullOrEmpty(action.Notes))
+        {
+            best = Math.Max(best, FuzzyScoreString(action.Notes, query) / 2);
+        }
         return best;
     }
 

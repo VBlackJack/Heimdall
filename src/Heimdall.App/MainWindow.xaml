@@ -10,6 +10,7 @@
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
         xmlns:theming="clr-namespace:Heimdall.App.Theming"
         xmlns:tunnels="clr-namespace:Heimdall.App.ViewModels.Tunnels"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="{Binding WindowTitle}"
@@ -3717,7 +3718,8 @@
                                                 </Path.Fill>
                                             </Path>
                                             <TextBlock Grid.Column="1"
-                                                       Text="{Binding DisplayName}"
+                                                       behaviors:HighlightTextBehavior.SourceText="{Binding DisplayName}"
+                                                       behaviors:HighlightTextBehavior.Query="{Binding DataContext.CommandPalette.SearchText, ElementName=MainWindowRoot}"
                                                        FontSize="{StaticResource FontSizeBody}"
                                                        FontWeight="Medium"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"
