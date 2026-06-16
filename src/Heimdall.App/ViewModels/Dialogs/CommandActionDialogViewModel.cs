@@ -55,6 +55,10 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     private Guid? _editWinTemplatePublicId;
     private string? _editLinuxTemplateId;
     private Guid? _editLinuxTemplatePublicId;
+    private List<CommandExample>? _editExamples;
+    private List<CommandExample>? _editWindowsExamples;
+    private List<CommandExample>? _editLinuxExamples;
+    private List<ExternalLink>? _editLinks;
 
     // ── Action fields ─────────────────────────────────────────────
 
@@ -223,6 +227,10 @@ public partial class CommandActionDialogViewModel : ObservableValidator
             Tags = string.IsNullOrWhiteSpace(Tags)
                 ? [] : Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
             Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
+            Examples = _editExamples is null ? new() : new List<CommandExample>(_editExamples),
+            WindowsExamples = _editWindowsExamples is null ? new() : new List<CommandExample>(_editWindowsExamples),
+            LinuxExamples = _editLinuxExamples is null ? new() : new List<CommandExample>(_editLinuxExamples),
+            Links = _editLinks is null ? new() : new List<ExternalLink>(_editLinks),
             IsUserCreated = true,
             UpdatedAt = DateTime.UtcNow
         };
@@ -278,6 +286,10 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         vm.Level = action.Level;
         vm.Tags = action.Tags is { Count: > 0 } ? string.Join(", ", action.Tags) : "";
         vm.Notes = action.Notes ?? "";
+        vm._editExamples = new List<CommandExample>(action.Examples);
+        vm._editWindowsExamples = new List<CommandExample>(action.WindowsExamples);
+        vm._editLinuxExamples = new List<CommandExample>(action.LinuxExamples);
+        vm._editLinks = new List<ExternalLink>(action.Links);
 
         if (action.WindowsCommandTemplate is { } winTemplate)
         {
