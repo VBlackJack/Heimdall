@@ -25,6 +25,8 @@ using TwinShell.Core.Enums;
 using TwinShell.Core.Interfaces;
 using ActionModel = TwinShell.Core.Models.Action;
 using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
+using CommandExample = TwinShell.Core.Models.CommandExample;
+using ExternalLink = TwinShell.Core.Models.ExternalLink;
 
 namespace Heimdall.App.ViewModels.CommandPalette;
 
@@ -111,6 +113,18 @@ public sealed partial class CommandPaletteViewModel
 
     /// <summary>True when the drilled-in action exposes notes.</summary>
     public bool SnippetHasNotes => !string.IsNullOrEmpty(SnippetDetailNotes);
+
+    /// <summary>Command examples of the drilled-in action (copied on demand).</summary>
+    public ObservableCollection<CommandExample> SnippetExamples { get; } = new();
+
+    /// <summary>External documentation links of the drilled-in action.</summary>
+    public ObservableCollection<ExternalLink> SnippetLinks { get; } = new();
+
+    /// <summary>True when the drilled-in action exposes at least one example.</summary>
+    public bool SnippetHasExamples => SnippetExamples.Count > 0;
+
+    /// <summary>True when the drilled-in action exposes at least one documentation link.</summary>
+    public bool SnippetHasLinks => SnippetLinks.Count > 0;
 
     // ── Variant selection ────────────────────────────────────────────
 
@@ -237,6 +251,19 @@ public sealed partial class CommandPaletteViewModel
         SnippetDetailRiskBrushKey = presentation.RiskBrushKey;
         SnippetDetailPlatformLabel = presentation.PlatformLabel;
 
+        SnippetExamples.Clear();
+        foreach (var example in presentation.Examples)
+        {
+            SnippetExamples.Add(example);
+        }
+        SnippetLinks.Clear();
+        foreach (var link in presentation.Links)
+        {
+            SnippetLinks.Add(link);
+        }
+        OnPropertyChanged(nameof(SnippetHasExamples));
+        OnPropertyChanged(nameof(SnippetHasLinks));
+
         foreach (var variant in variants)
         {
             SnippetVariants.Add(new SnippetVariantDisplayItem
@@ -272,6 +299,10 @@ public sealed partial class CommandPaletteViewModel
         SnippetDetailRiskBadge = string.Empty;
         SnippetDetailRiskBrushKey = string.Empty;
         SnippetDetailPlatformLabel = string.Empty;
+        SnippetExamples.Clear();
+        SnippetLinks.Clear();
+        OnPropertyChanged(nameof(SnippetHasExamples));
+        OnPropertyChanged(nameof(SnippetHasLinks));
         SnippetGeneratedCommand = string.Empty;
         SnippetValidationError = string.Empty;
         IsSnippetCommandValid = false;
@@ -327,6 +358,17 @@ public sealed partial class CommandPaletteViewModel
         CopySnippetPayload(SnippetGeneratedCommand, SnippetDetailTitle);
         CloseSnippetDetail();
         IsOpen = false;
+    }
+
+    /// <summary>
+    /// Copies a single example command to the clipboard without closing the
+    /// palette (a convenience, unlike <see cref="CopySnippet"/>).
+    /// </summary>
+    [RelayCommand]
+    private void CopySnippetExample(CommandExample? example)
+    {
+        if (example is null || string.IsNullOrEmpty(example.Command)) return;
+        CopySnippetPayload(example.Command, SnippetDetailTitle);
     }
 
     /// <summary>Returns to the palette result list, keeping the palette open.</summary>

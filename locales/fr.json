@@ -3465,6 +3465,8 @@
   "PaletteSnippetVariantsHeader": "Commandes",
   "PaletteSnippetParametersHeader": "Paramètres",
   "PaletteSnippetNotesHeader": "Notes",
+  "PaletteSnippetExamplesHeader": "Exemples",
+  "PaletteSnippetLinksHeader": "Liens",
   "PaletteSnippetPreviewHeader": "Commande",
   "PaletteSnippetDetailHints": "Entrée : envoyer · Ctrl+Entrée : copier · Échap : retour",
   "PaletteSnippetCopied": "Snippet copié : {0}",

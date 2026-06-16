@@ -3988,6 +3988,83 @@
                                Margin="14,6,14,0"
                                Visibility="{Binding CommandPalette.SnippetValidationError, Converter={StaticResource NullToVisibilityConverter}}"/>
 
+                    <!-- Examples (copy on click; collapsed when the action has none). -->
+                    <StackPanel Visibility="{Binding CommandPalette.SnippetHasExamples, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{loc:Translate PaletteSnippetExamplesHeader}"
+                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Opacity="0.85"
+                                   Padding="14,8,14,4"/>
+                        <ScrollViewer MaxHeight="120"
+                                      VerticalScrollBarVisibility="Auto"
+                                      Margin="14,0">
+                            <ItemsControl ItemsSource="{Binding CommandPalette.SnippetExamples}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="6,3"
+                                                Margin="0,2,0,0"
+                                                Background="{DynamicResource CardBrush}"
+                                                CornerRadius="{StaticResource CornerRadiusSm}">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right"
+                                                        Content="&#xE8C8;"
+                                                        FontFamily="Segoe MDL2 Assets"
+                                                        Command="{Binding DataContext.CommandPalette.CopySnippetExampleCommand, ElementName=MainWindowRoot}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                        ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
+                                                        AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
+                                                        FontSize="11" Width="22" Height="22"
+                                                        Padding="2"
+                                                        VerticalAlignment="Top"
+                                                        Focusable="False"/>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Command}"
+                                                               FontFamily="{StaticResource FontFamilyMonospace}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Description}"
+                                                               FontSize="{StaticResource FontSizeSmallCaption}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextWrapping="Wrap"
+                                                               Visibility="{Binding Description, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+
+                    <!-- Documentation links (open in browser; collapsed when none). -->
+                    <StackPanel Visibility="{Binding CommandPalette.SnippetHasLinks, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{loc:Translate PaletteSnippetLinksHeader}"
+                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Opacity="0.85"
+                                   Padding="14,8,14,4"/>
+                        <ItemsControl ItemsSource="{Binding CommandPalette.SnippetLinks}"
+                                      Margin="14,0,14,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock FontSize="{StaticResource FontSizeCaption}"
+                                               Margin="0,2,0,0">
+                                        <Hyperlink NavigateUri="{Binding Url}"
+                                                   RequestNavigate="OnPaletteLinkNavigate"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   AutomationProperties.Name="{Binding Title}">
+                                            <Run Text="{Binding Title, Mode=OneWay}"/>
+                                        </Hyperlink>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
                     <TextBlock Text="{loc:Translate PaletteSnippetDetailHints}"
                                FontSize="{StaticResource FontSizeCaption}"
                                Padding="14,6"

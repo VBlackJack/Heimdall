@@ -2546,6 +2546,31 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     }
 
     /// <summary>
+    /// Opens an external documentation link from the palette snippet detail in the
+    /// default browser. Mirrors CommandLibraryView.OnLinkNavigate: http/https only,
+    /// shell-executed, failures logged without a modal.
+    /// </summary>
+    private void OnPaletteLinkNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        try
+        {
+            if (e.Uri.Scheme is not ("http" or "https")) return;
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = e.Uri.AbsoluteUri,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandPalette] Failed to open link: {ex.Message}");
+        }
+        e.Handled = true;
+    }
+
+    /// <summary>
     /// Dismiss the command palette when the user clicks anywhere in the main window
     /// (outside the Popup). The Popup is a separate HWND, so clicks on the main
     /// window surface never reach it — we intercept them here instead.

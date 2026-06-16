@@ -3465,6 +3465,8 @@
   "PaletteSnippetVariantsHeader": "Commands",
   "PaletteSnippetParametersHeader": "Parameters",
   "PaletteSnippetNotesHeader": "Notes",
+  "PaletteSnippetExamplesHeader": "Examples",
+  "PaletteSnippetLinksHeader": "Links",
   "PaletteSnippetPreviewHeader": "Command",
   "PaletteSnippetDetailHints": "Enter: send · Ctrl+Enter: copy · Esc: back",
   "PaletteQuickConnectHeader": "Quick Connect",
