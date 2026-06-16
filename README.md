@@ -14,7 +14,7 @@
 
 [![CI](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml/badge.svg)](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-6810%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-6854%20passing-brightgreen.svg)]()
 [![Tools](https://img.shields.io/badge/tools-59%20sysops-blue.svg)]()
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)]()
 
@@ -406,7 +406,7 @@ Release mode also produces Inno Setup `.exe` installers in `Dist/installers/` wi
 | RDP | ActiveX MsTscAx (WindowsFormsHost) |
 | Citrix | StoreBrowse CLI integration |
 | Crypto | System.Security.Cryptography.ProtectedData (DPAPI) |
-| Testing | xUnit (6,810 passing tests across 8 projects) |
+| Testing | xUnit (6,854 passing tests across 8 projects) |
 | Built-in Tools | 59 sysops tools (Ctrl+K → `tools` or Ctrl+Shift+T) |
 | Serialization | System.Text.Json |
 
