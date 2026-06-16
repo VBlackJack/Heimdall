@@ -179,8 +179,9 @@
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch">
                         <StackPanel VerticalAlignment="Center"
-                                    HorizontalAlignment="Center"
-                                    MaxWidth="400">
+                                    HorizontalAlignment="Center">
+                            <!-- Message text group: capped width so long messages wrap nicely. -->
+                            <StackPanel MaxWidth="400">
                             <TextBlock x:Name="ReconnectMessageText"
                                        Text="{loc:Translate SshDisconnectedMessage}"
                                        FontSize="{StaticResource FontSizeSubtitle}"
@@ -188,8 +189,11 @@
                                        TextAlignment="Center"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <StackPanel Orientation="Horizontal"
+                            </StackPanel>
+                            <!-- Button row: WrapPanel so localized labels wrap instead of clipping. -->
+                            <WrapPanel Orientation="Horizontal"
                                         HorizontalAlignment="Center"
+                                        MaxWidth="720"
                                         Margin="0,16,0,0">
                                 <Button x:Name="OverlayReconnectButton"
                                         Content="{loc:Translate BtnReconnectSession}"
@@ -207,7 +211,7 @@
                                         Padding="16,6"
                                         FontSize="{StaticResource FontSizeBodyLarge}"
                                         Margin="8,0,0,0"/>
-                            </StackPanel>
+                            </WrapPanel>
                         </StackPanel>
                     </Border>
 

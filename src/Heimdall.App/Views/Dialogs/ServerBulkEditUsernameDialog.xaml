@@ -93,6 +93,7 @@
                     Margin="0,12,0,0">
             <Button Content="{loc:Translate BtnCancel}"
                     IsCancel="True"
+                    Style="{StaticResource SecondaryButtonStyle}"
                     MinWidth="88"
                     Margin="0,0,8,0"/>
             <Button Content="{loc:Translate BtnApply}"
