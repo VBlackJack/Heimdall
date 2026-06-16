@@ -3815,7 +3815,8 @@
                                 Padding="4,1"
                                 VerticalAlignment="Center"
                                 Margin="0,0,6,0"
-                                ToolTip="{Binding CommandPalette.SnippetDetailRiskLabel}">
+                                ToolTip="{Binding CommandPalette.SnippetDetailRiskLabel}"
+                                AutomationProperties.Name="{Binding CommandPalette.SnippetDetailRiskLabel}">
                             <Border.Background>
                                 <MultiBinding Converter="{StaticResource ResourceKeyToBrushConverter}">
                                     <Binding Path="CommandPalette.SnippetDetailRiskBrushKey"/>
@@ -3830,7 +3831,8 @@
                         <TextBlock Text="{Binding CommandPalette.SnippetDetailPlatformLabel}"
                                    FontSize="{StaticResource FontSizeSmallCaption}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"/>
+                                   VerticalAlignment="Center"
+                                   AutomationProperties.Name="{Binding CommandPalette.SnippetDetailPlatformLabel}"/>
                     </StackPanel>
 
                     <Border Height="1" Background="{DynamicResource BorderBrush}"/>
@@ -3897,6 +3899,8 @@
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Bd"
                                                     Background="{TemplateBinding Background}"
+                                                    BorderBrush="Transparent"
+                                                    BorderThickness="1"
                                                     CornerRadius="{StaticResource CornerRadiusSm}"
                                                     Padding="{TemplateBinding Padding}">
                                                 <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -3910,6 +3914,9 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="Bd" Property="Background"
                                                             Value="{DynamicResource HighlightBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -3934,6 +3941,7 @@
                                     <StackPanel Margin="0,4">
                                         <TextBlock Text="{Binding DisplayLabel}"
                                                    ToolTip="{Binding DisplayTooltip}"
+                                                   AutomationProperties.HelpText="{Binding DisplayTooltip}"
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    Margin="0,0,0,2"/>
@@ -3945,7 +3953,8 @@
                                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                                  BorderBrush="{DynamicResource BorderBrush}"
                                                  BorderThickness="1"
-                                                 AutomationProperties.Name="{Binding DisplayLabel}"/>
+                                                 AutomationProperties.Name="{Binding DisplayLabel}"
+                                                 AutomationProperties.HelpText="{Binding DisplayTooltip}"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

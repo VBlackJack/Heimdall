@@ -90,7 +90,8 @@
                       Foreground="{DynamicResource TextPrimaryBrush}">
                 <ListView.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:CommandLibraryPickerItem}">
-                        <Grid Margin="0,0,0,8">
+                        <Grid Margin="0,0,0,8"
+                              AutomationProperties.Name="{Binding Title}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="160"/>
@@ -153,7 +154,8 @@
                                 </StackPanel>
                                 <TextBox Grid.Column="1"
                                          Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                         AutomationProperties.Name="{Binding Label}">
+                                         AutomationProperties.Name="{Binding Label}"
+                                         AutomationProperties.HelpText="{Binding Description}">
                                     <TextBox.Style>
                                         <Style TargetType="TextBox" BasedOn="{StaticResource DialogFormTextBoxStyle}">
                                             <Setter Property="ToolTip" Value="{Binding Description}"/>

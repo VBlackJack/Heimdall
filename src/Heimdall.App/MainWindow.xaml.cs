@@ -2430,6 +2430,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 {
                     PaletteVariantsList.SelectedIndex++;
                     PaletteVariantsList.ScrollIntoView(PaletteVariantsList.SelectedItem);
+                    FocusSelectedVariantItem();
                 }
                 e.Handled = true;
             }
@@ -2439,6 +2440,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 {
                     PaletteVariantsList.SelectedIndex--;
                     PaletteVariantsList.ScrollIntoView(PaletteVariantsList.SelectedItem);
+                    FocusSelectedVariantItem();
                 }
                 e.Handled = true;
             }
@@ -2511,7 +2513,36 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             PaletteVariantsList.SelectedIndex = 0;
         }
 
-        _ = PaletteVariantsList.Focus();
+        if (PaletteVariantsList.ItemContainerGenerator
+                .ContainerFromIndex(PaletteVariantsList.SelectedIndex) is ListBoxItem item)
+        {
+            _ = item.Focus();
+        }
+        else
+        {
+            _ = PaletteVariantsList.Focus();
+            FocusSelectedVariantItem();
+        }
+    }
+
+    /// <summary>
+    /// Moves keyboard focus to the currently selected variant's container so the
+    /// focus ring and the UIA focus track the selection during arrow navigation.
+    /// Deferred to Input priority so the container is realized before focusing.
+    /// </summary>
+    private void FocusSelectedVariantItem()
+    {
+        if (PaletteVariantsList.SelectedIndex < 0) return;
+        _ = Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input,
+            new Action(() =>
+            {
+                if (PaletteVariantsList.ItemContainerGenerator
+                        .ContainerFromIndex(PaletteVariantsList.SelectedIndex) is ListBoxItem item)
+                {
+                    _ = item.Focus();
+                }
+            }));
     }
 
     /// <summary>
