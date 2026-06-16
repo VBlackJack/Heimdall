@@ -31,6 +31,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Security;
+using Heimdall.Core.Updates;
 using SshAgentPreferenceEnum = Heimdall.Core.Ssh.SshAgentPreference;
 
 namespace Heimdall.App.ViewModels;
@@ -95,8 +96,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
     private readonly PinManager _pinManager;
+    private readonly IUpdateService _updateService;
+    private readonly IAppVersionProvider _appVersionProvider;
     private readonly IProfileImportService? _profileImportService;
     private bool _disposed;
+
+    // Repository coordinates for the update check, captured from settings on load.
+    private string _updateOwner = "";
+    private string _updateRepo = "";
     private int _mobaStoredCredentialCount;
 
     private string _originalTheme = "";
@@ -133,6 +140,26 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     private string _externalEditorPath = "";
+
+    // --- Updates ---
+
+    [ObservableProperty]
+    private bool _updateCheckEnabled = true;
+
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(1, 8760, ErrorMessage = "Update check interval must be between 1 and 8760 hours.")]
+    private int _updateCheckIntervalHours = 24;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckNowCommand))]
+    private bool _isCheckingUpdate;
+
+    [ObservableProperty]
+    private string _updateStatusText = string.Empty;
+
+    /// <summary>The raw informational version for display (never raises PropertyChanged, so it stays out of dirty).</summary>
+    public string CurrentVersionText => _appVersionProvider.InformationalVersion;
 
     // --- Terminal ---
 
@@ -492,14 +519,52 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IDialogService dialogService,
         TrustedHostKeysSettingsViewModel trustedHostKeys,
         PinManager pinManager,
+        IUpdateService updateService,
+        IAppVersionProvider appVersionProvider,
         IProfileImportService? profileImportService = null)
     {
         _configManager = configManager;
         _localizer = localizer;
         _dialogService = dialogService;
         _pinManager = pinManager;
+        _updateService = updateService;
+        _appVersionProvider = appVersionProvider;
         _profileImportService = profileImportService;
         TrustedHostKeys = trustedHostKeys;
+    }
+
+    private bool CanCheckNow() => !IsCheckingUpdate;
+
+    /// <summary>
+    /// Runs a one-shot update check against the configured repository and reports
+    /// the outcome in <see cref="UpdateStatusText"/>. Never marks settings dirty.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanCheckNow))]
+    private async Task CheckNowAsync(CancellationToken cancellationToken)
+    {
+        IsCheckingUpdate = true;
+        UpdateStatusText = _localizer.Format("SettingsUpdateStatusChecking");
+        try
+        {
+            var current = _appVersionProvider.Current;
+            if (current is null)
+            {
+                UpdateStatusText = _localizer.Format("SettingsUpdateStatusUnknownVersion");
+                return;
+            }
+
+            var result = await _updateService.CheckForUpdatesAsync(current.Value, _updateOwner, _updateRepo, cancellationToken);
+            UpdateStatusText = result.Status switch
+            {
+                UpdateCheckStatus.UpToDate => _localizer.Format("SettingsUpdateStatusUpToDate"),
+                UpdateCheckStatus.UpdateAvailable => _localizer.Format("SettingsUpdateStatusAvailable", result.Update!.Version.ToString()),
+                _ => _localizer.Format("SettingsUpdateStatusFailed"),
+            };
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
     }
 
     public TrustedHostKeysSettingsViewModel TrustedHostKeys { get; }
@@ -593,6 +658,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         PreventSleepDuringSession = settings.PreventSleepDuringSession;
         CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
         ExternalEditorPath = settings.ExternalEditorPath;
+
+        // Updates
+        UpdateCheckEnabled = settings.UpdateCheckEnabled;
+        UpdateCheckIntervalHours = settings.UpdateCheckIntervalHours;
+        _updateOwner = settings.UpdateRepositoryOwner;
+        _updateRepo = settings.UpdateRepositoryName;
 
         // UI state
         ShowToolsPanel = settings.ShowToolsPanel;
@@ -774,6 +845,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.PreventSleepDuringSession = PreventSleepDuringSession;
             settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
             settings.ExternalEditorPath = ExternalEditorPath;
+            settings.UpdateCheckEnabled = UpdateCheckEnabled;
+            settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
 
             // Terminal
             settings.TerminalFontFamily = TerminalFontFamily;
@@ -1763,6 +1836,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // Mark dirty when any settings property changes, excluding non-settings properties
         if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
+            or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
             or nameof(SelectedGateway) or nameof(SelectedProject)
             or nameof(SelectedExternalTool) or nameof(HasValidationErrors)
             or nameof(IsPinConfigured) or nameof(PinStatusText)

@@ -2040,6 +2040,27 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsUpdatesTitle" Text="{loc:Translate SettingsSectionUpdates}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <CheckBox x:Name="Mw_SettingsUpdateCheckEnabled" Content="{loc:Translate SettingsLabelUpdateCheckEnabled}" IsChecked="{Binding Settings.UpdateCheckEnabled}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <StackPanel Margin="0,12,0,0">
+                                            <TextBlock x:Name="Mw_SettingsUpdateIntervalLabel" Text="{loc:Translate SettingsLabelUpdateInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <TextBox Text="{Binding Settings.UpdateCheckIntervalHours}" Width="100" HorizontalAlignment="Left"
+                                                     AutomationProperties.LabeledBy="{x:Reference Mw_SettingsUpdateIntervalLabel}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,12,0,0">
+                                            <TextBlock x:Name="Mw_SettingsCurrentVersionLabel" Text="{loc:Translate SettingsLabelCurrentVersion}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding Settings.CurrentVersionText}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCurrentVersionLabel}"/>
+                                        </StackPanel>
+                                        <Button x:Name="Mw_SettingsCheckNowButton" Content="{loc:Translate SettingsBtnCheckNow}" Command="{Binding Settings.CheckNowCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                AutomationProperties.Name="{loc:Translate SettingsBtnCheckNow}"/>
+                                        <TextBlock x:Name="Mw_SettingsUpdateStatus" Text="{Binding Settings.UpdateStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

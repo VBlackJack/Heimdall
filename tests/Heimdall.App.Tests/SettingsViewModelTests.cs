@@ -29,6 +29,7 @@ using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
+using Heimdall.Core.Updates;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
@@ -1036,7 +1037,9 @@ public sealed class SettingsViewModelTests
             localizer,
             dialog,
             trustedHostKeys,
-            new PinManager());
+            new PinManager(),
+            new FakeUpdateService(),
+            new AppVersionProvider("2026.061501"));
 
         viewModel.Dispose();
         viewModel.Dispose();
@@ -1054,10 +1057,14 @@ public sealed class SettingsViewModelTests
         FakeConfigManager config,
         FakeDialogService? dialog = null,
         IProfileImportService? profileImportService = null,
-        LocalizationManager? localizer = null)
+        LocalizationManager? localizer = null,
+        IUpdateService? updateService = null,
+        IAppVersionProvider? appVersionProvider = null)
     {
         localizer ??= new LocalizationManager();
         dialog ??= new FakeDialogService();
+        updateService ??= new FakeUpdateService();
+        appVersionProvider ??= new AppVersionProvider("2026.061501");
         var trustedHostKeys = new TrustedHostKeysSettingsViewModel(
             new HostKeyTrustService(new HostKeyStore()),
             () => new KnownHostsImportReport(0, 0, []),
@@ -1073,7 +1080,56 @@ public sealed class SettingsViewModelTests
             dialog,
             trustedHostKeys,
             new PinManager(),
+            updateService,
+            appVersionProvider,
             profileImportService);
+    }
+
+    [Theory]
+    [InlineData(UpdateCheckStatus.UpToDate, "SettingsUpdateStatusUpToDate")]
+    [InlineData(UpdateCheckStatus.CheckFailed, "SettingsUpdateStatusFailed")]
+    public async Task CheckNowAsync_MapsStatusToExpectedKey_WithoutMarkingDirty(UpdateCheckStatus status, string expectedKey)
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService { Result = new UpdateCheckResult(status, null) };
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer.Format(expectedKey), viewModel.UpdateStatusText);
+        Assert.False(viewModel.IsCheckingUpdate);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task CheckNowAsync_UpdateAvailable_IncludesVersionWithoutMarkingDirty()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var info = new UpdateInfo(
+            HeimdallVersion.Parse("2026.061502"),
+            "v2026.061502",
+            "https://example.test",
+            "notes",
+            new UpdateAsset("Heimdall_2026.061502_Standard_Setup.exe", "https://example.test/setup.exe", 1),
+            null);
+        var updateService = new FakeUpdateService { Result = new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, info) };
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer.Format("SettingsUpdateStatusAvailable", "2026.061502"), viewModel.UpdateStatusText);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    private sealed class FakeUpdateService : IUpdateService
+    {
+        public UpdateCheckResult Result { get; set; } = new(UpdateCheckStatus.UpToDate, null);
+
+        public Task<UpdateCheckResult> CheckForUpdatesAsync(HeimdallVersion current, string owner, string repo, CancellationToken cancellationToken)
+            => Task.FromResult(Result);
+
+        public Task<string> DownloadVerifiedAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
     }
 
     private static JsonSerializerOptions GetExportJsonOptions()

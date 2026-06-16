@@ -150,7 +150,9 @@ public sealed partial class SessionCoordinatorPreMountTests
                 localizer,
                 dialogService,
                 null!,
-                new PinManager());
+                new PinManager(),
+                null!,
+                null!);
             MainViewModel main = new MainViewModel(
                 configManager,
                 localizer,
