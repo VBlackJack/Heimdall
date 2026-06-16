@@ -268,6 +268,16 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 ShowOnboardingOverlay(viewModel.CurrentSettings);
             }
 
+            // Throttled background update check (usually a no-op). Never blocks the UI.
+            try
+            {
+                await viewModel.Update.CheckOnStartupAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn($"[Updates] startup check: {ex.Message}");
+            }
+
             _settingsRuntimeBridgeInitialized = true;
         };
 
@@ -280,6 +290,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 if (DataContext is MainViewModel vm)
                 {
                     RefreshVmDrivenLocalization(vm);
+                    // The update status string is set imperatively and does not re-localize live.
+                    vm.Settings.UpdateStatusText = string.Empty;
                 }
             });
         };

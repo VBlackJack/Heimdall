@@ -176,6 +176,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 serverList,
                 connection,
                 settings,
+                null!,
                 new ServiceCollection().BuildServiceProvider());
 
             return new TestHarness(rootPath, main, dispatcher, dialogService, embeddedSessionManager, handlers);

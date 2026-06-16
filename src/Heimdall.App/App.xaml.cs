@@ -419,6 +419,7 @@ public partial class App : System.Windows.Application
             sp.GetRequiredService<IAppVersionProvider>().Current?.ToString() ?? "unknown"));
         services.AddSingleton<IVariantDetector>(_ => new VariantDetector());
         services.AddSingleton<IUpdateService, UpdateService>();
+        services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
         services.AddSingleton<IConnectionService, ConnectionService>();
         services.AddSingleton<ConnectionService>(sp =>
             (ConnectionService)sp.GetRequiredService<IConnectionService>());
@@ -497,6 +498,7 @@ public partial class App : System.Windows.Application
 
         // ViewModels
         services.AddTransient<MainViewModel>();
+        services.AddTransient<UpdateBannerViewModel>();
         services.AddTransient<ServerListViewModel>();
         services.AddTransient<ConnectionViewModel>();
         services.AddTransient<SettingsViewModel>();

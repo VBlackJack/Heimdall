@@ -219,6 +219,36 @@
                      IsHitTestVisible="False"
                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
+        <!-- MAIN CONTENT WRAPPER: non-modal update banner row + content -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Update banner: its own layout row pushes content down (no overlay over the ActiveX surface). -->
+            <Border x:Name="Mw_UpdateBanner" Grid.Row="0"
+                    Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+                    Padding="{StaticResource SpacingLg}"
+                    Visibility="{Binding Update.IsBannerVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <DockPanel LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="Mw_UpdateBannerViewRelease" Content="{loc:Translate UpdateBannerViewReleaseBtn}" Command="{Binding Update.ViewReleaseCommand}"
+                                Style="{DynamicResource PrimaryButtonStyle}" Margin="0,0,8,0"
+                                AutomationProperties.Name="{loc:Translate UpdateBannerViewReleaseBtn}"/>
+                        <Button x:Name="Mw_UpdateBannerLater" Content="{loc:Translate UpdateBannerLaterBtn}" Command="{Binding Update.LaterCommand}"
+                                Style="{DynamicResource SecondaryButtonStyle}" Margin="0,0,8,0"
+                                AutomationProperties.Name="{loc:Translate UpdateBannerLaterBtn}"/>
+                        <Button x:Name="Mw_UpdateBannerSkip" Content="{loc:Translate UpdateBannerSkipVersionBtn}" Command="{Binding Update.SkipVersionCommand}"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                AutomationProperties.Name="{loc:Translate UpdateBannerSkipVersionBtn}"/>
+                    </StackPanel>
+                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}">
+                        <Run Text="{loc:Translate UpdateBannerText}"/><Run Text="{Binding Update.BannerVersionText}" FontWeight="SemiBold"/>
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+
         <!-- MAIN CONTENT -->
         <Grid x:Name="MainContentArea" Grid.Row="1"
               ClipToBounds="True">
@@ -3378,6 +3408,7 @@
             </ScrollViewer>
 
             <!-- Sessions overlay removed — now inside Servers Grid Column 2 -->
+        </Grid>
         </Grid>
 
         <!-- Fullscreen exit chrome uses a Popup (own HWND) so it stays visible above ActiveX/WebView content. -->

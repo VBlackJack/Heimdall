@@ -232,6 +232,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// </summary>
     public SettingsViewModel Settings { get; }
 
+    public UpdateBannerViewModel Update { get; }
+
     /// <summary>Centralized tool registry shared with MainWindow for menus.</summary>
     public ToolRegistry ToolRegistry { get; }
 
@@ -312,6 +314,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ServerListViewModel serverList,
         ConnectionViewModel connection,
         SettingsViewModel settings,
+        UpdateBannerViewModel update,
         IServiceProvider serviceProvider,
         IRecentConnectionTracker? recentConnections = null)
     {
@@ -329,6 +332,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ServerList = serverList;
         Connection = connection;
         Settings = settings;
+        Update = update;
         Sidebar = new SidebarViewModel(this, localizer, configManager, toolsTabPopulation, toolContextProvider, _uiDispatcher);
         ToolsTab = new ToolsTabViewModel(this, localizer, toolContextProvider);
         CommandPalette = new CommandPaletteViewModel(
