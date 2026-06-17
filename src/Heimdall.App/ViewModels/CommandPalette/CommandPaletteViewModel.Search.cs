@@ -54,7 +54,7 @@ public sealed partial class CommandPaletteViewModel
                     initialResults.Add(new ServerItemViewModel
                     {
                         Id = $"session-{s.ServerId}",
-                        DisplayName = $"\u2194 {s.Title}",
+                        DisplayName = MergeArrowPrefix + s.Title,
                         RemoteServer = _localizer["SplitMergeActiveSession"],
                         ConnectionType = s.ConnectionType ?? "",
                         Group = _localizer["SplitActiveSessionsHeader"]
@@ -92,7 +92,7 @@ public sealed partial class CommandPaletteViewModel
 
             if (_splitPaletteSession is null)
             {
-                var recentHosts = _recentConnections.GetRecents(10)
+                var recentHosts = _recentConnections.GetRecents(MaxRecentHostSuggestions)
                     .Select(r => r.Host)
                     .ToList();
                 var recentlyConnected = new List<ServerItemViewModel>();
@@ -117,7 +117,7 @@ public sealed partial class CommandPaletteViewModel
                     .ToList();
 
                 initialResults.AddRange(recentlyConnected);
-                initialResults.AddRange(others.Take(Math.Max(0, 10 - recentlyConnected.Count)));
+                initialResults.AddRange(others.Take(Math.Max(0, MaxServerSuggestions - recentlyConnected.Count)));
             }
             else
             {
@@ -210,7 +210,7 @@ public sealed partial class CommandPaletteViewModel
 
         var matches = scored
             .OrderByDescending(x => x.Score)
-            .Take(20)
+            .Take(MaxFuzzyResults)
             .Select(x => x.Item)
             .ToList();
 
@@ -391,6 +391,24 @@ public sealed partial class CommandPaletteViewModel
 
     private const int ToolExactAliasScore = 999;
 
+    /// <summary>Maximum number of fuzzy-ranked results shown in the palette.</summary>
+    private const int MaxFuzzyResults = 20;
+
+    /// <summary>Maximum number of recently-connected hosts bubbled to the top of the empty-query seed.</summary>
+    private const int MaxRecentHostSuggestions = 10;
+
+    /// <summary>Maximum number of servers surfaced in the empty-query seed (normal, non-split mode).</summary>
+    private const int MaxServerSuggestions = 10;
+
+    /// <summary>Maximum length of the command preview shown next to a snippet result.</summary>
+    private const int SnippetPreviewMaxLength = 96;
+
+    /// <summary>Decorative prefix marking an active session as a split-merge candidate.</summary>
+    private const string MergeArrowPrefix = "↔ ";
+
+    /// <summary>Ellipsis glyph appended to truncated previews.</summary>
+    private const string EllipsisGlyph = "…";
+
     /// <summary>
     /// Returns true when the input looks like a bare IP address or hostname
     /// (no spaces, no protocol prefix, alphanumeric with dots and hyphens).
@@ -474,9 +492,9 @@ public sealed partial class CommandPaletteViewModel
     private ServerItemViewModel BuildSnippetItem(ActionModel action)
     {
         var preview = ResolveSnippetCommand(action);
-        if (preview.Length > 96)
+        if (preview.Length > SnippetPreviewMaxLength)
         {
-            preview = preview[..96] + "…";
+            preview = preview[..SnippetPreviewMaxLength] + EllipsisGlyph;
         }
 
         return new ServerItemViewModel

@@ -24,6 +24,9 @@ public static class AppConstants
     /// <summary>Maximum import file size for Command Library JSON imports.</summary>
     public const long MaxImportFileSizeBytes = 50 * 1024 * 1024;
 
+    /// <summary>Maximum size of a single Command Library seed JSON file read at first launch.</summary>
+    public const long MaxSeedFileSizeBytes = 100 * 1024;
+
     /// <summary>Maximum accepted length of an imported action Title.</summary>
     public const int MaxImportActionTitleLength = 200;
 
