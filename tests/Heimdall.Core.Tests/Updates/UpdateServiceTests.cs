@@ -197,13 +197,15 @@ public sealed class UpdateServiceTests
         var wrongHash = new string('0', 64);
         var client = new StubReleaseClient { StreamFactory = () => new MemoryStream(payload) };
         var service = CreateService(client, BuildVariant.Standard);
-        var update = UpdateWithSha(wrongHash, payload.Length);
+        // Unique version isolates this test's temp-file snapshot from the other (parallel) download tests.
+        const string tag = "v2026.061597";
+        var update = UpdateWithSha(wrongHash, payload.Length, tag);
 
-        var before = TempSnapshot();
+        var before = TempSnapshot(tag);
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
 
-        Assert.Empty(TempSnapshot().Except(before));
+        Assert.Empty(TempSnapshot(tag).Except(before));
     }
 
     [Fact]
@@ -212,13 +214,15 @@ public sealed class UpdateServiceTests
         var payload = Encoding.ASCII.GetBytes("payload");
         var client = new StubReleaseClient { StreamFactory = () => new MemoryStream(payload) };
         var service = CreateService(client, BuildVariant.Standard);
-        var update = UpdateWithSha(null, payload.Length);
+        // Unique version isolates this test's temp-file snapshot from the other (parallel) download tests.
+        const string tag = "v2026.061598";
+        var update = UpdateWithSha(null, payload.Length, tag);
 
-        var before = TempSnapshot();
+        var before = TempSnapshot(tag);
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
 
-        Assert.Empty(TempSnapshot().Except(before));
+        Assert.Empty(TempSnapshot(tag).Except(before));
     }
 
     private static UpdateService CreateService(StubReleaseClient client, BuildVariant variant)
@@ -241,15 +245,18 @@ public sealed class UpdateServiceTests
         return new GitHubRelease(tag, $"https://github.com/VBlackJack/Heimdall/releases/tag/{tag}", "notes", assets);
     }
 
-    private static UpdateInfo UpdateWithSha(string? sha256, long sizeBytes)
+    private static UpdateInfo UpdateWithSha(string? sha256, long sizeBytes, string versionTag = NewerTag)
     {
-        var version = HeimdallVersion.Parse(NewerTag);
-        var asset = new UpdateAsset("Heimdall_2026.061502_Standard_Setup.exe", "https://example.test/standard.exe", sizeBytes);
-        return new UpdateInfo(version, NewerTag, "https://example.test", "notes", asset, sha256);
+        var version = HeimdallVersion.Parse(versionTag);
+        var asset = new UpdateAsset($"Heimdall_{version}_Standard_Setup.exe", "https://example.test/standard.exe", sizeBytes);
+        return new UpdateInfo(version, versionTag, "https://example.test", "notes", asset, sha256);
     }
 
-    private static HashSet<string> TempSnapshot()
-        => new(Directory.EnumerateFiles(Path.GetTempPath(), "Heimdall_*"), StringComparer.OrdinalIgnoreCase);
+    private static HashSet<string> TempSnapshot(string versionTag)
+    {
+        var version = HeimdallVersion.Parse(versionTag);
+        return new(Directory.EnumerateFiles(Path.GetTempPath(), $"Heimdall_{version}_*"), StringComparer.OrdinalIgnoreCase);
+    }
 
     private sealed class StubReleaseClient : IGitHubReleaseClient
     {
