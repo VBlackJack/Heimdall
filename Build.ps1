@@ -194,6 +194,12 @@ function Publish-Variant {
     $variantFolder = "Heimdall_build.${buildNumber}${suffix}"
     $variantDir = Join-Path $distDir $variantFolder
 
+    # Clean only this variant's output folder. dotnet publish overwrites files
+    # but never removes stale ones, so a surviving folder accumulates cruft
+    # across builds of the same version. Scoped to $variantDir, never $distDir,
+    # so the auto-increment scan over sibling build folders stays intact.
+    if (Test-Path $variantDir) { Remove-Item $variantDir -Recurse -Force }
+
     Write-Host "  Publishing $VariantName to $variantFolder..." -ForegroundColor Yellow
     dotnet publish $AppProject -c $Mode -o $variantDir --nologo --verbosity quiet --self-contained true -r win-x64 -p:PublishSingleFile=false
     if ($LASTEXITCODE -ne 0) {
@@ -228,10 +234,16 @@ function Publish-Variant {
         Copy-Item $assetsSrc $assetsDest -Recurse -Force
     }
 
-    # Bundle WebView2 runtime for SelfContained edition only
+    # Bundle WebView2 runtime for SelfContained edition only.
+    # Copy the runtime *contents* into a freshly recreated destination so the
+    # layout is always runtimes\webview2\<files>. Copying the source directory
+    # itself with -Recurse nests it as a child (runtimes\webview2\webview2\...)
+    # whenever the destination already exists, duplicating ~400 MB per level.
     if ($VariantName -eq 'SelfContained') {
         $wv2Dest = Join-Path $variantDir 'runtimes\webview2'
-        Copy-Item $wv2Runtime $wv2Dest -Recurse -Force
+        if (Test-Path $wv2Dest) { Remove-Item $wv2Dest -Recurse -Force }
+        New-Item -ItemType Directory -Path $wv2Dest -Force | Out-Null
+        Copy-Item (Join-Path $wv2Runtime '*') $wv2Dest -Recurse -Force
         Write-Host "    + WebView2 Fixed Version Runtime bundled" -ForegroundColor DarkGray
     }
 
