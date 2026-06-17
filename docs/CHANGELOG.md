@@ -12,6 +12,23 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-17: One-click in-app updater (v2026.061702)
+
+A user-facing release completing the in-app updater: an available update can now be
+downloaded, verified and installed in one click, with Heimdall relaunching itself when
+the install finishes.
+
+- **One-click "Download & install".** Both the Settings "Updates" card and the startup
+  update banner now offer a primary "Download & install" action. It downloads the new
+  installer (with a progress bar and a Cancel button), verifies its SHA-256 checksum,
+  closes active sessions, installs silently and relaunches Heimdall automatically.
+- **Truly unattended install.** The installer no longer shows an "already installed,
+  upgrade?" prompt during a silent update; that confirmation now appears only for
+  interactive (double-click) installs, since the app already confirms before updating.
+- **Internal.** The downloaded installer keeps its real ".exe" extension so it can be
+  launched directly; SHA-256 verification is mandatory before any install; the automated
+  test baseline is now 7,018 passing tests, 0 warnings.
+
 ## 2026-06-17 — In-app updater, French UI polish and Command Library authoring (v2026.061701)
 
 A user-facing release adding a first in-app update experience, fixing French button
