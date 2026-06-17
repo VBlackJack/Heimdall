@@ -41,8 +41,8 @@ public sealed partial class CommandLibraryViewModel
     public void Copy()
     {
         if (string.IsNullOrEmpty(GeneratedCommand)) return;
-        SetClipboardText?.Invoke(GeneratedCommand);
-        ShowCopyFeedback?.Invoke("copy");
+        var copied = SetClipboardText?.Invoke(GeneratedCommand) ?? false;
+        if (copied) ShowCopyFeedback?.Invoke("copy");
         RecordHistory(GeneratedCommand);
     }
 
@@ -67,8 +67,8 @@ public sealed partial class CommandLibraryViewModel
     public void CopyExample(string? command)
     {
         if (string.IsNullOrEmpty(command)) return;
-        SetClipboardText?.Invoke(command);
-        ShowCopyFeedback?.Invoke("example");
+        var copied = SetClipboardText?.Invoke(command) ?? false;
+        if (copied) ShowCopyFeedback?.Invoke("example");
     }
 
     /// <summary>
@@ -90,8 +90,8 @@ public sealed partial class CommandLibraryViewModel
     public void CopyHistoryEntry(string? command)
     {
         if (string.IsNullOrEmpty(command)) return;
-        SetClipboardText?.Invoke(command);
-        TriggerHistoryCopyFeedback();
+        var copied = SetClipboardText?.Invoke(command) ?? false;
+        if (copied) TriggerHistoryCopyFeedback();
     }
 
     /// <summary>Clears the search box.</summary>

@@ -121,12 +121,13 @@ public partial class CommandLibraryView : UserControl, IToolView
     /// <summary>
     /// Thin wrapper around <see cref="Clipboard.SetText"/> that swallows the
     /// External clipboard-locked exceptions Windows raises when another
-    /// process owns the clipboard.
+    /// process owns the clipboard. Returns <c>true</c> on a successful write,
+    /// <c>false</c> when the clipboard was unavailable.
     /// </summary>
-    private static void SetClipboardSafely(string text)
+    private static bool SetClipboardSafely(string text)
     {
-        try { Clipboard.SetText(text); }
-        catch (System.Runtime.InteropServices.ExternalException) { }
+        try { Clipboard.SetText(text); return true; }
+        catch (System.Runtime.InteropServices.ExternalException) { return false; }
     }
 
     // ── Links ─────────────────────────────────────────────────────

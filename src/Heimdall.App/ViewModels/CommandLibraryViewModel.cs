@@ -363,9 +363,11 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>
     /// Callback installed by the view to write text to the system clipboard.
-    /// Keeps WPF references out of the VM so it remains testable.
+    /// Returns <c>true</c> when the write succeeded, <c>false</c> when the
+    /// clipboard was unavailable. Keeps WPF references out of the VM so it
+    /// remains testable.
     /// </summary>
-    public Action<string>? SetClipboardText { get; set; }
+    public Func<string, bool>? SetClipboardText { get; set; }
 
     /// <summary>
     /// Callback installed by the view to flash a transient "copied" animation
