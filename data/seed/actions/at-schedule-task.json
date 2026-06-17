@@ -17,7 +17,7 @@
     "id": "at-cmd",
     "platform": 1,
     "name": "at",
-    "commandPattern": "echo \"{command}\" | at {time}",
+    "commandPattern": "echo {command} | at {time}",
     "parameters": [
       {
         "name": "command",

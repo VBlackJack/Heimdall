@@ -16,7 +16,7 @@
     "id": "gpo-get-links-cmd",
     "platform": 0,
     "name": "Get-GPO",
-    "commandPattern": "(Get-GPO -Name \"{gpoName}\").GpoLinks | Select-Object Target,Enabled,Enforced",
+    "commandPattern": "(Get-GPO -Name {gpoName}).GpoLinks | Select-Object Target,Enabled,Enforced",
     "parameters": [
       {
         "name": "gpoName",

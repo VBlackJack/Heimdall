@@ -16,7 +16,7 @@
     "id": "ad-get-ou-details-cmd",
     "platform": 0,
     "name": "Get-ADOrganizationalUnit",
-    "commandPattern": "Get-ADOrganizationalUnit -Identity \"{ouDN}\" -Properties *",
+    "commandPattern": "Get-ADOrganizationalUnit -Identity {ouDN} -Properties *",
     "parameters": [
       {
         "name": "ouDN",

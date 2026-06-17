@@ -15,7 +15,7 @@
     "id": "d5086d24-2152-4fbc-aad6-d9548b122f8f",
     "platform": 1,
     "name": "find",
-    "commandPattern": "find {path} -name \"{pattern}\"",
+    "commandPattern": "find {path} -name {pattern}",
     "parameters": [
       {
         "name": "path",

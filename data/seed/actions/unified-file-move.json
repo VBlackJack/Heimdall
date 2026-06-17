@@ -30,7 +30,7 @@
     "id": "file-move-windows-cmd",
     "platform": 0,
     "name": "Move-Item",
-    "commandPattern": "Move-Item -Path \"{sourcePath}\" -Destination \"{destinationPath}\" -Force",
+    "commandPattern": "Move-Item -Path {sourcePath} -Destination {destinationPath} -Force",
     "parameters": [
       {
         "name": "sourcePath",
@@ -87,7 +87,7 @@
     "id": "file-move-linux-cmd",
     "platform": 1,
     "name": "mv",
-    "commandPattern": "mv \"{sourcePath}\" \"{destinationPath}\"",
+    "commandPattern": "mv {sourcePath} {destinationPath}",
     "parameters": [
       {
         "name": "sourcePath",

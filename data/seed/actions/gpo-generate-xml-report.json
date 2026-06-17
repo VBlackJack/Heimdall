@@ -16,7 +16,7 @@
     "id": "gpo-generate-xml-report-cmd",
     "platform": 0,
     "name": "Get-GPOReport",
-    "commandPattern": "Get-GPOReport -Name \"{gpoName}\" -ReportType Xml -Path \"{outputPath}\"",
+    "commandPattern": "Get-GPOReport -Name {gpoName} -ReportType Xml -Path {outputPath}",
     "parameters": [
       {
         "name": "gpoName",

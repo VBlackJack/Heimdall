@@ -17,7 +17,7 @@
     "id": "archive-tar-linux-cmd",
     "platform": 1,
     "name": "tar",
-    "commandPattern": "tar -czf \"{archiveName}.tar.gz\" \"{sourcePath}\"",
+    "commandPattern": "tar -czf \"{archiveName}.tar.gz\" {sourcePath}",
     "parameters": [
       {
         "name": "archiveName",

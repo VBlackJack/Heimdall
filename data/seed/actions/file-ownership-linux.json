@@ -16,7 +16,7 @@
     "id": "file-ownership-linux-cmd",
     "platform": 1,
     "name": "chown",
-    "commandPattern": "chown {owner}:{group} \"{path}\"",
+    "commandPattern": "chown {owner}:{group} {path}",
     "parameters": [
       {
         "name": "owner",

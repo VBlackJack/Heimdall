@@ -16,7 +16,7 @@
     "id": "ansible-playbook-tags-win",
     "platform": 0,
     "name": "ansible-playbook",
-    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --tags \"{tags}\"",
+    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --tags {tags}",
     "parameters": [
       {
         "name": "playbookPath",
@@ -49,7 +49,7 @@
     "id": "ansible-playbook-tags-linux",
     "platform": 1,
     "name": "ansible-playbook",
-    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --tags \"{tags}\"",
+    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --tags {tags}",
     "parameters": [
       {
         "name": "playbookPath",

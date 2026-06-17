@@ -16,7 +16,7 @@
     "id": "archive-zip-windows-cmd",
     "platform": 0,
     "name": "Compress-Archive",
-    "commandPattern": "Compress-Archive -Path \"{sourcePath}\" -DestinationPath \"{zipPath}\" -CompressionLevel Optimal -Force",
+    "commandPattern": "Compress-Archive -Path {sourcePath} -DestinationPath {zipPath} -CompressionLevel Optimal -Force",
     "parameters": [
       {
         "name": "sourcePath",

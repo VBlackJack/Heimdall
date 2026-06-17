@@ -16,7 +16,7 @@
     "id": "gpo-create-new-cmd",
     "platform": 0,
     "name": "New-GPO",
-    "commandPattern": "New-GPO -Name \"{gpoName}\" -Comment \"{comment}\"",
+    "commandPattern": "New-GPO -Name {gpoName} -Comment {comment}",
     "parameters": [
       {
         "name": "gpoName",

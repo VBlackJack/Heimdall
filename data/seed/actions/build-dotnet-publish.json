@@ -17,7 +17,7 @@
     "id": "build-dotnet-publish-win-cmd",
     "platform": 0,
     "name": "dotnet publish",
-    "commandPattern": "dotnet publish \"{projectPath}\" --configuration Release --output \"{outputPath}\"",
+    "commandPattern": "dotnet publish {projectPath} --configuration Release --output {outputPath}",
     "parameters": [
       {
         "name": "projectPath",
@@ -42,7 +42,7 @@
     "id": "build-dotnet-publish-linux-cmd",
     "platform": 1,
     "name": "dotnet publish",
-    "commandPattern": "dotnet publish \"{projectPath}\" --configuration Release --output \"{outputPath}\"",
+    "commandPattern": "dotnet publish {projectPath} --configuration Release --output {outputPath}",
     "parameters": [
       {
         "name": "projectPath",

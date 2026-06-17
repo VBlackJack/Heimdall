@@ -16,7 +16,7 @@
     "id": "gpo-generate-html-report-cmd",
     "platform": 0,
     "name": "Get-GPOReport",
-    "commandPattern": "Get-GPOReport -Name \"{gpoName}\" -ReportType Html -Path \"{outputPath}\"",
+    "commandPattern": "Get-GPOReport -Name {gpoName} -ReportType Html -Path {outputPath}",
     "parameters": [
       {
         "name": "gpoName",

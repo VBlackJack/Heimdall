@@ -16,7 +16,7 @@
     "id": "run-java-win-cmd",
     "platform": 0,
     "name": "java",
-    "commandPattern": "java -jar \"{jarPath}\"",
+    "commandPattern": "java -jar {jarPath}",
     "parameters": [
       {
         "name": "jarPath",
@@ -33,7 +33,7 @@
     "id": "run-java-linux-cmd",
     "platform": 1,
     "name": "java",
-    "commandPattern": "java -jar \"{jarPath}\"",
+    "commandPattern": "java -jar {jarPath}",
     "parameters": [
       {
         "name": "jarPath",

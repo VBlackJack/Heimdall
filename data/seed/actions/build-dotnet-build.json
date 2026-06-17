@@ -17,7 +17,7 @@
     "id": "build-dotnet-build-win-cmd",
     "platform": 0,
     "name": "dotnet build",
-    "commandPattern": "dotnet build \"{projectPath}\" --configuration {configuration}",
+    "commandPattern": "dotnet build {projectPath} --configuration {configuration}",
     "parameters": [
       {
         "name": "projectPath",
@@ -42,7 +42,7 @@
     "id": "build-dotnet-build-linux-cmd",
     "platform": 1,
     "name": "dotnet build",
-    "commandPattern": "dotnet build \"{projectPath}\" --configuration {configuration}",
+    "commandPattern": "dotnet build {projectPath} --configuration {configuration}",
     "parameters": [
       {
         "name": "projectPath",

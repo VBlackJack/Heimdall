@@ -16,7 +16,7 @@
     "id": "1e605fe9-b556-4145-a7ca-5a2556903843",
     "platform": 1,
     "name": "logger",
-    "commandPattern": "logger -p {priority} \"{message}\"",
+    "commandPattern": "logger -p {priority} {message}",
     "parameters": [
       {
         "name": "priority",

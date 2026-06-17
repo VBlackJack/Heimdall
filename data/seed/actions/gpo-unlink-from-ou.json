@@ -16,7 +16,7 @@
     "id": "gpo-unlink-from-ou-cmd",
     "platform": 0,
     "name": "Remove-GPLink",
-    "commandPattern": "Remove-GPLink -Name \"{gpoName}\" -Target \"{ouDN}\"",
+    "commandPattern": "Remove-GPLink -Name {gpoName} -Target {ouDN}",
     "parameters": [
       {
         "name": "gpoName",

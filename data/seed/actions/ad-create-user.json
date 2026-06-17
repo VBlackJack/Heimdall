@@ -16,7 +16,7 @@
     "id": "ad-create-user-cmd",
     "platform": 0,
     "name": "New-ADUser",
-    "commandPattern": "New-ADUser -Name \"{fullName}\" -SamAccountName {username} -UserPrincipalName {username}@{domain} -GivenName \"{firstName}\" -Surname \"{lastName}\" -DisplayName \"{fullName}\" -Path \"{ouPath}\" -AccountPassword (ConvertTo-SecureString \"{password}\" -AsPlainText -Force) -Enabled $true",
+    "commandPattern": "New-ADUser -Name {fullName} -SamAccountName {username} -UserPrincipalName {username}@{domain} -GivenName {firstName} -Surname {lastName} -DisplayName {fullName} -Path {ouPath} -AccountPassword (ConvertTo-SecureString {password} -AsPlainText -Force) -Enabled $true",
     "parameters": [
       {
         "name": "fullName",

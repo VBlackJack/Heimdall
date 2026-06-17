@@ -16,7 +16,7 @@
     "id": "grep-logs-cmd",
     "platform": 1,
     "name": "grep",
-    "commandPattern": "grep -i \"{pattern}\" {logfile} | tail -n {lines}",
+    "commandPattern": "grep -i {pattern} {logfile} | tail -n {lines}",
     "parameters": [
       {
         "name": "pattern",

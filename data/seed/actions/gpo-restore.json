@@ -16,7 +16,7 @@
     "id": "gpo-restore-cmd",
     "platform": 0,
     "name": "Restore-GPO",
-    "commandPattern": "Restore-GPO -Name \"{gpoName}\" -Path \"{backupPath}\"",
+    "commandPattern": "Restore-GPO -Name {gpoName} -Path {backupPath}",
     "parameters": [
       {
         "name": "gpoName",

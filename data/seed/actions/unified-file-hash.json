@@ -35,7 +35,7 @@
     "id": "file-hash-win-cmd",
     "platform": 0,
     "name": "Get-FileHash",
-    "commandPattern": "Get-FileHash -Path \"{filePath}\" -Algorithm SHA256",
+    "commandPattern": "Get-FileHash -Path {filePath} -Algorithm SHA256",
     "parameters": [
       {
         "name": "filePath",
@@ -84,7 +84,7 @@
     "id": "file-hash-linux-cmd",
     "platform": 1,
     "name": "sha256sum",
-    "commandPattern": "sha256sum \"{filePath}\"",
+    "commandPattern": "sha256sum {filePath}",
     "parameters": [
       {
         "name": "filePath",

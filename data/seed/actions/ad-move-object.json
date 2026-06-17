@@ -16,7 +16,7 @@
     "id": "ad-move-object-cmd",
     "platform": 0,
     "name": "Move-ADObject",
-    "commandPattern": "Move-ADObject -Identity \"{objectDN}\" -TargetPath \"{targetOU}\"",
+    "commandPattern": "Move-ADObject -Identity {objectDN} -TargetPath {targetOU}",
     "parameters": [
       {
         "name": "objectDN",

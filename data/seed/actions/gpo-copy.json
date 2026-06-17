@@ -16,7 +16,7 @@
     "id": "gpo-copy-cmd",
     "platform": 0,
     "name": "Copy-GPO",
-    "commandPattern": "Copy-GPO -SourceName \"{sourceGPO}\" -TargetName \"{targetGPO}\"",
+    "commandPattern": "Copy-GPO -SourceName {sourceGPO} -TargetName {targetGPO}",
     "parameters": [
       {
         "name": "sourceGPO",

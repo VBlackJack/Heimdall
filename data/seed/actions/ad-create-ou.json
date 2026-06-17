@@ -16,7 +16,7 @@
     "id": "ad-create-ou-cmd",
     "platform": 0,
     "name": "New-ADOrganizationalUnit",
-    "commandPattern": "New-ADOrganizationalUnit -Name \"{ouName}\" -Path \"{parentPath}\" -Description \"{description}\" -ProtectedFromAccidentalDeletion $true",
+    "commandPattern": "New-ADOrganizationalUnit -Name {ouName} -Path {parentPath} -Description {description} -ProtectedFromAccidentalDeletion $true",
     "parameters": [
       {
         "name": "ouName",

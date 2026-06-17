@@ -16,7 +16,7 @@
     "id": "file-directory-size-linux-cmd",
     "platform": 1,
     "name": "du",
-    "commandPattern": "du -sh \"{path}\"",
+    "commandPattern": "du -sh {path}",
     "parameters": [
       {
         "name": "path",

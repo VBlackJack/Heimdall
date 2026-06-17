@@ -16,7 +16,7 @@
     "id": "ad-add-user-to-group-cmd",
     "platform": 0,
     "name": "Add-ADGroupMember",
-    "commandPattern": "Add-ADGroupMember -Identity \"{groupName}\" -Members {username}",
+    "commandPattern": "Add-ADGroupMember -Identity {groupName} -Members {username}",
     "parameters": [
       {
         "name": "groupName",

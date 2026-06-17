@@ -16,7 +16,7 @@
     "id": "archive-unzip-windows-cmd",
     "platform": 0,
     "name": "Expand-Archive",
-    "commandPattern": "Expand-Archive -Path \"{zipPath}\" -DestinationPath \"{destinationPath}\" -Force",
+    "commandPattern": "Expand-Archive -Path {zipPath} -DestinationPath {destinationPath} -Force",
     "parameters": [
       {
         "name": "zipPath",

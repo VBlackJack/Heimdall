@@ -16,7 +16,7 @@
     "id": "302fc47e-9c7b-4333-8fd5-4f67aec742c2",
     "platform": 0,
     "name": "sqlcmd",
-    "commandPattern": "sqlcmd -S {server} -d {database} -Q \"{query}\"",
+    "commandPattern": "sqlcmd -S {server} -d {database} -Q {query}",
     "parameters": [
       {
         "name": "server",

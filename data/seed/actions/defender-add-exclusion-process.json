@@ -15,7 +15,7 @@
     "id": "defender-add-exclusion-process-cmd",
     "platform": 0,
     "name": "Add-MpPreference",
-    "commandPattern": "Add-MpPreference -ExclusionProcess \"{processName}\"",
+    "commandPattern": "Add-MpPreference -ExclusionProcess {processName}",
     "parameters": [
       {
         "name": "processName",

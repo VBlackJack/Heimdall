@@ -16,7 +16,7 @@
     "id": "gpo-set-permissions-cmd",
     "platform": 0,
     "name": "Set-GPPermission",
-    "commandPattern": "Set-GPPermission -Name \"{gpoName}\" -TargetName \"{targetName}\" -TargetType {targetType} -PermissionLevel {permission}",
+    "commandPattern": "Set-GPPermission -Name {gpoName} -TargetName {targetName} -TargetType {targetType} -PermissionLevel {permission}",
     "parameters": [
       {
         "name": "gpoName",

@@ -29,7 +29,7 @@
     "id": "search-content-windows-cmd",
     "platform": 0,
     "name": "Select-String",
-    "commandPattern": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Select-String -Pattern \"{searchTerm}\"",
+    "commandPattern": "Get-ChildItem -Path {searchPath} -Filter {filePattern} -Recurse | Select-String -Pattern {searchTerm}",
     "parameters": [
       {
         "name": "searchPath",
@@ -104,7 +104,7 @@
     "id": "search-content-linux-cmd",
     "platform": 1,
     "name": "grep",
-    "commandPattern": "grep -r \"{searchTerm}\" \"{searchPath}\"",
+    "commandPattern": "grep -r {searchTerm} {searchPath}",
     "parameters": [
       {
         "name": "searchTerm",
