@@ -44,7 +44,9 @@ public sealed partial class CommandLibraryViewModel
     {
         if (string.IsNullOrEmpty(GeneratedCommand)) return;
         var copied = SetClipboardText?.Invoke(GeneratedCommand) ?? false;
-        if (copied) ShowCopyFeedback?.Invoke("copy");
+        if (!copied) return;
+
+        ShowCopyFeedback?.Invoke("copy");
         RecordHistory(GeneratedCommand);
     }
 

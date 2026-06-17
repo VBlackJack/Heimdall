@@ -194,10 +194,22 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     {
         try
         {
-            await using var scope = _serviceProvider.CreateAsyncScope();
-            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-            var actions = await actionService.GetAllActionsAsync().ConfigureAwait(false);
-            _cachedSnippets = actions.ToList();
+            List<ActionModel> actions;
+            await using (var scope = _serviceProvider.CreateAsyncScope())
+            {
+                var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
+                actions = (await actionService.GetAllActionsAsync()).ToList();
+            }
+            _cachedSnippets = actions;
+
+            // Awaited without ConfigureAwait(false) so this continuation resumes
+            // on the UI thread (Open/OpenSplit run there). Re-rank once fresh data
+            // lands so a query typed before the cache populated surfaces snippets
+            // without requiring another keystroke.
+            if (IsOpen && !IsSnippetDetailOpen && !string.IsNullOrWhiteSpace(SearchText))
+            {
+                OnSearchTextChanged(SearchText);
+            }
         }
         catch (Exception ex)
         {
