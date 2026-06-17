@@ -12,6 +12,30 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-17 — In-app updater, French UI polish and Command Library authoring (v2026.061701)
+
+A user-facing release adding a first in-app update experience, fixing French button
+clipping in the RDP/SSH overlays, and making Command Library actions fully authorable
+(examples, links and per-parameter help) with a guard before sending dangerous commands.
+
+- **In-app updater (v1)** — Heimdall now checks for a newer release on startup (spaced
+  out, configurable in Settings) and shows a non-blocking banner with "View release",
+  "Later" and "Skip this version". A new "Updates" section in Settings adds a manual
+  "Check now" button.
+- **Verifiable release checksums** — every GitHub release now publishes a
+  `SHA256SUMS.txt` asset, so installer integrity can be verified, and it is the
+  foundation for the upcoming one-click update.
+- **Command Library authoring** — examples and documentation links are no longer lost
+  when editing an action and are now editable in the action dialog; parameters gain a
+  description field shown as a tooltip; sending a command flagged dangerous now asks for
+  confirmation, both in the dedicated view and the Ctrl+K palette; the search box is
+  refocused after a reload; and the "copied" feedback only appears when the clipboard
+  write actually succeeded.
+- **French UI polish** — button labels are no longer clipped in the RDP and SSH error
+  and reconnect overlays, and the bulk-edit dialog Cancel button is styled consistently.
+- **Internal** — the automated test baseline is now 6,974 passing tests, 0 warnings, and
+  the CI formatting gate was fixed to enforce a CRLF checkout for Windows text files.
+
 ## 2026-06-16 — Command Library explanations, accessibility and discoverability (v2026.061602)
 
 A user-facing pass making Command Library snippets self-explanatory and reachable for
