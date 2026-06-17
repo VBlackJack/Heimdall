@@ -14,9 +14,16 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
+using Heimdall.App.Services.Import;
+using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Import;
+using Heimdall.Core.Localization;
+using Heimdall.Core.Ssh;
 using Heimdall.Core.Updates;
 
 namespace Heimdall.App.Tests;
@@ -166,7 +173,9 @@ public sealed class UpdateBannerViewModelTests
         var settings = BaseSettings();
         var update = new StubUpdateService { Result = Available(Newer) };
         var browser = new StubBrowserLauncher();
-        var vm = new UpdateBannerViewModel(update, new StubConfigManager(settings), new AppVersionProvider(Current), browser);
+        var vm = new UpdateBannerViewModel(
+            update, new StubConfigManager(settings), new AppVersionProvider(Current), browser,
+            new FakeUpdateInstallFlow(), new ConfirmingDialogService(false), new LocalizationManager());
         await vm.CheckOnStartupAsync(CancellationToken.None);
 
         vm.ViewReleaseCommand.Execute(null);
@@ -174,8 +183,100 @@ public sealed class UpdateBannerViewModelTests
         Assert.Equal($"https://github.com/VBlackJack/Heimdall/releases/tag/v{Newer}", browser.OpenedUrl);
     }
 
-    private static UpdateBannerViewModel CreateViewModel(AppSettings settings, StubUpdateService update, string informationalVersion)
-        => new(update, new StubConfigManager(settings), new AppVersionProvider(informationalVersion), new StubBrowserLauncher());
+    [Fact]
+    public void DownloadAndInstall_NoAvailableUpdate_CommandCannotExecute()
+    {
+        var vm = CreateViewModel(BaseSettings(), new StubUpdateService { Result = UpToDate() }, Current);
+
+        Assert.False(vm.DownloadAndInstallCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_CanExecuteReflectsUpdateAndInstallingState()
+    {
+        var vm = CreateViewModel(BaseSettings(), new StubUpdateService { Result = Available(Newer) }, Current);
+        Assert.False(vm.DownloadAndInstallCommand.CanExecute(null));
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+        Assert.True(vm.DownloadAndInstallCommand.CanExecute(null));
+
+        vm.IsInstalling = true;
+        Assert.False(vm.DownloadAndInstallCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_DeclinedConfirm_DoesNotRunFlow()
+    {
+        var flow = new FakeUpdateInstallFlow();
+        var vm = CreateViewModel(
+            BaseSettings(), new StubUpdateService { Result = Available(Newer) }, Current,
+            installFlow: flow, dialogService: new ConfirmingDialogService(false));
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        await vm.DownloadAndInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, flow.RunCallCount);
+        Assert.False(vm.IsInstalling);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_OutcomeStarted_RunsFlowAndClearsStatus()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var flow = new FakeUpdateInstallFlow { Outcome = UpdateInstallOutcome.Started };
+        var vm = CreateViewModel(
+            BaseSettings(), new StubUpdateService { Result = Available(Newer) }, Current,
+            installFlow: flow, dialogService: new ConfirmingDialogService(true), localizer: localizer);
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        await vm.DownloadAndInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, flow.RunCallCount);
+        Assert.Equal(string.Empty, vm.BannerStatusText);
+        Assert.False(vm.HasBannerStatus);
+        Assert.False(vm.IsInstalling);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_OutcomeInstallLaunchFailed_ShowsInstallFailedStatus()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var flow = new FakeUpdateInstallFlow { Outcome = UpdateInstallOutcome.InstallLaunchFailed };
+        var vm = CreateViewModel(
+            BaseSettings(), new StubUpdateService { Result = Available(Newer) }, Current,
+            installFlow: flow, dialogService: new ConfirmingDialogService(true), localizer: localizer);
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        await vm.DownloadAndInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, flow.RunCallCount);
+        Assert.Equal(localizer.Format("SettingsUpdateStatusInstallFailed"), vm.BannerStatusText);
+        Assert.True(vm.HasBannerStatus);
+        Assert.False(vm.IsInstalling);
+    }
+
+    private static UpdateBannerViewModel CreateViewModel(
+        AppSettings settings,
+        StubUpdateService update,
+        string informationalVersion,
+        IUpdateInstallFlow? installFlow = null,
+        IDialogService? dialogService = null,
+        LocalizationManager? localizer = null)
+        => new(
+            update,
+            new StubConfigManager(settings),
+            new AppVersionProvider(informationalVersion),
+            new StubBrowserLauncher(),
+            installFlow ?? new FakeUpdateInstallFlow(),
+            dialogService ?? new ConfirmingDialogService(true),
+            localizer ?? new LocalizationManager());
+
+    private static async Task<LocalizationManager> CreateLocalizerAsync()
+    {
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
+    }
 
     private static AppSettings BaseSettings() => new()
     {
@@ -215,6 +316,99 @@ public sealed class UpdateBannerViewModelTests
         }
 
         public Task<string> DownloadVerifiedAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class FakeUpdateInstallFlow : IUpdateInstallFlow
+    {
+        public UpdateInstallOutcome Outcome { get; set; } = UpdateInstallOutcome.Started;
+
+        public int RunCallCount { get; private set; }
+
+        public Task<UpdateInstallOutcome> RunAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+        {
+            RunCallCount++;
+            return Task.FromResult(Outcome);
+        }
+    }
+
+    private sealed class ConfirmingDialogService(bool confirmResult) : IDialogService
+    {
+        public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
+            => Task.FromResult(confirmResult);
+
+        public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)
+            => throw new NotSupportedException();
+
+        public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null)
+            => throw new NotSupportedException();
+
+        public Task<string?> ShowPasswordInputAsync(string title, string prompt, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null)
+            => throw new NotSupportedException();
+
+        public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null)
+            => throw new NotSupportedException();
+
+        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
+            => throw new NotSupportedException();
+
+        public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null)
+            => throw new NotSupportedException();
+
+        public Task ShowPinDialogAsync(PinDialogViewModel viewModel)
+            => throw new NotSupportedException();
+
+        public Task<PinSetupResult?> ShowPinSetupDialogAsync(PinSetupDialogViewModel viewModel)
+            => throw new NotSupportedException();
+
+        public Task<SnapshotRestoreDialogResult?> ShowSnapshotRestoreDialogAsync(SnapshotRestoreDialogViewModel viewModel)
+            => throw new NotSupportedException();
+
+        public Task<RdpImportSelection?> ShowRdpImportDialogAsync(RdpImportDialogViewModel viewModel)
+            => throw new NotSupportedException();
+
+        public Task<ImportOutcome?> ShowImportOpenSshConfigAsync(OpenSshParseResult parseResult)
+            => throw new NotSupportedException();
+
+        public Task<ImportOutcome?> ShowImportPuttySessionsAsync(PuttySessionParseResult parseResult)
+            => throw new NotSupportedException();
+
+        public Task<KnownHostsImportOutcome?> ShowImportKnownHostsAsync(KnownHostsImportPreview preview)
+            => throw new NotSupportedException();
+
+        public Task ShowTrustedHostKeyDetailsAsync(TrustedHostKeyDetailsDialogViewModel viewModel)
+            => throw new NotSupportedException();
+
+        public Task<ImportKnownHostsConflictResolution?> ShowImportKnownHostsConflictAsync(
+            ImportKnownHostsConflictDialogViewModel viewModel)
+            => throw new NotSupportedException();
+
+        public Task<CommandLibraryPickerResult?> ShowCommandLibraryPickerAsync(
+            CommandLibraryPickerDialogViewModel viewModel,
+            AutoPrefillContext? prefillContext = null,
+            string? existingActionId = null,
+            IReadOnlyDictionary<string, string>? existingValues = null)
+            => throw new NotSupportedException();
+
+        public Task<int?> ShowBulkEditPortAsync(int count, int? initialPort, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<string?> ShowBulkEditUsernameAsync(int count, string? initialUsername, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<string?> ShowBulkEditPasswordAsync(int count, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public void ShowError(string title, string message)
+            => throw new NotSupportedException();
+
+        public void ShowInfo(string title, string message)
+            => throw new NotSupportedException();
+
+        public void ShowWarning(string title, string message)
             => throw new NotSupportedException();
     }
 

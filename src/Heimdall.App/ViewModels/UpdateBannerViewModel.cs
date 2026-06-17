@@ -19,6 +19,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Updates;
 
 namespace Heimdall.App.ViewModels;
@@ -34,9 +35,15 @@ public partial class UpdateBannerViewModel : ObservableObject
     private readonly IConfigManager _configManager;
     private readonly IAppVersionProvider _appVersionProvider;
     private readonly IBrowserLauncher _browserLauncher;
+    private readonly IUpdateInstallFlow _installFlow;
+    private readonly IDialogService _dialogService;
+    private readonly LocalizationManager _localizer;
 
     private HeimdallVersion? _candidateVersion;
     private string _releaseUrl = string.Empty;
+
+    // The update found by the startup check; drives the download-and-install action.
+    private UpdateInfo? _availableUpdate;
 
     [ObservableProperty]
     private bool _isBannerVisible;
@@ -44,16 +51,38 @@ public partial class UpdateBannerViewModel : ObservableObject
     [ObservableProperty]
     private string _bannerVersionText = string.Empty;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DownloadAndInstallCommand))]
+    private bool _isInstalling;
+
+    [ObservableProperty]
+    private double _downloadProgress;
+
+    [ObservableProperty]
+    private string _bannerStatusText = string.Empty;
+
+    /// <summary>True when a status message should be shown under the banner text.</summary>
+    public bool HasBannerStatus => !string.IsNullOrEmpty(BannerStatusText);
+
+    partial void OnBannerStatusTextChanged(string value) =>
+        OnPropertyChanged(nameof(HasBannerStatus));
+
     public UpdateBannerViewModel(
         IUpdateService updateService,
         IConfigManager configManager,
         IAppVersionProvider appVersionProvider,
-        IBrowserLauncher browserLauncher)
+        IBrowserLauncher browserLauncher,
+        IUpdateInstallFlow installFlow,
+        IDialogService dialogService,
+        LocalizationManager localizer)
     {
         _updateService = updateService;
         _configManager = configManager;
         _appVersionProvider = appVersionProvider;
         _browserLauncher = browserLauncher;
+        _installFlow = installFlow;
+        _dialogService = dialogService;
+        _localizer = localizer;
     }
 
     /// <summary>
@@ -106,8 +135,48 @@ public partial class UpdateBannerViewModel : ObservableObject
 
         _candidateVersion = version;
         _releaseUrl = result.Update.ReleaseUrl;
+        _availableUpdate = result.Update;
         BannerVersionText = version.ToString();
         IsBannerVisible = true;
+    }
+
+    private bool CanDownloadAndInstall() => !IsInstalling && _availableUpdate is not null;
+
+    /// <summary>
+    /// Downloads the verified installer for the banner's update and launches the relauncher via
+    /// the shared install flow; the app shuts down on success. Stays open on failure.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanDownloadAndInstall), IncludeCancelCommand = true)]
+    private async Task DownloadAndInstallAsync(CancellationToken cancellationToken)
+    {
+        var update = _availableUpdate;
+        if (update is null)
+        {
+            return;
+        }
+
+        var confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer["SettingsUpdateConfirmTitle"],
+            _localizer.Format("SettingsUpdateConfirmMessage", update.Version.ToString()));
+        if (!confirmed)
+        {
+            return;
+        }
+
+        IsInstalling = true;
+        DownloadProgress = 0;
+        BannerStatusText = _localizer.Format("SettingsUpdateStatusDownloading");
+        try
+        {
+            var progress = new Progress<double>(p => DownloadProgress = p);
+            var outcome = await _installFlow.RunAsync(update, progress, cancellationToken);
+            var key = UpdateInstallOutcomeText.StatusKey(outcome);
+            BannerStatusText = key is null ? string.Empty : _localizer.Format(key);
+        }
+        finally
+        {
+            IsInstalling = false;
+        }
     }
 
     [RelayCommand]
