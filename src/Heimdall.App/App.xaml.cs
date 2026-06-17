@@ -419,6 +419,10 @@ public partial class App : System.Windows.Application
             sp.GetRequiredService<IAppVersionProvider>().Current?.ToString() ?? "unknown"));
         services.AddSingleton<IVariantDetector>(_ => new VariantDetector());
         services.AddSingleton<IUpdateService, UpdateService>();
+        services.AddSingleton<IUpdateInstallerHost, SystemUpdateInstallerHost>();
+        services.AddSingleton<IUpdateInstaller, UpdateInstaller>();
+        services.AddSingleton<IApplicationLifecycle, ApplicationLifecycle>();
+        services.AddSingleton<IUpdateInstallFlow, UpdateInstallFlow>();
         services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
         services.AddSingleton<IConnectionService, ConnectionService>();
         services.AddSingleton<ConnectionService>(sp =>
