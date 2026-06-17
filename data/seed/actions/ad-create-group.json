@@ -16,7 +16,7 @@
     "id": "ad-create-group-cmd",
     "platform": 0,
     "name": "New-ADGroup",
-    "commandPattern": "New-ADGroup -Name \"{groupName}\" -SamAccountName \"{groupName}\" -GroupCategory {groupCategory} -GroupScope {groupScope} -DisplayName \"{displayName}\" -Path \"{ouPath}\" -Description \"{description}\"",
+    "commandPattern": "New-ADGroup -Name {groupName} -SamAccountName {groupName} -GroupCategory {groupCategory} -GroupScope {groupScope} -DisplayName {displayName} -Path {ouPath} -Description {description}",
     "parameters": [
       {
         "name": "groupName",

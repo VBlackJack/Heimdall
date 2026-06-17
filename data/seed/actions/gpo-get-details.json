@@ -16,7 +16,7 @@
     "id": "gpo-get-details-cmd",
     "platform": 0,
     "name": "Get-GPO",
-    "commandPattern": "Get-GPO -Name \"{gpoName}\" | Select-Object *",
+    "commandPattern": "Get-GPO -Name {gpoName} | Select-Object *",
     "parameters": [
       {
         "name": "gpoName",

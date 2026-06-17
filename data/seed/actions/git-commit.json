@@ -15,7 +15,7 @@
     "id": "git-commit-win",
     "platform": 0,
     "name": "git",
-    "commandPattern": "git commit -m \"{message}\"",
+    "commandPattern": "git commit -m {message}",
     "parameters": [
       {
         "name": "message",
@@ -32,7 +32,7 @@
     "id": "git-commit-linux",
     "platform": 1,
     "name": "git",
-    "commandPattern": "git commit -m \"{message}\"",
+    "commandPattern": "git commit -m {message}",
     "parameters": [
       {
         "name": "message",

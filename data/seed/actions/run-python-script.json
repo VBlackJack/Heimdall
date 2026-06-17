@@ -16,7 +16,7 @@
     "id": "run-python-win-cmd",
     "platform": 0,
     "name": "python",
-    "commandPattern": "python \"{scriptPath}\"",
+    "commandPattern": "python {scriptPath}",
     "parameters": [
       {
         "name": "scriptPath",
@@ -33,7 +33,7 @@
     "id": "run-python-linux-cmd",
     "platform": 1,
     "name": "python3",
-    "commandPattern": "python3 \"{scriptPath}\"",
+    "commandPattern": "python3 {scriptPath}",
     "parameters": [
       {
         "name": "scriptPath",

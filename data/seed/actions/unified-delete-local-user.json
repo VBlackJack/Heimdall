@@ -117,7 +117,7 @@
     "id": "delete-localuser-win-cmd",
     "platform": 0,
     "name": "Remove-LocalUser",
-    "commandPattern": "Remove-LocalUser -Name \"{username}\"",
+    "commandPattern": "Remove-LocalUser -Name {username}",
     "parameters": [
       {
         "name": "username",

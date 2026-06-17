@@ -16,7 +16,7 @@
     "id": "journalctl-json-cmd",
     "platform": 1,
     "name": "journalctl",
-    "commandPattern": "journalctl -u {unit} --since \"{since}\" -o json-pretty --no-pager",
+    "commandPattern": "journalctl -u {unit} --since {since} -o json-pretty --no-pager",
     "parameters": [
       {
         "name": "unit",

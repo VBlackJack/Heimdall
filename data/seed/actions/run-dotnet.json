@@ -16,7 +16,7 @@
     "id": "run-dotnet-win-cmd",
     "platform": 0,
     "name": "dotnet run",
-    "commandPattern": "dotnet run --project \"{projectPath}\"",
+    "commandPattern": "dotnet run --project {projectPath}",
     "parameters": [
       {
         "name": "projectPath",
@@ -33,7 +33,7 @@
     "id": "run-dotnet-linux-cmd",
     "platform": 1,
     "name": "dotnet run",
-    "commandPattern": "dotnet run --project \"{projectPath}\"",
+    "commandPattern": "dotnet run --project {projectPath}",
     "parameters": [
       {
         "name": "projectPath",

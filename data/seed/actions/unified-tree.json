@@ -23,7 +23,7 @@
     "id": "search-tree-windows-cmd",
     "platform": 0,
     "name": "tree",
-    "commandPattern": "tree \"{path}\" /F /A",
+    "commandPattern": "tree {path} /F /A",
     "parameters": [
       {
         "name": "path",
@@ -72,7 +72,7 @@
     "id": "search-tree-linux-cmd",
     "platform": 1,
     "name": "tree",
-    "commandPattern": "tree \"{path}\"",
+    "commandPattern": "tree {path}",
     "parameters": [
       {
         "name": "path",

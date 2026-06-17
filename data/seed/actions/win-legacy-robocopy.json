@@ -17,7 +17,7 @@
     "id": "e9651f13-04b4-4e5a-a3b4-381bf498816d",
     "platform": 0,
     "name": "robocopy",
-    "commandPattern": "robocopy \"{source}\" \"{destination}\" /MIR /MT:16 /R:1 /W:1 /NP /LOG:\"{logFile}\"",
+    "commandPattern": "robocopy {source} {destination} /MIR /MT:16 /R:1 /W:1 /NP /LOG:{logFile}",
     "parameters": [
       {
         "name": "source",

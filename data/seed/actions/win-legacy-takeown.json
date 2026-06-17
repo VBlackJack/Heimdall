@@ -16,7 +16,7 @@
     "id": "656ebe05-656e-49a6-9356-faa48dcd87af",
     "platform": 0,
     "name": "takeown",
-    "commandPattern": "takeown /f \"{path}\" /r /d O",
+    "commandPattern": "takeown /f {path} /r /d O",
     "parameters": [
       {
         "name": "path",

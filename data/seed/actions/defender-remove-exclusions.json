@@ -16,7 +16,7 @@
     "id": "defender-remove-exclusions-cmd",
     "platform": 0,
     "name": "Remove-MpPreference",
-    "commandPattern": "Remove-MpPreference -ExclusionPath \"{folderPath}\"",
+    "commandPattern": "Remove-MpPreference -ExclusionPath {folderPath}",
     "parameters": [
       {
         "name": "folderPath",

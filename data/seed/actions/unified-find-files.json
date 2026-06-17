@@ -29,7 +29,7 @@
     "id": "search-find-files-windows-cmd",
     "platform": 0,
     "name": "Get-ChildItem",
-    "commandPattern": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime",
+    "commandPattern": "Get-ChildItem -Path {searchPath} -Filter {pattern} -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime",
     "parameters": [
       {
         "name": "searchPath",
@@ -96,7 +96,7 @@
     "id": "search-find-files-linux-cmd",
     "platform": 1,
     "name": "find",
-    "commandPattern": "find \"{searchPath}\" -name \"{pattern}\"",
+    "commandPattern": "find {searchPath} -name {pattern}",
     "parameters": [
       {
         "name": "searchPath",

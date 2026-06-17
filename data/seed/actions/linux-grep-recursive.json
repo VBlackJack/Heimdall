@@ -16,7 +16,7 @@
     "id": "618a0557-eb37-4ce3-9dd8-3c9259176994",
     "platform": 1,
     "name": "grep",
-    "commandPattern": "grep -rnw \"{path}\" -e \"{pattern}\"",
+    "commandPattern": "grep -rnw {path} -e {pattern}",
     "parameters": [
       {
         "name": "path",

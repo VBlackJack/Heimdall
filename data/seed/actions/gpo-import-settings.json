@@ -16,7 +16,7 @@
     "id": "gpo-import-settings-cmd",
     "platform": 0,
     "name": "Import-GPO",
-    "commandPattern": "Import-GPO -BackupId {backupId} -TargetName \"{targetGPO}\" -Path \"{backupPath}\"",
+    "commandPattern": "Import-GPO -BackupId {backupId} -TargetName {targetGPO} -Path {backupPath}",
     "parameters": [
       {
         "name": "backupId",

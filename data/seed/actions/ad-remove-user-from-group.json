@@ -16,7 +16,7 @@
     "id": "ad-remove-user-from-group-cmd",
     "platform": 0,
     "name": "Remove-ADGroupMember",
-    "commandPattern": "Remove-ADGroupMember -Identity \"{groupName}\" -Members {username} -Confirm:$false",
+    "commandPattern": "Remove-ADGroupMember -Identity {groupName} -Members {username} -Confirm:$false",
     "parameters": [
       {
         "name": "groupName",

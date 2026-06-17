@@ -15,7 +15,7 @@
     "id": "defender-add-exclusion-extension-cmd",
     "platform": 0,
     "name": "Add-MpPreference",
-    "commandPattern": "Add-MpPreference -ExclusionExtension \"{extension}\"",
+    "commandPattern": "Add-MpPreference -ExclusionExtension {extension}",
     "parameters": [
       {
         "name": "extension",

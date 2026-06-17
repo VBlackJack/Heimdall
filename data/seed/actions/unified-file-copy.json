@@ -29,7 +29,7 @@
     "id": "file-copy-windows-cmd",
     "platform": 0,
     "name": "Copy-Item",
-    "commandPattern": "Copy-Item -Path \"{sourcePath}\" -Destination \"{destinationPath}\" -Recurse -Force",
+    "commandPattern": "Copy-Item -Path {sourcePath} -Destination {destinationPath} -Recurse -Force",
     "parameters": [
       {
         "name": "sourcePath",
@@ -86,7 +86,7 @@
     "id": "file-copy-linux-cmd",
     "platform": 1,
     "name": "cp",
-    "commandPattern": "cp -r \"{sourcePath}\" \"{destinationPath}\"",
+    "commandPattern": "cp -r {sourcePath} {destinationPath}",
     "parameters": [
       {
         "name": "sourcePath",

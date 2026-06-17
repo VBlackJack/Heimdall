@@ -25,7 +25,7 @@
     "id": "file-permissions-windows-cmd",
     "platform": 0,
     "name": "icacls",
-    "commandPattern": "icacls \"{path}\" /grant {user}:{permissions}",
+    "commandPattern": "icacls {path} /grant {user}:{permissions}",
     "parameters": [
       {
         "name": "path",
@@ -95,7 +95,7 @@
     "id": "file-permissions-linux-cmd",
     "platform": 1,
     "name": "chmod",
-    "commandPattern": "chmod {permissions} \"{path}\"",
+    "commandPattern": "chmod {permissions} {path}",
     "parameters": [
       {
         "name": "permissions",

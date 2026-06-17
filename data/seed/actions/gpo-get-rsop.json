@@ -16,7 +16,7 @@
     "id": "gpo-get-rsop-cmd",
     "platform": 0,
     "name": "gpresult",
-    "commandPattern": "gpresult /H \"{outputPath}\" /F",
+    "commandPattern": "gpresult /H {outputPath} /F",
     "parameters": [
       {
         "name": "outputPath",

@@ -16,7 +16,7 @@
     "id": "ansible-playbook-limit-win",
     "platform": 0,
     "name": "ansible-playbook",
-    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --limit \"{hostPattern}\"",
+    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --limit {hostPattern}",
     "parameters": [
       {
         "name": "playbookPath",
@@ -49,7 +49,7 @@
     "id": "ansible-playbook-limit-linux",
     "platform": 1,
     "name": "ansible-playbook",
-    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --limit \"{hostPattern}\"",
+    "commandPattern": "ansible-playbook {playbookPath} -i {inventory} --limit {hostPattern}",
     "parameters": [
       {
         "name": "playbookPath",

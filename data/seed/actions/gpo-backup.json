@@ -16,7 +16,7 @@
     "id": "gpo-backup-cmd",
     "platform": 0,
     "name": "Backup-GPO",
-    "commandPattern": "Backup-GPO -Name \"{gpoName}\" -Path \"{backupPath}\"",
+    "commandPattern": "Backup-GPO -Name {gpoName} -Path {backupPath}",
     "parameters": [
       {
         "name": "gpoName",

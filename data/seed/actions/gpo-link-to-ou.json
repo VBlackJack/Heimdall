@@ -16,7 +16,7 @@
     "id": "gpo-link-to-ou-cmd",
     "platform": 0,
     "name": "New-GPLink",
-    "commandPattern": "New-GPLink -Name \"{gpoName}\" -Target \"{ouDN}\" -LinkEnabled Yes",
+    "commandPattern": "New-GPLink -Name {gpoName} -Target {ouDN} -LinkEnabled Yes",
     "parameters": [
       {
         "name": "gpoName",

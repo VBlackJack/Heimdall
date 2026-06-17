@@ -16,7 +16,7 @@
     "id": "gpo-get-security-filtering-cmd",
     "platform": 0,
     "name": "Get-GPPermission",
-    "commandPattern": "Get-GPPermission -Name \"{gpoName}\" -All | Where-Object {$_.Permission -eq 'GpoApply'} | Select-Object Trustee",
+    "commandPattern": "Get-GPPermission -Name {gpoName} -All | Where-Object {$_.Permission -eq 'GpoApply'} | Select-Object Trustee",
     "parameters": [
       {
         "name": "gpoName",

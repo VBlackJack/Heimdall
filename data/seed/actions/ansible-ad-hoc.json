@@ -15,7 +15,7 @@
     "id": "ansible-ad-hoc-win",
     "platform": 0,
     "name": "ansible",
-    "commandPattern": "ansible {hostPattern} -m {module} -a \"{args}\"",
+    "commandPattern": "ansible {hostPattern} -m {module} -a {args}",
     "parameters": [
       {
         "name": "hostPattern",
@@ -48,7 +48,7 @@
     "id": "ansible-ad-hoc-linux",
     "platform": 1,
     "name": "ansible",
-    "commandPattern": "ansible {hostPattern} -m {module} -a \"{args}\"",
+    "commandPattern": "ansible {hostPattern} -m {module} -a {args}",
     "parameters": [
       {
         "name": "hostPattern",

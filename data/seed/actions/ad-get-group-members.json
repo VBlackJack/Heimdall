@@ -16,7 +16,7 @@
     "id": "ad-get-group-members-cmd",
     "platform": 0,
     "name": "Get-ADGroupMember",
-    "commandPattern": "Get-ADGroupMember -Identity \"{groupName}\" | Select-Object Name,SamAccountName,objectClass | Format-Table -AutoSize",
+    "commandPattern": "Get-ADGroupMember -Identity {groupName} | Select-Object Name,SamAccountName,objectClass | Format-Table -AutoSize",
     "parameters": [
       {
         "name": "groupName",

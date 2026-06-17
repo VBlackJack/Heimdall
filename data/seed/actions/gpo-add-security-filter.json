@@ -16,7 +16,7 @@
     "id": "gpo-add-security-filter-cmd",
     "platform": 0,
     "name": "Set-GPPermission",
-    "commandPattern": "Set-GPPermission -Name \"{gpoName}\" -TargetName \"{targetName}\" -TargetType {targetType} -PermissionLevel GpoApply",
+    "commandPattern": "Set-GPPermission -Name {gpoName} -TargetName {targetName} -TargetType {targetType} -PermissionLevel GpoApply",
     "parameters": [
       {
         "name": "gpoName",

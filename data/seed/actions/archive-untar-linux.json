@@ -16,7 +16,7 @@
     "id": "archive-untar-linux-cmd",
     "platform": 1,
     "name": "tar",
-    "commandPattern": "tar -xzf \"{archivePath}\" -C \"{destinationPath}\"",
+    "commandPattern": "tar -xzf {archivePath} -C {destinationPath}",
     "parameters": [
       {
         "name": "archivePath",

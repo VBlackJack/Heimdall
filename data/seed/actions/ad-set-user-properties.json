@@ -16,7 +16,7 @@
     "id": "ad-set-user-properties-cmd",
     "platform": 0,
     "name": "Set-ADUser",
-    "commandPattern": "Set-ADUser -Identity {username} -Department \"{department}\" -Title \"{title}\" -OfficePhone \"{phone}\" -EmailAddress \"{email}\"",
+    "commandPattern": "Set-ADUser -Identity {username} -Department {department} -Title {title} -OfficePhone {phone} -EmailAddress {email}",
     "parameters": [
       {
         "name": "username",

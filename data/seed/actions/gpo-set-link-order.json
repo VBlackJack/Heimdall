@@ -16,7 +16,7 @@
     "id": "gpo-set-link-order-cmd",
     "platform": 0,
     "name": "Set-GPLink",
-    "commandPattern": "Set-GPLink -Name \"{gpoName}\" -Target \"{ouDN}\" -Order {order}",
+    "commandPattern": "Set-GPLink -Name {gpoName} -Target {ouDN} -Order {order}",
     "parameters": [
       {
         "name": "gpoName",

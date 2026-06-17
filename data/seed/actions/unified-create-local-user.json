@@ -111,7 +111,7 @@
     "id": "create-localuser-win-cmd",
     "platform": 0,
     "name": "New-LocalUser",
-    "commandPattern": "New-LocalUser -Name \"{username}\" -NoPassword",
+    "commandPattern": "New-LocalUser -Name {username} -NoPassword",
     "parameters": [
       {
         "name": "username",

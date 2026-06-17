@@ -16,7 +16,7 @@
     "id": "gpo-get-permissions-cmd",
     "platform": 0,
     "name": "Get-GPPermission",
-    "commandPattern": "Get-GPPermission -Name \"{gpoName}\" -All | Select-Object Trustee,Permission,Inherited",
+    "commandPattern": "Get-GPPermission -Name {gpoName} -All | Select-Object Trustee,Permission,Inherited",
     "parameters": [
       {
         "name": "gpoName",

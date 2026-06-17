@@ -16,7 +16,7 @@
     "id": "defender-add-exclusion-folder-cmd",
     "platform": 0,
     "name": "Add-MpPreference",
-    "commandPattern": "Add-MpPreference -ExclusionPath \"{folderPath}\"",
+    "commandPattern": "Add-MpPreference -ExclusionPath {folderPath}",
     "parameters": [
       {
         "name": "folderPath",

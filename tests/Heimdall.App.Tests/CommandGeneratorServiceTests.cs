@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using FluentAssertions;
 using TwinShell.Core.Constants;
+using TwinShell.Core.Enums;
 using TwinShell.Core.Models;
 using TwinShell.Core.Services;
 using ActionModel = TwinShell.Core.Models.Action;
@@ -23,6 +25,65 @@ namespace Heimdall.App.Tests;
 
 public sealed class CommandGeneratorServiceTests
 {
+    // Regression for seed defect D2 (Lot A): seed patterns used to double-quote the
+    // placeholder (e.g. -Identity "{groupName}"), so the generator wrapped the already
+    // single-quoted value into a literal "'...'". After Lot A unwrapped the seed patterns,
+    // the producer must emit a single-quoted value with no surrounding double quotes.
+    // Producer: CommandGeneratorService.GenerateCommand (CommandGeneratorService.cs:29)
+    //           -> QuoteForShell (CommandGeneratorService.cs:332).
+    [Fact]
+    public void GenerateCommand_WindowsStringParameters_SingleQuotesWithoutDoubleWrap()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = new CommandTemplate
+        {
+            Id = "ad-add-user-to-group-cmd",
+            Name = "Add-ADGroupMember",
+            Platform = Platform.Windows,
+            CommandPattern = "Add-ADGroupMember -Identity {groupName} -Members {username}",
+            Parameters =
+            [
+                CommandLibraryTestHelpers.RequiredParameter("groupName", "Group name"),
+                CommandLibraryTestHelpers.RequiredParameter("username", "User name")
+            ]
+        };
+        Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["groupName"] = "Domain Admins",
+            ["username"] = "jdupont"
+        };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("Add-ADGroupMember -Identity 'Domain Admins' -Members 'jdupont'");
+        command.Should().NotContain("\"'", "the generator must not double-wrap the single-quoted value (D2 Lot A)");
+    }
+
+    // Bash counterpart of the same contract, using the corrected seed pattern
+    // git-commit.json (linuxCommandTemplate: "git commit -m {message}").
+    [Fact]
+    public void GenerateCommand_LinuxStringParameter_SingleQuotesWithoutDoubleWrap()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = new CommandTemplate
+        {
+            Id = "git-commit-linux",
+            Name = "git commit",
+            Platform = Platform.Linux,
+            CommandPattern = "git commit -m {message}",
+            Parameters = [CommandLibraryTestHelpers.RequiredParameter("message", "Message")]
+        };
+        Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["message"] = "initial commit"
+        };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("git commit -m 'initial commit'");
+        command.Should().NotContain("\"'", "the generator must not double-wrap the single-quoted value (D2 Lot A)");
+    }
+
     [Fact]
     public void GenerateCommand_NoParameters_PatternWithinLimit_ReturnsPattern()
     {

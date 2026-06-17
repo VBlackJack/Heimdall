@@ -30,7 +30,7 @@
     "id": "file-delete-windows-cmd",
     "platform": 0,
     "name": "Remove-Item",
-    "commandPattern": "Remove-Item -Path \"{path}\" -Recurse -Force",
+    "commandPattern": "Remove-Item -Path {path} -Recurse -Force",
     "parameters": [
       {
         "name": "path",
@@ -84,7 +84,7 @@
     "id": "file-delete-linux-cmd",
     "platform": 1,
     "name": "rm",
-    "commandPattern": "rm -rf \"{path}\"",
+    "commandPattern": "rm -rf {path}",
     "parameters": [
       {
         "name": "path",

@@ -23,7 +23,7 @@
     "id": "file-create-directory-windows-cmd",
     "platform": 0,
     "name": "New-Item",
-    "commandPattern": "New-Item -Path \"{path}\" -ItemType Directory -Force",
+    "commandPattern": "New-Item -Path {path} -ItemType Directory -Force",
     "parameters": [
       {
         "name": "path",
@@ -82,7 +82,7 @@
     "id": "file-create-directory-linux-cmd",
     "platform": 1,
     "name": "mkdir",
-    "commandPattern": "mkdir -p \"{path}\"",
+    "commandPattern": "mkdir -p {path}",
     "parameters": [
       {
         "name": "path",

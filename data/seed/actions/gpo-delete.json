@@ -16,7 +16,7 @@
     "id": "gpo-delete-cmd",
     "platform": 0,
     "name": "Remove-GPO",
-    "commandPattern": "Remove-GPO -Name \"{gpoName}\"",
+    "commandPattern": "Remove-GPO -Name {gpoName}",
     "parameters": [
       {
         "name": "gpoName",
