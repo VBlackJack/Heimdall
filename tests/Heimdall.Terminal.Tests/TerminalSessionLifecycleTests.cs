@@ -225,23 +225,45 @@ public sealed class TerminalSessionLifecycleTests
         TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
         session.ProcessExited += exitCode => exited.TrySetResult(exitCode);
 
-        Task serverTask = TerminalTestHelpers.SendBytesOneAtATimeAsync(
-            listener,
-            Encoding.ASCII.GetBytes("X"),
-            delayBetweenBytes: TimeSpan.FromMilliseconds(10));
+        // The server keeps the connection open until the test has observed the running
+        // state, then closes it on a signal. This makes the read loop exit deterministic
+        // rather than racing StartAsync, which would otherwise let the loop end before the
+        // running state can be asserted.
+        TaskCompletionSource closeServer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task serverTask = Task.Run(async () =>
+        {
+            using TcpClient client = await listener.AcceptTcpClientAsync();
+            client.NoDelay = true;
+            await using NetworkStream stream = client.GetStream();
+            await stream.WriteAsync(Encoding.ASCII.GetBytes("X"));
+            await stream.FlushAsync();
+            await closeServer.Task;
+        });
 
         try
         {
             await session.StartAsync(string.Empty, string.Empty);
-            Assert.True(session.IsRunning);
 
+            // IsRunning flips true on a background read loop; await the real transition.
+            await TerminalTestHelpers.WaitForConditionAsync(
+                () => session.IsRunning,
+                TimeSpan.FromSeconds(10),
+                "Session did not report IsRunning after StartAsync.");
+
+            // Release the server so it closes the connection and the read loop exits.
+            closeServer.TrySetResult();
             await serverTask.WaitAsync(TimeSpan.FromSeconds(10));
             await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-            Assert.False(session.IsRunning);
+            // Once the read loop has exited, IsRunning must flip back to false.
+            await TerminalTestHelpers.WaitForConditionAsync(
+                () => !session.IsRunning,
+                TimeSpan.FromSeconds(10),
+                "Session still reported IsRunning after the read loop exited.");
         }
         finally
         {
+            closeServer.TrySetResult();
             session.Dispose();
             listener.Stop();
         }

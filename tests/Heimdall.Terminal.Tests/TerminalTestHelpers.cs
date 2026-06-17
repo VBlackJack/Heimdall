@@ -62,6 +62,25 @@ internal static class TerminalTestHelpers
         }
     }
 
+    internal static async Task WaitForConditionAsync(
+        Func<bool> condition,
+        TimeSpan timeout,
+        string? failureMessage = null)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(20);
+        }
+
+        Assert.Fail(failureMessage ?? "Condition was not satisfied within the allotted time.");
+    }
+
     internal static void AssertProcessHasExited(int processId)
     {
         DateTime deadline = DateTime.UtcNow.AddSeconds(5);
