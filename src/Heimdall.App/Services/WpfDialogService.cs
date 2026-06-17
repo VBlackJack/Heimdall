@@ -43,6 +43,10 @@ public sealed class WpfDialogService(
 
     /// <inheritdoc/>
     public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
+        => ShowConfirmAsync(title, message, severity, topmost: false);
+
+    /// <inheritdoc/>
+    public Task<bool> ShowConfirmAsync(string title, string message, string severity, bool topmost)
     {
         if (IsApplicationShuttingDown())
         {
@@ -52,7 +56,7 @@ public sealed class WpfDialogService(
         var yes = _localizer["BtnYes"];
         var no = _localizer["BtnNo"];
         var result = Views.Dialogs.MessageDialog.ShowConfirm(
-            GetOwnerWindow(), title, message, severity, yes, no);
+            GetOwnerWindow(), title, message, severity, yes, no, topmost);
 
         return Task.FromResult(result);
     }

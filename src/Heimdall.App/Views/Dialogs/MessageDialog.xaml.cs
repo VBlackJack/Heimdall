@@ -69,9 +69,11 @@ public partial class MessageDialog : Window
         string message,
         string severity = "info",
         string primaryLabel = "Yes",
-        string secondaryLabel = "No")
+        string secondaryLabel = "No",
+        bool topmost = false)
     {
         var dialog = new MessageDialog { Owner = owner };
+        dialog.Topmost = topmost;
         dialog.TitleText.Text = title;
         dialog.MessageText.Text = message;
         dialog.BtnPrimary.Content = primaryLabel;

@@ -37,6 +37,10 @@ public static class DangerousCommandGuard
     /// <param name="level">The criticality of the command about to run.</param>
     /// <param name="dialog">The dialog service used to prompt for confirmation.</param>
     /// <param name="localize">Resolves an i18n key to its localized string.</param>
+    /// <param name="topmost">
+    /// When <c>true</c>, the confirmation renders above a topmost popup (e.g. the
+    /// Ctrl+K command palette); otherwise it uses the default window stacking.
+    /// </param>
     /// <returns>
     /// <c>true</c> when the command may proceed (below the dangerous threshold,
     /// or confirmed by the user); <c>false</c> when the user declined.
@@ -50,7 +54,8 @@ public static class DangerousCommandGuard
     public static async Task<bool> ConfirmIfDangerousAsync(
         CriticalityLevel level,
         IDialogService dialog,
-        Func<string, string> localize)
+        Func<string, string> localize,
+        bool topmost = false)
     {
         if (level < CriticalityLevel.Dangerous)
         {
@@ -60,6 +65,7 @@ public static class DangerousCommandGuard
         return await dialog.ShowConfirmAsync(
             localize("ConfirmDangerousSendTitle"),
             localize("ConfirmDangerousSendMessage"),
-            "warning");
+            "warning",
+            topmost);
     }
 }

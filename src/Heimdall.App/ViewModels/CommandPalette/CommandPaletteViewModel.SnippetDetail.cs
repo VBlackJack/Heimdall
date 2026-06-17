@@ -18,6 +18,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,10 @@ public sealed partial class CommandPaletteViewModel
     private IServiceScope? _snippetScope;
     private ICommandGeneratorService? _snippetGenerator;
     private CommandTemplate? _snippetTemplate;
+
+    // Retains the action currently open in the detail surface so its criticality
+    // can be read when a snippet is sent (the execute path is guarded).
+    private ActionModel? _detailAction;
 
     // ── Observable detail state ──────────────────────────────────────
 
@@ -252,6 +257,7 @@ public sealed partial class CommandPaletteViewModel
         _snippetScope = _serviceProvider.CreateScope();
         _snippetGenerator = _snippetScope.ServiceProvider.GetRequiredService<ICommandGeneratorService>();
 
+        _detailAction = action;
         SnippetDetailTitle = action.Title;
 
         SnippetDetailDescription = presentation.Description;
@@ -319,6 +325,7 @@ public sealed partial class CommandPaletteViewModel
         IsSnippetDetailOpen = false;
         SelectedSnippetVariant = null;
         _snippetTemplate = null;
+        _detailAction = null;
         _snippetGenerator = null;
         _snippetScope?.Dispose();
         _snippetScope = null;
@@ -340,11 +347,21 @@ public sealed partial class CommandPaletteViewModel
     /// back to the clipboard when no session can accept it (e.g. RDP).
     /// </summary>
     [RelayCommand]
-    private void SendSnippet()
+    private async Task SendSnippetAsync()
     {
         if (string.IsNullOrEmpty(SnippetGeneratedCommand)) return;
 
         var active = _main.Connection.ActiveSession;
+        if (active is not null)
+        {
+            var level = _detailAction?.Level ?? CriticalityLevel.Info;
+            if (!await DangerousCommandGuard.ConfirmIfDangerousAsync(
+                    level, _dialogService, key => _localizer[key], topmost: true))
+            {
+                return;
+            }
+        }
+
         if (active is not null
             && _embeddedSessionManager.TrySendCommandToSession(active, SnippetGeneratedCommand))
         {
@@ -386,11 +403,21 @@ public sealed partial class CommandPaletteViewModel
     /// session can accept it) and closes the palette, mirroring <see cref="SendSnippet"/>.
     /// </summary>
     [RelayCommand]
-    private void SendSnippetExample(CommandExample? example)
+    private async Task SendSnippetExampleAsync(CommandExample? example)
     {
         if (example is null || string.IsNullOrEmpty(example.Command)) return;
 
         var active = _main.Connection.ActiveSession;
+        if (active is not null)
+        {
+            var level = _detailAction?.Level ?? CriticalityLevel.Info;
+            if (!await DangerousCommandGuard.ConfirmIfDangerousAsync(
+                    level, _dialogService, key => _localizer[key], topmost: true))
+            {
+                return;
+            }
+        }
+
         if (active is not null
             && _embeddedSessionManager.TrySendCommandToSession(active, example.Command))
         {

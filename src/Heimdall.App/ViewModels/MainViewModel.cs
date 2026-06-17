@@ -336,8 +336,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         Sidebar = new SidebarViewModel(this, localizer, configManager, toolsTabPopulation, toolContextProvider, _uiDispatcher);
         ToolsTab = new ToolsTabViewModel(this, localizer, toolContextProvider);
         CommandPalette = new CommandPaletteViewModel(
-            this, localizer, toolRegistry, configManager, embeddedSessionManager, externalToolLaunchService,
-            recentConnections ?? new RecentConnectionTracker(), serviceProvider);
+            this, localizer, dialogService, toolRegistry, configManager, embeddedSessionManager,
+            externalToolLaunchService, recentConnections ?? new RecentConnectionTracker(), serviceProvider);
         Tunnels = new TunnelsViewModel(
             this,
             localizer,

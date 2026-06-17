@@ -54,6 +54,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
     private readonly LocalizationManager _localizer;
+    private readonly Heimdall.App.Services.IDialogService _dialogService;
     private readonly ToolRegistry _toolRegistry;
     private readonly IConfigManager _configManager;
     private readonly IEmbeddedSessionManager _embeddedSessionManager;
@@ -85,6 +86,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     public CommandPaletteViewModel(
         MainViewModel main,
         LocalizationManager localizer,
+        Heimdall.App.Services.IDialogService dialogService,
         ToolRegistry toolRegistry,
         IConfigManager configManager,
         IEmbeddedSessionManager embeddedSessionManager,
@@ -94,6 +96,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     {
         _main = main;
         _localizer = localizer;
+        _dialogService = dialogService;
         _toolRegistry = toolRegistry;
         _configManager = configManager;
         _embeddedSessionManager = embeddedSessionManager;

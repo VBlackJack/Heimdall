@@ -39,6 +39,14 @@ public interface IDialogService
     Task<bool> ShowConfirmAsync(string title, string message, string severity = "info");
 
     /// <summary>
+    /// Confirmation variant that can render above a topmost popup (e.g. the Ctrl+K
+    /// command palette). Default implementation ignores <paramref name="topmost"/>
+    /// and delegates to the 3-arg overload, so existing implementations need no change.
+    /// </summary>
+    Task<bool> ShowConfirmAsync(string title, string message, string severity, bool topmost)
+        => ShowConfirmAsync(title, message, severity);
+
+    /// <summary>
     /// Shows a three-choice dialog (Save / Discard / Cancel).
     /// </summary>
     /// <returns>True = Save, false = Discard, null = Cancel.</returns>
