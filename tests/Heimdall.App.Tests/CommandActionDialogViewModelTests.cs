@@ -139,4 +139,82 @@ public sealed class CommandActionDialogViewModelTests
         result.LinuxExamples.Should().BeEquivalentTo(source.LinuxExamples);
         result.Links.Should().BeEquivalentTo(source.Links);
     }
+
+    [Fact]
+    public void FromAction_FlattensBucketsIntoExamplesWithCorrectPlatform()
+    {
+        var source = CreateActionWithExamplesAndLinks();
+
+        var vm = CommandActionDialogViewModel.FromAction(source);
+
+        vm.Examples.Should().HaveCount(3);
+        vm.Examples.Should().ContainSingle(e => e.Command == "ls" && e.Platform == Platform.Both);
+        vm.Examples.Should().ContainSingle(e => e.Command == "dir" && e.Platform == Platform.Windows);
+        vm.Examples.Should().ContainSingle(e => e.Command == "ls -la" && e.Platform == Platform.Linux);
+        vm.Links.Should().ContainSingle(l => l.Title == "Docs" && l.Url == "https://example.com/docs");
+    }
+
+    [Fact]
+    public void ToAction_RepartitionsWhenRowPlatformChanged()
+    {
+        var source = CreateActionWithExamplesAndLinks();
+        var vm = CommandActionDialogViewModel.FromAction(source);
+
+        // The "ls" example came from the generic (Both) bucket; retarget it to Linux.
+        var generic = vm.Examples.Single(e => e.Command == "ls");
+        generic.Platform = Platform.Linux;
+
+        var result = vm.ToAction();
+
+        result.Examples.Should().NotContain(e => e.Command == "ls");        // left the Both bucket
+        result.LinuxExamples.Should().Contain(e => e.Command == "ls");      // moved into the Linux bucket
+        result.LinuxExamples.Should().Contain(e => e.Command == "ls -la");  // original Linux example intact
+    }
+
+    [Fact]
+    public void AddMode_ExampleWithWindowsPlatform_LandsInWindowsBucket()
+    {
+        var vm = new CommandActionDialogViewModel
+        {
+            Title = "New action",
+            Category = "Misc",
+            WindowsPattern = "dir",
+        };
+        vm.Examples.Add(new ExampleEntryVm { Command = "dir /a", Description = "All", Platform = Platform.Windows });
+        vm.Examples.Add(new ExampleEntryVm { Command = "echo hi", Description = "Generic", Platform = Platform.Both });
+
+        var result = vm.ToAction();
+
+        result.WindowsExamples.Should().ContainSingle(e => e.Command == "dir /a" && e.Description == "All");
+        result.Examples.Should().ContainSingle(e => e.Command == "echo hi");
+        result.LinuxExamples.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Links_RoundTripAndAdd()
+    {
+        var source = CreateActionWithExamplesAndLinks();
+        var vm = CommandActionDialogViewModel.FromAction(source);
+        vm.Links.Add(new LinkEntryVm { Title = "More", Url = "https://example.com/more" });
+
+        var result = vm.ToAction();
+
+        result.Links.Should().HaveCount(2);
+        result.Links.Should().ContainSingle(l => l.Title == "Docs" && l.Url == "https://example.com/docs");
+        result.Links.Should().ContainSingle(l => l.Title == "More" && l.Url == "https://example.com/more");
+    }
+
+    [Fact]
+    public void AddExampleAndAddLink_MarkDialogDirty()
+    {
+        var vm = new CommandActionDialogViewModel();
+        vm.IsDirty.Should().BeFalse();
+
+        vm.AddExampleCommand.Execute(null);
+        vm.IsDirty.Should().BeTrue();
+
+        vm.IsDirty = false;
+        vm.AddLinkCommand.Execute(null);
+        vm.IsDirty.Should().BeTrue();
+    }
 }

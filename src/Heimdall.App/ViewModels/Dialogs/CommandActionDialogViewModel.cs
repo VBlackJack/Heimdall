@@ -55,10 +55,6 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     private Guid? _editWinTemplatePublicId;
     private string? _editLinuxTemplateId;
     private Guid? _editLinuxTemplatePublicId;
-    private List<CommandExample>? _editExamples;
-    private List<CommandExample>? _editWindowsExamples;
-    private List<CommandExample>? _editLinuxExamples;
-    private List<ExternalLink>? _editLinks;
 
     // ── Action fields ─────────────────────────────────────────────
 
@@ -111,6 +107,30 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     private string _linuxTemplateName = "";
 
     public ObservableCollection<ParameterEntryVm> LinuxParameters { get; } = [];
+
+    // ── Examples & links ──────────────────────────────────────────
+
+    /// <summary>
+    /// Single editable example list; each row carries its own target platform.
+    /// Routed into the action's three example buckets on save.
+    /// </summary>
+    public ObservableCollection<ExampleEntryVm> Examples { get; } = [];
+
+    public ObservableCollection<LinkEntryVm> Links { get; } = [];
+
+    private IReadOnlyList<string>? _platformOptions;
+
+    /// <summary>
+    /// Localized platform names, index-aligned to the <see cref="Platform"/> enum
+    /// (0 = Windows, 1 = Linux, 2 = Both), so a row's enum value maps to the combo
+    /// <c>SelectedIndex</c>. Falls back to plain names when no localizer is set.
+    /// </summary>
+    public IReadOnlyList<string> PlatformOptions => _platformOptions ??=
+    [
+        Localizer?["ToolCmdLibPlatformWindows"] ?? "Windows",
+        Localizer?["ToolCmdLibPlatformLinux"] ?? "Linux",
+        Localizer?["ToolCmdLibPlatformBoth"] ?? "Both",
+    ];
 
     // ── Validation ────────────────────────────────────────────────
 
@@ -194,6 +214,34 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         if (param is not null) LinuxParameters.Remove(param);
     }
 
+    // ── Example & link commands ───────────────────────────────────
+
+    [RelayCommand]
+    private void AddExample()
+    {
+        Examples.Add(new ExampleEntryVm());
+        IsDirty = true;
+    }
+
+    [RelayCommand]
+    private void RemoveExample(ExampleEntryVm? example)
+    {
+        if (example is not null && Examples.Remove(example)) IsDirty = true;
+    }
+
+    [RelayCommand]
+    private void AddLink()
+    {
+        Links.Add(new LinkEntryVm());
+        IsDirty = true;
+    }
+
+    [RelayCommand]
+    private void RemoveLink(LinkEntryVm? link)
+    {
+        if (link is not null && Links.Remove(link)) IsDirty = true;
+    }
+
     // ── Dirty tracking ────────────────────────────────────────────
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
@@ -227,10 +275,13 @@ public partial class CommandActionDialogViewModel : ObservableValidator
             Tags = string.IsNullOrWhiteSpace(Tags)
                 ? [] : Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
             Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
-            Examples = _editExamples is null ? new() : new List<CommandExample>(_editExamples),
-            WindowsExamples = _editWindowsExamples is null ? new() : new List<CommandExample>(_editWindowsExamples),
-            LinuxExamples = _editLinuxExamples is null ? new() : new List<CommandExample>(_editLinuxExamples),
-            Links = _editLinks is null ? new() : new List<ExternalLink>(_editLinks),
+            Examples = Examples.Where(e => e.Platform == TwinShell.Core.Enums.Platform.Both)
+                .Select(e => e.ToModel()).ToList(),
+            WindowsExamples = Examples.Where(e => e.Platform == TwinShell.Core.Enums.Platform.Windows)
+                .Select(e => e.ToModel()).ToList(),
+            LinuxExamples = Examples.Where(e => e.Platform == TwinShell.Core.Enums.Platform.Linux)
+                .Select(e => e.ToModel()).ToList(),
+            Links = Links.Select(l => l.ToModel()).ToList(),
             IsUserCreated = true,
             UpdatedAt = DateTime.UtcNow
         };
@@ -286,10 +337,22 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         vm.Level = action.Level;
         vm.Tags = action.Tags is { Count: > 0 } ? string.Join(", ", action.Tags) : "";
         vm.Notes = action.Notes ?? "";
-        vm._editExamples = new List<CommandExample>(action.Examples);
-        vm._editWindowsExamples = new List<CommandExample>(action.WindowsExamples);
-        vm._editLinuxExamples = new List<CommandExample>(action.LinuxExamples);
-        vm._editLinks = new List<ExternalLink>(action.Links);
+        foreach (var e in action.Examples)
+        {
+            vm.Examples.Add(ExampleEntryVm.FromModel(e, TwinShell.Core.Enums.Platform.Both));
+        }
+        foreach (var e in action.WindowsExamples)
+        {
+            vm.Examples.Add(ExampleEntryVm.FromModel(e, TwinShell.Core.Enums.Platform.Windows));
+        }
+        foreach (var e in action.LinuxExamples)
+        {
+            vm.Examples.Add(ExampleEntryVm.FromModel(e, TwinShell.Core.Enums.Platform.Linux));
+        }
+        foreach (var l in action.Links)
+        {
+            vm.Links.Add(LinkEntryVm.FromModel(l));
+        }
 
         if (action.WindowsCommandTemplate is { } winTemplate)
         {
@@ -380,5 +443,51 @@ public partial class ParameterEntryVm : ObservableObject
         DefaultValue = p.DefaultValue ?? "",
         Required = p.Required,
         Description = p.Description ?? ""
+    };
+}
+
+/// <summary>
+/// Editable example entry: a command plus description targeting one platform.
+/// The platform routes the example into the action's matching example bucket.
+/// </summary>
+public partial class ExampleEntryVm : ObservableObject
+{
+    [ObservableProperty] private string _command = "";
+    [ObservableProperty] private string _description = "";
+    [ObservableProperty] private Platform _platform = Platform.Both;
+
+    public CommandExample ToModel() => new()
+    {
+        Command = Command.Trim(),
+        Description = Description.Trim(),
+        Platform = Platform
+    };
+
+    public static ExampleEntryVm FromModel(CommandExample e, Platform platform) => new()
+    {
+        Command = e.Command,
+        Description = e.Description,
+        Platform = platform
+    };
+}
+
+/// <summary>
+/// Editable documentation link entry (title + URL).
+/// </summary>
+public partial class LinkEntryVm : ObservableObject
+{
+    [ObservableProperty] private string _title = "";
+    [ObservableProperty] private string _url = "";
+
+    public ExternalLink ToModel() => new()
+    {
+        Title = Title.Trim(),
+        Url = Url.Trim()
+    };
+
+    public static LinkEntryVm FromModel(ExternalLink l) => new()
+    {
+        Title = l.Title,
+        Url = l.Url
     };
 }

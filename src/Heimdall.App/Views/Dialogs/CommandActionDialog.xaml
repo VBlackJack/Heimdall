@@ -4,6 +4,7 @@
         xmlns:converters="clr-namespace:Heimdall.App.Converters"
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
+        xmlns:enums="clr-namespace:TwinShell.Core.Enums;assembly=TwinShell.Core"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -331,6 +332,115 @@
                          Height="50" VerticalContentAlignment="Top"
                          VerticalScrollBarVisibility="Auto"
                          MaxLength="5000" TabIndex="12"/>
+
+                <!-- ── Examples ────────────────────────────── -->
+                <TextBlock Style="{StaticResource DialogSectionTitleStyle}"
+                           Text="{loc:Translate ToolCmdLibDialogSectionExamples}"
+                           Margin="0,16,0,4"/>
+                <ItemsControl ItemsSource="{Binding Examples}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,2,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="24"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding Command, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="{loc:Translate ToolCmdLibDialogExampleCommand}"
+                                             FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                             FontSize="{StaticResource FontSizeCaption}"
+                                             Background="{DynamicResource CardBrush}"
+                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                             BorderBrush="{DynamicResource BorderBrush}"/>
+                                    <!-- Value-matched selection (by enum Tag, not index) so the row's
+                                         platform displays correctly regardless of item realization order. -->
+                                    <ComboBox Grid.Column="1"
+                                              SelectedValuePath="Tag"
+                                              SelectedValue="{Binding Platform}"
+                                              AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblPlatform}"
+                                              Margin="0,0,4,0"
+                                              FontSize="{StaticResource FontSizeCaption}">
+                                        <ComboBoxItem Tag="{x:Static enums:Platform.Windows}"
+                                                      Content="{Binding DataContext.PlatformOptions[0], RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                        <ComboBoxItem Tag="{x:Static enums:Platform.Linux}"
+                                                      Content="{Binding DataContext.PlatformOptions[1], RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                        <ComboBoxItem Tag="{x:Static enums:Platform.Both}"
+                                                      Content="{Binding DataContext.PlatformOptions[2], RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                    </ComboBox>
+                                    <Button Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                            FontSize="10" Width="20" Height="20"
+                                            AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
+                                            Command="{Binding DataContext.RemoveExampleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
+                                            Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                </Grid>
+                                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource WatermarkTextBoxStyle}"
+                                         Tag="{loc:Translate ToolCmdLibDialogExampleDescription}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogExampleDescription}"
+                                         Margin="0,2,4,0" Padding="4,3"
+                                         FontSize="{StaticResource FontSizeSmallCaption}"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button x:Name="BtnAddExample" Content="{loc:Translate ToolCmdLibDialogBtnAddExample}"
+                        Command="{Binding AddExampleCommand}"
+                        AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        FontSize="{StaticResource FontSizeCaption}"
+                        Padding="8,2" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+
+                <!-- ── Documentation links ─────────────────── -->
+                <TextBlock Style="{StaticResource DialogSectionTitleStyle}"
+                           Text="{loc:Translate ToolCmdLibDialogSectionLinks}"
+                           Margin="0,16,0,4"/>
+                <ItemsControl ItemsSource="{Binding Links}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="24"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLinkTitle}"
+                                         Margin="0,0,4,0" Padding="4,3"
+                                         FontSize="{StaticResource FontSizeCaption}"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
+                                <TextBox Grid.Column="1" Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLinkUrl}"
+                                         FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                         FontSize="{StaticResource FontSizeCaption}"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
+                                <Button Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                        FontSize="10" Width="20" Height="20"
+                                        AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
+                                        Command="{Binding DataContext.RemoveLinkCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
+                                        Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button x:Name="BtnAddLink" Content="{loc:Translate ToolCmdLibDialogBtnAddLink}"
+                        Command="{Binding AddLinkCommand}"
+                        AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        FontSize="{StaticResource FontSizeCaption}"
+                        Padding="8,2" HorizontalAlignment="Left" Margin="0,4,0,0"/>
             </StackPanel>
         </ScrollViewer>
 
