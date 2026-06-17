@@ -187,6 +187,15 @@
                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                               VerticalAlignment="Center"/>
                                 </Grid>
+                                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource WatermarkTextBoxStyle}"
+                                         Tag="{loc:Translate ToolCmdLibDialogParamDescription}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamDescription}"
+                                         Margin="0,2,4,0" Padding="4,3"
+                                         FontSize="{StaticResource FontSizeSmallCaption}"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -285,6 +294,15 @@
                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                               VerticalAlignment="Center"/>
                                 </Grid>
+                                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource WatermarkTextBoxStyle}"
+                                         Tag="{loc:Translate ToolCmdLibDialogParamDescription}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamDescription}"
+                                         Margin="0,2,4,0" Padding="4,3"
+                                         FontSize="{StaticResource FontSizeSmallCaption}"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

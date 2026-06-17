@@ -5168,6 +5168,7 @@
   "ToolCmdLibDialogParamLabel": "Label",
   "ToolCmdLibDialogParamType": "Type",
   "ToolCmdLibDialogParamDefault": "Default value",
+  "ToolCmdLibDialogParamDescription": "Description (shown as a tooltip)",
   "ToolCmdLibDialogParamRequired": "Required",
   "ToolCmdLibDialogBtnAddParam": "+ Parameter",
   "ToolCmdLibDialogSectionWindows": "Windows Template",
