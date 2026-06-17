@@ -65,8 +65,10 @@ function InitializeSetup(): Boolean;
 var
   OldVersion: String;
 begin
-  // Check for existing installation and offer upgrade
-  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B7A4D3E1-8F2C-4A91-9D5E-6C3B8A1F0E72}_is1', 'DisplayVersion', OldVersion) then
+  // Check for existing installation and offer upgrade. Skip the prompt in silent mode
+  // (the in-app updater already confirmed with the user) so unattended updates never block.
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B7A4D3E1-8F2C-4A91-9D5E-6C3B8A1F0E72}_is1', 'DisplayVersion', OldVersion)
+     and (not WizardSilent()) then
   begin
     if MsgBox(FmtMessage(CustomMessage('UpgradePrompt'), [OldVersion, '{#AppVersion}']), mbConfirmation, MB_YESNO) = IDNO then
     begin
