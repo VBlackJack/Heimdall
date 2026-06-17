@@ -152,6 +152,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 null!,
                 new PinManager(),
                 null!,
+                null!,
                 null!);
             MainViewModel main = new MainViewModel(
                 configManager,

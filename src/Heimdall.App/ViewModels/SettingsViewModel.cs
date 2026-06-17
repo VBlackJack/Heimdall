@@ -98,7 +98,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private readonly PinManager _pinManager;
     private readonly IUpdateService _updateService;
     private readonly IAppVersionProvider _appVersionProvider;
+    private readonly IUpdateInstallFlow _installFlow;
     private readonly IProfileImportService? _profileImportService;
+
+    // The update found by the last successful check; drives the download-and-install action.
+    private UpdateInfo? _availableUpdate;
     private bool _disposed;
 
     // Repository coordinates for the update check, captured from settings on load.
@@ -153,7 +157,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CheckNowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DownloadAndInstallCommand))]
     private bool _isCheckingUpdate;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckNowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DownloadAndInstallCommand))]
+    private bool _isInstallingUpdate;
+
+    [ObservableProperty]
+    private double _downloadProgress;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DownloadAndInstallCommand))]
+    private bool _isUpdateAvailable;
 
     [ObservableProperty]
     private string _updateStatusText = string.Empty;
@@ -521,6 +538,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         PinManager pinManager,
         IUpdateService updateService,
         IAppVersionProvider appVersionProvider,
+        IUpdateInstallFlow installFlow,
         IProfileImportService? profileImportService = null)
     {
         _configManager = configManager;
@@ -529,11 +547,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _pinManager = pinManager;
         _updateService = updateService;
         _appVersionProvider = appVersionProvider;
+        _installFlow = installFlow;
         _profileImportService = profileImportService;
         TrustedHostKeys = trustedHostKeys;
     }
 
-    private bool CanCheckNow() => !IsCheckingUpdate;
+    private bool CanCheckNow() => !IsCheckingUpdate && !IsInstallingUpdate;
 
     /// <summary>
     /// Runs a one-shot update check against the configured repository and reports
@@ -554,6 +573,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             }
 
             var result = await _updateService.CheckForUpdatesAsync(current.Value, _updateOwner, _updateRepo, cancellationToken);
+            if (result.Status == UpdateCheckStatus.UpdateAvailable)
+            {
+                _availableUpdate = result.Update;
+                IsUpdateAvailable = true;
+            }
+            else
+            {
+                _availableUpdate = null;
+                IsUpdateAvailable = false;
+            }
+
             UpdateStatusText = result.Status switch
             {
                 UpdateCheckStatus.UpToDate => _localizer.Format("SettingsUpdateStatusUpToDate"),
@@ -564,6 +594,50 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         finally
         {
             IsCheckingUpdate = false;
+        }
+    }
+
+    private bool CanDownloadAndInstall() =>
+        IsUpdateAvailable && !IsCheckingUpdate && !IsInstallingUpdate;
+
+    /// <summary>
+    /// Downloads the verified installer for the available update, launches the detached
+    /// relauncher, and shuts the app down so the installer can replace it. The app stays
+    /// running on any failure.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanDownloadAndInstall), IncludeCancelCommand = true)]
+    private async Task DownloadAndInstallAsync(CancellationToken cancellationToken)
+    {
+        var update = _availableUpdate;
+        if (update is null)
+        {
+            return;
+        }
+
+        var confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer["SettingsUpdateConfirmTitle"],
+            _localizer.Format("SettingsUpdateConfirmMessage", update.Version.ToString()));
+        if (!confirmed)
+        {
+            return;
+        }
+
+        IsInstallingUpdate = true;
+        DownloadProgress = 0;
+        try
+        {
+            UpdateStatusText = _localizer.Format("SettingsUpdateStatusDownloading");
+            var progress = new Progress<double>(p => DownloadProgress = p);
+            var outcome = await _installFlow.RunAsync(update, progress, cancellationToken);
+            var key = UpdateInstallOutcomeText.StatusKey(outcome);
+            if (key is not null)
+            {
+                UpdateStatusText = _localizer.Format(key);
+            }
+        }
+        finally
+        {
+            IsInstallingUpdate = false;
         }
     }
 
@@ -1837,6 +1911,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Mark dirty when any settings property changes, excluding non-settings properties
         if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
             or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
+            or nameof(IsInstallingUpdate) or nameof(DownloadProgress) or nameof(IsUpdateAvailable)
             or nameof(SelectedGateway) or nameof(SelectedProject)
             or nameof(SelectedExternalTool) or nameof(HasValidationErrors)
             or nameof(IsPinConfigured) or nameof(PinStatusText)

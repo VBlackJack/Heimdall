@@ -1039,7 +1039,8 @@ public sealed class SettingsViewModelTests
             trustedHostKeys,
             new PinManager(),
             new FakeUpdateService(),
-            new AppVersionProvider("2026.061501"));
+            new AppVersionProvider("2026.061501"),
+            new FakeUpdateInstallFlow());
 
         viewModel.Dispose();
         viewModel.Dispose();
@@ -1059,12 +1060,14 @@ public sealed class SettingsViewModelTests
         IProfileImportService? profileImportService = null,
         LocalizationManager? localizer = null,
         IUpdateService? updateService = null,
-        IAppVersionProvider? appVersionProvider = null)
+        IAppVersionProvider? appVersionProvider = null,
+        IUpdateInstallFlow? installFlow = null)
     {
         localizer ??= new LocalizationManager();
         dialog ??= new FakeDialogService();
         updateService ??= new FakeUpdateService();
         appVersionProvider ??= new AppVersionProvider("2026.061501");
+        installFlow ??= new FakeUpdateInstallFlow();
         var trustedHostKeys = new TrustedHostKeysSettingsViewModel(
             new HostKeyTrustService(new HostKeyStore()),
             () => new KnownHostsImportReport(0, 0, []),
@@ -1082,6 +1085,7 @@ public sealed class SettingsViewModelTests
             new PinManager(),
             updateService,
             appVersionProvider,
+            installFlow,
             profileImportService);
     }
 
@@ -1121,15 +1125,138 @@ public sealed class SettingsViewModelTests
         Assert.False(viewModel.IsDirty);
     }
 
+    [Fact]
+    public void DownloadAndInstall_NoUpdateAvailable_CommandCannotExecute()
+    {
+        var viewModel = CreateViewModel(new FakeConfigManager());
+
+        Assert.False(viewModel.IsUpdateAvailable);
+        Assert.False(viewModel.DownloadAndInstallCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_DeclinedConfirm_DoesNotRunFlow()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService { Result = AvailableResult() };
+        var flow = new FakeUpdateInstallFlow();
+        var dialog = new FakeDialogService { ConfirmResult = false };
+        var viewModel = CreateViewModel(
+            new FakeConfigManager(), dialog, localizer: localizer,
+            updateService: updateService, installFlow: flow);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+        await viewModel.DownloadAndInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, flow.RunCallCount);
+        Assert.False(viewModel.IsInstallingUpdate);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_OutcomeStarted_RunsFlowAndSetsNoErrorStatus()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService { Result = AvailableResult() };
+        var flow = new FakeUpdateInstallFlow { Outcome = UpdateInstallOutcome.Started };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(
+            new FakeConfigManager(), dialog, localizer: localizer,
+            updateService: updateService, installFlow: flow);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+        await viewModel.DownloadAndInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, flow.RunCallCount);
+        // Started maps to a null status key, so the last status remains the "downloading" message.
+        Assert.Equal(localizer.Format("SettingsUpdateStatusDownloading"), viewModel.UpdateStatusText);
+        Assert.False(viewModel.IsInstallingUpdate);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_OutcomeInstallLaunchFailed_ShowsInstallFailedStatus()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService { Result = AvailableResult() };
+        var flow = new FakeUpdateInstallFlow { Outcome = UpdateInstallOutcome.InstallLaunchFailed };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(
+            new FakeConfigManager(), dialog, localizer: localizer,
+            updateService: updateService, installFlow: flow);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+        await viewModel.DownloadAndInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, flow.RunCallCount);
+        Assert.Equal(localizer.Format("SettingsUpdateStatusInstallFailed"), viewModel.UpdateStatusText);
+        Assert.False(viewModel.IsInstallingUpdate);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstall_OutcomeVerificationFailed_ShowsVerificationFailedStatus()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService { Result = AvailableResult() };
+        var flow = new FakeUpdateInstallFlow { Outcome = UpdateInstallOutcome.VerificationFailed };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(
+            new FakeConfigManager(), dialog, localizer: localizer,
+            updateService: updateService, installFlow: flow);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+        await viewModel.DownloadAndInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, flow.RunCallCount);
+        Assert.Equal(localizer.Format("SettingsUpdateStatusVerificationFailed"), viewModel.UpdateStatusText);
+        Assert.False(viewModel.IsInstallingUpdate);
+    }
+
+    private static UpdateCheckResult AvailableResult() =>
+        new(
+            UpdateCheckStatus.UpdateAvailable,
+            new UpdateInfo(
+                HeimdallVersion.Parse("2026.061502"),
+                "v2026.061502",
+                "https://example.test",
+                "notes",
+                new UpdateAsset("Heimdall_2026.061502_Standard_Setup.exe", "https://example.test/setup.exe", 1),
+                null));
+
     private sealed class FakeUpdateService : IUpdateService
     {
         public UpdateCheckResult Result { get; set; } = new(UpdateCheckStatus.UpToDate, null);
+
+        public string DownloadResultPath { get; set; } = @"C:\Temp\HeimdallSetup.exe";
+
+        public Exception? DownloadException { get; set; }
+
+        public int DownloadCallCount { get; private set; }
 
         public Task<UpdateCheckResult> CheckForUpdatesAsync(HeimdallVersion current, string owner, string repo, CancellationToken cancellationToken)
             => Task.FromResult(Result);
 
         public Task<string> DownloadVerifiedAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
+        {
+            DownloadCallCount++;
+            if (DownloadException is not null)
+            {
+                throw DownloadException;
+            }
+
+            return Task.FromResult(DownloadResultPath);
+        }
+    }
+
+    private sealed class FakeUpdateInstallFlow : IUpdateInstallFlow
+    {
+        public UpdateInstallOutcome Outcome { get; set; } = UpdateInstallOutcome.Started;
+
+        public int RunCallCount { get; private set; }
+
+        public Task<UpdateInstallOutcome> RunAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+        {
+            RunCallCount++;
+            return Task.FromResult(Outcome);
+        }
     }
 
     private static JsonSerializerOptions GetExportJsonOptions()

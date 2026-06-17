@@ -2088,6 +2088,18 @@
                                                 Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
                                                 AutomationProperties.Name="{loc:Translate SettingsBtnCheckNow}"/>
                                         <TextBlock x:Name="Mw_SettingsUpdateStatus" Text="{Binding Settings.UpdateStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                        <Button x:Name="Mw_SettingsDownloadInstallButton" Content="{loc:Translate SettingsBtnDownloadInstall}" Command="{Binding Settings.DownloadAndInstallCommand}"
+                                                Style="{DynamicResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                AutomationProperties.Name="{loc:Translate SettingsBtnDownloadInstall}"
+                                                Visibility="{Binding Settings.IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <ProgressBar x:Name="Mw_SettingsDownloadProgress" Minimum="0" Maximum="1" Value="{Binding Settings.DownloadProgress}"
+                                                     Height="6" Margin="0,8,0,0"
+                                                     AutomationProperties.Name="{loc:Translate SettingsUpdateStatusDownloading}"
+                                                     Visibility="{Binding Settings.IsInstallingUpdate, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <Button x:Name="Mw_SettingsDownloadCancelButton" Content="{loc:Translate BtnCancel}" Command="{Binding Settings.DownloadAndInstallCancelCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                                AutomationProperties.Name="{loc:Translate BtnCancel}"
+                                                Visibility="{Binding Settings.IsInstallingUpdate, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                 </Border>
 
