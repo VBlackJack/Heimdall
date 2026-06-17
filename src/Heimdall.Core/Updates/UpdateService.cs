@@ -29,6 +29,7 @@ public sealed class UpdateService : IUpdateService
     private const string InstallerNameFormat = "Heimdall_{0}_{1}_Setup.exe";
     private const string ChecksumFileName = "SHA256SUMS.txt";
     private const string ChecksumSeparator = "  ";
+    private const string DefaultInstallerExtension = ".exe";
     private const int DownloadBufferSize = 81920;
 
     private readonly IGitHubReleaseClient _client;
@@ -87,7 +88,15 @@ public sealed class UpdateService : IUpdateService
     {
         ArgumentNullException.ThrowIfNull(update);
 
-        var tempPath = Path.Combine(Path.GetTempPath(), $"Heimdall_{update.Version}_{Guid.NewGuid():N}.tmp");
+        // Preserve the installer's real extension so the relauncher can execute it; Windows
+        // cannot run a ".tmp" file and would otherwise prompt the user to pick an app.
+        var extension = Path.GetExtension(update.Asset.Name);
+        if (string.IsNullOrEmpty(extension))
+        {
+            extension = DefaultInstallerExtension;
+        }
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"Heimdall_{update.Version}_{Guid.NewGuid():N}{extension}");
         try
         {
             await using (var source = await _client.OpenAssetStreamAsync(update.Asset.DownloadUrl, cancellationToken).ConfigureAwait(false))

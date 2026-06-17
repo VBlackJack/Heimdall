@@ -170,6 +170,27 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task DownloadVerifiedAsync_ExeInstaller_ReturnsPathWithExeExtension()
+    {
+        var payload = Encoding.ASCII.GetBytes("verified-installer-payload");
+        var hash = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        var client = new StubReleaseClient { StreamFactory = () => new MemoryStream(payload) };
+        var service = CreateService(client, BuildVariant.Standard);
+        var update = UpdateWithSha(hash, payload.Length);
+
+        var path = await service.DownloadVerifiedAsync(update, null, CancellationToken.None);
+
+        try
+        {
+            Assert.Equal(".exe", Path.GetExtension(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task DownloadVerifiedAsync_HashMismatch_ThrowsAndDeletesTemp()
     {
         var payload = Encoding.ASCII.GetBytes("payload");
@@ -228,7 +249,7 @@ public sealed class UpdateServiceTests
     }
 
     private static HashSet<string> TempSnapshot()
-        => new(Directory.EnumerateFiles(Path.GetTempPath(), "Heimdall_*.tmp"), StringComparer.OrdinalIgnoreCase);
+        => new(Directory.EnumerateFiles(Path.GetTempPath(), "Heimdall_*"), StringComparer.OrdinalIgnoreCase);
 
     private sealed class StubReleaseClient : IGitHubReleaseClient
     {
