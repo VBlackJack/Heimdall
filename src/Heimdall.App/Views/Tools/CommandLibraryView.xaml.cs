@@ -95,8 +95,8 @@ public partial class CommandLibraryView : UserControl, IToolView
             System.Windows.Threading.DispatcherPriority.Loaded,
             new Action(() =>
             {
-                // Search box is unnamed after Phase B; just move focus into the view.
-                Focus();
+                // Land focus on the search box so the user can type immediately.
+                SearchBox.Focus();
             }));
     }
 

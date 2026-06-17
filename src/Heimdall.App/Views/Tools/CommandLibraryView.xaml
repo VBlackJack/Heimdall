@@ -149,7 +149,8 @@
 
                 <!-- Search bar — always full width -->
                 <Grid Grid.Row="0">
-                    <TextBox Style="{StaticResource WatermarkTextBoxStyle}"
+                    <TextBox x:Name="SearchBox"
+                             Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag="{loc:Translate ToolCmdLibSearchPlaceholder}"
                              Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="{loc:Translate ToolCmdLibSearchPlaceholder}"
