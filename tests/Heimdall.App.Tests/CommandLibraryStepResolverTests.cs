@@ -55,8 +55,32 @@ public sealed class CommandLibraryStepResolverTests
     }
 
     [Fact]
-    public async Task ResolveAsync_NoLinuxTemplate_ReturnsBrokenNoTemplate()
+    public async Task ResolveAsync_NoTemplateAtAll_ReturnsBrokenNoTemplate()
     {
+        var action = new ActionModel
+        {
+            Id = "no-template",
+            Title = "No template",
+            Category = "Ops",
+            Platform = Platform.Both
+        };
+        var provider = CommandLibraryTestHelpers.CreateResolverServiceProvider(action);
+        var resolver = new CommandLibraryStepResolver(provider.GetRequiredService<IServiceScopeFactory>());
+
+        var result = await resolver.ResolveAsync(new PostConnectStep
+        {
+            CommandLibraryId = action.Id
+        }, CancellationToken.None);
+
+        Assert.Equal(PostConnectResolveStatus.BrokenNoTemplate, result.Status);
+        Assert.Equal("LogPostConnectResolveBrokenNoTemplate", result.ReasonKey);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_WindowsOnlyAction_FallsBackToWindowsTemplate()
+    {
+        // SSH into a Windows OpenSSH host: no Linux template exists, but the
+        // action's Windows pattern must still resolve instead of breaking.
         var action = new ActionModel
         {
             Id = "win-only",
@@ -77,11 +101,17 @@ public sealed class CommandLibraryStepResolverTests
 
         var result = await resolver.ResolveAsync(new PostConnectStep
         {
-            CommandLibraryId = action.Id
+            CommandLibraryId = action.Id,
+            CommandLibraryParams = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["name"] = "hello"
+            }
         }, CancellationToken.None);
 
-        Assert.Equal(PostConnectResolveStatus.BrokenNoTemplate, result.Status);
-        Assert.Equal("LogPostConnectResolveBrokenNoTemplate", result.ReasonKey);
+        Assert.Equal(PostConnectResolveStatus.Resolved, result.Status);
+        Assert.NotNull(result.ResolvedInput);
+        Assert.Contains("hello", result.ResolvedInput!, StringComparison.Ordinal);
+        Assert.Null(result.ReasonKey);
     }
 
     [Fact]

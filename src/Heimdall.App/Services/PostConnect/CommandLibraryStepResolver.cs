@@ -55,10 +55,15 @@ public sealed class CommandLibraryStepResolver(IServiceScopeFactory scopeFactory
             };
         }
 
-        var template = action.LinuxCommandTemplate;
+        // Post-connect runs only over SSH terminals, where a POSIX shell is the
+        // dominant case, so the Linux template is preferred. Fall back to the
+        // Windows template (e.g. SSH into a Windows OpenSSH host) so a linked
+        // action that only carries a Windows pattern still resolves instead of
+        // silently breaking.
+        var template = action.LinuxCommandTemplate ?? action.WindowsCommandTemplate;
         if (template is null)
         {
-            FileLogger.Info($"Post-connect resolve: action '{action.Id}' has no Linux template.");
+            FileLogger.Info($"Post-connect resolve: action '{action.Id}' has no usable template.");
             return new PostConnectResolveResult
             {
                 Status = PostConnectResolveStatus.BrokenNoTemplate,

@@ -147,7 +147,7 @@ internal static class TwinShellBootstrapper
             try
             {
                 var json = await File.ReadAllTextAsync(file);
-                if (json.Length > 100 * 1024) continue;
+                if (json.Length > Heimdall.Core.Configuration.AppConstants.MaxSeedFileSizeBytes) continue;
 
                 var action = JsonSerializer.Deserialize<ActionModel>(json, options);
                 if (action is null
@@ -235,20 +235,20 @@ internal static class TwinShellBootstrapper
         }
 
         private void OnSettingsChanged(Heimdall.Core.Configuration.AppSettings s)
+            => _cached = MapSettings(s);
+
+        private static UserSettings MapSettings(Heimdall.Core.Configuration.AppSettings s) => new()
         {
-            _cached = new UserSettings
-            {
-                GitRemoteUrl = s.CmdLibGitSyncUrl,
-                GitAccessToken = DecryptToken(s.CmdLibGitSyncToken),
-                GitBranch = s.CmdLibGitSyncBranch,
-                GitUserName = s.CmdLibGitSyncAuthorName,
-                GitUserEmail = s.CmdLibGitSyncAuthorEmail,
-                GitSyncOnStartup = s.CmdLibGitSyncOnStartup,
-                GitAutoPush = s.CmdLibGitSyncAutoPush,
-                GitRepositoryPath = Path.Combine(DbDir, "git-repo"),
-                GitAuthMethod = "https"
-            };
-        }
+            GitRemoteUrl = s.CmdLibGitSyncUrl,
+            GitAccessToken = DecryptToken(s.CmdLibGitSyncToken),
+            GitBranch = s.CmdLibGitSyncBranch,
+            GitUserName = s.CmdLibGitSyncAuthorName,
+            GitUserEmail = s.CmdLibGitSyncAuthorEmail,
+            GitSyncOnStartup = s.CmdLibGitSyncOnStartup,
+            GitAutoPush = s.CmdLibGitSyncAutoPush,
+            GitRepositoryPath = Path.Combine(DbDir, "git-repo"),
+            GitAuthMethod = "https"
+        };
 
         public async Task<UserSettings> LoadSettingsAsync()
         {
@@ -266,18 +266,7 @@ internal static class TwinShellBootstrapper
             try
             {
                 var s = await _configManager.LoadSettingsAsync();
-                _cached = new UserSettings
-                {
-                    GitRemoteUrl = s.CmdLibGitSyncUrl,
-                    GitAccessToken = DecryptToken(s.CmdLibGitSyncToken),
-                    GitBranch = s.CmdLibGitSyncBranch,
-                    GitUserName = s.CmdLibGitSyncAuthorName,
-                    GitUserEmail = s.CmdLibGitSyncAuthorEmail,
-                    GitSyncOnStartup = s.CmdLibGitSyncOnStartup,
-                    GitAutoPush = s.CmdLibGitSyncAutoPush,
-                    GitRepositoryPath = Path.Combine(DbDir, "git-repo"),
-                    GitAuthMethod = "https"
-                };
+                _cached = MapSettings(s);
             }
             catch (Exception ex)
             {

@@ -17,6 +17,7 @@
 using System.Globalization;
 using FluentAssertions;
 using LibGit2Sharp;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using TwinShell.Core.Interfaces;
 using TwinShell.Core.Models;
@@ -143,10 +144,34 @@ public sealed class GitSyncServiceCancellationTests
 
         return new GitSyncService(
             new FakeSettingsService(settings),
-            syncService,
             NullLogger<GitSyncService>.Instance,
             new FakeLocalizationService(),
-            serviceScopeFactory: null);
+            new SingleServiceScopeFactory(syncService));
+    }
+
+    /// <summary>
+    /// Minimal scope factory whose scopes resolve only <see cref="ISyncService"/>
+    /// (to the supplied fake) and return null for everything else — enough for
+    /// <see cref="GitSyncService"/> to run import/export through a scope while the
+    /// optional sync-history repository stays absent.
+    /// </summary>
+    private sealed class SingleServiceScopeFactory : IServiceScopeFactory, IServiceScope, IServiceProvider
+    {
+        private readonly ISyncService _syncService;
+
+        internal SingleServiceScopeFactory(ISyncService syncService)
+            => _syncService = syncService;
+
+        public IServiceScope CreateScope() => this;
+
+        public IServiceProvider ServiceProvider => this;
+
+        public object? GetService(Type serviceType)
+            => serviceType == typeof(ISyncService) ? _syncService : null;
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class GitRepositoryFixture : IDisposable

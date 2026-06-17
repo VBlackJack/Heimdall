@@ -217,4 +217,47 @@ public sealed class CommandActionDialogViewModelTests
         vm.AddLinkCommand.Execute(null);
         vm.IsDirty.Should().BeTrue();
     }
+
+    /// <summary>
+    /// Freezes the validation-localization convention: every DataAnnotation
+    /// surfaced through the Title/Category error fields must resolve through the
+    /// internal key map to its localized string. If an attribute's
+    /// <c>ErrorMessage</c> is changed without updating the map, the error would
+    /// fall back to the raw English text and no longer equal the localized value.
+    /// </summary>
+    [Fact]
+    public async Task Validate_LocalizesEachSurfacedDataAnnotationError()
+    {
+        var localizer = await CommandLibraryTestHelpers.CreateAppLocalizerAsync();
+
+        var titleRequired = new CommandActionDialogViewModel
+        {
+            Localizer = localizer,
+            Title = "",
+            Category = "Ops",
+            LinuxPattern = "ls",
+        };
+        titleRequired.ValidateCommand.Execute(null);
+        titleRequired.TitleError.Should().Be(localizer["ToolCmdLibValidationTitleRequired"]);
+
+        var titleTooLong = new CommandActionDialogViewModel
+        {
+            Localizer = localizer,
+            Title = new string('x', 201),
+            Category = "Ops",
+            LinuxPattern = "ls",
+        };
+        titleTooLong.ValidateCommand.Execute(null);
+        titleTooLong.TitleError.Should().Be(localizer["ToolCmdLibValidationTitleMaxLength"]);
+
+        var categoryRequired = new CommandActionDialogViewModel
+        {
+            Localizer = localizer,
+            Title = "Valid title",
+            Category = "",
+            LinuxPattern = "ls",
+        };
+        categoryRequired.ValidateCommand.Execute(null);
+        categoryRequired.CategoryError.Should().Be(localizer["ToolCmdLibValidationCategoryRequired"]);
+    }
 }
