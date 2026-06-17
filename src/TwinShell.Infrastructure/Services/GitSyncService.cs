@@ -18,10 +18,9 @@ namespace TwinShell.Infrastructure.Services;
 public sealed class GitSyncService : IGitSyncService, IDisposable
 {
     private readonly ISettingsService _settingsService;
-    private readonly ISyncService _yamlSyncService;
     private readonly ILogger<GitSyncService> _logger;
     private readonly ILocalizationService _localization;
-    private readonly IServiceScopeFactory? _serviceScopeFactory;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     // Retry configuration
     private const int MaxRetryAttempts = 3;
@@ -60,16 +59,40 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
     public GitSyncService(
         ISettingsService settingsService,
-        ISyncService yamlSyncService,
         ILogger<GitSyncService> logger,
         ILocalizationService localization,
-        IServiceScopeFactory? serviceScopeFactory = null)
+        IServiceScopeFactory serviceScopeFactory)
     {
         _settingsService = settingsService;
-        _yamlSyncService = yamlSyncService;
         _logger = logger;
         _localization = localization;
         _serviceScopeFactory = serviceScopeFactory;
+    }
+
+    /// <summary>
+    /// Imports the YAML tree into the database through a fresh DI scope.
+    /// <see cref="ISyncService"/> is scoped (it depends on the per-request
+    /// <c>DbContext</c> and repositories); resolving it here — rather than
+    /// holding it in a field on this singleton — avoids a captive dependency
+    /// that would pin one <c>DbContext</c> for the whole application lifetime.
+    /// </summary>
+    private async Task<SyncImportResult> ImportFromYamlAsync(string localPath, CancellationToken cancellationToken)
+    {
+        using IServiceScope scope = _serviceScopeFactory.CreateScope();
+        ISyncService syncService = scope.ServiceProvider.GetRequiredService<ISyncService>();
+        return await syncService.ImportDataFromYamlAsync(localPath, cancellationToken);
+    }
+
+    /// <summary>
+    /// Exports the database to a YAML tree through a fresh DI scope. See
+    /// <see cref="ImportFromYamlAsync"/> for why the scoped service is resolved
+    /// per operation instead of being captured in a field.
+    /// </summary>
+    private async Task<SyncExportResult> ExportToYamlAsync(string localPath, CancellationToken cancellationToken)
+    {
+        using IServiceScope scope = _serviceScopeFactory.CreateScope();
+        ISyncService syncService = scope.ServiceProvider.GetRequiredService<ISyncService>();
+        return await syncService.ExportDataToYamlAsync(localPath, cancellationToken);
     }
 
     /// <summary>
@@ -192,11 +215,6 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         string operationType,
         DateTime startedAt)
     {
-        if (_serviceScopeFactory == null)
-        {
-            return;
-        }
-
         try
         {
             // Create a scope to get a scoped repository instance
@@ -635,7 +653,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             // Import YAML files into database
             cancellationToken.ThrowIfCancellationRequested();
             RaiseStatusChanged(L(MessageKeys.GitSyncImporting), SyncPhase.Importing, 50, entityType: "Actions");
-            var importResult = await _yamlSyncService.ImportDataFromYamlAsync(localPath, cancellationToken);
+            var importResult = await ImportFromYamlAsync(localPath, cancellationToken);
 
             if (importResult.Success)
             {
@@ -742,7 +760,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             // Export database to YAML
             cancellationToken.ThrowIfCancellationRequested();
             RaiseStatusChanged(L(MessageKeys.GitSyncExporting), SyncPhase.Exporting, 10, entityType: "Actions");
-            var exportResult = await _yamlSyncService.ExportDataToYamlAsync(localPath, cancellationToken);
+            var exportResult = await ExportToYamlAsync(localPath, cancellationToken);
 
             if (!exportResult.Success)
             {
