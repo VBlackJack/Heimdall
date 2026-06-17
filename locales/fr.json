@@ -5149,6 +5149,8 @@
   "ToolCmdLibCopied": "Copi\u00e9 !",
   "ToolCmdLibDeleteConfirmTitle": "Supprimer la commande",
   "ToolCmdLibDeleteConfirmMessage": "Supprimer la commande \u00ab {0} \u00bb ? Cette action est irr\u00e9versible.",
+  "ConfirmDangerousSendTitle": "Ex\u00e9cuter cette commande dangereuse ?",
+  "ConfirmDangerousSendMessage": "Cette commande est marqu\u00e9e comme dangereuse et s'ex\u00e9cutera imm\u00e9diatement sur la session. Continuer ?",
   "ToolCmdLibDialogTitleAdd": "Ajouter une commande",
   "ToolCmdLibDialogTitleEdit": "\u00c9diter la commande",
   "ToolCmdLibDialogLblTitle": "Titre",

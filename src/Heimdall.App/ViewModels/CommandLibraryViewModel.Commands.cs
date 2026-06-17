@@ -16,11 +16,13 @@
 
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services;
 using Heimdall.App.Services.Import;
 using Heimdall.App.Services.Sync;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.App.ViewModels.Dialogs;
 using Microsoft.Extensions.DependencyInjection;
+using TwinShell.Core.Enums;
 using TwinShell.Core.Interfaces;
 
 namespace Heimdall.App.ViewModels;
@@ -48,12 +50,20 @@ public sealed partial class CommandLibraryViewModel
 
     /// <summary>
     /// Invokes the registered Send-to-Terminal handler with the current
-    /// generated command and records the action in history.
+    /// generated command and records the action in history. Because Send
+    /// executes the command immediately on the session, actions flagged
+    /// <see cref="CriticalityLevel.Dangerous"/> require user confirmation first.
     /// </summary>
     [RelayCommand]
-    public void Send()
+    public async Task SendAsync()
     {
         if (string.IsNullOrEmpty(GeneratedCommand) || SendCommandHandler is null) return;
+        var level = _selectedAction?.Level ?? CriticalityLevel.Info;
+        if (!await DangerousCommandGuard.ConfirmIfDangerousAsync(level, _dialogService, LocalizeKey))
+        {
+            return;
+        }
+
         SendCommandHandler(GeneratedCommand);
         ShowCopyFeedback?.Invoke("send");
         RecordHistory(GeneratedCommand);

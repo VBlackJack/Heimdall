@@ -5150,6 +5150,8 @@
   "ToolCmdLibCopied": "Copied!",
   "ToolCmdLibDeleteConfirmTitle": "Delete Command",
   "ToolCmdLibDeleteConfirmMessage": "Delete the command \"{0}\"? This cannot be undone.",
+  "ConfirmDangerousSendTitle": "Run this dangerous command?",
+  "ConfirmDangerousSendMessage": "This command is flagged as dangerous and will run immediately on the session. Continue?",
   "ToolCmdLibDialogTitleAdd": "Add Command",
   "ToolCmdLibDialogTitleEdit": "Edit Command",
   "ToolCmdLibDialogLblTitle": "Title",
