@@ -56,6 +56,28 @@ if (-not (Test-Path $distDir)) {
     New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 }
 
+if ($Publish -and -not $DryRun) {
+    if ($Mode -ne 'Release') {
+        Write-Output "[!] Publish requires -Mode Release."
+        exit 1
+    }
+
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        Write-Output "[!] GitHub CLI 'gh' was not found on PATH."
+        exit 1
+    }
+
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & gh auth status *> $null
+    $ghAuthExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $prevEAP
+    if ($ghAuthExitCode -ne 0) {
+        Write-Output "[!] GitHub CLI is not authenticated. Run 'gh auth login' and retry."
+        exit 1
+    }
+}
+
 # ── Build number: YYYY.MMDDxx (xx = sequential within day) ──────────────────
 
 $today = Get-Date
@@ -402,16 +424,24 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     $notes += "$fence`n"
     $artifacts += $checksumFile
 
+    $notesFile = Join-Path $installerDir "RELEASE_NOTES_v${buildNumber}.md"
+    [System.IO.File]::WriteAllText($notesFile, $notes, [System.Text.UTF8Encoding]::new($false))
+    Write-Output "[$label] Wrote $(Split-Path $notesFile -Leaf)."
+
+    $createArgs = @('release', 'create', "v$buildNumber") + $artifacts + @('--title', "v$buildNumber", '--notes-file', $notesFile)
+
     Write-Host "[$label] Release notes:" -ForegroundColor DarkGray
     Write-Host $notes -ForegroundColor DarkGray
 
     if ($isDry) {
-        Write-Host ""
-        Write-Host "[$label] Would run: git add + commit + push" -ForegroundColor Magenta
-        $artifactArgs = ($artifacts | ForEach-Object { "`"$(Split-Path $_ -Leaf)`"" }) -join ' '
-        Write-Host "[$label] Would run: gh release create v${buildNumber} $artifactArgs" -ForegroundColor Magenta
-        Write-Host ""
-        Write-Host "[$label] Dry run complete. No changes made to git or GitHub." -ForegroundColor Magenta
+        Write-Output ""
+        Write-Output "[$label] Would run: git add $AppProject"
+        Write-Output "[$label] Would run: git status --porcelain -- $AppProject"
+        Write-Output "[$label] Would run: git commit -m `"release: v${buildNumber}`" (if version file changed)"
+        Write-Output "[$label] Would run: git push"
+        Write-Output "[$label] Would run: gh $($createArgs -join ' ')"
+        Write-Output ""
+        Write-Output "[$label] Dry run complete. No changes made to git or GitHub."
     } else {
         # Commit version bump + push
         # git writes progress to stderr which PowerShell treats as a terminating
@@ -419,27 +449,84 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         # Continue so $LASTEXITCODE is the sole success indicator.
         Write-Host "[$label] Committing version bump..." -ForegroundColor DarkGray
         $prevEAP = $ErrorActionPreference
+        $prevGitPrompt = $env:GIT_TERMINAL_PROMPT
         $ErrorActionPreference = 'Continue'
-        & git add $AppProject 2>$null
-        & git commit -m "release: v${buildNumber}" 2>$null
-        & git push 2>$null
-        $ErrorActionPreference = $prevEAP
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[!] Git push failed. Create the release manually." -ForegroundColor DarkYellow
-        } else {
-            Write-Host "[$label] Pushed to remote." -ForegroundColor DarkGray
+        $env:GIT_TERMINAL_PROMPT = '0'
+        try {
+            $gitAddOut = & git add $AppProject 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Output "[!] Git add failed."
+                $gitAddOut | ForEach-Object { Write-Output $_ }
+                exit 1
+            }
+
+            $gitStatusOut = & git status --porcelain -- $AppProject 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Output "[!] Git status failed."
+                $gitStatusOut | ForEach-Object { Write-Output $_ }
+                exit 1
+            }
+
+            if ($gitStatusOut) {
+                $commitOut = & git commit -m "release: v${buildNumber}" 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Output "[!] Git commit failed."
+                    $commitOut | ForEach-Object { Write-Output $_ }
+                    exit 1
+                }
+            } else {
+                Write-Output "[$label] No version bump changes to commit."
+            }
+
+            $pushOut = & git push 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Output "[!] Git push failed. Aborting release creation."
+                $pushOut | ForEach-Object { Write-Output $_ }
+                exit 1
+            }
+            Write-Output "[$label] Pushed to remote."
+        } finally {
+            $ErrorActionPreference = $prevEAP
+            if ($null -eq $prevGitPrompt) {
+                Remove-Item Env:\GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
+            } else {
+                $env:GIT_TERMINAL_PROMPT = $prevGitPrompt
+            }
         }
 
-        # Create release
-        $artifactArgs = ($artifacts | ForEach-Object { "`"$_`"" }) -join ' '
-        $cmd = "gh release create v${buildNumber} $artifactArgs --title `"v${buildNumber}`" --notes `"$notes`""
-        Invoke-Expression $cmd
+        # Create or update the release.
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & gh release view "v$buildNumber" *> $null
+            $releaseExists = ($LASTEXITCODE -eq 0)
 
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "[$label] Release published: https://github.com/VBlackJack/Heimdall/releases/tag/v${buildNumber}" -ForegroundColor Green
-        } else {
-            Write-Host "[!] GitHub release creation failed." -ForegroundColor Red
-            exit 1
+            if ($releaseExists) {
+                $uploadOut = & gh release upload "v$buildNumber" @artifacts --clobber 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Output "[!] GitHub release asset upload failed."
+                    $uploadOut | ForEach-Object { Write-Output $_ }
+                    exit 1
+                }
+
+                $editOut = & gh release edit "v$buildNumber" --notes-file $notesFile 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Output "[!] GitHub release notes update failed."
+                    $editOut | ForEach-Object { Write-Output $_ }
+                    exit 1
+                }
+            } else {
+                $createOut = & gh @createArgs 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Output "[!] GitHub release creation failed."
+                    $createOut | ForEach-Object { Write-Output $_ }
+                    exit 1
+                }
+            }
+        } finally {
+            $ErrorActionPreference = $prevEAP
         }
+
+        Write-Output "[$label] Release published: https://github.com/VBlackJack/Heimdall/releases/tag/v${buildNumber}"
     }
 }
