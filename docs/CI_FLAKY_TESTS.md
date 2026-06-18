@@ -19,6 +19,14 @@ A second non-blocking step in `.github/workflows/ci.yml` runs the same
 tests with `continue-on-error: true` so that the signal stays visible in
 the workflow summary without failing the build.
 
+The workflow also runs tests tagged `[Trait("Category", "RequiresDesktop")]`
+in a separate non-blocking informational step with a timeout. These tests
+exercise desktop UIAutomation smoke paths and require a reliable interactive
+Windows desktop. They pass in a normal developer session, but can hang or
+flake on the GitHub Actions Windows runner because the runner desktop and
+UIAutomation latency are not deterministic. They stay out of the blocking
+coverage pass by design while remaining visible in CI.
+
 ## Why these tests are flaky on the runner only
 
 Four distinct root causes share the same symptom (`TaskCanceledException`,
@@ -78,8 +86,9 @@ suite, tagged tests included. Expect them to pass.
 To reproduce the CI behavior locally:
 
 ```powershell
-dotnet test Heimdall.slnx --filter "Category!=CIUnstable"
+dotnet test Heimdall.slnx --filter "Category!=CIUnstable&Category!=RequiresDesktop"
 dotnet test Heimdall.slnx --filter "Category=CIUnstable"
+dotnet test Heimdall.slnx --filter "Category=RequiresDesktop"
 ```
 
 ## When to remove a tag
