@@ -30,9 +30,10 @@ jobs:
         run: dotnet build Heimdall.slnx --no-restore -c Release
 
       - name: Test with coverage
+        timeout-minutes: 25
         run: >
           dotnet test Heimdall.slnx --no-build -c Release
-          --filter "Category!=CIUnstable"
+          --filter "Category!=CIUnstable&Category!=RequiresDesktop"
           --verbosity normal
           --collect:"XPlat Code Coverage"
           --results-directory TestResults
@@ -46,11 +47,25 @@ jobs:
       - name: Test CIUnstable (informational, non-blocking)
         if: always()
         continue-on-error: true
+        timeout-minutes: 15
         run: >
           dotnet test Heimdall.slnx --no-build -c Release
           --filter "Category=CIUnstable"
           --verbosity normal
           --results-directory TestResults/CIUnstable
+
+      # Informational pass for desktop UIAutomation smoke tests. These need a
+      # real interactive desktop to be deterministic and can hang on GitHub
+      # Actions Windows runners. Keep the signal visible without blocking CI.
+      - name: Test RequiresDesktop (informational, non-blocking)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 15
+        run: >
+          dotnet test Heimdall.slnx --no-build -c Release
+          --filter "Category=RequiresDesktop"
+          --verbosity normal
+          --results-directory TestResults/RequiresDesktop
 
       - name: Check for vulnerable dependencies
         shell: pwsh
