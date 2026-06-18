@@ -16,7 +16,6 @@
 
 using System.IO;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
@@ -30,7 +29,7 @@ namespace TwinShell.Infrastructure.Services;
 /// Enables collaborative editing through Git-synchronized folders.
 /// Decoupled from database context - uses repository interfaces for data access.
 /// </summary>
-public sealed class JsonSyncService : ISyncService
+public sealed class JsonSyncService : SyncServiceBase
 {
     private readonly IActionRepository _actionRepository;
     private readonly IBatchRepository _batchRepository;
@@ -38,15 +37,6 @@ public sealed class JsonSyncService : ISyncService
     private readonly ICommandTemplateRepository _templateRepository;
     private readonly IUnitOfWork? _unitOfWork;
     private readonly JsonSerializerOptions _jsonOptions;
-
-    // Folder structure constants
-    private const string ActionsFolderName = "actions";
-    private const string BatchesFolderName = "batches";
-    private const string TemplatesFolderName = "templates";
-    private const string CategoriesFolderName = "categories";
-
-    // File size limit for security (100KB per individual sync file)
-    private const long MaxFileSizeBytes = 100 * 1024; // 100 KB
 
     public JsonSyncService(
         IActionRepository actionRepository,
@@ -65,7 +55,7 @@ public sealed class JsonSyncService : ISyncService
 
     #region Export
 
-    public async Task<SyncExportResult> ExportDataToYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
+    public override async Task<SyncExportResult> ExportDataToYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
     {
         var result = new SyncExportResult { Success = true };
 
@@ -360,7 +350,7 @@ public sealed class JsonSyncService : ISyncService
 
     #region Import
 
-    public async Task<SyncImportResult> ImportDataFromYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
+    public override async Task<SyncImportResult> ImportDataFromYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
     {
         var result = new SyncImportResult { Success = true };
 
@@ -377,33 +367,7 @@ public sealed class JsonSyncService : ISyncService
             // Import in order: categories, templates, actions, batches
             // (respecting dependencies)
 
-            var categoriesPath = Path.Combine(rootFolderPath, CategoriesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(categoriesPath))
-            {
-                await ImportCategoriesAsync(categoriesPath, result, cancellationToken);
-            }
-
-            var templatesPath = Path.Combine(rootFolderPath, TemplatesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(templatesPath))
-            {
-                await ImportTemplatesAsync(templatesPath, result, cancellationToken);
-            }
-
-            var actionsPath = Path.Combine(rootFolderPath, ActionsFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(actionsPath))
-            {
-                await ImportActionsAsync(actionsPath, result, cancellationToken);
-            }
-
-            var batchesPath = Path.Combine(rootFolderPath, BatchesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(batchesPath))
-            {
-                await ImportBatchesAsync(batchesPath, result, cancellationToken);
-            }
+            await RunImportPipelineAsync(rootFolderPath, result, cancellationToken);
 
             // Commit transaction if successful
             cancellationToken.ThrowIfCancellationRequested();
@@ -450,7 +414,7 @@ public sealed class JsonSyncService : ISyncService
         return result;
     }
 
-    private async Task ImportCategoriesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportCategoriesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         var files = Directory.GetFiles(folderPath, "*.json", SearchOption.TopDirectoryOnly);
 
@@ -530,7 +494,7 @@ public sealed class JsonSyncService : ISyncService
         }
     }
 
-    private async Task ImportTemplatesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportTemplatesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         var files = Directory.GetFiles(folderPath, "*.json", SearchOption.TopDirectoryOnly);
 
@@ -620,7 +584,7 @@ public sealed class JsonSyncService : ISyncService
         }
     }
 
-    private async Task ImportActionsAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportActionsAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         // Recursively find all JSON files (organized by category subfolders)
         var files = Directory.GetFiles(folderPath, "*.json", SearchOption.AllDirectories);
@@ -778,7 +742,7 @@ public sealed class JsonSyncService : ISyncService
         }
     }
 
-    private async Task ImportBatchesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportBatchesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         var files = Directory.GetFiles(folderPath, "*.json", SearchOption.TopDirectoryOnly);
 
@@ -916,7 +880,7 @@ public sealed class JsonSyncService : ISyncService
 
     #region Validation
 
-    public async Task<SyncValidationResult> ValidateFolderAsync(string rootFolderPath, CancellationToken cancellationToken = default)
+    public override async Task<SyncValidationResult> ValidateFolderAsync(string rootFolderPath, CancellationToken cancellationToken = default)
     {
         var result = new SyncValidationResult { IsValid = true };
 
@@ -931,63 +895,11 @@ public sealed class JsonSyncService : ISyncService
                 return result;
             }
 
-            // Check categories
-            var categoriesPath = Path.Combine(rootFolderPath, CategoriesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(categoriesPath))
-            {
-                result.CategoryFilesFound = await ValidateJsonFilesAsync<CategoryModel>(
-                    categoriesPath,
-                    result,
-                    "category",
-                    JsonSchemaValidator.ValidateCategory,
-                    cancellationToken);
-            }
-
-            // Check templates
-            var templatesPath = Path.Combine(rootFolderPath, TemplatesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(templatesPath))
-            {
-                result.TemplateFilesFound = await ValidateJsonFilesAsync<TemplateModel>(
-                    templatesPath,
-                    result,
-                    "template",
-                    JsonSchemaValidator.ValidateTemplate,
-                    cancellationToken);
-            }
-
-            // Check actions (recursive)
-            var actionsPath = Path.Combine(rootFolderPath, ActionsFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(actionsPath))
-            {
-                result.ActionFilesFound = await ValidateJsonFilesAsync<ActionModel>(
-                    actionsPath,
-                    result,
-                    "action",
-                    JsonSchemaValidator.ValidateAction,
-                    cancellationToken,
-                    SearchOption.AllDirectories);
-            }
-
-            // Check batches
-            var batchesPath = Path.Combine(rootFolderPath, BatchesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(batchesPath))
-            {
-                result.BatchFilesFound = await ValidateJsonFilesAsync<BatchModel>(
-                    batchesPath,
-                    result,
-                    "batch",
-                    JsonSchemaValidator.ValidateBatch,
-                    cancellationToken);
-            }
-
-            if (result.TotalFilesFound == 0)
-            {
-                result.Warnings.Add("No JSON files found in the folder structure.");
-            }
+            await RunValidationPipelineAsync(
+                rootFolderPath,
+                result,
+                "No JSON files found in the folder structure.",
+                cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -1001,6 +913,51 @@ public sealed class JsonSyncService : ISyncService
 
         return result;
     }
+
+    protected override Task<int> ValidateCategoriesAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateJsonFilesAsync<CategoryModel>(
+            folderPath,
+            result,
+            "category",
+            JsonSchemaValidator.ValidateCategory,
+            cancellationToken);
+
+    protected override Task<int> ValidateTemplatesAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateJsonFilesAsync<TemplateModel>(
+            folderPath,
+            result,
+            "template",
+            JsonSchemaValidator.ValidateTemplate,
+            cancellationToken);
+
+    protected override Task<int> ValidateActionsAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateJsonFilesAsync<ActionModel>(
+            folderPath,
+            result,
+            "action",
+            JsonSchemaValidator.ValidateAction,
+            cancellationToken,
+            SearchOption.AllDirectories);
+
+    protected override Task<int> ValidateBatchesAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateJsonFilesAsync<BatchModel>(
+            folderPath,
+            result,
+            "batch",
+            JsonSchemaValidator.ValidateBatch,
+            cancellationToken);
 
     private async Task<int> ValidateJsonFilesAsync<T>(
         string folderPath,
@@ -1063,14 +1020,6 @@ public sealed class JsonSyncService : ISyncService
     #endregion
 
     #region Helpers
-
-    private static void EnsureDirectoryExists(string path)
-    {
-        if (!Directory.Exists(path))
-        {
-            Directory.CreateDirectory(path);
-        }
-    }
 
     private async Task WriteJsonFileAsync<T>(string filePath, T model, CancellationToken cancellationToken)
     {
@@ -1184,12 +1133,6 @@ public sealed class JsonSyncService : ISyncService
         }
     }
 
-    private static bool ValidateFileSize(string filePath)
-    {
-        var fileInfo = new FileInfo(filePath);
-        return fileInfo.Length <= MaxFileSizeBytes;
-    }
-
     private static string SanitizeFileName(string name)
     {
         string sanitized = SanitizeFileNameCore(name);
@@ -1205,45 +1148,6 @@ public sealed class JsonSyncService : ISyncService
         return string.IsNullOrWhiteSpace(sanitized)
             ? $"{publicId:N}.json"
             : $"{sanitized}-{publicId:N}.json";
-    }
-
-    private static string SanitizeFileNameCore(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return string.Empty;
-        }
-
-        // SECURITY: Protect against path traversal attacks
-        // Remove any path separators and parent directory references
-        string sanitized = name
-            .Replace("..", "")
-            .Replace("/", "_")
-            .Replace("\\", "_");
-
-        // Remove invalid characters
-        char[] invalidChars = Path.GetInvalidFileNameChars();
-        sanitized = new string(sanitized
-            .Select(c => invalidChars.Contains(c) ? '_' : c)
-            .ToArray());
-
-        // Replace multiple underscores with single
-        sanitized = Regex.Replace(sanitized, @"_+", "_");
-
-        // Trim and limit length
-        sanitized = sanitized.Trim('_').Trim();
-        if (sanitized.Length > 100)
-        {
-            sanitized = sanitized.Substring(0, 100);
-        }
-
-        // SECURITY: Final check - ensure no path traversal possible
-        if (sanitized.Contains("..") || Path.IsPathRooted(sanitized))
-        {
-            return string.Empty;
-        }
-
-        return sanitized;
     }
 
     private static List<CommandExample> ParseExamples(List<ExampleModel>? models)
