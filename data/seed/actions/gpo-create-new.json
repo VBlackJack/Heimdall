@@ -38,7 +38,7 @@
   },
   "examples": [
     {
-      "command": "New-GPO -Name \"Security-Policy-IT\" -Comment \"Politique de sécurité pour le département IT\"",
+      "command": "New-GPO -Name \"Security-Policy-IT\" -Comment \"Security policy for the IT department\"",
       "description": "Crée une nouvelle GPO pour la sécurité IT",
       "platform": 0
     },

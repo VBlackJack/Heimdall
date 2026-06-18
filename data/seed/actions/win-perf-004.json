@@ -20,7 +20,7 @@
     "id": "win-perf-004-cmd",
     "platform": 0,
     "name": "Set-DnsClientServerAddress",
-    "commandPattern": "$interface = Get-NetAdapter | Where-Object {$_.Status -eq 'Up' -and $_.Name -like '*{InterfaceName}*'} | Select-Object -First 1; if ($interface) { Set-DnsClientServerAddress -InterfaceIndex $interface.ifIndex -ServerAddresses ('9.9.9.9','149.112.112.112'); Write-Host \"DNS Quad9 configuré sur l'interface $($interface.Name)\" -ForegroundColor Green; ipconfig /flushdns } else { Write-Host \"Interface réseau non trouvée\" -ForegroundColor Red }",
+    "commandPattern": "$interface = Get-NetAdapter | Where-Object {$_.Status -eq 'Up' -and $_.Name -like '*{InterfaceName}*'} | Select-Object -First 1; if ($interface) { Set-DnsClientServerAddress -InterfaceIndex $interface.ifIndex -ServerAddresses ('9.9.9.9','149.112.112.112'); Write-Host \"Quad9 DNS configured on interface $($interface.Name)\" -ForegroundColor Green; ipconfig /flushdns } else { Write-Host \"Network interface not found\" -ForegroundColor Red }",
     "parameters": [
       {
         "name": "InterfaceName",

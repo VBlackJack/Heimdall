@@ -19,7 +19,7 @@
     "id": "win-perf-003-cmd",
     "platform": 0,
     "name": "Set-DnsClientServerAddress",
-    "commandPattern": "$interface = Get-NetAdapter | Where-Object {$_.Status -eq 'Up' -and $_.Name -like '*{InterfaceName}*'} | Select-Object -First 1; if ($interface) { Set-DnsClientServerAddress -InterfaceIndex $interface.ifIndex -ServerAddresses ('208.67.222.222','208.67.220.220'); Write-Host \"DNS OpenDNS configuré sur l'interface $($interface.Name)\" -ForegroundColor Green; ipconfig /flushdns } else { Write-Host \"Interface réseau non trouvée\" -ForegroundColor Red }",
+    "commandPattern": "$interface = Get-NetAdapter | Where-Object {$_.Status -eq 'Up' -and $_.Name -like '*{InterfaceName}*'} | Select-Object -First 1; if ($interface) { Set-DnsClientServerAddress -InterfaceIndex $interface.ifIndex -ServerAddresses ('208.67.222.222','208.67.220.220'); Write-Host \"OpenDNS configured on interface $($interface.Name)\" -ForegroundColor Green; ipconfig /flushdns } else { Write-Host \"Network interface not found\" -ForegroundColor Red }",
     "parameters": [
       {
         "name": "InterfaceName",

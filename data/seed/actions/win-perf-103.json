@@ -18,7 +18,7 @@
     "id": "win-perf-103-cmd",
     "platform": 0,
     "name": "powercfg",
-    "commandPattern": "powercfg /hibernate off; Write-Host \"Hibernation désactivée. Le fichier hiberfil.sys sera supprimé\" -ForegroundColor Green",
+    "commandPattern": "powercfg /hibernate off; Write-Host \"Hibernation disabled. The hiberfil.sys file will be removed\" -ForegroundColor Green",
     "parameters": []
   },
   "examples": [

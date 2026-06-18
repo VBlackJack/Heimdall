@@ -49,7 +49,7 @@
       "platform": 0
     },
     {
-      "command": "Disable-ADAccount -Identity jdupont -PassThru | Set-ADUser -Description \"Compte désactivé le $(Get-Date -Format 'dd/MM/yyyy') - Départ entreprise\"",
+      "command": "Disable-ADAccount -Identity jdupont -PassThru | Set-ADUser -Description \"Account disabled on $(Get-Date -Format 'dd/MM/yyyy') - Employee departure\"",
       "description": "Désactive le compte et ajoute automatiquement une note avec la date et la raison. Le switch -PassThru permet de passer l'objet au pipeline. Set-ADUser -Description documente l'action pour la traçabilité. Excellente pratique pour les audits : toujours documenter les raisons de désactivation.",
       "platform": 0
     },

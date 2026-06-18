@@ -19,7 +19,7 @@
     "id": "win-perf-402-cmd",
     "platform": 0,
     "name": "Disable-CoreIsolation",
-    "commandPattern": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity' -Name 'Enabled' -Type DWord -Value 0 -ErrorAction SilentlyContinue; bcdedit /set hypervisorlaunchtype off; Write-Host \"Core Isolation désactivé\" -ForegroundColor Green; Write-Warning \"Redémarrage requis. Impact sécurité: protection contre exploits kernel réduite\"",
+    "commandPattern": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity' -Name 'Enabled' -Type DWord -Value 0 -ErrorAction SilentlyContinue; bcdedit /set hypervisorlaunchtype off; Write-Host \"Core Isolation disabled\" -ForegroundColor Green; Write-Warning \"Restart required. Security impact: reduced protection against kernel exploits\"",
     "parameters": []
   },
   "examples": [

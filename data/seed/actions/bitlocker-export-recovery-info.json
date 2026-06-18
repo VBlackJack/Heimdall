@@ -16,7 +16,7 @@
     "id": "bitlocker-export-recovery-info-cmd",
     "platform": 0,
     "name": "Get-BitLockerVolume",
-    "commandPattern": "$report = @(); Get-BitLockerVolume | ForEach-Object { $vol = $_; $_.KeyProtector | Where-Object {$_.KeyProtectorType -eq 'RecoveryPassword'} | ForEach-Object { $report += [PSCustomObject]@{ Volume=$vol.MountPoint; RecoveryPassword=$_.RecoveryPassword; KeyId=$_.KeyProtectorId } } }; $report | Export-Csv C:\\BitLocker-Recovery-Report.csv -NoTypeInformation; Write-Host 'Rapport sauvegardé: C:\\BitLocker-Recovery-Report.csv' -ForegroundColor Green",
+    "commandPattern": "$report = @(); Get-BitLockerVolume | ForEach-Object { $vol = $_; $_.KeyProtector | Where-Object {$_.KeyProtectorType -eq 'RecoveryPassword'} | ForEach-Object { $report += [PSCustomObject]@{ Volume=$vol.MountPoint; RecoveryPassword=$_.RecoveryPassword; KeyId=$_.KeyProtectorId } } }; $report | Export-Csv C:\\BitLocker-Recovery-Report.csv -NoTypeInformation; Write-Host 'Report saved: C:\\BitLocker-Recovery-Report.csv' -ForegroundColor Green",
     "parameters": []
   },
   "examples": [

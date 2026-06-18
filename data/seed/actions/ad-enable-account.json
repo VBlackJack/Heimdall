@@ -50,7 +50,7 @@
       "platform": 0
     },
     {
-      "command": "Get-ADUser -Filter * -Properties Enabled,Description | Where-Object {$_.Enabled -eq $false -and $_.Description -like '*congé*'} | Enable-ADAccount",
+      "command": "Get-ADUser -Filter * -Properties Enabled,Description | Where-Object {$_.Enabled -eq $false -and $_.Description -like '*leave*'} | Enable-ADAccount",
       "description": "Réactive automatiquement les comptes désactivés pour congés (basé sur le champ Description). Utile si votre organisation utilise des conventions de nommage dans Description. Adaptez le filtre selon vos pratiques internes.",
       "platform": 0
     }

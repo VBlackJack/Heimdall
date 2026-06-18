@@ -18,7 +18,7 @@
     "id": "win-perf-205-cmd",
     "platform": 0,
     "name": "Disable-WindowsSearch",
-    "commandPattern": "Stop-Service -Name 'WSearch' -Force -ErrorAction SilentlyContinue; Set-Service -Name 'WSearch' -StartupType Disabled; Write-Host \"Windows Search Indexing désactivé\" -ForegroundColor Green; Write-Warning \"La recherche de fichiers sera plus lente mais le CPU/disque sera libéré\"",
+    "commandPattern": "Stop-Service -Name 'WSearch' -Force -ErrorAction SilentlyContinue; Set-Service -Name 'WSearch' -StartupType Disabled; Write-Host \"Windows Search Indexing disabled\" -ForegroundColor Green; Write-Warning \"File search will be slower but CPU/disk load will be reduced\"",
     "parameters": []
   },
   "examples": [

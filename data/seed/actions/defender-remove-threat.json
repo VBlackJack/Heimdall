@@ -35,7 +35,7 @@
       "platform": 0
     },
     {
-      "command": "Get-MpThreat | Where-Object {$_.SeverityID -ge 4} | ForEach-Object { Remove-MpThreat -ThreatID $_.ThreatID; Write-Host \"Supprimé: $($_.ThreatName)\" -ForegroundColor Green }",
+      "command": "Get-MpThreat | Where-Object {$_.SeverityID -ge 4} | ForEach-Object { Remove-MpThreat -ThreatID $_.ThreatID; Write-Host \"Removed: $($_.ThreatName)\" -ForegroundColor Green }",
       "description": "Supprime toutes les menaces graves/sévères (niveau 4-5)",
       "platform": 0
     },

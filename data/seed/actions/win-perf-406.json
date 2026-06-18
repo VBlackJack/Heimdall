@@ -18,7 +18,7 @@
     "id": "win-perf-406-cmd",
     "platform": 0,
     "name": "Add-MpPreference",
-    "commandPattern": "Add-MpPreference -ExclusionPath '{Path}'; Write-Host \"Exclusion ajoutée: {Path}\" -ForegroundColor Green; Write-Warning \"Attention: n'excluez que des dossiers de confiance (jeux, dev tools)\"",
+    "commandPattern": "Add-MpPreference -ExclusionPath '{Path}'; Write-Host \"Exclusion added: {Path}\" -ForegroundColor Green; Write-Warning \"Only exclude trusted folders (games, dev tools)\"",
     "parameters": [
       {
         "name": "Path",

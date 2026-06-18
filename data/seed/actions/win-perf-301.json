@@ -19,7 +19,7 @@
     "id": "win-perf-301-cmd",
     "platform": 0,
     "name": "Disable-Superfetch",
-    "commandPattern": "Stop-Service -Name 'SysMain' -Force -ErrorAction SilentlyContinue; Set-Service -Name 'SysMain' -StartupType Disabled; Write-Host \"Superfetch/SysMain désactivé\" -ForegroundColor Green",
+    "commandPattern": "Stop-Service -Name 'SysMain' -Force -ErrorAction SilentlyContinue; Set-Service -Name 'SysMain' -StartupType Disabled; Write-Host \"Superfetch/SysMain disabled\" -ForegroundColor Green",
     "parameters": []
   },
   "examples": [

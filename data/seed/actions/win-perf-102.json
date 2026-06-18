@@ -18,7 +18,7 @@
     "id": "win-perf-102-cmd",
     "platform": 0,
     "name": "powercfg",
-    "commandPattern": "powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c; Write-Host \"Plan Hautes performances activé\" -ForegroundColor Green",
+    "commandPattern": "powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c; Write-Host \"High performance plan enabled\" -ForegroundColor Green",
     "parameters": []
   },
   "examples": [

@@ -18,7 +18,7 @@
     "id": "win-perf-101-cmd",
     "platform": 0,
     "name": "powercfg",
-    "commandPattern": "powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61; $ultimateGuid = (powercfg -list | Select-String 'Ultimate' | Select-Object -First 1) -replace '.*GUID: ([a-f0-9\\-]+).*','$1'; if ($ultimateGuid) { powercfg /setactive $ultimateGuid; Write-Host \"Plan Ultimate Performance activé\" -ForegroundColor Green } else { Write-Host \"Erreur: impossible de créer le plan Ultimate Performance\" -ForegroundColor Red }",
+    "commandPattern": "powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61; $ultimateGuid = (powercfg -list | Select-String 'Ultimate' | Select-Object -First 1) -replace '.*GUID: ([a-f0-9\\-]+).*','$1'; if ($ultimateGuid) { powercfg /setactive $ultimateGuid; Write-Host \"Ultimate Performance plan enabled\" -ForegroundColor Green } else { Write-Host \"Error: unable to create the Ultimate Performance plan\" -ForegroundColor Red }",
     "parameters": []
   },
   "examples": [
