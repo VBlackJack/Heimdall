@@ -15,7 +15,7 @@
     "id": "test-wsus-connectivity-cmd",
     "platform": 0,
     "name": "Test-NetConnection",
-    "commandPattern": "powershell -Command \"$WUServer = (Get-ItemProperty 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue).WUServer; if ($WUServer) { Write-Host 'WSUS Server: ' $WUServer; Test-NetConnection -ComputerName ($WUServer -replace 'http://|https://|/' -split ':')[0] -Port 8530 } else { Write-Host 'Aucun serveur WSUS configuré' }\"",
+    "commandPattern": "powershell -Command \"$WUServer = (Get-ItemProperty 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue).WUServer; if ($WUServer) { Write-Host 'WSUS Server: ' $WUServer; Test-NetConnection -ComputerName ($WUServer -replace 'http://|https://|/' -split ':')[0] -Port 8530 } else { Write-Host 'No WSUS server configured' }\"",
     "parameters": []
   },
   "examples": [

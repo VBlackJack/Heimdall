@@ -46,7 +46,7 @@
   },
   "examples": [
     {
-      "command": "New-ADOrganizationalUnit -Name \"Departement IT\" -Path \"DC=contoso,DC=com\" -Description \"OU pour le département IT\" -ProtectedFromAccidentalDeletion $true",
+      "command": "New-ADOrganizationalUnit -Name \"Departement IT\" -Path \"DC=contoso,DC=com\" -Description \"OU for the IT department\" -ProtectedFromAccidentalDeletion $true",
       "description": "Crée une nouvelle OU Departement IT",
       "platform": 0
     },

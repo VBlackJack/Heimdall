@@ -16,7 +16,7 @@
     "id": "laps-export-report-cmd",
     "platform": 0,
     "name": "Get-ADComputer",
-    "commandPattern": "$report = @(); Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | ForEach-Object { $report += [PSCustomObject]@{ Computer=$_.Name; Password=$_.'ms-Mcs-AdmPwd'; Expiration=[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') } }; $report | Export-Csv C:\\LAPS-Report-$(Get-Date -Format 'yyyyMMdd').csv -NoTypeInformation; Write-Host \"Rapport généré: C:\\LAPS-Report-$(Get-Date -Format 'yyyyMMdd').csv\" -ForegroundColor Green",
+    "commandPattern": "$report = @(); Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | ForEach-Object { $report += [PSCustomObject]@{ Computer=$_.Name; Password=$_.'ms-Mcs-AdmPwd'; Expiration=[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') } }; $report | Export-Csv C:\\LAPS-Report-$(Get-Date -Format 'yyyyMMdd').csv -NoTypeInformation; Write-Host \"Report generated: C:\\LAPS-Report-$(Get-Date -Format 'yyyyMMdd').csv\" -ForegroundColor Green",
     "parameters": []
   },
   "examples": [

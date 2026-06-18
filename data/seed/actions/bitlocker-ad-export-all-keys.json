@@ -17,7 +17,7 @@
     "id": "bitlocker-ad-export-all-keys-cmd",
     "platform": 0,
     "name": "Get-ADComputer",
-    "commandPattern": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $computer = $_; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword,msFVE-RecoveryGuid,whenCreated -ErrorAction SilentlyContinue; foreach($key in $keys) { $report += [PSCustomObject]@{ Computer=$computer.Name; RecoveryPassword=$key.'msFVE-RecoveryPassword'; VolumeGUID=$key.'msFVE-RecoveryGuid'; DateCreated=$key.whenCreated } } }; $report | Export-Csv C:\\BitLocker-All-Keys-$(Get-Date -Format 'yyyyMMdd-HHmm').csv -NoTypeInformation; Write-Host \"Rapport exporté: C:\\BitLocker-All-Keys-$(Get-Date -Format 'yyyyMMdd-HHmm').csv\" -ForegroundColor Green",
+    "commandPattern": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $computer = $_; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword,msFVE-RecoveryGuid,whenCreated -ErrorAction SilentlyContinue; foreach($key in $keys) { $report += [PSCustomObject]@{ Computer=$computer.Name; RecoveryPassword=$key.'msFVE-RecoveryPassword'; VolumeGUID=$key.'msFVE-RecoveryGuid'; DateCreated=$key.whenCreated } } }; $report | Export-Csv C:\\BitLocker-All-Keys-$(Get-Date -Format 'yyyyMMdd-HHmm').csv -NoTypeInformation; Write-Host \"Report exported: C:\\BitLocker-All-Keys-$(Get-Date -Format 'yyyyMMdd-HHmm').csv\" -ForegroundColor Green",
     "parameters": []
   },
   "examples": [

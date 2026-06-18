@@ -19,7 +19,7 @@
     "id": "win-perf-401-cmd",
     "platform": 0,
     "name": "Disable-HAGS",
-    "commandPattern": "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Force -ErrorAction SilentlyContinue | Out-Null; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -Type DWord -Value 1; Write-Host \"HAGS désactivé\" -ForegroundColor Green; Write-Warning \"Redémarrage requis pour appliquer les changements\"",
+    "commandPattern": "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Force -ErrorAction SilentlyContinue | Out-Null; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -Type DWord -Value 1; Write-Host \"HAGS disabled\" -ForegroundColor Green; Write-Warning \"Restart required to apply the changes\"",
     "parameters": []
   },
   "examples": [

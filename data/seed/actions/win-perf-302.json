@@ -18,7 +18,7 @@
     "id": "win-perf-302-cmd",
     "platform": 0,
     "name": "Disable-Prefetch",
-    "commandPattern": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters' -Name 'EnablePrefetcher' -Type DWord -Value 0 -ErrorAction SilentlyContinue; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters' -Name 'EnableSuperfetch' -Type DWord -Value 0 -ErrorAction SilentlyContinue; Write-Host \"Prefetch désactivé\" -ForegroundColor Green; Write-Warning \"Redémarrage recommandé\"",
+    "commandPattern": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters' -Name 'EnablePrefetcher' -Type DWord -Value 0 -ErrorAction SilentlyContinue; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters' -Name 'EnableSuperfetch' -Type DWord -Value 0 -ErrorAction SilentlyContinue; Write-Host \"Prefetch disabled\" -ForegroundColor Green; Write-Warning \"Restart recommended\"",
     "parameters": []
   },
   "examples": [

@@ -18,7 +18,7 @@
     "id": "win-perf-405-cmd",
     "platform": 0,
     "name": "Set-MpPreference",
-    "commandPattern": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limité à 25% CPU\" -ForegroundColor Green",
+    "commandPattern": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limited to 25% CPU\" -ForegroundColor Green",
     "parameters": []
   },
   "examples": [
@@ -33,22 +33,22 @@
       "platform": 0
     },
     {
-      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limité à 25% CPU\" -ForegroundColor Green -WhatIf",
+      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limited to 25% CPU\" -ForegroundColor Green -WhatIf",
       "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
       "platform": 0
     },
     {
-      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limité à 25% CPU\" -ForegroundColor Green -Confirm:$false",
+      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limited to 25% CPU\" -ForegroundColor Green -Confirm:$false",
       "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
       "platform": 0
     },
     {
-      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limité à 25% CPU\" -ForegroundColor Green -PassThru",
+      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limited to 25% CPU\" -ForegroundColor Green -PassThru",
       "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
       "platform": 0
     },
     {
-      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limité à 25% CPU\" -ForegroundColor Green -Verbose",
+      "command": "Set-MpPreference -ScanAvgCPULoadFactor 25; Write-Host \"Windows Defender limited to 25% CPU\" -ForegroundColor Green -Verbose",
       "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
       "platform": 0
     }

@@ -17,7 +17,7 @@
     "id": "win-perf-203-cmd",
     "platform": 0,
     "name": "Restore-DefaultServices",
-    "commandPattern": "Write-Host \"Restauration des services Windows par défaut...\" -ForegroundColor Yellow; $defaultServices = @{'DiagTrack'='Automatic';'dmwappushservice'='Manual';'SysMain'='Automatic';'WSearch'='Manual';'WerSvc'='Manual';'BITS'='Manual';'wuauserv'='Manual';'DoSvc'='Automatic';'Schedule'='Automatic';'EventLog'='Automatic';'AudioSrv'='Automatic';'AudioEndpointBuilder'='Automatic';'Themes'='Automatic';'MMCSS'='Automatic';'wscsvc'='Automatic';'WinDefend'='Automatic'}; $count = 0; foreach ($svc in $defaultServices.GetEnumerator()) { try { $service = Get-Service -Name $svc.Key -ErrorAction SilentlyContinue; if ($service) { $startType = switch($svc.Value) { 'Automatic' { 'Automatic' } 'Manual' { 'Manual' } 'Disabled' { 'Disabled' } default { 'Manual' } }; Set-Service -Name $svc.Key -StartupType $startType -ErrorAction Stop; $count++ } } catch { Write-Warning \"Impossible de restaurer $($svc.Key)\" } }; Write-Host \"$count services restaurés\" -ForegroundColor Green; Write-Host \"Redémarrage recommandé\" -ForegroundColor Yellow",
+    "commandPattern": "Write-Host \"Restoring default Windows services...\" -ForegroundColor Yellow; $defaultServices = @{'DiagTrack'='Automatic';'dmwappushservice'='Manual';'SysMain'='Automatic';'WSearch'='Manual';'WerSvc'='Manual';'BITS'='Manual';'wuauserv'='Manual';'DoSvc'='Automatic';'Schedule'='Automatic';'EventLog'='Automatic';'AudioSrv'='Automatic';'AudioEndpointBuilder'='Automatic';'Themes'='Automatic';'MMCSS'='Automatic';'wscsvc'='Automatic';'WinDefend'='Automatic'}; $count = 0; foreach ($svc in $defaultServices.GetEnumerator()) { try { $service = Get-Service -Name $svc.Key -ErrorAction SilentlyContinue; if ($service) { $startType = switch($svc.Value) { 'Automatic' { 'Automatic' } 'Manual' { 'Manual' } 'Disabled' { 'Disabled' } default { 'Manual' } }; Set-Service -Name $svc.Key -StartupType $startType -ErrorAction Stop; $count++ } } catch { Write-Warning \"Unable to restore $($svc.Key)\" } }; Write-Host \"$count services restored\" -ForegroundColor Green; Write-Host \"Restart recommended\" -ForegroundColor Yellow",
     "parameters": []
   },
   "examples": [
@@ -27,6 +27,6 @@
       "platform": 0
     }
   ],
-  "notes": "Restaure les services les plus courants à leur état par défaut. Annule les modifications de WIN-PERF-201 et WIN-PERF-202. Redémarrage recommandé après restauration.",
+  "notes": "Restaure les services les plus courants à leur état par défaut. Annule les modifications de WIN-PERF-201 et WIN-PERF-202. Restart recommended après restauration.",
   "links": []
 }

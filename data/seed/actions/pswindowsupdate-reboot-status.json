@@ -26,7 +26,7 @@
       "platform": 0
     },
     {
-      "command": "if (Get-WURebootStatus -Silent) { 'Redémarrage nécessaire' } else { 'Pas de redémarrage' }",
+      "command": "if (Get-WURebootStatus -Silent) { 'Restart required' } else { 'No restart required' }",
       "description": "Teste et affiche un message selon le statut",
       "platform": 0
     },

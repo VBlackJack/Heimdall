@@ -18,7 +18,7 @@
     "id": "win-perf-104-cmd",
     "platform": 0,
     "name": "powercfg",
-    "commandPattern": "powercfg -setacvalueindex SCHEME_CURRENT SUB_SLEEP HYBRIDSLEEP 0; powercfg -setdcvalueindex SCHEME_CURRENT SUB_SLEEP HYBRIDSLEEP 0; powercfg -setactive SCHEME_CURRENT; Write-Host \"Mode veille hybride désactivé\" -ForegroundColor Green",
+    "commandPattern": "powercfg -setacvalueindex SCHEME_CURRENT SUB_SLEEP HYBRIDSLEEP 0; powercfg -setdcvalueindex SCHEME_CURRENT SUB_SLEEP HYBRIDSLEEP 0; powercfg -setactive SCHEME_CURRENT; Write-Host \"Hybrid sleep mode disabled\" -ForegroundColor Green",
     "parameters": []
   },
   "examples": [
