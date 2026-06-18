@@ -23,6 +23,7 @@
         "name": "taskname",
         "label": "Nom de la tâche",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "MyTask",
         "required": true,
         "description": "Nom de la tâche à créer"
@@ -31,6 +32,7 @@
         "name": "executable",
         "label": "Exécutable",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "powershell.exe",
         "required": true,
         "description": "Programme à exécuter"
@@ -39,6 +41,7 @@
         "name": "arguments",
         "label": "Arguments",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "-File C:\\Scripts\\backup.ps1",
         "required": false,
         "description": "Arguments de la commande"

@@ -25,6 +25,7 @@
         "name": "vmName",
         "label": "Nom de la VM",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
         "description": "Nom de la VM à exporter"
@@ -33,6 +34,7 @@
         "name": "exportPath",
         "label": "Chemin d'export",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "D:\\VM-Exports",
         "required": true,
         "description": "Dossier de destination de l'export"

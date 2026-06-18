@@ -25,6 +25,7 @@
         "name": "serverInstance",
         "label": "Instance SQL Server",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "localhost",
         "required": true,
         "description": "Instance SQL Server cible"
@@ -33,6 +34,7 @@
         "name": "databaseName",
         "label": "Nom de la base",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
         "description": "Nom de la base de données à restaurer"
@@ -41,6 +43,7 @@
         "name": "backupPath",
         "label": "Fichier de sauvegarde",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Backups\\backup.bak",
         "required": true,
         "description": "Chemin du fichier .bak"

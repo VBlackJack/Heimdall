@@ -25,6 +25,7 @@
         "name": "vmName",
         "label": "Nom de la VM",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
         "description": "Nom de la machine virtuelle"
@@ -33,6 +34,7 @@
         "name": "snapshotName",
         "label": "Nom du snapshot",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "Checkpoint-$(Get-Date -Format 'yyyy-MM-dd_HH-mm')",
         "required": true,
         "description": "Nom du point de contrôle"

@@ -34,6 +34,7 @@
         "name": "exportPath",
         "label": "Chemin d'export",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Export\\certificate.cer",
         "required": true,
         "description": "Chemin du fichier de destination"

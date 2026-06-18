@@ -473,6 +473,27 @@ public sealed class CommandGeneratorServiceTests
         parameter!.Quoting.Should().BeNull();
     }
 
+    // D2 Lot B step 2a: seed parameters tagged InlineInQuotes must no longer double-wrap.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Theory]
+    [MemberData(nameof(InlineInQuotesSeedParameters))]
+    public void GenerateCommand_SeedInlineInQuotesParameters_DoNotDoubleWrap(
+        string fileName,
+        string templateName,
+        CommandTemplate template,
+        string parameterName)
+    {
+        CommandGeneratorService service = CreateService();
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, parameterName);
+
+        string command = service.GenerateCommand(template, values);
+
+        ContainsValueInsideSingleQuotedSpan(command, "A B")
+            .Should()
+            .BeTrue($"{fileName} / {templateName} / {parameterName} should keep the value inside one existing single-quoted span");
+        command.Should().NotContain("''A B''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
+    }
+
     // ===== TEST-01: type validation rejects =====
 
     [Theory]
@@ -696,5 +717,130 @@ public sealed class CommandGeneratorServiceTests
         }
 
         return parameters;
+    }
+
+    public static IEnumerable<object[]> InlineInQuotesSeedParameters()
+    {
+        string seedActionsDirectory = FindSeedActionsDirectory();
+        foreach (string filePath in Directory.EnumerateFiles(seedActionsDirectory, "*.json").OrderBy(path => path, StringComparer.Ordinal))
+        {
+            string json = File.ReadAllText(filePath);
+            ActionModel? action = JsonSerializer.Deserialize<ActionModel>(json, JsonOptionsHelper.CaseInsensitive);
+            if (action == null)
+            {
+                continue;
+            }
+
+            foreach ((string TemplateName, CommandTemplate? Template) item in new[]
+            {
+                ("windowsCommandTemplate", action.WindowsCommandTemplate),
+                ("linuxCommandTemplate", action.LinuxCommandTemplate)
+            })
+            {
+                if (item.Template == null)
+                {
+                    continue;
+                }
+
+                foreach (TemplateParameter parameter in item.Template.Parameters.Where(parameter => parameter.Quoting == QuotingMode.InlineInQuotes))
+                {
+                    yield return new object[]
+                    {
+                        Path.GetFileName(filePath),
+                        item.TemplateName,
+                        item.Template,
+                        parameter.Name
+                    };
+                }
+            }
+        }
+    }
+
+    private static Dictionary<string, string> CreateSeedGenerationValues(CommandTemplate template, string targetParameterName)
+    {
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+
+        foreach (TemplateParameter parameter in template.Parameters)
+        {
+            if (string.Equals(parameter.Name, targetParameterName, StringComparison.Ordinal))
+            {
+                values[parameter.Name] = "A B";
+                continue;
+            }
+
+            values[parameter.Name] = SafeValueForParameter(parameter);
+        }
+
+        return values;
+    }
+
+    private static bool ContainsValueInsideSingleQuotedSpan(string command, string value)
+    {
+        bool insideSingleQuotedSpan = false;
+        int spanStart = 0;
+
+        for (int index = 0; index < command.Length; index++)
+        {
+            if (command[index] != '\'')
+            {
+                continue;
+            }
+
+            if (insideSingleQuotedSpan && index + 1 < command.Length && command[index + 1] == '\'')
+            {
+                index++;
+                continue;
+            }
+
+            if (!insideSingleQuotedSpan)
+            {
+                spanStart = index + 1;
+                insideSingleQuotedSpan = true;
+                continue;
+            }
+
+            string span = command[spanStart..index];
+            if (span.Contains(value, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            insideSingleQuotedSpan = false;
+        }
+
+        return false;
+    }
+
+    private static string SafeValueForParameter(TemplateParameter parameter)
+        => parameter.Type.ToLowerInvariant() switch
+        {
+            "hostname" => "srv01",
+            "ipaddress" => "10.0.0.1",
+            "int" or "integer" => "1",
+            "number" => "1",
+            "driveletter" => "C",
+            "bool" or "boolean" => "true",
+            "path" => Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Heimdall",
+                "seed-test.txt"),
+            _ => "value"
+        };
+
+    private static string FindSeedActionsDirectory()
+    {
+        DirectoryInfo? current = new(AppContext.BaseDirectory);
+        while (current != null)
+        {
+            string candidate = Path.Combine(current.FullName, "data", "seed", "actions");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not find data/seed/actions from the test output directory.");
     }
 }

@@ -26,6 +26,7 @@
         "name": "siteName",
         "label": "Nom du site",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
         "description": "Nom du site IIS à gérer"

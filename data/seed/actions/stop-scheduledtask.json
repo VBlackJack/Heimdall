@@ -23,6 +23,7 @@
         "name": "taskname",
         "label": "Nom de la tâche",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "MyTask",
         "required": true,
         "description": "Nom de la tâche à arrêter"

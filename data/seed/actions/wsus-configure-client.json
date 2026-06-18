@@ -22,6 +22,7 @@
         "name": "wsusServer",
         "label": "Serveur WSUS",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "wsus.domain.local",
         "required": true,
         "description": "Nom d'hôte ou IP du serveur WSUS"

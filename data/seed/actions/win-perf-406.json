@@ -24,6 +24,7 @@
         "name": "Path",
         "label": "Chemin à exclure",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Program Files (x86)\\Steam\\steamapps\\common",
         "required": true,
         "description": "Chemin complet du dossier ou fichier à exclure (ex: C:\\Games, C:\\Dev)"

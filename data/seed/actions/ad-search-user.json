@@ -21,6 +21,7 @@
         "name": "searchTerm",
         "label": "Terme de recherche",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
         "description": "Nom ou partie du nom à rechercher"

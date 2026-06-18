@@ -26,6 +26,7 @@
         "name": "siteName",
         "label": "Nom du site",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
         "description": "Nom du nouveau site IIS"
@@ -34,6 +35,7 @@
         "name": "physicalPath",
         "label": "Chemin physique",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\inetpub\\wwwroot",
         "required": true,
         "description": "Chemin du dossier contenant le site"
@@ -50,6 +52,7 @@
         "name": "hostHeader",
         "label": "Host Header",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": false,
         "description": "En-tête d'hôte (ex: www.example.com)"
