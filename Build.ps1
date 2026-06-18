@@ -135,7 +135,7 @@ if ($Version) {
 }
 
 $assemblyVer = "1.0.$($today.ToString('MMdd')).$sequence"
-$totalSteps = if ($Mode -eq 'Release') { 5 } else { 4 }
+$totalSteps = if ($Mode -eq 'Release') { 6 } else { 5 }
 $step = 0
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -186,6 +186,21 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 Write-Host "[$step/$totalSteps] Build succeeded" -ForegroundColor Green
+
+# ── Step 4: Check formatting ───────────────────────────────────────────────
+
+$step++
+if (-not $SkipTests) {
+    Write-Host "[$step/$totalSteps] Checking code formatting..." -ForegroundColor Yellow
+    dotnet format $SolutionFile.FullName --no-restore --verify-no-changes --verbosity diagnostic
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Formatting check FAILED. Run 'dotnet format $($SolutionFile.Name)' to fix." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[$step/$totalSteps] Formatting OK" -ForegroundColor Green
+} else {
+    Write-Host "[$step/$totalSteps] Format check skipped" -ForegroundColor DarkYellow
+}
 
 # ── Determine which variants to produce ───────────────────────────────────
 
@@ -280,7 +295,7 @@ function Publish-Variant {
     return $variantDir
 }
 
-# ── Step 4: Publish all variants ──────────────────────────────────────────
+# ── Step 5: Publish all variants ──────────────────────────────────────────
 
 $step++
 Write-Host "[$step/$totalSteps] Publishing ($($variants -join ' + '))..." -ForegroundColor Yellow
@@ -293,7 +308,7 @@ foreach ($v in $variants) {
 
 Write-Host "[$step/$totalSteps] Published" -ForegroundColor Green
 
-# ── Step 5: Installers (Release mode only) ────────────────────────────────
+# ── Step 6: Installers (Release mode only) ────────────────────────────────
 
 if ($Mode -eq 'Release') {
     $step++
