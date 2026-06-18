@@ -20,7 +20,7 @@
       {
         "name": "driveLetter",
         "label": "Lettre du disque",
-        "type": "string",
+        "type": "driveletter",
         "defaultValue": "C",
         "required": true,
         "description": "Lettre du volume"
