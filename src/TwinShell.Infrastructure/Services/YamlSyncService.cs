@@ -16,7 +16,6 @@
 
 using System.IO;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using TwinShell.Core.Enums;
@@ -33,20 +32,11 @@ namespace TwinShell.Infrastructure.Services;
 /// Service for GitOps synchronization of TwinShell data via YAML files.
 /// Enables collaborative editing through Git-synchronized folders.
 /// </summary>
-public sealed class YamlSyncService : ISyncService
+public sealed class YamlSyncService : SyncServiceBase
 {
     private readonly TwinShellDbContext _dbContext;
     private readonly ISerializer _yamlSerializer;
     private readonly IDeserializer _yamlDeserializer;
-
-    // Folder structure constants
-    private const string ActionsFolderName = "actions";
-    private const string BatchesFolderName = "batches";
-    private const string TemplatesFolderName = "templates";
-    private const string CategoriesFolderName = "categories";
-
-    // File size limit for security (100KB per individual sync file)
-    private const long MaxFileSizeBytes = 100 * 1024; // 100 KB
 
     public YamlSyncService(TwinShellDbContext dbContext)
     {
@@ -66,7 +56,7 @@ public sealed class YamlSyncService : ISyncService
 
     #region Export
 
-    public async Task<SyncExportResult> ExportDataToYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
+    public override async Task<SyncExportResult> ExportDataToYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
     {
         var result = new SyncExportResult { Success = true };
 
@@ -316,7 +306,7 @@ public sealed class YamlSyncService : ISyncService
 
     #region Import
 
-    public async Task<SyncImportResult> ImportDataFromYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
+    public override async Task<SyncImportResult> ImportDataFromYamlAsync(string rootFolderPath, CancellationToken cancellationToken = default)
     {
         var result = new SyncImportResult { Success = true };
         IDbContextTransaction? transaction = null;
@@ -329,33 +319,7 @@ public sealed class YamlSyncService : ISyncService
             // Import in order: categories, templates, actions, batches
             // (respecting dependencies)
 
-            var categoriesPath = Path.Combine(rootFolderPath, CategoriesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(categoriesPath))
-            {
-                await ImportCategoriesAsync(categoriesPath, result, cancellationToken);
-            }
-
-            var templatesPath = Path.Combine(rootFolderPath, TemplatesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(templatesPath))
-            {
-                await ImportTemplatesAsync(templatesPath, result, cancellationToken);
-            }
-
-            var actionsPath = Path.Combine(rootFolderPath, ActionsFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(actionsPath))
-            {
-                await ImportActionsAsync(actionsPath, result, cancellationToken);
-            }
-
-            var batchesPath = Path.Combine(rootFolderPath, BatchesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(batchesPath))
-            {
-                await ImportBatchesAsync(batchesPath, result, cancellationToken);
-            }
+            await RunImportPipelineAsync(rootFolderPath, result, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -404,7 +368,7 @@ public sealed class YamlSyncService : ISyncService
         return result;
     }
 
-    private async Task ImportCategoriesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportCategoriesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         var files = Directory.GetFiles(folderPath, "*.yaml", SearchOption.TopDirectoryOnly);
 
@@ -476,7 +440,7 @@ public sealed class YamlSyncService : ISyncService
         }
     }
 
-    private async Task ImportTemplatesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportTemplatesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         var files = Directory.GetFiles(folderPath, "*.yaml", SearchOption.TopDirectoryOnly);
 
@@ -547,7 +511,7 @@ public sealed class YamlSyncService : ISyncService
         }
     }
 
-    private async Task ImportActionsAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportActionsAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         // Recursively find all YAML files (organized by category subfolders)
         var files = Directory.GetFiles(folderPath, "*.yaml", SearchOption.AllDirectories);
@@ -669,7 +633,7 @@ public sealed class YamlSyncService : ISyncService
         }
     }
 
-    private async Task ImportBatchesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
+    protected override async Task ImportBatchesAsync(string folderPath, SyncImportResult result, CancellationToken cancellationToken)
     {
         var files = Directory.GetFiles(folderPath, "*.yaml", SearchOption.TopDirectoryOnly);
 
@@ -752,7 +716,7 @@ public sealed class YamlSyncService : ISyncService
 
     #region Validation
 
-    public async Task<SyncValidationResult> ValidateFolderAsync(string rootFolderPath, CancellationToken cancellationToken = default)
+    public override async Task<SyncValidationResult> ValidateFolderAsync(string rootFolderPath, CancellationToken cancellationToken = default)
     {
         var result = new SyncValidationResult { IsValid = true };
 
@@ -767,59 +731,11 @@ public sealed class YamlSyncService : ISyncService
                 return result;
             }
 
-            // Check categories
-            var categoriesPath = Path.Combine(rootFolderPath, CategoriesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(categoriesPath))
-            {
-                result.CategoryFilesFound = await ValidateYamlFilesAsync<CategoryYamlModel>(
-                    categoriesPath,
-                    result,
-                    "category",
-                    cancellationToken);
-            }
-
-            // Check templates
-            var templatesPath = Path.Combine(rootFolderPath, TemplatesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(templatesPath))
-            {
-                result.TemplateFilesFound = await ValidateYamlFilesAsync<TemplateYamlModel>(
-                    templatesPath,
-                    result,
-                    "template",
-                    cancellationToken);
-            }
-
-            // Check actions (recursive)
-            var actionsPath = Path.Combine(rootFolderPath, ActionsFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(actionsPath))
-            {
-                result.ActionFilesFound = await ValidateYamlFilesAsync<ActionYamlModel>(
-                    actionsPath,
-                    result,
-                    "action",
-                    cancellationToken,
-                    SearchOption.AllDirectories);
-            }
-
-            // Check batches
-            var batchesPath = Path.Combine(rootFolderPath, BatchesFolderName);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Directory.Exists(batchesPath))
-            {
-                result.BatchFilesFound = await ValidateYamlFilesAsync<BatchYamlModel>(
-                    batchesPath,
-                    result,
-                    "batch",
-                    cancellationToken);
-            }
-
-            if (result.TotalFilesFound == 0)
-            {
-                result.Warnings.Add("No YAML files found in the folder structure.");
-            }
+            await RunValidationPipelineAsync(
+                rootFolderPath,
+                result,
+                "No YAML files found in the folder structure.",
+                cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -833,6 +749,47 @@ public sealed class YamlSyncService : ISyncService
 
         return result;
     }
+
+    protected override Task<int> ValidateCategoriesAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateYamlFilesAsync<CategoryYamlModel>(
+            folderPath,
+            result,
+            "category",
+            cancellationToken);
+
+    protected override Task<int> ValidateTemplatesAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateYamlFilesAsync<TemplateYamlModel>(
+            folderPath,
+            result,
+            "template",
+            cancellationToken);
+
+    protected override Task<int> ValidateActionsAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateYamlFilesAsync<ActionYamlModel>(
+            folderPath,
+            result,
+            "action",
+            cancellationToken,
+            SearchOption.AllDirectories);
+
+    protected override Task<int> ValidateBatchesAsync(
+        string folderPath,
+        SyncValidationResult result,
+        CancellationToken cancellationToken)
+        => ValidateYamlFilesAsync<BatchYamlModel>(
+            folderPath,
+            result,
+            "batch",
+            cancellationToken);
 
     private async Task<int> ValidateYamlFilesAsync<T>(
         string folderPath,
@@ -885,63 +842,15 @@ public sealed class YamlSyncService : ISyncService
 
     #region Helpers
 
-    private static void EnsureDirectoryExists(string path)
-    {
-        if (!Directory.Exists(path))
-        {
-            Directory.CreateDirectory(path);
-        }
-    }
-
     private async Task WriteYamlFileAsync<T>(string filePath, T model, CancellationToken cancellationToken)
     {
         var yaml = _yamlSerializer.Serialize(model);
         await File.WriteAllTextAsync(filePath, yaml, cancellationToken);
     }
 
-    private static bool ValidateFileSize(string filePath)
-    {
-        var fileInfo = new FileInfo(filePath);
-        return fileInfo.Length <= MaxFileSizeBytes;
-    }
-
     private static string SanitizeFileName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return Guid.NewGuid().ToString();
-        }
-
-        // SECURITY: Protect against path traversal attacks
-        // Remove any path separators and parent directory references
-        var sanitized = name
-            .Replace("..", "")
-            .Replace("/", "_")
-            .Replace("\\", "_");
-
-        // Remove invalid characters
-        var invalidChars = Path.GetInvalidFileNameChars();
-        sanitized = new string(sanitized
-            .Select(c => invalidChars.Contains(c) ? '_' : c)
-            .ToArray());
-
-        // Replace multiple underscores with single
-        sanitized = Regex.Replace(sanitized, @"_+", "_");
-
-        // Trim and limit length
-        sanitized = sanitized.Trim('_').Trim();
-        if (sanitized.Length > 100)
-        {
-            sanitized = sanitized.Substring(0, 100);
-        }
-
-        // SECURITY: Final check - ensure no path traversal possible
-        if (sanitized.Contains("..") || Path.IsPathRooted(sanitized))
-        {
-            return Guid.NewGuid().ToString();
-        }
-
-        // If empty after sanitization, use GUID
+        string sanitized = SanitizeFileNameCore(name);
         return string.IsNullOrWhiteSpace(sanitized) ? Guid.NewGuid().ToString() : sanitized;
     }
 
