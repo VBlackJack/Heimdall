@@ -3843,6 +3843,8 @@
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Bd"
                                                     Background="{TemplateBinding Background}"
+                                                    BorderBrush="Transparent"
+                                                    BorderThickness="1"
                                                     CornerRadius="{StaticResource CornerRadiusSm}"
                                                     Padding="{TemplateBinding Padding}">
                                                 <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -3856,6 +3858,9 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="Bd" Property="Background"
                                                             Value="{DynamicResource HighlightBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>

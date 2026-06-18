@@ -2371,6 +2371,7 @@
   "ErrorCommandLibraryPickerActionMissing": "L'action pr\u00e9c\u00e9demment li\u00e9e n'est plus disponible. S\u00e9lectionnez-en une autre ou annulez.",
   "LabelCommandLibraryPickerSearch": "Rechercher",
   "LabelCommandLibraryPickerPlatform": "Plateforme",
+  "LabelCommandLibraryPickerResults": "R\u00e9sultats de la biblioth\u00e8que de commandes",
   "LabelCommandLibraryPickerParameters": "Param\u00e8tres",
   "LabelCommandLibraryPickerPreview": "Aper\u00e7u",
   "LabelCommandLibraryPickerNoLinuxTemplate": "Cette action ne fournit pas de mod\u00e8le de commande Linux.",
