@@ -546,6 +546,69 @@ public sealed class CommandGeneratorServiceTests
         command.Should().NotContain("\"");
     }
 
+    // D2 Lot B step 2c: Defender numeric placeholders must not leave a stray PowerShell $.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_SeedDefenderCloudProtection_UsesNumberPlaceholderWithoutDollar()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LoadSeedTemplate(
+            "defender-configure-cloud-protection.json",
+            "windowsCommandTemplate");
+        Dictionary<string, string> values = CreateSeedDefaultValues(template);
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("Set-MpPreference -MAPSReporting 2");
+
+        Dictionary<string, string> invalidValues = CreateSeedGenerationValues(template, "level", "abc");
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, invalidValues));
+    }
+
+    // D2 Lot B step 2c: Defender schedule uses a bare numeric day and a quoted time string.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_SeedDefenderScheduleScan_UsesNumberDayAndQuotedTime()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LoadSeedTemplate("defender-schedule-scan.json", "windowsCommandTemplate");
+        Dictionary<string, string> values = CreateSeedDefaultValues(template);
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("Set-MpPreference -ScanScheduleDay 0 -ScanScheduleTime '02:00:00'");
+    }
+
+    // D2 Lot B step 2c: users enter false/true while the template supplies the PowerShell $ prefix.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Theory]
+    [InlineData("false", "Set-MpPreference -DisableRealtimeMonitoring $false")]
+    [InlineData("true", "Set-MpPreference -DisableRealtimeMonitoring $true")]
+    public void GenerateCommand_SeedDefenderRealtimeMonitoring_InlinesBooleanAfterDollar(
+        string value,
+        string expectedCommand)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LoadSeedTemplate("defender-enable-realtime.json", "windowsCommandTemplate");
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, "enableDisable", value);
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be(expectedCommand);
+    }
+
+    // D2 Lot B step 2c: values still pass through the dangerous-character blocklist.
+    // Producer: CommandGeneratorService.GenerateCommand -> ValidateParameterValue.
+    [Fact]
+    public void GenerateCommand_SeedDefenderRealtimeMonitoring_ValueWithDollarThrows()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LoadSeedTemplate("defender-enable-realtime.json", "windowsCommandTemplate");
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, "enableDisable", "$false");
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
     // ===== TEST-01: type validation rejects =====
 
     [Theory]
@@ -794,7 +857,9 @@ public sealed class CommandGeneratorServiceTests
                     continue;
                 }
 
-                foreach (TemplateParameter parameter in item.Template.Parameters.Where(parameter => parameter.Quoting == QuotingMode.InlineInQuotes))
+                foreach (TemplateParameter parameter in item.Template.Parameters.Where(parameter =>
+                    parameter.Quoting == QuotingMode.InlineInQuotes &&
+                    IsPlaceholderInsideSingleQuotedSpan(item.Template.CommandPattern, parameter.Name)))
                 {
                     yield return new object[]
                     {
@@ -858,6 +923,20 @@ public sealed class CommandGeneratorServiceTests
         };
     }
 
+    private static Dictionary<string, string> CreateSeedDefaultValues(CommandTemplate template)
+    {
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+
+        foreach (TemplateParameter parameter in template.Parameters)
+        {
+            values[parameter.Name] = !string.IsNullOrWhiteSpace(parameter.DefaultValue)
+                ? parameter.DefaultValue
+                : SafeValueForParameter(parameter);
+        }
+
+        return values;
+    }
+
     private static Dictionary<string, string> CreateSeedGenerationValues(
         CommandTemplate template,
         string targetParameterName,
@@ -914,6 +993,27 @@ public sealed class CommandGeneratorServiceTests
         }
 
         return false;
+    }
+
+    private static bool IsPlaceholderInsideSingleQuotedSpan(string commandPattern, string parameterName)
+    {
+        string placeholder = "{" + parameterName + "}";
+        int placeholderIndex = commandPattern.IndexOf(placeholder, StringComparison.Ordinal);
+        if (placeholderIndex < 0)
+        {
+            return false;
+        }
+
+        int quoteCount = 0;
+        for (int index = 0; index < placeholderIndex; index++)
+        {
+            if (commandPattern[index] == '\'')
+            {
+                quoteCount++;
+            }
+        }
+
+        return quoteCount % 2 == 1;
     }
 
     private static string SafeValueForParameter(TemplateParameter parameter)

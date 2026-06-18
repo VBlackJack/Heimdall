@@ -15,12 +15,12 @@
     "id": "defender-schedule-scan-cmd",
     "platform": 0,
     "name": "Set-MpPreference",
-    "commandPattern": "Set-MpPreference -ScanScheduleDay ${day} -ScanScheduleTime ${time}",
+    "commandPattern": "Set-MpPreference -ScanScheduleDay {day} -ScanScheduleTime {time}",
     "parameters": [
       {
         "name": "day",
         "label": "Jour",
-        "type": "string",
+        "type": "number",
         "defaultValue": "0",
         "required": true,
         "description": "0=Tous les jours, 1=Dimanche, 2=Lundi... 7=Samedi, 8=Jamais"

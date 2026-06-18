@@ -21,9 +21,10 @@
         "name": "enableDisable",
         "label": "Activer ou désactiver",
         "type": "string",
-        "defaultValue": "$false",
+        "defaultValue": "false",
+        "quoting": "InlineInQuotes",
         "required": true,
-        "description": "$false pour activer, $true pour désactiver"
+        "description": "false pour activer, true pour désactiver"
       }
     ]
   },
