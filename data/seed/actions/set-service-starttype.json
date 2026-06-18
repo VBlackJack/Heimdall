@@ -23,6 +23,7 @@
         "name": "servicename",
         "label": "Nom du service",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "wuauserv",
         "required": true,
         "description": "Nom du service à configurer"

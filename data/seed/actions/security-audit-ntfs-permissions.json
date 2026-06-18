@@ -23,6 +23,7 @@
         "name": "path",
         "label": "Chemin du dossier/fichier",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\",
         "required": true,
         "description": "Chemin complet du dossier ou fichier à auditer"

@@ -24,6 +24,7 @@
         "name": "InterfaceName",
         "label": "Nom de l'interface réseau",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "Ethernet",
         "required": false,
         "description": "Nom de l'interface réseau (Ethernet, Wi-Fi, etc.)"
@@ -32,6 +33,7 @@
         "name": "PrimaryDNS",
         "label": "DNS primaire",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "8.8.8.8",
         "required": true,
         "description": "Adresse IP du serveur DNS primaire"
@@ -40,6 +42,7 @@
         "name": "SecondaryDNS",
         "label": "DNS secondaire",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "8.8.4.4",
         "required": true,
         "description": "Adresse IP du serveur DNS secondaire"

@@ -26,6 +26,7 @@
         "name": "vmName",
         "label": "Nom de la VM",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
         "description": "Nom de la VM à analyser"

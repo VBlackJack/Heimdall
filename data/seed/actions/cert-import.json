@@ -26,6 +26,7 @@
         "name": "certPath",
         "label": "Chemin du certificat",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Certs\\certificate.cer",
         "required": true,
         "description": "Chemin du fichier certificat (.cer, .crt)"

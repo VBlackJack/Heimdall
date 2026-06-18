@@ -26,6 +26,7 @@
         "name": "dnsName",
         "label": "Nom DNS",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "localhost",
         "required": true,
         "description": "Nom DNS ou Subject du certificat (ex: localhost, *.example.com)"

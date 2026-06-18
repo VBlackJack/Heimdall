@@ -26,6 +26,7 @@
         "name": "serverInstance",
         "label": "Instance SQL Server",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "localhost",
         "required": true,
         "description": "Instance SQL Server"

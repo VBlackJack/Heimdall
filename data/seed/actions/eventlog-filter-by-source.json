@@ -22,6 +22,7 @@
         "name": "logName",
         "label": "Nom du journal",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "Application",
         "required": true,
         "description": "Nom du journal à rechercher"
@@ -30,6 +31,7 @@
         "name": "providerName",
         "label": "Nom du fournisseur",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "Application Error",
         "required": true,
         "description": "Nom exact du fournisseur/source"

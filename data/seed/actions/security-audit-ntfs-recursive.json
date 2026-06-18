@@ -23,6 +23,7 @@
         "name": "path",
         "label": "Chemin de base",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Shares",
         "required": true,
         "description": "Chemin du dossier racine à auditer"

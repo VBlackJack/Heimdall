@@ -24,6 +24,7 @@
         "name": "InterfaceName",
         "label": "Nom de l'interface réseau",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "Ethernet",
         "required": false,
         "description": "Nom de l'interface réseau (Ethernet, Wi-Fi, etc.)"

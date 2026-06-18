@@ -22,6 +22,7 @@
         "name": "logName",
         "label": "Nom du journal",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "System",
         "required": true,
         "description": "Nom du journal à exporter"
@@ -38,6 +39,7 @@
         "name": "outputPath",
         "label": "Chemin du fichier de sortie",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Temp\\EventLog.csv",
         "required": true,
         "description": "Chemin complet du fichier CSV de sortie"
