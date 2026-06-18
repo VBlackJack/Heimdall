@@ -16,6 +16,7 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Extensions;
 using Heimdall.App.Services;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Views;
@@ -313,8 +314,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
-        _ = SafeFireAndForgetAsync(
-            _main.Connection.CloseSessionAsync(tab, DisconnectReason.FailedSession, confirm: false));
+        _main.Connection.CloseSessionAsync(tab, DisconnectReason.FailedSession, confirm: false)
+            .SafeFireAndForget();
     }
 
     /// <summary>
@@ -431,15 +432,15 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         if (string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
             && _main.CurrentSettings?.SftpAutoOpenOnSsh == true)
         {
-            _ = SafeFireAndForgetAsync(
-                AutoOpenSftpAsync(tab, originalServerId, _main.Split.GetSessionToken(tab)));
+            AutoOpenSftpAsync(tab, originalServerId, _main.Split.GetSessionToken(tab))
+                .SafeFireAndForget();
         }
 
         if (string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
             && session is SshSessionResult sshSession)
         {
-            _ = SafeFireAndForgetAsync(
-                RunPostConnectSequenceAsync(tab, originalServerId, displayName, sshSession, _main.Split.GetSessionToken(tab)));
+            RunPostConnectSequenceAsync(tab, originalServerId, displayName, sshSession, _main.Split.GetSessionToken(tab))
+                .SafeFireAndForget();
         }
     }
 
@@ -502,7 +503,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// </summary>
     private void OnReconnectRequested(SessionTabViewModel tab, string serverId, string connectionType)
     {
-        _ = SafeFireAndForgetAsync(OnReconnectRequestedAsync(tab, serverId, connectionType));
+        OnReconnectRequestedAsync(tab, serverId, connectionType).SafeFireAndForget();
     }
 
     /// <summary>
@@ -534,7 +535,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         SessionPaneModel pane,
         DisconnectReason reason)
     {
-        _ = SafeFireAndForgetAsync(OnDisconnectRequestedAsync(tab, pane, reason));
+        OnDisconnectRequestedAsync(tab, pane, reason).SafeFireAndForget();
     }
 
     /// <summary>
@@ -545,7 +546,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// </summary>
     private void OnCloseRequested(SessionTabViewModel tab)
     {
-        _ = SafeFireAndForgetAsync(OnCloseRequestedAsync(tab));
+        OnCloseRequestedAsync(tab).SafeFireAndForget();
     }
 
     private async Task OnCloseRequestedAsync(SessionTabViewModel tab)
@@ -578,7 +579,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
     private void OnEditServerRequested(string serverId)
     {
-        _ = SafeFireAndForgetAsync(OnEditServerRequestedAsync(serverId));
+        OnEditServerRequestedAsync(serverId).SafeFireAndForget();
     }
 
     private async Task OnEditServerRequestedAsync(string serverId)
@@ -866,20 +867,6 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             PostConnectStepStatus.Broken => _localizer["StatusPostConnectBroken"],
             _ => status.ToString()
         };
-    }
-
-    // ── Fire-and-forget helper (duplicated from MainViewModel) ───────
-
-    private static async Task SafeFireAndForgetAsync(Task task)
-    {
-        try
-        {
-            await task.ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            FileLogger.Error($"Fire-and-forget task failed: {ex.Message}", ex);
-        }
     }
 
     private void InvokeOnUi(Action action)

@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Extensions;
 using Heimdall.App.Services;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
@@ -71,6 +72,11 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 
     /// <summary>Read-only accessor used by the search partial.</summary>
     internal IReadOnlyList<ActionModel> Snippets => _cachedSnippets;
+
+    /// <summary>
+    /// Callback installed by the WPF host to write text to the system clipboard.
+    /// </summary>
+    public Func<string, bool>? SetClipboardText { get; set; }
 
     /// <summary>
     /// When non-null, the palette is in "split mode": selecting a server
@@ -303,14 +309,14 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 
             if (!item.Id.StartsWith("adhoc-", StringComparison.Ordinal))
             {
-                _ = SafeFireAndForgetAsync(
-                    _main.SplitSessionWithServerAsync(splitSession, item.Id, splitOrientation, splitPaneId));
+                _main.SplitSessionWithServerAsync(splitSession, item.Id, splitOrientation, splitPaneId)
+                    .SafeFireAndForget();
                 return;
             }
         }
 
         // Fall through to normal palette behavior
-        _ = SafeFireAndForgetAsync(ConnectInternalAsync(item));
+        ConnectInternalAsync(item).SafeFireAndForget();
     }
 
     /// <summary>
@@ -609,17 +615,4 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         _main.TrackRecentTool(toolId.ToUpperInvariant());
     }
 
-    // ── Fire-and-forget helper (duplicated from MainViewModel) ───────
-
-    private static async Task SafeFireAndForgetAsync(Task task)
-    {
-        try
-        {
-            await task.ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            FileLogger.Error($"Fire-and-forget task failed: {ex.Message}", ex);
-        }
-    }
 }

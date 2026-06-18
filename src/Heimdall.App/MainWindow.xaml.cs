@@ -158,6 +158,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
         DataContext = viewModel;
+        viewModel.CommandPalette.SetClipboardText = SetClipboardSafely;
         _themeService = themeService;
         _contextMenuFactory = contextMenuFactory;
         _sessionTabContextMenuFactory = sessionTabContextMenuFactory;
@@ -317,6 +318,19 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private void OnSplitPaletteRequested(object? sender, EventArgs e)
     {
         BeginFocusCommandPalette();
+    }
+
+    private static bool SetClipboardSafely(string text)
+    {
+        try
+        {
+            Clipboard.SetText(text);
+            return true;
+        }
+        catch (ExternalException)
+        {
+            return false;
+        }
     }
 
     private static void RefreshVmDrivenLocalization(MainViewModel vm)
