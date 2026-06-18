@@ -15,12 +15,12 @@
     "id": "defender-configure-cloud-protection-cmd",
     "platform": 0,
     "name": "Set-MpPreference",
-    "commandPattern": "Set-MpPreference -MAPSReporting ${level}",
+    "commandPattern": "Set-MpPreference -MAPSReporting {level}",
     "parameters": [
       {
         "name": "level",
         "label": "Niveau de reporting",
-        "type": "string",
+        "type": "number",
         "defaultValue": "2",
         "required": true,
         "description": "0=Désactivé, 1=Basique, 2=Avancé (recommandé)"
