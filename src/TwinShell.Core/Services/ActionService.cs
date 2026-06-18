@@ -28,10 +28,12 @@ namespace TwinShell.Core.Services;
 public sealed class ActionService : IActionService
 {
     private readonly IActionRepository _repository;
+    private readonly ILocalizationService _localizationService;
 
-    public ActionService(IActionRepository repository)
+    public ActionService(IActionRepository repository, ILocalizationService localizationService)
     {
         _repository = repository;
+        _localizationService = localizationService;
     }
 
     public async Task<IEnumerable<ActionModel>> GetAllActionsAsync()
@@ -148,62 +150,62 @@ public sealed class ActionService : IActionService
     /// <summary>
     /// Validates action data using centralized validation constants
     /// </summary>
-    private static bool ValidateAction(ActionModel action, out string errorMessage)
+    private bool ValidateAction(ActionModel action, out string errorMessage)
     {
         // Check required fields
         if (string.IsNullOrWhiteSpace(action?.Title))
         {
-            errorMessage = "Title is required.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationTitleRequired");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(action.Category))
         {
-            errorMessage = "Category is required.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationCategoryRequired");
             return false;
         }
 
         // Check field lengths
         if (action.Title.Length > ValidationConstants.MaxActionTitleLength)
         {
-            errorMessage = $"Title cannot exceed {ValidationConstants.MaxActionTitleLength} characters.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationTitleMaxLength");
             return false;
         }
 
         if (action.Category.Length > ValidationConstants.MaxActionCategoryLength)
         {
-            errorMessage = $"Category cannot exceed {ValidationConstants.MaxActionCategoryLength} characters.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationCategoryMaxLength");
             return false;
         }
 
         if ((action.Description?.Length ?? 0) > ValidationConstants.MaxActionDescriptionLength)
         {
-            errorMessage = $"Description cannot exceed {ValidationConstants.MaxActionDescriptionLength} characters.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationDescMaxLength");
             return false;
         }
 
         if ((action.Notes?.Length ?? 0) > ValidationConstants.MaxActionNotesLength)
         {
-            errorMessage = $"Notes cannot exceed {ValidationConstants.MaxActionNotesLength} characters.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationNotesMaxLength");
             return false;
         }
 
         // Check collections sizes
         if ((action.Tags?.Count ?? 0) > ValidationConstants.MaxActionTagsCount)
         {
-            errorMessage = $"Cannot have more than {ValidationConstants.MaxActionTagsCount} tags.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationTagsMaxCount");
             return false;
         }
 
         if ((action.Examples?.Count ?? 0) > ValidationConstants.MaxActionExamplesCount)
         {
-            errorMessage = $"Cannot have more than {ValidationConstants.MaxActionExamplesCount} examples.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationExamplesMaxCount");
             return false;
         }
 
         if ((action.Links?.Count ?? 0) > ValidationConstants.MaxActionLinksCount)
         {
-            errorMessage = $"Cannot have more than {ValidationConstants.MaxActionLinksCount} links.";
+            errorMessage = _localizationService.GetString("ToolCmdLibValidationLinksMaxCount");
             return false;
         }
 
