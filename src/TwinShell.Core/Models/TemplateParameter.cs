@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using TwinShell.Core.Enums;
+
 namespace TwinShell.Core.Models;
 
 /// <summary>
@@ -50,4 +52,9 @@ public sealed class TemplateParameter
     /// Description/help text for the parameter
     /// </summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Optional quoting behavior override for command generation.
+    /// </summary>
+    public QuotingMode? Quoting { get; set; }
 }

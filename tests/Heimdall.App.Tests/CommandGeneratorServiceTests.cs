@@ -15,9 +15,11 @@
  */
 
 using System.IO;
+using System.Text.Json;
 using FluentAssertions;
 using TwinShell.Core.Constants;
 using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
 using TwinShell.Core.Services;
 using ActionModel = TwinShell.Core.Models.Action;
@@ -295,6 +297,180 @@ public sealed class CommandGeneratorServiceTests
 
         withApostrophe.Should().Be("echo 'a''b'");
         withDoubleQuote.Should().Be("echo 'a\"b'");
+    }
+
+    // D2 Lot B: default producer path remains ShellQuote when TemplateParameter.Quoting is null.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_NullQuotingMode_UsesShellQuoteOnWindows()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "Write-Output {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "O'Brien" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("Write-Output 'O''Brien'");
+    }
+
+    // D2 Lot B: default producer path remains ShellQuote when TemplateParameter.Quoting is null.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_NullQuotingMode_UsesShellQuoteOnLinux()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LinuxTemplate(
+            "printf %s {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "it's" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("printf %s 'it'\\''s'");
+    }
+
+    // D2 Lot B: InlineInQuotes is for placeholders already inside a single-quoted context.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_InlineInQuotes_WindowsString_DoesNotAddOuterQuotes()
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("searchTerm", "Search term");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = WindowsTemplate(
+            "Get-ADUser -Filter \"Name -like '*{searchTerm}*'\"",
+            parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["searchTerm"] = "foo" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("Get-ADUser -Filter \"Name -like '*foo*'\"");
+        command.Should().Contain("-like '*foo*'");
+        command.Should().NotContain("''foo''");
+    }
+
+    // D2 Lot B: InlineInQuotes keeps platform-specific inner escaping but does not wrap.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_InlineInQuotes_WindowsStringWithApostrophe_EscapesInsideExistingQuotes()
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("searchTerm", "Search term");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = WindowsTemplate(
+            "Get-ADUser -Filter \"Name -like '*{searchTerm}*'\"",
+            parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["searchTerm"] = "O'Brien" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("Get-ADUser -Filter \"Name -like '*O''Brien*'\"");
+        command.Should().NotContain("'''O", "InlineInQuotes must not add a second shell-quote wrapper");
+    }
+
+    // D2 Lot B: InlineInQuotes keeps platform-specific inner escaping but does not wrap.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_InlineInQuotes_LinuxStringWithApostrophe_EscapesInsideExistingQuotes()
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("searchTerm", "Search term");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = LinuxTemplate(
+            "grep '*{searchTerm}*' access.log",
+            parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["searchTerm"] = "it's" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("grep '*it'\\''s*' access.log");
+        command.Should().NotContain("''it", "InlineInQuotes must not add a second shell-quote wrapper");
+    }
+
+    // D2 Lot B: driveletter is a validated bare type for patterns such as {driveLetter}:.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_DriveLetterType_SubstitutesValueWithoutQuotes()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "manage-bde -on {driveLetter}: -RecoveryPassword",
+            CommandLibraryTestHelpers.RequiredParameter("driveLetter", "Drive letter", "driveletter"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["driveLetter"] = "C" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("manage-bde -on C: -RecoveryPassword");
+        command.Should().Contain(" C:");
+        command.Should().NotContain("'C':");
+    }
+
+    // D2 Lot B: driveletter is a whitelist type, so malformed values fail before substitution.
+    // Producer: CommandGeneratorService.GenerateCommand -> ValidateParameterValue.
+    [Theory]
+    [InlineData("CD")]
+    [InlineData("1")]
+    [InlineData(";")]
+    public void GenerateCommand_InvalidDriveLetter_Throws(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "manage-bde -on {driveLetter}:",
+            CommandLibraryTestHelpers.RequiredParameter("driveLetter", "Drive letter", "driveletter"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["driveLetter"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    // D2 Lot B: QuotingMode changes only escaping; G1 dangerous-character validation still runs first.
+    // Producer: CommandGeneratorService.GenerateCommand -> ValidateParameterValue.
+    [Theory]
+    [InlineData("foo;bar")]
+    [InlineData("foo$(bar)")]
+    public void GenerateCommand_InlineInQuotesWithDangerousCharacter_Throws(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("searchTerm", "Search term");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = WindowsTemplate(
+            "Get-ADUser -Filter \"Name -like '*{searchTerm}*'\"",
+            parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["searchTerm"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    [Fact]
+    public void TemplateParameter_QuotingMode_RoundTripsThroughCompactStorageAsString()
+    {
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("searchTerm", "Search term");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+
+        string json = JsonSerializer.Serialize(parameter, JsonOptionsHelper.CompactStorage);
+        TemplateParameter? deserialized = JsonSerializer.Deserialize<TemplateParameter>(
+            json,
+            JsonOptionsHelper.CompactStorage);
+
+        json.Should().Contain("\"Quoting\":\"InlineInQuotes\"");
+        deserialized.Should().NotBeNull();
+        deserialized!.Quoting.Should().Be(QuotingMode.InlineInQuotes);
+    }
+
+    [Fact]
+    public void TemplateParameter_MissingQuotingMode_DeserializesToNull()
+    {
+        const string json = """
+            {"Name":"searchTerm","Label":"Search term","Type":"string","Required":true}
+            """;
+
+        TemplateParameter? parameter = JsonSerializer.Deserialize<TemplateParameter>(
+            json,
+            JsonOptionsHelper.CompactStorage);
+
+        parameter.Should().NotBeNull();
+        parameter!.Quoting.Should().BeNull();
     }
 
     // ===== TEST-01: type validation rejects =====
