@@ -17,10 +17,14 @@
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
+using TwinShell.Core.Models;
 using TwinShell.Persistence;
 using TwinShell.Persistence.Schema;
 
@@ -45,7 +49,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(2);
+        userVersion.Should().Be(3);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -62,7 +66,7 @@ public sealed class TwinShellSchemaUpgradeTests
     }
 
     [Fact]
-    public async Task UpgradeAsync_FreshDatabase_MarksSchemaVersionTwo()
+    public async Task UpgradeAsync_FreshDatabase_MarksSchemaVersionThree()
     {
         await using TempTwinShellDatabase database = new TempTwinShellDatabase();
         await database.Context.Database.EnsureCreatedAsync();
@@ -70,7 +74,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(2);
+        userVersion.Should().Be(3);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -100,7 +104,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(2);
+        userVersion.Should().Be(3);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -142,7 +146,7 @@ public sealed class TwinShellSchemaUpgradeTests
     }
 
     [Fact]
-    public async Task BootstrapperInitializationPath_FreshDatabase_ReachesVersionTwo()
+    public async Task BootstrapperInitializationPath_FreshDatabase_ReachesVersionThree()
     {
         await using TempTwinShellDatabase database = new TempTwinShellDatabase();
         ServiceCollection services = new ServiceCollection();
@@ -159,7 +163,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(context);
-        userVersion.Should().Be(2);
+        userVersion.Should().Be(3);
     }
 
     // Producer: TwinShellSchema step 2
@@ -174,7 +178,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(2);
+        userVersion.Should().Be(3);
 
         // Windows system template: single double-quoted placeholder is unwrapped.
         string windowsSystemPattern = await ReadCommandPatternAsync(database.Context, "tpl-system-windows");
@@ -207,7 +211,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(2);
+        userVersion.Should().Be(3);
 
         string windowsAfterSecond = await ReadCommandPatternAsync(database.Context, "tpl-system-windows");
         string linuxAfterSecond = await ReadCommandPatternAsync(database.Context, "tpl-system-linux");
@@ -216,6 +220,81 @@ public sealed class TwinShellSchemaUpgradeTests
         windowsAfterSecond.Should().Be("Get-ADGroup -Identity {groupName} -Properties *");
         linuxAfterSecond.Should().Be(linuxAfterFirst);
         linuxAfterSecond.Should().Be("grep {pattern} {file}");
+    }
+
+    // Producer: TwinShellSchema step 3
+    // ("D2 Lot B distribute quoting modes, drive-letter type, unwrapped affixes and Defender fixes to system command templates")
+    // applied by SchemaUpgrader.UpgradeAsync against a database seeded at user_version = 2.
+    [Fact]
+    public async Task UpgradeAsync_V3_DistributesD2LotBFixesToSystemTemplatesOnly()
+    {
+        await using TempTwinShellDatabase database = new TempTwinShellDatabase();
+        await database.SeedD2LotBMigrationFixtureAtVersionTwoAsync();
+        Dictionary<string, TemplateRow> beforeRows = await ReadCommandTemplateRowsAsync(database.Context);
+
+        await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
+
+        int userVersion = await ReadUserVersionAsync(database.Context);
+        userVersion.Should().Be(3);
+
+        Dictionary<string, TemplateRow> afterRows = await ReadCommandTemplateRowsAsync(database.Context);
+        int updatedRows = afterRows.Count(row => beforeRows[row.Key] != row.Value);
+        updatedRows.Should().Be(7);
+
+        List<TemplateParameter> class1Parameters = await ReadTemplateParametersAsync(database.Context, "tpl-class1");
+        FindParameter(class1Parameters, "vmName").Quoting.Should().Be(QuotingMode.InlineInQuotes);
+        FindParameter(class1Parameters, "action").Quoting.Should().BeNull();
+
+        List<TemplateParameter> driveParameters = await ReadTemplateParametersAsync(database.Context, "tpl-driveletter");
+        FindParameter(driveParameters, "driveLetter").Type.Should().Be("driveletter");
+        FindParameter(driveParameters, "driveLetter").Quoting.Should().BeNull();
+
+        string archivePattern = await ReadCommandPatternAsync(database.Context, "tpl-archive");
+        archivePattern.Should().Be("tar -czf '{archiveName}.tar.gz' {sourcePath}");
+        List<TemplateParameter> archiveParameters = await ReadTemplateParametersAsync(database.Context, "tpl-archive");
+        FindParameter(archiveParameters, "archiveName").Quoting.Should().Be(QuotingMode.InlineInQuotes);
+
+        string icaclsPattern = await ReadCommandPatternAsync(database.Context, "tpl-icacls");
+        icaclsPattern.Should().Be("icacls {path} /grant '{user}:(OI)(CI)F' /T");
+        List<TemplateParameter> icaclsParameters = await ReadTemplateParametersAsync(database.Context, "tpl-icacls");
+        FindParameter(icaclsParameters, "user").Quoting.Should().Be(QuotingMode.InlineInQuotes);
+
+        string cloudPattern = await ReadCommandPatternAsync(database.Context, "tpl-defender-cloud");
+        cloudPattern.Should().Be("Set-MpPreference -MAPSReporting {level}");
+        List<TemplateParameter> cloudParameters = await ReadTemplateParametersAsync(database.Context, "tpl-defender-cloud");
+        FindParameter(cloudParameters, "level").Type.Should().Be("number");
+
+        string schedulePattern = await ReadCommandPatternAsync(database.Context, "tpl-defender-schedule");
+        schedulePattern.Should().Be("Set-MpPreference -ScanScheduleDay {day} -ScanScheduleTime {time}");
+        List<TemplateParameter> scheduleParameters = await ReadTemplateParametersAsync(database.Context, "tpl-defender-schedule");
+        FindParameter(scheduleParameters, "day").Type.Should().Be("number");
+        FindParameter(scheduleParameters, "time").Type.Should().Be("string");
+
+        string realtimePattern = await ReadCommandPatternAsync(database.Context, "tpl-defender-realtime");
+        realtimePattern.Should().Be("Set-MpPreference -DisableRealtimeMonitoring ${enableDisable}");
+        List<TemplateParameter> realtimeParameters = await ReadTemplateParametersAsync(database.Context, "tpl-defender-realtime");
+        FindParameter(realtimeParameters, "enableDisable").DefaultValue.Should().Be("false");
+        FindParameter(realtimeParameters, "enableDisable").Quoting.Should().Be(QuotingMode.InlineInQuotes);
+
+        afterRows["tpl-user-archive"].Should().Be(beforeRows["tpl-user-archive"]);
+    }
+
+    [Fact]
+    public async Task UpgradeAsync_V3_IsIdempotentAcrossRepeatedRuns()
+    {
+        await using TempTwinShellDatabase database = new TempTwinShellDatabase();
+        await database.SeedD2LotBMigrationFixtureAtVersionTwoAsync();
+
+        await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
+        Dictionary<string, TemplateRow> rowsAfterFirst = await ReadCommandTemplateRowsAsync(database.Context);
+
+        await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
+
+        int userVersion = await ReadUserVersionAsync(database.Context);
+        userVersion.Should().Be(3);
+
+        Dictionary<string, TemplateRow> rowsAfterSecond = await ReadCommandTemplateRowsAsync(database.Context);
+        rowsAfterSecond.Should().Equal(rowsAfterFirst);
     }
 
     private static async Task<string> ReadCommandPatternAsync(
@@ -250,6 +329,85 @@ public sealed class TwinShellSchemaUpgradeTests
             }
         }
     }
+
+    private static async Task<List<TemplateParameter>> ReadTemplateParametersAsync(
+        TwinShellDbContext context,
+        string templateId)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        bool openedConnection = connection.State != ConnectionState.Open;
+
+        try
+        {
+            if (openedConnection)
+            {
+                await connection.OpenAsync();
+            }
+
+            await using DbCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT ParametersJson FROM CommandTemplates WHERE Id = $id";
+            DbParameter idParameter = command.CreateParameter();
+            idParameter.ParameterName = "$id";
+            idParameter.Value = templateId;
+            command.Parameters.Add(idParameter);
+
+            object? result = await command.ExecuteScalarAsync();
+            string parametersJson = Convert.ToString(result, CultureInfo.InvariantCulture) ?? "[]";
+            return JsonSerializer.Deserialize<List<TemplateParameter>>(
+                parametersJson,
+                JsonOptionsHelper.CompactStorage) ?? new List<TemplateParameter>();
+        }
+        finally
+        {
+            if (openedConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task<Dictionary<string, TemplateRow>> ReadCommandTemplateRowsAsync(
+        TwinShellDbContext context)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        bool openedConnection = connection.State != ConnectionState.Open;
+
+        try
+        {
+            if (openedConnection)
+            {
+                await connection.OpenAsync();
+            }
+
+            await using DbCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT Id, CommandPattern, ParametersJson FROM CommandTemplates ORDER BY Id";
+            await using DbDataReader reader = await command.ExecuteReaderAsync();
+            Dictionary<string, TemplateRow> rows = new Dictionary<string, TemplateRow>(StringComparer.Ordinal);
+
+            while (await reader.ReadAsync())
+            {
+                string id = reader.GetString(0);
+                string commandPattern = reader.GetString(1);
+                string parametersJson = reader.GetString(2);
+                rows.Add(id, new TemplateRow(commandPattern, parametersJson));
+            }
+
+            return rows;
+        }
+        finally
+        {
+            if (openedConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static TemplateParameter FindParameter(
+        IEnumerable<TemplateParameter> parameters,
+        string parameterName)
+        => parameters.Single(parameter =>
+            string.Equals(parameter.Name, parameterName, StringComparison.Ordinal));
 
     private static async Task<int> ReadUserVersionAsync(TwinShellDbContext context)
     {
@@ -410,6 +568,24 @@ public sealed class TwinShellSchemaUpgradeTests
         }
     }
 
+    private static TemplateParameter Parameter(
+        string name,
+        string type = "string",
+        string? defaultValue = null)
+        => new TemplateParameter
+        {
+            Name = name,
+            Label = name,
+            Type = type,
+            DefaultValue = defaultValue,
+            Required = true,
+            Description = name
+        };
+
+    private sealed record TemplateRow(
+        string CommandPattern,
+        string ParametersJson);
+
     private sealed class TempTwinShellDatabase : IAsyncDisposable
     {
         private readonly string _rootPath;
@@ -455,7 +631,8 @@ public sealed class TwinShellSchemaUpgradeTests
                         + "IsUserCreated INTEGER NOT NULL DEFAULT 0)",
                     "CommandTemplates" =>
                         "CREATE TABLE CommandTemplates (Id TEXT NOT NULL PRIMARY KEY, "
-                        + "CommandPattern TEXT NOT NULL DEFAULT '')",
+                        + "CommandPattern TEXT NOT NULL DEFAULT '', "
+                        + "ParametersJson TEXT NOT NULL DEFAULT '[]')",
                     _ => "CREATE TABLE " + tableName + " (Id TEXT NOT NULL PRIMARY KEY)"
                 };
 
@@ -478,7 +655,8 @@ public sealed class TwinShellSchemaUpgradeTests
         {
             await ExecuteNonQueryAsync(
                 Context,
-                "CREATE TABLE CommandTemplates (Id TEXT NOT NULL PRIMARY KEY, CommandPattern TEXT NOT NULL)");
+                "CREATE TABLE CommandTemplates (Id TEXT NOT NULL PRIMARY KEY, "
+                + "CommandPattern TEXT NOT NULL, ParametersJson TEXT NOT NULL DEFAULT '[]')");
             await ExecuteNonQueryAsync(
                 Context,
                 "CREATE TABLE Actions (Id TEXT NOT NULL PRIMARY KEY, "
@@ -500,7 +678,73 @@ public sealed class TwinShellSchemaUpgradeTests
             await ExecuteNonQueryAsync(Context, "PRAGMA user_version = 1");
         }
 
-        private async Task InsertTemplateAsync(string id, string pattern)
+        // Seeds a pre-v3 database with representative D2 Lot B shapes. Only the v3 step runs.
+        internal async Task SeedD2LotBMigrationFixtureAtVersionTwoAsync()
+        {
+            await ExecuteNonQueryAsync(
+                Context,
+                "CREATE TABLE CommandTemplates (Id TEXT NOT NULL PRIMARY KEY, "
+                + "CommandPattern TEXT NOT NULL, ParametersJson TEXT NOT NULL DEFAULT '[]')");
+            await ExecuteNonQueryAsync(
+                Context,
+                "CREATE TABLE Actions (Id TEXT NOT NULL PRIMARY KEY, "
+                + "WindowsCommandTemplateId TEXT NULL, LinuxCommandTemplateId TEXT NULL, "
+                + "IsUserCreated INTEGER NOT NULL)");
+
+            await InsertTemplateAsync(
+                "tpl-class1",
+                "Get-VM -Name '{vmName}' -Action {action}",
+                Parameter("vmName"),
+                Parameter("action"));
+            await InsertTemplateAsync(
+                "tpl-driveletter",
+                "Get-BitLockerVolume -MountPoint \"{driveLetter}:\"",
+                Parameter("driveLetter"));
+            await InsertTemplateAsync(
+                "tpl-archive",
+                "tar -czf \"{archiveName}.tar.gz\" {sourcePath}",
+                Parameter("archiveName"),
+                Parameter("sourcePath"));
+            await InsertTemplateAsync(
+                "tpl-icacls",
+                "icacls {path} /grant \"{user}:(OI)(CI)F\" /T",
+                Parameter("path"),
+                Parameter("user"));
+            await InsertTemplateAsync(
+                "tpl-defender-cloud",
+                "Set-MpPreference -MAPSReporting ${level}",
+                Parameter("level", defaultValue: "2"));
+            await InsertTemplateAsync(
+                "tpl-defender-schedule",
+                "Set-MpPreference -ScanScheduleDay ${day} -ScanScheduleTime ${time}",
+                Parameter("day", defaultValue: "0"),
+                Parameter("time", defaultValue: "02:00:00"));
+            await InsertTemplateAsync(
+                "tpl-defender-realtime",
+                "Set-MpPreference -DisableRealtimeMonitoring ${enableDisable}",
+                Parameter("enableDisable", defaultValue: "$false"));
+            await InsertTemplateAsync(
+                "tpl-user-archive",
+                "tar -czf \"{archiveName}.tar.gz\" {sourcePath}",
+                Parameter("archiveName"),
+                Parameter("sourcePath"));
+
+            await InsertActionAsync("act-class1", "tpl-class1", linuxTemplateId: null, isUserCreated: 0);
+            await InsertActionAsync("act-driveletter", "tpl-driveletter", linuxTemplateId: null, isUserCreated: 0);
+            await InsertActionAsync("act-archive", "tpl-archive", linuxTemplateId: null, isUserCreated: 0);
+            await InsertActionAsync("act-icacls", "tpl-icacls", linuxTemplateId: null, isUserCreated: 0);
+            await InsertActionAsync("act-defender-cloud", "tpl-defender-cloud", linuxTemplateId: null, isUserCreated: 0);
+            await InsertActionAsync("act-defender-schedule", "tpl-defender-schedule", linuxTemplateId: null, isUserCreated: 0);
+            await InsertActionAsync("act-defender-realtime", "tpl-defender-realtime", linuxTemplateId: null, isUserCreated: 0);
+            await InsertActionAsync("act-user-archive", "tpl-user-archive", linuxTemplateId: null, isUserCreated: 1);
+
+            await ExecuteNonQueryAsync(Context, "PRAGMA user_version = 2");
+        }
+
+        private async Task InsertTemplateAsync(
+            string id,
+            string pattern,
+            params TemplateParameter[] parameters)
         {
             DbConnection connection = Context.Database.GetDbConnection();
             bool openedConnection = connection.State != ConnectionState.Open;
@@ -514,9 +758,14 @@ public sealed class TwinShellSchemaUpgradeTests
 
                 await using DbCommand command = connection.CreateCommand();
                 command.CommandText =
-                    "INSERT INTO CommandTemplates (Id, CommandPattern) VALUES ($id, $pattern)";
+                    "INSERT INTO CommandTemplates (Id, CommandPattern, ParametersJson) "
+                    + "VALUES ($id, $pattern, $parametersJson)";
                 AddParameter(command, "$id", id);
                 AddParameter(command, "$pattern", pattern);
+                AddParameter(
+                    command,
+                    "$parametersJson",
+                    JsonSerializer.Serialize(parameters.ToList(), JsonOptionsHelper.CompactStorage));
 
                 await command.ExecuteNonQueryAsync();
             }

@@ -16,8 +16,12 @@
 
 using System.Data.Common;
 using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Heimdall.Core.Logging;
+using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
+using TwinShell.Core.Models;
 
 namespace TwinShell.Persistence.Schema;
 
@@ -50,7 +54,11 @@ public static class TwinShellSchema
         new SchemaStep(
             2,
             "D2 unwrap double-quoted placeholders in system command templates",
-            ApplyUnwrapDoubleQuotedPlaceholdersAsync)
+            ApplyUnwrapDoubleQuotedPlaceholdersAsync),
+        new SchemaStep(
+            3,
+            "D2 Lot B distribute quoting modes, drive-letter type, unwrapped affixes and Defender fixes to system command templates",
+            ApplyD2LotBAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -106,6 +114,231 @@ public static class TwinShellSchema
             + " system command template(s)");
     }
 
+    private static async Task ApplyD2LotBAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        List<SystemCommandTemplateRow> systemTemplates = await ReadSystemCommandTemplatesForD2LotBAsync(
+            connection,
+            transaction,
+            cancellationToken);
+
+        int updatedCount = 0;
+
+        foreach (SystemCommandTemplateRow template in systemTemplates)
+        {
+            string commandPattern = template.CommandPattern;
+            bool patternChanged = false;
+            bool parametersChanged = false;
+            List<TemplateParameter>? parameters = DeserializeParameters(template.ParametersJson);
+
+            if (parameters is { Count: > 0 })
+            {
+                parametersChanged = ApplyD2LotBGenericParameterFixes(commandPattern, parameters);
+            }
+
+            patternChanged = ApplyD2LotBTargetedFixes(
+                ref commandPattern,
+                parameters,
+                ref parametersChanged);
+
+            if (!patternChanged && !parametersChanged)
+            {
+                continue;
+            }
+
+            string? parametersJson = parametersChanged && parameters is { Count: > 0 }
+                ? JsonSerializer.Serialize(parameters, JsonOptionsHelper.CompactStorage)
+                : null;
+
+            await UpdateCommandTemplateAsync(
+                connection,
+                transaction,
+                template.Id,
+                patternChanged ? commandPattern : null,
+                parametersJson,
+                cancellationToken);
+            updatedCount++;
+        }
+
+        FileLogger.Info(
+            "[TwinShell] D2 Lot B migration updated "
+            + updatedCount.ToString(CultureInfo.InvariantCulture)
+            + " system command template(s)");
+    }
+
+    private static bool ApplyD2LotBGenericParameterFixes(
+        string commandPattern,
+        List<TemplateParameter> parameters)
+    {
+        bool changed = false;
+
+        foreach (TemplateParameter parameter in parameters)
+        {
+            if (parameter.Quoting == null && IsPlaceholderInsideSingleQuotedSpan(commandPattern, parameter.Name))
+            {
+                parameter.Quoting = QuotingMode.InlineInQuotes;
+                changed = true;
+            }
+
+            if (string.Equals(parameter.Name, "driveLetter", StringComparison.Ordinal)
+                && string.Equals(parameter.Type, "string", StringComparison.OrdinalIgnoreCase))
+            {
+                parameter.Type = "driveletter";
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private static bool ApplyD2LotBTargetedFixes(
+        ref string commandPattern,
+        List<TemplateParameter>? parameters,
+        ref bool parametersChanged)
+    {
+        bool patternChanged = false;
+
+        if (string.Equals(
+            commandPattern,
+            "tar -czf \"{archiveName}.tar.gz\" {sourcePath}",
+            StringComparison.Ordinal))
+        {
+            commandPattern = "tar -czf '{archiveName}.tar.gz' {sourcePath}";
+            patternChanged = true;
+            parametersChanged |= SetParameterQuoting(parameters, "archiveName");
+        }
+
+        if (string.Equals(
+            commandPattern,
+            "icacls {path} /grant \"{user}:(OI)(CI)F\" /T",
+            StringComparison.Ordinal))
+        {
+            commandPattern = "icacls {path} /grant '{user}:(OI)(CI)F' /T";
+            patternChanged = true;
+            parametersChanged |= SetParameterQuoting(parameters, "user");
+        }
+
+        if (string.Equals(
+            commandPattern,
+            "Set-MpPreference -MAPSReporting ${level}",
+            StringComparison.Ordinal))
+        {
+            commandPattern = "Set-MpPreference -MAPSReporting {level}";
+            patternChanged = true;
+            parametersChanged |= SetParameterType(parameters, "level", "string", "number");
+        }
+
+        if (string.Equals(
+            commandPattern,
+            "Set-MpPreference -ScanScheduleDay ${day} -ScanScheduleTime ${time}",
+            StringComparison.Ordinal))
+        {
+            commandPattern = "Set-MpPreference -ScanScheduleDay {day} -ScanScheduleTime {time}";
+            patternChanged = true;
+            parametersChanged |= SetParameterType(parameters, "day", "string", "number");
+        }
+
+        if (string.Equals(
+            commandPattern,
+            "Set-MpPreference -DisableRealtimeMonitoring ${enableDisable}",
+            StringComparison.Ordinal))
+        {
+            parametersChanged |= SetParameterDefaultValue(parameters, "enableDisable", "$false", "false");
+            parametersChanged |= SetParameterQuoting(parameters, "enableDisable");
+        }
+
+        return patternChanged;
+    }
+
+    private static bool IsPlaceholderInsideSingleQuotedSpan(string commandPattern, string parameterName)
+    {
+        string placeholder = "{" + parameterName + "}";
+        int placeholderIndex = commandPattern.IndexOf(placeholder, StringComparison.Ordinal);
+        if (placeholderIndex < 0)
+        {
+            return false;
+        }
+
+        int quoteCount = 0;
+        for (int index = 0; index < placeholderIndex; index++)
+        {
+            if (commandPattern[index] == '\'')
+            {
+                quoteCount++;
+            }
+        }
+
+        return quoteCount % 2 == 1;
+    }
+
+    private static bool SetParameterQuoting(List<TemplateParameter>? parameters, string parameterName)
+    {
+        TemplateParameter? parameter = FindParameter(parameters, parameterName);
+        if (parameter == null || parameter.Quoting != null)
+        {
+            return false;
+        }
+
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        return true;
+    }
+
+    private static bool SetParameterType(
+        List<TemplateParameter>? parameters,
+        string parameterName,
+        string currentType,
+        string replacementType)
+    {
+        TemplateParameter? parameter = FindParameter(parameters, parameterName);
+        if (parameter == null
+            || !string.Equals(parameter.Type, currentType, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        parameter.Type = replacementType;
+        return true;
+    }
+
+    private static bool SetParameterDefaultValue(
+        List<TemplateParameter>? parameters,
+        string parameterName,
+        string currentDefaultValue,
+        string replacementDefaultValue)
+    {
+        TemplateParameter? parameter = FindParameter(parameters, parameterName);
+        if (parameter == null
+            || !string.Equals(parameter.DefaultValue, currentDefaultValue, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        parameter.DefaultValue = replacementDefaultValue;
+        return true;
+    }
+
+    private static TemplateParameter? FindParameter(
+        List<TemplateParameter>? parameters,
+        string parameterName)
+        => parameters?.FirstOrDefault(parameter =>
+            string.Equals(parameter.Name, parameterName, StringComparison.Ordinal));
+
+    private static List<TemplateParameter>? DeserializeParameters(string? parametersJson)
+    {
+        if (string.IsNullOrWhiteSpace(parametersJson))
+        {
+            return null;
+        }
+
+        List<TemplateParameter>? parameters = JsonSerializer.Deserialize<List<TemplateParameter>>(
+            parametersJson,
+            JsonOptionsHelper.CompactStorage);
+
+        return parameters is { Count: > 0 } ? parameters : null;
+    }
+
     private static async Task<List<(string Id, string Pattern)>> ReadSystemCommandTemplatesAsync(
         DbConnection connection,
         DbTransaction transaction,
@@ -137,6 +370,38 @@ public static class TwinShellSchema
         return templates;
     }
 
+    private static async Task<List<SystemCommandTemplateRow>> ReadSystemCommandTemplatesForD2LotBAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "SELECT ct.Id, ct.CommandPattern, ct.ParametersJson FROM CommandTemplates ct "
+            + "WHERE EXISTS (SELECT 1 FROM Actions a "
+            + "WHERE (a.WindowsCommandTemplateId = ct.Id OR a.LinuxCommandTemplateId = ct.Id) "
+            + "AND a.IsUserCreated = 0)";
+
+        List<SystemCommandTemplateRow> templates = new List<SystemCommandTemplateRow>();
+
+        await using DbDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1))
+            {
+                continue;
+            }
+
+            string id = reader.GetString(0);
+            string pattern = reader.GetString(1);
+            string? parametersJson = reader.IsDBNull(2) ? null : reader.GetString(2);
+            templates.Add(new SystemCommandTemplateRow(id, pattern, parametersJson));
+        }
+
+        return templates;
+    }
+
     private static async Task UpdateCommandTemplatePatternAsync(
         DbConnection connection,
         DbTransaction transaction,
@@ -152,6 +417,52 @@ public static class TwinShellSchema
         patternParameter.ParameterName = "@pattern";
         patternParameter.Value = pattern;
         command.Parameters.Add(patternParameter);
+
+        DbParameter idParameter = command.CreateParameter();
+        idParameter.ParameterName = "@id";
+        idParameter.Value = id;
+        command.Parameters.Add(idParameter);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task UpdateCommandTemplateAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        string id,
+        string? commandPattern,
+        string? parametersJson,
+        CancellationToken cancellationToken)
+    {
+        List<string> assignments = new List<string>();
+        await using DbCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+
+        if (commandPattern != null)
+        {
+            assignments.Add("CommandPattern = @pattern");
+            DbParameter patternParameter = command.CreateParameter();
+            patternParameter.ParameterName = "@pattern";
+            patternParameter.Value = commandPattern;
+            command.Parameters.Add(patternParameter);
+        }
+
+        if (parametersJson != null)
+        {
+            assignments.Add("ParametersJson = @parametersJson");
+            DbParameter parametersJsonParameter = command.CreateParameter();
+            parametersJsonParameter.ParameterName = "@parametersJson";
+            parametersJsonParameter.Value = parametersJson;
+            command.Parameters.Add(parametersJsonParameter);
+        }
+
+        if (assignments.Count == 0)
+        {
+            return;
+        }
+
+        command.CommandText =
+            "UPDATE CommandTemplates SET " + string.Join(", ", assignments) + " WHERE Id = @id";
 
         DbParameter idParameter = command.CreateParameter();
         idParameter.ParameterName = "@id";
@@ -234,4 +545,9 @@ public static class TwinShellSchema
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private sealed record SystemCommandTemplateRow(
+        string Id,
+        string CommandPattern,
+        string? ParametersJson);
 }
