@@ -17,12 +17,13 @@
     "id": "archive-tar-linux-cmd",
     "platform": 1,
     "name": "tar",
-    "commandPattern": "tar -czf \"{archiveName}.tar.gz\" {sourcePath}",
+    "commandPattern": "tar -czf '{archiveName}.tar.gz' {sourcePath}",
     "parameters": [
       {
         "name": "archiveName",
         "label": "Nom de l'archive",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "backup",
         "required": true,
         "description": "Nom du fichier archive (sans extension)"

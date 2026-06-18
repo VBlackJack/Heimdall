@@ -494,6 +494,58 @@ public sealed class CommandGeneratorServiceTests
         command.Should().NotContain("''A B''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
     }
 
+    // D2 Lot B step 2b: seed driveLetter parameters must be validated bare values.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Theory]
+    [MemberData(nameof(DriveLetterSeedTemplates))]
+    public void GenerateCommand_SeedDriveLetterParameters_SubstituteWithoutQuotes(
+        string fileName,
+        CommandTemplate template)
+    {
+        CommandGeneratorService service = CreateService();
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, "driveLetter", "D");
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Contain("D:", $"{fileName} should emit the drive mount point without quoting the letter");
+        command.Should().NotContain("'D'", $"{fileName} must not single-quote the drive letter");
+
+        Dictionary<string, string> invalidValues = CreateSeedGenerationValues(template, "driveLetter", "DD");
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, invalidValues));
+    }
+
+    // D2 Lot B step 2b: archive affix placeholder is inside one single-quoted span.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_SeedArchiveTarAffixPlaceholder_UsesOneQuotedArchiveToken()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LoadSeedTemplate("archive-tar-linux.json", "linuxCommandTemplate");
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, "archiveName", "my arc");
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Contain("'my arc.tar.gz'");
+        command.Should().NotContain("''my arc''");
+        command.Should().NotContain("\"");
+    }
+
+    // D2 Lot B step 2b: icacls affix placeholder keeps the ACL suffix in the same quoted token.
+    // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
+    [Fact]
+    public void GenerateCommand_SeedIcaclsAffixPlaceholder_UsesOneQuotedAclToken()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LoadSeedTemplate("win-legacy-icacls.json", "windowsCommandTemplate");
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, "user", "CORP\\svc");
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Contain("'CORP\\svc:(OI)(CI)F'");
+        command.Should().NotContain("''CORP\\svc''");
+        command.Should().NotContain("\"");
+    }
+
     // ===== TEST-01: type validation rejects =====
 
     [Theory]
@@ -756,7 +808,60 @@ public sealed class CommandGeneratorServiceTests
         }
     }
 
-    private static Dictionary<string, string> CreateSeedGenerationValues(CommandTemplate template, string targetParameterName)
+    public static IEnumerable<object[]> DriveLetterSeedTemplates()
+    {
+        string seedActionsDirectory = FindSeedActionsDirectory();
+        foreach (string filePath in Directory.EnumerateFiles(seedActionsDirectory, "*.json").OrderBy(path => path, StringComparer.Ordinal))
+        {
+            string json = File.ReadAllText(filePath);
+            ActionModel? action = JsonSerializer.Deserialize<ActionModel>(json, JsonOptionsHelper.CaseInsensitive);
+            if (action == null)
+            {
+                continue;
+            }
+
+            foreach (CommandTemplate? template in new[] { action.WindowsCommandTemplate, action.LinuxCommandTemplate })
+            {
+                if (template == null)
+                {
+                    continue;
+                }
+
+                if (template.Parameters.Any(parameter =>
+                    string.Equals(parameter.Name, "driveLetter", StringComparison.Ordinal) &&
+                    string.Equals(parameter.Type, "driveletter", StringComparison.OrdinalIgnoreCase)))
+                {
+                    yield return new object[]
+                    {
+                        Path.GetFileName(filePath),
+                        template
+                    };
+                }
+            }
+        }
+    }
+
+    private static CommandTemplate LoadSeedTemplate(string fileName, string templateName)
+    {
+        string filePath = Path.Combine(FindSeedActionsDirectory(), fileName);
+        string json = File.ReadAllText(filePath);
+        ActionModel action = JsonSerializer.Deserialize<ActionModel>(json, JsonOptionsHelper.CaseInsensitive)
+            ?? throw new InvalidOperationException($"Could not deserialize seed action {fileName}.");
+
+        return templateName switch
+        {
+            "windowsCommandTemplate" => action.WindowsCommandTemplate
+                ?? throw new InvalidOperationException($"{fileName} has no Windows command template."),
+            "linuxCommandTemplate" => action.LinuxCommandTemplate
+                ?? throw new InvalidOperationException($"{fileName} has no Linux command template."),
+            _ => throw new ArgumentOutOfRangeException(nameof(templateName), templateName, "Unknown seed template name.")
+        };
+    }
+
+    private static Dictionary<string, string> CreateSeedGenerationValues(
+        CommandTemplate template,
+        string targetParameterName,
+        string targetValue = "A B")
     {
         Dictionary<string, string> values = new(StringComparer.Ordinal);
 
@@ -764,7 +869,7 @@ public sealed class CommandGeneratorServiceTests
         {
             if (string.Equals(parameter.Name, targetParameterName, StringComparison.Ordinal))
             {
-                values[parameter.Name] = "A B";
+                values[parameter.Name] = targetValue;
                 continue;
             }
 

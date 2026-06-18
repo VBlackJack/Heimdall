@@ -17,7 +17,7 @@
     "id": "11f285b1-4f34-4366-87e4-7483e496705f",
     "platform": 0,
     "name": "icacls",
-    "commandPattern": "icacls {path} /grant \"{user}:(OI)(CI)F\" /T",
+    "commandPattern": "icacls {path} /grant '{user}:(OI)(CI)F' /T",
     "parameters": [
       {
         "name": "path",
@@ -31,6 +31,7 @@
         "name": "user",
         "label": "Utilisateur/Groupe",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "Users",
         "required": true,
         "description": "Nom de l'utilisateur ou du groupe"
