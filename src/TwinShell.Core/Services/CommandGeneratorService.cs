@@ -16,10 +16,12 @@
 
 using System.IO;
 using System.Net;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using TwinShell.Core.Constants;
+using TwinShell.Core.Enums;
 using TwinShell.Core.Interfaces;
 using TwinShell.Core.Models;
 
@@ -34,6 +36,8 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
     // BUGFIX: Declare Regex as static readonly for better performance
     private static readonly Regex HostnameRegex = new Regex(@"^(?!-)([a-zA-Z0-9-]{1,63}(?<!-)\.)*[a-zA-Z0-9-]{1,63}$", RegexOptions.Compiled);
+
+    private static readonly Regex DriveLetterRegex = new Regex(@"^[A-Za-z]$", RegexOptions.Compiled);
 
     // BUGFIX: Declare dangerous characters as static readonly for better performance
     private static readonly char[] DangerousChars = { '&', '|', ';', '`', '$', '(', ')', '<', '>', '\n', '\r' };
@@ -93,7 +97,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             }
 
             // Escape the value for shell safety using the target platform
-            var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform);
+            var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting);
 
             // Replace {parameterName} with actual value using StringBuilder
             var placeholder = $"{{{parameter.Name}}}";
@@ -190,6 +194,13 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                         }
                         break;
 
+                    case "number":
+                        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                        {
+                            errors.Add($"{parameter.Label} must be a number");
+                        }
+                        break;
+
                     case "bool":
                     case "boolean":
                         if (!bool.TryParse(value, out _))
@@ -225,6 +236,13 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                         {
                             // BUGFIX: Replace hardcoded French message with localization
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterInvalidIPAddress, parameter.Label));
+                        }
+                        break;
+
+                    case "driveletter":
+                        if (!DriveLetterRegex.IsMatch(value))
+                        {
+                            errors.Add($"{parameter.Label} must be a single drive letter");
                         }
                         break;
 
@@ -287,6 +305,22 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 }
                 break;
 
+            case "number":
+                if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                {
+                    error = "Must be a number";
+                    return false;
+                }
+                break;
+
+            case "driveletter":
+                if (!DriveLetterRegex.IsMatch(value))
+                {
+                    error = "Must be a single drive letter";
+                    return false;
+                }
+                break;
+
             case "path":
                 if (!IsValidPath(value))
                 {
@@ -321,14 +355,16 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// <summary>
     /// Escapes a parameter value based on its type
     /// </summary>
-    private string EscapeParameterValue(string value, string parameterType, TwinShell.Core.Enums.Platform platform)
+    private string EscapeParameterValue(string value, string parameterType, Platform platform, QuotingMode? quotingMode)
     {
         switch (parameterType.ToLower())
         {
             case "hostname":
             case "ipaddress":
+            case "driveletter":
             case "int":
             case "integer":
+            case "number":
                 // These types are already validated with whitelist, no additional escaping needed
                 return value;
 
@@ -336,7 +372,9 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             case "string":
             default:
                 // Quote for shell safety using the target platform
-                return QuoteForShell(value, platform);
+                return (quotingMode ?? QuotingMode.ShellQuote) == QuotingMode.InlineInQuotes
+                    ? EscapeInlineInSingleQuotes(value, platform)
+                    : QuoteForShell(value, platform);
         }
     }
 
@@ -345,9 +383,9 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// Windows (PowerShell): Single quotes escaped by doubling ('')
     /// Linux/macOS (Bash): Single quotes escaped by closing, escaping, reopening ('\''')
     /// </summary>
-    private static string QuoteForShell(string value, TwinShell.Core.Enums.Platform platform)
+    private static string QuoteForShell(string value, Platform platform)
     {
-        if (platform == TwinShell.Core.Enums.Platform.Windows)
+        if (platform == Platform.Windows)
         {
             // PowerShell escaping: Single quotes are escaped by doubling them
             // Example: "It's cool" becomes "'It''s cool'"
@@ -360,6 +398,16 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             // Example: "It's cool" becomes "'It'\''s cool'"
             return "'" + value.Replace("'", "'\\''") + "'";
         }
+    }
+
+    private static string EscapeInlineInSingleQuotes(string value, Platform platform)
+    {
+        if (platform == Platform.Windows)
+        {
+            return value.Replace("'", "''");
+        }
+
+        return value.Replace("'", "'\\''");
     }
 
     /// <summary>
