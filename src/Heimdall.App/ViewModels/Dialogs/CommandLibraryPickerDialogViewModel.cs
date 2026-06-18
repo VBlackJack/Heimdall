@@ -56,11 +56,15 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         {
             SetProperty(ref _platformFilter, value);
             _actionsView.Refresh();
+            OnPropertyChanged(nameof(IsNoResultsVisible));
         }
     }
 
     [ObservableProperty]
     private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private bool _isLoading;
 
     private string? _platformFilter;
 
@@ -74,6 +78,11 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
     private string _generatedCommand = string.Empty;
 
     public string DialogTitle => _localizer["DialogTitleCommandLibraryPicker"];
+
+    public bool IsNoResultsVisible =>
+        !IsLoading
+        && (ActionsView is null ? false : !ActionsView.Cast<object>().Any())
+        && (!string.IsNullOrWhiteSpace(SearchText) || PlatformFilter is not null);
 
     public string? ResultActionId { get; private set; }
 
@@ -117,7 +126,13 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         return LoadAsync();
     }
 
-    partial void OnSearchTextChanged(string value) => _actionsView.Refresh();
+    partial void OnSearchTextChanged(string value)
+    {
+        _actionsView.Refresh();
+        OnPropertyChanged(nameof(IsNoResultsVisible));
+    }
+
+    partial void OnIsLoadingChanged(bool value) => OnPropertyChanged(nameof(IsNoResultsVisible));
 
     partial void OnSelectedActionChanged(CommandLibraryPickerItem? value)
     {
@@ -163,48 +178,57 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadAsync()
     {
-        using var scope = _scopeFactory.CreateScope();
-        var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-        var items = (await actionService.GetAllActionsAsync().ConfigureAwait(false))
-            .Select(action => new CommandLibraryPickerItem
-            {
-                ActionId = action.Id,
-                Title = action.Title,
-                Category = action.Category,
-                HasLinuxTemplate = action.LinuxCommandTemplate is not null,
-                HasWindowsTemplate = action.WindowsCommandTemplate is not null,
-                LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
-                LinuxTemplate = action.LinuxCommandTemplate,
-                Presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key])
-            })
-            .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        Actions.Clear();
-        foreach (var item in items)
+        IsLoading = true;
+        try
         {
-            Actions.Add(item);
+            using var scope = _scopeFactory.CreateScope();
+            var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
+            var items = (await actionService.GetAllActionsAsync().ConfigureAwait(false))
+                .Select(action => new CommandLibraryPickerItem
+                {
+                    ActionId = action.Id,
+                    Title = action.Title,
+                    Category = action.Category,
+                    HasLinuxTemplate = action.LinuxCommandTemplate is not null,
+                    HasWindowsTemplate = action.WindowsCommandTemplate is not null,
+                    LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
+                    LinuxTemplate = action.LinuxCommandTemplate,
+                    Presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key])
+                })
+                .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            Actions.Clear();
+            foreach (var item in items)
+            {
+                Actions.Add(item);
+            }
+
+            _actionsView.Filter = FilterAction;
+            _actionsView.Refresh();
+
+            if (!string.IsNullOrWhiteSpace(_preselectedActionId))
+            {
+                var preselected = Actions.FirstOrDefault(item =>
+                    string.Equals(item.ActionId, _preselectedActionId, StringComparison.Ordinal));
+                if (preselected is not null)
+                {
+                    SelectedAction = preselected;
+                }
+                else
+                {
+                    ErrorMessage = _localizer["ErrorCommandLibraryPickerActionMissing"];
+                }
+            }
+
+            ConfirmCommand.NotifyCanExecuteChanged();
         }
-
-        _actionsView.Filter = FilterAction;
-        _actionsView.Refresh();
-
-        if (!string.IsNullOrWhiteSpace(_preselectedActionId))
+        finally
         {
-            var preselected = Actions.FirstOrDefault(item =>
-                string.Equals(item.ActionId, _preselectedActionId, StringComparison.Ordinal));
-            if (preselected is not null)
-            {
-                SelectedAction = preselected;
-            }
-            else
-            {
-                ErrorMessage = _localizer["ErrorCommandLibraryPickerActionMissing"];
-            }
+            IsLoading = false;
+            OnPropertyChanged(nameof(IsNoResultsVisible));
         }
-
-        ConfirmCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanConfirm))]

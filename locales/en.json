@@ -2372,6 +2372,7 @@
   "ErrorCommandLibraryPickerActionMissing": "The previously linked action is no longer available. Select another or cancel.",
   "LabelCommandLibraryPickerSearch": "Search",
   "LabelCommandLibraryPickerPlatform": "Platform",
+  "LabelCommandLibraryPickerResults": "Command Library results",
   "LabelCommandLibraryPickerParameters": "Parameters",
   "LabelCommandLibraryPickerPreview": "Preview",
   "LabelCommandLibraryPickerNoLinuxTemplate": "This action does not provide a Linux command template.",

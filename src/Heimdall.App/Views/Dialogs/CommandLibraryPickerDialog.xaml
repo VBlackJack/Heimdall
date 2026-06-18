@@ -84,61 +84,74 @@
                 Background="{DynamicResource CardBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1">
-            <ListView ItemsSource="{Binding ActionsView}"
-                      SelectedItem="{Binding SelectedAction}"
-                      Background="{DynamicResource CardBrush}"
-                      BorderThickness="0"
-                      Foreground="{DynamicResource TextPrimaryBrush}">
-                <ListView.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:CommandLibraryPickerItem}">
-                        <Grid Margin="0,0,0,8"
-                              AutomationProperties.Name="{Binding Title}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="150"/>
-                                <ColumnDefinition Width="150"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Title}"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding Presentation.Description}"
-                                           Visibility="{Binding Presentation.Description, Converter={StaticResource NullToVisibilityConverter}}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           FontSize="{StaticResource FontSizeCaption}"
-                                           TextTrimming="CharacterEllipsis"
-                                           Margin="0,2,0,0"/>
-                            </StackPanel>
-                            <TextBlock Grid.Column="1"
-                                       Margin="8,0,0,0"
-                                       VerticalAlignment="Center"
-                                       Text="{Binding Category}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <StackPanel Grid.Column="2"
-                                        Orientation="Horizontal"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center">
-                                <Border CornerRadius="3"
-                                        Padding="4,1"
-                                        Margin="0,0,6,0"
-                                        VerticalAlignment="Center"
-                                        Background="{Binding Presentation.RiskBrushKey, Converter={StaticResource ResourceKeyToBrushConverter}}"
-                                        ToolTip="{Binding Presentation.RiskLabel}"
-                                        AutomationProperties.Name="{Binding Presentation.RiskLabel}">
-                                    <TextBlock Text="{Binding Presentation.RiskBadge}"
+            <Grid>
+                <ListView ItemsSource="{Binding ActionsView}"
+                          SelectedItem="{Binding SelectedAction}"
+                          Background="{DynamicResource CardBrush}"
+                          BorderThickness="0"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          AutomationProperties.Name="{loc:Translate LabelCommandLibraryPickerResults}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:CommandLibraryPickerItem}">
+                            <Grid Margin="0,0,0,8"
+                                  AutomationProperties.Name="{Binding Title}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="150"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Presentation.Description}"
+                                               Visibility="{Binding Presentation.Description, Converter={StaticResource NullToVisibilityConverter}}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                FontSize="{StaticResource FontSizeCaption}"
-                                               FontWeight="Bold"
-                                               Foreground="{DynamicResource BadgeTextBrush}"/>
-                                </Border>
-                                <TextBlock Text="{Binding PlatformBadgeText}"
-                                           Foreground="{DynamicResource AccentBrush}"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding Category}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <StackPanel Grid.Column="2"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <Border CornerRadius="3"
+                                            Padding="4,1"
+                                            Margin="0,0,6,0"
+                                            VerticalAlignment="Center"
+                                            Background="{Binding Presentation.RiskBrushKey, Converter={StaticResource ResourceKeyToBrushConverter}}"
+                                            ToolTip="{Binding Presentation.RiskLabel}"
+                                            AutomationProperties.Name="{Binding Presentation.RiskLabel}">
+                                        <TextBlock Text="{Binding Presentation.RiskBadge}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource BadgeTextBrush}"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding PlatformBadgeText}"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <ProgressBar Style="{StaticResource ToolLoadingBarStyle}"
+                             VerticalAlignment="Top"
+                             Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                <TextBlock Text="{loc:Translate ToolCmdLibNoResults}"
+                           Visibility="{Binding IsNoResultsVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                           Style="{StaticResource ToolEmptyStateTextStyle}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Grid>
         </Border>
 
         <Border Grid.Row="3"
