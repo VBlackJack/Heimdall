@@ -140,8 +140,10 @@ internal static class TwinShellBootstrapper
             .ToArray();
 
         var options = JsonOptionsHelper.CaseInsensitive;
-        var seeded = 0;
+        var validActions = new List<ActionModel>(jsonFiles.Length);
 
+        // Parse/validate/normalize pass: per-file try/catch so one malformed or oversized
+        // file is logged and skipped without aborting the rest of the batch.
         foreach (var file in jsonFiles)
         {
             try
@@ -159,8 +161,7 @@ internal static class TwinShellBootstrapper
                 action.CreatedAt = DateTime.UtcNow;
                 action.UpdatedAt = DateTime.UtcNow;
 
-                await repo.AddAsync(action);
-                seeded++;
+                validActions.Add(action);
             }
             catch (Exception ex)
             {
@@ -169,8 +170,19 @@ internal static class TwinShellBootstrapper
             }
         }
 
+        // Single-transaction batch insert: one SaveChanges for the whole seed instead of
+        // ~514 serialized AddAsync transactions on the awaited startup path. The seed runs
+        // only on an empty DB, so AddRangeAsync's within-batch template dedup is sufficient.
+        // Atomicity tradeoff: a DbUpdateException (e.g. a duplicate Id across two seed files)
+        // now fails the whole seed rather than skipping a single row. This is acceptable and
+        // arguably preferable (all-or-nothing) for curated, version-controlled seed data.
+        if (validActions.Count > 0)
+        {
+            await repo.AddRangeAsync(validActions);
+        }
+
         Heimdall.Core.Logging.FileLogger.Info(
-            $"[TwinShell] Seeded {seeded} actions from {jsonFiles.Length} files");
+            $"[TwinShell] Seeded {validActions.Count} actions from {jsonFiles.Length} files");
     }
 
     /// <summary>
