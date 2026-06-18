@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using FluentAssertions;
 using TwinShell.Core.Constants;
 using TwinShell.Core.Enums;
@@ -181,6 +182,321 @@ public sealed class CommandGeneratorServiceTests
         Assert.True(isValid);
         Assert.Empty(errors);
     }
+
+    // ===== TEST-01: shell escaping / quoting =====
+
+    // Windows apostrophe escaping: PowerShell doubles the single quote ('' ), and the value
+    // is never double-wrapped (ties back to D2: no "'...'" output).
+    [Fact]
+    public void GenerateCommand_WindowsStringWithApostrophe_DoublesQuoteWithoutDoubleWrap()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "Get-ADUser -Identity {name}",
+            CommandLibraryTestHelpers.RequiredParameter("name", "Name"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["name"] = "O'Brien" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("Get-ADUser -Identity 'O''Brien'");
+        command.Should().NotContain("\"'", "the generator must not double-wrap the single-quoted value (D2)");
+    }
+
+    // Linux apostrophe escaping: close-quote, escaped literal quote, reopen ('\'').
+    [Fact]
+    public void GenerateCommand_LinuxStringWithApostrophe_UsesCloseEscapeReopen()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LinuxTemplate(
+            "echo {msg}",
+            CommandLibraryTestHelpers.RequiredParameter("msg", "Message"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["msg"] = "it's" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("echo 'it'\\''s'");
+    }
+
+    // Whitelisted types (hostname/ipaddress/int) are substituted bare (no surrounding quotes).
+    [Theory]
+    [InlineData("hostname", "srv01", "-ComputerName srv01")]
+    [InlineData("ipaddress", "10.0.0.1", "-ComputerName 10.0.0.1")]
+    [InlineData("int", "42", "-ComputerName 42")]
+    [InlineData("integer", "42", "-ComputerName 42")]
+    public void GenerateCommand_WhitelistedType_SubstitutesValueWithoutQuotes(
+        string type,
+        string value,
+        string expected)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-ComputerName {h}",
+            CommandLibraryTestHelpers.RequiredParameter("h", "Host", type));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["h"] = value };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be(expected);
+    }
+
+    // Dangerous shell characters in a string value block generation (command injection guard).
+    [Theory]
+    [InlineData("a&b")]
+    [InlineData("a|b")]
+    [InlineData("a;b")]
+    [InlineData("a`b")]
+    [InlineData("a$b")]
+    [InlineData("a(b")]
+    [InlineData("a)b")]
+    [InlineData("a<b")]
+    [InlineData("a>b")]
+    [InlineData("a\nb")]
+    public void GenerateCommand_StringWithDangerousCharacter_Throws(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "echo {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    // Control character (built at runtime to avoid attribute-literal escaping ambiguity).
+    [Fact]
+    public void GenerateCommand_StringWithControlCharacter_Throws()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "echo {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        string value = "a" + (char)1 + "b";
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    // Allow-list boundary: an apostrophe and a double-quote are NOT in DangerousChars, so they
+    // are safely quoted rather than rejected.
+    [Fact]
+    public void GenerateCommand_StringWithQuotes_IsQuotedNotRejected()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "echo {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+
+        string withApostrophe = service.GenerateCommand(
+            template,
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["v"] = "a'b" });
+        string withDoubleQuote = service.GenerateCommand(
+            template,
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["v"] = "a\"b" });
+
+        withApostrophe.Should().Be("echo 'a''b'");
+        withDoubleQuote.Should().Be("echo 'a\"b'");
+    }
+
+    // ===== TEST-01: type validation rejects =====
+
+    [Theory]
+    [InlineData("-bad")]
+    [InlineData("host_underscore")]
+    public void GenerateCommand_InvalidHostname_Throws(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-ComputerName {h}",
+            CommandLibraryTestHelpers.RequiredParameter("h", "Host", "hostname"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["h"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    [Fact]
+    public void GenerateCommand_OverlongHostname_Throws()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-ComputerName {h}",
+            CommandLibraryTestHelpers.RequiredParameter("h", "Host", "hostname"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["h"] = new string('a', 256) };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    [Theory]
+    [InlineData("srv01")]
+    [InlineData("sub.domain.com")]
+    public void GenerateCommand_ValidHostname_Succeeds(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-ComputerName {h}",
+            CommandLibraryTestHelpers.RequiredParameter("h", "Host", "hostname"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["h"] = value };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("-ComputerName " + value);
+    }
+
+    [Theory]
+    [InlineData("999.1.1.1")]
+    [InlineData("not-an-ip")]
+    public void GenerateCommand_InvalidIpAddress_Throws(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-Target {ip}",
+            CommandLibraryTestHelpers.RequiredParameter("ip", "Target", "ipaddress"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["ip"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    [Theory]
+    [InlineData("10.0.0.1")]
+    [InlineData("2001:db8::1")]
+    public void GenerateCommand_ValidIpAddress_Succeeds(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-Target {ip}",
+            CommandLibraryTestHelpers.RequiredParameter("ip", "Target", "ipaddress"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["ip"] = value };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("-Target " + value);
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("")]
+    public void GenerateCommand_InvalidInteger_Throws(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-Count {n}",
+            CommandLibraryTestHelpers.RequiredParameter("n", "Count", "int"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["n"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    [Fact]
+    public void GenerateCommand_ValidInteger_Succeeds()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-Count {n}",
+            CommandLibraryTestHelpers.RequiredParameter("n", "Count", "int"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["n"] = "42" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be("-Count 42");
+    }
+
+    [Fact]
+    public void GenerateCommand_ValidPathUnderAppData_Succeeds()
+    {
+        CommandGeneratorService service = CreateService();
+        string validPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Heimdall",
+            "report.txt");
+        CommandTemplate template = WindowsTemplate(
+            "-Path {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["p"] = validPath };
+
+        string command = service.GenerateCommand(template, values);
+
+        // Path is a quoted type; assert it is single-quoted and contains the path payload.
+        command.Should().StartWith("-Path '").And.EndWith("'");
+        command.Should().Contain("report.txt");
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidPaths))]
+    public void GenerateCommand_InvalidPath_Throws(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "-Path {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["p"] = value };
+
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    public static IEnumerable<object[]> InvalidPaths()
+    {
+        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        yield return new object[] { "~/secret.txt" };                                              // tilde expansion
+        yield return new object[] { "%APPDATA%\\secret.txt" };                                      // env-var expansion
+        yield return new object[] { Path.Combine(appData, "..", "..", "..", "..", "evil.txt") };    // traversal out of allowed base
+        yield return new object[] { Path.Combine("relative", "path", "file.txt") };                 // non-rooted (relative)
+        yield return new object[] { Path.Combine(userProfile, "Desktop", "evil.txt") };             // blocked subfolder
+        yield return new object[] { Path.Combine(userProfile, "Downloads", "evil.txt") };           // blocked subfolder
+        yield return new object[] { Path.Combine(userProfile, "Documents", "evil.txt") };           // blocked subfolder
+    }
+
+    // ===== TEST-01: ValidateParameters localized path (line 120) =====
+
+    [Fact]
+    public void ValidateParameters_RequiredMissing_ReturnsFalseWithError()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "echo {name}",
+            CommandLibraryTestHelpers.RequiredParameter("name", "Name"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+
+        bool isValid = service.ValidateParameters(template, values, out List<string> errors);
+
+        isValid.Should().BeFalse();
+        errors.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void ValidateParameters_DangerousCharacterInString_ReturnsFalseWithError()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "echo {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "a&b" };
+
+        bool isValid = service.ValidateParameters(template, values, out List<string> errors);
+
+        isValid.Should().BeFalse();
+        errors.Should().NotBeEmpty();
+    }
+
+    private static CommandTemplate WindowsTemplate(string pattern, params TemplateParameter[] parameters) =>
+        new CommandTemplate
+        {
+            Id = "win-template",
+            Name = "Windows template",
+            Platform = Platform.Windows,
+            CommandPattern = pattern,
+            Parameters = [.. parameters]
+        };
+
+    private static CommandTemplate LinuxTemplate(string pattern, params TemplateParameter[] parameters) =>
+        new CommandTemplate
+        {
+            Id = "linux-template",
+            Name = "Linux template",
+            Platform = Platform.Linux,
+            CommandPattern = pattern,
+            Parameters = [.. parameters]
+        };
 
     private static CommandGeneratorService CreateService() =>
         new CommandGeneratorService(new FakeTwinShellLocalizationService());
