@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Extensions;
 using Heimdall.App.Services;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
@@ -142,7 +143,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             _suppressTabChangeGuard = true;
             SelectedTab = "Settings";
             _suppressTabChangeGuard = false;
-            _ = SafeFireAndForgetAsync(HandleUnsavedSettingsGuardAsync(value));
+            HandleUnsavedSettingsGuardAsync(value).SafeFireAndForget();
             return;
         }
 
@@ -384,7 +385,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _onToolSessionRequested = (toolId, title, ctx) =>
         {
             TrackRecentTool(toolId.ToUpperInvariant());
-            _ = SafeFireAndForgetAsync(OpenToolTabAsync(toolId, title, ctx));
+            OpenToolTabAsync(toolId, title, ctx).SafeFireAndForget();
         };
         ServerList.ToolSessionRequested += _onToolSessionRequested;
         _onStatusMessageRequested = message => StatusText = message;
@@ -606,18 +607,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ServerList.ToolSessionRequested -= _onToolSessionRequested;
         ServerList.StatusMessageRequested -= _onStatusMessageRequested;
         Connection.PropertyChanged -= _connectionPropertyChangedHandler;
-    }
-
-    private static async Task SafeFireAndForgetAsync(Task task)
-    {
-        try
-        {
-            await task.ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Error($"Fire-and-forget task failed: {ex.Message}", ex);
-        }
     }
 
     // ── Split operations (delegated to SplitService) ─────────────────

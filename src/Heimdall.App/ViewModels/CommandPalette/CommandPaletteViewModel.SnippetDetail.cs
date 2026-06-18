@@ -447,15 +447,13 @@ public sealed partial class CommandPaletteViewModel
     /// </summary>
     private void CopySnippetPayload(string payload, string title)
     {
-        try
+        if (SetClipboardText?.Invoke(payload) == true)
         {
-            System.Windows.Clipboard.SetText(payload);
             _main.StatusText = _localizer.Format("PaletteSnippetCopied", title);
+            return;
         }
-        catch (Exception ex)
-        {
-            FileLogger.Warn($"Snippet clipboard copy failed: {ex.Message}");
-        }
+
+        FileLogger.Warn("Snippet clipboard copy failed.");
     }
 
     /// <summary>

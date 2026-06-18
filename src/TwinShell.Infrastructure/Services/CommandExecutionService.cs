@@ -247,27 +247,4 @@ public sealed class CommandExecutionService : ICommandExecutionService
         return $"-c {escaped}";
     }
 
-    /// <summary>
-    /// Escapes command for PowerShell execution (legacy method, kept for compatibility)
-    /// </summary>
-    private string EscapeForPowerShell(string command)
-    {
-        // Comprehensive escaping for all PowerShell special characters
-        return command
-            .Replace("\\", "\\\\")
-            .Replace("\"", "`\"")
-            .Replace("$", "`$")
-            .Replace("`", "``")
-            .Replace("'", "''");
-    }
-
-    /// <summary>
-    /// Escapes command for Bash execution (legacy method, kept for compatibility)
-    /// </summary>
-    private string EscapeForBash(string command)
-    {
-        // Use single quotes for literal interpretation
-        // Single quotes prevent all expansions except for single quotes themselves
-        return "'" + command.Replace("'", "'\\''") + "'";
-    }
 }

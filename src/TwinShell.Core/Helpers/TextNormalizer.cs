@@ -207,34 +207,6 @@ public static class TextNormalizer
     }
 
     /// <summary>
-    /// Checks if two strings are similar enough based on fuzzy matching.
-    /// Uses Levenshtein distance with a threshold based on string length.
-    /// </summary>
-    /// <param name="source">First string</param>
-    /// <param name="target">Second string</param>
-    /// <param name="maxDistanceRatio">Maximum allowed distance ratio (0.0 - 1.0). Default: 0.3 (30% difference allowed)</param>
-    /// <returns>True if strings are similar enough</returns>
-    /// <example>
-    /// IsFuzzyMatch("service", "serviec", 0.3) → true (2/7 = 28% difference)
-    /// IsFuzzyMatch("user", "network", 0.3) → false (too different)
-    /// </example>
-    public static bool IsFuzzyMatch(string source, string target, double maxDistanceRatio = 0.3)
-    {
-        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(target))
-        {
-            return false;
-        }
-
-        int distance = LevenshteinDistance(source, target);
-        int maxLength = Math.Max(source.Length, target.Length);
-
-        // Calculate actual distance ratio
-        double distanceRatio = (double)distance / maxLength;
-
-        return distanceRatio <= maxDistanceRatio;
-    }
-
-    /// <summary>
     /// Finds the best fuzzy match for a search token within a text.
     /// Returns the similarity score (0.0 = no match, 1.0 = perfect match).
     /// </summary>
