@@ -12,6 +12,26 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-18: Command Library quoting fixes (v2026.061803)
+
+This release fixes a class of incorrect shell quoting in the bundled TwinShell command
+library, so generated commands stay correct when a parameter is single-quoted in the
+template, is a drive letter, or is a Microsoft Defender setting.
+
+- **Correct quoting for embedded parameters.** Parameters sitting inside an existing
+  single-quoted span of a template (for example `-Name '{vmName}'` or
+  `-like '*{searchTerm}*'`) are no longer double-wrapped, so values with spaces or quotes
+  produce valid commands. A new `InlineInQuotes` quoting mode drives this.
+- **Drive-letter parameters.** Drive-letter inputs use a dedicated validated type and are
+  no longer quoted, so `{driveLetter}:` produces `C:` instead of a broken `'C':`.
+- **Microsoft Defender templates.** The three Defender commands now pass numeric and
+  boolean values correctly (no stray `$`, no broken quoting).
+- **Existing installations migrated.** A SchemaUpgrader step (v3) applies all of these
+  fixes to databases created before this release; user-created commands are never touched.
+- **Internal.** A shared `SyncServiceBase` removes JSON/YAML sync duplication, the Apache
+  2.0 header was added to the remaining TwinShell sources, and the automated test baseline
+  is now 7,181 passing tests, 0 warnings.
+
 ## 2026-06-17: One-click in-app updater (v2026.061702)
 
 A user-facing release completing the in-app updater: an available update can now be
