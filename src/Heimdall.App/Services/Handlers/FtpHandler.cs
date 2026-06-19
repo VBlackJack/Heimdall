@@ -16,6 +16,7 @@
 
 using System.Globalization;
 using System.Net;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -32,13 +33,19 @@ internal sealed class FtpHandler : IProtocolHandler
 {
     private readonly ConnectionStateMachine _connectionSm;
     private readonly LocalizationManager _localizer;
+    private readonly FtpsCertificateStore _certificateStore;
+    private readonly IFtpsCertificateVerifier _certificateVerifier;
 
     public FtpHandler(
         ConnectionStateMachine connectionSm,
-        LocalizationManager localizer)
+        LocalizationManager localizer,
+        FtpsCertificateStore certificateStore,
+        IFtpsCertificateVerifier certificateVerifier)
     {
         _connectionSm = connectionSm;
         _localizer = localizer;
+        _certificateStore = certificateStore;
+        _certificateVerifier = certificateVerifier;
     }
 
     public string Protocol => "FTP";
@@ -85,7 +92,7 @@ internal sealed class FtpHandler : IProtocolHandler
         var username = server.FtpUsername;
         var password = ConnectionHelpers.DecryptPassword(server.FtpPasswordEncrypted);
 
-        var browser = new FtpBrowser();
+        var browser = new FtpBrowser(_certificateStore, _certificateVerifier);
 
         try
         {
@@ -98,6 +105,14 @@ internal sealed class FtpHandler : IProtocolHandler
                     server.FtpUseSsl,
                     ct)
                 .ConfigureAwait(false);
+        }
+        catch (FtpsCertificateRejectedException ex)
+        {
+            browser.Dispose();
+            Core.Logging.FileLogger.Warn($"FTPS certificate rejected: {ex.Message}");
+            var userMsg = BuildCertificateRejectedMessage(ex);
+            _connectionSm.SetError(server.Id, userMsg);
+            return new ConnectionResult(false, userMsg, null);
         }
         catch (Exception ex)
         {
@@ -142,6 +157,34 @@ internal sealed class FtpHandler : IProtocolHandler
             "WarnFtpCleartext",
             host,
             port.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private string BuildCertificateRejectedMessage(FtpsCertificateRejectedException ex)
+    {
+        if (ex.IsMismatch && !string.IsNullOrWhiteSpace(ex.StoredFingerprint))
+        {
+            var message = _localizer["ErrorFtpsCertificateMismatch"];
+            if (string.Equals(message, "ErrorFtpsCertificateMismatch", StringComparison.Ordinal))
+            {
+                message = "FTPS certificate mismatch. Stored fingerprint differs from server-presented fingerprint.";
+            }
+
+            var detail = _localizer.Format(
+                "ErrorFtpsCertificateMismatchDetail",
+                ex.StoredFingerprint,
+                ex.PresentedFingerprint);
+            if (string.Equals(detail, "ErrorFtpsCertificateMismatchDetail", StringComparison.Ordinal))
+            {
+                detail = $"Stored: {ex.StoredFingerprint}. Presented: {ex.PresentedFingerprint}.";
+            }
+
+            return $"{message} {detail}";
+        }
+
+        var rejected = _localizer["ErrorFtpsCertificateRejected"];
+        return string.Equals(rejected, "ErrorFtpsCertificateRejected", StringComparison.Ordinal)
+            ? "FTPS certificate was not trusted. Connection refused."
+            : rejected;
     }
 
     private static bool IsValidFtpHost(string host)

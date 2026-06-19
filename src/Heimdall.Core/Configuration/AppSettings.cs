@@ -15,6 +15,7 @@
  */
 
 using System.Text.Json.Serialization;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 
@@ -238,6 +239,10 @@ public sealed class AppSettings
     // SSH host key trust store v2 with metadata.
     // Key: "host:port" or "[ipv6]:port"; Value: fingerprint + provenance.
     public Dictionary<string, HostKeyEntry> TrustedHostKeysV2 { get; set; } = new();
+
+    // FTPS certificate trust store with metadata.
+    // Key: "host:port" or "[ipv6]:port"; Value: certificate fingerprint + provenance.
+    public Dictionary<string, FtpsCertificateEntry> TrustedFtpsCertificates { get; set; } = new();
 
     // Scheduled connections
     public List<ScheduledTaskDto> ScheduledTasks { get; set; } = new();

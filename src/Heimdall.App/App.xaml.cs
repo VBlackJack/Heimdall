@@ -28,6 +28,7 @@ using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Onboarding;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.App.ViewModels.Tools;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
@@ -35,6 +36,7 @@ using Heimdall.Core.SessionHealth;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Core.Updates;
+using Heimdall.Sftp;
 using Heimdall.Ssh;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
@@ -208,6 +210,13 @@ public partial class App : System.Windows.Application
                 }
 
                 _ = PersistTrustedHostKeyAsync(configManager, key, fingerprint);
+            };
+
+            var ftpsCertificateStore = _serviceProvider.GetRequiredService<FtpsCertificateStore>();
+            ftpsCertificateStore.LoadEntriesFromConfig(settings.TrustedFtpsCertificates);
+            ftpsCertificateStore.CertificateTrusted += (key, entry) =>
+            {
+                _ = PersistTrustedFtpsCertificateEntryAsync(configManager, key, entry);
             };
 
             _serviceProvider.GetRequiredService<KnownHostsStartupSync>().StartIfEnabled(settings);
@@ -397,6 +406,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IHostKeyTrustService, HostKeyTrustService>();
         services.AddSingleton<KnownHostsStartupSync>();
         services.AddSingleton<IHostKeyVerifier, DialogHostKeyVerifier>();
+        services.AddSingleton<FtpsCertificateStore>();
+        services.AddSingleton<IFtpsCertificateVerifier, DialogFtpsCertificateVerifier>();
         services.AddSingleton<PinManager>();
 
         // SSH/Tunnel services
@@ -568,6 +579,25 @@ public partial class App : System.Windows.Application
         {
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"Failed to persist host key metadata for {key}: {ex.Message}");
+        }
+    }
+
+    internal static async Task PersistTrustedFtpsCertificateEntryAsync(
+        IConfigManager configManager,
+        string key,
+        FtpsCertificateEntry entry)
+    {
+        try
+        {
+            await configManager.MergeSettingAsync(settings =>
+            {
+                settings.TrustedFtpsCertificates[key] = entry;
+            });
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"Failed to persist FTPS certificate metadata for {key}: {ex.Message}");
         }
     }
 
