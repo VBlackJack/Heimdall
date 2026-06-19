@@ -273,6 +273,36 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         _dialogService = dialogService;
     }
 
+    internal static LocalRenameCollisionAction DetermineRenameCollisionAction(
+        bool isDirectory,
+        string sourceFullPath,
+        string newPath,
+        bool targetFileExists,
+        bool targetDirectoryExists)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceFullPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newPath);
+
+        if (!targetFileExists && !targetDirectoryExists)
+        {
+            return LocalRenameCollisionAction.None;
+        }
+
+        if (string.Equals(sourceFullPath, newPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return LocalRenameCollisionAction.None;
+        }
+
+        if (isDirectory || targetDirectoryExists)
+        {
+            return LocalRenameCollisionAction.BlockExistingTarget;
+        }
+
+        return targetFileExists
+            ? LocalRenameCollisionAction.ConfirmOverwriteFile
+            : LocalRenameCollisionAction.None;
+    }
+
     /// <summary>
     /// Deletes the provided entries after user confirmation and refreshes the current directory.
     /// </summary>
@@ -360,6 +390,28 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
                 return;
             }
 
+            var collisionAction = DetermineRenameCollisionAction(
+                entry.IsDirectory,
+                entry.FullPath,
+                newPath,
+                File.Exists(newPath),
+                Directory.Exists(newPath));
+            if (collisionAction == LocalRenameCollisionAction.ConfirmOverwriteFile)
+            {
+                var overwriteMessage = string.Format(L10n("FileBrowserPasteOverwriteMessage"), newName);
+                var overwrite = await dialogService.ShowConfirmAsync(title, overwriteMessage, "warning");
+                if (!overwrite)
+                {
+                    return;
+                }
+            }
+            else if (collisionAction == LocalRenameCollisionAction.BlockExistingTarget)
+            {
+                var warningMessage = string.Format(L10n("FileBrowserRenameTargetExists"), newName);
+                dialogService.ShowWarning(title, warningMessage);
+                return;
+            }
+
             await Task.Run(() =>
             {
                 if (entry.IsDirectory)
@@ -368,7 +420,10 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
                 }
                 else
                 {
-                    File.Move(entry.FullPath, newPath);
+                    File.Move(
+                        entry.FullPath,
+                        newPath,
+                        overwrite: collisionAction == LocalRenameCollisionAction.ConfirmOverwriteFile);
                 }
             });
 
@@ -696,3 +751,10 @@ public sealed record LocalFileEntry(
     bool IsDirectory,
     long Size,
     DateTime LastModified);
+
+internal enum LocalRenameCollisionAction
+{
+    None,
+    ConfirmOverwriteFile,
+    BlockExistingTarget
+}

@@ -1948,6 +1948,7 @@
   "FileBrowserLoadError": "Could not open this folder \u2014 access denied or unavailable.",
   "FileBrowserDeleteError": "Failed to delete \"{0}\": {1}",
   "FileBrowserRenameError": "Failed to rename \"{0}\": {1}",
+  "FileBrowserRenameTargetExists": "An item named \"{0}\" already exists.",
   "FileBrowserNewFolderError": "Failed to create folder: {0}",
   "FileBrowserCtxOpenInEditor": "Open in Editor",
   "EditorRejectedShellTarget": "Launching shell interpreters or script hosts as editors is blocked for security reasons.",
