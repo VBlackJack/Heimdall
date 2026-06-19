@@ -140,6 +140,20 @@ public sealed class UpdateBannerViewModelTests
     }
 
     [Fact]
+    public async Task CheckOnStartup_UpdateNotInstallable_HidesBannerButPersistsLastCheck()
+    {
+        var settings = BaseSettings();
+        var update = new StubUpdateService { Result = NotInstallable(Newer) };
+        var vm = CreateViewModel(settings, update, Current);
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        Assert.True(update.WasCalled);
+        Assert.False(vm.IsBannerVisible);
+        Assert.False(string.IsNullOrEmpty(settings.UpdateLastCheckUtc));
+    }
+
+    [Fact]
     public async Task SkipVersion_PersistsSkippedVersionAndHidesBanner()
     {
         var settings = BaseSettings();
@@ -290,6 +304,15 @@ public sealed class UpdateBannerViewModelTests
 
     private static UpdateCheckResult UpToDate()
         => new(UpdateCheckStatus.UpToDate, null);
+
+    private static UpdateCheckResult NotInstallable(string version)
+    {
+        var release = new ReleaseRef(
+            HeimdallVersion.Parse(version),
+            $"v{version}",
+            $"https://github.com/VBlackJack/Heimdall/releases/tag/v{version}");
+        return new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, release);
+    }
 
     private static UpdateCheckResult Available(string version)
     {

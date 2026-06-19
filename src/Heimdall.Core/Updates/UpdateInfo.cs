@@ -18,7 +18,7 @@ namespace Heimdall.Core.Updates;
 
 /// <summary>
 /// Describes a single available update: its version, the originating release,
-/// the asset to download, and the optional expected SHA-256 of that asset.
+/// the asset to download, and the expected SHA-256 of that asset.
 /// </summary>
 public sealed record UpdateInfo(
     HeimdallVersion Version,

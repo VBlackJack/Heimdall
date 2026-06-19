@@ -614,6 +614,7 @@
   "SettingsUpdateStatusChecking": "Recherche de mises \u00e0 jour...",
   "SettingsUpdateStatusUpToDate": "Vous utilisez la derni\u00e8re version.",
   "SettingsUpdateStatusAvailable": "Mise \u00e0 jour disponible : {0}",
+  "SettingsUpdateStatusNotInstallable": "La mise \u00e0 jour {0} est disponible, mais cette variante ne peut pas l'installer automatiquement. Ouvrez la page de release pour l'installer manuellement.",
   "SettingsUpdateStatusFailed": "\u00c9chec de la v\u00e9rification des mises \u00e0 jour. Voir le journal pour les d\u00e9tails.",
   "SettingsUpdateStatusUnknownVersion": "Version actuelle inconnue ; impossible de v\u00e9rifier les mises \u00e0 jour.",
   "SettingsUpdateStatusDownloading": "T\u00e9l\u00e9chargement de la mise \u00e0 jour\u2026",

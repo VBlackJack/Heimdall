@@ -61,24 +61,31 @@ public sealed class UpdateService : IUpdateService
             return new UpdateCheckResult(UpdateCheckStatus.CheckFailed, null);
         }
 
+        if (releaseVersion <= current)
+        {
+            return new UpdateCheckResult(UpdateCheckStatus.UpToDate, null);
+        }
+
+        var releaseRef = new ReleaseRef(releaseVersion, release.TagName, release.HtmlUrl);
         var variant = _variantDetector.Detect();
         var installerName = BuildInstallerName(releaseVersion, variant);
-
         var selectedAsset = release.Assets
             .FirstOrDefault(a => string.Equals(a.Name, installerName, StringComparison.OrdinalIgnoreCase));
         if (selectedAsset is null)
         {
             FileLogger.Warn($"Update check: release {release.TagName} has no installer asset '{installerName}'.");
-            return new UpdateCheckResult(UpdateCheckStatus.CheckFailed, null);
+            return new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, releaseRef);
         }
 
         var sha256 = await ResolveSha256Async(release, installerName, cancellationToken).ConfigureAwait(false);
+        if (!IsSha256Hex(sha256))
+        {
+            FileLogger.Warn($"Update check: release {release.TagName} has no valid SHA-256 for '{installerName}'.");
+            return new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, releaseRef);
+        }
 
         var info = new UpdateInfo(releaseVersion, release.TagName, release.HtmlUrl, release.Body, selectedAsset, sha256);
-        var status = releaseVersion > current
-            ? UpdateCheckStatus.UpdateAvailable
-            : UpdateCheckStatus.UpToDate;
-        return new UpdateCheckResult(status, info);
+        return new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, info);
     }
 
     public async Task<string> DownloadVerifiedAsync(
@@ -177,6 +184,16 @@ public sealed class UpdateService : IUpdateService
         }
 
         return ParseChecksumLine(text, installerName);
+    }
+
+    private static bool IsSha256Hex(string? value)
+    {
+        if (value is null || value.Length != 64)
+        {
+            return false;
+        }
+
+        return value.All(Uri.IsHexDigit);
     }
 
     private static async Task CopyWithProgressAsync(

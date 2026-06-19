@@ -183,7 +183,8 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 new PinManager(),
                 new FakeUpdateService(),
                 new AppVersionProvider("2026.061501"),
-                new FakeUpdateInstallFlow());
+                new FakeUpdateInstallFlow(),
+                new FakeBrowserLauncher());
 
             MainViewModel main = new(
                 configManager,
@@ -438,6 +439,13 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
     private sealed class FakeClipboardService : IClipboardService
     {
         public void SetText(string text)
+        {
+        }
+    }
+
+    private sealed class FakeBrowserLauncher : IBrowserLauncher
+    {
+        public void Open(string url)
         {
         }
     }

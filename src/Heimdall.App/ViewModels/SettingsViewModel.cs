@@ -99,10 +99,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private readonly IUpdateService _updateService;
     private readonly IAppVersionProvider _appVersionProvider;
     private readonly IUpdateInstallFlow _installFlow;
+    private readonly IBrowserLauncher _browserLauncher;
     private readonly IProfileImportService? _profileImportService;
 
     // The update found by the last successful check; drives the download-and-install action.
     private UpdateInfo? _availableUpdate;
+    private string _updateReleaseUrl = string.Empty;
     private bool _disposed;
 
     // Repository coordinates for the update check, captured from settings on load.
@@ -171,6 +173,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DownloadAndInstallCommand))]
     private bool _isUpdateAvailable;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenUpdateReleaseCommand))]
+    private bool _isUpdateReleaseAvailable;
 
     [ObservableProperty]
     private string _updateStatusText = string.Empty;
@@ -539,6 +545,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IUpdateService updateService,
         IAppVersionProvider appVersionProvider,
         IUpdateInstallFlow installFlow,
+        IBrowserLauncher browserLauncher,
         IProfileImportService? profileImportService = null)
     {
         _configManager = configManager;
@@ -548,6 +555,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _updateService = updateService;
         _appVersionProvider = appVersionProvider;
         _installFlow = installFlow;
+        _browserLauncher = browserLauncher;
         _profileImportService = profileImportService;
         TrustedHostKeys = trustedHostKeys;
     }
@@ -563,6 +571,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         IsCheckingUpdate = true;
         UpdateStatusText = _localizer.Format("SettingsUpdateStatusChecking");
+        ClearUpdateActions();
         try
         {
             var current = _appVersionProvider.Current;
@@ -576,18 +585,21 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             if (result.Status == UpdateCheckStatus.UpdateAvailable)
             {
                 _availableUpdate = result.Update;
+                _updateReleaseUrl = result.Update!.ReleaseUrl;
                 IsUpdateAvailable = true;
+                IsUpdateReleaseAvailable = true;
             }
-            else
+            else if (result.Status == UpdateCheckStatus.UpdateNotInstallable)
             {
-                _availableUpdate = null;
-                IsUpdateAvailable = false;
+                _updateReleaseUrl = result.Release!.HtmlUrl;
+                IsUpdateReleaseAvailable = true;
             }
 
             UpdateStatusText = result.Status switch
             {
                 UpdateCheckStatus.UpToDate => _localizer.Format("SettingsUpdateStatusUpToDate"),
                 UpdateCheckStatus.UpdateAvailable => _localizer.Format("SettingsUpdateStatusAvailable", result.Update!.Version.ToString()),
+                UpdateCheckStatus.UpdateNotInstallable => _localizer.Format("SettingsUpdateStatusNotInstallable", result.Release!.Version.ToString()),
                 _ => _localizer.Format("SettingsUpdateStatusFailed"),
             };
         }
@@ -596,6 +608,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             IsCheckingUpdate = false;
         }
     }
+
+    private void ClearUpdateActions()
+    {
+        _availableUpdate = null;
+        _updateReleaseUrl = string.Empty;
+        IsUpdateAvailable = false;
+        IsUpdateReleaseAvailable = false;
+    }
+
+    private bool CanOpenUpdateRelease() =>
+        IsUpdateReleaseAvailable && !string.IsNullOrWhiteSpace(_updateReleaseUrl);
+
+    [RelayCommand(CanExecute = nameof(CanOpenUpdateRelease))]
+    private void OpenUpdateRelease() => _browserLauncher.Open(_updateReleaseUrl);
 
     private bool CanDownloadAndInstall() =>
         IsUpdateAvailable && !IsCheckingUpdate && !IsInstallingUpdate;
@@ -1912,6 +1938,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
             or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
             or nameof(IsInstallingUpdate) or nameof(DownloadProgress) or nameof(IsUpdateAvailable)
+            or nameof(IsUpdateReleaseAvailable)
             or nameof(SelectedGateway) or nameof(SelectedProject)
             or nameof(SelectedExternalTool) or nameof(HasValidationErrors)
             or nameof(IsPinConfigured) or nameof(PinStatusText)
