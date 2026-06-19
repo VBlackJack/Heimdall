@@ -588,6 +588,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             {
                 UpdateCheckStatus.UpToDate => _localizer.Format("SettingsUpdateStatusUpToDate"),
                 UpdateCheckStatus.UpdateAvailable => _localizer.Format("SettingsUpdateStatusAvailable", result.Update!.Version.ToString()),
+                UpdateCheckStatus.UpdateNotInstallable => _localizer.Format("SettingsUpdateStatusNotInstallable", result.Release!.Version.ToString()),
                 _ => _localizer.Format("SettingsUpdateStatusFailed"),
             };
         }

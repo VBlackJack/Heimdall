@@ -66,6 +66,7 @@ public sealed class UpdateService : IUpdateService
             return new UpdateCheckResult(UpdateCheckStatus.UpToDate, null);
         }
 
+        var releaseRef = new ReleaseRef(releaseVersion, release.TagName, release.HtmlUrl);
         var variant = _variantDetector.Detect();
         var installerName = BuildInstallerName(releaseVersion, variant);
         var selectedAsset = release.Assets
@@ -73,14 +74,14 @@ public sealed class UpdateService : IUpdateService
         if (selectedAsset is null)
         {
             FileLogger.Warn($"Update check: release {release.TagName} has no installer asset '{installerName}'.");
-            return new UpdateCheckResult(UpdateCheckStatus.CheckFailed, null);
+            return new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, releaseRef);
         }
 
         var sha256 = await ResolveSha256Async(release, installerName, cancellationToken).ConfigureAwait(false);
         if (!IsSha256Hex(sha256))
         {
             FileLogger.Warn($"Update check: release {release.TagName} has no valid SHA-256 for '{installerName}'.");
-            return new UpdateCheckResult(UpdateCheckStatus.CheckFailed, null);
+            return new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, releaseRef);
         }
 
         var info = new UpdateInfo(releaseVersion, release.TagName, release.HtmlUrl, release.Body, selectedAsset, sha256);

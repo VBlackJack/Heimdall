@@ -80,6 +80,7 @@ public sealed class UpdateServiceTests
 
         Assert.Equal(UpdateCheckStatus.CheckFailed, result.Status);
         Assert.Null(result.Update);
+        Assert.Null(result.Release);
     }
 
     [Fact]
@@ -94,14 +95,16 @@ public sealed class UpdateServiceTests
         var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
 
         Assert.Equal(UpdateCheckStatus.CheckFailed, result.Status);
+        Assert.Null(result.Update);
+        Assert.Null(result.Release);
     }
 
     [Fact]
-    public async Task CheckForUpdatesAsync_NoMatchingInstaller_CheckFailed()
+    public async Task CheckForUpdatesAsync_NoMatchingInstaller_UpdateNotInstallable()
     {
         var release = new GitHubRelease(
             NewerTag,
-            "https://example.test",
+            $"https://github.com/VBlackJack/Heimdall/releases/tag/{NewerTag}",
             "notes",
             [
                 new UpdateAsset("Heimdall_2026.061502_SelfContained_Setup.exe", "https://example.test/sc.exe", SelfContainedSize),
@@ -114,7 +117,9 @@ public sealed class UpdateServiceTests
 
         var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
 
-        Assert.Equal(UpdateCheckStatus.CheckFailed, result.Status);
+        Assert.Equal(UpdateCheckStatus.UpdateNotInstallable, result.Status);
+        Assert.Null(result.Update);
+        AssertReleaseRef(result);
     }
 
     [Theory]
@@ -155,7 +160,7 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckForUpdatesAsync_NewerReleaseWithoutChecksum_CheckFailed()
+    public async Task CheckForUpdatesAsync_NewerReleaseWithoutChecksum_UpdateNotInstallable()
     {
         var client = new StubReleaseClient
         {
@@ -166,12 +171,13 @@ public sealed class UpdateServiceTests
 
         var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
 
-        Assert.Equal(UpdateCheckStatus.CheckFailed, result.Status);
+        Assert.Equal(UpdateCheckStatus.UpdateNotInstallable, result.Status);
         Assert.Null(result.Update);
+        AssertReleaseRef(result);
     }
 
     [Fact]
-    public async Task CheckForUpdatesAsync_NewerReleaseWithMalformedChecksum_CheckFailed()
+    public async Task CheckForUpdatesAsync_NewerReleaseWithMalformedChecksum_UpdateNotInstallable()
     {
         var client = new StubReleaseClient
         {
@@ -182,8 +188,9 @@ public sealed class UpdateServiceTests
 
         var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
 
-        Assert.Equal(UpdateCheckStatus.CheckFailed, result.Status);
+        Assert.Equal(UpdateCheckStatus.UpdateNotInstallable, result.Status);
         Assert.Null(result.Update);
+        AssertReleaseRef(result);
     }
 
     [Fact]
@@ -269,6 +276,14 @@ public sealed class UpdateServiceTests
 
     private static UpdateService CreateService(StubReleaseClient client, BuildVariant variant)
         => new(client, new StubVariantDetector(variant));
+
+    private static void AssertReleaseRef(UpdateCheckResult result, string tag = NewerTag)
+    {
+        Assert.NotNull(result.Release);
+        Assert.Equal(HeimdallVersion.Parse(tag), result.Release!.Version);
+        Assert.Equal(tag, result.Release.TagName);
+        Assert.Equal($"https://github.com/VBlackJack/Heimdall/releases/tag/{tag}", result.Release.HtmlUrl);
+    }
 
     private static GitHubRelease ReleaseFor(string tag, bool includeChecksum)
     {

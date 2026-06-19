@@ -23,6 +23,7 @@ public enum UpdateCheckStatus
 {
     UpToDate,
     UpdateAvailable,
+    UpdateNotInstallable,
     CheckFailed,
     Skipped,
 }

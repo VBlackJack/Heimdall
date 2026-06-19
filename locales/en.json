@@ -614,6 +614,7 @@
   "SettingsUpdateStatusChecking": "Checking for updates...",
   "SettingsUpdateStatusUpToDate": "You are running the latest version.",
   "SettingsUpdateStatusAvailable": "Update available: {0}",
+  "SettingsUpdateStatusNotInstallable": "Update {0} is available, but this build cannot install it automatically. Open the release page to install it manually.",
   "SettingsUpdateStatusFailed": "Update check failed. See the log for details.",
   "SettingsUpdateStatusUnknownVersion": "Current version is unknown; cannot check for updates.",
   "SettingsUpdateStatusDownloading": "Downloading update\u2026",

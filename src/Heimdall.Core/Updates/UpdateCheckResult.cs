@@ -17,6 +17,11 @@
 namespace Heimdall.Core.Updates;
 
 /// <summary>
-/// Result of an update check: the status and, when an update is available, its details.
+/// Reference to a newer release that cannot be installed automatically.
 /// </summary>
-public sealed record UpdateCheckResult(UpdateCheckStatus Status, UpdateInfo? Update);
+public sealed record ReleaseRef(HeimdallVersion Version, string TagName, string HtmlUrl);
+
+/// <summary>
+/// Result of an update check: installable updates use Update; non-installable newer releases use Release.
+/// </summary>
+public sealed record UpdateCheckResult(UpdateCheckStatus Status, UpdateInfo? Update, ReleaseRef? Release = null);

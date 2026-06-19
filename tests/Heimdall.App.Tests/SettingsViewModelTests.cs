@@ -1126,6 +1126,28 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task CheckNowAsync_UpdateNotInstallable_ShowsVersionWithoutInstallButton()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var release = new ReleaseRef(
+            HeimdallVersion.Parse("2026.061502"),
+            "v2026.061502",
+            "https://github.com/VBlackJack/Heimdall/releases/tag/v2026.061502");
+        var updateService = new FakeUpdateService
+        {
+            Result = new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, release)
+        };
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer.Format("SettingsUpdateStatusNotInstallable", "2026.061502"), viewModel.UpdateStatusText);
+        Assert.False(viewModel.IsUpdateAvailable);
+        Assert.False(viewModel.DownloadAndInstallCommand.CanExecute(null));
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
     public void DownloadAndInstall_NoUpdateAvailable_CommandCannotExecute()
     {
         var viewModel = CreateViewModel(new FakeConfigManager());
