@@ -235,21 +235,41 @@ public sealed class FtpBrowser : IRemoteBrowser
 
         string fileName = Path.GetFileName(localPath);
         long totalBytes = Math.Max(0, new FileInfo(localPath).Length);
+        string tempRemotePath = CreateUploadTempRemotePath(remotePath);
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            IProgress<FtpProgress> progress = CreateProgress(fileName, totalBytes, isUpload: true);
-            FtpStatus status = await client.UploadFile(
-                localPath,
-                remotePath,
-                FtpRemoteExists.Overwrite,
-                false,
-                FtpVerify.None,
-                progress,
-                ct).ConfigureAwait(false);
+            try
+            {
+                IProgress<FtpProgress> progress = CreateProgress(fileName, totalBytes, isUpload: true);
+                FtpStatus status = await client.UploadFile(
+                    localPath,
+                    tempRemotePath,
+                    FtpRemoteExists.Overwrite,
+                    false,
+                    FtpVerify.None,
+                    progress,
+                    ct).ConfigureAwait(false);
 
-            ThrowIfFailed(status, remotePath, "upload");
+                ThrowIfFailed(status, tempRemotePath, "upload");
+
+                bool moved = await client.MoveFile(
+                    tempRemotePath,
+                    remotePath,
+                    FtpRemoteExists.Overwrite,
+                    ct).ConfigureAwait(false);
+                if (!moved)
+                {
+                    FileLogger.Warn($"FTP upload commit move returned false for '{remotePath}'.");
+                    throw new IOException();
+                }
+            }
+            catch
+            {
+                await RollbackUploadTempFileAsync(client, tempRemotePath).ConfigureAwait(false);
+                throw;
+            }
         }
         finally
         {
@@ -383,6 +403,13 @@ public sealed class FtpBrowser : IRemoteBrowser
         return NormalizePath($"{basePath}/{path}");
     }
 
+    internal static string CreateUploadTempRemotePath(string finalRemotePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
+
+        return $"{finalRemotePath}.{Guid.NewGuid():N}.part";
+    }
+
     internal static SftpFileInfo MapFtpItemToFileInfo(FtpListItem item, string parentPath)
     {
         bool isDirectory = item.Type == FtpObjectType.Directory;
@@ -429,6 +456,21 @@ public sealed class FtpBrowser : IRemoteBrowser
         if (status == FtpStatus.Failed)
         {
             throw new IOException($"FTP {operation} failed for '{remotePath}'.");
+        }
+    }
+
+    private static async Task RollbackUploadTempFileAsync(AsyncFtpClient client, string tempRemotePath)
+    {
+        try
+        {
+            if (await client.FileExists(tempRemotePath, CancellationToken.None).ConfigureAwait(false))
+            {
+                await client.DeleteFile(tempRemotePath, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"FTP temp upload rollback failed for '{tempRemotePath}': {ex.Message}");
         }
     }
 
