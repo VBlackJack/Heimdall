@@ -94,17 +94,19 @@
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Stretch">
                 <StackPanel VerticalAlignment="Center"
-                            HorizontalAlignment="Center"
-                            MaxWidth="400">
-                    <TextBlock x:Name="ReconnectMessageText"
-                               FontSize="{StaticResource FontSizeSubtitle}"
-                               FontWeight="SemiBold"
-                               TextAlignment="Center"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextPrimaryBrush}" />
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                Margin="0,16,0,0">
+                            HorizontalAlignment="Center">
+                    <StackPanel MaxWidth="400">
+                        <TextBlock x:Name="ReconnectMessageText"
+                                   FontSize="{StaticResource FontSizeSubtitle}"
+                                   FontWeight="SemiBold"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <WrapPanel Orientation="Horizontal"
+                               HorizontalAlignment="Center"
+                               MaxWidth="720"
+                               Margin="0,16,0,0">
                         <Button x:Name="OverlayReconnectButton"
                                 Click="OnOverlayReconnectClick"
                                 Style="{DynamicResource PrimaryButtonStyle}"
@@ -117,7 +119,7 @@
                                 Padding="16,6"
                                 FontSize="{StaticResource FontSizeBodyLarge}"
                                 Margin="8,0,0,0"/>
-                    </StackPanel>
+                    </WrapPanel>
                 </StackPanel>
             </Border>
 
