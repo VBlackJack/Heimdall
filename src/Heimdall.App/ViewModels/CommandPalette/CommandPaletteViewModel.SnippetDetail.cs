@@ -224,7 +224,7 @@ public sealed partial class CommandPaletteViewModel
         {
             FileLogger.Warn($"[CommandPalette] Snippet generate failed: {ex.Message}");
             SnippetGeneratedCommand = _snippetTemplate.CommandPattern;
-            SnippetValidationError = string.Empty;
+            SnippetValidationError = string.Format(_localizer["ToolCmdLibGenerateError"], ex.Message);
             IsSnippetCommandValid = false;
         }
     }
