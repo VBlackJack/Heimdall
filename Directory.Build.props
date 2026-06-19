@@ -4,8 +4,4 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
-  <ItemGroup>
-    <!-- SQLitePCLRaw.lib.e_sqlite3 has no patched package version; keep audit active for every other advisory. -->
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
-  </ItemGroup>
 </Project>
