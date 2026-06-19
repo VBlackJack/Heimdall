@@ -17,8 +17,10 @@
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
+using Heimdall.App.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
 using TwinShell.Core.Models;
@@ -55,7 +57,11 @@ internal static class TwinShellBootstrapper
             options.UseSqlite($"Data Source={DbPath}"));
 
         // Logging adapter (TwinShell repositories require ILogger<T>)
-        services.AddLogging();
+        services.AddLogging(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Warning);
+            builder.AddProvider(new FileLoggerProvider(LogLevel.Warning));
+        });
 
         // Memory cache (required by ActionRepository)
         services.AddMemoryCache();
