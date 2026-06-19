@@ -1393,7 +1393,7 @@
                                         Command="{Binding ServerList.ConnectCommand}"
                                         CommandParameter="{Binding ServerList.SelectedServer}"
                                         Style="{DynamicResource PrimaryButtonStyle}"
-                                        Width="120" HorizontalAlignment="Left"
+                                        MinWidth="120" HorizontalAlignment="Left"
                                         Margin="0,20,0,0"
                                         AutomationProperties.Name="{loc:Translate AccessDetailConnect}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
