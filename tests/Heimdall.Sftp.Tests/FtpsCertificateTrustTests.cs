@@ -1,0 +1,205 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+using System.Net.Security;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using Heimdall.Core.Certificates;
+
+namespace Heimdall.Sftp.Tests;
+
+public sealed class FtpsCertificateTrustTests
+{
+    [Fact]
+    public void ValidateServerCertificate_ValidUnknownCertificate_PinsSilently()
+    {
+        using var certificate = CreateCertificate("CN=ftps.example.com");
+        var store = new FtpsCertificateStore();
+        var verifier = new RecordingVerifier(FtpsCertificateDecision.Reject);
+        var browser = new FtpBrowser(store, verifier);
+
+        var accepted = browser.ValidateServerCertificate(
+            "ftps.example.com",
+            21,
+            certificate,
+            chain: null,
+            SslPolicyErrors.None,
+            policyErrorMessage: null);
+
+        var entry = store.GetEntry("ftps.example.com", 21);
+        Assert.True(accepted);
+        Assert.NotNull(entry);
+        Assert.Equal(FtpsCertificateSource.SystemValidated, entry.Source);
+        Assert.Equal(CertificateFingerprint.ComputeSha256(certificate), entry.Fingerprint);
+        Assert.Equal(0, verifier.CallCount);
+    }
+
+    [Fact]
+    public void ValidateServerCertificate_InvalidUnknownCertificate_AcceptTrustsPersistently()
+    {
+        using var certificate = CreateCertificate("CN=self-signed.example.com");
+        var store = new FtpsCertificateStore();
+        var verifier = new RecordingVerifier(FtpsCertificateDecision.Accept);
+        var browser = new FtpBrowser(store, verifier);
+
+        var accepted = browser.ValidateServerCertificate(
+            "self-signed.example.com",
+            990,
+            certificate,
+            chain: null,
+            SslPolicyErrors.RemoteCertificateChainErrors,
+            "self-signed certificate");
+
+        var entry = store.GetEntry("self-signed.example.com", 990);
+        Assert.True(accepted);
+        Assert.NotNull(entry);
+        Assert.Equal(FtpsCertificateSource.UserConfirmed, entry.Source);
+        Assert.Equal("self-signed certificate", entry.ValidationErrors);
+        Assert.Equal(1, verifier.CallCount);
+    }
+
+    [Fact]
+    public void ValidateServerCertificate_InvalidUnknownCertificate_TrustOnceDoesNotPersist()
+    {
+        using var certificate = CreateCertificate("CN=session.example.com");
+        using var replacement = CreateCertificate("CN=session.example.com");
+        var store = new FtpsCertificateStore();
+        var verifier = new RecordingVerifier(FtpsCertificateDecision.TrustOnce);
+        var browser = new FtpBrowser(store, verifier);
+
+        var accepted = browser.ValidateServerCertificate(
+            "session.example.com",
+            21,
+            certificate,
+            chain: null,
+            SslPolicyErrors.RemoteCertificateChainErrors,
+            "self-signed certificate");
+        var acceptedAgain = browser.ValidateServerCertificate(
+            "session.example.com",
+            21,
+            certificate,
+            chain: null,
+            SslPolicyErrors.RemoteCertificateChainErrors,
+            "self-signed certificate");
+
+        Assert.True(accepted);
+        Assert.True(acceptedAgain);
+        Assert.Null(store.GetEntry("session.example.com", 21));
+        Assert.NotNull(store.GetSessionEntry("session.example.com", 21));
+        Assert.Equal(1, verifier.CallCount);
+
+        var ex = Assert.Throws<FtpsCertificateRejectedException>(() =>
+            browser.ValidateServerCertificate(
+                "session.example.com",
+                21,
+                replacement,
+                chain: null,
+                SslPolicyErrors.RemoteCertificateChainErrors,
+                "self-signed certificate"));
+        Assert.True(ex.IsMismatch);
+        Assert.Equal(1, verifier.CallCount);
+    }
+
+    [Fact]
+    public void ValidateServerCertificate_InvalidUnknownCertificate_RejectThrows()
+    {
+        using var certificate = CreateCertificate("CN=rejected.example.com");
+        var store = new FtpsCertificateStore();
+        var verifier = new RecordingVerifier(FtpsCertificateDecision.Reject);
+        var browser = new FtpBrowser(store, verifier);
+
+        var ex = Assert.Throws<FtpsCertificateRejectedException>(() =>
+            browser.ValidateServerCertificate(
+                "rejected.example.com",
+                21,
+                certificate,
+                chain: null,
+                SslPolicyErrors.RemoteCertificateChainErrors,
+                "self-signed certificate"));
+
+        Assert.False(ex.IsMismatch);
+        Assert.Null(store.GetEntry("rejected.example.com", 21));
+        Assert.Equal(1, verifier.CallCount);
+    }
+
+    [Fact]
+    public void ValidateServerCertificate_PinnedMismatchRejectsWithoutPrompt()
+    {
+        using var original = CreateCertificate("CN=rotate.example.com");
+        using var replacement = CreateCertificate("CN=rotate.example.com");
+        var store = new FtpsCertificateStore();
+        var verifier = new RecordingVerifier(FtpsCertificateDecision.Accept);
+        var browser = new FtpBrowser(store, verifier);
+
+        Assert.True(browser.ValidateServerCertificate(
+            "rotate.example.com",
+            21,
+            original,
+            chain: null,
+            SslPolicyErrors.None,
+            policyErrorMessage: null));
+
+        var ex = Assert.Throws<FtpsCertificateRejectedException>(() =>
+            browser.ValidateServerCertificate(
+                "rotate.example.com",
+                21,
+                replacement,
+                chain: null,
+                SslPolicyErrors.None,
+                policyErrorMessage: null));
+
+        Assert.True(ex.IsMismatch);
+        Assert.Equal(CertificateFingerprint.ComputeSha256(original), ex.StoredFingerprint);
+        Assert.Equal(CertificateFingerprint.ComputeSha256(replacement), ex.PresentedFingerprint);
+        Assert.Equal(0, verifier.CallCount);
+    }
+
+    [Theory]
+    [InlineData("ftp.example.com", 21, "ftp.example.com:21")]
+    [InlineData("2001:db8::1", 990, "[2001:db8::1]:990")]
+    public void MakeKey_FormatsHostPortForPersistence(string host, int port, string expected)
+    {
+        Assert.Equal(expected, FtpsCertificateStore.MakeKey(host, port));
+    }
+
+    private static X509Certificate2 CreateCertificate(string subjectName)
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(
+            subjectName,
+            key,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+
+        using var certificate = request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(30));
+        return X509CertificateLoader.LoadCertificate(certificate.Export(X509ContentType.Cert));
+    }
+
+    private sealed class RecordingVerifier(FtpsCertificateDecision decision) : IFtpsCertificateVerifier
+    {
+        public int CallCount { get; private set; }
+
+        public Task<FtpsCertificateDecision> VerifyAsync(
+            FtpsCertificatePrompt prompt,
+            CancellationToken ct = default)
+        {
+            CallCount++;
+            return Task.FromResult(decision);
+        }
+    }
+}

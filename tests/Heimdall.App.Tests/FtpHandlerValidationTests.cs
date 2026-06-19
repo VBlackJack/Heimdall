@@ -16,10 +16,12 @@
 
 using System.IO;
 using Heimdall.App.Services.Handlers;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.StateMachine;
+using Heimdall.Sftp;
 
 namespace Heimdall.App.Tests;
 
@@ -100,7 +102,11 @@ public sealed class FtpHandlerValidationTests
     }
 
     private static FtpHandler CreateHandler()
-        => new(new ConnectionStateMachine(), new LocalizationManager());
+        => new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            new FtpsCertificateStore(),
+            RejectingFtpsCertificateVerifier.Instance);
 
     private static ServerProfileDto CreateServer(string host, int port)
         => new()

@@ -106,6 +106,7 @@
     "credentialProviderCommand": "",
     "credentialProviderDatabase": "",
     "trustedHostKeys": {},
+    "trustedFtpsCertificates": {},
     "x11ServerPath": null,
     "x11AutoStart": true,
     "sysinternalsPath": null,

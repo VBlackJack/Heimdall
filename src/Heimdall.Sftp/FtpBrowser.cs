@@ -17,7 +17,9 @@
 using System.IO;
 using System.Net;
 using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using FluentFTP;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
 
@@ -33,6 +35,8 @@ public sealed class FtpBrowser : IRemoteBrowser
     private const int DefaultTimeoutMilliseconds = 30_000;
 
     private readonly SemaphoreSlim _opLock = new SemaphoreSlim(1, 1);
+    private readonly FtpsCertificateStore _certificateStore;
+    private readonly IFtpsCertificateVerifier _certificateVerifier;
     private AsyncFtpClient? _client;
     private string? _host;
     private int _port;
@@ -57,6 +61,19 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     /// <summary>Whether FTP over TLS is enabled for the current session.</summary>
     public bool IsTlsEnabled => _useSsl;
+
+    public FtpBrowser()
+        : this(new FtpsCertificateStore(), RejectingFtpsCertificateVerifier.Instance)
+    {
+    }
+
+    public FtpBrowser(
+        FtpsCertificateStore certificateStore,
+        IFtpsCertificateVerifier certificateVerifier)
+    {
+        _certificateStore = certificateStore;
+        _certificateVerifier = certificateVerifier;
+    }
 
     /// <summary>
     /// Connects to the FTP server with the supplied credentials.
@@ -90,9 +107,25 @@ public sealed class FtpBrowser : IRemoteBrowser
         string effectiveUsername = string.IsNullOrEmpty(username) ? "anonymous" : username;
         FtpConfig config = CreateConfig(passiveMode, useSsl);
         AsyncFtpClient client = new AsyncFtpClient(host, effectiveUsername, password ?? string.Empty, _port, config);
-        client.ValidateCertificate += static (_, e) =>
+        FtpsCertificateRejectedException? certificateRejection = null;
+        client.ValidateCertificate += (_, e) =>
         {
-            e.Accept = e.PolicyErrors == SslPolicyErrors.None;
+            try
+            {
+                e.Accept = ValidateServerCertificate(
+                    host,
+                    _port,
+                    e.Certificate,
+                    e.Chain,
+                    e.PolicyErrors,
+                    e.PolicyErrorMessage,
+                    ct);
+            }
+            catch (FtpsCertificateRejectedException ex)
+            {
+                certificateRejection = ex;
+                e.Accept = false;
+            }
         };
 
         try
@@ -104,6 +137,11 @@ public sealed class FtpBrowser : IRemoteBrowser
             client.Dispose();
             _host = null;
             _connected = false;
+            if (certificateRejection is not null)
+            {
+                throw certificateRejection;
+            }
+
             throw;
         }
 
@@ -410,6 +448,120 @@ public sealed class FtpBrowser : IRemoteBrowser
         return $"{finalRemotePath}.{Guid.NewGuid():N}.part";
     }
 
+    internal bool ValidateServerCertificate(
+        string host,
+        int port,
+        X509Certificate? certificate,
+        X509Chain? chain,
+        SslPolicyErrors policyErrors,
+        string? policyErrorMessage,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+
+        if (certificate is null)
+        {
+            throw new FtpsCertificateRejectedException(
+                host,
+                port,
+                "(missing)",
+                null,
+                isMismatch: false,
+                "FTPS server did not present a certificate.");
+        }
+
+        ct.ThrowIfCancellationRequested();
+
+        using var certificate2 = CopyCertificate(certificate);
+        string fingerprint = CertificateFingerprint.ComputeSha256(certificate2);
+        string validationErrors = BuildValidationErrors(policyErrors, chain, policyErrorMessage);
+
+        var sessionEntry = _certificateStore.GetSessionEntry(host, port);
+        if (sessionEntry is not null
+            && FtpsCertificateStore.ConstantTimeEquals(sessionEntry.Fingerprint, fingerprint))
+        {
+            return true;
+        }
+
+        if (sessionEntry is not null)
+        {
+            throw new FtpsCertificateRejectedException(
+                host,
+                port,
+                fingerprint,
+                sessionEntry.Fingerprint,
+                isMismatch: true,
+                "FTPS certificate fingerprint mismatch.");
+        }
+
+        var storedEntry = _certificateStore.GetEntry(host, port);
+        if (storedEntry is not null)
+        {
+            if (!FtpsCertificateStore.ConstantTimeEquals(storedEntry.Fingerprint, fingerprint))
+            {
+                throw new FtpsCertificateRejectedException(
+                    host,
+                    port,
+                    fingerprint,
+                    storedEntry.Fingerprint,
+                    isMismatch: true,
+                    "FTPS certificate fingerprint mismatch.");
+            }
+
+            _certificateStore.RefreshLastSeen(host, port);
+            return true;
+        }
+
+        var entry = CreateCertificateEntry(
+            certificate2,
+            fingerprint,
+            validationErrors,
+            policyErrors == SslPolicyErrors.None
+                ? FtpsCertificateSource.SystemValidated
+                : FtpsCertificateSource.UserConfirmed);
+
+        if (policyErrors == SslPolicyErrors.None)
+        {
+            _certificateStore.Trust(host, port, entry);
+            return true;
+        }
+
+        var prompt = new FtpsCertificatePrompt(
+            host,
+            port,
+            fingerprint,
+            storedEntry?.Fingerprint,
+            entry.Subject,
+            entry.Issuer,
+            entry.NotBefore,
+            entry.NotAfter,
+            validationErrors);
+        FtpsCertificateDecision decision = _certificateVerifier
+            .VerifyAsync(prompt, ct)
+            .GetAwaiter()
+            .GetResult();
+
+        if (decision == FtpsCertificateDecision.Accept)
+        {
+            _certificateStore.Trust(host, port, entry);
+            return true;
+        }
+
+        if (decision == FtpsCertificateDecision.TrustOnce)
+        {
+            _certificateStore.TrustForSession(host, port, entry);
+            return true;
+        }
+
+        throw new FtpsCertificateRejectedException(
+            host,
+            port,
+            fingerprint,
+            null,
+            isMismatch: false,
+            "FTPS certificate was rejected.");
+    }
+
     internal static SftpFileInfo MapFtpItemToFileInfo(FtpListItem item, string parentPath)
     {
         bool isDirectory = item.Type == FtpObjectType.Directory;
@@ -472,6 +624,65 @@ public sealed class FtpBrowser : IRemoteBrowser
         {
             FileLogger.Warn($"FTP temp upload rollback failed for '{tempRemotePath}': {ex.Message}");
         }
+    }
+
+    private static X509Certificate2 CopyCertificate(X509Certificate certificate)
+    {
+        var rawCertificate = certificate.Export(X509ContentType.Cert);
+        return X509CertificateLoader.LoadCertificate(rawCertificate);
+    }
+
+    private static FtpsCertificateEntry CreateCertificateEntry(
+        X509Certificate2 certificate,
+        string fingerprint,
+        string validationErrors,
+        FtpsCertificateSource source)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new FtpsCertificateEntry(
+            fingerprint,
+            now,
+            now,
+            string.IsNullOrWhiteSpace(certificate.Subject) ? "(unknown)" : certificate.Subject,
+            string.IsNullOrWhiteSpace(certificate.Issuer) ? "(unknown)" : certificate.Issuer,
+            new DateTimeOffset(certificate.NotBefore),
+            new DateTimeOffset(certificate.NotAfter),
+            source)
+        {
+            ValidationErrors = validationErrors
+        };
+    }
+
+    private static string BuildValidationErrors(
+        SslPolicyErrors policyErrors,
+        X509Chain? chain,
+        string? policyErrorMessage)
+    {
+        if (!string.IsNullOrWhiteSpace(policyErrorMessage))
+        {
+            return policyErrorMessage.Trim();
+        }
+
+        if (policyErrors == SslPolicyErrors.None)
+        {
+            return "None";
+        }
+
+        if (chain?.ChainStatus is { Length: > 0 } statuses)
+        {
+            var details = statuses
+                .Select(static status => status.StatusInformation.Trim())
+                .Where(static status => !string.IsNullOrWhiteSpace(status))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            if (details.Length > 0)
+            {
+                return string.Join("; ", details);
+            }
+        }
+
+        return policyErrors.ToString();
     }
 
     private IProgress<FtpProgress> CreateProgress(string fileName, long totalBytes, bool isUpload)

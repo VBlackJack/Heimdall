@@ -17,6 +17,7 @@
 using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
@@ -360,6 +361,43 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal("SHA256:abc123", entry.GetProperty("fingerprint").GetString());
         Assert.Equal("ssh-ed25519", entry.GetProperty("algorithm").GetString());
         Assert.Equal("UserConfirmed", entry.GetProperty("source").GetString());
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_WritesTrustedFtpsCertificatesSchema()
+    {
+        var settings = new AppSettings
+        {
+            TrustedFtpsCertificates = new Dictionary<string, FtpsCertificateEntry>
+            {
+                ["ftps.example.com:21"] = new(
+                    "SHA256:AA:BB",
+                    DateTimeOffset.Parse("2026-04-24T10:15:00Z"),
+                    DateTimeOffset.Parse("2026-04-24T10:16:00Z"),
+                    "CN=ftps.example.com",
+                    "CN=Test CA",
+                    DateTimeOffset.Parse("2026-04-01T00:00:00Z"),
+                    DateTimeOffset.Parse("2027-04-01T00:00:00Z"),
+                    FtpsCertificateSource.UserConfirmed)
+                {
+                    ValidationErrors = "self-signed"
+                }
+            }
+        };
+
+        await _manager.SaveSettingsAsync(settings);
+
+        var json = await File.ReadAllTextAsync(_manager.SettingsPath);
+        using var document = JsonDocument.Parse(json);
+        var entry = document.RootElement
+            .GetProperty("trustedFtpsCertificates")
+            .GetProperty("ftps.example.com:21");
+
+        Assert.Equal("SHA256:AA:BB", entry.GetProperty("fingerprint").GetString());
+        Assert.Equal("CN=ftps.example.com", entry.GetProperty("subject").GetString());
+        Assert.Equal("CN=Test CA", entry.GetProperty("issuer").GetString());
+        Assert.Equal("UserConfirmed", entry.GetProperty("source").GetString());
+        Assert.Equal("self-signed", entry.GetProperty("validationErrors").GetString());
     }
 
     [Fact]
