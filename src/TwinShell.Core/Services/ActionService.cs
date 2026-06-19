@@ -197,7 +197,11 @@ public sealed class ActionService : IActionService
             return false;
         }
 
-        if ((action.Examples?.Count ?? 0) > ValidationConstants.MaxActionExamplesCount)
+        var examplesCount =
+            (action.Examples?.Count ?? 0)
+            + (action.WindowsExamples?.Count ?? 0)
+            + (action.LinuxExamples?.Count ?? 0);
+        if (examplesCount > ValidationConstants.MaxActionExamplesCount)
         {
             errorMessage = _localizationService.GetString("ToolCmdLibValidationExamplesMaxCount");
             return false;
