@@ -12,6 +12,27 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-19: Safer update checks (v2026.061901)
+
+This release hardens the in-app update check so Heimdall only offers an update it can
+actually install, and tells you when a newer release exists that this build cannot install
+on its own.
+
+- **Version compared before assets.** The update check compares the release version first
+  and reports "up to date" without requiring any installer asset, so an equal-or-older
+  latest release no longer triggers a spurious failure.
+- **Install offered only when verifiable.** A newer release is offered as a one-click
+  install only when the installer for the running variant is present and a valid SHA-256 is
+  published in `SHA256SUMS.txt`, preventing a "Download and install" that would fail only
+  after downloading.
+- **Newer-but-not-installable is now distinct.** When a newer release exists without a
+  matching installer or checksum, the Settings page reports it as available-but-not-
+  installable (with the version) instead of a generic check failure.
+- **View the release page.** Settings now shows a "View release" action for both installable
+  and not-installable updates, opening the release page through a scheme-validated launcher.
+- **Internal.** New `UpdateNotInstallable` status and `ReleaseRef` carrier on the update
+  result; the automated test baseline is now 7,215 passing tests, 0 warnings.
+
 ## 2026-06-18: Command Library quoting fixes (v2026.061803)
 
 This release fixes a class of incorrect shell quoting in the bundled TwinShell command
