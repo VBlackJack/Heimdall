@@ -1040,7 +1040,8 @@ public sealed class SettingsViewModelTests
             new PinManager(),
             new FakeUpdateService(),
             new AppVersionProvider("2026.061501"),
-            new FakeUpdateInstallFlow());
+            new FakeUpdateInstallFlow(),
+            new StubBrowserLauncher());
 
         viewModel.Dispose();
         viewModel.Dispose();
@@ -1061,13 +1062,15 @@ public sealed class SettingsViewModelTests
         LocalizationManager? localizer = null,
         IUpdateService? updateService = null,
         IAppVersionProvider? appVersionProvider = null,
-        IUpdateInstallFlow? installFlow = null)
+        IUpdateInstallFlow? installFlow = null,
+        IBrowserLauncher? browserLauncher = null)
     {
         localizer ??= new LocalizationManager();
         dialog ??= new FakeDialogService();
         updateService ??= new FakeUpdateService();
         appVersionProvider ??= new AppVersionProvider("2026.061501");
         installFlow ??= new FakeUpdateInstallFlow();
+        browserLauncher ??= new StubBrowserLauncher();
         var trustedHostKeys = new TrustedHostKeysSettingsViewModel(
             new HostKeyTrustService(new HostKeyStore()),
             () => new KnownHostsImportReport(0, 0, []),
@@ -1086,6 +1089,7 @@ public sealed class SettingsViewModelTests
             updateService,
             appVersionProvider,
             installFlow,
+            browserLauncher,
             profileImportService);
     }
 
@@ -1122,6 +1126,8 @@ public sealed class SettingsViewModelTests
         await viewModel.CheckNowCommand.ExecuteAsync(null);
 
         Assert.Equal(localizer.Format("SettingsUpdateStatusAvailable", "2026.061502"), viewModel.UpdateStatusText);
+        Assert.True(viewModel.IsUpdateReleaseAvailable);
+        Assert.True(viewModel.OpenUpdateReleaseCommand.CanExecute(null));
         Assert.False(viewModel.IsDirty);
     }
 
@@ -1137,13 +1143,22 @@ public sealed class SettingsViewModelTests
         {
             Result = new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, release)
         };
-        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+        var browser = new StubBrowserLauncher();
+        var viewModel = CreateViewModel(
+            new FakeConfigManager(), localizer: localizer,
+            updateService: updateService, browserLauncher: browser);
 
         await viewModel.CheckNowCommand.ExecuteAsync(null);
 
         Assert.Equal(localizer.Format("SettingsUpdateStatusNotInstallable", "2026.061502"), viewModel.UpdateStatusText);
         Assert.False(viewModel.IsUpdateAvailable);
         Assert.False(viewModel.DownloadAndInstallCommand.CanExecute(null));
+        Assert.True(viewModel.IsUpdateReleaseAvailable);
+        Assert.True(viewModel.OpenUpdateReleaseCommand.CanExecute(null));
+
+        viewModel.OpenUpdateReleaseCommand.Execute(null);
+
+        Assert.Equal(release.HtmlUrl, browser.OpenedUrl);
         Assert.False(viewModel.IsDirty);
     }
 
@@ -1242,6 +1257,13 @@ public sealed class SettingsViewModelTests
                 "notes",
                 new UpdateAsset("Heimdall_2026.061502_Standard_Setup.exe", "https://example.test/setup.exe", 1),
                 null));
+
+    private sealed class StubBrowserLauncher : IBrowserLauncher
+    {
+        public string? OpenedUrl { get; private set; }
+
+        public void Open(string url) => OpenedUrl = url;
+    }
 
     private sealed class FakeUpdateService : IUpdateService
     {

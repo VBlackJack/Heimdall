@@ -2105,6 +2105,10 @@
                                                 Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
                                                 AutomationProperties.Name="{loc:Translate SettingsBtnCheckNow}"/>
                                         <TextBlock x:Name="Mw_SettingsUpdateStatus" Text="{Binding Settings.UpdateStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                        <Button x:Name="Mw_SettingsViewReleaseButton" Content="{loc:Translate UpdateBannerViewReleaseBtn}" Command="{Binding Settings.OpenUpdateReleaseCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                AutomationProperties.Name="{loc:Translate UpdateBannerViewReleaseBtn}"
+                                                Visibility="{Binding Settings.IsUpdateReleaseAvailable, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <Button x:Name="Mw_SettingsDownloadInstallButton" Content="{loc:Translate SettingsBtnDownloadInstall}" Command="{Binding Settings.DownloadAndInstallCommand}"
                                                 Style="{DynamicResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
                                                 AutomationProperties.Name="{loc:Translate SettingsBtnDownloadInstall}"
