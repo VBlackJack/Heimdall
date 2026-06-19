@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+using System.IO;
+using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.Tests;
@@ -38,6 +41,55 @@ public sealed class LocalShellHandlerTests
 
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             handler.ConnectAsync(null!, settings, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_WhenShellLaunchFails_ReturnsLocalizedGenericMessage()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ConnectionStateMachine stateMachine = new ConnectionStateMachine();
+        LocalShellHandler handler = new LocalShellHandler(stateMachine, localizer);
+        string missingExecutable = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall-missing-shell-{Guid.NewGuid():N}.exe");
+        ServerProfileDto server = new ServerProfileDto
+        {
+            Id = "local-shell-missing-executable",
+            ConnectionType = "LOCAL",
+            LocalShellExecutable = missingExecutable
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(localizer["ErrorLocalShellLaunchFailed"], result.ErrorMessage);
+        Assert.Equal(localizer["ErrorLocalShellLaunchFailed"], stateMachine.GetStateData(server.Id)?.ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    public async Task LocalShellErrorKeys_AreLocalized(string locale)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync(locale);
+        string[] keys =
+        [
+            "ErrorLocalShellGsudoNotFound",
+            "ErrorLocalShellElevatedStartFailed",
+            "ErrorLocalShellElevationCancelled",
+            "ErrorLocalShellLaunchFailed"
+        ];
+
+        foreach (string key in keys)
+        {
+            string value = localizer[key];
+
+            Assert.NotEqual(key, value);
+            Assert.False(string.IsNullOrWhiteSpace(value));
+        }
     }
 
     [Theory]
@@ -142,6 +194,13 @@ public sealed class LocalShellHandlerTests
 
     private static LocalShellHandler CreateHandler()
     {
-        return new LocalShellHandler(new ConnectionStateMachine());
+        return new LocalShellHandler(new ConnectionStateMachine(), new LocalizationManager());
+    }
+
+    private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
+    {
+        LocalizationManager manager = new LocalizationManager();
+        await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+        return manager;
     }
 }
