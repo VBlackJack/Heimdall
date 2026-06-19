@@ -12,6 +12,32 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-19: FTPS trust, safer FTP operations and dependency hardening (v2026.061902)
+
+This release closes the FTPS trust gap, makes FTP/local file operations less
+destructive, and removes the SQLitePCLRaw audit suppression by moving to patched
+packages.
+
+- **FTPS certificate trust.** FTPS now validates server certificates with a
+  hybrid system-validation/TOFU model, persists trusted fingerprints, detects
+  changed certificates, and shows localized Accept / Trust once / Reject prompts
+  with certificate details when user confirmation is required.
+- **FTP uploads are atomic.** FTP uploads write to a uniquely named `.part`
+  target and move into place only after a successful transfer, with rollback
+  cleanup if upload or final rename fails.
+- **Safer local renames.** Local file browser renames now ask before overwriting
+  an existing target instead of replacing it silently.
+- **Localized local-shell failures.** Local shell launch errors now use EN/FR
+  localized messages instead of raw fallback strings.
+- **Dependency advisory fixed.** TwinShell SQLite persistence moved to EF
+  Core/Extensions 10.0.9 and `SQLitePCLRaw.bundle_e_sqlite3` 3.0.3; the
+  GHSA-2m69 audit suppression was removed.
+- **UI polish and tests.** French button wrapping was tightened in reconnect and
+  error surfaces, with coverage added for FTPS trust, FTP atomic uploads,
+  local-shell localization, local rename overwrite confirmation, and config
+  persistence. The automated test baseline is now 7,236 passing tests, 0
+  failures.
+
 ## 2026-06-19: Safer update checks (v2026.061901)
 
 This release hardens the in-app update check so Heimdall only offers an update it can
