@@ -16,6 +16,7 @@
 
 using System.IO;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
 using Heimdall.Core.StateMachine;
@@ -28,10 +29,14 @@ namespace Heimdall.App.Services.Handlers;
 internal sealed class LocalShellHandler : IProtocolHandler
 {
     private readonly ConnectionStateMachine _connectionSm;
+    private readonly LocalizationManager _localizer;
 
-    public LocalShellHandler(ConnectionStateMachine connectionSm)
+    public LocalShellHandler(
+        ConnectionStateMachine connectionSm,
+        LocalizationManager localizer)
     {
         _connectionSm = connectionSm;
+        _localizer = localizer;
     }
 
     public string Protocol => "LOCAL";
@@ -109,10 +114,11 @@ internal sealed class LocalShellHandler : IProtocolHandler
             else if (elevationMode == ElevationMode.Gsudo)
             {
                 Core.Logging.FileLogger.Warn("gsudo mode requested but gsudo not found.");
-                _connectionSm.SetError(server.Id, "gsudo not found");
+                string message = _localizer["ErrorLocalShellGsudoNotFound"];
+                _connectionSm.SetError(server.Id, message);
                 return new ConnectionResult(
                     false,
-                    "gsudo not found. Install gsudo or switch elevation mode to Auto.",
+                    message,
                     null);
             }
             else
@@ -158,8 +164,9 @@ internal sealed class LocalShellHandler : IProtocolHandler
         {
             session.Dispose();
             Core.Logging.FileLogger.Error("Local shell launch failed", ex);
-            _connectionSm.SetError(server.Id, ex.Message);
-            return new ConnectionResult(false, ex.Message, null);
+            string message = _localizer["ErrorLocalShellLaunchFailed"];
+            _connectionSm.SetError(server.Id, message);
+            return new ConnectionResult(false, message, null);
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
@@ -195,8 +202,9 @@ internal sealed class LocalShellHandler : IProtocolHandler
             System.Diagnostics.Process? process = System.Diagnostics.Process.Start(psi);
             if (process is null)
             {
-                _connectionSm.SetError(server.Id, "Failed to start elevated process");
-                return new ConnectionResult(false, "Failed to start elevated process", null);
+                string message = _localizer["ErrorLocalShellElevatedStartFailed"];
+                _connectionSm.SetError(server.Id, message);
+                return new ConnectionResult(false, message, null);
             }
 
             Core.Logging.FileLogger.Info($"External elevated shell started: PID={process.Id}");
@@ -210,14 +218,16 @@ internal sealed class LocalShellHandler : IProtocolHandler
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
             Core.Logging.FileLogger.Info("User cancelled elevation prompt");
-            _connectionSm.SetError(server.Id, "Elevation cancelled by user");
-            return new ConnectionResult(false, "Elevation cancelled by user", null);
+            string message = _localizer["ErrorLocalShellElevationCancelled"];
+            _connectionSm.SetError(server.Id, message);
+            return new ConnectionResult(false, message, null);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Error("External elevated shell launch failed", ex);
-            _connectionSm.SetError(server.Id, ex.Message);
-            return new ConnectionResult(false, ex.Message, null);
+            string message = _localizer["ErrorLocalShellElevatedStartFailed"];
+            _connectionSm.SetError(server.Id, message);
+            return new ConnectionResult(false, message, null);
         }
     }
 
