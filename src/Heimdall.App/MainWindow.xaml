@@ -4096,48 +4096,76 @@
                             <ItemsControl ItemsSource="{Binding CommandPalette.SnippetExamples}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
+                                        <!-- Card row. The apply action lives on a flat Button (in the
+                                             visual tree, so it inherits the per-item DataContext) instead
+                                             of a Border body with no handler. Copy and Send stay as
+                                             sibling buttons in a dedicated column so clicking them never
+                                             triggers the row apply. Mirrors the CMDLIB examples list. -->
                                         <Border Padding="6,3"
                                                 Margin="0,2,0,0"
                                                 Background="{DynamicResource CardBrush}"
                                                 CornerRadius="{StaticResource CornerRadiusSm}">
-                                            <DockPanel>
-                                                <Button DockPanel.Dock="Right"
-                                                        Content="&#xE8C8;"
-                                                        FontFamily="Segoe MDL2 Assets"
-                                                        Command="{Binding DataContext.CommandPalette.CopySnippetExampleCommand, ElementName=MainWindowRoot}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{DynamicResource ToolbarGhostButtonStyle}"
-                                                        ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
-                                                        AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
-                                                        FontSize="11" Width="22" Height="22"
-                                                        Padding="2"
-                                                        VerticalAlignment="Top"
-                                                        Focusable="False"/>
-                                                <Button DockPanel.Dock="Right"
-                                                        Content="&#xE724;"
-                                                        FontFamily="Segoe MDL2 Assets"
-                                                        Command="{Binding DataContext.CommandPalette.SendSnippetExampleCommand, ElementName=MainWindowRoot}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{DynamicResource ToolbarGhostButtonStyle}"
-                                                        ToolTip="{loc:Translate PaletteSnippetBtnSendExample}"
-                                                        AutomationProperties.Name="{loc:Translate PaletteSnippetBtnSendExample}"
-                                                        FontSize="11" Width="22" Height="22"
-                                                        Padding="2"
-                                                        VerticalAlignment="Top"
-                                                        Focusable="False"/>
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Command}"
-                                                               FontFamily="{StaticResource FontFamilyMonospace}"
-                                                               FontSize="{StaticResource FontSizeCaption}"
-                                                               Foreground="{DynamicResource AccentBrush}"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding Description}"
-                                                               FontSize="{StaticResource FontSizeSmallCaption}"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                                               TextWrapping="Wrap"
-                                                               Visibility="{Binding Description, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0"
+                                                        Command="{Binding DataContext.CommandPalette.ApplySnippetExampleCommand, ElementName=MainWindowRoot}"
+                                                        CommandParameter="{Binding Command}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Padding="0"
+                                                        Cursor="Hand"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Stretch"
+                                                        ToolTip="{loc:Translate ToolCmdLibApplyExample}"
+                                                        AutomationProperties.Name="{loc:Translate ToolCmdLibApplyExample}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}">
+                                                                <ContentPresenter HorizontalAlignment="Stretch"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Command}"
+                                                                   FontFamily="{StaticResource FontFamilyMonospace}"
+                                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Description}"
+                                                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap"
+                                                                   Visibility="{Binding Description, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                                    </StackPanel>
+                                                </Button>
+                                                <StackPanel Grid.Column="1"
+                                                            Orientation="Horizontal"
+                                                            VerticalAlignment="Top">
+                                                    <Button Content="&#xE724;"
+                                                            FontFamily="Segoe MDL2 Assets"
+                                                            Command="{Binding DataContext.CommandPalette.SendSnippetExampleCommand, ElementName=MainWindowRoot}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                            ToolTip="{loc:Translate PaletteSnippetBtnSendExample}"
+                                                            AutomationProperties.Name="{loc:Translate PaletteSnippetBtnSendExample}"
+                                                            FontSize="11" Width="22" Height="22"
+                                                            Padding="2"
+                                                            Focusable="False"/>
+                                                    <Button Content="&#xE8C8;"
+                                                            FontFamily="Segoe MDL2 Assets"
+                                                            Command="{Binding DataContext.CommandPalette.CopySnippetExampleCommand, ElementName=MainWindowRoot}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                            ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
+                                                            AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
+                                                            FontSize="11" Width="22" Height="22"
+                                                            Padding="2"
+                                                            Focusable="False"/>
                                                 </StackPanel>
-                                            </DockPanel>
+                                            </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

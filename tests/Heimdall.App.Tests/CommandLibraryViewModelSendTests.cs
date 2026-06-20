@@ -246,6 +246,36 @@ public sealed class CommandLibraryViewModelSendTests
     }
 
     [Fact]
+    public async Task ApplyExample_DistinctNonFirstValues_UpdateGeneratedCommandAndMarkValid()
+    {
+        var viewModel = await CreateSelectedViewModelAsync(new RecordingDialogService());
+
+        // Mirrors clicking the 2nd / 3rd example rows: each carries its own command.
+        viewModel.ApplyExample("netdom query fsmo -WhatIf");
+        Assert.Equal("netdom query fsmo -WhatIf", viewModel.GeneratedCommand);
+        Assert.True(viewModel.IsCommandValid);
+
+        viewModel.ApplyExample("netdom query fsmo -Confirm:$false");
+        Assert.Equal("netdom query fsmo -Confirm:$false", viewModel.GeneratedCommand);
+        Assert.True(viewModel.IsCommandValid);
+    }
+
+    [Fact]
+    public async Task ApplyExample_NullOrEmpty_IsNoOp()
+    {
+        var viewModel = await CreateSelectedViewModelAsync(new RecordingDialogService());
+
+        viewModel.ApplyExample("netdom query fsmo");
+        var before = viewModel.GeneratedCommand;
+
+        viewModel.ApplyExample(null);
+        Assert.Equal(before, viewModel.GeneratedCommand);
+
+        viewModel.ApplyExample(string.Empty);
+        Assert.Equal(before, viewModel.GeneratedCommand);
+    }
+
+    [Fact]
     public async Task ExportAsync_WhenConfirmationDeclined_DoesNotExport()
     {
         var dialog = new RecordingDialogService { ConfirmResult = false };

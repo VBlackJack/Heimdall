@@ -49,6 +49,20 @@ public sealed partial class CommandPaletteViewModel
     // can be read when a snippet is sent (the execute path is guarded).
     private ActionModel? _detailAction;
 
+    // True when SnippetGeneratedCommand currently holds a literal example applied
+    // via ApplySnippetExample rather than output produced by the generator. Example
+    // text bypasses parameter validation and escaping, so a snippet-level Send must
+    // always confirm before running it regardless of the action's level (mirrors
+    // CommandLibraryViewModel._generatedFromExample).
+    private bool _snippetGeneratedFromExample;
+
+    /// <summary>
+    /// Test seam: true when <see cref="SnippetGeneratedCommand"/> currently holds an
+    /// applied example. Reset whenever the command is regenerated from parameters,
+    /// the variant selection changes, or the detail surface closes.
+    /// </summary>
+    internal bool SnippetGeneratedFromExample => _snippetGeneratedFromExample;
+
     // ── Observable detail state ──────────────────────────────────────
 
     /// <summary>True while the snippet drill-in detail view is shown over the result list.</summary>
@@ -145,6 +159,10 @@ public sealed partial class CommandPaletteViewModel
     /// </summary>
     partial void OnSelectedSnippetVariantChanged(SnippetVariantDisplayItem? value)
     {
+        // A variant change produces a fresh generated command, so any previously
+        // applied example is no longer in effect.
+        _snippetGeneratedFromExample = false;
+
         UnsubscribeSnippetParameters();
         SnippetParameters.Clear();
 
@@ -196,6 +214,8 @@ public sealed partial class CommandPaletteViewModel
     private void RegenerateSnippetCommand()
     {
         if (_snippetTemplate is null || _snippetGenerator is null) return;
+
+        _snippetGeneratedFromExample = false;
 
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var p in SnippetParameters)
@@ -323,6 +343,7 @@ public sealed partial class CommandPaletteViewModel
         SnippetGeneratedCommand = string.Empty;
         SnippetValidationError = string.Empty;
         IsSnippetCommandValid = false;
+        _snippetGeneratedFromExample = false;
         IsSnippetDetailOpen = false;
         SelectedSnippetVariant = null;
         _snippetTemplate = null;
@@ -355,7 +376,12 @@ public sealed partial class CommandPaletteViewModel
         var active = _main.Connection.ActiveSession;
         if (active is not null)
         {
-            var level = _detailAction?.Level ?? CriticalityLevel.Info;
+            // A command applied from an example bypasses parameter validation and
+            // escaping, so force confirmation regardless of the action's level
+            // (mirrors CommandLibraryViewModel.SendAsync).
+            var level = _snippetGeneratedFromExample
+                ? CriticalityLevel.Dangerous
+                : _detailAction?.Level ?? CriticalityLevel.Info;
             if (!await DangerousCommandGuard.ConfirmIfDangerousAsync(
                     level, _dialogService, key => _localizer[key], topmost: true))
             {
@@ -397,6 +423,23 @@ public sealed partial class CommandPaletteViewModel
     {
         if (example is null || string.IsNullOrEmpty(example.Command)) return;
         CopySnippetPayload(example.Command, SnippetDetailTitle);
+    }
+
+    /// <summary>
+    /// Loads an example command into the <see cref="SnippetGeneratedCommand"/> preview
+    /// so the user can review it before Copy/Send, mirroring
+    /// <c>CommandLibraryViewModel.ApplyExample</c>. Marks the command valid and flags it
+    /// as example-sourced (so a later Send forces confirmation). No-op when empty.
+    /// </summary>
+    [RelayCommand]
+    private void ApplySnippetExample(string? command)
+    {
+        if (string.IsNullOrEmpty(command)) return;
+
+        SnippetGeneratedCommand = command;
+        SnippetValidationError = string.Empty;
+        IsSnippetCommandValid = true;
+        _snippetGeneratedFromExample = true;
     }
 
     /// <summary>

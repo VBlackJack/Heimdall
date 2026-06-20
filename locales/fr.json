@@ -5125,6 +5125,7 @@
   "ToolCmdLibRiskBadgeDanger": "DANGER",
   "ToolCmdLibBtnCopy": "Copier",
   "ToolCmdLibBtnCopyExample": "Copier l'exemple",
+  "ToolCmdLibApplyExample": "Appliquer l'exemple",
   "ToolCmdLibBtnSend": "Envoyer au terminal",
   "ToolCmdLibSendTooltipReady": "Envoyer au terminal",
   "ToolCmdLibSendTooltipInvalid": "Commande non pr\u00eate",

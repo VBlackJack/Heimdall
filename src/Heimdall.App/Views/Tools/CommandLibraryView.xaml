@@ -442,17 +442,50 @@
                             <ItemsControl ItemsSource="{Binding SelectedActionExamples}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
+                                        <!-- Card row. The apply action lives on a flat Button (in the
+                                             visual tree, so it inherits the per-item DataContext) instead
+                                             of a Border MouseBinding, which only resolved CommandParameter
+                                             for the first realized container. Copy is a sibling Button so
+                                             clicking it never triggers the row apply. -->
                                         <Border Padding="6,3" Margin="0,2,0,0"
                                                 Background="{DynamicResource BackgroundBrush}"
-                                                CornerRadius="{StaticResource CornerRadiusSm}" Cursor="Hand"
-                                                Tag="{Binding Command}">
-                                            <Border.InputBindings>
-                                                <MouseBinding MouseAction="LeftClick"
-                                                              Command="{Binding DataContext.ApplyExampleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                              CommandParameter="{Binding Command}"/>
-                                            </Border.InputBindings>
-                                            <DockPanel>
-                                                <Button DockPanel.Dock="Right"
+                                                CornerRadius="{StaticResource CornerRadiusSm}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0"
+                                                        Command="{Binding DataContext.ApplyExampleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding Command}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Padding="0"
+                                                        Cursor="Hand"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Stretch"
+                                                        ToolTip="{loc:Translate ToolCmdLibApplyExample}"
+                                                        AutomationProperties.Name="{loc:Translate ToolCmdLibApplyExample}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}">
+                                                                <ContentPresenter HorizontalAlignment="Stretch"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Command}"
+                                                                   FontFamily="Consolas"
+                                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding Description}"
+                                                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1"
                                                         Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
                                                         Command="{Binding DataContext.CopyExampleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding Command}"
@@ -462,18 +495,7 @@
                                                         FontSize="11" Width="22" Height="22"
                                                         Padding="2" VerticalAlignment="Top"
                                                         Focusable="False"/>
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Command}"
-                                                               FontFamily="Consolas"
-                                                               FontSize="{StaticResource FontSizeCaption}"
-                                                               Foreground="{DynamicResource AccentBrush}"
-                                                               TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Description}"
-                                                               FontSize="{StaticResource FontSizeSmallCaption}"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                                               TextWrapping="Wrap"/>
-                                                </StackPanel>
-                                            </DockPanel>
+                                            </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
