@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
@@ -36,6 +37,7 @@ public sealed class JsonSyncService : SyncServiceBase
     private readonly ICustomCategoryRepository _categoryRepository;
     private readonly ICommandTemplateRepository _templateRepository;
     private readonly IUnitOfWork? _unitOfWork;
+    private readonly ILogger<JsonSyncService>? _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public JsonSyncService(
@@ -43,13 +45,15 @@ public sealed class JsonSyncService : SyncServiceBase
         IBatchRepository batchRepository,
         ICustomCategoryRepository categoryRepository,
         ICommandTemplateRepository templateRepository,
-        IUnitOfWork? unitOfWork = null)
+        IUnitOfWork? unitOfWork = null,
+        ILogger<JsonSyncService>? logger = null)
     {
         _actionRepository = actionRepository;
         _batchRepository = batchRepository;
         _categoryRepository = categoryRepository;
         _templateRepository = templateRepository;
         _unitOfWork = unitOfWork;
+        _logger = logger;
         _jsonOptions = JsonOptionsHelper.SyncService;
     }
 
@@ -384,8 +388,9 @@ public sealed class JsonSyncService : SyncServiceBase
                 {
                     await _unitOfWork.RollbackTransactionAsync();
                 }
-                catch
+                catch (Exception rollbackEx)
                 {
+                    _logger?.LogWarning(rollbackEx, "Rollback after cancellation failed during import");
                 }
             }
 
