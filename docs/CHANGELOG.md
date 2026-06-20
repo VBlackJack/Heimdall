@@ -12,6 +12,26 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-20: Command Library send-state clarity and reliability fixes (v2026.062001)
+
+This release sharpens the Command Library experience and closes three reliability
+gaps in command generation, logging, and validation.
+
+- **Clearer send-state.** The Command Library makes the "Send to terminal"
+  button state easier to read and adds a copy hint, with the Ctrl+K palette
+  wired to the same bridge.
+- **Examples apply on row click.** Selecting an example row now applies it
+  directly, in both the Command Library and the Ctrl+K palette.
+- **Palette surfaces regenerate errors.** The Ctrl+K snippet detail now shows
+  `ToolCmdLibGenerateError` when regeneration fails, instead of silently
+  clearing the message (parity with the library view).
+- **TwinShell logging reaches the FileLogger.** TwinShell `ILogger<T>` output is
+  routed through a dedicated MEL provider into the FileLogger; it was previously
+  dropped in Release builds.
+- **Correct example cap.** The per-action example cap now sums the three buckets
+  (common / Windows / Linux), closing a completeness gap in validation.
+- **Tests.** The automated baseline is now 7,288 passing tests, 0 failures.
+
 ## 2026-06-19: FTPS trust, safer FTP operations and dependency hardening (v2026.061902)
 
 This release closes the FTPS trust gap, makes FTP/local file operations less
