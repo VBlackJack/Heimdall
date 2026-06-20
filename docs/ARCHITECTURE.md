@@ -583,7 +583,7 @@ Historic formats (`MobaXterm`, `RDCMan`, `mRemoteNG`) keep their dedicated parse
 
 ## Design System (CommonControls.xaml — 1,880+ lines, 45 tokens, WCAG AA)
 
-The application uses a centralized Design System defined in `CommonControls.xaml`, backed by the `ThemeForge.Theme` NuGet package and the `HeimdallThemeBridge.xaml` app brush bridge. The 16 ThemeForge palettes provide canonical color slots; the bridge re-expresses Heimdall's 74 app brush keys on those slots. Theme swapping is owned by `HeimdallThemeService` (singleton DI) — see `docs/TROUBLESHOOTING.md` ("Theme Switching — Stale Colors After Swap") for the reactivity patterns.
+The application uses a centralized Design System defined in `CommonControls.xaml`, backed by the `ThemeForge.Theme` NuGet package and the `HeimdallThemeBridge.xaml` app brush bridge. The 17 ThemeForge palettes provide canonical color slots; the bridge re-expresses Heimdall's 74 app brush keys on those slots. Theme swapping is owned by `HeimdallThemeService` (singleton DI) — see `docs/TROUBLESHOOTING.md` ("Theme Switching — Stale Colors After Swap") for the reactivity patterns.
 
 **Typography tokens (10)** — `sys:Double` resources for consistent font sizing:
 - `FontSizeSmallCaption` (11), `FontSizeCaption` (12), `FontSizeBody` (13), `FontSizeBodyLarge` (14), `FontSizeSubtitle` (15), `FontSizeLarge` (17), `FontSizeTitle` (20), `FontSizeDisplay` (22), `FontSizeHeadline` (24), `FontSizeHero` (64)
@@ -888,7 +888,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 ### Theme System (`HeimdallThemeService` + ThemeForge)
 
-**Problem**: Runtime theme swapping across 16 ThemeForge palettes must keep every Heimdall surface in sync — including app-specific brushes, converters that resolve brushes at convert time (server icons, status dots), the AvalonEdit file editor, and the DWM title-bar chrome.
+**Problem**: Runtime theme swapping across 17 ThemeForge palettes must keep every Heimdall surface in sync — including app-specific brushes, converters that resolve brushes at convert time (server icons, status dots), the AvalonEdit file editor, and the DWM title-bar chrome.
 
 **Solution**: `Services/HeimdallThemeService.cs` is Heimdall's compatibility wrapper around `ThemeForge.Theme.ThemeService`.
 
