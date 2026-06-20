@@ -2040,6 +2040,7 @@
                                                     <ComboBoxItem x:Name="Mw_ThemeTarn" Content="{loc:Translate ThemeTarn}" Tag="Tarn" AutomationProperties.Name="{loc:Translate ThemeTarn}"/>
                                                     <ComboBoxItem x:Name="Mw_ThemeMortis" Content="{loc:Translate ThemeMortis}" Tag="Mortis" AutomationProperties.Name="{loc:Translate ThemeMortis}"/>
                                                     <ComboBoxItem x:Name="Mw_ThemeSlate" Content="{loc:Translate ThemeSlate}" Tag="Slate" AutomationProperties.Name="{loc:Translate ThemeSlate}"/>
+                                                    <ComboBoxItem x:Name="Mw_ThemeMagellan" Content="{loc:Translate ThemeMagellan}" Tag="Magellan" AutomationProperties.Name="{loc:Translate ThemeMagellan}"/>
                                                     <ComboBoxItem x:Name="Mw_ThemeVoivode" Content="{loc:Translate ThemeVoivode}" Tag="Voivode" AutomationProperties.Name="{loc:Translate ThemeVoivode}"/>
                                                     <ComboBoxItem x:Name="Mw_ThemeCarmilla" Content="{loc:Translate ThemeCarmilla}" Tag="Carmilla" AutomationProperties.Name="{loc:Translate ThemeCarmilla}"/>
                                                     <ComboBoxItem x:Name="Mw_ThemeWhitby" Content="{loc:Translate ThemeWhitby}" Tag="Whitby" AutomationProperties.Name="{loc:Translate ThemeWhitby}"/>

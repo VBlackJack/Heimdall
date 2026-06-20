@@ -52,7 +52,8 @@ public static partial class SchemaValidator
     private static readonly HashSet<string> ValidThemes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Dracula", "Drakul", "Striga", "Cinder", "Bracken", "Tarn", "Mortis", "Slate",
-        "Voivode", "Carmilla", "Whitby", "Vesper", "Parchment", "Folio", "Wormwood", "Sconce"
+        "Magellan", "Voivode", "Carmilla", "Whitby", "Vesper", "Parchment", "Folio",
+        "Wormwood", "Sconce"
     };
 
     private static readonly HashSet<string> ValidConnectionTypes = new(StringComparer.OrdinalIgnoreCase)

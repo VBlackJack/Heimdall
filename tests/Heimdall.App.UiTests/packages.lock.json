@@ -391,8 +391,8 @@
       },
       "ThemeForge.Theme": {
         "type": "Transitive",
-        "resolved": "2.0.0",
-        "contentHash": "7U8Gd8/5nxCJRNjXEXZ6xkxGcDh+YgCXzFHC1Y87xLj4zJiXuRiXCk6Ztq/5EQSUJgKpZWYG+JgvdfQJ93ZwGg=="
+        "resolved": "2.1.0",
+        "contentHash": "S67HoDY799UJZPq4kRIpVlxY8vkLFcdedxmBtJUj9748s2gThkSGvmCQKY7UlzrnAl/IW1Zodbo0iJy+rzp0eg=="
       },
       "xunit.abstractions": {
         "type": "Transitive",
@@ -450,7 +450,7 @@
           "Heimdall.Ssh": "[1.0.0, )",
           "Heimdall.Terminal": "[1.0.0, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.9, )",
-          "ThemeForge.Theme": "[2.0.0, )",
+          "ThemeForge.Theme": "[2.1.0, )",
           "TwinShell.Core": "[1.0.0, )",
           "TwinShell.Infrastructure": "[1.0.0, )",
           "TwinShell.Persistence": "[1.0.0, )"
