@@ -12,6 +12,20 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-20: Magellan theme and release-notes tooling (v2026.062002)
+
+This release adds the Magellan dark theme and streamlines the release-notes
+workflow.
+
+- **Magellan theme.** A new brand-derived dark variant (deep navy background,
+  indigo accent) is available in the theme picker, sourced from ThemeForge 2.1.0;
+  it meets WCAG AA contrast across all functional accents.
+- **Release-notes tooling.** `Build.ps1 -Publish` now prepends a hand-written
+  notes file (`docs/release-notes/v<version>.md`, or an explicit
+  `-ReleaseNotesFile`) above the auto-generated Downloads and Checksums section,
+  removing the manual post-publish edit step.
+- **Tests.** The automated baseline is now 7,289 passing tests, 0 failures.
+
 ## 2026-06-20: Command Library send-state clarity and reliability fixes (v2026.062001)
 
 This release sharpens the Command Library experience and closes three reliability
