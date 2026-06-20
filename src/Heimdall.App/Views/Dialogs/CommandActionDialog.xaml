@@ -38,9 +38,9 @@
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <!-- Title -->
-                <TextBlock x:Name="LblTitle" Style="{StaticResource DialogLabelStyle}"/>
+                <TextBlock x:Name="LblTitle" Text="{loc:Translate ToolCmdLibDialogLblTitle}" Style="{StaticResource DialogLabelStyle}"/>
                 <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
-                         AutomationProperties.Name="{Binding Text, ElementName=LblTitle}"
+                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblTitle}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          MaxLength="200" x:Name="TxtTitle" TabIndex="0"/>
                 <TextBlock Text="{Binding TitleError}"
@@ -48,9 +48,9 @@
                            Visibility="{Binding TitleError, Converter={StaticResource NullToVis}}"/>
 
                 <!-- Category (editable ComboBox) -->
-                <TextBlock x:Name="LblCategory" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="LblCategory" Text="{loc:Translate ToolCmdLibDialogLblCategory}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <ComboBox ItemsSource="{Binding AvailableCategories}"
-                          AutomationProperties.Name="{Binding Text, ElementName=LblCategory}"
+                          AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblCategory}"
                           Text="{Binding Category, UpdateSourceTrigger=PropertyChanged}"
                           IsEditable="True"
                           Style="{StaticResource DialogFormComboBoxStyle}"
@@ -68,32 +68,32 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0">
-                        <TextBlock x:Name="LblPlatform" Style="{StaticResource DialogLabelStyle}"/>
+                        <TextBlock x:Name="LblPlatform" Text="{loc:Translate ToolCmdLibDialogLblPlatform}" Style="{StaticResource DialogLabelStyle}"/>
                         <ComboBox x:Name="CmbPlatform"
-                                  AutomationProperties.Name="{Binding Text, ElementName=LblPlatform}"
+                                  AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblPlatform}"
                                   SelectedIndex="{Binding Platform}"
                                   Style="{StaticResource DialogFormComboBoxStyle}" TabIndex="2">
-                            <ComboBoxItem x:Name="PlatformWindows"/>
-                            <ComboBoxItem x:Name="PlatformLinux"/>
-                            <ComboBoxItem x:Name="PlatformBoth"/>
+                            <ComboBoxItem x:Name="PlatformWindows" Content="{loc:Translate ToolCmdLibPlatformWindows}"/>
+                            <ComboBoxItem x:Name="PlatformLinux" Content="{loc:Translate ToolCmdLibPlatformLinux}"/>
+                            <ComboBoxItem x:Name="PlatformBoth" Content="{loc:Translate ToolCmdLibPlatformBoth}"/>
                         </ComboBox>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
-                        <TextBlock x:Name="LblRisk" Style="{StaticResource DialogLabelStyle}"/>
+                        <TextBlock x:Name="LblRisk" Text="{loc:Translate ToolCmdLibDialogLblRisk}" Style="{StaticResource DialogLabelStyle}"/>
                         <ComboBox x:Name="CmbRisk"
-                                  AutomationProperties.Name="{Binding Text, ElementName=LblRisk}"
+                                  AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblRisk}"
                                   SelectedIndex="{Binding Level}"
                                   Style="{StaticResource DialogFormComboBoxStyle}" TabIndex="3">
-                            <ComboBoxItem x:Name="RiskInfo"/>
-                            <ComboBoxItem x:Name="RiskRun"/>
-                            <ComboBoxItem x:Name="RiskDangerous"/>
+                            <ComboBoxItem x:Name="RiskInfo" Content="{loc:Translate ToolCmdLibRiskInfo}"/>
+                            <ComboBoxItem x:Name="RiskRun" Content="{loc:Translate ToolCmdLibRiskRun}"/>
+                            <ComboBoxItem x:Name="RiskDangerous" Content="{loc:Translate ToolCmdLibRiskDangerous}"/>
                         </ComboBox>
                     </StackPanel>
                 </Grid>
 
                 <!-- Description -->
-                <TextBlock x:Name="LblDescription" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="LblDescription" Text="{loc:Translate ToolCmdLibDialogLblDescription}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblDescription}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
@@ -106,16 +106,17 @@
                 <StackPanel x:Name="WindowsSection"
                             Visibility="{Binding ShowWindowsSection, Converter={StaticResource BoolToVisibilityConverter}}">
                 <TextBlock x:Name="LblWindowsSection"
+                           Text="{loc:Translate ToolCmdLibDialogSectionWindows}"
                            Style="{StaticResource DialogSectionTitleStyle}"
                            Margin="0,16,0,4"/>
 
-                <TextBlock x:Name="LblWinPattern" Style="{StaticResource DialogLabelStyle}"/>
+                <TextBlock x:Name="LblWinPattern" Text="{loc:Translate ToolCmdLibDialogLblPattern}" Style="{StaticResource DialogLabelStyle}"/>
                 <TextBox Text="{Binding WindowsPattern, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblWinPattern}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          FontFamily="Consolas" TabIndex="5"/>
 
-                <TextBlock x:Name="LblWinName" Style="{StaticResource DialogLabelStyle}" Margin="0,4,0,4"/>
+                <TextBlock x:Name="LblWinName" Text="{loc:Translate ToolCmdLibDialogLblTemplateName}" Style="{StaticResource DialogLabelStyle}" Margin="0,4,0,4"/>
                 <TextBox Text="{Binding WindowsTemplateName, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblWinName}"
                          Style="{StaticResource DialogFormTextBoxStyle}" TabIndex="6"/>
@@ -126,9 +127,9 @@
                         <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="80"/><ColumnDefinition Width="24"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" x:Name="LblWinParamName" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="1" x:Name="LblWinParamLabel" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="2" x:Name="LblWinParamType" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="0" x:Name="LblWinParamName" Text="{loc:Translate ToolCmdLibDialogParamName}" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" x:Name="LblWinParamLabel" Text="{loc:Translate ToolCmdLibDialogParamLabel}" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="2" x:Name="LblWinParamType" Text="{loc:Translate ToolCmdLibDialogParamType}" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
                 </Grid>
                 <ItemsControl ItemsSource="{Binding WindowsParameters}" Margin="0,0,0,0">
                     <ItemsControl.ItemTemplate>
@@ -213,16 +214,17 @@
                 <StackPanel x:Name="LinuxSection"
                             Visibility="{Binding ShowLinuxSection, Converter={StaticResource BoolToVisibilityConverter}}">
                 <TextBlock x:Name="LblLinuxSection"
+                           Text="{loc:Translate ToolCmdLibDialogSectionLinux}"
                            Style="{StaticResource DialogSectionTitleStyle}"
                            Margin="0,16,0,4"/>
 
-                <TextBlock x:Name="LblLinuxPattern" Style="{StaticResource DialogLabelStyle}"/>
+                <TextBlock x:Name="LblLinuxPattern" Text="{loc:Translate ToolCmdLibDialogLblPattern}" Style="{StaticResource DialogLabelStyle}"/>
                 <TextBox Text="{Binding LinuxPattern, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblLinuxPattern}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          FontFamily="Consolas" TabIndex="8"/>
 
-                <TextBlock x:Name="LblLinuxName" Style="{StaticResource DialogLabelStyle}" Margin="0,4,0,4"/>
+                <TextBlock x:Name="LblLinuxName" Text="{loc:Translate ToolCmdLibDialogLblTemplateName}" Style="{StaticResource DialogLabelStyle}" Margin="0,4,0,4"/>
                 <TextBox Text="{Binding LinuxTemplateName, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblLinuxName}"
                          Style="{StaticResource DialogFormTextBoxStyle}" TabIndex="9"/>
@@ -233,9 +235,9 @@
                         <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="80"/><ColumnDefinition Width="24"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" x:Name="LblLinuxParamName" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="1" x:Name="LblLinuxParamLabel" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
-                    <TextBlock Grid.Column="2" x:Name="LblLinuxParamType" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="0" x:Name="LblLinuxParamName" Text="{loc:Translate ToolCmdLibDialogParamName}" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1" x:Name="LblLinuxParamLabel" Text="{loc:Translate ToolCmdLibDialogParamLabel}" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="2" x:Name="LblLinuxParamType" Text="{loc:Translate ToolCmdLibDialogParamType}" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
                 </Grid>
                 <ItemsControl ItemsSource="{Binding LinuxParameters}" Margin="0,4,0,0">
                     <ItemsControl.ItemTemplate>
@@ -318,13 +320,13 @@
                 </StackPanel>
 
                 <!-- Tags -->
-                <TextBlock x:Name="LblTags" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="LblTags" Text="{loc:Translate ToolCmdLibDialogLblTags}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <TextBox Text="{Binding Tags, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblTags}"
                          Style="{StaticResource DialogFormTextBoxStyle}" TabIndex="11"/>
 
                 <!-- Notes -->
-                <TextBlock x:Name="LblNotes" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="LblNotes" Text="{loc:Translate ToolCmdLibDialogLblNotes}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblNotes}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
@@ -455,11 +457,13 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="CancelBtn" IsCancel="True" MinWidth="80"
-                    AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"
+                    Content="{loc:Translate BtnCancel}"
+                    AutomationProperties.Name="{loc:Translate BtnCancel}"
                     Margin="0,0,8,0"
                     Style="{DynamicResource SecondaryButtonStyle}"/>
             <Button x:Name="SaveBtn" IsDefault="True" MinWidth="80"
-                    AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"
+                    Content="{loc:Translate BtnSave}"
+                    AutomationProperties.Name="{loc:Translate BtnSave}"
                     Click="OnSaveClick"
                     Style="{DynamicResource PrimaryButtonStyle}"/>
         </StackPanel>

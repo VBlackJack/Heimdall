@@ -26,6 +26,13 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class ToolRegistry
 {
+    /// <summary>
+    /// Stable tool id of the Command Library (TwinShell) tool. Exposed as a
+    /// constant so callers (e.g. the Command Palette bridge) reference it
+    /// without re-typing the magic literal.
+    /// </summary>
+    public const string CommandLibraryToolId = "CMDLIB";
+
     private readonly record struct ToolEntry(ToolDescriptor Descriptor, Func<IToolView> Factory);
 
     private readonly IReadOnlyList<ToolEntry> _entries;
@@ -104,7 +111,7 @@ public sealed class ToolRegistry
             Entry("NOTES",    ToolCategory.System,   "ToolCategorySystem",   "PaletteToolNotes",    "PaletteToolNotesWith",    ["notes","note","markdown","md","confluence"], false, () => new Views.Tools.NotesToolView(), "Geo.Tool.Notes"),
             Entry("DIAGRAM",  ToolCategory.System,   "ToolCategorySystem",   "PaletteToolDiagram",  "PaletteToolDiagramWith",  ["diagram","drawio","schema"],         false, () => new Views.Tools.DiagramEditorView(),  "Geo.Tool.Diagram"),
             Entry("HACKERSIM",ToolCategory.System,   "ToolCategorySystem",   "PaletteToolHackerSim","PaletteToolHackerSimWith",["hacker","matrix","hackersim"],        false, () => new Views.Tools.HackerSimulatorView(),"Geo.Tool.HackerSimulator"),
-            Entry("CMDLIB",   ToolCategory.System,   "ToolCategorySystem",   "PaletteToolCmdLib",   "PaletteToolCmdLibWith",   ["cmd","command","library","snippet","twinshell","cheat","cheatsheet","powershell","bash"], false, () => new Views.Tools.CommandLibraryView(), "Geo.Tool.CommandLibrary"),
+            Entry(CommandLibraryToolId, ToolCategory.System, "ToolCategorySystem", "PaletteToolCmdLib", "PaletteToolCmdLibWith", ["cmd","command","library","snippet","twinshell","cheat","cheatsheet","powershell","bash"], false, () => new Views.Tools.CommandLibraryView(), "Geo.Tool.CommandLibrary"),
             Entry("PRIVLAUNCH", ToolCategory.System, "ToolCategorySystem", "PaletteToolPrivLaunch", null, ["privlaunch","sudo","nsudo","elevate","system","trustedinstaller"], false, () => new Views.Tools.PrivilegeLauncherView(), "Geo.Tool.PrivilegeLauncher"),
 
             // ── External ─────────────────────────────────────────────

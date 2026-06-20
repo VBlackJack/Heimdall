@@ -18,8 +18,11 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Heimdall.Core.Configuration;
+using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
 using ActionModel = TwinShell.Core.Models.Action;
+using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 
 namespace Heimdall.App.Services.Import;
 
@@ -93,6 +96,8 @@ public sealed class CommandLibraryTransferService(
                 continue;
             }
 
+            NormalizeParameterQuoting(action);
+
             var existing = await actionService.GetActionByPublicIdAsync(action.PublicId)
                 ?? await actionService.GetActionByIdAsync(action.Id);
             if (existing is not null)
@@ -122,6 +127,43 @@ public sealed class CommandLibraryTransferService(
         }
 
         return CommandLibraryImportResult.Success(imported, updated, skipped);
+    }
+
+    /// <summary>
+    /// Re-validates the trust assumption that <see cref="QuotingMode.InlineInQuotes"/>
+    /// carries at persistence time: the parameter placeholder must already sit inside a
+    /// single-quoted span of its command pattern. An imported file can declare
+    /// <c>InlineInQuotes</c> on a placeholder that lives outside any quotes, which would
+    /// inject the value with neither surrounding quotes nor full escaping. Any such
+    /// parameter is reset to the safe default so the generator falls back to
+    /// <see cref="QuotingMode.ShellQuote"/> (full single-quote wrapping).
+    /// </summary>
+    private static void NormalizeParameterQuoting(ActionModel action)
+    {
+        NormalizeTemplateQuoting(action.WindowsCommandTemplate);
+        NormalizeTemplateQuoting(action.LinuxCommandTemplate);
+    }
+
+    private static void NormalizeTemplateQuoting(CommandTemplate? template)
+    {
+        if (template?.Parameters is not { Count: > 0 } parameters)
+        {
+            return;
+        }
+
+        foreach (var parameter in parameters)
+        {
+            if (parameter is null || parameter.Quoting != QuotingMode.InlineInQuotes)
+            {
+                continue;
+            }
+
+            if (!CommandPatternQuoting.IsPlaceholderInsideSingleQuotedSpan(
+                    template.CommandPattern, parameter.Name))
+            {
+                parameter.Quoting = QuotingMode.ShellQuote;
+            }
+        }
     }
 
     private static List<ActionModel>? ParseImportJson(string json)

@@ -176,7 +176,8 @@ public static class TwinShellSchema
 
         foreach (TemplateParameter parameter in parameters)
         {
-            if (parameter.Quoting == null && IsPlaceholderInsideSingleQuotedSpan(commandPattern, parameter.Name))
+            if (parameter.Quoting == null
+                && CommandPatternQuoting.IsPlaceholderInsideSingleQuotedSpan(commandPattern, parameter.Name))
             {
                 parameter.Quoting = QuotingMode.InlineInQuotes;
                 changed = true;
@@ -250,27 +251,6 @@ public static class TwinShellSchema
         }
 
         return patternChanged;
-    }
-
-    private static bool IsPlaceholderInsideSingleQuotedSpan(string commandPattern, string parameterName)
-    {
-        string placeholder = "{" + parameterName + "}";
-        int placeholderIndex = commandPattern.IndexOf(placeholder, StringComparison.Ordinal);
-        if (placeholderIndex < 0)
-        {
-            return false;
-        }
-
-        int quoteCount = 0;
-        for (int index = 0; index < placeholderIndex; index++)
-        {
-            if (commandPattern[index] == '\'')
-            {
-                quoteCount++;
-            }
-        }
-
-        return quoteCount % 2 == 1;
     }
 
     private static bool SetParameterQuoting(List<TemplateParameter>? parameters, string parameterName)

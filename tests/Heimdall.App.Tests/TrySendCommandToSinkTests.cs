@@ -97,4 +97,28 @@ public sealed class TrySendCommandToSinkTests
 
         result.Should().BeFalse();
     }
+
+    [Fact]
+    public void HasTerminalSink_TreeWithSink_ReturnsTrue()
+    {
+        // A non-terminal pane (e.g. RDP surface) plus one terminal sink.
+        var root = Split(Leaf(new object()), Leaf(new FakeSink()));
+
+        EmbeddedSessionManager.HasTerminalSink(root).Should().BeTrue();
+    }
+
+    [Fact]
+    public void HasTerminalSink_NoSinkInTree_ReturnsFalse()
+    {
+        // Only non-terminal panes (RDP/VNC/SFTP) — nothing can receive a command.
+        var root = Split(Leaf(new object()), Leaf(null));
+
+        EmbeddedSessionManager.HasTerminalSink(root).Should().BeFalse();
+    }
+
+    [Fact]
+    public void HasTerminalSink_NullRoot_ReturnsFalse()
+    {
+        EmbeddedSessionManager.HasTerminalSink(null).Should().BeFalse();
+    }
 }

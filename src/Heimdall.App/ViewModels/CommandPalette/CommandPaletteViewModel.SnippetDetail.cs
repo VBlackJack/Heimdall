@@ -21,6 +21,7 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Interfaces;
@@ -437,6 +438,31 @@ public sealed partial class CommandPaletteViewModel
     private void BackFromSnippetDetail()
     {
         CloseSnippetDetail();
+    }
+
+    /// <summary>
+    /// Bridges the palette (discovery) to the Command Library (execution): opens
+    /// (or focuses, if already open) the CMDLIB tool tab preselected on the action
+    /// currently drilled into, then closes the palette. The action id is carried
+    /// via <see cref="ToolContext.InitialActionId"/>; CMDLIB resolves it against
+    /// the same <c>IActionService</c> the palette uses. No direct command injection
+    /// happens here: the user sends or copies from CMDLIB. No-op when no detail is open.
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenSnippetInLibraryAsync()
+    {
+        var action = _detailAction;
+        if (action is null) return;
+
+        var context = new ToolContext(InitialActionId: action.Id);
+        var title = _localizer["PaletteToolCmdLib"];
+
+        _main.TrackRecentTool(ToolRegistry.CommandLibraryToolId);
+
+        CloseSnippetDetail();
+        IsOpen = false;
+
+        await _main.OpenToolTabAsync(ToolRegistry.CommandLibraryToolId, title, context);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

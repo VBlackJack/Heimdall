@@ -1004,7 +1004,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         context = (context ?? new ToolContext()) with
         {
             SetBusyAction = busy => sessionTab.IsBusy = busy,
-            SendCommandAction = command => TrySendCommandToSession(sessionTab, command)
+            SendCommandAction = command => TrySendCommandToSession(sessionTab, command),
+            CanSendToTerminal = () => SessionHasTerminalSink(sessionTab)
         };
 
         view.Initialize(context, _localizer);
@@ -1020,6 +1021,25 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     }
 
     /// <summary>
+    /// Reports whether the given session tab currently hosts at least one
+    /// injectable terminal (an <see cref="ITerminalCommandSink"/>) anywhere in
+    /// its split tree. Drives the Command Library Send button's enabled state:
+    /// being attached to a session is not enough; the tab must contain a
+    /// terminal pane that can actually receive the command.
+    /// </summary>
+    /// <param name="session">The session tab to inspect.</param>
+    /// <returns>
+    /// <c>true</c> when a terminal sink exists in the tab's split tree;
+    /// otherwise <c>false</c> (including when <paramref name="session"/> is null).
+    /// </returns>
+    public bool SessionHasTerminalSink(SessionTabViewModel session)
+    {
+        if (session is null) return false;
+
+        return HasTerminalSink(session.RootContent);
+    }
+
+    /// <summary>
     /// Pure helper that walks the split tree and forwards the command to the
     /// first leaf whose host control is an <see cref="ITerminalCommandSink"/>.
     /// </summary>
@@ -1031,15 +1051,35 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     /// </returns>
     internal static bool TrySendCommandToFirstSink(ISplitContent? root, string command)
     {
+        var sink = FindFirstTerminalSink(root);
+        if (sink is null) return false;
+
+        sink.WriteCommand(command);
+        return true;
+    }
+
+    /// <summary>
+    /// Pure helper that reports whether the split tree contains at least one
+    /// <see cref="ITerminalCommandSink"/> leaf, reusing the same traversal as
+    /// <see cref="TrySendCommandToFirstSink"/>.
+    /// </summary>
+    internal static bool HasTerminalSink(ISplitContent? root) => FindFirstTerminalSink(root) is not null;
+
+    /// <summary>
+    /// Walks the split tree depth-first and returns the first leaf host control
+    /// that is an <see cref="ITerminalCommandSink"/>, or <c>null</c> when none
+    /// exists. Single source of the sink-lookup traversal.
+    /// </summary>
+    private static ITerminalCommandSink? FindFirstTerminalSink(ISplitContent? root)
+    {
         foreach (var pane in SplitTreeHelper.EnumerateLeaves(root))
         {
             if (pane.HostControl is ITerminalCommandSink sink)
             {
-                sink.WriteCommand(command);
-                return true;
+                return sink;
             }
         }
 
-        return false;
+        return null;
     }
 }

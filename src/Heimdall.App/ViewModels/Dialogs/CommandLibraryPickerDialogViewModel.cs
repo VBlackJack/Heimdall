@@ -193,7 +193,10 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
                     HasWindowsTemplate = action.WindowsCommandTemplate is not null,
                     LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
                     LinuxTemplate = action.LinuxCommandTemplate,
-                    Presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key])
+                    Presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key]),
+                    PlatformBadge = ResolvePlatformBadge(
+                        action.WindowsCommandTemplate is not null,
+                        action.LinuxCommandTemplate is not null)
                 })
                 .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
@@ -263,6 +266,18 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         ResultActionTitle = null;
         ResultParams = null;
         CloseRequested?.Invoke();
+    }
+
+    private string ResolvePlatformBadge(bool hasWindows, bool hasLinux)
+    {
+        if (hasWindows && hasLinux)
+        {
+            return _localizer["ToolCmdLibPlatformLabelBoth"];
+        }
+
+        return hasLinux
+            ? _localizer["ToolCmdLibPlatformLabelLin"]
+            : _localizer["ToolCmdLibPlatformLabelWin"];
     }
 
     private bool FilterAction(object item)

@@ -132,7 +132,7 @@
                                                    FontWeight="Bold"
                                                    Foreground="{DynamicResource BadgeTextBrush}"/>
                                     </Border>
-                                    <TextBlock Text="{Binding PlatformBadgeText}"
+                                    <TextBlock Text="{Binding PlatformBadge}"
                                                Foreground="{DynamicResource AccentBrush}"
                                                FontWeight="SemiBold"
                                                VerticalAlignment="Center"/>

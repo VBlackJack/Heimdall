@@ -42,6 +42,20 @@ public partial class CommandLibraryView : UserControl, IToolView
     public CommandLibraryView()
     {
         InitializeComponent();
+        IsVisibleChanged += OnViewIsVisibleChanged;
+    }
+
+    /// <summary>
+    /// Re-evaluates the Send button state when the view becomes visible again:
+    /// the split layout or pane focus may have changed which terminal sink (if
+    /// any) is available since the view was last shown.
+    /// </summary>
+    private void OnViewIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is true)
+        {
+            _viewModel?.RefreshSendState();
+        }
     }
 
     // ── IToolView ─────────────────────────────────────────────────
@@ -58,6 +72,7 @@ public partial class CommandLibraryView : UserControl, IToolView
         _viewModel = services.GetRequiredService<CommandLibraryViewModel>();
 
         _viewModel.SendCommandHandler = context?.SendCommandAction;
+        _viewModel.CanSendToTerminalProbe = context?.CanSendToTerminal;
         _viewModel.ShowActionDialogAsync = ShowActionDialogAsync;
         _viewModel.ShowSaveFileDialog = ShowSaveFileDialog;
         _viewModel.ShowOpenFileDialog = ShowOpenFileDialog;
@@ -68,8 +83,15 @@ public partial class CommandLibraryView : UserControl, IToolView
         DataContext = _viewModel;
 
         _viewModel.AutoSelectPlatform(context?.ConnectionType);
-        _ = _viewModel.InitializeAsync(context?.TargetHost);
+        _ = _viewModel.InitializeAsync(context?.TargetHost, context?.InitialActionId);
     }
+
+    /// <summary>
+    /// Preselects an action on an already-initialized view. Called by
+    /// <see cref="MainViewModel.OpenToolTabAsync"/> when the Command Palette
+    /// bridge focuses an existing CMDLIB tab instead of creating a new one.
+    /// </summary>
+    public void PreselectAction(string actionId) => _viewModel?.SelectActionById(actionId);
 
     /// <inheritdoc/>
     public bool CanClose() => _viewModel?.CanClose ?? true;

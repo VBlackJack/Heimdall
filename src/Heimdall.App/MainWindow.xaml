@@ -4171,6 +4171,17 @@
                         </ItemsControl>
                     </StackPanel>
 
+                    <!-- Bridge to the Command Library: discovery (palette) hands off
+                         to execution (CMDLIB Send/Copy) with this action preselected. -->
+                    <Button Content="{loc:Translate PaletteSnippetOpenInLibrary}"
+                            Command="{Binding CommandPalette.OpenSnippetInLibraryCommand}"
+                            AutomationProperties.Name="{loc:Translate PaletteSnippetOpenInLibrary}"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            HorizontalAlignment="Left"
+                            Margin="14,8,14,0"
+                            Padding="12,6"
+                            FontSize="{StaticResource FontSizeBody}"/>
+
                     <TextBlock Text="{loc:Translate PaletteSnippetDetailHints}"
                                FontSize="{StaticResource FontSizeCaption}"
                                Padding="14,6"

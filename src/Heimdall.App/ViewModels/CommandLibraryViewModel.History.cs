@@ -19,6 +19,7 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 
 namespace Heimdall.App.ViewModels;
 
@@ -103,26 +104,23 @@ public sealed partial class CommandLibraryViewModel
     }
 
     /// <summary>
-    /// Records a generated command in the persistent history for the active
-    /// action and template. Fire-and-forget; failures are logged but never
-    /// surfaced to the user.
+    /// Records the active action in the persistent history. Fire-and-forget;
+    /// failures are logged but never surfaced to the user.
     /// </summary>
     /// <remarks>
     /// The history insert runs on a worker thread so the Copy/Send hot path
     /// stays snappy. A new DI scope is created inside the <see cref="Task.Run"/>
-    /// closure to avoid sharing a <c>DbContext</c> with the UI thread.
+    /// closure to avoid sharing a <c>DbContext</c> with the UI thread. The
+    /// payload is built by <see cref="BuildSecretFreeHistoryPayload"/> so that
+    /// user-entered parameter values never reach the unencrypted history store.
     /// </remarks>
-    private void RecordHistory(string generatedCommand)
+    private void RecordHistory()
     {
         var action = _selectedAction;
         var template = _activeTemplate;
         if (action is null || template is null) return;
 
-        var paramValues = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var p in _parameters)
-        {
-            paramValues[p.Name] = p.Value;
-        }
+        var (command, parameters) = BuildSecretFreeHistoryPayload(template);
 
         _ = Task.Run(async () =>
         {
@@ -131,7 +129,7 @@ public sealed partial class CommandLibraryViewModel
                 using var scope = _serviceProvider.CreateScope();
                 var historyService = scope.ServiceProvider.GetRequiredService<ICommandHistoryService>();
                 await historyService.AddCommandAsync(
-                    action.Id, generatedCommand, paramValues,
+                    action.Id, command, parameters,
                     template.Platform, action.Title, action.Category);
             }
             catch (Exception ex)
@@ -140,5 +138,18 @@ public sealed partial class CommandLibraryViewModel
                     $"[CommandLibrary] Failed to record history: {ex.Message}");
             }
         });
+    }
+
+    /// <summary>
+    /// Builds the history payload for the active selection. The un-substituted
+    /// template pattern is stored and parameter values are intentionally dropped,
+    /// so user-entered secrets never reach the unencrypted history store
+    /// (<c>twinshell.db</c>). The entry still records which action ran and when.
+    /// </summary>
+    internal static (string Command, Dictionary<string, string> Parameters) BuildSecretFreeHistoryPayload(
+        CommandTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        return (template.CommandPattern, new Dictionary<string, string>(StringComparer.Ordinal));
     }
 }

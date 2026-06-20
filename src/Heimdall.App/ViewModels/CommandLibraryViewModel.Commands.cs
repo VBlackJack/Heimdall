@@ -47,7 +47,7 @@ public sealed partial class CommandLibraryViewModel
         if (!copied) return;
 
         ShowCopyFeedback?.Invoke("copy");
-        RecordHistory(GeneratedCommand);
+        RecordHistory();
     }
 
     /// <summary>
@@ -55,12 +55,20 @@ public sealed partial class CommandLibraryViewModel
     /// generated command and records the action in history. Because Send
     /// executes the command immediately on the session, actions flagged
     /// <see cref="CriticalityLevel.Dangerous"/> require user confirmation first.
+    /// Commands originating from an applied example always require confirmation,
+    /// since example text bypasses parameter validation and escaping.
     /// </summary>
     [RelayCommand]
     public async Task SendAsync()
     {
         if (string.IsNullOrEmpty(GeneratedCommand) || SendCommandHandler is null) return;
-        var level = _selectedAction?.Level ?? CriticalityLevel.Info;
+
+        // Example text bypasses GenerateCommand validation and escaping, and both the
+        // example string and the action level come from (possibly imported) data. Force a
+        // confirmation for example-originated commands regardless of the declared level.
+        var level = _generatedFromExample
+            ? CriticalityLevel.Dangerous
+            : _selectedAction?.Level ?? CriticalityLevel.Info;
         if (!await DangerousCommandGuard.ConfirmIfDangerousAsync(level, _dialogService, LocalizeKey))
         {
             return;
@@ -68,7 +76,7 @@ public sealed partial class CommandLibraryViewModel
 
         SendCommandHandler(GeneratedCommand);
         ShowCopyFeedback?.Invoke("send");
-        RecordHistory(GeneratedCommand);
+        RecordHistory();
     }
 
     /// <summary>
@@ -330,6 +338,15 @@ public sealed partial class CommandLibraryViewModel
         var defaultName = $"commands-export-{DateTime.Now:yyyyMMdd}.json";
         var path = ShowSaveFileDialog(defaultName, "JSON files (*.json)|*.json");
         if (string.IsNullOrEmpty(path)) return;
+
+        // The export writes parameter defaults, examples, and notes verbatim, so any
+        // secret a user embedded in those free-text fields would land in cleartext.
+        // Warn before writing so the user can cancel.
+        var proceed = await _dialogService.ShowConfirmAsync(
+            LocalizeKey("ToolCmdLibExportSecretWarningTitle"),
+            LocalizeKey("ToolCmdLibExportSecretWarningMessage"),
+            "warning");
+        if (!proceed) return;
 
         await RunActionServiceOperationAsync(
             async actionService =>

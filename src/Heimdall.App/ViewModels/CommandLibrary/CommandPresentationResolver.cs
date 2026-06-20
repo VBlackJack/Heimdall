@@ -21,11 +21,12 @@ namespace Heimdall.App.ViewModels.CommandLibrary;
 
 /// <summary>
 /// Stateless resolver turning a TwinShell action into a UI-agnostic
-/// <see cref="CommandPresentation"/>. The risk/platform localized strings and
-/// brush key mirror <see cref="CommandLibraryActionEntry"/> exactly so every
-/// surface yields byte-identical labels. Localization fallbacks are resolved
-/// through the supplied <paramref name="localize"/> delegate (same pattern as
-/// the sync result mapper); the resolver has no WPF or service dependencies.
+/// <see cref="CommandPresentation"/>. This is the single source of truth for the
+/// risk/platform localized strings and brush key: <see cref="CommandLibraryActionEntry"/>
+/// delegates to the public mapping helpers here so every surface yields byte-identical
+/// labels. Localization fallbacks are resolved through the supplied <c>localize</c>
+/// delegate (same pattern as the sync result mapper); the resolver has no WPF or
+/// service dependencies.
 /// </summary>
 public static class CommandPresentationResolver
 {
@@ -54,16 +55,22 @@ public static class CommandPresentationResolver
         };
     }
 
-    /// <summary>Localized platform label; mirrors CommandLibraryActionEntry.PlatformLabel.</summary>
-    private static string ResolvePlatformLabel(Platform platform, Func<string, string> localize) => platform switch
+    /// <summary>
+    /// Localized platform label (Windows / Linux / Both). Single source of truth shared
+    /// with <see cref="CommandLibraryActionEntry.PlatformLabel"/>.
+    /// </summary>
+    public static string ResolvePlatformLabel(Platform platform, Func<string, string> localize) => platform switch
     {
         Platform.Windows => localize("ToolCmdLibPlatformLabelWin"),
         Platform.Linux => localize("ToolCmdLibPlatformLabelLin"),
         _ => localize("ToolCmdLibPlatformLabelBoth")
     };
 
-    /// <summary>Risk brush resource key; mirrors CommandLibraryActionEntry.RiskBrushKey.</summary>
-    private static string ResolveRiskBrushKey(CriticalityLevel level) => level switch
+    /// <summary>
+    /// Risk brush resource key. Single source of truth shared with
+    /// <see cref="CommandLibraryActionEntry.RiskBrushKey"/>.
+    /// </summary>
+    public static string ResolveRiskBrushKey(CriticalityLevel level) => level switch
     {
         CriticalityLevel.Info => "TextSecondaryBrush",
         CriticalityLevel.Run => "WarningBrush",
@@ -71,8 +78,11 @@ public static class CommandPresentationResolver
         _ => "TextSecondaryBrush"
     };
 
-    /// <summary>Localized long-form risk label; mirrors CommandLibraryActionEntry.RiskLabel.</summary>
-    private static string ResolveRiskLabel(CriticalityLevel level, Func<string, string> localize) => level switch
+    /// <summary>
+    /// Localized long-form risk label. Single source of truth shared with
+    /// <see cref="CommandLibraryActionEntry.RiskLabel"/>.
+    /// </summary>
+    public static string ResolveRiskLabel(CriticalityLevel level, Func<string, string> localize) => level switch
     {
         CriticalityLevel.Info => localize("ToolCmdLibRiskInfo"),
         CriticalityLevel.Run => localize("ToolCmdLibRiskRun"),
@@ -80,8 +90,11 @@ public static class CommandPresentationResolver
         _ => string.Empty
     };
 
-    /// <summary>Localized short risk badge; mirrors CommandLibraryActionEntry.RiskBadge.</summary>
-    private static string ResolveRiskBadge(CriticalityLevel level, Func<string, string> localize) => level switch
+    /// <summary>
+    /// Localized short risk badge. Single source of truth shared with
+    /// <see cref="CommandLibraryActionEntry.RiskBadge"/>.
+    /// </summary>
+    public static string ResolveRiskBadge(CriticalityLevel level, Func<string, string> localize) => level switch
     {
         CriticalityLevel.Info => localize("ToolCmdLibRiskBadgeInfo"),
         CriticalityLevel.Run => localize("ToolCmdLibRiskBadgeRun"),

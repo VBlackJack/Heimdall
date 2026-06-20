@@ -34,9 +34,9 @@ public sealed class CommandLibraryPickerItem
     /// <summary>Resolved presentation (description, risk, platform labels) for this action.</summary>
     public required CommandPresentation Presentation { get; init; }
 
-    public string PlatformBadgeText => HasLinuxTemplate && HasWindowsTemplate
-        ? "WIN/LIN"
-        : HasLinuxTemplate
-            ? "LIN"
-            : "WIN";
+    /// <summary>
+    /// Localized platform badge text, resolved at construction from the same keys the
+    /// main view uses (<c>ToolCmdLibPlatformLabelWin</c> / <c>...Lin</c> / <c>...Both</c>).
+    /// </summary>
+    public required string PlatformBadge { get; init; }
 }

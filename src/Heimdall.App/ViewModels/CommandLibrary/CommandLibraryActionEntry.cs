@@ -15,7 +15,6 @@
  */
 
 using CommunityToolkit.Mvvm.ComponentModel;
-using TwinShell.Core.Enums;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.ViewModels.CommandLibrary;
@@ -72,38 +71,35 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject
     /// </summary>
     public int SearchRank => _viewModel.GetSearchRank(Source.Id);
 
-    /// <summary>Localized platform label (Windows / Linux / Both).</summary>
-    public string PlatformLabel => Source.Platform switch
-    {
-        Platform.Windows => _viewModel.LocalizeKey("ToolCmdLibPlatformLabelWin"),
-        Platform.Linux => _viewModel.LocalizeKey("ToolCmdLibPlatformLabelLin"),
-        _ => _viewModel.LocalizeKey("ToolCmdLibPlatformLabelBoth")
-    };
+    /// <summary>
+    /// Localized platform label (Windows / Linux / Both). Delegates to
+    /// <see cref="CommandPresentationResolver.ResolvePlatformLabel"/>, the single
+    /// source of truth for this mapping.
+    /// </summary>
+    public string PlatformLabel =>
+        CommandPresentationResolver.ResolvePlatformLabel(Source.Platform, _viewModel.LocalizeKey);
 
-    /// <summary>Theme resource key representing the action's risk level.</summary>
-    public string RiskBrushKey => Source.Level switch
-    {
-        CriticalityLevel.Info => "TextSecondaryBrush",
-        CriticalityLevel.Run => "WarningBrush",
-        CriticalityLevel.Dangerous => "ErrorBrush",
-        _ => "TextSecondaryBrush"
-    };
+    /// <summary>
+    /// Theme resource key representing the action's risk level. Delegates to
+    /// <see cref="CommandPresentationResolver.ResolveRiskBrushKey"/>, the single
+    /// source of truth for this mapping.
+    /// </summary>
+    public string RiskBrushKey =>
+        CommandPresentationResolver.ResolveRiskBrushKey(Source.Level);
 
-    /// <summary>Localized long-form risk label, used for tooltips.</summary>
-    public string RiskLabel => Source.Level switch
-    {
-        CriticalityLevel.Info => _viewModel.LocalizeKey("ToolCmdLibRiskInfo"),
-        CriticalityLevel.Run => _viewModel.LocalizeKey("ToolCmdLibRiskRun"),
-        CriticalityLevel.Dangerous => _viewModel.LocalizeKey("ToolCmdLibRiskDangerous"),
-        _ => string.Empty
-    };
+    /// <summary>
+    /// Localized long-form risk label, used for tooltips. Delegates to
+    /// <see cref="CommandPresentationResolver.ResolveRiskLabel"/>, the single
+    /// source of truth for this mapping.
+    /// </summary>
+    public string RiskLabel =>
+        CommandPresentationResolver.ResolveRiskLabel(Source.Level, _viewModel.LocalizeKey);
 
-    /// <summary>Short risk badge text shown in the action list.</summary>
-    public string RiskBadge => Source.Level switch
-    {
-        CriticalityLevel.Info => _viewModel.LocalizeKey("ToolCmdLibRiskBadgeInfo"),
-        CriticalityLevel.Run => _viewModel.LocalizeKey("ToolCmdLibRiskBadgeRun"),
-        CriticalityLevel.Dangerous => _viewModel.LocalizeKey("ToolCmdLibRiskBadgeDanger"),
-        _ => string.Empty
-    };
+    /// <summary>
+    /// Short risk badge text shown in the action list. Delegates to
+    /// <see cref="CommandPresentationResolver.ResolveRiskBadge"/>, the single
+    /// source of truth for this mapping.
+    /// </summary>
+    public string RiskBadge =>
+        CommandPresentationResolver.ResolveRiskBadge(Source.Level, _viewModel.LocalizeKey);
 }

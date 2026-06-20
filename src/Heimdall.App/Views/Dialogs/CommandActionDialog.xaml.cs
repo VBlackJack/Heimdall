@@ -21,8 +21,9 @@ using Heimdall.App.ViewModels.Dialogs;
 namespace Heimdall.App.Views.Dialogs;
 
 /// <summary>
-/// Command action add/edit dialog. Code-behind handles localization,
-/// validation triggering, and DialogResult assignment.
+/// Command action add/edit dialog. Static labels, accessibility names, and
+/// section visibility are bound in XAML; code-behind handles validation
+/// triggering, the unsaved-changes prompt, and DialogResult assignment.
 /// </summary>
 public partial class CommandActionDialog : Window
 {
@@ -31,84 +32,7 @@ public partial class CommandActionDialog : Window
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
 
-        Loaded += (_, _) =>
-        {
-            if (DataContext is not CommandActionDialogViewModel { Localizer: not null } vm)
-            {
-                TxtTitle.Focus();
-                return;
-            }
-
-            // Buttons
-            CancelBtn.Content = vm.Localizer["BtnCancel"];
-            SaveBtn.Content = vm.Localizer["BtnSave"];
-            System.Windows.Automation.AutomationProperties.SetName(CancelBtn, vm.Localizer["BtnCancel"]);
-            System.Windows.Automation.AutomationProperties.SetName(SaveBtn, vm.Localizer["BtnSave"]);
-
-            // Form labels
-            LblTitle.Text = vm.Localizer["ToolCmdLibDialogLblTitle"];
-            LblCategory.Text = vm.Localizer["ToolCmdLibDialogLblCategory"];
-            LblPlatform.Text = vm.Localizer["ToolCmdLibDialogLblPlatform"];
-            LblRisk.Text = vm.Localizer["ToolCmdLibDialogLblRisk"];
-            LblDescription.Text = vm.Localizer["ToolCmdLibDialogLblDescription"];
-            LblTags.Text = vm.Localizer["ToolCmdLibDialogLblTags"];
-            LblNotes.Text = vm.Localizer["ToolCmdLibDialogLblNotes"];
-
-            // Template section headers
-            LblWindowsSection.Text = vm.Localizer["ToolCmdLibDialogSectionWindows"];
-            LblLinuxSection.Text = vm.Localizer["ToolCmdLibDialogSectionLinux"];
-            LblWinPattern.Text = vm.Localizer["ToolCmdLibDialogLblPattern"];
-            LblLinuxPattern.Text = vm.Localizer["ToolCmdLibDialogLblPattern"];
-            LblWinName.Text = vm.Localizer["ToolCmdLibDialogLblTemplateName"];
-            LblLinuxName.Text = vm.Localizer["ToolCmdLibDialogLblTemplateName"];
-            LblWinParamName.Text = vm.Localizer["ToolCmdLibDialogParamName"];
-            LblWinParamLabel.Text = vm.Localizer["ToolCmdLibDialogParamLabel"];
-            LblWinParamType.Text = vm.Localizer["ToolCmdLibDialogParamType"];
-            LblLinuxParamName.Text = vm.Localizer["ToolCmdLibDialogParamName"];
-            LblLinuxParamLabel.Text = vm.Localizer["ToolCmdLibDialogParamLabel"];
-            LblLinuxParamType.Text = vm.Localizer["ToolCmdLibDialogParamType"];
-
-            // Parameter buttons
-            BtnAddWinParam.Content = vm.Localizer["ToolCmdLibDialogBtnAddParam"];
-            BtnAddLinuxParam.Content = vm.Localizer["ToolCmdLibDialogBtnAddParam"];
-
-            // Platform combo localization
-            PlatformWindows.Content = vm.Localizer["ToolCmdLibPlatformWindows"];
-            PlatformLinux.Content = vm.Localizer["ToolCmdLibPlatformLinux"];
-            PlatformBoth.Content = vm.Localizer["ToolCmdLibPlatformBoth"];
-
-            // Risk combo localization
-            RiskInfo.Content = vm.Localizer["ToolCmdLibRiskInfo"];
-            RiskRun.Content = vm.Localizer["ToolCmdLibRiskRun"];
-            RiskDangerous.Content = vm.Localizer["ToolCmdLibRiskDangerous"];
-
-            // Accessibility
-            System.Windows.Automation.AutomationProperties.SetName(TxtTitle, vm.Localizer["ToolCmdLibDialogLblTitle"]);
-            System.Windows.Automation.AutomationProperties.SetName(CmbCategory, vm.Localizer["ToolCmdLibDialogLblCategory"]);
-            System.Windows.Automation.AutomationProperties.SetName(CmbPlatform, vm.Localizer["ToolCmdLibDialogLblPlatform"]);
-            System.Windows.Automation.AutomationProperties.SetName(CmbRisk, vm.Localizer["ToolCmdLibDialogLblRisk"]);
-
-            // Show/hide template sections based on platform
-            UpdateTemplateSections(vm.Platform);
-            CmbPlatform.SelectionChanged += (_, _) =>
-            {
-                if (DataContext is CommandActionDialogViewModel v)
-                    UpdateTemplateSections(v.Platform);
-            };
-
-            TxtTitle.Focus();
-        };
-    }
-
-    private void UpdateTemplateSections(TwinShell.Core.Enums.Platform platform)
-    {
-        WindowsSection.Visibility = platform is TwinShell.Core.Enums.Platform.Windows
-            or TwinShell.Core.Enums.Platform.Both
-            ? Visibility.Visible : Visibility.Collapsed;
-
-        LinuxSection.Visibility = platform is TwinShell.Core.Enums.Platform.Linux
-            or TwinShell.Core.Enums.Platform.Both
-            ? Visibility.Visible : Visibility.Collapsed;
+        Loaded += (_, _) => TxtTitle.Focus();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)

@@ -18,6 +18,8 @@ using System.IO;
 using System.Text.Json;
 using Heimdall.App.Services.Import;
 using Heimdall.Core.Configuration;
+using TwinShell.Core.Enums;
+using TwinShell.Core.Models;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.Tests;
@@ -245,6 +247,76 @@ public sealed class CommandLibraryTransferServiceTests
             Assert.Equal(CommandLibraryImportOutcome.FileTooLarge, result.Outcome);
         });
     }
+
+    [Fact]
+    public async Task ImportAsync_ResetsInlineQuoting_WhenPlaceholderOutsideSingleQuotedSpan()
+    {
+        var publicId = Guid.NewGuid();
+        var action = new ActionModel
+        {
+            Id = "quote-1",
+            PublicId = publicId,
+            Title = "Quoting",
+            Category = "Net",
+            WindowsCommandTemplate = new CommandTemplate
+            {
+                Id = "quote-1-win",
+                Name = "win",
+                Platform = Platform.Windows,
+                CommandPattern = "Write-Output '{inside}' {outside}",
+                Parameters =
+                [
+                    InlineParameter("inside"),
+                    InlineParameter("outside")
+                ]
+            },
+            LinuxCommandTemplate = new CommandTemplate
+            {
+                Id = "quote-1-lin",
+                Name = "lin",
+                Platform = Platform.Linux,
+                CommandPattern = "grep '{inside}' {outside}",
+                Parameters =
+                [
+                    InlineParameter("inside"),
+                    InlineParameter("outside")
+                ]
+            }
+        };
+
+        var service = new CommandLibraryTransferService();
+        var actionService = new FakeActionService([]);
+        var json = JsonSerializer.Serialize(new { actions = new[] { action } });
+
+        await WithTempFileAsync(json, async path =>
+        {
+            var result = await service.ImportAsync(actionService, path);
+            Assert.Equal(1, result.Imported);
+
+            var stored = await actionService.GetActionByPublicIdAsync(publicId);
+            Assert.NotNull(stored);
+
+            var win = stored!.WindowsCommandTemplate!.Parameters;
+            Assert.Equal(QuotingMode.InlineInQuotes, FindParameter(win, "inside").Quoting);
+            Assert.Equal(QuotingMode.ShellQuote, FindParameter(win, "outside").Quoting);
+
+            var lin = stored.LinuxCommandTemplate!.Parameters;
+            Assert.Equal(QuotingMode.InlineInQuotes, FindParameter(lin, "inside").Quoting);
+            Assert.Equal(QuotingMode.ShellQuote, FindParameter(lin, "outside").Quoting);
+        });
+    }
+
+    private static TemplateParameter InlineParameter(string name)
+        => new()
+        {
+            Name = name,
+            Label = name,
+            Type = "string",
+            Quoting = QuotingMode.InlineInQuotes
+        };
+
+    private static TemplateParameter FindParameter(IEnumerable<TemplateParameter> parameters, string name)
+        => parameters.Single(parameter => string.Equals(parameter.Name, name, StringComparison.Ordinal));
 
     private static async Task WithTempFileAsync(string content, Func<string, Task> body)
     {

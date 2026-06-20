@@ -282,6 +282,7 @@
                                 Command="{Binding DataContext.ToggleFavoriteByIdCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 CommandParameter="{Binding Source.Id}"
                                 ToolTip="{Binding FavoriteTooltip}"
+                                AutomationProperties.Name="{Binding FavoriteTooltip}"
                                 Style="{DynamicResource ToolbarGhostButtonStyle}"
                                 FontSize="14" Width="24" Height="24"
                                 VerticalAlignment="Center" Margin="{StaticResource MarginInlineStart}"
@@ -399,6 +400,7 @@
                                                    VerticalAlignment="Center"/>
                                         <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  ToolTip="{Binding DisplayTooltip}"
+                                                 AutomationProperties.Name="{Binding DisplayLabel}"
                                                  FontSize="{StaticResource FontSizeBody}"
                                                  FontFamily="Consolas"
                                                  Padding="{StaticResource PaddingInput}"
@@ -530,6 +532,8 @@
                                 Command="{Binding SendCommand}"
                                 IsEnabled="{Binding IsSendEnabled}"
                                 Visibility="{Binding IsSendVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                ToolTip="{Binding SendTooltip}"
+                                ToolTipService.ShowOnDisabled="True"
                                 Content="{loc:Translate ToolCmdLibBtnSend}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnSend}"
                                 Style="{DynamicResource PrimaryButtonStyle}"
@@ -537,6 +541,18 @@
                                 FontSize="{StaticResource FontSizeBody}"
                                 TabIndex="6"/>
                     </StackPanel>
+                    <!-- Inline hint shown only for non-injectable sessions (RDP/VNC/etc.):
+                         command is ready but there is no terminal sink to Send into,
+                         so guide the user to Copy and paste manually. -->
+                    <TextBlock x:Name="CopyHintText"
+                               Text="{loc:Translate ToolCmdLibCopyHintNoTerminal}"
+                               AutomationProperties.Name="{loc:Translate ToolCmdLibCopyHintNoTerminal}"
+                               Visibility="{Binding ShowCopyHint, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center"
+                               Margin="{StaticResource MarginInlineSm}"/>
                 </DockPanel>
             </Grid>
         </Border>
@@ -618,6 +634,7 @@
                                         Command="{Binding DataContext.CopyHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding GeneratedCommand}"
                                         ToolTip="{loc:Translate ToolCmdLibBtnCopy}"
+                                        AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
                                         Style="{DynamicResource ToolbarGhostButtonStyle}"
                                         FontSize="11" Width="22" Height="22"
                                         Padding="2" VerticalAlignment="Center"

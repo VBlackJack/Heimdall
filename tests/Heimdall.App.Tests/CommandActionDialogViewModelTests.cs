@@ -219,6 +219,40 @@ public sealed class CommandActionDialogViewModelTests
     }
 
     /// <summary>
+    /// The dialog binds the Windows/Linux template sections' visibility directly to
+    /// <see cref="CommandActionDialogViewModel.ShowWindowsSection"/> and
+    /// <see cref="CommandActionDialogViewModel.ShowLinuxSection"/>, so a Platform change
+    /// must raise PropertyChanged for both flags and return the correct value:
+    /// Windows visible for Windows/Both, Linux visible for Linux/Both.
+    /// </summary>
+    [Theory]
+    [InlineData(Platform.Windows, true, false)]
+    [InlineData(Platform.Linux, false, true)]
+    [InlineData(Platform.Both, true, true)]
+    public void PlatformChange_NotifiesSectionFlags_WithCorrectValues(
+        Platform platform,
+        bool expectedWindows,
+        bool expectedLinux)
+    {
+        // Start from a platform different to the target so the change actually fires.
+        var vm = new CommandActionDialogViewModel { Platform = Platform.Windows };
+        if (platform == Platform.Windows)
+        {
+            vm.Platform = Platform.Linux;
+        }
+
+        var notified = new List<string?>();
+        vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+
+        vm.Platform = platform;
+
+        notified.Should().Contain(nameof(CommandActionDialogViewModel.ShowWindowsSection));
+        notified.Should().Contain(nameof(CommandActionDialogViewModel.ShowLinuxSection));
+        vm.ShowWindowsSection.Should().Be(expectedWindows);
+        vm.ShowLinuxSection.Should().Be(expectedLinux);
+    }
+
+    /// <summary>
     /// Freezes the validation-localization convention: every DataAnnotation
     /// surfaced through the Title/Category error fields must resolve through the
     /// internal key map to its localized string. If an attribute's

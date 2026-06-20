@@ -759,6 +759,16 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             if (existing is not null)
             {
                 Connection.ActiveSession = existing;
+
+                // Bridge case: an already-open Command Library tab is focused
+                // rather than re-created, so apply the requested preselection to
+                // the live instance (a fresh open handles it via Initialize).
+                if (!string.IsNullOrWhiteSpace(context?.InitialActionId)
+                    && existing.HostControl is Views.Tools.CommandLibraryView commandLibraryView)
+                {
+                    commandLibraryView.PreselectAction(context.InitialActionId!);
+                }
+
                 return;
             }
         }

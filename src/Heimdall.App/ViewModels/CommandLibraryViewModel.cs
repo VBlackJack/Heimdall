@@ -90,6 +90,14 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private bool _disposed;
     private bool _loadingSelection;
 
+    /// <summary>
+    /// True when <see cref="GeneratedCommand"/> currently holds a literal example
+    /// applied via <see cref="ApplyExampleText"/> rather than output produced by the
+    /// generator. Example text bypasses parameter validation and escaping, so Send
+    /// must always confirm before running it regardless of the action's level.
+    /// </summary>
+    private bool _generatedFromExample;
+
     private ListCollectionView? _actionsView;
     private DispatcherTimer? _historyCopyTimer;
 
@@ -205,6 +213,8 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// <summary>True when the current parameter set produces a valid command.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSendEnabled))]
+    [NotifyPropertyChangedFor(nameof(SendTooltip))]
+    [NotifyPropertyChangedFor(nameof(ShowCopyHint))]
     private bool _isCommandValid;
 
     /// <summary>Multi-line validation error text (one bullet per error).</summary>
@@ -230,6 +240,8 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSendEnabled))]
+    [NotifyPropertyChangedFor(nameof(SendTooltip))]
+    [NotifyPropertyChangedFor(nameof(ShowCopyHint))]
     private bool _isSendVisible;
 
     /// <summary>Currently selected entry in the action list (bound from the view).</summary>
@@ -288,8 +300,46 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// <summary>True when <see cref="ValidationError"/> is non-empty.</summary>
     public bool HasValidationError => !string.IsNullOrEmpty(ValidationError);
 
-    /// <summary>True when the Send button should be interactive.</summary>
-    public bool IsSendEnabled => IsCommandValid && IsSendVisible;
+    /// <summary>
+    /// True when the Send button should be interactive: the generated command
+    /// is valid AND the owning session tab currently contains an injectable
+    /// terminal (probed via <see cref="CanSendToTerminalProbe"/>). Visibility is
+    /// a separate, coarser gate (see <see cref="IsSendVisible"/>): a visible but
+    /// disabled button can still explain itself through <see cref="SendTooltip"/>.
+    /// </summary>
+    public bool IsSendEnabled => IsCommandValid && (CanSendToTerminalProbe?.Invoke() ?? false);
+
+    /// <summary>
+    /// Tooltip for the Send button. When the button is enabled it returns the
+    /// normal "Send to terminal" hint; when disabled it explains why — either
+    /// the command is not ready, or there is no injectable terminal in this tab.
+    /// </summary>
+    public string SendTooltip
+    {
+        get
+        {
+            if (!IsCommandValid)
+            {
+                return LocalizeKey("ToolCmdLibSendTooltipInvalid");
+            }
+            if (!(CanSendToTerminalProbe?.Invoke() ?? false))
+            {
+                return LocalizeKey("ToolCmdLibSendTooltipNoTerminal");
+            }
+            return LocalizeKey("ToolCmdLibSendTooltipReady");
+        }
+    }
+
+    /// <summary>
+    /// True when an inline "copy and paste manually" hint should be shown: the
+    /// tool is attached to a session and the command is ready to send, but the
+    /// tab has no injectable terminal sink (probed via
+    /// <see cref="CanSendToTerminalProbe"/>). This is the RDP/VNC/Citrix/SFTP/FTP
+    /// case where Send is disabled and Copy is the user's path forward. Hidden
+    /// for standalone tabs, invalid commands, or when a terminal sink is present.
+    /// </summary>
+    public bool ShowCopyHint
+        => IsSendVisible && IsCommandValid && !(CanSendToTerminalProbe?.Invoke() ?? false);
 
     /// <summary>True when the selected action can be edited or deleted.</summary>
     public bool CanEditSelected => IsSelectedActionEditable;
@@ -360,6 +410,39 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         }
     }
     private Action<string>? _sendCommandHandler;
+
+    /// <summary>
+    /// Probe installed by the view from
+    /// <see cref="Heimdall.Core.Models.ToolContext.CanSendToTerminal"/>. Answers
+    /// "does this session tab currently contain an injectable terminal sink?".
+    /// The probe result is not observable, so the consumers (<see cref="IsSendEnabled"/>,
+    /// <see cref="SendTooltip"/>) are re-evaluated via <see cref="RefreshSendState"/>
+    /// whenever the probe is wired or the view becomes visible again.
+    /// </summary>
+    public Func<bool>? CanSendToTerminalProbe
+    {
+        get => _canSendToTerminalProbe;
+        set
+        {
+            _canSendToTerminalProbe = value;
+            RefreshSendState();
+        }
+    }
+    private Func<bool>? _canSendToTerminalProbe;
+
+    /// <summary>
+    /// Re-evaluates the probe-dependent Send properties (<see cref="IsSendEnabled"/>,
+    /// <see cref="SendTooltip"/>, and <see cref="ShowCopyHint"/>). Pure aside from
+    /// raising change notifications; safe to call whenever the available terminal
+    /// sink may have changed (e.g. split layout or pane focus changes, or the view
+    /// re-shows).
+    /// </summary>
+    public void RefreshSendState()
+    {
+        OnPropertyChanged(nameof(IsSendEnabled));
+        OnPropertyChanged(nameof(SendTooltip));
+        OnPropertyChanged(nameof(ShowCopyHint));
+    }
 
     /// <summary>
     /// Callback installed by the view to write text to the system clipboard.
@@ -465,7 +548,11 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// Optional host string from the originating server tab; used to prefill
     /// host-typed parameters when a template is selected.
     /// </param>
-    public async Task InitializeAsync(string? targetHost)
+    /// <param name="initialActionId">
+    /// Optional action id to preselect once the library has loaded (used by the
+    /// Command Palette "Open in Command Library" bridge). Unknown ids are ignored.
+    /// </param>
+    public async Task InitializeAsync(string? targetHost, string? initialActionId = null)
     {
         _targetHost = string.IsNullOrWhiteSpace(targetHost) ? null : targetHost.Trim();
         EmptyStateMessage = LocalizeKey("ToolCmdLibStatusLoading");
@@ -528,6 +615,8 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
             OnPropertyChanged(nameof(ResultCountText));
             OnPropertyChanged(nameof(IsNoResultsVisible));
             OnPropertyChanged(nameof(IsEmptyStateVisible));
+
+            SelectActionById(initialActionId);
         }
         catch (Exception ex)
         {
@@ -682,6 +771,30 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     }
 
     /// <summary>
+    /// Preselects the action with the given id (matching <see cref="ActionModel.Id"/>)
+    /// by driving <see cref="SelectedEntry"/>, which triggers the normal selection
+    /// and command-generation path. No-op when the id is null/empty; logs a Warning
+    /// and leaves the current selection unchanged when no matching action is loaded.
+    /// Used by the Command Palette "Open in Command Library" bridge, both on fresh
+    /// open and when an already-open CMDLIB tab is reused.
+    /// </summary>
+    public void SelectActionById(string? actionId)
+    {
+        if (string.IsNullOrEmpty(actionId)) return;
+
+        var entry = _allEntries.FirstOrDefault(
+            e => string.Equals(e.Source.Id, actionId, StringComparison.Ordinal));
+        if (entry is null)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandLibrary] Preselect action not found: {actionId}");
+            return;
+        }
+
+        SelectedEntry = entry;
+    }
+
+    /// <summary>
     /// Switches between Windows and Linux templates for the current selection.
     /// No-op when only one template is available.
     /// </summary>
@@ -710,13 +823,15 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>
     /// Recomputes <see cref="GeneratedCommand"/> from the current parameter
-    /// values. Called by the view's <c>OnParameterChanged</c> event handler
-    /// in Phase A; will become automatic once parameter entries gain
-    /// observable <c>Value</c> properties in Phase B.
+    /// values. Invoked automatically whenever a parameter's observable
+    /// <see cref="CommandLibraryParameterEntry.Value"/> changes (via
+    /// <see cref="OnParameterValueChanged"/>) and after a template is selected.
     /// </summary>
     public void RegenerateCommand()
     {
         if (_activeTemplate is null || _commandGenerator is null) return;
+
+        _generatedFromExample = false;
 
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var p in _parameters)
@@ -763,6 +878,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         GeneratedCommand = command;
         ValidationError = string.Empty;
         IsCommandValid = true;
+        _generatedFromExample = true;
     }
 
     private void ApplyActiveTemplate()
@@ -854,6 +970,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         GeneratedCommand = string.Empty;
         ValidationError = string.Empty;
         IsCommandValid = false;
+        _generatedFromExample = false;
 
         SelectedActionNotes = string.Empty;
         SelectedActionExamples.Clear();
