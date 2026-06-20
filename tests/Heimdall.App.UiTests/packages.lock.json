@@ -65,8 +65,8 @@
       },
       "AvalonEdit": {
         "type": "Transitive",
-        "resolved": "6.3.0.90",
-        "contentHash": "WVTb5MxwGqKdeasd3nG5udlV4t6OpvkFanziwI133K0/QJ5FvZmfzRQgpAjGTJhQfIA8GP7AzKQ3sTY9JOFk8Q=="
+        "resolved": "6.3.1.120",
+        "contentHash": "6ASBKPzAg64BLDlFOJo4Ypr1sA/6hB5+TfHLJaZYUSTE0jgxvKlVqKeo/ISTG9qEMxu604qUu6BGugmJkfdrNw=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
@@ -442,7 +442,7 @@
       "Heimdall": {
         "type": "Project",
         "dependencies": {
-          "AvalonEdit": "[6.3.0.90, )",
+          "AvalonEdit": "[6.3.1.120, )",
           "CommunityToolkit.Mvvm": "[8.4.0, )",
           "Heimdall.Core": "[1.0.0, )",
           "Heimdall.Rdp": "[1.0.0, )",
