@@ -17,12 +17,19 @@
 .PARAMETER Version
     Force a specific build number (e.g. '2026.033101') instead of auto-incrementing.
 
+.PARAMETER ReleaseNotesFile
+    Optional path to a hand-written notes file (e.g. localized highlights) prepended
+    above the auto-generated Downloads/Checksums section of the GitHub release notes.
+    When omitted, the tracked convention file 'docs/release-notes/v<version>.md' is used
+    if present; otherwise only the auto-generated notes are published.
+
 .EXAMPLE
     .\Build.ps1                              # Debug build
     .\Build.ps1 -Mode Release                # Release build with installers
     .\Build.ps1 -Mode Release -Publish       # Release + GitHub publish
     .\Build.ps1 -Mode Release -DryRun        # Full build + simulated publish (no git/gh changes)
     .\Build.ps1 -Mode Release -Version 2026.033101  # Force version
+    .\Build.ps1 -Mode Release -Publish -ReleaseNotesFile notes.md  # Prepend custom notes
 
 .NOTES
     Copyright 2026 Julien Bombled
@@ -43,7 +50,11 @@ param(
     # Simulate -Publish without actually pushing or creating the GitHub release
     [switch]$DryRun,
 
-    [string]$Version
+    [string]$Version,
+
+    # Optional hand-written notes file prepended above the auto-generated release
+    # notes. Falls back to docs/release-notes/v<version>.md when omitted.
+    [string]$ReleaseNotesFile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -418,6 +429,30 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
 
     # Build release notes
     $notes = "## Heimdall v${buildNumber}`n`n"
+
+    # Optional hand-written notes prepended above the auto-generated Downloads
+    # section. Resolution order: explicit -ReleaseNotesFile, then the tracked
+    # convention docs/release-notes/v<version>.md, otherwise auto notes only.
+    $customNotesPath = $null
+    if ($ReleaseNotesFile) {
+        if (Test-Path -LiteralPath $ReleaseNotesFile) {
+            $customNotesPath = $ReleaseNotesFile
+        } else {
+            Write-Host "[!] -ReleaseNotesFile not found: $ReleaseNotesFile" -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        $conventionNotes = Join-Path $ProjectRoot "docs\release-notes\v${buildNumber}.md"
+        if (Test-Path -LiteralPath $conventionNotes) {
+            $customNotesPath = $conventionNotes
+        }
+    }
+    if ($customNotesPath) {
+        $customNotes = [System.IO.File]::ReadAllText($customNotesPath)
+        $notes += $customNotes.TrimEnd() + "`n`n"
+        Write-Host "[$label] Prepended custom notes from $(Split-Path $customNotesPath -Leaf)." -ForegroundColor DarkGray
+    }
+
     $notes += "### Downloads`n`n"
     $notes += "| File | Description |`n|------|-------------|`n"
     foreach ($a in $artifacts) {
