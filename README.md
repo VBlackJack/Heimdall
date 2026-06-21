@@ -251,7 +251,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 
 ### Security
 - DPAPI encryption + HMAC-SHA256 integrity via unified `CredentialProtector`
-- External credential provider: choose a command-line provider (preset templates for KeePassXC, KeePass2/KPScript, Bitwarden CLI, 1Password CLI, pass — with an optional unlock secret fed via stdin, a separate username command, a per-profile vault entry name, and a "first line only" output mode) or the native Windows Credential Manager; the provider is built through `ICredentialProviderFactory` and covers SSH/SFTP, RDP/Citrix, WinRM, FTP, Telnet and VNC — database path browser, placeholder hints, test button with inline feedback
+- External credential provider: choose a command-line provider (preset templates for KeePassXC, KeePass2/KPScript, Bitwarden CLI, 1Password CLI, pass - with an optional unlock secret fed via stdin, a separate username command, a per-profile vault entry name, and a "first line only" output mode) or the native Windows Credential Manager; the provider is built through `ICredentialProviderFactory` and covers SSH/SFTP, RDP/Citrix, WinRM, FTP, Telnet and VNC - database path browser, placeholder hints, test button with inline feedback
 - Optional Windows Hello gate: requires a biometric/PIN verification before stored credentials are used on connect (single and bulk), fail-closed with a configurable grace window
 - PBKDF2-SHA256 PIN hashing (100,000 iterations) with lockout mechanics
 - Windows ACL enforcement on config directories, log files, and temp files
