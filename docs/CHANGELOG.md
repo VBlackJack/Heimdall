@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-21: External vault integration overhaul
+
+Hardened and extended the external credential provider after an audit found the
+shipped presets unusable out of the box, then added native and biometric options.
+
+- **Interactive vault tools now work.** The command provider can feed an optional
+  unlock secret (DPAPI-stored) to the tool via stdin, so KeePassXC and `pass`
+  unlock non-interactively. Stderr is drained before the write to avoid pipe
+  deadlock, and a hung tool is killed on timeout.
+- **Username from the vault.** An optional separate username command resolves the
+  login, run only when the profile has no username; failure falls back to the hint.
+- **Per-profile vault entry name.** A `VaultEntryName` override decouples the vault
+  lookup from the Heimdall display name.
+- **All protocols covered.** Telnet and VNC now use the provider alongside
+  SSH/SFTP, RDP/Citrix, WinRM and FTP.
+- **Provider selection + DI.** `ICredentialProviderFactory` builds either the
+  command provider or the new **Windows Credential Manager** provider
+  (`CredReadW`, returns username + password). Provider construction is injectable
+  and unit-tested end to end.
+- **First-line output mode + KeePass2 preset.** A "first line only" option strips
+  trailing output such as KPScript's `OK:` line; a KeePass2 (KPScript) preset was
+  added, with in-app guidance recommending `keepassxc-cli` against `.kdbx` files
+  for stdin-based unlocking.
+- **Windows Hello gate.** An optional, fail-closed biometric/PIN verification can
+  be required before stored credentials are used, on both single and bulk connect,
+  with a configurable in-memory grace window.
+- **Fixes.** The Settings "Test" button now uses the configured timeout.
+- **Tests.** Baseline raised to 7,337 passing tests, 0 failures.
+
 ## 2026-06-20: Magellan theme and release-notes tooling (v2026.062002)
 
 This release adds the Magellan dark theme and streamlines the release-notes

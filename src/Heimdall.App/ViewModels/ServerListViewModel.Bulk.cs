@@ -300,6 +300,14 @@ public partial class ServerListViewModel
             return;
         }
 
+        // Windows Hello gate: verify once for the whole batch, before the plan is
+        // prepared (plan preparation resolves stored credentials). Abort on failure.
+        var settings = await _configManager.LoadSettingsAsync();
+        if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
+        {
+            return;
+        }
+
         var plan = await PrepareBulkConnectPlanAsync(selectedItems, cancellationToken);
         if (plan.ConnectableCount <= 0)
         {
@@ -336,6 +344,15 @@ public partial class ServerListViewModel
         IReadOnlyList<ServerItemViewModel> serversToConnect,
         CancellationToken cancellationToken = default)
     {
+        // Windows Hello gate for any caller of this entry point, before credentials are
+        // resolved in plan preparation. The shared grace window prevents a second prompt
+        // if a recent verification (single-connect or another batch) already succeeded.
+        var settings = await _configManager.LoadSettingsAsync();
+        if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
+        {
+            return;
+        }
+
         var plan = await PrepareBulkConnectPlanAsync(serversToConnect, cancellationToken);
         await ConnectServersBulkCoreAsync(plan, cancellationToken);
     }

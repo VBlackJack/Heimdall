@@ -140,6 +140,7 @@ public class ServerProfileDtoTests
         Assert.False(dto.HasSshKeyPassphraseEncryptedField);
         Assert.Null(dto.Tags);
         Assert.Null(dto.Environment);
+        Assert.Null(dto.VaultEntryName);
         Assert.Null(dto.LocalShellExecutable);
         Assert.Null(dto.LocalShellArguments);
         Assert.Null(dto.LocalShellWorkingDirectory);
@@ -188,6 +189,7 @@ public class ServerProfileDtoTests
             RdpResizeEnableDelayMs = 3000,
             RdpStrictServerAuthentication = true,
             Environment = "Production",
+            VaultEntryName = "prod-db/rdp",
             LocalShellExecutable = "pwsh.exe",
             LocalShellElevated = true,
         };
@@ -233,6 +235,7 @@ public class ServerProfileDtoTests
         Assert.Equal(original.RdpResizeEnableDelayMs, deserialized.RdpResizeEnableDelayMs);
         Assert.Equal(original.RdpStrictServerAuthentication, deserialized.RdpStrictServerAuthentication);
         Assert.Equal(original.Environment, deserialized.Environment);
+        Assert.Equal(original.VaultEntryName, deserialized.VaultEntryName);
         Assert.Equal(original.LocalShellExecutable, deserialized.LocalShellExecutable);
         Assert.Equal(original.LocalShellElevated, deserialized.LocalShellElevated);
     }
@@ -344,6 +347,69 @@ public class ServerProfileDtoTests
 
         Assert.NotNull(dto);
         Assert.Null(dto.TunnelsPanelExpanded);
+    }
+
+    [Fact]
+    public void VaultEntryName_DefaultsToNull()
+    {
+        var dto = new ServerProfileDto();
+
+        Assert.Null(dto.VaultEntryName);
+    }
+
+    [Fact]
+    public void VaultEntryName_RoundTrip_PreservesValue()
+    {
+        var original = new ServerProfileDto
+        {
+            Id = "srv-vault",
+            DisplayName = "Display Only",
+            RemoteServer = "10.0.0.1",
+            VaultEntryName = "team-vault/prod-db"
+        };
+
+        var json = JsonSerializer.Serialize(original, CamelCaseOmitNullOptions);
+        var deserialized = JsonSerializer.Deserialize<ServerProfileDto>(json, CamelCaseOmitNullOptions);
+
+        Assert.Contains("\"vaultEntryName\": \"team-vault/prod-db\"", json);
+        Assert.NotNull(deserialized);
+        Assert.Equal("team-vault/prod-db", deserialized.VaultEntryName);
+    }
+
+    [Fact]
+    public void VaultEntryName_RoundTrip_NullOmitsKey()
+    {
+        var original = new ServerProfileDto
+        {
+            Id = "srv-vault-null",
+            DisplayName = "Display Only",
+            RemoteServer = "10.0.0.1",
+            VaultEntryName = null
+        };
+
+        var json = JsonSerializer.Serialize(original, CamelCaseOmitNullOptions);
+        var deserialized = JsonSerializer.Deserialize<ServerProfileDto>(json, CamelCaseOmitNullOptions);
+
+        Assert.DoesNotContain("vaultEntryName", json);
+        Assert.NotNull(deserialized);
+        Assert.Null(deserialized.VaultEntryName);
+    }
+
+    [Fact]
+    public void VaultEntryName_LegacyJson_DeserialisesToNull()
+    {
+        var json = """
+        {
+            "id": "srv-legacy",
+            "displayName": "Legacy",
+            "remoteServer": "10.0.0.1"
+        }
+        """;
+
+        var dto = JsonSerializer.Deserialize<ServerProfileDto>(json, CamelCaseOmitNullOptions);
+
+        Assert.NotNull(dto);
+        Assert.Null(dto.VaultEntryName);
     }
 
     [Fact]

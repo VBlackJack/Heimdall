@@ -397,11 +397,13 @@ ISplitContent (marker interface)
 
 **Solution**: `GroupDefaultsDto` defines default connection settings (gateway, SSH username, key path, port, connection type) at the group/folder level. Servers inherit these values when their own fields are null or empty. Resolution is hierarchical: a server in `PROD/Linux` inherits from `PROD/Linux` first, then falls back to `PROD` if the nested group does not override the field.
 
-### 19. External Credential Provider (CommandCredentialProvider)
+### 19. External Credential Providers (factory + command / Windows Credential Manager)
 
-**Problem**: Security-conscious environments store credentials in external password managers (KeePassXC, Bitwarden CLI, 1Password CLI, `pass`), not in the application's DPAPI vault.
+**Problem**: Security-conscious environments store credentials in external password managers (KeePassXC, KeePass2, Bitwarden CLI, 1Password CLI, `pass`) or the native Windows Credential Manager, not in the application's DPAPI vault.
 
-**Solution**: `CommandCredentialProvider` implements `ICredentialProvider` by executing a user-configured CLI command template. Placeholders `{Host}`, `{Port}`, `{User}`, `{Title}`, `{Database}` are substituted at runtime with context-aware sanitization: `InputValidator.IsShellTarget()` inspects the template's executable to choose strict stripping for shell interpreters (cmd.exe, PowerShell, WSL, WSH) or relaxed stripping for regular executables (keepassxc-cli, bw, op). The command's stdout is captured and trimmed as the password. A 10-second timeout prevents hangs. Soft failures (non-zero exit, empty output) surface a warning dialog to the user. This enables zero-knowledge credential retrieval where Heimdall never persists the password.
+**Solution**: `ICredentialProviderFactory` (`CredentialProviderFactory`) builds the provider chosen in settings (`CredentialProviderType`): the command provider or the native Windows Credential Manager. `CommandCredentialProvider` executes a user-configured CLI template — placeholders `{Host}`, `{Port}`, `{User}`, `{Title}`, `{Database}` are substituted with context-aware sanitization (`InputValidator.IsShellTarget()` chooses strict stripping for shell interpreters vs relaxed stripping for regular executables like keepassxc-cli, bw, op). An optional **unlock secret** is fed to the tool via stdin (KeePassXC master password, GPG passphrase), an optional **separate username command** resolves the login, a **configurable timeout** bounds each call, and a **"first line only"** mode strips trailing noise such as KPScript's `OK:` line (also useful for `pass`). `WindowsCredentialManagerProvider` reads generic credentials via `CredReadW` (Win32), returning both username and password and keying off the per-profile vault entry name (`VaultEntryName`) or the display name. Retrieved passwords are re-encrypted with DPAPI before injection into the in-memory profile, so all downstream protocols (SSH/SFTP, RDP/Citrix, WinRM, FTP, Telnet, VNC) work unchanged. Soft failures (non-zero exit, empty output) surface a warning to the user. This enables zero-knowledge credential retrieval where Heimdall never persists the password.
+
+A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsentVerifier`) can require a biometric/PIN verification before any stored credential is resolved, on both single and bulk connect. It is fail-closed (blocks when Hello is enabled but unavailable/not enrolled) and remembers a successful verification for a configurable in-memory grace window (`RequireWindowsHelloOnConnect`, `WindowsHelloGraceMinutes`) to avoid prompting on every connection.
 
 ### 20. Scheduled Tasks Engine (TaskSchedulerService)
 
@@ -734,7 +736,8 @@ Error state reachable from Ready or Busy.
 | File writes | UTF-8 without BOM via `SecureFileWriter` |
 | Memory | Credentials cleared after COM injection, `SecureString` for handoff paths |
 | Exception handling | Global handlers registered before first await, unobserved task exceptions caught |
-| External credentials | `CommandCredentialProvider` executes CLI password managers (KeePassXC, Bitwarden, 1Password) with 10s timeout |
+| External credentials | `CredentialProviderFactory` selects the command provider (KeePassXC, KeePass2/KPScript, Bitwarden, 1Password, pass) or the native Windows Credential Manager; configurable timeout, optional unlock secret via stdin, DPAPI re-encryption before use |
+| Windows Hello gate | Optional fail-closed biometric/PIN verification (`UserConsentVerifier`) before stored credentials are used, on single and bulk connect, with a configurable grace window |
 | Logging | `FileLogger.Dispose()` flushes before marking disposed (no lost diagnostics) |
 
 ## Settings Panel Architecture

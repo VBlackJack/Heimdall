@@ -702,6 +702,9 @@ public partial class ServerDialog : Window
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_TagsBox, DlgSrv_TagsLabel);
         DlgSrv_MacAddressLabel.Text = _localizer["ServerDialogLabelMacAddress"];
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_MacAddressBox, DlgSrv_MacAddressLabel);
+        DlgSrv_VaultEntryNameLabel.Text = _localizer["ServerDialogLabelVaultEntryName"];
+        DlgSrv_VaultEntryNameHint.Text = _localizer["ServerDialogVaultEntryNameHelp"];
+        System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_VaultEntryNameBox, DlgSrv_VaultEntryNameLabel);
 
         // Action buttons
         DlgSrv_CancelBtn.Content = _localizer["ServerDialogBtnCancel"];

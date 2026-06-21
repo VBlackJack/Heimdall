@@ -405,13 +405,57 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     }
 
     [ObservableProperty]
+    private CredentialProviderKind _credentialProviderType = CredentialProviderKind.Command;
+
+    /// <summary>True when the command-based provider is selected (controls field visibility).</summary>
+    public bool IsCommandProvider
+    {
+        get => CredentialProviderType == CredentialProviderKind.Command;
+        set { if (value) CredentialProviderType = CredentialProviderKind.Command; }
+    }
+
+    /// <summary>True when the Windows Credential Manager provider is selected.</summary>
+    public bool IsWindowsCredentialManagerProvider
+    {
+        get => CredentialProviderType == CredentialProviderKind.WindowsCredentialManager;
+        set { if (value) CredentialProviderType = CredentialProviderKind.WindowsCredentialManager; }
+    }
+
+    partial void OnCredentialProviderTypeChanged(CredentialProviderKind value)
+    {
+        OnPropertyChanged(nameof(IsCommandProvider));
+        OnPropertyChanged(nameof(IsWindowsCredentialManagerProvider));
+    }
+
+    [ObservableProperty]
     private string _credentialProviderCommand = "";
 
     [ObservableProperty]
     private string _credentialProviderDatabase = "";
 
+    // Optional command that retrieves the username from the vault (plaintext template).
+    [ObservableProperty]
+    private string _credentialProviderUsernameCommand = "";
+
+    // Take only the first non-empty line of command output (KeePass2 KPScript, pass, etc.).
+    [ObservableProperty]
+    private bool _credentialProviderFirstLineOnly;
+
+    // Plaintext unlock secret held only in the view-model; persisted DPAPI-encrypted.
+    [ObservableProperty]
+    private string _credentialProviderUnlockSecret = "";
+
+    [ObservableProperty]
+    private int _credentialProviderTimeoutMs = 10000;
+
     [ObservableProperty]
     private bool _requireCredentialGuard;
+
+    [ObservableProperty]
+    private bool _requireWindowsHelloOnConnect;
+
+    [ObservableProperty]
+    private int _windowsHelloGraceMinutes = AppSettings.DefaultWindowsHelloGraceMinutes;
 
     [ObservableProperty]
     private bool _isPinConfigured;
@@ -834,9 +878,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // Security
         UseExternalCredentialProvider = settings.UseExternalCredentialProvider;
+        CredentialProviderType = settings.CredentialProviderType;
         CredentialProviderCommand = settings.CredentialProviderCommand ?? "";
         CredentialProviderDatabase = settings.CredentialProviderDatabase ?? "";
+        CredentialProviderUsernameCommand = settings.CredentialProviderUsernameCommand ?? "";
+        CredentialProviderFirstLineOnly = settings.CredentialProviderFirstLineOnly;
+        CredentialProviderUnlockSecret =
+            CredentialProtector.Unprotect(settings.CredentialProviderUnlockSecretEncrypted) ?? "";
+        CredentialProviderTimeoutMs = settings.CredentialProviderTimeoutMs;
         RequireCredentialGuard = settings.RequireCredentialGuard;
+        RequireWindowsHelloOnConnect = settings.RequireWindowsHelloOnConnect;
+        WindowsHelloGraceMinutes = settings.WindowsHelloGraceMinutes;
         IsPinConfigured = !string.IsNullOrEmpty(settings.PinHash) && !string.IsNullOrEmpty(settings.PinSalt);
 
         // Advanced / Logging
@@ -1011,9 +1063,19 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             // Security
             settings.UseExternalCredentialProvider = UseExternalCredentialProvider;
+            settings.CredentialProviderType = CredentialProviderType;
             settings.CredentialProviderCommand = CredentialProviderCommand;
             settings.CredentialProviderDatabase = CredentialProviderDatabase;
+            settings.CredentialProviderUsernameCommand = CredentialProviderUsernameCommand;
+            settings.CredentialProviderFirstLineOnly = CredentialProviderFirstLineOnly;
+            settings.CredentialProviderUnlockSecretEncrypted =
+                string.IsNullOrEmpty(CredentialProviderUnlockSecret)
+                    ? null
+                    : CredentialProtector.Protect(CredentialProviderUnlockSecret);
+            settings.CredentialProviderTimeoutMs = CredentialProviderTimeoutMs;
             settings.RequireCredentialGuard = RequireCredentialGuard;
+            settings.RequireWindowsHelloOnConnect = RequireWindowsHelloOnConnect;
+            settings.WindowsHelloGraceMinutes = WindowsHelloGraceMinutes;
 
             // Advanced / Logging
             settings.EnableLogging = EnableLogging;
@@ -1853,7 +1915,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         try
         {
             var provider = new Core.Security.CommandCredentialProvider(
-                CredentialProviderCommand, CredentialProviderDatabase);
+                CredentialProviderCommand, CredentialProviderDatabase,
+                CredentialProviderTimeoutMs,
+                string.IsNullOrEmpty(CredentialProviderUnlockSecret)
+                    ? null
+                    : CredentialProviderUnlockSecret,
+                string.IsNullOrWhiteSpace(CredentialProviderUsernameCommand)
+                    ? null
+                    : CredentialProviderUsernameCommand,
+                CredentialProviderFirstLineOnly);
 
             var result = await provider.GetCredentialAsync(
                 "test.example.com", 22, "testuser", "TestEntry", cancellationToken);

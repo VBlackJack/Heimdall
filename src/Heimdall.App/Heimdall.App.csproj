@@ -76,7 +76,9 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- Windows-10-versioned TFM enables built-in CsWinRT projections (e.g. UserConsentVerifier
+         for the Windows Hello connect gate). No extra package required on .NET 5+. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>

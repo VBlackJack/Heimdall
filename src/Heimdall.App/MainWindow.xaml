@@ -2869,6 +2869,13 @@
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsCredProviderTitle" Text="{loc:Translate SettingsSectionCredentialProvider}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
                                         <CheckBox x:Name="Mw_SettingsCredProviderEnabled" Content="{loc:Translate SettingsLabelCredProviderEnabled}" IsChecked="{Binding Settings.UseExternalCredentialProvider}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}">
+                                            <TextBlock x:Name="Mw_SettingsCredProviderTypeLabel" Text="{loc:Translate SettingsLabelCredProviderType}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <RadioButton x:Name="Mw_SettingsCredProviderTypeCommand" GroupName="CredProviderType" Content="{loc:Translate SettingsCredProviderTypeCommand}" IsChecked="{Binding Settings.IsCommandProvider, Mode=TwoWay}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <RadioButton x:Name="Mw_SettingsCredProviderTypeCredMan" GroupName="CredProviderType" Content="{loc:Translate SettingsCredProviderTypeCredMan}" IsChecked="{Binding Settings.IsWindowsCredentialManagerProvider, Mode=TwoWay}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="Mw_SettingsCredProviderTypeCredManHelp" Text="{loc:Translate SettingsCredProviderTypeCredManHelp}" Visibility="{Binding Settings.IsWindowsCredentialManagerProvider, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel x:Name="Mw_SettingsCommandProviderFields" Visibility="{Binding Settings.IsCommandProvider, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProvPresetLabel" Text="{loc:Translate CredProvPresetLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox x:Name="Mw_SettingsCredProvPreset" SelectionChanged="OnCredProvPresetChanged" FontSize="{StaticResource FontSizeBody}" Margin="0,0,0,12"/>
@@ -2877,6 +2884,16 @@
                                             <TextBlock x:Name="Mw_SettingsCredProviderCmdLabel" Text="{loc:Translate SettingsLabelCredProviderCommand}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <TextBox x:Name="Mw_SettingsCredProvCmd" Text="{Binding Settings.CredentialProviderCommand}" Tag="{loc:Translate SettingsCredProvCmdPlaceholder}"/>
                                             <TextBlock x:Name="Mw_SettingsCredProvCmdHint" Text="{loc:Translate CredProvCmdHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" FontFamily="Consolas" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                            <TextBlock x:Name="Mw_SettingsCredProvUsernameCmdLabel" Text="{loc:Translate SettingsLabelCredProviderUsernameCmd}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="Mw_SettingsCredProvUsernameCmd" Text="{Binding Settings.CredentialProviderUsernameCommand}" Tag="{loc:Translate SettingsCredProviderUsernameCmdPlaceholder}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvUsernameCmdLabel}"/>
+                                            <TextBlock x:Name="Mw_SettingsCredProvUsernameCmdHint" Text="{loc:Translate SettingsCredProviderUsernameCmdHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                            <TextBlock x:Name="Mw_SettingsCredProvUnlockLabel" Text="{loc:Translate SettingsLabelCredProviderUnlock}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <PasswordBox x:Name="Mw_SettingsCredProvUnlock" FontSize="{StaticResource FontSizeBody}" PasswordChanged="OnCredProvUnlockChanged" ToolTip="{loc:Translate SettingsCredProviderUnlockPlaceholder}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvUnlockLabel}"/>
+                                            <TextBlock x:Name="Mw_SettingsCredProvUnlockHint" Text="{loc:Translate SettingsCredProviderUnlockHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                         <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProviderDbLabel" Text="{loc:Translate SettingsLabelCredProviderDatabase}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
@@ -2894,7 +2911,20 @@
                                             <Button x:Name="Mw_SettingsCredProvTestBtn" DockPanel.Dock="Right" Content="{loc:Translate CredProvBtnTest}" Command="{Binding Settings.TestCredentialProviderCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate CredProvBtnTest}"/>
                                             <TextBlock x:Name="Mw_SettingsCredProvTestResult" Text="{Binding Settings.CredentialProviderTestResult}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" FontStyle="Italic" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                         </DockPanel>
+                                        <CheckBox x:Name="Mw_SettingsCredProvFirstLineOnly" Content="{loc:Translate SettingsLabelCredProviderFirstLineOnly}" IsChecked="{Binding Settings.CredentialProviderFirstLineOnly}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"/>
+                                        <TextBlock x:Name="Mw_SettingsCredProvFirstLineOnlyHint" Text="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        <TextBlock x:Name="Mw_SettingsCredProvKeePass2Hint" Text="{loc:Translate SettingsCredProviderKeePass2Hint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsCredGuard" Content="{loc:Translate SettingsLabelCredentialGuard}" IsChecked="{Binding Settings.RequireCredentialGuard}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"/>
+                                        <CheckBox x:Name="Mw_SettingsRequireWindowsHello" Content="{loc:Translate SettingsLabelRequireWindowsHello}" IsChecked="{Binding Settings.RequireWindowsHelloOnConnect}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"/>
+                                        <TextBlock Text="{loc:Translate SettingsRequireWindowsHelloHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        <StackPanel Margin="0,8,0,0" IsEnabled="{Binding Settings.RequireWindowsHelloOnConnect}">
+                                            <TextBlock x:Name="Mw_SettingsWindowsHelloGraceLabel" Text="{loc:Translate SettingsLabelWindowsHelloGrace}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.WindowsHelloGraceMinutes}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsWindowsHelloGraceLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMinutes}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 

@@ -27,8 +27,8 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 ## Why Heimdall?
 
 - **9 protocols, one interface** --- RDP, SSH, SFTP, VNC, Telnet, FTP, Citrix, WinRM, and local shell sessions in a single tabbed window
-- **Zero-trust credential storage** --- DPAPI encryption + HMAC-SHA256 integrity, PBKDF2 PIN protection, Windows ACL enforcement
-- **External vault integration** --- KeePassXC, Bitwarden CLI, 1Password CLI, or any command-line password manager
+- **Zero-trust credential storage** --- DPAPI encryption + HMAC-SHA256 integrity, PBKDF2 PIN protection, Windows ACL enforcement, optional Windows Hello (biometric/PIN) gate before connect
+- **External vault integration** --- KeePassXC, KeePass2 (KPScript), Bitwarden CLI, 1Password CLI, `pass`, the native Windows Credential Manager, or any command-line password manager
 - **Pageant-native** --- Direct IPC with PuTTY Pageant via shared memory (no agent forwarding hacks)
 - **Portable** --- Self-contained build with no installer required
 
@@ -251,7 +251,8 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 
 ### Security
 - DPAPI encryption + HMAC-SHA256 integrity via unified `CredentialProtector`
-- External credential provider: preset templates for KeePassXC, Bitwarden CLI, 1Password CLI, pass — database path browser, placeholder hints, test button with inline feedback
+- External credential provider: choose a command-line provider (preset templates for KeePassXC, KeePass2/KPScript, Bitwarden CLI, 1Password CLI, pass — with an optional unlock secret fed via stdin, a separate username command, a per-profile vault entry name, and a "first line only" output mode) or the native Windows Credential Manager; the provider is built through `ICredentialProviderFactory` and covers SSH/SFTP, RDP/Citrix, WinRM, FTP, Telnet and VNC — database path browser, placeholder hints, test button with inline feedback
+- Optional Windows Hello gate: requires a biometric/PIN verification before stored credentials are used on connect (single and bulk), fail-closed with a configurable grace window
 - PBKDF2-SHA256 PIN hashing (100,000 iterations) with lockout mechanics
 - Windows ACL enforcement on config directories, log files, and temp files
 - Centralized `InputValidator` security utilities: `EscapeShellArg()`, `EscapeForDoubleQuotedString()`, `ValidateDomain()`, `SanitizeCsvCell()`, `IsShellTarget()` — shell injection prevention (CWE-78) on all SSH tunnel and tool `CreateCommand()` calls, context-aware placeholder sanitization (strict for shell targets, relaxed for regular executables), CSV formula injection prevention on all exporters, CRLF sanitization on HTTP headers

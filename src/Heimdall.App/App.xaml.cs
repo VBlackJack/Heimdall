@@ -463,6 +463,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IForegroundWatchService, ForegroundWatchService>();
         services.AddSingleton<IToolContextProvider, ToolContextProvider>();
         services.AddSingleton<CredentialProviderPresetService>();
+        services.AddSingleton<Core.Security.ICredentialProviderFactory, Core.Security.CredentialProviderFactory>();
+        services.AddSingleton<IWindowsHelloService, WindowsHelloService>();
         services.AddSingleton<CommandLibrarySettingsService>();
         services.AddSingleton<ExternalToolSettingsService>();
         services.AddSingleton<ExternalToolLaunchService>();

@@ -355,8 +355,24 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private void ApplySettingsLocalization(MainViewModel vm)
     {
         PopulateCredentialProviderPresets();
+        PopulateCredentialProviderUnlockSecret(vm);
         _ = RefreshCommandLibraryTokenStatusAsync();
         RefreshExternalToolSettingsUi(vm);
+    }
+
+    // Pushes the (decrypted) unlock secret from the view-model into the PasswordBox.
+    // Suppressed so the resulting PasswordChanged event does not mark settings dirty.
+    private void PopulateCredentialProviderUnlockSecret(MainViewModel vm)
+    {
+        _suppressCredProvUnlockChange = true;
+        try
+        {
+            Mw_SettingsCredProvUnlock.Password = vm.Settings.CredentialProviderUnlockSecret;
+        }
+        finally
+        {
+            _suppressCredProvUnlockChange = false;
+        }
     }
 
     private void PopulateCredentialProviderPresets()
@@ -1803,6 +1819,20 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
 
         vm.Settings.CredentialProviderCommand = command;
+        vm.Settings.IsDirty = true;
+    }
+
+    // Guards the unlock PasswordBox so programmatic population on load does not mark dirty.
+    private bool _suppressCredProvUnlockChange;
+
+    private void OnCredProvUnlockChanged(object sender, RoutedEventArgs e)
+    {
+        if (_suppressCredProvUnlockChange || DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        vm.Settings.CredentialProviderUnlockSecret = Mw_SettingsCredProvUnlock.Password;
         vm.Settings.IsDirty = true;
     }
 

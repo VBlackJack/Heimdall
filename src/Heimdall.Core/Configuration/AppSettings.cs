@@ -249,8 +249,36 @@ public sealed class AppSettings
 
     // External credential provider (KeePassXC, Bitwarden CLI, 1Password CLI, etc.)
     public bool UseExternalCredentialProvider { get; set; }
+
+    // Which provider implementation to use when the external provider is enabled.
+    [JsonConverter(typeof(JsonStringEnumConverter<CredentialProviderKind>))]
+    public CredentialProviderKind CredentialProviderType { get; set; } = CredentialProviderKind.Command;
+
     public string? CredentialProviderCommand { get; set; }
     public string? CredentialProviderDatabase { get; set; }
+
+    // Optional second command that retrieves the username from the vault. Run only when
+    // the profile has no username. A command template, not a secret -> plaintext.
+    public string? CredentialProviderUsernameCommand { get; set; }
+
+    // When true, take only the first non-empty line of command output (for tools that
+    // print the value on line 1 followed by status text, e.g. KeePass2 KPScript, pass).
+    public bool CredentialProviderFirstLineOnly { get; set; }
+
+    // DPAPI-encrypted unlock secret (database master password / GPG passphrase)
+    // written to the provider command's stdin. Never stored in plaintext.
+    public string? CredentialProviderUnlockSecretEncrypted { get; set; }
+
+    // Windows Hello (biometric/PIN) gate evaluated at connect time, before stored
+    // credentials are resolved or used. Fail-closed when enabled but unavailable.
+    public bool RequireWindowsHelloOnConnect { get; set; }
+
+    /// <summary>Default grace window (minutes) for a successful Windows Hello verification.</summary>
+    public const int DefaultWindowsHelloGraceMinutes = 5;
+
+    // Minutes a successful verification is remembered (in-memory, not persisted across
+    // restarts) before the user is prompted again. 0 = always re-verify.
+    public int WindowsHelloGraceMinutes { get; set; } = DefaultWindowsHelloGraceMinutes;
 
     // External tools (launched from server context menu)
     public List<ExternalToolDefinition> ExternalTools { get; set; } = new();

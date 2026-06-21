@@ -29,10 +29,14 @@ public class CommandCredentialProviderTests
 
     private static CommandCredentialProvider CreateProvider(
         string? commandTemplate,
-        string? databasePath = null)
+        string? databasePath = null,
+        string? unlockSecret = null,
+        string? usernameCommandTemplate = null,
+        bool firstLineOnly = false)
     {
         return new CommandCredentialProvider(
-            commandTemplate, databasePath, timeoutMs: TestTimeoutMs);
+            commandTemplate, databasePath, timeoutMs: TestTimeoutMs, unlockSecret: unlockSecret,
+            usernameCommandTemplate: usernameCommandTemplate, firstLineOnly: firstLineOnly);
     }
 
     // ---------------------------------------------------------------
@@ -372,6 +376,148 @@ public class CommandCredentialProviderTests
         var expanded = provider.ExpandTemplate(
             "bw.exe get {Title}", "host", 22, "user", "entry\"injected");
         Assert.Equal("bw.exe get entryinjected", expanded);
+    }
+
+    // ---------------------------------------------------------------
+    // Unlock secret injection via stdin
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public async Task GetCredentialAsync_WithUnlockSecret_FeedsStdin()
+    {
+        // `sort` reads its standard input and writes the (single) line back to stdout. The
+        // provider must redirect stdin and write the unlock secret, so the echoed output
+        // equals the injected secret — proving stdin injection works end to end.
+        var provider = CreateProvider("cmd.exe /c sort", unlockSecret: "vault-master-pw");
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("vault-master-pw", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_NullUnlockSecret_DoesNotRedirectStdin()
+    {
+        // No regression: with a null unlock secret, stdin is not redirected and a plain
+        // command that never reads stdin still completes and returns its output. (A forced
+        // stdin redirect with no writer would leave the child waiting on an open pipe.)
+        var provider = CreateProvider("cmd.exe /c echo no-stdin-needed", unlockSecret: null);
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("no-stdin-needed", result.Password);
+    }
+
+    // ---------------------------------------------------------------
+    // Username command (separate vault lookup)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public async Task GetCredentialAsync_UsernameCommand_RunsWhenHintEmpty()
+    {
+        var provider = CreateProvider(
+            "cmd.exe /c echo secret",
+            usernameCommandTemplate: "cmd.exe /c echo resolveduser");
+        var result = await provider.GetCredentialAsync("host", 22, null, "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("resolveduser", result.Username);
+        Assert.Equal("secret", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_UsernameCommand_NotRunWhenHintProvided()
+    {
+        var provider = CreateProvider(
+            "cmd.exe /c echo secret",
+            usernameCommandTemplate: "cmd.exe /c echo resolveduser");
+        var result = await provider.GetCredentialAsync("host", 22, "explicit", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("explicit", result.Username);
+        Assert.Equal("secret", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_NoUsernameCommand_EchoesHint()
+    {
+        // No regression: without a username command, the hint is echoed unchanged.
+        var provider = CreateProvider("cmd.exe /c echo secret", usernameCommandTemplate: null);
+        var result = await provider.GetCredentialAsync("host", 22, "hintuser", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("hintuser", result.Username);
+        Assert.Equal("secret", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_UsernameCommandFailure_FallsBackToHint()
+    {
+        // A failed username command must not fail the whole call: the password is still
+        // returned and the username falls back to the (empty) hint.
+        var provider = CreateProvider(
+            "cmd.exe /c echo secret",
+            usernameCommandTemplate: "cmd.exe /c exit 1");
+        var result = await provider.GetCredentialAsync("host", 22, null, "title");
+
+        Assert.NotNull(result);
+        Assert.Equal(string.Empty, result.Username);
+        Assert.Equal("secret", result.Password);
+    }
+
+    // ---------------------------------------------------------------
+    // First-line-only output mode (KeePass2 KPScript, pass)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public async Task GetCredentialAsync_FirstLineOnly_TakesFirstLine()
+    {
+        // Emulates KPScript: the value on line 1, then a trailing "OK: ..." status line.
+        var provider = CreateProvider(
+            "cmd.exe /c echo thepass& echo OK: done", firstLineOnly: true);
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("thepass", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_FirstLineOnly_SkipsLeadingBlankLines()
+    {
+        // `echo.` prints an empty line first; first-line-only must skip it.
+        var provider = CreateProvider(
+            "cmd.exe /c echo.& echo realvalue", firstLineOnly: true);
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("realvalue", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_FirstLineOnlyFalse_ReturnsWholeOutput()
+    {
+        // Default behaviour: the whole trimmed output is returned (status line included).
+        var provider = CreateProvider(
+            "cmd.exe /c echo thepass& echo OK: done", firstLineOnly: false);
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Contains("thepass", result.Password);
+        Assert.Contains("OK: done", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_FirstLineOnly_AppliesToUsernameCommand()
+    {
+        var provider = CreateProvider(
+            "cmd.exe /c echo secret",
+            usernameCommandTemplate: "cmd.exe /c echo resolveduser& echo OK: done",
+            firstLineOnly: true);
+        var result = await provider.GetCredentialAsync("host", 22, null, "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("resolveduser", result.Username);
+        Assert.Equal("secret", result.Password);
     }
 
     [Fact]

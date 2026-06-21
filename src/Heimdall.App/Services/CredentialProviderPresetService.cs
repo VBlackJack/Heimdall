@@ -25,6 +25,7 @@ public sealed class CredentialProviderPresetService
     [
         new("Custom", ""),
         new("KeePassXC", "keepassxc-cli show -s -a Password \"{Database}\" \"{Title}\""),
+        new("KeePass2 (KPScript)", "KPScript.exe -c:GetEntryString \"{Database}\" -Field:Password -ref-Title:\"{Title}\""),
         new("Bitwarden CLI", "bw get password \"{Title}\""),
         new("1Password CLI", "op read \"op://{Title}/password\""),
         new("pass (GPG)", "pass show \"{Title}\""),

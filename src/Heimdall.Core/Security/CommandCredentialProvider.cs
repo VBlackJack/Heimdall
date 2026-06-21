@@ -39,6 +39,9 @@ public sealed class CommandCredentialProvider : ICredentialProvider
 
     private readonly string? _commandTemplate;
     private readonly string? _databasePath;
+    private readonly string? _unlockSecret;
+    private readonly string? _usernameCommandTemplate;
+    private readonly bool _firstLineOnly;
 
     /// <summary>
     /// Initializes the provider with the command template and optional database path.
@@ -51,11 +54,39 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// Path to the password database file (replaces <c>{Database}</c>).
     /// </param>
     /// <param name="timeoutMs">Command execution timeout in milliseconds.</param>
-    public CommandCredentialProvider(string? commandTemplate, string? databasePath, int timeoutMs = 10000)
+    /// <param name="unlockSecret">
+    /// Optional secret (database master password / GPG passphrase) written to the
+    /// child process stdin followed by a newline. Required by tools such as
+    /// <c>keepassxc-cli</c> and <c>pass</c> that prompt for an unlock secret. When
+    /// null or empty, stdin is not redirected (the tool runs non-interactively).
+    /// </param>
+    /// <param name="usernameCommandTemplate">
+    /// Optional second command (same placeholders, same timeout and unlock-secret
+    /// stdin) that retrieves the username from the vault. Run only when the caller
+    /// passes no username hint. A failed or empty username command never fails the
+    /// overall call: the username hint is used instead.
+    /// </param>
+    /// <param name="firstLineOnly">
+    /// When true, the command result is the first non-empty (trimmed) line of stdout
+    /// instead of the whole trimmed output. Required by tools that print the value on
+    /// line 1 followed by status text (e.g. KeePass2 <c>KPScript</c>'s trailing
+    /// <c>OK: ...</c> line, or <c>pass</c>'s notes after the password). Applies to both
+    /// the password and username commands.
+    /// </param>
+    public CommandCredentialProvider(
+        string? commandTemplate,
+        string? databasePath,
+        int timeoutMs = 10000,
+        string? unlockSecret = null,
+        string? usernameCommandTemplate = null,
+        bool firstLineOnly = false)
     {
         _commandTemplate = commandTemplate;
         _databasePath = databasePath;
         _commandTimeout = TimeSpan.FromMilliseconds(timeoutMs);
+        _unlockSecret = unlockSecret;
+        _usernameCommandTemplate = usernameCommandTemplate;
+        _firstLineOnly = firstLineOnly;
     }
 
     /// <inheritdoc />
@@ -77,10 +108,94 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             return null;
         }
 
-        var expandedCommand = ExpandTemplate(_commandTemplate, serverHost, port, username, title);
+        string? password;
+        try
+        {
+            password = await RunCommandAsync(_commandTemplate, serverHost, port, username, title, ct)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Logging.FileLogger.Warn("CommandCredentialProvider: command timed out");
+            throw;
+        }
+
+        if (string.IsNullOrEmpty(password))
+        {
+            // RunCommandAsync already logged the reason (empty output, non-zero exit, or failure).
+            return null;
+        }
+
+        string resolvedUsername = await ResolveUsernameAsync(
+            serverHost, port, username, title, ct).ConfigureAwait(false);
+
+        return new CredentialResult(resolvedUsername, password);
+    }
+
+    /// <summary>
+    /// Resolves the username for the returned credential. When a username command is
+    /// configured and the caller supplied no username hint, the command's stdout is used;
+    /// otherwise (and on any username-command failure/empty output) the hint is echoed.
+    /// A failed username command never fails the overall credential lookup.
+    /// </summary>
+    private async Task<string> ResolveUsernameAsync(
+        string serverHost,
+        int port,
+        string? username,
+        string? title,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_usernameCommandTemplate)
+            || !string.IsNullOrWhiteSpace(username))
+        {
+            return username ?? string.Empty;
+        }
+
+        try
+        {
+            string? resolved = await RunCommandAsync(
+                _usernameCommandTemplate, serverHost, port, username, title, ct)
+                .ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(resolved))
+            {
+                return resolved;
+            }
+
+            // Empty/failed username command (already logged by RunCommandAsync): fall back to the hint.
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // The username command hit its own timeout (the caller's token is not cancelled).
+            // This must not fail the whole call: fall back to the hint. Never log the value.
+            Logging.FileLogger.Warn("CommandCredentialProvider: username command timed out");
+        }
+
+        return username ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Executes a single credential command and returns its trimmed stdout, or null when the
+    /// command produced empty output, exited non-zero, or failed to launch. Applies the configured
+    /// timeout and unlock-secret stdin injection, drains stderr, and kills a hung process on
+    /// timeout/cancellation. Throws <see cref="OperationCanceledException"/> on timeout/cancellation.
+    /// </summary>
+    private async Task<string?> RunCommandAsync(
+        string template,
+        string serverHost,
+        int port,
+        string? username,
+        string? title,
+        CancellationToken ct)
+    {
+        var expandedCommand = ExpandTemplate(template, serverHost, port, username, title);
         var (executable, arguments) = SplitCommand(expandedCommand);
 
         Logging.FileLogger.Info($"CommandCredentialProvider: executing command for host={serverHost}");
+
+        // When set, the unlock secret is fed to the child process stdin so tools that
+        // prompt for a database/GPG passphrase can run unattended.
+        bool injectUnlockSecret = !string.IsNullOrEmpty(_unlockSecret);
 
         try
         {
@@ -92,7 +207,8 @@ public sealed class CommandCredentialProvider : ICredentialProvider
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true
+                RedirectStandardError = true,
+                RedirectStandardInput = injectUnlockSecret
             };
 
             process.Start();
@@ -107,15 +223,33 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             string stdout;
             try
             {
+                if (injectUnlockSecret)
+                {
+                    // Write the unlock secret followed by a newline, then close the stream so the
+                    // tool receives EOF. Shares the linked timeout/cancellation; a cancellation here
+                    // is handled by the catch below, which kills the process. Never logged.
+                    try
+                    {
+                        await process.StandardInput.WriteLineAsync(
+                            (_unlockSecret ?? string.Empty).AsMemory(), linkedCts.Token)
+                            .ConfigureAwait(false);
+                        await process.StandardInput.FlushAsync(linkedCts.Token).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        process.StandardInput.Close();
+                    }
+                }
+
                 stdout = await process.StandardOutput.ReadToEndAsync(linkedCts.Token)
                     .ConfigureAwait(false);
                 await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                // Any timeout/cancellation - during the stdout read OR the exit wait - must kill the external
-                // process before `using` disposes it (Dispose does not terminate the process), otherwise a hung
-                // credential tool is left orphaned holding its database lock.
+                // Any timeout/cancellation - during the stdin write, stdout read, OR the exit wait - must
+                // kill the external process before `using` disposes it (Dispose does not terminate the
+                // process), otherwise a hung credential tool is left orphaned holding its database lock.
                 TryKillProcess(process);
                 throw;
             }
@@ -135,19 +269,19 @@ public sealed class CommandCredentialProvider : ICredentialProvider
                 return null;
             }
 
-            string password = stdout.Trim();
-            if (string.IsNullOrEmpty(password))
+            string output = _firstLineOnly ? FirstNonEmptyLine(stdout) : stdout.Trim();
+            if (string.IsNullOrEmpty(output))
             {
                 Logging.FileLogger.Warn("CommandCredentialProvider: command returned empty output");
                 return null;
             }
 
-            // Return the provided username (or empty) with the retrieved password
-            return new CredentialResult(username ?? string.Empty, password);
+            return output;
         }
         catch (OperationCanceledException)
         {
-            Logging.FileLogger.Warn("CommandCredentialProvider: command timed out");
+            // Propagate to the caller, which decides whether a timeout fails the whole lookup
+            // (password command) or falls back to the hint (username command).
             throw;
         }
         catch (Exception ex)
@@ -236,6 +370,24 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         }
 
         return (trimmed[..spaceIndex], trimmed[(spaceIndex + 1)..]);
+    }
+
+    /// <summary>
+    /// Returns the first non-empty, trimmed line of the supplied text, or an empty string
+    /// when every line is blank. Used by the "first line only" output mode.
+    /// </summary>
+    private static string FirstNonEmptyLine(string text)
+    {
+        foreach (var line in text.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length > 0)
+            {
+                return trimmed;
+            }
+        }
+
+        return string.Empty;
     }
 
     /// <summary>

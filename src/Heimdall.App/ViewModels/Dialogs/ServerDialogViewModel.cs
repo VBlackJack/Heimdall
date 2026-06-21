@@ -242,6 +242,14 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     private string _connectionType = "RDP";
 
+    /// <summary>
+    /// Optional override for the external password-manager entry name (substituted for
+    /// the credential provider's <c>{Title}</c> placeholder). Empty falls back to the
+    /// display name.
+    /// </summary>
+    [ObservableProperty]
+    private string _vaultEntryName = "";
+
     // --- WinRM settings ---
 
     [ObservableProperty]
@@ -1685,6 +1693,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             LocalPort = LocalPort,
             Group = string.IsNullOrWhiteSpace(Group) ? null : Group,
             ConnectionType = ConnectionType,
+            VaultEntryName = string.IsNullOrWhiteSpace(VaultEntryName) ? null : VaultEntryName,
             WinRmPort = WinRmPort,
             WinRmUsername = string.IsNullOrWhiteSpace(WinRmUsername) ? null : WinRmUsername,
             WinRmPasswordEncrypted = string.IsNullOrEmpty(WinRmPassword)
@@ -1828,6 +1837,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.UseAutomaticTunnelPort = dto.LocalPort <= 0 || dto.LocalPort == suggestedTunnelPort;
         vm.Group = dto.Group ?? "";
         vm.ConnectionType = connectionType;
+        vm.VaultEntryName = dto.VaultEntryName ?? "";
         vm.WinRmPort = dto.WinRmPort > 0
             ? dto.WinRmPort
             : dto.WinRmUseSsl ? DefaultPorts.WinRmHttps : DefaultPorts.WinRmHttp;

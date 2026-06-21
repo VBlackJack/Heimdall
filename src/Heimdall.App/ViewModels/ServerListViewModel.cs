@@ -158,7 +158,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         KnownHostsImporter knownHostsImporter,
         IRecentConnectionTracker? recentConnections = null,
         IProfileImportService? profileImportService = null,
-        SessionHealthMonitor? healthMonitor = null)
+        SessionHealthMonitor? healthMonitor = null,
+        ICredentialProviderFactory? credentialProviderFactory = null,
+        IWindowsHelloService? windowsHelloService = null)
     {
         _configManager = configManager;
         _localizer = localizer;
@@ -172,6 +174,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         _knownHostsImporter = knownHostsImporter;
         _recentConnections = recentConnections ?? new RecentConnectionTracker();
         _healthMonitor = healthMonitor;
+        _credentialProviderFactory = credentialProviderFactory ?? new CredentialProviderFactory();
+        _windowsHelloService = windowsHelloService ?? new WindowsHelloService();
 
         InitializeSelectionModel();
         _connectionSm.StateChanged += OnConnectionStateChanged;
@@ -202,6 +206,17 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     }
 
     private readonly IRecentConnectionTracker _recentConnections;
+
+    private readonly ICredentialProviderFactory _credentialProviderFactory;
+
+    private readonly IWindowsHelloService _windowsHelloService;
+
+    /// <summary>
+    /// In-memory timestamp of the last successful Windows Hello verification. Used to honor
+    /// the grace window so the user is not prompted on every connect. Not persisted across
+    /// app restarts by design.
+    /// </summary>
+    private DateTimeOffset? _lastWindowsHelloVerifiedAt;
 
     public void Dispose()
     {
@@ -702,6 +717,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
             var settings = await _configManager.LoadSettingsAsync();
 
+            // Windows Hello gate: when enabled, require a successful biometric/PIN
+            // verification before any stored credentials are resolved or used.
+            if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
+            {
+                return false;
+            }
+
             // Apply group-level inherited defaults (gateway, SSH username, key path)
             // before preflight and connection. Server's own values take priority.
             if (settings.GroupDefaults.Count > 0 && !string.IsNullOrEmpty(serverDto.Group))
@@ -940,7 +962,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         }
     }
 
-    private static CredentialTarget? GetCredentialTarget(ServerProfileDto dto)
+    internal static CredentialTarget? GetCredentialTarget(ServerProfileDto dto)
     {
         var connType = dto.ConnectionType?.ToUpperInvariant();
 
@@ -978,14 +1000,83 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                 username => { if (string.IsNullOrEmpty(dto.FtpUsername)) dto.FtpUsername = username; });
         }
 
+        if (connType is "TELNET" && string.IsNullOrEmpty(dto.TelnetPasswordEncrypted))
+        {
+            return new CredentialTarget(
+                dto.TelnetPort, dto.TelnetUsername,
+                encrypted => dto.TelnetPasswordEncrypted = encrypted,
+                username => { if (string.IsNullOrEmpty(dto.TelnetUsername)) dto.TelnetUsername = username; });
+        }
+
+        if (connType is "VNC" && string.IsNullOrEmpty(dto.VncPassword))
+        {
+            // VncPassword is DPAPI-encrypted despite the name; VNC has no username field.
+            return new CredentialTarget(
+                dto.VncPort, null,
+                encrypted => dto.VncPassword = encrypted,
+                _ => { });
+        }
+
         return null;
     }
 
-    private readonly record struct CredentialTarget(
+    internal readonly record struct CredentialTarget(
         int Port,
         string? Username,
         Action<string> SetPassword,
         Action<string> SetUsernameIfEmpty);
+
+    /// <summary>
+    /// Enforces the optional Windows Hello gate before any stored credentials are used.
+    /// Returns true to allow the connect, false to abort it. Fail-closed: when the gate is
+    /// enabled but Hello is unavailable / not enrolled, the connect is blocked. A successful
+    /// verification is remembered for <see cref="AppSettings.WindowsHelloGraceMinutes"/>
+    /// minutes (in-memory) so the user is not prompted on every connect.
+    /// </summary>
+    internal async Task<bool> EnsureWindowsHelloAsync(AppSettings settings, CancellationToken ct)
+    {
+        if (!settings.RequireWindowsHelloOnConnect)
+        {
+            return true;
+        }
+
+        // Grace window: a recent successful verification still counts. 0 minutes = always re-verify.
+        if (_lastWindowsHelloVerifiedAt is { } last
+            && DateTimeOffset.UtcNow - last < TimeSpan.FromMinutes(settings.WindowsHelloGraceMinutes))
+        {
+            return true;
+        }
+
+        if (!await _windowsHelloService.IsAvailableAsync().ConfigureAwait(true))
+        {
+            Core.Logging.FileLogger.Warn(
+                "Windows Hello required but unavailable or not enrolled; blocking connect.");
+            StatusMessageRequested?.Invoke(_localizer["ErrorWindowsHelloUnavailable"]);
+            return false;
+        }
+
+        try
+        {
+            bool verified = await _windowsHelloService
+                .VerifyAsync(_localizer["WindowsHelloVerifyReason"], ct)
+                .ConfigureAwait(true);
+
+            if (verified)
+            {
+                _lastWindowsHelloVerifiedAt = DateTimeOffset.UtcNow;
+                return true;
+            }
+
+            StatusMessageRequested?.Invoke(_localizer["WarnWindowsHelloFailed"]);
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            // Clean abort via the status-text channel (no modal, no crash).
+            StatusMessageRequested?.Invoke(_localizer["WarnWindowsHelloCancelled"]);
+            return false;
+        }
+    }
 
     /// <summary>
     /// If the external credential provider is enabled and the server has no stored
@@ -993,7 +1084,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     /// the password and injects it (DPAPI-encrypted) into the DTO. This allows all
     /// downstream code to work unchanged.
     /// </summary>
-    private async Task<bool> TryResolveExternalCredentialsAsync(
+    internal async Task<bool> TryResolveExternalCredentialsAsync(
         ServerProfileDto serverDto,
         AppSettings settings,
         CancellationToken ct,
@@ -1004,9 +1095,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             return false;
         }
 
-        var provider = new Core.Security.CommandCredentialProvider(
-            settings.CredentialProviderCommand, settings.CredentialProviderDatabase,
-            settings.CredentialProviderTimeoutMs);
+        var provider = _credentialProviderFactory.Create(settings);
 
         if (!provider.IsAvailable)
         {
@@ -1021,9 +1110,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
         try
         {
+            var vaultTitle = string.IsNullOrWhiteSpace(serverDto.VaultEntryName)
+                ? serverDto.DisplayName
+                : serverDto.VaultEntryName;
+
             var credential = await provider.GetCredentialAsync(
                 serverDto.RemoteServer, credTarget.Value.Port,
-                credTarget.Value.Username, serverDto.DisplayName, ct);
+                credTarget.Value.Username, vaultTitle, ct);
 
             if (credential is null)
             {

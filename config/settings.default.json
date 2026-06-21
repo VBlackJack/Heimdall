@@ -16,6 +16,8 @@
     "hostKeyProbeTimeoutMs": 8000,
     "telnetConnectTimeoutMs": 15000,
     "credentialProviderTimeoutMs": 10000,
+    "requireWindowsHelloOnConnect": false,
+    "windowsHelloGraceMinutes": 5,
     "rdpCredentialAutofillTimeoutMs": 90000,
     "rdpArtifactCleanupDelayMs": 10000,
     "rdpResizeEnableDelayMs": 10000,

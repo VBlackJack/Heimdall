@@ -2530,6 +2530,14 @@
                                                  AutomationProperties.Name="{loc:Translate ServerDialogLabelMacAddress}"
                                                  Text="{Binding MacAddress, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                        <TextBlock x:Name="DlgSrv_VaultEntryNameLabel" Style="{StaticResource LabelStyle}" Margin="0,12,0,4"/>
+                                        <TextBox x:Name="DlgSrv_VaultEntryNameBox" TabIndex="105"
+                                                 AutomationProperties.Name="{loc:Translate ServerDialogLabelVaultEntryName}"
+                                                 Tag="{loc:Translate ServerDialogVaultEntryNamePlaceholder}"
+                                                 Text="{Binding VaultEntryName, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource WatermarkTextBoxStyle}"/>
+                                        <TextBlock x:Name="DlgSrv_VaultEntryNameHint"
+                                                   Style="{StaticResource DialogHintTextStyle}"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

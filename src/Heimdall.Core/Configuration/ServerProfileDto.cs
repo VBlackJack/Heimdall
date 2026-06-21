@@ -50,6 +50,13 @@ public sealed class ServerProfileDto
     public string? ProjectId { get; set; }
     public string ConnectionType { get; set; } = "RDP";
 
+    /// <summary>
+    /// Optional name or reference of this profile's entry in the external password
+    /// manager, substituted for the <c>{Title}</c> placeholder in the credential
+    /// provider command. When null or empty, <see cref="DisplayName"/> is used.
+    /// </summary>
+    public string? VaultEntryName { get; set; }
+
     // WinRM settings
     public int WinRmPort { get; set; } = DefaultPorts.WinRmHttp;
     public string? WinRmUsername { get; set; }
