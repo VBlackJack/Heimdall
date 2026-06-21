@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Build script for Heimdall — produces portable distributions and installers.
+    Build script for Heimdall - produces portable distributions and installers.
 
 .PARAMETER Mode
     Build mode: 'Debug' (default) or 'Release'.
@@ -22,6 +22,11 @@
     above the auto-generated Downloads/Checksums section of the GitHub release notes.
     When omitted, the tracked convention file 'docs/release-notes/v<version>.md' is used
     if present; otherwise only the auto-generated notes are published.
+
+.PARAMETER AllowNonAsciiNotes
+    Override the typography guard. By default the publish step refuses to publish when
+    the hand-written notes contain banned "smart" punctuation (em-dash, curly quotes,
+    ellipsis, no-break/thin spaces); pass this switch to publish anyway.
 
 .EXAMPLE
     .\Build.ps1                              # Debug build
@@ -54,11 +59,17 @@ param(
 
     # Optional hand-written notes file prepended above the auto-generated release
     # notes. Falls back to docs/release-notes/v<version>.md when omitted.
-    [string]$ReleaseNotesFile
+    [string]$ReleaseNotesFile,
+
+    # Override the release-notes typography guard (publish despite banned characters).
+    [switch]$AllowNonAsciiNotes
 )
 
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = $PSScriptRoot
+
+# Release-notes typography guard (banned "smart" punctuation detection).
+. (Join-Path $ProjectRoot 'scripts\NotesTypographyGuard.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
 $SolutionFile = Get-ChildItem -Path $ProjectRoot -Filter '*.slnx' | Select-Object -First 1
 $distDir = Join-Path $ProjectRoot "Dist\$($Mode.ToLower())"
@@ -95,7 +106,7 @@ $today = Get-Date
 $datePrefix = $today.ToString('yyyy.MMdd')
 
 if ($Version) {
-    # Forced version — validate format
+    # Forced version - validate format
     if ($Version -notmatch '^\d{4}\.\d{6}$') {
         Write-Host "[!] Invalid version format '$Version'. Expected YYYY.MMDDxx (e.g. 2026.033101)." -ForegroundColor Red
         exit 1
@@ -448,6 +459,26 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         }
     }
     if ($customNotesPath) {
+        # Typography guard: refuse to publish notes containing banned "smart"
+        # punctuation (em-dash, curly quotes, ellipsis, no-break/thin spaces).
+        # French accents and the French guillemets are allowed. Fail-closed unless
+        # -AllowNonAsciiNotes is set.
+        $noteViolations = @(Get-NotesTypographyViolations -Path $customNotesPath)
+        if ($noteViolations.Count -gt 0) {
+            if ($AllowNonAsciiNotes) {
+                Write-Host "[$label] WARNING: release notes contain $($noteViolations.Count) banned character(s); publishing anyway (-AllowNonAsciiNotes)." -ForegroundColor Yellow
+                foreach ($v in $noteViolations) {
+                    Write-Host ("    {0}:{1}:{2}  '{3}' {4} ({5})" -f (Split-Path $v.File -Leaf), $v.Line, $v.Column, $v.Char, $v.CodePoint, $v.Name) -ForegroundColor DarkYellow
+                }
+            } else {
+                Write-Host "[!] Release notes contain banned typography. Use ASCII equivalents (e.g. '-' instead of an em-dash, a normal space instead of a no-break space)." -ForegroundColor Red
+                foreach ($v in $noteViolations) {
+                    Write-Host ("    {0}:{1}:{2}  '{3}' {4} ({5})" -f $v.File, $v.Line, $v.Column, $v.Char, $v.CodePoint, $v.Name) -ForegroundColor Red
+                }
+                Write-Host "    Fix the notes file, or pass -AllowNonAsciiNotes to override. Refusing to publish." -ForegroundColor Red
+                exit 1
+            }
+        }
         $customNotes = [System.IO.File]::ReadAllText($customNotesPath)
         $notes += $customNotes.TrimEnd() + "`n`n"
         Write-Host "[$label] Prepended custom notes from $(Split-Path $customNotesPath -Leaf)." -ForegroundColor DarkGray
