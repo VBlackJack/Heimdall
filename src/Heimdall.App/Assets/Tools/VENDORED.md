@@ -1,7 +1,7 @@
 # Vendored Binaries
 
 These binaries are bundled as fallbacks when the user does not have them installed system-wide.
-They are **not** auto-updated — check upstream releases periodically.
+They are **not** auto-updated - check upstream releases periodically.
 
 | Binary     | Version        | Upstream                                             | License     |
 |------------|----------------|------------------------------------------------------|-------------|

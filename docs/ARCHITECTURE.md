@@ -84,9 +84,9 @@ Heimdall.slnx (14 projects)
 2. **Plink fallback**: When `AuthPreflightChecker.RequiresPageantFallback()` detects that the only viable auth method is Pageant, `PlinkTunnelRunner` handles tunnels and `PipeModeSession` handles interactive SSH. Plink communicates with Pageant natively, but Heimdall still owns host-key trust. `PlinkHostKeyDecider` accepts a stored fingerprint, or uses injectable `IPlinkHostKeyProbe` plus `IHostKeyVerifier` to resolve first-use trust before launch. If no Heimdall-trusted fingerprint can be resolved, the path fails with `SshFailureCode.HostKeyUnavailable` instead of falling back to PuTTY/Plink's cache.
 
 **Pageant integration fixes** (3 critical bugs resolved):
-- `AGENT_COPYDATA_ID` must be `0x804e50ba` — any other value causes Pageant to silently ignore the request
+- `AGENT_COPYDATA_ID` must be `0x804e50ba` - any other value causes Pageant to silently ignore the request
 - RSA-SHA2 algorithms (`rsa-sha2-256`, `rsa-sha2-512`) must be registered on the `ConnectionInfo` for modern servers that reject legacy `ssh-rsa`
-- `PageantHostAlgorithm.Sign()` must return the full SSH signature blob (algorithm name length + algorithm name + signature length + signature), not just the raw signature bytes — SSH.NET expects the wire-format blob. `PageantClient.SignData()` already returns this blob unchanged.
+- `PageantHostAlgorithm.Sign()` must return the full SSH signature blob (algorithm name length + algorithm name + signature length + signature), not just the raw signature bytes - SSH.NET expects the wire-format blob. `PageantClient.SignData()` already returns this blob unchanged.
 
 ### 2. Pipe Mode for SSH Terminals (NOT ConPTY)
 
@@ -118,7 +118,7 @@ ConPTY (`ConPtySession`) is kept for local shell scenarios only.
 Key design decisions:
 - `--direct` flag bypasses gsudo's service/cache mechanism, avoiding the `ServiceHelper.StartService` crash
 - `Auto` mode tries gsudo first (best UX: embedded terminal), catches `InvalidOperationException`, retries as external window
-- `Runas` mode uses `Process.Start` with `Verb="runas"` and `UseShellExecute=true` — cannot redirect stdin/stdout (Windows limitation), so the terminal opens in a separate window
+- `Runas` mode uses `Process.Start` with `Verb="runas"` and `UseShellExecute=true` - cannot redirect stdin/stdout (Windows limitation), so the terminal opens in a separate window
 - UAC cancellation (Win32 error 1223) caught and reported as user-friendly message
 - Backward compatible: legacy `LocalShellElevated=true` maps to `Auto` via `EffectiveElevationMode` computed property
 
@@ -137,14 +137,14 @@ Key design decisions:
 
 The terminal page (`terminal.html`) is loaded via `NavigateToString` (no external origin). Security hardening:
 
-- **CSP**: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'` — all scripts are inlined, no external resource loading permitted
+- **CSP**: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'` - all scripts are inlined, no external resource loading permitted
 - **Navigation blocking**: `NavigationStarting` handler cancels any navigation away from `about:` or `data:` origins
 - **Message origin validation**: `OnWebMessageReceived` rejects messages from unexpected sources
 - **URL opening**: Only `http://` and `https://` URIs are passed to `Process.Start` with `UseShellExecute`
 
 ### 4. RDP ActiveX with Layout Flush Protocol
 
-**Problem**: WPF's `WindowsFormsHost` has an "airspace" issue where the rendering surface is not properly bound to the visible HWND if layout hasn't been flushed before `Connect()`. Additionally, the Win32 HWND always renders above WPF content in the same window — `Panel.ZIndex` has no effect.
+**Problem**: WPF's `WindowsFormsHost` has an "airspace" issue where the rendering surface is not properly bound to the visible HWND if layout hasn't been flushed before `Connect()`. Additionally, the Win32 HWND always renders above WPF content in the same window - `Panel.ZIndex` has no effect.
 
 **Solution**: Mandatory layout flush before every `Connect()`:
 
@@ -152,11 +152,11 @@ The terminal page (`terminal.html`) is loaded via `NavigateToString` (no externa
 UpdateLayout() -> DoEvents() -> Dispatcher.Invoke(Render) -> EnsureHandle -> Connect()
 ```
 
-**Airspace overlay rule**: Any WPF UI that must render above a `WindowsFormsHost` surface (RDP, VNC) MUST use a WPF `Popup`. A Popup creates its own top-level HWND that the OS composites above the embedded ActiveX surface. The Command Palette uses this pattern — it was originally a `Grid` overlay with `Panel.ZIndex="9999"` which was invisible over RDP sessions.
+**Airspace overlay rule**: Any WPF UI that must render above a `WindowsFormsHost` surface (RDP, VNC) MUST use a WPF `Popup`. A Popup creates its own top-level HWND that the OS composites above the embedded ActiveX surface. The Command Palette uses this pattern - it was originally a `Grid` overlay with `Panel.ZIndex="9999"` which was invisible over RDP sessions.
 
 Additional guards:
 - Resolution updates blocked for 5 seconds after `OnConnected` (prevents disconnect code 4360)
-- COM dispose follows strict order: collapse visibility, detach from tree, disconnect, detach event sink, dispose — do NOT call `Marshal.ReleaseComObject` (let AxHost handle RCW cleanup)
+- COM dispose follows strict order: collapse visibility, detach from tree, disconnect, detach event sink, dispose - do NOT call `Marshal.ReleaseComObject` (let AxHost handle RCW cleanup)
 - Auto-reconnect with bounded retry (`MaxReconnectAttempts = 20`) and cancel support via COM event sink
 - Disconnect reason decoder: `GetDisconnectReasonKey()` maps 24 MsTscAx codes to i18n keys
 
@@ -169,7 +169,7 @@ Additional guards:
 
 ### 4b. RDP Profile Resolution and One-Shot Mode Override
 
-**Problem**: Two related sources of confusion in the RDP launch chain. (1) The External path (mstsc) used to fall back to `AppSettings.DefaultResolutionWidth/Height` and ignore the per-server `RdpResolutionMode`, `RdpFixedWidth/Height`, multi-monitor, and smart sizing — so the user-configured profile silently failed to apply. (2) Mode is a per-server property (`RdpMode = "Embedded" | "External"`), with no way to flip it for a single triage launch without editing the profile.
+**Problem**: Two related sources of confusion in the RDP launch chain. (1) The External path (mstsc) used to fall back to `AppSettings.DefaultResolutionWidth/Height` and ignore the per-server `RdpResolutionMode`, `RdpFixedWidth/Height`, multi-monitor, and smart sizing - so the user-configured profile silently failed to apply. (2) Mode is a per-server property (`RdpMode = "Embedded" | "External"`), with no way to flip it for a single triage launch without editing the profile.
 
 **Solution**: Centralize per-server resolution decisions in `RdpProfileResolver.ResolveResolution(server, settings)` (in `Heimdall.App/Services/`), returning a `RdpResolvedResolution` record `(Width, Height, MultiMonitor, SmartSizing, SelectedMonitorIndices)`. Mirrors the existing `RdpProfileResolver.ResolveColorDepth` precedence rule (server > settings > fallback). Both Embedded (via `RdpDisplayResolver` and the COM property setters) and External (via `RdpFileGenerator.RdpFileOptions`) consume the same resolved record, eliminating the silent divergence.
 
@@ -195,11 +195,11 @@ Connect-time Multimon topology validation lives in `RdpDisplayResolver.ValidateM
 
 ### 4c. RDP Toolbar UX Helpers and Letterbox Pinning
 
-**Resolution mode indicator** (`RdpResolutionModeIndicator`, `Heimdall.App/Views/EmbeddedRdp/`): a stateless static helper that resolves the live effective resolution mode from `(profileMode, manualWidth, manualHeight, profileFixedWidth, profileFixedHeight)`. A per-session manual override (set via the toolbar's Resolution menu) always wins and is reported as `Fixed (W,H)`; otherwise the persisted profile mode is returned. The same helper produces the Segoe MDL2 glyph (5 distinct codepoints — Auto/FitWindow/SmartSizing/Fixed/Multimon), the i18n key per mode (reusing `ServerDialogResolutionMode*` to avoid duplication), and the formatted header / tooltip strings. `EmbeddedRdpView.GetEffectiveResolutionState()` exposes the result as `internal` so `SessionTabContextMenuFactory.AppendActiveModeHeader` can mirror the same `Active mode: <mode>` header on the right-click Resolution submenu — both menus stay in sync without duplicating logic.
+**Resolution mode indicator** (`RdpResolutionModeIndicator`, `Heimdall.App/Views/EmbeddedRdp/`): a stateless static helper that resolves the live effective resolution mode from `(profileMode, manualWidth, manualHeight, profileFixedWidth, profileFixedHeight)`. A per-session manual override (set via the toolbar's Resolution menu) always wins and is reported as `Fixed (W,H)`; otherwise the persisted profile mode is returned. The same helper produces the Segoe MDL2 glyph (5 distinct codepoints - Auto/FitWindow/SmartSizing/Fixed/Multimon), the i18n key per mode (reusing `ServerDialogResolutionMode*` to avoid duplication), and the formatted header / tooltip strings. `EmbeddedRdpView.GetEffectiveResolutionState()` exposes the result as `internal` so `SessionTabContextMenuFactory.AppendActiveModeHeader` can mirror the same `Active mode: <mode>` header on the right-click Resolution submenu - both menus stay in sync without duplicating logic.
 
-**Redirection visibility policy** (`RdpRedirectionVisibilityPolicy`, same folder): pure helpers behind the `+N` expand chip. `IsIndicatorVisible(isActive, alwaysExpanded, sessionExpandedOverride)` decides per-icon visibility, `ShouldShowExpandBadge(disabledCount, alwaysExpanded, sessionExpandedOverride)` decides badge visibility. `EmbeddedRdpView` keeps a session-local `_redirectionExpandedOverride` that the badge click flips. The `AppSettings.RdpRedirectionIndicatorsAlwaysExpanded` opt-in (default `false`) preserves the legacy "show all" behaviour for users who prefer it; the setting is not exposed in the Settings UI yet — users edit `settings.json` directly.
+**Redirection visibility policy** (`RdpRedirectionVisibilityPolicy`, same folder): pure helpers behind the `+N` expand chip. `IsIndicatorVisible(isActive, alwaysExpanded, sessionExpandedOverride)` decides per-icon visibility, `ShouldShowExpandBadge(disabledCount, alwaysExpanded, sessionExpandedOverride)` decides badge visibility. `EmbeddedRdpView` keeps a session-local `_redirectionExpandedOverride` that the badge click flips. The `AppSettings.RdpRedirectionIndicatorsAlwaysExpanded` opt-in (default `false`) preserves the legacy "show all" behaviour for users who prefer it; the setting is not exposed in the Settings UI yet - users edit `settings.json` directly.
 
-**Letterbox HWND pinning** (`RdpRegionFrameLayout`, same folder): when letterbox is active, `HostWidth` / `HostHeight` are now set to the frame size instead of `double.NaN`, so the WPF `WindowsFormsHost` is allocated exactly the RDP region rectangle. Without this pin, the host's HostVisual could extend past the frame and the Win32 HWND default gray would bleed through the letterbox bands. With the pin, the bands fall back to the parent `SurfaceContainer.Background` (= `SurfaceBrush`), matching the rest of the surface. The non-letterbox case keeps `HostWidth = double.NaN` (Stretch) — no change to the connected fullscreen path.
+**Letterbox HWND pinning** (`RdpRegionFrameLayout`, same folder): when letterbox is active, `HostWidth` / `HostHeight` are now set to the frame size instead of `double.NaN`, so the WPF `WindowsFormsHost` is allocated exactly the RDP region rectangle. Without this pin, the host's HostVisual could extend past the frame and the Win32 HWND default gray would bleed through the letterbox bands. With the pin, the bands fall back to the parent `SurfaceContainer.Background` (= `SurfaceBrush`), matching the rest of the surface. The non-letterbox case keeps `HostWidth = double.NaN` (Stretch) - no change to the connected fullscreen path.
 
 **Disconnect overlay action policy** (`RdpDisconnectActionPolicy`): `ShouldOfferEditProfile(disconnectCode)` always returns `true` (Edit profile is rarely harmful and is costly to miss). The previous behaviour (suppressing the button on non-remediation codes) is now scoped to `ResolvePrimaryAction`, which still uses the private `IsProfileRemediationCode` helper (codes 2055/2308/2311/2825/3080/3848/4360) to decide whether Edit profile or Reconnect is the *primary*, pre-focused action.
 
@@ -236,14 +236,14 @@ Mid-session host-key failures do not collapse into generic disconnect text. `Ssh
 ### 9. ISessionResult Type Hierarchy
 
 All connection operations return an `ISessionResult` (defined in `Heimdall.Core/Models/`). Concrete implementations carry protocol-specific session state:
-- `RdpSessionResult` — ActiveX handle, resolution info
-- `SshSessionResult` — shell stream or pipe mode session reference
-- `SftpSessionResult` — `SftpSessionBundle` (SftpClient + SshClient for sudo)
-- `CitrixSessionResult` — ICA session handle
-- `LocalSessionResult` — ConPTY session reference
-- `VncSessionResult` — WebSocket proxy handle, noVNC connection info
-- `TelnetSessionResult` — `TelnetSession` reference (raw TCP)
-- `FtpSessionResult` — `FtpBrowser` (IRemoteBrowser) reference
+- `RdpSessionResult` - ActiveX handle, resolution info
+- `SshSessionResult` - shell stream or pipe mode session reference
+- `SftpSessionResult` - `SftpSessionBundle` (SftpClient + SshClient for sudo)
+- `CitrixSessionResult` - ICA session handle
+- `LocalSessionResult` - ConPTY session reference
+- `VncSessionResult` - WebSocket proxy handle, noVNC connection info
+- `TelnetSessionResult` - `TelnetSession` reference (raw TCP)
+- `FtpSessionResult` - `FtpBrowser` (IRemoteBrowser) reference
 
 `ConnectionResult.Warning` is an optional, non-blocking status message for successful connections that still need user-visible caution, such as credentialed FTP without TLS. It is routed to the status surface rather than a modal.
 
@@ -253,13 +253,13 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 ### 11. Quick Connect (Ctrl+K)
 
-**Per-host history bias**: `IRecentConnectionTracker` (singleton DI, `Heimdall.App/Services/RecentConnectionTracker.cs`) keeps an in-memory log of successful `(host, protocol, timestamp)` tuples (max 50 entries, deduped by `(host, protocol)`). It is fed from `ServerListViewModel.OnConnectionStateChanged` whenever a session reaches `Connected` or `LaunchedExternalClient`. `CommandPaletteViewModel` consumes it for two ad-hoc UX wins: (1) when the user types a bare IP/hostname, the SSH and RDP suggestions reorder so the protocol last used for that host shows first; (2) when the palette is opened with an empty query, persisted servers whose `RemoteServer` matches a recent host are bubbled to the top of the suggestion list, ordered most-recent-first. The tracker is process-scoped only — no disk persistence yet; future work can add load/save without changing the public interface.
+**Per-host history bias**: `IRecentConnectionTracker` (singleton DI, `Heimdall.App/Services/RecentConnectionTracker.cs`) keeps an in-memory log of successful `(host, protocol, timestamp)` tuples (max 50 entries, deduped by `(host, protocol)`). It is fed from `ServerListViewModel.OnConnectionStateChanged` whenever a session reaches `Connected` or `LaunchedExternalClient`. `CommandPaletteViewModel` consumes it for two ad-hoc UX wins: (1) when the user types a bare IP/hostname, the SSH and RDP suggestions reorder so the protocol last used for that host shows first; (2) when the palette is opened with an empty query, persisted servers whose `RemoteServer` matches a recent host are bubbled to the top of the suggestion list, ordered most-recent-first. The tracker is process-scoped only - no disk persistence yet; future work can add load/save without changing the public interface.
 
 **Architecture**: A `Popup`-based Command Palette (own HWND, renders above ActiveX/WindowsFormsHost surfaces) parses connection strings of the form `[protocol://]user@host[:port]`. The parser infers protocol from port if omitted (22=SSH, 3389=RDP, 1494=Citrix, 5900=VNC, 23=Telnet, 21=FTP). A `ServerProfileDto` is created transiently (not persisted) and passed to `ConnectionService.ConnectAsync()`. Recent connections are stored in `settings.json` for quick re-use. When opened in split mode, the palette forces Embedded connection mode and attaches the new session as the secondary pane of the active tab.
 
-**Unified fuzzy ranker**: `CommandPaletteViewModel.Search.cs` scores tools (localized label + `CommandPrefixes` aliases + category), external tools, servers (`DisplayName`, `RemoteServer`, `Group`, `Username`, `ConnectionType`, `Environment`, `Tags`, `ProjectName`), and TwinShell snippets in a single pass before sorting and taking the top 20. The only early-return paths are (1) explicit argument-bearing tool invocations — `<prefix> <argument>` where `LabelWithArgKey` is defined, e.g. `ping 8.8.8.8` or `subnet 10.0.0.0/8` — and (2) the literal `tool`/`tools` query that lists every registered tool. Everything else mixes results so queries like `calculator`, `formatter`, or `encoder` surface the tool match alongside any servers that also match.
+**Unified fuzzy ranker**: `CommandPaletteViewModel.Search.cs` scores tools (localized label + `CommandPrefixes` aliases + category), external tools, servers (`DisplayName`, `RemoteServer`, `Group`, `Username`, `ConnectionType`, `Environment`, `Tags`, `ProjectName`), and TwinShell snippets in a single pass before sorting and taking the top 20. The only early-return paths are (1) explicit argument-bearing tool invocations - `<prefix> <argument>` where `LabelWithArgKey` is defined, e.g. `ping 8.8.8.8` or `subnet 10.0.0.0/8` - and (2) the literal `tool`/`tools` query that lists every registered tool. Everything else mixes results so queries like `calculator`, `formatter`, or `encoder` surface the tool match alongside any servers that also match.
 
-**Snippet indexing**: The palette refreshes a per-open snapshot of the TwinShell action library via a scoped `IActionService` resolved through `IServiceProvider.CreateAsyncScope` — fire-and-forget at every `Open()`/`OpenSplit()` so the cache is always fresh without blocking the popup. Snippets score on Title (full weight), Tags (full weight, important for sysops queries like `disk` or `df`), Description and Category (halved). On selection, `HandleSnippetSelection` resolves the best copy-paste payload (`ResolveSnippetCommand`: Windows template → Linux template → first example → action title), writes it to `System.Windows.Clipboard`, and surfaces a status message — snippets are clipboard-only, intercepted before any split/connect routing so a `snippet-*` Id can never accidentally open a tab or merge a pane.
+**Snippet indexing**: The palette refreshes a per-open snapshot of the TwinShell action library via a scoped `IActionService` resolved through `IServiceProvider.CreateAsyncScope` - fire-and-forget at every `Open()`/`OpenSplit()` so the cache is always fresh without blocking the popup. Snippets score on Title (full weight), Tags (full weight, important for sysops queries like `disk` or `df`), Description and Category (halved). On selection, `HandleSnippetSelection` resolves the best copy-paste payload (`ResolveSnippetCommand`: Windows template → Linux template → first example → action title), writes it to `System.Windows.Clipboard`, and surfaces a status message - snippets are clipboard-only, intercepted before any split/connect routing so a `snippet-*` Id can never accidentally open a tab or merge a pane.
 
 **Visual section headers**: The flat ListBox consumes a `CollectionViewSource` with `PropertyGroupDescription` on `Group`. `PaletteGroupHeaderConverter` normalizes empty Group values to a localized `Servers` / `Quick Connect` fallback so no untitled section ever renders. Ad-hoc items (`adhoc-ssh-…`, `adhoc-rdp-…`) explicitly take the `PaletteQuickConnectHeader` group so they cluster under their own header instead of falling through to the fallback.
 
@@ -297,19 +297,19 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 **Solution**: Two-tier approach using SSH exec channels alongside the SFTP session:
 
-**Tier 1 — Automatic fallback** (transparent to user):
+**Tier 1 - Automatic fallback** (transparent to user):
 Every file operation catches typed permission-denied exceptions (`SftpPermissionDeniedException`, plus local `UnauthorizedAccessException` for temp-file paths), then retries via SSH exec:
 - Upload: SFTP to `/tmp/` → `sudo tee` to target; cleanup runs as a separate `sudo rm -f` command from a `finally` path
 - Download: `sudo cat` via SSH exec
 - Edit: delegates to `RemoteFileEditor.EditFileSudoAsync`
 - Chmod/Rename/Delete/Mkdir: `sudo chmod`/`mv`/`rm`/`mkdir` via SSH exec
 
-**Tier 2 — "Browse as root" toggle** (user-initiated):
+**Tier 2 - "Browse as root" toggle** (user-initiated):
 Toolbar toggle button switches directory listing from SFTP `ListDirectory` to `sudo ls -la --time-style=long-iso` via SSH exec. Enables browsing ANY directory regardless of permissions.
 
 **Key design decisions and pitfalls encountered**:
 
-- **SSH auth must match the main session**: Sudo helpers must use `SshConnectionFactory.Create()` with the same Pageant/key/password auth as the original connection. Early implementation used raw `new SshClient(connInfo)` which bypassed Pageant integration — the SSH connection failed with "Permission denied (publickey,password)" and the user saw a confusing error.
+- **SSH auth must match the main session**: Sudo helpers must use `SshConnectionFactory.Create()` with the same Pageant/key/password auth as the original connection. Early implementation used raw `new SshClient(connInfo)` which bypassed Pageant integration - the SSH connection failed with "Permission denied (publickey,password)" and the user saw a confusing error.
 - **Host key verification required**: Sudo SSH clients must use `SshConnectionFactory.Create()` with the shared `HostKeyStore` and production `IHostKeyVerifier` so they receive the same preflight trust resolution and pinned verifier as normal SSH/SFTP sessions. Bypassing the factory skips the fail-closed host-key flow.
 - **Escalation must stay typed**: SSH.NET can surface broad `SshException("Failure")` messages for many non-permission conditions. The sudo path intentionally does not substring-match generic failures; false negatives are safer than privileged operations on unrelated errors.
 - **Remote edit sessions cache trust**: sudo edit upload uses the `PinnedFingerprintVerifier` resolved at file-open time. Host-key rotation during an edit raises `HostKeyRotatedDuringUpload`, closes the edit session, and does not re-run TOFU on every save.
@@ -329,22 +329,22 @@ ISplitContent (marker interface)
                          Auto-clamping: SplitRatio setter clamps to [MinRatio, MaxRatio] BEFORE PropertyChanged
 ```
 
-**Pane identity** — two distinct IDs serve different purposes:
+**Pane identity** - two distinct IDs serve different purposes:
 - `ServerId` (session-scoped): assigned AFTER successful connection; used as state machine key and tunnel tracking key. Empty during connection phase.
 - `OriginalServerId` (stable): set at pane creation from server inventory ID; never changes. Used for reconnect lookups, disconnect history, and `SplitLayoutMemory` pairing. Set early in `SplitSessionWithServerAsync` for proper cleanup if the pane is closed during connection.
 
-`SessionTabViewModel.RootContent` holds the tree root. A single pane is a `SessionPaneModel`. A split is a `SplitContainerModel` whose children can themselves be split — enabling arbitrary layouts (2x2, L-shape, 3 side-by-side, etc.) up to 8 panes per tab. `SplitTreeHelper` provides static traversal and mutation helpers: `EnumerateLeaves`, `FindPane`, `FindPaneByHostControl`, `FindParent`, `RemovePane`, `ReplacePane`, `CountLeaves`, `FirstLeaf`. `ReplacePaneRecursive` short-circuits after the first pane match. Pane-scoped failure diagnostics now live on `SessionPaneModel` (`FailureDetails` plus derived visibility helpers), so SSH/RDP failure disclosure remains attached to the correct pane even when tabs are split.
+`SessionTabViewModel.RootContent` holds the tree root. A single pane is a `SessionPaneModel`. A split is a `SplitContainerModel` whose children can themselves be split - enabling arbitrary layouts (2x2, L-shape, 3 side-by-side, etc.) up to 8 panes per tab. `SplitTreeHelper` provides static traversal and mutation helpers: `EnumerateLeaves`, `FindPane`, `FindPaneByHostControl`, `FindParent`, `RemovePane`, `ReplacePane`, `CountLeaves`, `FirstLeaf`. `ReplacePaneRecursive` short-circuits after the first pane match. Pane-scoped failure diagnostics now live on `SessionPaneModel` (`FailureDetails` plus derived visibility helpers), so SSH/RDP failure disclosure remains attached to the correct pane even when tabs are split.
 
 **SplitService** (extracted from MainViewModel): All split/merge orchestration lives in `Heimdall.App.Services.SplitService`, a singleton DI service that owns:
-- `SplitSessionWithServerAsync` — async connection + tree insertion with CancellationToken propagated to protocol handlers
-- `SplitSessionWithTool` — synchronous tool docking
-- `MergeExistingSession` — live reparent with CanClose() check on all source tree leaves (not just primary shim); user feedback when blocked by busy tool
-- `ClosePane` — type-aware cleanup: disconnect/dispose host → set `HostControl=null` → remove pane from tree
-- `CloseAllPanes` — centralized tab teardown: CanClose() gate, cancellation, history, tunnel release, state reset, disposal (called by `ConnectionViewModel.CloseSessionInternal`)
-- `ReconnectPaneAsync` — deferred old state machine cleanup (released only after new connection succeeds); no longer creates self-referential LayoutMemory entries
-- `SwapSplitPanesAsync` — async two-phase swap: detach host controls → await visual tree → swap model → await again → restore (prevents WebView2/ActiveX reparenting race)
-- `ToggleSplitOrientation` — in-place tree mutation
-- `ConnectByProtocolAsync` — unified 8-protocol dispatch with CancellationToken passthrough to all `ConnectionService.Connect*Async` handlers
+- `SplitSessionWithServerAsync` - async connection + tree insertion with CancellationToken propagated to protocol handlers
+- `SplitSessionWithTool` - synchronous tool docking
+- `MergeExistingSession` - live reparent with CanClose() check on all source tree leaves (not just primary shim); user feedback when blocked by busy tool
+- `ClosePane` - type-aware cleanup: disconnect/dispose host → set `HostControl=null` → remove pane from tree
+- `CloseAllPanes` - centralized tab teardown: CanClose() gate, cancellation, history, tunnel release, state reset, disposal (called by `ConnectionViewModel.CloseSessionInternal`)
+- `ReconnectPaneAsync` - deferred old state machine cleanup (released only after new connection succeeds); no longer creates self-referential LayoutMemory entries
+- `SwapSplitPanesAsync` - async two-phase swap: detach host controls → await visual tree → swap model → await again → restore (prevents WebView2/ActiveX reparenting race)
+- `ToggleSplitOrientation` - in-place tree mutation
+- `ConnectByProtocolAsync` - unified 8-protocol dispatch with CancellationToken passthrough to all `ConnectionService.Connect*Async` handlers
 - Per-session `CancellationTokenSource` lifecycle (`RegisterSession`/`CancelSession` with deferred dispose to avoid leaks)
 - `SplitLayoutMemory` instance for layout persistence
 
@@ -354,20 +354,20 @@ ISplitContent (marker interface)
 
 **Split new connection**: Right-click → "Split..." → Horizontal | Vertical → Command Palette in split mode → select server → new `SessionPaneModel` inserted into tree via `SplitContainerModel` wrapping. Loading overlay visible during async connection. Post-await guard aborts if pane was removed or tab closed during connection. Per-session CancellationToken ensures graceful abort when tab is closed. Split palette shows ALL servers from inventory (not limited to recent).
 
-**Split with tool**: When a built-in tool is selected in split mode (palette search or recent tools), `SplitSessionWithTool()` creates the tool control synchronously via `EmbeddedSessionManager.CreateToolControl()` and docks it directly into the split pane — no loading overlay or async connection needed. Tool panes use `ConnectionType = "TOOL:<ID>"` and a GUID-based `ServerId` for tree addressing.
+**Split with tool**: When a built-in tool is selected in split mode (palette search or recent tools), `SplitSessionWithTool()` creates the tool control synchronously via `EmbeddedSessionManager.CreateToolControl()` and docks it directly into the split pane - no loading overlay or async connection needed. Tool panes use `ConnectionType = "TOOL:<ID>"` and a GUID-based `ServerId` for tree addressing.
 
-**Merge existing session or tool**: Right-click → "Merge with..." → session or tool → Horizontal | Vertical → `MergeExistingSession()` reparents the live `HostControl` into a new pane without reconnecting. Checks `CanClose()` on all source tool panes before proceeding (busy tool blocks merge). Works symmetrically for both connection tabs and tool tabs. Uses `OriginalServerId` as stable lookup key (fallback from `ServerId` which may be empty during connection; tool tabs use `ServerId` directly). Consults `SplitLayoutMemory` to restore prior ratio for previously-paired servers. Cancels any in-progress operations for the source session. State machine entries preserved during merge (connections alive, just reparented) — cleanup happens when the tab is eventually closed.
+**Merge existing session or tool**: Right-click → "Merge with..." → session or tool → Horizontal | Vertical → `MergeExistingSession()` reparents the live `HostControl` into a new pane without reconnecting. Checks `CanClose()` on all source tool panes before proceeding (busy tool blocks merge). Works symmetrically for both connection tabs and tool tabs. Uses `OriginalServerId` as stable lookup key (fallback from `ServerId` which may be empty during connection; tool tabs use `ServerId` directly). Consults `SplitLayoutMemory` to restore prior ratio for previously-paired servers. Cancels any in-progress operations for the source session. State machine entries preserved during merge (connections alive, just reparented) - cleanup happens when the tab is eventually closed.
 
 **Drag-to-split**: Drag a tab onto the content area of another tab. Orientation is auto-detected from drop position (closest edge). Works on already-split sessions to create 3+ pane layouts.
 
 **Operations**: Swap panes, toggle orientation (Ctrl+Shift+O), detach any pane to `FloatingSessionWindow`, close individual pane (promotes sibling in tree), unsplit (restores pane as independent tab). Pane close is type-aware: connection panes get disconnect history + tunnel release + state machine reset; tool panes check `IToolView.CanClose()` and skip state machine/tunnel teardown. Close order is fixed: disconnect/dispose the host through `EmbeddedSessionManager`, set `HostControl=null`, then remove the pane from the tree. RDP/ActiveX-specific teardown order is handled inside `RdpDisconnectTeardownSequence`.
 
-**Splitter ratio**: Model auto-clamps `SplitRatio` to `[0.1, 0.9]` in the setter (before PropertyChanged fires) — the view reads the ratio directly without redundant clamping. Captured via `GridSplitter.DragCompleted` per `SplitContainerControl` with NaN/Infinity guard, persisted in the tree model. Restored on tab switch via layout rebuild. Double-click splitter resets to `DefaultRatio` (0.5).
+**Splitter ratio**: Model auto-clamps `SplitRatio` to `[0.1, 0.9]` in the setter (before PropertyChanged fires) - the view reads the ratio directly without redundant clamping. Captured via `GridSplitter.DragCompleted` per `SplitContainerControl` with NaN/Infinity guard, persisted in the tree model. Restored on tab switch via layout rebuild. Double-click splitter resets to `DefaultRatio` (0.5).
 
 **Split layout persistence**: `SplitLayoutMemory` records server pair associations in `config/split-layouts.json` with versioned JSON schema (`{ "version": 1, "entries": [...] }`). Backward-compatible with legacy bare-array format. Thread-safe via `lock` on all public methods. Atomic save via unique temp file (`Guid`-suffixed) + `File.Move(overwrite: true)` with `finally` cleanup. When opening the Command Palette in split mode, previously paired servers are boosted to the top of results.
 
 **Race condition guards**:
-- Per-session `CancellationToken` propagated through `ConnectByProtocolAsync` to all protocol handlers — closing a tab cancels the actual connection attempt, not just the outer wrapper
+- Per-session `CancellationToken` propagated through `ConnectByProtocolAsync` to all protocol handlers - closing a tab cancels the actual connection attempt, not just the outer wrapper
 - `CancelSession` disposes the CTS after a 5-second delay (deferred dispose) so in-flight operations can observe cancellation before the source is reclaimed
 - Post-await check `!ActiveSessions.Contains(session) || FindPane(...) is null` prevents orphaned connections
 - `CountLeaves >= 8` gate prevents unbounded tree growth
@@ -383,7 +383,7 @@ ISplitContent (marker interface)
 
 **Problem**: Users need to view multiple sessions side by side, or move a session to a second monitor.
 
-**Solution**: `FloatingSessionWindow` hosts a single detached `SessionTabViewModel`. Any individual pane can be detached from a split tree via `DetachPaneToFloatingWindow(paneId)` — the pane is extracted from the tree, promoted to an independent tab, then detached to a floating window. The window applies the current theme via `WindowThemeHelper`, displays session metadata (title, tunnel route), and provides a reattach button. On close, if not explicitly reattached, the session is returned to the main window for proper cleanup.
+**Solution**: `FloatingSessionWindow` hosts a single detached `SessionTabViewModel`. Any individual pane can be detached from a split tree via `DetachPaneToFloatingWindow(paneId)` - the pane is extracted from the tree, promoted to an independent tab, then detached to a floating window. The window applies the current theme via `WindowThemeHelper`, displays session metadata (title, tunnel route), and provides a reattach button. On close, if not explicitly reattached, the session is returned to the main window for proper cleanup.
 
 ### 17. Tunnel Ref-Counting for Shared Tunnels
 
@@ -419,9 +419,9 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 ### 21b. Session Reachability Monitor (Inventory-wide TCP Probes)
 
-**Problem**: §21 only sees CPU/RAM/disk **after** the user has connected. The user also wants an at-a-glance view of which servers in the inventory are reachable on the network **before** opening a session — green/red dots in the sidebar rather than discovering at click-time that a host is down.
+**Problem**: §21 only sees CPU/RAM/disk **after** the user has connected. The user also wants an at-a-glance view of which servers in the inventory are reachable on the network **before** opening a session - green/red dots in the sidebar rather than discovering at click-time that a host is down.
 
-**Solution**: `Heimdall.Core.SessionHealth` defines the data model (`HealthStatus` enum, immutable `HealthState` record, `IHealthProbe` test seam, `TcpHealthProbe` default implementation) and `Heimdall.App.Services.SessionHealthMonitor` orchestrates it. A `System.Threading.Timer` fires every `SessionHealthCheckIntervalSeconds` (default 60), loads the latest inventory from `IConfigManager.LoadServersAsync` (so adds/removes via the server dialog are picked up automatically without a separate refresh hook), and dispatches throttled parallel TCP probes through a `SemaphoreSlim` (default 10 concurrent). The protocol → port resolver maps RDP→`RemotePort`, SSH/SFTP→`SshPort`, VNC→`VncPort`, FTP→`FtpPort`, Telnet→`TelnetPort`; Citrix and Local Shell are intentionally not probed. Gateway-fronted servers (`SshGatewayId != null`) short-circuit to `Unknown` without consuming a probe slot — direct probes would always fail because the gateway is the only reachable hop. State for servers removed from the inventory between cycles is evicted on the next cycle.
+**Solution**: `Heimdall.Core.SessionHealth` defines the data model (`HealthStatus` enum, immutable `HealthState` record, `IHealthProbe` test seam, `TcpHealthProbe` default implementation) and `Heimdall.App.Services.SessionHealthMonitor` orchestrates it. A `System.Threading.Timer` fires every `SessionHealthCheckIntervalSeconds` (default 60), loads the latest inventory from `IConfigManager.LoadServersAsync` (so adds/removes via the server dialog are picked up automatically without a separate refresh hook), and dispatches throttled parallel TCP probes through a `SemaphoreSlim` (default 10 concurrent). The protocol → port resolver maps RDP→`RemotePort`, SSH/SFTP→`SshPort`, VNC→`VncPort`, FTP→`FtpPort`, Telnet→`TelnetPort`; Citrix and Local Shell are intentionally not probed. Gateway-fronted servers (`SshGatewayId != null`) short-circuit to `Unknown` without consuming a probe slot - direct probes would always fail because the gateway is the only reachable hop. State for servers removed from the inventory between cycles is evicted on the next cycle.
 
 **Settings integration**: `IConfigManager.SettingsChanged` is subscribed in the constructor; toggling `SessionHealthMonitorEnabled` or changing any of the four `SessionHealth*` settings re-arms the Timer without restart. Disabling clears the in-memory state dictionary.
 
@@ -459,19 +459,19 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 **Solution**: two complementary patterns applied as pure structural splits (no logic change, no rename, no signature change):
 
-1. **Extract to DI-registered services** when the logic does not need named XAML element access — a service takes a handful of dependencies via its constructor, is registered as a singleton in `App.xaml.cs`, and is injected into `MainWindow` alongside `MainViewModel`. Communication back into the window uses either a small callback interface (when many methods need window state) or plain `Action<T>` delegates (when only one or two callbacks are needed).
-   - **`ContextMenuFactory`** (647 lines) — builds the four session `TreeView` context menus and the "Detected Tools" submenu. Reaches back into `MainWindow` through `IContextMenuCallbacks`.
-   - **`SessionTabContextMenuFactory`** (335 lines) — builds the session tab strip context menu (19 conditional items: close/close others/close all/rename/duplicate/detach/split/merge/unsplit/reconnect/…). Reaches back through `ISessionTabContextCallbacks`.
-   - **`ToolsTabPopulationService`** (605 lines) — owns the full-page Tools tab rebuild and the sidebar Tools `TreeView` data/filter. Reaches back via `Action<ToolDescriptor>` (card click) + `Action<string>` (pin click). Theme tokens are resolved via `Application.Current.FindResource` so the service stays decoupled from any `FrameworkElement`.
-   - **`FileShareService`** — ephemeral HTTP/TFTP folder sharing lifecycle (previously inline in `OnShareFolderClick`). Event-based API (`ShareStarted` / `ShareStopped`), `IAsyncDisposable` — `App.OnExit` routes through `IAsyncDisposable.DisposeAsync` on the service provider to properly dispose async-only services.
-   - **`KeyboardShortcutService`** (18 shortcuts) — fluent shortcut registration with `canExecute` gating, replacing the monolithic `OnPreviewKeyDown` switch. Registered in `MainWindow` constructor.
-   - **`SessionWindowService`** — split/merge/detach/unsplit orchestration moved out of MainWindow. Exposes `SplitPaletteRequested` event for MainWindow to open the palette in split mode.
+1. **Extract to DI-registered services** when the logic does not need named XAML element access - a service takes a handful of dependencies via its constructor, is registered as a singleton in `App.xaml.cs`, and is injected into `MainWindow` alongside `MainViewModel`. Communication back into the window uses either a small callback interface (when many methods need window state) or plain `Action<T>` delegates (when only one or two callbacks are needed).
+   - **`ContextMenuFactory`** (647 lines) - builds the four session `TreeView` context menus and the "Detected Tools" submenu. Reaches back into `MainWindow` through `IContextMenuCallbacks`.
+   - **`SessionTabContextMenuFactory`** (335 lines) - builds the session tab strip context menu (19 conditional items: close/close others/close all/rename/duplicate/detach/split/merge/unsplit/reconnect/…). Reaches back through `ISessionTabContextCallbacks`.
+   - **`ToolsTabPopulationService`** (605 lines) - owns the full-page Tools tab rebuild and the sidebar Tools `TreeView` data/filter. Reaches back via `Action<ToolDescriptor>` (card click) + `Action<string>` (pin click). Theme tokens are resolved via `Application.Current.FindResource` so the service stays decoupled from any `FrameworkElement`.
+   - **`FileShareService`** - ephemeral HTTP/TFTP folder sharing lifecycle (previously inline in `OnShareFolderClick`). Event-based API (`ShareStarted` / `ShareStopped`), `IAsyncDisposable` - `App.OnExit` routes through `IAsyncDisposable.DisposeAsync` on the service provider to properly dispose async-only services.
+   - **`KeyboardShortcutService`** (18 shortcuts) - fluent shortcut registration with `canExecute` gating, replacing the monolithic `OnPreviewKeyDown` switch. Registered in `MainWindow` constructor.
+   - **`SessionWindowService`** - split/merge/detach/unsplit orchestration moved out of MainWindow. Exposes `SplitPaletteRequested` event for MainWindow to open the palette in split mode.
 
 2. **Split into `partial class` files** when the logic *must* touch named XAML elements directly (so extraction to a service would require passing dozens of `FrameworkElement` parameters on every call). The new file declares `public partial class MainWindow` and holds a thematically coherent subset of methods. Cross-file access is free (same class, same assembly) so static helpers and private fields remain shared without any visibility changes. POCOs co-located with the partials (`WindowUIState`, `TreeInteractionState`, `TabInteractionState`) own the fields/flags previously scattered across the monolith.
-   - **`MainWindow.Localization.cs`** (519 lines) — the 8 `Apply*Localization` methods (`ApplyLocalization` orchestrator + Navigation / Toolbar / Tunnel / Scheduled / Settings / About / Accessibility). Phase 5A/5B have since migrated Navigation/Toolbar/Accessibility to `{loc:Translate}` — those apply helpers are now empty stubs pending deletion after Phase 5C/5D.
-   - **`MainWindow.WindowUI.cs`** + `WindowUIState` POCO — fullscreen toggle, sidebar collapse, tree scroll persistence, folder expand/collapse memory, window-bounds save/restore.
-   - **`MainWindow.TreeInteractions.cs`** + `TreeInteractionState` POCO — session `TreeView` drag-drop, filter box, inline rename, context-menu plumbing. The move-to-group UX now routes both context-menu and drag-drop through the same `ServerListViewModel` core method, validates drag-drop targets against the same project-scoped group set, preserves `_expandedNodes` by avoiding `LoadServers` reloads, and exposes a dedicated no-group drop zone for drag-to-root parity.
-   - **`MainWindow.TabInteractions.cs`** + `TabInteractionState` POCO — session tab drag-to-reorder, drag-to-detach, drop target resolution, tab-strip hover tracking.
+   - **`MainWindow.Localization.cs`** (519 lines) - the 8 `Apply*Localization` methods (`ApplyLocalization` orchestrator + Navigation / Toolbar / Tunnel / Scheduled / Settings / About / Accessibility). Phase 5A/5B have since migrated Navigation/Toolbar/Accessibility to `{loc:Translate}` - those apply helpers are now empty stubs pending deletion after Phase 5C/5D.
+   - **`MainWindow.WindowUI.cs`** + `WindowUIState` POCO - fullscreen toggle, sidebar collapse, tree scroll persistence, folder expand/collapse memory, window-bounds save/restore.
+   - **`MainWindow.TreeInteractions.cs`** + `TreeInteractionState` POCO - session `TreeView` drag-drop, filter box, inline rename, context-menu plumbing. The move-to-group UX now routes both context-menu and drag-drop through the same `ServerListViewModel` core method, validates drag-drop targets against the same project-scoped group set, preserves `_expandedNodes` by avoiding `LoadServers` reloads, and exposes a dedicated no-group drop zone for drag-to-root parity.
+   - **`MainWindow.TabInteractions.cs`** + `TabInteractionState` POCO - session tab drag-to-reorder, drag-to-detach, drop target resolution, tab-strip hover tracking.
 
 **Decision rule**: if the method's entire body is `Mw_X.Text = vm.Localize(...)` against named elements, use a partial class. If it manipulates the tree or builds controls from data and can be reshaped to take a `Panel`/`Control` parameter, extract to a service. The same `ConnectionService` in `Heimdall.App/Services/` already uses this partial-class pattern with 10 files for its per-protocol connection flows.
 
@@ -485,15 +485,15 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 Four sub-VMs extracted in Phase 4:
 
-- **`CommandPaletteViewModel`** (Ctrl+K palette) — 14 methods covering fuzzy search ranking, tool-command parsing (`tools`, `ping 10.0.0.1`), ad-hoc connection string parsing (`user@host:port` with protocol inference), recent-tools boosting, and the connect/split flows. Owns the `IsCommandPaletteOpen` state and the `SplitLayoutMemory` pairing lookup.
-- **`TunnelsViewModel`** — tunnel panel collection, tunnel tab, route resolver (`ResolveRoute(sessionId)` for the session header display). Subscribes to `TunnelManager.ActiveTunnels` `CollectionChanged` and tears it down in `Dispose`.
-- **`ScheduledTasksViewModel`** — `TaskSchedulerService` ownership, `TasksProvider`/`TaskDueCallback`/`PersistCallback` wire-up, idempotent `_started` flag to survive `LoadAsync` re-entrancy.
-- **`SessionCoordinator`** — session-lifecycle hub: 8 external wire-ups (5 `Split.*` providers/setters + 3 `EmbeddedSessionManager` callbacks: `BroadcastCallback`, `IsBroadcastActive`, `ReconnectRequestedCallback`), the broadcast-mode cluster (toggle + fan-out + per-view indicators), `OnSessionReady` (materialize session tabs, resolve tunnel route, record history, auto-open SFTP companion pane), and `OnReconnectRequestedAsync` (close stale tab + re-trigger connect flow). `OpenToolCallback` stayed on `MainViewModel` because `OpenToolTabAsync` is a shell concern shared with the sidebar/tools-tab/palette consumers.
+- **`CommandPaletteViewModel`** (Ctrl+K palette) - 14 methods covering fuzzy search ranking, tool-command parsing (`tools`, `ping 10.0.0.1`), ad-hoc connection string parsing (`user@host:port` with protocol inference), recent-tools boosting, and the connect/split flows. Owns the `IsCommandPaletteOpen` state and the `SplitLayoutMemory` pairing lookup.
+- **`TunnelsViewModel`** - tunnel panel collection, tunnel tab, route resolver (`ResolveRoute(sessionId)` for the session header display). Subscribes to `TunnelManager.ActiveTunnels` `CollectionChanged` and tears it down in `Dispose`.
+- **`ScheduledTasksViewModel`** - `TaskSchedulerService` ownership, `TasksProvider`/`TaskDueCallback`/`PersistCallback` wire-up, idempotent `_started` flag to survive `LoadAsync` re-entrancy.
+- **`SessionCoordinator`** - session-lifecycle hub: 8 external wire-ups (5 `Split.*` providers/setters + 3 `EmbeddedSessionManager` callbacks: `BroadcastCallback`, `IsBroadcastActive`, `ReconnectRequestedCallback`), the broadcast-mode cluster (toggle + fan-out + per-view indicators), `OnSessionReady` (materialize session tabs, resolve tunnel route, record history, auto-open SFTP companion pane), and `OnReconnectRequestedAsync` (close stale tab + re-trigger connect flow). `OpenToolCallback` stayed on `MainViewModel` because `OpenToolTabAsync` is a shell concern shared with the sidebar/tools-tab/palette consumers.
 
 Two additional shell-layer sub-VMs were extracted during Phase 2 to mirror the XAML binding story for the left sidebar:
 
-- **`SidebarViewModel`** — Sessions/Tools tab toggle, tool filter text, `SidebarToolCategoryViewModel` tree, lazy population on first activation, `Ctrl+Shift+T` toggle target selection (the sibling RadioButton must be explicitly set — see `ToggleSidebarTab()` gotcha in §Sidebar).
-- **`ToolsTabViewModel`** — full-page Tools browser VM state (favorites, recents, filter, section visibility). Section rendering itself stays in `ToolsTabPopulationService` (which writes to named XAML panels), wired through a Panel-injection event so the VM never touches `FrameworkElement` directly.
+- **`SidebarViewModel`** - Sessions/Tools tab toggle, tool filter text, `SidebarToolCategoryViewModel` tree, lazy population on first activation, `Ctrl+Shift+T` toggle target selection (the sibling RadioButton must be explicitly set - see `ToggleSidebarTab()` gotcha in §Sidebar).
+- **`ToolsTabViewModel`** - full-page Tools browser VM state (favorites, recents, filter, section visibility). Section rendering itself stays in `ToolsTabPopulationService` (which writes to named XAML panels), wired through a Panel-injection event so the VM never touches `FrameworkElement` directly.
 
 **Result**: `MainViewModel.cs` dropped from **1,917 → 628 lines (−67%)**. The shell class now orchestrates sub-VM instantiation, shared settings, the single `OpenToolCallback`, and the composed `LoadAsync` pipeline. Each sub-VM is independently navigable, testable in isolation (sub-VMs that don't touch `Application.Current.Dispatcher` run cleanly in xUnit), and owns its own event-subscription lifecycle via `IDisposable`.
 
@@ -505,18 +505,18 @@ Two additional shell-layer sub-VMs were extracted during Phase 2 to mirror the X
 
 Migration was split by UI pattern:
 
-- **5A — Navigation + Toolbar labels (58 sites)**: tab strip headers, toolbar button content/tooltips, Quick Connect / Quick File Server, broadcast toggle label, status-bar ready text, and shortcuts hint. Straight mappings used the mechanical pattern `Mw_X.Text = vm.Localize("Key")` → `Text="{loc:Translate Key}"`.
-- **5B — Accessibility attributes (39 sites)**: all imperative `AutomationProperties.SetName(Mw_X, vm.Localize("Key"))` calls moved to `AutomationProperties.Name="{loc:Translate Key}"` on the owning XAML element. `ApplyAccessibilityLocalization` was deleted entirely.
-- **5C.1 — Tunnel + Scheduled + About (40 sites)**: tunnel/scheduled DataGrid column headers, context-menu headers, action buttons, and field labels moved 1-for-1 to XAML. `ApplyScheduledLocalization` had no residual work and was deleted.
-- **5C.2 — Settings tab (160 sites)**: the densest pass covered 6 settings sub-tabs with radios, checkboxes, labels, watermarks, tooltips, and option groups. It included 24 `Content` + `AutomationProperties.Name` twin migrations spanning theme variants, session persistence, transport modes, RDP display/audio options, gateway actions, apply-mode buttons, and credential-provider actions. `ApplySettingsLocalization` remains only as a residual runtime UI population stub.
-- **5D.1 — Composites via inline `<Run>` (8 sites)**: status-bar composites (`" " + key + " " + key`) and About feature bullets (`"\u2022 " + key`) were split into anonymous inline `Run` elements containing literal text plus `{loc:Translate Key}` bindings. `ApplyNavigationLocalization` and `ApplyAboutLocalization` were deleted.
-- **5D.2 — Logic-heavy cases (2 sites + helper extraction)**: the share-folder conditional label moved out of `ApplyToolbarLocalization` into `UpdateShareFolderLabel()` on `MainWindow`, called from `SharingStarted`, `SharingStopped`, the locale handler, and startup while `FileShareService` remains non-INPC. The tunnel-panel header `{0}` split moved to `TunnelsViewModel.TunnelPanelHeaderPrefix` / `TunnelPanelHeaderSuffix`, with `Mode=OneWay` inline `Run` bindings and `LocalizationManager.LocaleChanged` re-notification. `ApplyToolbarLocalization` and `ApplyTunnelLocalization` were deleted.
+- **5A - Navigation + Toolbar labels (58 sites)**: tab strip headers, toolbar button content/tooltips, Quick Connect / Quick File Server, broadcast toggle label, status-bar ready text, and shortcuts hint. Straight mappings used the mechanical pattern `Mw_X.Text = vm.Localize("Key")` → `Text="{loc:Translate Key}"`.
+- **5B - Accessibility attributes (39 sites)**: all imperative `AutomationProperties.SetName(Mw_X, vm.Localize("Key"))` calls moved to `AutomationProperties.Name="{loc:Translate Key}"` on the owning XAML element. `ApplyAccessibilityLocalization` was deleted entirely.
+- **5C.1 - Tunnel + Scheduled + About (40 sites)**: tunnel/scheduled DataGrid column headers, context-menu headers, action buttons, and field labels moved 1-for-1 to XAML. `ApplyScheduledLocalization` had no residual work and was deleted.
+- **5C.2 - Settings tab (160 sites)**: the densest pass covered 6 settings sub-tabs with radios, checkboxes, labels, watermarks, tooltips, and option groups. It included 24 `Content` + `AutomationProperties.Name` twin migrations spanning theme variants, session persistence, transport modes, RDP display/audio options, gateway actions, apply-mode buttons, and credential-provider actions. `ApplySettingsLocalization` remains only as a residual runtime UI population stub.
+- **5D.1 - Composites via inline `<Run>` (8 sites)**: status-bar composites (`" " + key + " " + key`) and About feature bullets (`"\u2022 " + key`) were split into anonymous inline `Run` elements containing literal text plus `{loc:Translate Key}` bindings. `ApplyNavigationLocalization` and `ApplyAboutLocalization` were deleted.
+- **5D.2 - Logic-heavy cases (2 sites + helper extraction)**: the share-folder conditional label moved out of `ApplyToolbarLocalization` into `UpdateShareFolderLabel()` on `MainWindow`, called from `SharingStarted`, `SharingStopped`, the locale handler, and startup while `FileShareService` remains non-INPC. The tunnel-panel header `{0}` split moved to `TunnelsViewModel.TunnelPanelHeaderPrefix` / `TunnelPanelHeaderSuffix`, with `Mode=OneWay` inline `Run` bindings and `LocalizationManager.LocaleChanged` re-notification. `ApplyToolbarLocalization` and `ApplyTunnelLocalization` were deleted.
 
 **Result**: `MainWindow.Localization.cs` dropped from **523 → 122 lines (−77%)**. Its remaining responsibilities are deliberately not pure XAML label localization:
 
-- `ApplyLocalization()` — now a one-call dispatcher to `ApplySettingsLocalization(vm)`.
-- `ApplySettingsLocalization()` — residual runtime UI population: `PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`, `UpdateExternalToolProviderStatus`, and the async token-status check. These helpers generate or update dynamic UI from runtime state, so they stay imperative until a dedicated settings-helper extraction.
-- `RefreshVmDrivenLocalization(vm)` — helper called from the constructor and locale change handler to refresh VM-driven ToolsTab labels that were previously cascaded through `ApplyLocalization()`. This preserves sub-VM refresh behavior after the dispatcher was reduced to its single settings call.
+- `ApplyLocalization()` - now a one-call dispatcher to `ApplySettingsLocalization(vm)`.
+- `ApplySettingsLocalization()` - residual runtime UI population: `PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`, `UpdateExternalToolProviderStatus`, and the async token-status check. These helpers generate or update dynamic UI from runtime state, so they stay imperative until a dedicated settings-helper extraction.
+- `RefreshVmDrivenLocalization(vm)` - helper called from the constructor and locale change handler to refresh VM-driven ToolsTab labels that were previously cascaded through `ApplyLocalization()`. This preserves sub-VM refresh behavior after the dispatcher was reduced to its single settings call.
 
 The Phase 5 final smoke test also surfaced a latent Command Palette regression from the Phase 2A/4A refactor path: single-click inside the palette closed the popup before double-click could fire. `OnWindowPreviewMouseDown` now guards clicks originating inside `CommandPalettePopup.Child` with fallback `IsMouseOver` and bounds checks, preserving outside-click dismissal while allowing normal ListBox selection and double-click execution.
 
@@ -579,27 +579,27 @@ prefill even if future alias tables expand.
 
 **Problem**: Two divergent flows used to import a `.rdp` or `.json` config file. Drag/drop on the main window routed to the rich `ServerListViewModel.ImportRdpFilesAsync` flow (preview + per-item conflict resolution + merge / replace / skip). The `Settings -> Import` button parsed inline with no preview and no conflict resolution. The user had no clue which entry point to use, and the two paths could diverge over time.
 
-**Solution**: `IProfileImportService` (in `Heimdall.App/Services/Import/`) is the single orchestrator for both entry points. It branches on file extension, delegates `.rdp` parsing to `IRdpImportService`, handles `.json` config payloads natively, and surfaces a `ProfileImportResult` to the caller after the user has resolved conflicts via `RdpImportDialogViewModel`. `ServerListViewModel.ImportRdpFilesAsync` is now a thin wrapper that hands the file list to the service, so drag/drop UX is preserved bit-for-bit. `SettingsViewModel.ImportConfigAsync` is also a thin wrapper around the same service — the previous `ImportRdpFileAsync` and `ImportJsonAsync` methods were deleted (no dead code).
+**Solution**: `IProfileImportService` (in `Heimdall.App/Services/Import/`) is the single orchestrator for both entry points. It branches on file extension, delegates `.rdp` parsing to `IRdpImportService`, handles `.json` config payloads natively, and surfaces a `ProfileImportResult` to the caller after the user has resolved conflicts via `RdpImportDialogViewModel`. `ServerListViewModel.ImportRdpFilesAsync` is now a thin wrapper that hands the file list to the service, so drag/drop UX is preserved bit-for-bit. `SettingsViewModel.ImportConfigAsync` is also a thin wrapper around the same service - the previous `ImportRdpFileAsync` and `ImportJsonAsync` methods were deleted (no dead code).
 
 Historic formats (`MobaXterm`, `RDCMan`, `mRemoteNG`) keep their dedicated parsers and are not routed through the new service. Their import filter entries remain in the OpenFileDialog so existing workflows are not regressed.
 
-## Design System (CommonControls.xaml — 1,880+ lines, 45 tokens, WCAG AA)
+## Design System (CommonControls.xaml - 1,880+ lines, 45 tokens, WCAG AA)
 
-The application uses a centralized Design System defined in `CommonControls.xaml`, backed by the `ThemeForge.Theme` NuGet package and the `HeimdallThemeBridge.xaml` app brush bridge. The 17 ThemeForge palettes provide canonical color slots; the bridge re-expresses Heimdall's 74 app brush keys on those slots. Theme swapping is owned by `HeimdallThemeService` (singleton DI) — see `docs/TROUBLESHOOTING.md` ("Theme Switching — Stale Colors After Swap") for the reactivity patterns.
+The application uses a centralized Design System defined in `CommonControls.xaml`, backed by the `ThemeForge.Theme` NuGet package and the `HeimdallThemeBridge.xaml` app brush bridge. The 17 ThemeForge palettes provide canonical color slots; the bridge re-expresses Heimdall's 74 app brush keys on those slots. Theme swapping is owned by `HeimdallThemeService` (singleton DI) - see `docs/TROUBLESHOOTING.md` ("Theme Switching - Stale Colors After Swap") for the reactivity patterns.
 
-**Typography tokens (10)** — `sys:Double` resources for consistent font sizing:
+**Typography tokens (10)** - `sys:Double` resources for consistent font sizing:
 - `FontSizeSmallCaption` (11), `FontSizeCaption` (12), `FontSizeBody` (13), `FontSizeBodyLarge` (14), `FontSizeSubtitle` (15), `FontSizeLarge` (17), `FontSizeTitle` (20), `FontSizeDisplay` (22), `FontSizeHeadline` (24), `FontSizeHero` (64)
 - Usage: `FontSize="{StaticResource FontSizeBody}"` instead of `FontSize="12"`
 
 **Font family tokens**:
-- `FontFamilyMonospace` (`Consolas, Courier New, monospace`) — used for path boxes, code editors, terminal text
+- `FontFamilyMonospace` (`Consolas, Courier New, monospace`) - used for path boxes, code editors, terminal text
 
-**Spacing tokens (5 uniform + 3 asymmetric)** — `Thickness` resources for margins/padding:
+**Spacing tokens (5 uniform + 3 asymmetric)** - `Thickness` resources for margins/padding:
 - Uniform: `SpacingXs` (4), `SpacingSm` (8), `SpacingMd` (12), `SpacingLg` (20), `SpacingXl` (24)
 - Asymmetric: `ContentAreaMargin` (16,0,16,16) for tool content areas, `SessionHeaderPadding` (8,4) for session header strips, `ToolHeaderPadding` (12,8) / `ToolFooterPadding` (12,8) for tool panel headers/footers
-- Button padding by role: `PaddingButtonHelp` (6,2), `PaddingButtonCopy` (10,4), `PaddingButtonPrimary` (12,6), `PaddingButtonPreset` (8,2) — Copy/Export buttons must use `PaddingButtonCopy`, not `PaddingButtonPrimary`
+- Button padding by role: `PaddingButtonHelp` (6,2), `PaddingButtonCopy` (10,4), `PaddingButtonPrimary` (12,6), `PaddingButtonPreset` (8,2) - Copy/Export buttons must use `PaddingButtonCopy`, not `PaddingButtonPrimary`
 - Input field padding: `PaddingInput` (8,6) for all TextBox inputs
-- Truly one-off asymmetric margins (`Margin="0,0,8,0"`) stay hardcoded — standard WPF practice
+- Truly one-off asymmetric margins (`Margin="0,0,8,0"`) stay hardcoded - standard WPF practice
 
 **Corner radius tokens (5)**: `CornerRadiusXs` (2), `CornerRadiusSm` (4), `CornerRadiusMd` (8), `CornerRadiusLg` (10), `CornerRadiusXl` (12)
 
@@ -607,35 +607,35 @@ The application uses a centralized Design System defined in `CommonControls.xaml
 
 **Icon size tokens (6)**: `IconSizeSmall` (12), `IconSizeMedium` (16), `IconSizeLarge` (20), `IconSizeXLarge` (36), `IconSizeEmptyState` (32), `IconSizeHero` (48)
 
-**Tool category brushes** — 5 distinct colors per tool category (defined in the bridge on ThemeForge slots):
+**Tool category brushes** - 5 distinct colors per tool category (defined in the bridge on ThemeForge slots):
 - `ToolNetworkBrush` (blue), `ToolSecurityBrush` (orange), `ToolEncodingBrush` (purple), `ToolSystemBrush` (cyan), `ToolExternalBrush` (pink)
 - Each tool has a per-tool glyph (Segoe MDL2 Assets) + category color in tree view and palette
 
-**Micro-animations** — Subtle transitions for panels toggling visibility:
+**Micro-animations** - Subtle transitions for panels toggling visibility:
 - `FadeInPanelStyle`: `DoubleAnimation` opacity 0→1 in 150ms on `Visibility=Visible`
 - Duration tokens: `AnimationFast` (150ms), `AnimationMedium` (250ms)
 - Applied to: session loading overlay, SSH/RDP/VNC reconnect overlays
 
 **Accessibility**:
-- `FocusIndicatorBrush` (cyan on dark, blue on light) — dedicated keyboard focus ring on all button styles
-- `TextOnAccentBrush` (white) — used on accent-colored surfaces (buttons, DataGrid selections, checkboxes)
+- `FocusIndicatorBrush` (cyan on dark, blue on light) - dedicated keyboard focus ring on all button styles
+- `TextOnAccentBrush` (white) - used on accent-colored surfaces (buttons, DataGrid selections, checkboxes)
 - All foreground/background pairs verified for WCAG AA (4.5:1 minimum contrast ratio)
-- `AutomationProperties.Name` on all interactive controls across all 57 tool views + all dialog views, via runtime-localized `SetName()` pattern in `ApplyLocalization()` — no empty XAML placeholders
+- `AutomationProperties.Name` on all interactive controls across all 57 tool views + all dialog views, via runtime-localized `SetName()` pattern in `ApplyLocalization()` - no empty XAML placeholders
 - `Focusable="False"` on decorative icon TextBlocks (empty state MDL2 glyphs) to exclude from keyboard focus and screen reader navigation
 - `ToolAsyncStateController`: centralized loading/error/empty-state/results visibility management for async tools (13 tools adopted)
-- `ToolLoadingBarStyle` (indeterminate, 4px) and `ToolDeterminateProgressBarStyle` (determinate, 20px) — all tool ProgressBars use shared styles
+- `ToolLoadingBarStyle` (indeterminate, 4px) and `ToolDeterminateProgressBarStyle` (determinate, 20px) - all tool ProgressBars use shared styles
 - Tool header pattern: Row 0 = title + help button only; input controls in a dedicated input strip (Row 2)
 
-**Protocol icons** — Unique `Geo.Protocol.*` vector geometries per protocol type in TreeView:
+**Protocol icons** - Unique `Geo.Protocol.*` vector geometries per protocol type in TreeView:
 - RDP, SSH, SFTP, Local Shell, Citrix, VNC, Telnet, FTP
 
 **19 themed control styles** with complete state coverage (hover, pressed, focused, disabled):
 - Window, PrimaryButton, SecondaryButton, ToolbarGhostButton, TextBox, PasswordBox, ComboBox, TabControl, TabItem, TreeView, ContextMenu, MenuItem, CheckBox, RadioButton, ToolTip, ListBox, Expander, ProgressBar, Slider, DataGrid
 
 **Global defaults**:
-- `DataGrid.ClipboardCopyMode="IncludeHeader"` — enables native Ctrl+C on all DataGrids
-- `TextBox.IsReadOnly` trigger — `SurfaceBrush` background + `Opacity=0.75` for read-only fields
-- `TreeViewItem`/`ListBoxItem` — `IsKeyboardFocused` trigger with `FocusIndicatorBrush` border
+- `DataGrid.ClipboardCopyMode="IncludeHeader"` - enables native Ctrl+C on all DataGrids
+- `TextBox.IsReadOnly` trigger - `SurfaceBrush` background + `Opacity=0.75` for read-only fields
+- `TreeViewItem`/`ListBoxItem` - `IsKeyboardFocused` trigger with `FocusIndicatorBrush` border
 
 ## Connection Flow
 
@@ -765,7 +765,7 @@ WebView2 is required for embedded SSH terminals (xterm.js) and VNC sessions (noV
 
 1. **Bundled Fixed Version Runtime** in `runtimes/webview2/` (Self-Contained edition, ~436 MB)
 2. **System Evergreen Runtime** via Edge or standalone installer (Standard edition)
-3. **Unavailable** — shows localized error message, no crash
+3. **Unavailable** - shows localized error message, no crash
 
 Build editions:
 
@@ -813,7 +813,7 @@ public interface IToolView : IDisposable
 }
 ```
 
-All tool views implement this contract. `EmbeddedSessionManager.CreateToolControl()` uses the registry's factory delegate to instantiate views without any protocol-specific switch logic. `SplitService.CloseAllPanes()` checks `CanClose()` per-pane before disposing — works for both standalone tool tabs and tool panes inside mixed splits (e.g., SSH + tool in the same tab). `SplitService.ClosePane()` also checks `CanClose()` when closing an individual tool pane in a split tree. `MergeExistingSession` shows a status bar message when a busy tool blocks the merge.
+All tool views implement this contract. `EmbeddedSessionManager.CreateToolControl()` uses the registry's factory delegate to instantiate views without any protocol-specific switch logic. `SplitService.CloseAllPanes()` checks `CanClose()` per-pane before disposing - works for both standalone tool tabs and tool panes inside mixed splits (e.g., SSH + tool in the same tab). `SplitService.ClosePane()` also checks `CanClose()` when closing an individual tool pane in a split tree. `MergeExistingSession` shows a status bar message when a busy tool blocks the merge.
 
 ### ToolContextMenuHelper (Shared DataGrid Actions)
 
@@ -846,7 +846,7 @@ When opening a tool from a server context menu, all available server metadata is
 - **Help system**: "?" button on all 49 tools shows localized description, usage instructions, and examples (i18n key pattern: `ToolHelp<UPPERCASE_ID>`, e.g., `ToolHelpBASE64`)
 - **Detail panel**: Selecting a tool in TreeView shows dedicated panel (name, category, description, "Open in Tab")
 - **Password presets**: Custom presets saved to `config/password-presets.json`, restored on click, deleted via right-click
-- **Protocol colors**: Theme-aware brushes are defined in `HeimdallThemeBridge.xaml` on ThemeForge slots — resolved through `DynamicResource` where possible and re-evaluated on theme swap via `HeimdallThemeService.ThemeRevision` triggers for converter-based bindings
+- **Protocol colors**: Theme-aware brushes are defined in `HeimdallThemeBridge.xaml` on ThemeForge slots - resolved through `DynamicResource` where possible and re-evaluated on theme swap via `HeimdallThemeService.ThemeRevision` triggers for converter-based bindings
 - **Cross-tool navigation**: `ToolContextMenuHelper` with `OpenToolAction` callback enables right-click → open another tool with prefilled context
 
 ### Notes Tool (Obsidian-style)
@@ -874,7 +874,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 **Sidebar toggle**: hamburger button in header collapses/expands the TreeView panel. Width persisted to `AppSettings.NotesSidebarWidth` via `ConfigManager.MergeSettingAsync()` (atomic load-mutate-save under write lock).
 
-**Template localization**: `NotesTemplateFactory.Create()` accepts optional `LocalizationManager` — all section headings use `ToolNotesTpl*` i18n keys. `Slugify()` strips diacritics via Unicode normalization so French titles produce ASCII-safe filenames.
+**Template localization**: `NotesTemplateFactory.Create()` accepts optional `LocalizationManager` - all section headings use `ToolNotesTpl*` i18n keys. `Slugify()` strips diacritics via Unicode normalization so French titles produce ASCII-safe filenames.
 
 **Editor context menu**: right-click in the editor shows 17 Markdown formatting actions (bold, italic, headings, lists, links, code blocks, table, horizontal rule). In Milkdown: JS-native context menu with localized labels via `set-menu-labels` message. In AvalonEdit: WPF `ContextMenu` built dynamically with `WrapEditorSelection`, `PrefixEditorLines`, `InsertInEditor` helpers.
 
@@ -883,7 +883,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 **Drag & drop**: Internal (move note between folders via `MoveNoteToFolderAsync`) + external (.md file import via copy to notes root)
 - **Network Cartography engine**: `Heimdall.Core.Discovery/` namespace with CartographyEngine (ping sweep + TTL capture, port scan, banner grab, HTTP/HTTPS header extraction, TLS cert inspection, NetBIOS/SNMP/mDNS UDP probes, OS fingerprinting, KB cache-skip), UdpProbeEngine (raw NetBIOS NBSTAT + SNMPv2c GET + mDNS service discovery), OsFingerprinter (TTL + 33 banner patterns), RoleClassifier (46+ port patterns, 96+ banner fingerprints, compiled CnRegex, multi-source ClassifyEnriched), OuiDatabase (300+ MAC prefixes), VlanDetector, DrawIoExporter, ScanHistoryManager (atomic write, ACL, retention, typed HostChange diff), KnowledgeBaseManager (static pure helpers for persistent per-field Observation\<T\> timestamps, merge-on-scan, TTL-based cache acceleration, host purge), and `INetworkKnowledgeBaseStore` (ViewModel persistence seam; `FileNetworkKnowledgeBaseStore` default, `InMemoryNetworkKnowledgeBaseStore` for tests). `CartographyEngine` continues to use the pure helper surface, while the ViewModel routes I/O through the store seam introduced to fix the Phase 3.6 initial-load race.
 - **PowerShell Execution Policy**: Configurable in Settings > Terminal, applied as `-ExecutionPolicy` flag on local shell launch
-- **Elevation modes**: `None` / `Auto` (gsudo `--direct` → external window fallback) / `Gsudo` / `Runas` — `Auto` default for AdminByRequest/CyberArk/BeyondTrust compatibility, configurable per server profile
+- **Elevation modes**: `None` / `Auto` (gsudo `--direct` → external window fallback) / `Gsudo` / `Runas` - `Auto` default for AdminByRequest/CyberArk/BeyondTrust compatibility, configurable per server profile
 
 ### Network Cartography Initialization Serialization
 
@@ -891,7 +891,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 ### Theme System (`HeimdallThemeService` + ThemeForge)
 
-**Problem**: Runtime theme swapping across 17 ThemeForge palettes must keep every Heimdall surface in sync — including app-specific brushes, converters that resolve brushes at convert time (server icons, status dots), the AvalonEdit file editor, and the DWM title-bar chrome.
+**Problem**: Runtime theme swapping across 17 ThemeForge palettes must keep every Heimdall surface in sync - including app-specific brushes, converters that resolve brushes at convert time (server icons, status dots), the AvalonEdit file editor, and the DWM title-bar chrome.
 
 **Solution**: `Services/HeimdallThemeService.cs` is Heimdall's compatibility wrapper around `ThemeForge.Theme.ThemeService`.
 
@@ -904,7 +904,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 **Brush-resolving converters**: `ConnectionTypeToColorConverter`, `ConnectionTypeToBrushConverter`, `ConnectionStateToBrushConverter`, `ServerStatusToColorConverter`, `TunnelBadgeStateToBrushConverter`, and `ResourceKeyToBrushConverter` resolve theme brushes via `TryFindResource`. Multi-value bindings pass the `ThemeRevision` trigger where live re-evaluation is required.
 
-**Generic resource-key converters**: `ResourceKeyToBrushConverter` (dual `IValue`/`IMulti`, used by the sidebar tool browser and tool views to resolve category/status brushes from VM properties) and `ResourceKeyToGeometryConverter` (simple `IValue`, resolves `Geo.Tool.*` geometries — immutable across themes, no trigger needed).
+**Generic resource-key converters**: `ResourceKeyToBrushConverter` (dual `IValue`/`IMulti`, used by the sidebar tool browser and tool views to resolve category/status brushes from VM properties) and `ResourceKeyToGeometryConverter` (simple `IValue`, resolves `Geo.Tool.*` geometries - immutable across themes, no trigger needed).
 
 **Code-built UI reactivity**: instead of caching `Brush` instances from `FindResource`, builders like `ToolsTabPopulationService` use `element.SetResourceReference(<DP>, "BrushKey")`. Residual direct `FindResource("<Name>Brush")` call sites are one-shot surfaces, local derived resources, or views that rebuild explicitly on `ThemeChanged`.
 
@@ -914,13 +914,13 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 **Solution**: the left sidebar is now a tabbed region. Two `RadioButton`s (`SidebarTabServers` / `SidebarTabTools`, `GroupName=SidebarTabs`) sit at the top of the sidebar, styled via `SidebarTabStyle` in `CommonControls.xaml` (flat tab with accent underline on `IsChecked`, `HighlightBrush` hover, `FocusIndicatorBrush` keyboard focus, all colors via `DynamicResource`). `Visibility` of `SidebarServersContent` and `SidebarToolsContent` is bound to each RadioButton's `IsChecked` via `BoolToVisibilityConverter`, so both content containers consume the full remaining sidebar height, one at a time.
 
-**Servers tab**: unchanged — toolbar (search, add, expand/collapse) on top of the `ServerTreeView`.
+**Servers tab**: unchanged - toolbar (search, add, expand/collapse) on top of the `ServerTreeView`.
 
-**Tools tab**: filter `TextBox` + context label (mirrors `Mw_ToolsTabContextText` — "Network tools open without gateway" / "…with <host>") + full-height `TreeView` populated lazily from `ToolRegistry.All` on first `SidebarTabTools.Checked`. The tree now always inserts a localized Favorites category at index 0, populated from `AppSettings.FavoriteToolIds` and sorted alphabetically by the localized `Name` shown in the UI. Data model:
+**Tools tab**: filter `TextBox` + context label (mirrors `Mw_ToolsTabContextText` - "Network tools open without gateway" / "…with <host>") + full-height `TreeView` populated lazily from `ToolRegistry.All` on first `SidebarTabTools.Checked`. The tree now always inserts a localized Favorites category at index 0, populated from `AppSettings.FavoriteToolIds` and sorted alphabetically by the localized `Name` shown in the UI. Data model:
 - `SidebarToolCategoryViewModel` (`ObservableObject` via CommunityToolkit.Mvvm): `CategoryName`, `BrushKey`, `Tools`, `VisibleCount` (drives the header badge), `IsExpanded` (two-way), `IsVisible`
 - `SidebarToolItemViewModel`: `Id`, `Name`, `BrushKey`, `IconGeometryKey`, pre-lowercased `Searchable` blob (`name + aliases`) for allocation-free filtering. Favorite state is not stored on the leaf VM; it is resolved live from `FavoriteToolIds`.
 
-`HierarchicalDataTemplate` renders category headers (accent dot + name + count badge) and leaves (14×14 vector icon + name). Brush bindings use `MultiBinding` over `[BrushKey, DataContext.ThemeRevision]` routed through `ResourceKeyToBrushConverter` — theme swap reactivity is automatic, no rebuild required. Icon geometries use `ResourceKeyToGeometryConverter` (immutable across themes).
+`HierarchicalDataTemplate` renders category headers (accent dot + name + count badge) and leaves (14×14 vector icon + name). Brush bindings use `MultiBinding` over `[BrushKey, DataContext.ThemeRevision]` routed through `ResourceKeyToBrushConverter` - theme swap reactivity is automatic, no rebuild required. Icon geometries use `ResourceKeyToGeometryConverter` (immutable across themes).
 
 **Filter**: `OnSidebarToolsFilterChanged` updates `IsVisible` per item (via `Searchable.Contains(filterLower)`) and `VisibleCount` / `IsExpanded` per category. Auto-expand when a filter is active, collapse when cleared. The Favorites category participates in the same filtering rules as every other category. An empty-state label appears when no category has a visible child.
 
@@ -930,7 +930,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 **Favorites ContextMenu**: attached to leaf items only and built programmatically in code-behind on right-click. Label and `AutomationProperties.Name` are resolved at open time from the current membership of `FavoriteToolIds`, using the existing `TreeCtxAddFavorite` / `TreeCtxRemoveFavorite` and `A11yPinTool` / `A11yUnpinTool` localization keys.
 
-**Ctrl+Shift+T gotcha**: `RadioButton.IsChecked = !IsChecked` on a grouped button does **not** auto-check its sibling — both end up unchecked, both content containers collapse, the sidebar goes blank. `ToggleSidebarTab()` therefore explicitly sets the target: `if (SidebarTabTools.IsChecked == true) SidebarTabServers.IsChecked = true; else SidebarTabTools.IsChecked = true;`.
+**Ctrl+Shift+T gotcha**: `RadioButton.IsChecked = !IsChecked` on a grouped button does **not** auto-check its sibling - both end up unchecked, both content containers collapse, the sidebar goes blank. `ToggleSidebarTab()` therefore explicitly sets the target: `if (SidebarTabTools.IsChecked == true) SidebarTabServers.IsChecked = true; else SidebarTabTools.IsChecked = true;`.
 
 **Persistence**: reuses the existing `ShowToolsPanel` bool setting (`true` = Tools tab active at startup). Restored in the window `Loaded` handler.
 
@@ -938,7 +938,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 ### Dedicated Tools Tab (full-page)
 
-Full-page browser on the main navigation rail, independent of the sidebar Tools tab. Contains 3 sections — Favorites (pinned tools, persisted in `AppSettings.FavoriteToolIds`), Recently Used (`_recentToolIds`, max 5), and All Tools by category. Cards are 280px wide with pin/unpin button and category-colored icon background. Search filters across name, aliases, and descriptions.
+Full-page browser on the main navigation rail, independent of the sidebar Tools tab. Contains 3 sections - Favorites (pinned tools, persisted in `AppSettings.FavoriteToolIds`), Recently Used (`_recentToolIds`, max 5), and All Tools by category. Cards are 280px wide with pin/unpin button and category-colored icon background. Search filters across name, aliases, and descriptions.
 
 **Launch flow**: `OnToolsTabCardClick` → `vm.OpenToolTabAsync` → `EmbeddedSessionManager.CreateToolControl` → `ToolRegistry.CreateView` (factory lambda) → `view.Initialize(context, localizer)`. Non-network tools use singleton tab behavior. Network tools pass selected server as `TargetHost` directly (no intermediate prompt). `OpenToolTabAsync` cleans up orphaned tabs on `CreateToolControl` failure.
 
@@ -946,7 +946,7 @@ Full-page browser on the main navigation rail, independent of the sidebar Tools 
 
 **NetworkCartography responsive**: Columns use proportional (`*`) widths with `MinWidth`. `SizeChanged` handler hides detail columns below 1100px and secondary columns below 800px for split pane support.
 
-**Design token gotcha**: `SpacingRowGap` is `sys:Double` (for Margin/Height). `RowDefinition.Height` requires `GridLength` — use `SpacingRowGapGrid` for grid row spacers.
+**Design token gotcha**: `SpacingRowGap` is `sys:Double` (for Margin/Height). `RowDefinition.Height` requires `GridLength` - use `SpacingRowGapGrid` for grid row spacers.
 
 ### Tool Categories (49 tools)
 
@@ -968,8 +968,8 @@ Full-page browser on the main navigation rail, independent of the sidebar Tools 
 ```
 
 **Architecture** (`src/Heimdall.App/Localization/`):
-- `TranslateExtension` — `MarkupExtension` that creates a live `Binding` to `LocalizationSource.Instance[Key]` for DependencyProperty targets (auto-updates on locale change). Falls back to static string for non-DP targets. Shows `[Key]` in designer mode.
-- `LocalizationSource` — Singleton bridge implementing `INotifyPropertyChanged`. Wraps `LocalizationManager` indexer and fires `PropertyChanged("Item[]")` on `LocaleChanged`, causing all bindings to re-evaluate.
+- `TranslateExtension` - `MarkupExtension` that creates a live `Binding` to `LocalizationSource.Instance[Key]` for DependencyProperty targets (auto-updates on locale change). Falls back to static string for non-DP targets. Shows `[Key]` in designer mode.
+- `LocalizationSource` - Singleton bridge implementing `INotifyPropertyChanged`. Wraps `LocalizationManager` indexer and fires `PropertyChanged("Item[]")` on `LocaleChanged`, causing all bindings to re-evaluate.
 - Initialized in `App.xaml.cs` after locale load: `LocalizationSource.Instance.Initialize(localization)`
 
 **Migration strategy**: Coexists with `ApplyLocalization()`. New views use `{loc:Translate}`, legacy views migrate incrementally. PinDialog fully migrated as POC.
@@ -979,8 +979,8 @@ Full-page browser on the main navigation rail, independent of the sidebar Tools 
 **Problem**: Three parallel icon systems (BitmapImage, Vector Geometry, MDL2 glyphs) complicated maintenance and caused visual inconsistencies between tree view, tabs, and tools.
 
 **Solution**: Unified to two tiers:
-1. **Tier 1 — Vector Geometries** (`IconGeometries.xaml`): Named `Geo.<Category>.<Name>` resources (Protocol.Rdp, Status.Connected, Tool.Ping, Tree.Group, etc.). Consumed via `Path` elements + `ConnectionTypeToGeometryConverter` / `ConnectionStateToGeometryConverter`.
-2. **Tier 2 — Segoe MDL2 Assets**: Inline in XAML for standard UI chrome (toolbar, navigation, menus). Not centralized — used as `TextBlock` with font-family.
+1. **Tier 1 - Vector Geometries** (`IconGeometries.xaml`): Named `Geo.<Category>.<Name>` resources (Protocol.Rdp, Status.Connected, Tool.Ping, Tree.Group, etc.). Consumed via `Path` elements + `ConnectionTypeToGeometryConverter` / `ConnectionStateToGeometryConverter`.
+2. **Tier 2 - Segoe MDL2 Assets**: Inline in XAML for standard UI chrome (toolbar, navigation, menus). Not centralized - used as `TextBlock` with font-family.
 
 **Key changes**: `ToolRegistry` stores `Geo.Tool.*` keys per tool with `FrozenDictionary` lookups. Converters resolve `TOOL:*` connection types via `ToolRegistry.GetGeometryKey()` / `GetCategoryBrushKey()`. TreeView uses 2 converter bindings instead of ~180 lines of DataTriggers.
 
@@ -989,7 +989,7 @@ Full-page browser on the main navigation rail, independent of the sidebar Tools 
 **Problem**: The server add/edit dialog presented 5 tabs of options on first open, overwhelming new users for what is usually a simple "name + host + port" operation.
 
 **Solution**: Two-mode dialog:
-- **Simple mode** (default): Shows only essential fields — Name, Connection Type, Host, Port, Project, Gateway.
+- **Simple mode** (default): Shows only essential fields - Name, Connection Type, Host, Port, Project, Gateway.
 - **Advanced mode** (toggle): Animated slide-down (ScaleY + Opacity, 300ms ease-out / 250ms ease-in) reveals the full TabControl with protocol-specific options.
 - Mode preference persisted to `AppSettings.ServerDialogAdvancedMode` via `ConfigManager.MergeSettingAsync()`.
 

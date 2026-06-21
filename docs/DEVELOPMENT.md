@@ -42,10 +42,10 @@ powershell -File Build.ps1 -SkipTests
 
 Batch shortcuts are also available:
 
-- `Run.bat` — build and launch
-- `Test.bat` — run tests
-- `Build.bat` — debug build
-- `Release.bat` — release pipeline
+- `Run.bat` - build and launch
+- `Test.bat` - run tests
+- `Build.bat` - debug build
+- `Release.bat` - release pipeline
 
 The current full-suite baseline is:
 
@@ -136,26 +136,26 @@ match the folder path to it. Example: use `Heimdall.Core.SystemInfo` with
 
 ## Where To Find Things
 
-- `src/Heimdall.Core/` — shared models, config, security, localization,
+- `src/Heimdall.Core/` - shared models, config, security, localization,
   state machine, discovery, validation.
-- `src/Heimdall.Ssh/` — SSH.NET integration, Pageant, Plink fallback,
+- `src/Heimdall.Ssh/` - SSH.NET integration, Pageant, Plink fallback,
   host-key trust, tunnel manager.
-- `src/Heimdall.Sftp/` — SFTP/FTP `IRemoteBrowser` implementations and
+- `src/Heimdall.Sftp/` - SFTP/FTP `IRemoteBrowser` implementations and
   remote file editing.
-- `src/Heimdall.Rdp/` — RDP ActiveX host and credential autofill helpers.
-- `src/Heimdall.Terminal/` — local shell, pipe mode, Telnet, terminal
+- `src/Heimdall.Rdp/` - RDP ActiveX host and credential autofill helpers.
+- `src/Heimdall.Terminal/` - local shell, pipe mode, Telnet, terminal
   abstractions.
-- `src/Heimdall.App/` — WPF composition root, services, handlers, view models,
+- `src/Heimdall.App/` - WPF composition root, services, handlers, view models,
   views, themes, localization.
-- `src/TwinShell.*` — command library persistence, core models, and
+- `src/TwinShell.*` - command library persistence, core models, and
   integration.
-- `tests/` — xUnit test projects matching the source areas.
-- `docs/ARCHITECTURE.md` — high-level architecture and design decisions.
-- `docs/SECURITY.md` — threat model, security controls, limitations, and
+- `tests/` - xUnit test projects matching the source areas.
+- `docs/ARCHITECTURE.md` - high-level architecture and design decisions.
+- `docs/SECURITY.md` - threat model, security controls, limitations, and
   security test references.
-- `docs/TOOLS.md` — built-in tool catalog, tool registry, external provider,
+- `docs/TOOLS.md` - built-in tool catalog, tool registry, external provider,
   SecNumCloud, and Command Library reference.
-- `docs/TROUBLESHOOTING.md` — known development/runtime issues and fixes.
+- `docs/TROUBLESHOOTING.md` - known development/runtime issues and fixes.
 
 ## CI Expectations
 

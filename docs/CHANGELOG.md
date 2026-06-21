@@ -159,54 +159,54 @@ the install finishes.
   launched directly; SHA-256 verification is mandatory before any install; the automated
   test baseline is now 7,018 passing tests, 0 warnings.
 
-## 2026-06-17 — In-app updater, French UI polish and Command Library authoring (v2026.061701)
+## 2026-06-17 - In-app updater, French UI polish and Command Library authoring (v2026.061701)
 
 A user-facing release adding a first in-app update experience, fixing French button
 clipping in the RDP/SSH overlays, and making Command Library actions fully authorable
 (examples, links and per-parameter help) with a guard before sending dangerous commands.
 
-- **In-app updater (v1)** — Heimdall now checks for a newer release on startup (spaced
+- **In-app updater (v1)** - Heimdall now checks for a newer release on startup (spaced
   out, configurable in Settings) and shows a non-blocking banner with "View release",
   "Later" and "Skip this version". A new "Updates" section in Settings adds a manual
   "Check now" button.
-- **Verifiable release checksums** — every GitHub release now publishes a
+- **Verifiable release checksums** - every GitHub release now publishes a
   `SHA256SUMS.txt` asset, so installer integrity can be verified, and it is the
   foundation for the upcoming one-click update.
-- **Command Library authoring** — examples and documentation links are no longer lost
+- **Command Library authoring** - examples and documentation links are no longer lost
   when editing an action and are now editable in the action dialog; parameters gain a
   description field shown as a tooltip; sending a command flagged dangerous now asks for
   confirmation, both in the dedicated view and the Ctrl+K palette; the search box is
   refocused after a reload; and the "copied" feedback only appears when the clipboard
   write actually succeeded.
-- **French UI polish** — button labels are no longer clipped in the RDP and SSH error
+- **French UI polish** - button labels are no longer clipped in the RDP and SSH error
   and reconnect overlays, and the bulk-edit dialog Cancel button is styled consistently.
-- **Internal** — the automated test baseline is now 6,974 passing tests, 0 warnings, and
+- **Internal** - the automated test baseline is now 6,974 passing tests, 0 warnings, and
   the CI formatting gate was fixed to enforce a CRLF checkout for Windows text files.
 
-## 2026-06-16 — Command Library explanations, accessibility and discoverability (v2026.061602)
+## 2026-06-16 - Command Library explanations, accessibility and discoverability (v2026.061602)
 
 A user-facing pass making Command Library snippets self-explanatory and reachable for
 every skill level, in both the Ctrl+K palette and the picker, plus internal refactors.
 
-- **Inline explanations** — drilling into a snippet in the Ctrl+K palette now shows its
+- **Inline explanations** - drilling into a snippet in the Ctrl+K palette now shows its
   description, a risk badge, a platform badge and its notes, instead of only the title.
   The picker rows also show the description and a risk badge.
-- **Examples and documentation links** — the snippet detail lists ready-made examples
+- **Examples and documentation links** - the snippet detail lists ready-made examples
   (copy or send) and the action's documentation links (click to open).
-- **Live command preview in the picker** — the generated command is shown and updated
+- **Live command preview in the picker** - the generated command is shown and updated
   as parameters are typed, before you confirm.
-- **Accessibility** — risk and platform are announced to screen readers, parameter help
+- **Accessibility** - risk and platform are announced to screen readers, parameter help
   is no longer hover-only, and keyboard focus follows the selected variant with a visible
   focus ring.
-- **Discoverability** — palette search now also matches snippet notes, and the matched
+- **Discoverability** - palette search now also matches snippet notes, and the matched
   text is highlighted in the result rows.
-- **Less clutter** — the palette command list shows template variants only; examples
+- **Less clutter** - the palette command list shows template variants only; examples
   live in their own section and gain a send action.
-- **Internal** — a pure `CommandPresentation` resolver is now shared by the palette and
+- **Internal** - a pure `CommandPresentation` resolver is now shared by the palette and
   the picker, and the Git-sync result-to-dialog mapping was extracted to a pure mapper.
   No behavior change.
 
-## 2026-06-16 — Command Library snippets in the palette and sessions tree scrolling (v2026.061601)
+## 2026-06-16 - Command Library snippets in the palette and sessions tree scrolling (v2026.061601)
 
 User-facing palette feature plus a sessions-tree readability fix and internal hygiene.
 
@@ -221,265 +221,265 @@ User-facing palette feature plus a sessions-tree readability fix and internal hy
   `CommandLibraryTransferService`, and the Command Library action-service
   operations now share a single operation envelope. No behavior change.
 
-## 2026-06-15 — ThemeForge public feed and honest CI formatting gate
+## 2026-06-15 - ThemeForge public feed and honest CI formatting gate
 
 Dependency and CI hygiene; no application code change.
 
-- **ThemeForge dependency** — migrated to `ThemeForge.Theme` 2.0.0, restored
+- **ThemeForge dependency** - migrated to `ThemeForge.Theme` 2.0.0, restored
   from the public nuget.org feed. The private GitHub Packages source, its NuGet
   credentials and the `THEMEFORGE_PACKAGES_TOKEN` CI secret were removed, so the
   restore is now anonymous. The consumed API surface was unchanged.
-- **CI formatting gate** — `dotnet format` previously ran before any build, so
+- **CI formatting gate** - `dotnet format` previously ran before any build, so
   the WPF project Heimdall.App failed to load (its XAML markup compiler needs
   referenced assemblies on disk) and was silently skipped while the step still
   exited 0. A Debug build now runs before the format check, and the SDK is
   pinned via a new `global.json` (10.0.103, `rollForward` `latestPatch`) so CI
   runs the gate under a verified feature band.
 
-## 2026-06-11 — Quality audit fix pass (v2026.061101)
+## 2026-06-11 - Quality audit fix pass (v2026.061101)
 
 Audit-fix release following the June 10, 2026 quality pass.
 
-- **Network scanner** — added a reentrancy guard so repeated `Ctrl+Shift+N`
+- **Network scanner** - added a reentrancy guard so repeated `Ctrl+Shift+N`
   cannot start two scans and two prompts at the same time.
-- **Server list search** — added a roughly 300 ms debounce for large
+- **Server list search** - added a roughly 300 ms debounce for large
   inventories while keeping clear/reset immediate.
-- **Notes export** — moved file writing off the UI path so exporting notes no
+- **Notes export** - moved file writing off the UI path so exporting notes no
   longer freezes the interface.
-- **Accessibility and localization** — command-library example copy buttons now
+- **Accessibility and localization** - command-library example copy buttons now
   expose accessible names/tooltips, and the About window's Author label is
   localized.
-- **Internal hygiene** — best-effort cleanup failures are logged, tunnel import
+- **Internal hygiene** - best-effort cleanup failures are logged, tunnel import
   order was normalized, the test baseline is documented at 6,810 passing tests,
   and internal audit artifacts were removed from the public tree.
 
-## 2026-06-10 — Embedded VNC connection fix (v2026.061006)
+## 2026-06-10 - Embedded VNC connection fix (v2026.061006)
 
 Restored embedded VNC sessions and tightened their diagnostics.
 
-- **VNC connection** — the internal WebSocket proxy now advertises the
+- **VNC connection** - the internal WebSocket proxy now advertises the
   subprotocol expected by the WebView2/Chromium viewer, so embedded VNC
   connects normally both direct and through SSH gateways.
-- **Reconnect UI** — the VNC display surface is cleared after disconnect so the
+- **Reconnect UI** - the VNC display surface is cleared after disconnect so the
   reconnection panel is visible instead of hidden behind the viewer.
-- **Diagnostics** — detailed VNC connection failures are now written to the
+- **Diagnostics** - detailed VNC connection failures are now written to the
   application log.
-- **Tests** — baseline moved to 6,808 passing tests with coverage for WebSocket
+- **Tests** - baseline moved to 6,808 passing tests with coverage for WebSocket
   subprotocol negotiation.
 
-## 2026-06-10 — Cross-application UX pass (v2026.061002)
+## 2026-06-10 - Cross-application UX pass (v2026.061002)
 
 Grouped six UX-audit PRs covering dialogs, localization, theming and session
 states.
 
-- **Dialogs and keyboard** — dialogs now use the themed dialog service, global
+- **Dialogs and keyboard** - dialogs now use the themed dialog service, global
   error dialogs hide stack traces, Escape maps to the non-destructive action,
   and repeated F1 no longer stacks duplicate help dialogs.
-- **Localization** — corrected double-encoded strings across English/French and
+- **Localization** - corrected double-encoded strings across English/French and
   made the French UI consistently use formal address.
-- **Theme and accessibility** — hardcoded colors were migrated to theme
+- **Theme and accessibility** - hardcoded colors were migrated to theme
   resources, with localized accessible names for status, favorite and paste
   preview surfaces.
-- **Sessions** — WinRM has its own connection state, progress indicators cover
+- **Sessions** - WinRM has its own connection state, progress indicators cover
   all protocols, and SFTP/FTP/VNC/Citrix disconnected states expose clear close
   or reconnect actions.
-- **Quality gates** — added static guards for locale encoding, dialog keyboard
+- **Quality gates** - added static guards for locale encoding, dialog keyboard
   contracts and themed colors; baseline 6,802 passing tests.
 
-## 2026-06-08 — SFTP and WinRM fundamentals hardening (v2026.060801)
+## 2026-06-08 - SFTP and WinRM fundamentals hardening (v2026.060801)
 
 Security and clarity pass for file transfer and remote shell basics.
 
-- **SFTP safety** — elevated uploads create owner-restricted temporary files and
+- **SFTP safety** - elevated uploads create owner-restricted temporary files and
   always clean them up, while create/rename rejects empty, dot and path-traversal
   names.
-- **Connection logs** — SSH/SFTP connection logs no longer include usernames or
+- **Connection logs** - SSH/SFTP connection logs no longer include usernames or
   identity details.
-- **Error clarity** — SFTP/FTP failures and protected-root deletion now surface
+- **Error clarity** - SFTP/FTP failures and protected-root deletion now surface
   localized, actionable messages.
-- **WinRM diagnostics** — common NTLM loop and WS-Man 12152 failures show
+- **WinRM diagnostics** - common NTLM loop and WS-Man 12152 failures show
   localized status hints without altering terminal output.
-- **Internal hardening** — host-key fingerprints are compared in constant time,
+- **Internal hardening** - host-key fingerprints are compared in constant time,
   sudo indicators follow theme resources, and protocol constants/guards were
   tightened.
 
-## 2026-06-07 — Terminal reconnection lifecycle fixes (v2026.060704)
+## 2026-06-07 - Terminal reconnection lifecycle fixes (v2026.060704)
 
 Improved reconnection behavior and process-exit detection for terminal-backed
 sessions.
 
-- **Telnet reconnect** — network interruptions now trigger automatic
+- **Telnet reconnect** - network interruptions now trigger automatic
   reconnection, while voluntary disconnects still close cleanly.
-- **Local Shell and WinRM** — process exit detection no longer depends on output
+- **Local Shell and WinRM** - process exit detection no longer depends on output
   flow, so fast or silent exits show the manual reconnect overlay reliably.
-- **Host-key dialog** — French host-key verification buttons no longer truncate.
-- **Tests** — added protocol-category reconnect coverage and ConPTY exit replay
+- **Host-key dialog** - French host-key verification buttons no longer truncate.
+- **Tests** - added protocol-category reconnect coverage and ConPTY exit replay
   coverage.
 
-## 2026-06-07 — Tunneled RDP and SSH robustness (v2026.060703)
+## 2026-06-07 - Tunneled RDP and SSH robustness (v2026.060703)
 
 Security and reliability fixes for tunneled RDP/SSH sessions plus gateway
 display cleanup.
 
-- **RDP credentials** — simultaneous external RDP sessions through the same SSH
+- **RDP credentials** - simultaneous external RDP sessions through the same SSH
   gateway now use distinct loopback aliases, isolating Windows Credential
   Manager entries per target.
-- **Gateway references** — gateway IDs are compared case-insensitively in the UI
+- **Gateway references** - gateway IDs are compared case-insensitively in the UI
   so valid references are no longer shown as orphaned.
-- **Tunnel ports** — local tunnel ports are allocated by the OS at open time,
+- **Tunnel ports** - local tunnel ports are allocated by the OS at open time,
   removing a rare race where an ephemeral port could be claimed before use.
-- **Tests** — expanded coverage for tunnel port allocation, loopback aliases and
+- **Tests** - expanded coverage for tunnel port allocation, loopback aliases and
   RDP credential isolation.
 
-## 2026-06-07 — SSH gateway import/export and repair (v2026.060702)
+## 2026-06-07 - SSH gateway import/export and repair (v2026.060702)
 
 Completed first-class handling for SSH gateways across configuration workflows.
 
-- **Import/export** — exports now include gateway definitions and imports
+- **Import/export** - exports now include gateway definitions and imports
   reconcile them by identity, preserving session-to-gateway links between
   machines.
-- **Inventory visibility** — routed sessions show a gateway badge, missing
+- **Inventory visibility** - routed sessions show a gateway badge, missing
   gateway references show a warning, and Settings now includes a gateway
   overview panel.
-- **Repair workflow** — orphaned gateway references can be cleared or reassigned
+- **Repair workflow** - orphaned gateway references can be cleared or reassigned
   to an existing gateway for a whole group of sessions.
-- **Security and internals** — gateway secrets remain excluded from exports, and
+- **Security and internals** - gateway secrets remain excluded from exports, and
   the import reconciler plus grouped gateway mutations are covered by tests.
 
-## 2026-06-06 — SSH/SFTP tunnel security and data safety (v2026.060602)
+## 2026-06-06 - SSH/SFTP tunnel security and data safety (v2026.060602)
 
 Security and reliability release for tunneled SSH/SFTP, remote editing and
 WinRM/RDP cleanup.
 
-- **Host-key verification** — tunneled SSH/SFTP connections now pin and verify
+- **Host-key verification** - tunneled SSH/SFTP connections now pin and verify
   the real target identity for SSH.NET, Plink and external PuTTY.
-- **Remote file safety** — elevated edit uploads restrict temporary files,
+- **Remote file safety** - elevated edit uploads restrict temporary files,
   upload fallback preserves originals, and editor upload tracking is atomic.
-- **Downloads and deletion** — remote filenames are constrained to the
+- **Downloads and deletion** - remote filenames are constrained to the
   destination folder, FTP downloads are atomic, and root deletion is blocked
   including sudo paths.
-- **Protocol fixes** — WinRM SSL/certificate options persist correctly, missing
+- **Protocol fixes** - WinRM SSL/certificate options persist correctly, missing
   PowerShell hosts show a clear error, RDP ACL failures are non-blocking, and SSH
   agent protocol/time-out diagnostics are clearer.
-- **Cleanup** — orphaned Plink password files are swept at startup, WinRM
+- **Cleanup** - orphaned Plink password files are swept at startup, WinRM
   bootstrap secrets are zeroed, dead code was removed, and tunnel reference
   counting is atomic.
 
-## 2026-06-06 — SSH reconnect and tools polish (v2026.060601)
+## 2026-06-06 - SSH reconnect and tools polish (v2026.060601)
 
 Small release focused on SSH connection behavior and tools readability.
 
-- **Plink reconnect** — failures during the initial Plink connection phase no
+- **Plink reconnect** - failures during the initial Plink connection phase no
   longer trigger automatic reconnect loops.
-- **Localization** — SSH probe messages and embedded-session labels are now
+- **Localization** - SSH probe messages and embedded-session labels are now
   localized in English and French.
-- **Tools tab** — externally detected tools are grouped by provider for easier
+- **Tools tab** - externally detected tools are grouped by provider for easier
   scanning.
-- **Configuration** — SSH reconnect, keep-alive, tunnel and Plink timings were
+- **Configuration** - SSH reconnect, keep-alive, tunnel and Plink timings were
   centralized in settings and schema validation.
 
-## 2026-06-05 — External SSH and RDP trust options (v2026.060502)
+## 2026-06-05 - External SSH and RDP trust options (v2026.060502)
 
 Security and usability improvements for external PuTTY, RDP and reconnect
 surfaces.
 
-- **PuTTY host keys** — external PuTTY launches now honor Heimdall's host-key
+- **PuTTY host keys** - external PuTTY launches now honor Heimdall's host-key
   policy by passing known fingerprints through `-hostkey`.
-- **RDP server authentication** — added optional per-profile/global strict server
+- **RDP server authentication** - added optional per-profile/global strict server
   authentication when NLA is enabled.
-- **Session tabs** — right-clicking a session tab exposes profile actions such
+- **Session tabs** - right-clicking a session tab exposes profile actions such
   as edit, copy host and copy username.
-- **Reconnect accessibility** — SSH reconnect overlays move keyboard focus to
+- **Reconnect accessibility** - SSH reconnect overlays move keyboard focus to
   their primary action when shown.
 
-## 2026-06-05 — WinRM HTTPS and session shortcuts (v2026.060501)
+## 2026-06-05 - WinRM HTTPS and session shortcuts (v2026.060501)
 
 WinRM HTTPS support plus session keyboard and lifecycle fixes.
 
-- **WinRM certificates** — profiles can opt into ignoring certificate
+- **WinRM certificates** - profiles can opt into ignoring certificate
   validation for trusted internal HTTPS hosts with self-signed certificates.
-- **Command palette** — `Ctrl+K` opens quick access even while focus is inside
+- **Command palette** - `Ctrl+K` opens quick access even while focus is inside
   SSH, VNC or RDP sessions.
-- **RDP credentials** — NetBIOS-domain usernames such as `DOMAIN\user`
+- **RDP credentials** - NetBIOS-domain usernames such as `DOMAIN\user`
   auto-connect without prompting again.
-- **Reconnect policy** — Local Shell and WinRM no longer auto-reconnect in loops
+- **Reconnect policy** - Local Shell and WinRM no longer auto-reconnect in loops
   when their process exits; network sessions keep recoverable reconnects.
-- **Cleanup** — WinRM temporary bootstrap scripts are cleaned at session end and
+- **Cleanup** - WinRM temporary bootstrap scripts are cleaned at session end and
   startup, including best-effort fallback paths.
 
-## 2026-06-04 — SSH, SFTP and WinRM quality pass (v2026.060403)
+## 2026-06-04 - SSH, SFTP and WinRM quality pass (v2026.060403)
 
 Fundamentals release for safer transfers, clearer remote-shell status and
 reconnectable diagnostics.
 
-- **SFTP transfers** — downloads and uploads are atomic, sudo saves can recover
+- **SFTP transfers** - downloads and uploads are atomic, sudo saves can recover
   from permission denial, sudo listings are cancellable, reconnect returns to
   the previous folder, and skipped folder downloads are reported honestly.
-- **SSH sessions** — automatic reconnect avoids fatal credential errors, `exit`
+- **SSH sessions** - automatic reconnect avoids fatal credential errors, `exit`
   closes cleanly, and validation messages are localized.
-- **WinRM sessions** — status no longer claims "connected" before handoff, and
+- **WinRM sessions** - status no longer claims "connected" before handoff, and
   configuration failures are localized instead of exposing raw exceptions.
-- **Diagnostics** — failed SFTP/RDP/WinRM connections open a structured
+- **Diagnostics** - failed SFTP/RDP/WinRM connections open a structured
   reconnectable failure panel, and failed reconnect diagnostics remain visible.
 
-## 2026-06-03 — RDP resilience and diagnostics (v2026.060301)
+## 2026-06-03 - RDP resilience and diagnostics (v2026.060301)
 
 RDP-focused release after runtime validation of connection, fullscreen and
 shutdown edge cases.
 
-- **Connection diagnostics** — RDP authentication and extended disconnect
+- **Connection diagnostics** - RDP authentication and extended disconnect
   reasons are classified more accurately, avoiding pointless reconnect loops for
   server-side refusals.
-- **Handshake watchdog** — frozen RDP handshakes are cut off cleanly with an
+- **Handshake watchdog** - frozen RDP handshakes are cut off cleanly with an
   explicit reconnect/close overlay.
-- **Fullscreen and focus** — F11, toolbar and context-menu fullscreen now share
+- **Fullscreen and focus** - F11, toolbar and context-menu fullscreen now share
   one implementation, and focus returns to the RDP surface only when appropriate.
-- **Reconnect UI** — disconnect code 1800 and administrator-initiated
+- **Reconnect UI** - disconnect code 1800 and administrator-initiated
   disconnects are surfaced, and cancelled auto-reconnect keeps an accessible
   overlay visible.
-- **Stability** — fixed two shutdown crash paths, wired `rdpKeepAliveIntervalMs`
+- **Stability** - fixed two shutdown crash paths, wired `rdpKeepAliveIntervalMs`
   end to end, restored legacy split-layout loading and documented the 6,441-test
   baseline.
 
-## 2026-06-02 — Release packaging baseline (v2026.060201)
+## 2026-06-02 - Release packaging baseline (v2026.060201)
 
 Packaging-only release with no functional notes attached to the GitHub release.
 
-- **Standard portable** — published the standard zip for systems with
+- **Standard portable** - published the standard zip for systems with
   Edge/WebView2 already available.
-- **Self-contained portable** — published the bundled WebView2 zip.
-- **Installers** — published both Standard and SelfContained setup executables.
+- **Self-contained portable** - published the bundled WebView2 zip.
+- **Installers** - published both Standard and SelfContained setup executables.
 
-## 2026-05-30 — FTP FluentFTP migration
+## 2026-05-30 - FTP FluentFTP migration
 
 Replaced the FTP browser's deprecated `FtpWebRequest` backend and home-grown
 LIST parser with FluentFTP `AsyncFtpClient`.
 
-- **Runtime** — added FluentFTP 54.2.0 to `Heimdall.Sftp`; FTP/FTPS operations
+- **Runtime** - added FluentFTP 54.2.0 to `Heimdall.Sftp`; FTP/FTPS operations
   now use true async client APIs, keep the existing `IRemoteBrowser` contract,
   and serialize FTP client access through the existing operation lock.
-- **Security** — explicit FTPS now enables FluentFTP data-connection
+- **Security** - explicit FTPS now enables FluentFTP data-connection
   encryption while credentialed cleartext FTP still surfaces the existing
   non-blocking warning.
-- **Tests** — removed Unix/DOS LIST parser fixtures and replaced them with
+- **Tests** - removed Unix/DOS LIST parser fixtures and replaced them with
   FluentFTP `FtpListItem` mapping coverage. Build green, **5,985 passing**,
   zero warnings.
 
-## 2026-05-30 — TwinShell dead-code removal
+## 2026-05-30 - TwinShell dead-code removal
 
-Removed a cluster of TwinShell services that were never wired into Heimdall —
+Removed a cluster of TwinShell services that were never wired into Heimdall - 
 the DI bridges (`HeimdallSettingsBridge` / `HeimdallLocalizationBridge`) and the
 inline bootstrapper seed replace them. Supervisor reconnaissance grepped the
 exact symbol across all of `src/` and `tests/` (not just the bootstrapper),
 which surfaced two domino pairs (`Backup`→`Config`, `BatchExecution`→`Audit`).
 
-- **Deleted (21 files, −3,320 lines)** — `BackupService` / `IBackupService`,
+- **Deleted (21 files, −3,320 lines)** - `BackupService` / `IBackupService`,
   `ConfigurationService` / `IConfigurationService`, the native `SettingsService`
   class, `ImportExportService` / `IImportExportService`, `BatchExecutionService`
   / `IBatchExecutionService`, `AuditLogService` / `IAuditLogService` and the full
   Audit cascade (`AuditLogEntity`, repository, EF configuration, `AuditLogs`
   DbSet), `JsonSeedService` / `ISeedService`, `BatchExecutionResult` (`867131b`).
-- **Kept (proven live)** — the `ISettingsService` *interface* (GitSync /
+- **Kept (proven live)** - the `ISettingsService` *interface* (GitSync /
   HealthCheck / Theme / Backdrop consume it via `HeimdallSettingsBridge`) and the
   whole `CommandBatch` cluster (one of the four PublicId tables, live through
   JSON/YAML sync + DI + tests).
@@ -487,18 +487,18 @@ which surfaced two domino pairs (`Backup`→`Config`, `BatchExecution`→`Audit`
 Pure deletion, zero functional change. Build green, **5,979 passing**, zero
 warnings. CI run `26662106337` success.
 
-## 2026-05-30 — TwinShell versioned schema runner (F1 + F3)
+## 2026-05-30 - TwinShell versioned schema runner (F1 + F3)
 
 Replaced the fragile schema-bootstrap path with a versioned `PRAGMA user_version`
-runner, closing audit findings F1 (no migration runner — `EnsureCreatedAsync`
+runner, closing audit findings F1 (no migration runner - `EnsureCreatedAsync`
 never alters an existing DB) and F3 (non-transactional ALTER→UPDATE→CREATE INDEX
 that could leave PublicId columns empty on a mid-upgrade crash).
 
-- **`SchemaUpgrader` / `SchemaStep` (new, `src/TwinShell.Persistence/Schema/`)** —
+- **`SchemaUpgrader` / `SchemaStep` (new, `src/TwinShell.Persistence/Schema/`)** - 
   reads `PRAGMA user_version`, applies steps with `Version > current` in
   ascending order, **one transaction per step** with the version bump inside the
   same transaction and best-effort logged rollback (`c698961`).
-- **Live wiring + dead-code removal** — `TwinShellSchema.Steps` carries one
+- **Live wiring + dead-code removal** - `TwinShellSchema.Steps` carries one
   idempotent step (GitOps PublicId columns, byte-identical UUID SQL);
   `TwinShellBootstrapper.InitializeAsync` calls `SchemaUpgrader.UpgradeAsync`
   after `EnsureCreatedAsync`. Dropped `EnsureGitOpsSchemaMigrationAsync`,
@@ -507,60 +507,60 @@ that could leave PublicId columns empty on a mid-upgrade crash).
 
 Fresh DBs (`EnsureCreated`) and legacy DBs both converge via `user_version 0 → 1`.
 Convention for the future: any TwinShell schema change is a new
-`SchemaStep(N, …)`, ascending, idempotent, transactional — never an EF migration
+`SchemaStep(N, …)`, ascending, idempotent, transactional - never an EF migration
 or an out-of-transaction ALTER again. **+10 tests** (5,969 → 5,979), build green,
 zero warnings. CI run `26656228551` success.
 
-## 2026-05-29 — TwinShell sync hardening
+## 2026-05-29 - TwinShell sync hardening
 
 Made the bundled TwinShell sync layer cancellable end-to-end and its export an
 authoritative mirror of the DB, closing audit findings J1/J5/J3/J2 and G1/G5/G2.
 The layer went from **0 to 24 tests** (`d3d7a1e`).
 
-- **Real cancellation** — `CancellationToken` threaded through `ISyncService`
+- **Real cancellation** - `CancellationToken` threaded through `ISyncService`
   import/export, `JsonSyncService` (rollback + rethrow on cancel so GitSync maps
   `Cancelled`), `YamlSyncService`, and every internal GitSync operation
   (clone/fetch/merge/import/export/stage/commit/push) including network abort via
   `OnTransferProgress` / `OnPushTransferProgress`. The visible **Cancel** button
   is no longer cosmetic.
-- **CTS race + leak fixed** — `_currentCancellationTokenSource` created /
+- **CTS race + leak fixed** - `_currentCancellationTokenSource` created /
   assigned / disposed under a dedicated lock (G5); `GitSyncService` is now
   `IDisposable` and disposes its `SemaphoreSlim` + CTS (G2).
-- **Export hygiene** — atomic per-file write via `*.tmp` → `File.Move` overwrite
+- **Export hygiene** - atomic per-file write via `*.tmp` → `File.Move` overwrite
   (J5), collision-safe `Name-{PublicId:N}.json` naming (J3), and orphan cleanup
   so the export folder mirrors the DB across the four managed folders (J2). A
   cancelled export deletes nothing.
 
 **+24 tests** (5,945 → 5,969), build green, zero warnings. First real export
 against an existing folder renames every file under the new naming scheme and
-removes the old ones — a one-time large git diff, expected.
+removes the old ones - a one-time large git diff, expected.
 
-## 2026-05-29 — CI housekeeping
+## 2026-05-29 - CI housekeeping
 
 Migrated the GitHub Actions runner image to `windows-2025` (VS 2026 toolchain)
 and bumped the workflow actions to their Node24 majors (`actions/*` v6/v5/v7)
 (`b3ab296`). No production change. CI run `26645789164` success (5m38s).
 
-## 2026-05-29 — Terminal transcript: stateful ANSI/VT strip (T-1 D5-bis)
+## 2026-05-29 - Terminal transcript: stateful ANSI/VT strip (T-1 D5-bis)
 
 Closing follow-up to the 2026-05-26 UTF-8 transcript decoder (D5). The stateful
 UTF-8 decoder fixed multi-byte fragmentation, but the ANSI strip was still a
 **stateless** regex applied per chunk, so a VT sequence split across two chunks
 (e.g. `\x1b[31` then `m`) leaked into the transcript in cleartext.
 
-- **`StreamingAnsiStripper` (new, `src/Heimdall.Terminal/Logging/`)** — a pure
+- **`StreamingAnsiStripper` (new, `src/Heimdall.Terminal/Logging/`)** - a pure
   char-level state machine (`Normal` / `AfterEsc` / `Csi`) that buffers an
   incomplete escape sequence between `Strip()` calls. API `Strip()` / `Flush()`
   / `Reset()`, with `Flush()` discarding any pending partial. Invalid chars are
   replayed in `Normal` via a `bool consumed` return (index not advanced), which
   reproduces the regex backtrack exactly, ESC-then-ESC included (`0d12a37`).
-- **Strict regex equivalence proven by oracle test** — the test reuses the old
+- **Strict regex equivalence proven by oracle test** - the test reuses the old
   `AnsiEscapeRegex` pattern as the reference on a self-contained token corpus
   plus 500 pseudo-random inputs (seed `20260529`). The regex's OSC-body quirk
   (`]` captured by the Fe class before the OSC alternative) and the `ESC7` /
-  `ESC8` passthrough are **preserved deliberately** — D5-bis only addresses
+  `ESC8` passthrough are **preserved deliberately** - D5-bis only addresses
   fragmentation.
-- **`EmbeddedSshView` integration** — `_transcriptStripper` wired into
+- **`EmbeddedSshView` integration** - `_transcriptStripper` wired into
   `WriteToTranscript`, unconditional `Flush` residue on
   `StopTranscriptInternal`, and `StartTranscript` reordered so the old
   transcript flush runs *before* the decoder/stripper `Reset()`. The dead
@@ -572,7 +572,7 @@ every cut point, cross-chunk CSI, Flush discard, Reset, invalid ESC). Build
 green, **5,928 passing**, zero warnings. Latent out-of-scope: OSC body leak +
 ESC7/8 passthrough in the transcript (minor, never requested).
 
-## 2026-05-28 — CI deflake bundle + Citrix launcher resolution
+## 2026-05-28 - CI deflake bundle + Citrix launcher resolution
 
 Two pair-architect chantiers: re-greening CI on master after the Citrix merge,
 and a Citrix Workspace App launcher-resolution + inline sign-in spike.
@@ -582,40 +582,40 @@ and a Citrix Workspace App launcher-resolution + inline sign-in spike.
 - **`WpfTestHost` startup timeout 10s → 60s** (`dc0acbe`) to absorb WPF + DI +
   ThemeForge + TwinShell DB-seed init latency on the GitHub Actions Windows 2025
   runner. Resolves all 79 `Heimdall.App.UiTests` failures at once.
-- **`CommandCredentialProvider` test timeout bump** — first a surgical single-test
+- **`CommandCredentialProvider` test timeout bump** - first a surgical single-test
   bump (`59db3f1`, quickly superseded), then a structural refactor (`8b90d5f`)
   introducing a local `CreateProvider` factory with `TestTimeoutMs = 60000`
   routing ~30 test sites; production code untouched (`timeoutMs` default stays
   10s). Final CI run on `8b90d5f` green in 6m24s, 5,897/5,897 (filter
-  `Category!=CIUnstable`). The deblock was achieved purely by timeout bumps — no
+  `Category!=CIUnstable`). The deblock was achieved purely by timeout bumps - no
   new `CIUnstable` tags added.
 
 ### Citrix launcher resolution + inline sign-in (`19a8cf6` merge, `92f803a`, `248f20d`)
 
-- **StoreBrowse / SelfService resolution on CWA 2507+** (`92f803a`) — handles the
+- **StoreBrowse / SelfService resolution on CWA 2507+** (`92f803a`) - handles the
   new `AuthManager` / `SelfServicePlugin` subfolders via a pure
   `BuildCitrixLauncherCandidates` helper, covered by 4 xUnit tests.
-- **Inline embed of the Workspace sign-in window** (`248f20d`, Option 2b) — when
+- **Inline embed of the Workspace sign-in window** (`248f20d`, Option 2b) - when
   the sign-in window is foreground, capture is done by diffing window handles
   rather than PID (so apps launched in a shared `wfica32` session are caught),
   cancellation propagated to `WatchForSessionAfterAuthAsync`, fire-and-forget
   observed via `_authWatchTask` / `_authWatchCts`, dedicated i18n key
   `CitrixAuthSignInHint` (EN + FR).
 
-Runtime validation **not performed** — CWA is absent from the current dev box
+Runtime validation **not performed** - CWA is absent from the current dev box
 (`Test-Path` negative on all 8 candidates). Residual risk vs master: nil (every
 untested path falls back to external mode). Build green, zero warnings.
 
-## 2026-05-27 — Release.bat encoding fix
+## 2026-05-27 - Release.bat encoding fix
 
-- **`Release.bat` ASCII + CRLF + `REM`** (`a48d23a`) — an em dash `—` (UTF-8
+- **`Release.bat` ASCII + CRLF + `REM`** (`a48d23a`) - an em dash ` - ` (UTF-8
   `e2 80 94`) on line 2, LF-only EOLs, and `::` comments combined to make
   `cmd.exe` misread the file under its OEM codepage, break the `::` label, and
   eventually evaluate `Heimdall` as a command. Fix: 3 comment lines
-  reworded (`::` → `REM`, `—` → `-`), EOL converted to CRLF, pure ASCII, no BOM.
+  reworded (`::` → `REM`, ` - ` → `-`), EOL converted to CRLF, pure ASCII, no BOM.
   No `.cs` touched, tests unchanged, build green.
 
-## 2026-05-26 — Terminal/ConPTY quality audit (T-1) + release v2026.052601
+## 2026-05-26 - Terminal/ConPTY quality audit (T-1) + release v2026.052601
 
 Pair-architect quality audit of the terminal subsystem (audit report
 `docs/audit/audit-terminal-conpty-2026-05-25.md`). Verdict: 0 P1 / 8 P2 / 19 P3.
@@ -624,36 +624,36 @@ Release **v2026.052601** (`860eccf`) was cut between the audit and the D-backlog
 
 ### 8-chunk audit (P2/P3 close, spanned 2026-05-25 → 26)
 
-- **Session lifecycle cleanup hardened** (`e71a476`, A1 — P2-1/5/6).
-- **Session event-callback safety** (`f061345`, A2 — P2-3).
-- **WebView2 trust boundary + dispatcher hygiene** (`d48e3dc`, B — P2-4 / D3 / D15 / D16).
-- **Stateful Telnet parser + `IsRunning`** (`0d3fba7`, C — P2-2 / D17).
-- **SmartPasteGuard Windows/PowerShell coverage** (`1b0fda4`, D — P2-7 / D18).
-- **`Heimdall.Terminal.Tests` project introduced** (`4346d97`, E1 — D19).
-- **Dedicated session tests** (`6299a78`, E2 — P2-8).
+- **Session lifecycle cleanup hardened** (`e71a476`, A1 - P2-1/5/6).
+- **Session event-callback safety** (`f061345`, A2 - P2-3).
+- **WebView2 trust boundary + dispatcher hygiene** (`d48e3dc`, B - P2-4 / D3 / D15 / D16).
+- **Stateful Telnet parser + `IsRunning`** (`0d3fba7`, C - P2-2 / D17).
+- **SmartPasteGuard Windows/PowerShell coverage** (`1b0fda4`, D - P2-7 / D18).
+- **`Heimdall.Terminal.Tests` project introduced** (`4346d97`, E1 - D19).
+- **Dedicated session tests** (`6299a78`, E2 - P2-8).
 - **P3 quick-win sweep** (`9f38c89`, F). Test count 5,847 → 5,879.
 
 ### Deferred D-backlog (5 commits)
 
-- **Clamp resize values + dedup failure logs** (`e4bf9e1`, D4) — pure
+- **Clamp resize values + dedup failure logs** (`e4bf9e1`, D4) - pure
   `ResizeFailureLogThrottle` component (`{Skip, LogCurrent,
   LogRepeatSummaryThenCurrent}`, thread-safe), dedup signature excludes
   dimensions so a terminal drag cannot bypass it; `Math.Clamp(value, 1, 999)`
   in `ResizeSession`. +8 tests → 5,887.
-- **Localize embedded terminal page strings** (`d9c9241`, D13) — pure
+- **Localize embedded terminal page strings** (`d9c9241`, D13) - pure
   `TerminalHtmlLocalizer` substitutes 3 markers in `terminal.html` with
   context-aware encoding (`WebUtility.HtmlEncode` for HTML, `JsonSerializer`
   for the JS literal) and explicit EN fallback. 3 new locale keys. +9 → 5,896.
-- **Stateful UTF-8 transcript decoder** (`73f7e90`, D5) — pure
+- **Stateful UTF-8 transcript decoder** (`73f7e90`, D5) - pure
   `StreamingUtf8Decoder` wrapping `Encoding.UTF8.GetDecoder()` via the
   single-pass `Decoder.Convert(...)`; only the `WriteToTranscript` site had real
   multi-byte fragmentation risk. +10 → 5,906.
-- **`CancellationToken` through `ITerminalSession.StartAsync`** (`c8b0d0f`, D1) —
+- **`CancellationToken` through `ITerminalSession.StartAsync`** (`c8b0d0f`, D1) - 
   optional trailing token (BCL convention). ConPty/PipeMode bail out via
   `ThrowIfCancellationRequested()`; Telnet links the token to its internal CTS,
   making the TCP connect truly cancellable. 4 call sites + 2 test fakes aligned.
   +3 → 5,909.
-- **WinRM credential plaintext reduction** (`f81825b`, D8) — `byte[]` +
+- **WinRM credential plaintext reduction** (`f81825b`, D8) - `byte[]` +
   `CryptographicOperations.ZeroMemory` end-to-end instead of `SecureString`
   (deliberate deviation: MSFT discourages `SecureString` on modern .NET and
   DPAPI consumes `byte[]` anyway). New `DpapiProvider.UnprotectToBytes` /
@@ -662,16 +662,16 @@ Release **v2026.052601** (`860eccf`) was cut between the audit and the D-backlog
 
 ### Housekeeping
 
-- **CI flake tags** — `ConPtySession` startup test (`601b0cc`) and
+- **CI flake tags** - `ConPtySession` startup test (`601b0cc`) and
   `TcpPingViewModel` mixed-results test (`d929b81`) tagged
   `[Trait("Category", "CIUnstable")]` (GHA Windows runner timing).
-- **HEAD secret scrub** (`629db10`) — redact internal hostnames and an employee
+- **HEAD secret scrub** (`629db10`) - redact internal hostnames and an employee
   id from `HEAD`.
-- **Docs sync** (`39c98c0`) — test/project counts post-T-1.
+- **Docs sync** (`39c98c0`) - test/project counts post-T-1.
 
 Build green, zero warnings. Test count 5,847 → 5,918 over the chantier.
 
-## 2026-05-25 — SFTP/FTP/file-server audit + EmbeddedSftpView MVVM refactor (AD-1)
+## 2026-05-25 - SFTP/FTP/file-server audit + EmbeddedSftpView MVVM refactor (AD-1)
 
 Two quality audits (SFTP/FTP core, then the App-side SFTP/FTP layer) plus the
 AD-1 MVVM refactor of `EmbeddedSftpView`. ~40 commits; grouped below by theme.
@@ -692,13 +692,13 @@ AD-1 MVVM refactor of `EmbeddedSftpView`. ~40 commits; grouped below by theme.
   cancellable without crashing (`c9f628e`).
 - **Sudo auth via stdin password feed** with clear failure surfacing
   (`6b2a7e9`, `e5374f8`); `SftpHandler` input validation (`f03e3a0`).
-- **Local file browser** — recursion + path-containment hardening (`fef54af`),
+- **Local file browser** - recursion + path-containment hardening (`fef54af`),
   filesystem I/O moved off the UI thread (`213a222`).
-- **File server / TFTP** — TFTP handling + HTTP response headers hardened
+- **File server / TFTP** - TFTP handling + HTTP response headers hardened
   (`431f8a7`), magic numbers replaced + start guarded (`e45d4af`), a
   TFTP-unauthenticated warning surfaced on share start (`5fdb736`).
 
-### AD-1 — EmbeddedSftpView MVVM refactor
+### AD-1 - EmbeddedSftpView MVVM refactor
 
 Drove the view from bindings/commands instead of code-behind (code-behind
 1623 → 1145 lines): selection-free and selection-based actions bound to commands
@@ -715,15 +715,15 @@ polish (`c2a72bc`).
 Tests covered (`a8e2ae5`, `da4590f`). Build green, **5,847 passing**, zero
 warnings, EN/FR locale parity preserved.
 
-## 2026-05-24 — Quality audit wave: splits, SSH/tunnel, RDP/ActiveX, i18n gate
+## 2026-05-24 - Quality audit wave: splits, SSH/tunnel, RDP/ActiveX, i18n gate
 
 A wide audit day across four subsystems plus a new RDP domain field.
 
 - **Split-system audit closed** (`689ea44`, S1–S10 / S12).
 - **SSH/tunnel audit** (`8911803` chunks A/B/D/E; `587abe6` H4–H7 final
-  hardening) — `FailureClassifier` connection-error classification hardened
+  hardening) - `FailureClassifier` connection-error classification hardened
   (`4c4ef75`), `KnownHostsParser` multi-colon host tokens validated (`dbdc87f`).
-- **RDP/ActiveX audit** — MsTscAx event sink guarded against subscriber
+- **RDP/ActiveX audit** - MsTscAx event sink guarded against subscriber
   exceptions (`617c78f`), keyboard-hook callback guarded (`15b54c1`), external
   credential autofill decoupled from the connect-scoped token (`e28d1a9`),
   negative monitor indices rejected in `ValidateMultimon` (`29bb0ad`), the
@@ -739,74 +739,74 @@ A wide audit day across four subsystems plus a new RDP domain field.
   `86c13e9`).
 - **Explicit RDP domain field** added to the ServerDialog with runtime wiring
   (`d0c34d6`, `b357ff1`).
-- **i18n gate** — XAML `{loc:Translate}` keys now gated against the locale file
+- **i18n gate** - XAML `{loc:Translate}` keys now gated against the locale file
   in CI (`73ba1ae`); missing RDP auto-reconnect / keep-alive labels added
   (`0dabd79`).
-- **Polish** — reconnect-overlay message inset (`198edc1`), empty band above the
+- **Polish** - reconnect-overlay message inset (`198edc1`), empty band above the
   first card on Settings sub-tabs trimmed (`198f097`). The SSH-gateway `12152`
   WS-Man limitation documented as environmental (`7c13fe6`).
 
 Build green, zero warnings, EN/FR locale parity preserved. *(Per-chantier test
-baseline for this day not recovered from git — backfill if strict convention
+baseline for this day not recovered from git - backfill if strict convention
 parity is wanted.)*
 
-## 2026-05-23 — WinRM-via-gateway + tunnel ref-count fixes + Settings UX
+## 2026-05-23 - WinRM-via-gateway + tunnel ref-count fixes + Settings UX
 
 Releases **v2026.052301** (`26f40c8`), **v2026.052302** (`eb20d94`),
 **v2026.052303** (`3030ed9`).
 
-- **WinRM-via-gateway** — WinRM profiles can route through an SSH gateway
+- **WinRM-via-gateway** - WinRM profiles can route through an SSH gateway
   (`b406c11`), with gateway selection in the profile UI (`9bf72bb`). HTTP-only;
   `WinRmUseSsl` + gateway is rejected.
 - **Tunnel reference-count leak closed** on every protocol exit path: RDP
   (`29b99d2`), SFTP (`cb703c1`), SSH.NET + Plink (`2d3bdff`), external PuTTY
   (`7785e64`).
-- **WinRM polish** — ServerDialog UI + connection-path diagram (`3fbe7e2`);
+- **WinRM polish** - ServerDialog UI + connection-path diagram (`3fbe7e2`);
   credential bootstrap no longer aborts on Windows PowerShell 5.1 (`ba1d062`).
-- **Stability** — close-time `NullReferenceException` with active sessions
+- **Stability** - close-time `NullReferenceException` with active sessions
   prevented (`79837dc`); terminal `convertEol` applied once the pipe session is
   attached (`0e0e632`).
-- **Settings UX overhaul** — search reworked to locate and highlight a setting
+- **Settings UX overhaul** - search reworked to locate and highlight a setting
   (`3a66e3f`), per-tab validation error badges (`62129f0`), validation feedback
   fix (`56eea3c`), RDP tab segmented (`9b2a7e8`), Advanced tab restructured with
   server import/export relocated (`da87b53`), RDP resolution-preset labels
   (`66f34f0`), missing accessibility labels (`029a4b8`).
-- **Docs** — slow-server RDP cutoff capture procedure
+- **Docs** - slow-server RDP cutoff capture procedure
   (`docs/repro/...`, `498c875`); optional SSH-gateway routing for WinRM in the
   README (`ccceeb0`).
 
 Build green, zero warnings, EN/FR locale parity preserved. *(Per-chantier test
 baseline for this day not recovered from git.)*
 
-## 2026-05-22 — WinRM 9th protocol completion + NLA parity + RD Gateway UI
+## 2026-05-22 - WinRM 9th protocol completion + NLA parity + RD Gateway UI
 
 Release **v2026.052201** (`7fe7bd1`). WinRM lands as the 9th protocol (ConPTY +
 `Enter-PSSession`, credential injected via a self-deleting `.ps1` bootstrap).
 
-- **WinRM runtime** — profile/config/UI support (`6dcc0a1`), launch bootstrap
+- **WinRM runtime** - profile/config/UI support (`6dcc0a1`), launch bootstrap
   (`b55117f`), connection dispatch + embedded runtime wiring (`e3114bc`),
   PowerShell launch correctness (`d0755b2`), transport preflight check
   (`f3ad97c`) with revocation false-negatives avoided (`4dd6c74`).
-- **RDP** — RD Gateway exposed in the UI and applied for embedded sessions
+- **RDP** - RD Gateway exposed in the UI and applied for embedded sessions
   (`fb3aade`); embedded RDP authentication level aligned with the `.rdp`
   generator, i.e. **NLA #16 external parity** (`074c70b`); RDP auto-reconnect
   cancelled when the SSH gateway cannot reach the target (`ec96ecd`); chained
   gateway-unreachable diagnostic emitted (`9460162`).
-- **ServerDialog restructure** — four-tab layout (`9afb5a2`) with per-protocol
+- **ServerDialog restructure** - four-tab layout (`9afb5a2`) with per-protocol
   visibility + per-tab error badges (`8670873`), duplicate adorner text fixed
   (`c63df2b`), freely resizable with single-level tab scrolling (`a288aeb`).
-- **RDP Options sub-tabs** — split into four sub-tabs (`6877e40`) with a
+- **RDP Options sub-tabs** - split into four sub-tabs (`6877e40`) with a
   segmented look, spacing/sectioning/focus refinement (`c8cbf14`, `ecd7e00`),
   roomier focus ring on checkboxes/radios (`617d7f5`), `InputBorderBrush`
   outline (`598f87b`), session-tree left inset (`1369d81`).
-- **Repo hygiene** — `.gitattributes` added + EOLs normalized to LF
+- **Repo hygiene** - `.gitattributes` added + EOLs normalized to LF
   (`f3b5248`); `CLAUDE.md` kept local/gitignored (`936ff81`); README/CLAUDE.md
   refreshed for WinRM (`716b34f`, `d7a1ddb`).
 
 Build green, zero warnings, EN/FR locale parity preserved. *(Per-chantier test
 baseline for this day not recovered from git.)*
 
-## 2026-05-20 → 21 — ThemeForge theme engine migration + accent tint selector
+## 2026-05-20 → 21 - ThemeForge theme engine migration + accent tint selector
 
 Heimdall's bespoke theme engine was replaced by the private `ThemeForge.Theme`
 NuGet package (16 canonical themes, app default `Drakul`).
@@ -821,32 +821,32 @@ NuGet package (16 canonical themes, app default `Drakul`).
   ThemeForge engine (`b97017e`), the theme selector rebuilt on ThemeForge
   palettes (`c9ba6f3`), and the WebView2 background retargeted to the ThemeForge
   slot (`8735e6a`).
-- **Accent tint selector** — the ThemeForge accent tint wired through
+- **Accent tint selector** - the ThemeForge accent tint wired through
   `HeimdallThemeService` (`9b10b48`) and exposed as a 9-tint selector in
   Appearance settings (`87072dc`).
-- **Post-migration regression sweep** (`9df0226`) — form controls given a
+- **Post-migration regression sweep** (`9df0226`) - form controls given a
   contrasted resting border (`6b2d387`), dialog cards pointed at the existing
   `CardBrush` (`db77296`).
-- **Adjacent fixes** — `OnLoginComplete` COM event DISPID corrected (`9b59cf7`),
+- **Adjacent fixes** - `OnLoginComplete` COM event DISPID corrected (`9b59cf7`),
   RFC 8332 RSA-SHA2 host-key algorithms recognized (`be4c904`), DNS pre-warm
   task exceptions observed (`6532806`), health probe throttle scoped per cycle +
   CTS disposal deferred (`62a084b`), SSH forwarded-port failures captured for
   diagnostics (`0d5fa38`), gateway-to-target unreachable reported in the RDP
   disconnect overlay (`04b5792`), pane-host detach skipped during shutdown
   (`5b8deab`), generic session-overlay actions routed by tab scope (`7e9a9db`).
-- **Docs** — ThemeForge migration documented + agent guidance versioned
+- **Docs** - ThemeForge migration documented + agent guidance versioned
   (`cca0c4c`, `f9ab25b`).
 
 Build green, zero warnings, EN/FR locale parity preserved. *(Per-chantier test
 baseline for this day not recovered from git.)*
 
-## 2026-05-17 — UX/polish series + Session Health Monitor + sidebar compaction
+## 2026-05-17 - UX/polish series + Session Health Monitor + sidebar compaction
 
 Ten commits across four chantiers. Tests baseline moved from 5,500 to **5,557 passing + 6 skipped** (+57 covering localizers, the extended `ServerStatusToColorConverter`, ViewModel change-notification, the full health monitor pipeline including port resolver / gateway short-circuit / probe state machine, and the new Settings validation). Locale parity now **5,543 keys EN/FR** (+22 keys this session).
 
 ### WCAG visual contrast pass (3 commits)
 
-The 7 light-pastel-accent Dracula variants were painting `#FFFFFF` on light accent backgrounds for the PrimaryButton, CheckBox glyph, and RadioButton dot — roughly 2:1 contrast where WCAG AA requires 4.5:1. A follow-up sweep also found 17 sites painting semantic text in the raw `SuccessBrush`/`WarningBrush`/`ErrorBrush` instead of the WCAG-tuned `*TextBrush` variants, which under-read on the 5 light themes.
+The 7 light-pastel-accent Dracula variants were painting `#FFFFFF` on light accent backgrounds for the PrimaryButton, CheckBox glyph, and RadioButton dot - roughly 2:1 contrast where WCAG AA requires 4.5:1. A follow-up sweep also found 17 sites painting semantic text in the raw `SuccessBrush`/`WarningBrush`/`ErrorBrush` instead of the WCAG-tuned `*TextBrush` variants, which under-read on the 5 light themes.
 
 - **`TextOnAccentBrush` rebased to the theme background color** for DraculaPro, Drakula, Blade, Buffy, Bathory, Lincoln, VanHelsing, and Morbius, lifting button text contrast from ~2:1 to 5.5–7.6:1 (`fd637cd`). Akasha and Striga already followed this pattern; the fix generalized it.
 - **CheckBox check glyph and RadioButton inner dot** switched from `TextPrimaryBrush` to `TextOnAccentBrush` so they remain legible on the same pastel accent fills when checked (`b048d5d`).
@@ -854,56 +854,56 @@ The 7 light-pastel-accent Dracula variants were painting `#FFFFFF` on light acce
 
 ### Command Palette (Ctrl+K) overhaul (3 commits)
 
-- **Phase A — Unified fuzzy ranker** (`dfd349f`): the old `TryParseToolCommand` (87 lines) early-returned on any tool-prefix match, hiding server matches that shared a prefix, and only matched tools by their `CommandPrefixes`. The new pipeline isolates explicit argument-bearing invocations (`ping 8.8.8.8`, `subnet 10.0.0.0/8`) for early return, then scores tools (localized label + aliases + category), external tools, and servers in one pass before sorting and taking the top 20. Queries like `calculator`, `formatter`, or `encoder` now surface the matching tool while server fuzzy matches still appear alongside. Split into 4 focused helpers: `TryParseExplicitToolInvocation`, `ScoreToolDescriptor`, `BuildToolPaletteItem`, `BuildExternalToolItem`.
-- **Phase B — Snippets indexed in the palette** (`9ba0bc0`): the 500+ TwinShell action library was previously unreachable from Ctrl+K. The palette refreshes a per-open snapshot via a scoped `IActionService`, scores snippets by Title (full weight), Tags (full weight), Description and Category (halved), and routes selection to a clipboard copy + status message — snippets are clipboard-only, never split, connect, or interrupt the active session. The dispatch path intercepts `snippet-*` Ids before any split/connect routing so a snippet cannot accidentally open a tab or merge a pane. `ResolveSnippetCommand` falls back Windows template → Linux template → first example → action title. Locale keys `PaletteSnippetsHeader` and `PaletteSnippetCopied`.
-- **Phase C — Visual section headers** (`9211bb5`): the flat ListBox now consumes a `CollectionViewSource` with a `PropertyGroupDescription` on `Group`. A new `PaletteGroupHeaderConverter` normalizes empty Group values (most ad-hoc and ungrouped servers) to a localized `Servers` / `Quick Connect` fallback so no untitled section ever renders. The textual `· {Group}` suffix on each row was removed — headers carry the categorization now. Locale keys `PaletteQuickConnectHeader` and `PaletteServersHeader`.
+- **Phase A - Unified fuzzy ranker** (`dfd349f`): the old `TryParseToolCommand` (87 lines) early-returned on any tool-prefix match, hiding server matches that shared a prefix, and only matched tools by their `CommandPrefixes`. The new pipeline isolates explicit argument-bearing invocations (`ping 8.8.8.8`, `subnet 10.0.0.0/8`) for early return, then scores tools (localized label + aliases + category), external tools, and servers in one pass before sorting and taking the top 20. Queries like `calculator`, `formatter`, or `encoder` now surface the matching tool while server fuzzy matches still appear alongside. Split into 4 focused helpers: `TryParseExplicitToolInvocation`, `ScoreToolDescriptor`, `BuildToolPaletteItem`, `BuildExternalToolItem`.
+- **Phase B - Snippets indexed in the palette** (`9ba0bc0`): the 500+ TwinShell action library was previously unreachable from Ctrl+K. The palette refreshes a per-open snapshot via a scoped `IActionService`, scores snippets by Title (full weight), Tags (full weight), Description and Category (halved), and routes selection to a clipboard copy + status message - snippets are clipboard-only, never split, connect, or interrupt the active session. The dispatch path intercepts `snippet-*` Ids before any split/connect routing so a snippet cannot accidentally open a tab or merge a pane. `ResolveSnippetCommand` falls back Windows template → Linux template → first example → action title. Locale keys `PaletteSnippetsHeader` and `PaletteSnippetCopied`.
+- **Phase C - Visual section headers** (`9211bb5`): the flat ListBox now consumes a `CollectionViewSource` with a `PropertyGroupDescription` on `Group`. A new `PaletteGroupHeaderConverter` normalizes empty Group values (most ad-hoc and ungrouped servers) to a localized `Servers` / `Quick Connect` fallback so no untitled section ever renders. The textual `· {Group}` suffix on each row was removed - headers carry the categorization now. Locale keys `PaletteQuickConnectHeader` and `PaletteServersHeader`.
 
 ### Session Health Monitor (3 commits)
 
-New background reachability monitor that probes the inventory on a Timer and surfaces per-server reachability in the sidebar. Disambiguation note: distinct from `Heimdall.Ssh.ServerHealthMonitor`, which polls CPU/RAM/disk on connected SSH sessions via shell commands — this new service operates on the inventory before/instead of connecting, via raw TCP.
+New background reachability monitor that probes the inventory on a Timer and surfaces per-server reachability in the sidebar. Disambiguation note: distinct from `Heimdall.Ssh.ServerHealthMonitor`, which polls CPU/RAM/disk on connected SSH sessions via shell commands - this new service operates on the inventory before/instead of connecting, via raw TCP.
 
-- **Phase 1 — Core service + state model + tests** (`62fd036`): new `Heimdall.Core.SessionHealth` namespace ships `HealthStatus` (Unknown/Probing/Up/Down), `HealthState` (immutable record with `LastCheckUtc`/`LatencyMs`/`Reason`), `IHealthProbe` (test seam), and `TcpHealthProbe` (default implementation with bounded `CancellationTokenSource.CancelAfter` timeout and `SocketError` → reason-tag classification). `Heimdall.App.Services.SessionHealthMonitor` loads the latest inventory from `IConfigManager.LoadServersAsync` on every Timer tick, runs throttled parallel probes through a `SemaphoreSlim` (default 10 concurrent), and re-arms its Timer when `IConfigManager.SettingsChanged` fires so the user can toggle Enabled or change the interval without restart. Gateway-fronted servers (`SshGatewayId != null`) and protocols without a TCP probe port (Citrix, Local Shell) short-circuit to Unknown without consuming a probe slot. State for servers removed between cycles is evicted from the in-memory dictionary. 4 new `AppSettings`: `SessionHealthMonitorEnabled` (default true), `SessionHealthCheckIntervalSeconds` (60), `SessionHealthProbeTimeoutMs` (2000), `SessionHealthMaxConcurrent` (10). 20 unit tests cover the protocol → port resolver, every short-circuit path, Probing/Up/Down event ordering, inventory eviction, and the disabled-state branch.
-- **Phase 2 — Sidebar UI integration** (`1a653ca`): a new observable `ServerItemViewModel.HealthState` is fed via `IUiDispatcher.InvokeAsync` on every `StatusChanged` event so the background timer thread never touches WPF bindings directly. `ServerStatusToColorConverter` was extended from 2/3 to 3/4 binding values, accepting an optional `HealthState` as `values[2]`; when the server is in a non-active connection state, the dot color comes from the live health verdict (`Up`→Success, `Down`→Error, `Probing`→Warning, `Unknown`→TextDisabled), and active state colors keep their existing meaning. Old call sites that still pass 2 or 3 values fall back to the legacy connection-type palette — the converter change is fully back-compatible. A new static `HealthReasonLocalizer` centralizes tooltip formatting and reason-tag translation (e.g. `"Reachable (42 ms) · 14:32:55"`). 12 new locale keys (4 statuses + 7 reasons + "never"), 17 new tests.
-- **Phase 3 — Settings UI** (`fa375a6`): the 4 settings are mirrored on `SettingsViewModel` as `[ObservableProperty]` fields with `[Range]` validation matching the runtime clamps (interval 15–3600 s, timeout 250–30000 ms, concurrent 1–50). A new Health Monitor group lands in `Settings → Advanced` right after Timeouts (1 CheckBox + 3 int fields in a 2×2 grid, copied from the Timeouts donor pattern). The Settings search bar gains keywords `health`, `monitor`, `probe`, `reachability`, `santé`, `sondage`. Save flow piggybacks on the existing `Save Settings` button; `SettingsChanged` was already wired in Phase 1, so toggling Enabled or changing the interval re-arms the monitor without restart. 5 new locale keys, 3 new tests covering the load/save mirror and out-of-range validation rejecting Save.
+- **Phase 1 - Core service + state model + tests** (`62fd036`): new `Heimdall.Core.SessionHealth` namespace ships `HealthStatus` (Unknown/Probing/Up/Down), `HealthState` (immutable record with `LastCheckUtc`/`LatencyMs`/`Reason`), `IHealthProbe` (test seam), and `TcpHealthProbe` (default implementation with bounded `CancellationTokenSource.CancelAfter` timeout and `SocketError` → reason-tag classification). `Heimdall.App.Services.SessionHealthMonitor` loads the latest inventory from `IConfigManager.LoadServersAsync` on every Timer tick, runs throttled parallel probes through a `SemaphoreSlim` (default 10 concurrent), and re-arms its Timer when `IConfigManager.SettingsChanged` fires so the user can toggle Enabled or change the interval without restart. Gateway-fronted servers (`SshGatewayId != null`) and protocols without a TCP probe port (Citrix, Local Shell) short-circuit to Unknown without consuming a probe slot. State for servers removed between cycles is evicted from the in-memory dictionary. 4 new `AppSettings`: `SessionHealthMonitorEnabled` (default true), `SessionHealthCheckIntervalSeconds` (60), `SessionHealthProbeTimeoutMs` (2000), `SessionHealthMaxConcurrent` (10). 20 unit tests cover the protocol → port resolver, every short-circuit path, Probing/Up/Down event ordering, inventory eviction, and the disabled-state branch.
+- **Phase 2 - Sidebar UI integration** (`1a653ca`): a new observable `ServerItemViewModel.HealthState` is fed via `IUiDispatcher.InvokeAsync` on every `StatusChanged` event so the background timer thread never touches WPF bindings directly. `ServerStatusToColorConverter` was extended from 2/3 to 3/4 binding values, accepting an optional `HealthState` as `values[2]`; when the server is in a non-active connection state, the dot color comes from the live health verdict (`Up`→Success, `Down`→Error, `Probing`→Warning, `Unknown`→TextDisabled), and active state colors keep their existing meaning. Old call sites that still pass 2 or 3 values fall back to the legacy connection-type palette - the converter change is fully back-compatible. A new static `HealthReasonLocalizer` centralizes tooltip formatting and reason-tag translation (e.g. `"Reachable (42 ms) · 14:32:55"`). 12 new locale keys (4 statuses + 7 reasons + "never"), 17 new tests.
+- **Phase 3 - Settings UI** (`fa375a6`): the 4 settings are mirrored on `SettingsViewModel` as `[ObservableProperty]` fields with `[Range]` validation matching the runtime clamps (interval 15–3600 s, timeout 250–30000 ms, concurrent 1–50). A new Health Monitor group lands in `Settings → Advanced` right after Timeouts (1 CheckBox + 3 int fields in a 2×2 grid, copied from the Timeouts donor pattern). The Settings search bar gains keywords `health`, `monitor`, `probe`, `reachability`, `santé`, `sondage`. Save flow piggybacks on the existing `Save Settings` button; `SettingsChanged` was already wired in Phase 1, so toggling Enabled or changing the interval re-arms the monitor without restart. 5 new locale keys, 3 new tests covering the load/save mirror and out-of-range validation rejecting Save.
 
 ### Sidebar toolbar compaction (1 commit)
 
-The Sessions sidebar wasted a full row (~44 px) on a 4-button toolbar (Add, Import, Expand All, Collapse All) under the search box (`83d1630`). The layout collapses to a single row: search takes the remaining width (`MinWidth=120` to stay usable on narrow sidebars), **Add** stays inline as the primary 1-click action, and the three less-used actions move behind a kebab `⋮` (Segoe MDL2 `E712 MoreVertical`) overflow button — Import becomes a submenu, Expand All and Collapse All become direct MenuItems. The filter result count `Mw_FilterResultCount` moves to a hint `TextBlock` that collapses to 0 height when no filter is active (the existing visibility toggle in `MainWindow.xaml.cs` line 838 still drives it). `OnImportButtonClick` renamed to `OnSidebarOverflowClick` (same body, generic name). One new locale key (`TooltipSidebarOverflow`).
+The Sessions sidebar wasted a full row (~44 px) on a 4-button toolbar (Add, Import, Expand All, Collapse All) under the search box (`83d1630`). The layout collapses to a single row: search takes the remaining width (`MinWidth=120` to stay usable on narrow sidebars), **Add** stays inline as the primary 1-click action, and the three less-used actions move behind a kebab `⋮` (Segoe MDL2 `E712 MoreVertical`) overflow button - Import becomes a submenu, Expand All and Collapse All become direct MenuItems. The filter result count `Mw_FilterResultCount` moves to a hint `TextBlock` that collapses to 0 height when no filter is active (the existing visibility toggle in `MainWindow.xaml.cs` line 838 still drives it). `OnImportButtonClick` renamed to `OnSidebarOverflowClick` (same body, generic name). One new locale key (`TooltipSidebarOverflow`).
 
 Build green, **5,557 passing + 6 skipped**, locale parity **5,543 keys EN/FR** (+22 this session).
 
-## 2026-05-16 — Bulk password update
+## 2026-05-16 - Bulk password update
 
-- **Bulk edit password** — multi-select servers (Ctrl+Click / Shift+Click) → right-click → Edit → Password applies the same DPAPI+HMAC encrypted password to all selected sessions, regardless of protocol. The dialog uses a double PasswordBox (password + confirmation) to prevent typos. The new password is encrypted once via `CredentialProtector.Protect()` and written to the protocol-specific encrypted field (`RdpPasswordEncrypted`, `SshPasswordEncrypted`, `FtpPasswordEncrypted`, `TelnetPasswordEncrypted`, or `VncPassword`) based on each session's `ConnectionType`. Follows the existing `ExecutePersistedBulkMutationAsync` transaction pattern. Affected files/classes: `ServerListViewModel.Bulk.cs`, `ServerBulkEditPasswordViewModel`, `ServerBulkEditPasswordDialog`, `ContextMenuFactory`, `IDialogService`, `WpfDialogService`, locales (8 new keys EN/FR).
+- **Bulk edit password** - multi-select servers (Ctrl+Click / Shift+Click) → right-click → Edit → Password applies the same DPAPI+HMAC encrypted password to all selected sessions, regardless of protocol. The dialog uses a double PasswordBox (password + confirmation) to prevent typos. The new password is encrypted once via `CredentialProtector.Protect()` and written to the protocol-specific encrypted field (`RdpPasswordEncrypted`, `SshPasswordEncrypted`, `FtpPasswordEncrypted`, `TelnetPasswordEncrypted`, or `VncPassword`) based on each session's `ConnectionType`. Follows the existing `ExecutePersistedBulkMutationAsync` transaction pattern. Affected files/classes: `ServerListViewModel.Bulk.cs`, `ServerBulkEditPasswordViewModel`, `ServerBulkEditPasswordDialog`, `ContextMenuFactory`, `IDialogService`, `WpfDialogService`, locales (8 new keys EN/FR).
 
 Build green, **5,500 passing + 6 skipped**, locale parity **5,505 keys EN/FR**.
 
-## 2026-05-12 — RDP improvement series: per-profile settings, multimon validation, Auto parity, autofill observability
+## 2026-05-12 - RDP improvement series: per-profile settings, multimon validation, Auto parity, autofill observability
 
 Four focused RDP follow-ups closed latent runtime drift, made invalid monitor topology recover without blocking the user, aligned external `.rdp` Auto mode with embedded behavior, and improved credential-autofill diagnostics without changing fail-closed matching.
 
-- **Per-profile resize enable delay honored at runtime** — embedded RDP now resolves `RdpResizeEnableDelayMs` as profile value when non-null -> global `AppSettings.RdpResizeEnableDelayMs` -> hardcoded 10,000 ms fallback, through the pure static `EmbeddedSessionManager.ResolveRdpResizeEnableDelayMs` helper. Profile `0` is a legitimate user choice that disables the post-connect resize lockout, negative profile values clamp to `0` at runtime while schema/dialog validation rejects them, and a negative global setting falls back to the hardcoded default with a Warning log. The per-profile schema maximum was aligned with the global setting (`30,000` -> `60,000` ms). Affected files/classes: `EmbeddedSessionManager`, `ServerProfileDto`, `SchemaValidator`, `ServerDialogViewModel`, settings UI tests. Commit `038992f`.
-- **Multimon topology validation and non-blocking fallback** — connect-time validation now runs through the pure `RdpDisplayResolver.ValidateMultimon` path and `RdpMultimonValidation` records before ActiveX settings are applied. A single-monitor host with Multimon requested, or any `selectedmonitors` index greater than or equal to the host `MonitorCount`, falls back to single-monitor mode; an empty selected-monitor list still means "use all monitors." The fallback surfaces as a localized status message through the existing reconnect status channel (`EmbeddedRdpView.StatusTextBlock`), not a modal, with new keys `RdpMultimonFallbackSingleMonitor` and `RdpMultimonFallbackInvalidSelection`. Affected files/classes: `RdpDisplayResolver`, `RdpMultimonValidation`, `EmbeddedSessionManager`, `EmbeddedRdpView`, locales, RDP display tests. Commit `2e9b938`.
-- **External `.rdp` Auto mode aligned with embedded Auto** — embedded Auto remains the reference contract, and external Auto now writes `smart sizing:i:1`, forces `use multimon:i:0` regardless of the profile flag, writes `screen mode id:i:1`, and emits deterministic primary working-area dimensions snapped to a multiple of 4 via `RdpDisplayHelper`. `RdpFileOptions` gained explicit `ScreenMode` and `EmitDisabledMultiMonitor` fields so `RdpProfileResolver` decides Auto semantics while `RdpFileGenerator` stays a dumb writer. Affected files/classes: `RdpProfileResolver`, `RdpDisplayResolver`, `RdpDisplayHelper`, `RdpFileGenerator`, `RdpHandler`, profile resolver/file generator tests. Commit `ae0dd70`.
-- **Credential autofill observability without credential leakage** — `CredentialAutofill` now emits one structured Debug entry per autofill attempt with broker window title, handle, PID, process name, rejection reason or accepted marker, plus an Info outcome line and Warning-level logging for enumeration exceptions. Strict host-title fail-closed matching is unchanged. The same pass scrubbed identity fields from RDP connect diagnostics in `RdpActiveXHost.SetCredentials` and `EmbeddedRdpView` so logs no longer include `user=`, `domain=`, or `hasPassword=`. Affected files/classes: `CredentialAutofill`, `RdpActiveXHost`, `EmbeddedRdpView`, credential-autofill tests. Commit `1d7c78c`.
+- **Per-profile resize enable delay honored at runtime** - embedded RDP now resolves `RdpResizeEnableDelayMs` as profile value when non-null -> global `AppSettings.RdpResizeEnableDelayMs` -> hardcoded 10,000 ms fallback, through the pure static `EmbeddedSessionManager.ResolveRdpResizeEnableDelayMs` helper. Profile `0` is a legitimate user choice that disables the post-connect resize lockout, negative profile values clamp to `0` at runtime while schema/dialog validation rejects them, and a negative global setting falls back to the hardcoded default with a Warning log. The per-profile schema maximum was aligned with the global setting (`30,000` -> `60,000` ms). Affected files/classes: `EmbeddedSessionManager`, `ServerProfileDto`, `SchemaValidator`, `ServerDialogViewModel`, settings UI tests. Commit `038992f`.
+- **Multimon topology validation and non-blocking fallback** - connect-time validation now runs through the pure `RdpDisplayResolver.ValidateMultimon` path and `RdpMultimonValidation` records before ActiveX settings are applied. A single-monitor host with Multimon requested, or any `selectedmonitors` index greater than or equal to the host `MonitorCount`, falls back to single-monitor mode; an empty selected-monitor list still means "use all monitors." The fallback surfaces as a localized status message through the existing reconnect status channel (`EmbeddedRdpView.StatusTextBlock`), not a modal, with new keys `RdpMultimonFallbackSingleMonitor` and `RdpMultimonFallbackInvalidSelection`. Affected files/classes: `RdpDisplayResolver`, `RdpMultimonValidation`, `EmbeddedSessionManager`, `EmbeddedRdpView`, locales, RDP display tests. Commit `2e9b938`.
+- **External `.rdp` Auto mode aligned with embedded Auto** - embedded Auto remains the reference contract, and external Auto now writes `smart sizing:i:1`, forces `use multimon:i:0` regardless of the profile flag, writes `screen mode id:i:1`, and emits deterministic primary working-area dimensions snapped to a multiple of 4 via `RdpDisplayHelper`. `RdpFileOptions` gained explicit `ScreenMode` and `EmitDisabledMultiMonitor` fields so `RdpProfileResolver` decides Auto semantics while `RdpFileGenerator` stays a dumb writer. Affected files/classes: `RdpProfileResolver`, `RdpDisplayResolver`, `RdpDisplayHelper`, `RdpFileGenerator`, `RdpHandler`, profile resolver/file generator tests. Commit `ae0dd70`.
+- **Credential autofill observability without credential leakage** - `CredentialAutofill` now emits one structured Debug entry per autofill attempt with broker window title, handle, PID, process name, rejection reason or accepted marker, plus an Info outcome line and Warning-level logging for enumeration exceptions. Strict host-title fail-closed matching is unchanged. The same pass scrubbed identity fields from RDP connect diagnostics in `RdpActiveXHost.SetCredentials` and `EmbeddedRdpView` so logs no longer include `user=`, `domain=`, or `hasPassword=`. Affected files/classes: `CredentialAutofill`, `RdpActiveXHost`, `EmbeddedRdpView`, credential-autofill tests. Commit `1d7c78c`.
 
 Build green, **5,505 passing + 6 skipped**, locale parity **5,491 keys EN/FR**.
 
-## 2026-05-11 — RDP scrollbar root cause fix and sidebar UX pass
+## 2026-05-11 - RDP scrollbar root cause fix and sidebar UX pass
 
 Tonight's pass closed the RDP scrollbar investigation with a resolver-level fix and made the production-sized session sidebar easier to scan.
 
-- **RDP scrollbar fix** — `RdpDisplayResolver.cs` now resolves `RdpResolutionMode.FitWindow` with `smartSizing: true` (`reason: explicit-fit-window-scaled`). The old FitWindow path used `smartSizing: false`, so MsTscAx rendered the remote desktop at native pixel size; on real Windows RDP servers, when that desktop exceeded the AxHost client rect, Windows painted non-client scrollbars. The attempted Win32 workaround (`RdpActiveXHost` stripping `WS_HSCROLL | WS_VSCROLL` via `EnumChildWindows` plus a 12-second `DispatcherTimer`) lost to MsTscAx's own layout loop, which re-applies the bits every layout pass. The resolver flip trades a small amount of bitmap scaling at non-integer ratios for scrollbar-free FitWindow semantics; Fixed mode remains available for pixel-perfect native rendering, explicit Smart Sizing remains available as a named scaled mode, and the strip plumbing remains as defense in depth for the remaining non-smart modes.
-- **Sidebar UX pass** — `MainWindow.xaml` now gives the Sessions sidebar a two-row toolbar (full-width search first, icon-only actions second), including an icon-only Import button. `SidebarDisplayNameFormatter` preserves the head of long names and ellipsizes only trailing parenthesized suffixes (`MaxLength = 40`, Unicode `\u2026`), `WindowUIState.DefaultSidebarWidth` moved from 260 to 320 px, the `(No group)` drop zone is visually toned down, and `TreeViewIndentGuideBrush` was added across all seven Dracula variants for hierarchy guides. Folder and leaf row density now differ more clearly, with about 25 tests covering `SidebarDisplayNameFormatterTests`, `RdpDisplayResolverTests`, and the post-connect strip timer.
+- **RDP scrollbar fix** - `RdpDisplayResolver.cs` now resolves `RdpResolutionMode.FitWindow` with `smartSizing: true` (`reason: explicit-fit-window-scaled`). The old FitWindow path used `smartSizing: false`, so MsTscAx rendered the remote desktop at native pixel size; on real Windows RDP servers, when that desktop exceeded the AxHost client rect, Windows painted non-client scrollbars. The attempted Win32 workaround (`RdpActiveXHost` stripping `WS_HSCROLL | WS_VSCROLL` via `EnumChildWindows` plus a 12-second `DispatcherTimer`) lost to MsTscAx's own layout loop, which re-applies the bits every layout pass. The resolver flip trades a small amount of bitmap scaling at non-integer ratios for scrollbar-free FitWindow semantics; Fixed mode remains available for pixel-perfect native rendering, explicit Smart Sizing remains available as a named scaled mode, and the strip plumbing remains as defense in depth for the remaining non-smart modes.
+- **Sidebar UX pass** - `MainWindow.xaml` now gives the Sessions sidebar a two-row toolbar (full-width search first, icon-only actions second), including an icon-only Import button. `SidebarDisplayNameFormatter` preserves the head of long names and ellipsizes only trailing parenthesized suffixes (`MaxLength = 40`, Unicode `\u2026`), `WindowUIState.DefaultSidebarWidth` moved from 260 to 320 px, the `(No group)` drop zone is visually toned down, and `TreeViewIndentGuideBrush` was added across all seven Dracula variants for hierarchy guides. Folder and leaf row density now differ more clearly, with about 25 tests covering `SidebarDisplayNameFormatterTests`, `RdpDisplayResolverTests`, and the post-connect strip timer.
 
-## 2026-05-09 — SSH/RDP audit follow-up
+## 2026-05-09 - SSH/RDP audit follow-up
 
 Fresh audit pass over the SSH and RDP stacks after the 2026-05-05 closure.
 Three findings shipped (1 P1, 2 P2); no P0. Build green, +3 tests.
 
 - **`.rdp` file ACL applied atomically (P1).** `RdpFileGenerator.WriteToFileAsync`
   used to write the file with the parent directory's inherited ACL and apply
-  the restrictive ACL afterwards — a brief TOCTOU window where another local
+  the restrictive ACL afterwards - a brief TOCTOU window where another local
   process could read host/user/gateway data. The path now routes through the
   new `SecureFileWriter.WriteAndProtectAsync` helper (async sibling of
   `WriteAndProtect`) so the restrictive ACL is set at file-creation time. The
@@ -921,13 +921,13 @@ Three findings shipped (1 P1, 2 P2); no P0. Build green, +3 tests.
 - **Plaintext-credential limitation reaffirmed (P2).** Audit confirmed the
   `SECURITY.md` "Credential lifetime in managed memory" section already
   covers the three remaining surfaces (RDP `put_ClearTextPassword`, SSH
-  password auth, `CredentialAutofill` `WM_SETTEXT`). No code change — the
+  password auth, `CredentialAutofill` `WM_SETTEXT`). No code change - the
   limitation is inherent to .NET's immutable `System.String` and the COM/UIA
   marshalling on credential entry points. Mitigation remains workstation
   lock; `SecureString` does not provide stronger guarantees on modern
   Windows.
 
-## 2026-05-05 — SSH/SFTP/FTP security audit closure
+## 2026-05-05 - SSH/SFTP/FTP security audit closure
 
 Pair-architect security cycle closing the consolidated SSH/SFTP audit plan
 (`archive/2026/ssh-sftp-audit/audit-ssh-sftp-action-plan.md`). 15 items shipped across P0/P1/P2, with
@@ -935,46 +935,46 @@ FTP coverage and cleartext-warning work closing the final deferred item.
 
 Security hardening:
 
-- **Gateway-aware tunnel reuse** — reusable tunnels now match on remote target,
+- **Gateway-aware tunnel reuse** - reusable tunnels now match on remote target,
   forwarding mode, and a collision-safe gateway chain key built from stable
   gateway IDs and a versioned SHA-256 hash. Overlapping private networks behind
   different bastions no longer share the same local tunnel.
-- **Plink host-key fail-closed** — Plink fallback paths use
+- **Plink host-key fail-closed** - Plink fallback paths use
   `PlinkHostKeyDecider` plus injectable `IPlinkHostKeyProbe`; if Heimdall
   cannot resolve a stored or safely probed fingerprint, the connection fails
   with `SshFailureCode.HostKeyUnavailable` instead of falling back to the
   PuTTY/Plink cache.
-- **Compile-time host-key dependencies** — production SSH/SFTP/tunnel/sudo
+- **Compile-time host-key dependencies** - production SSH/SFTP/tunnel/sudo
   entry points now require non-null `HostKeyStore` and `IHostKeyVerifier`
   dependencies. `RejectingHostKeyVerifier` is the safe fail-closed verifier;
   `AutoAcceptHostKeyVerifier` remains isolated to tests that explicitly need
   first-use acceptance.
-- **Typed sudo permission handling** — sudo escalation in the SFTP view now
+- **Typed sudo permission handling** - sudo escalation in the SFTP view now
   triggers only on typed permission-denied exceptions, removing the old
   substring heuristic that treated generic `Failure` messages as permission
   denials.
-- **Sudo edit verifier caching** — sudo edit sessions cache the pinned
+- **Sudo edit verifier caching** - sudo edit sessions cache the pinned
   verifier created when the file is opened. A host-key rotation during
   auto-upload emits `HostKeyRotatedDuringUpload`, closes the edit session, and
   does not silently re-prompt.
-- **Mid-session security events** — `SftpBrowser` and `SshShellSession` expose
+- **Mid-session security events** - `SftpBrowser` and `SshShellSession` expose
   typed `SshSessionSecurityEvent` values via `SshSessionFailureDispatcher`;
   SSH auto-reconnect is suppressed on host-key mismatch signals.
-- **Sudo upload cleanup** — privileged uploads split the write and cleanup
+- **Sudo upload cleanup** - privileged uploads split the write and cleanup
   commands so `/tmp/.heimdall_*` files are removed from a `finally` path even
   when `sudo tee` fails.
-- **External editor launch** — the default editor resolves to the absolute
+- **External editor launch** - the default editor resolves to the absolute
   Windows Notepad path and launches with `UseShellExecute=false`, avoiding
   file association surprises for privileged temp files.
-- **Known hosts importer** — the app-side importer now mirrors the core
+- **Known hosts importer** - the app-side importer now mirrors the core
   streaming `TextReader` path, refuses files above 50 MB, and reports typed
   `FileTooLarge` / `FileReadError` diagnostics.
-- **Remote edit upload lifecycle** — file-watcher uploads are tracked,
+- **Remote edit upload lifecycle** - file-watcher uploads are tracked,
   cancellation-aware, and drained on `CloseEdit` / `Dispose` so exceptions are
   observed instead of falling into `UnobservedTaskException`.
-- **Legacy host-key verify API** — `HostKeyStore.Verify(byte[])` is marked
+- **Legacy host-key verify API** - `HostKeyStore.Verify(byte[])` is marked
   `[Obsolete]` with tests preserving the legacy first-use contract.
-- **Shell teardown hygiene** — `SshShellSession` no longer disposes its read
+- **Shell teardown hygiene** - `SshShellSession` no longer disposes its read
   loop cancellation source while the loop may still be running.
 
 FTP follow-up:
@@ -1011,7 +1011,7 @@ Documentation reorganization:
 Test baseline after this pass: **5,453 passing + 6 skipped** (was 5,030),
 zero warnings, i18n parity preserved (en=fr=5,489 leaf keys).
 
-## 2026-05-04 — RDP UX deferred polish sprint
+## 2026-05-04 - RDP UX deferred polish sprint
 
 Pair-architect follow-up sprint closing the 14 deferred findings + 2
 follow-ups (`RDP-LIVE-24`, `RDP-LIVE-25`) carried over from the
@@ -1019,74 +1019,74 @@ follow-ups (`RDP-LIVE-24`, `RDP-LIVE-25`) carried over from the
 
 User-visible changes:
 
-- **Resolution menu mode header** (RDP-LIVE-16) — both the toolbar
+- **Resolution menu mode header** (RDP-LIVE-16) - both the toolbar
   Resolution menu and the right-click Resolution submenu now show a
   non-clickable `Active mode: <mode>` header in their first slot,
   followed by `(WIDTH×HEIGHT)` when a fixed resolution is active.
   Reflects the live effective mode (manual session override beats
   profile mode).
-- **Resolution button glyph per mode** (RDP-LIVE-21) — five distinct
+- **Resolution button glyph per mode** (RDP-LIVE-21) - five distinct
   Segoe MDL2 glyphs (Auto / FitWindow / SmartSizing / Fixed / Multimon)
   on the toolbar Resolution button. Tooltip is enriched with the mode
   label and dimensions when available.
-- **Auto-collapse disabled redirection indicators** (RDP-LIVE-19) — the
+- **Auto-collapse disabled redirection indicators** (RDP-LIVE-19) - the
   embedded RDP toolbar status zone now hides redirection icons that are
   off, surfacing them through a discreet `+N` expand chip. Opt-in
   setting `RdpRedirectionIndicatorsAlwaysExpanded` in `settings.json`
   preserves the legacy "show all" behaviour for users who prefer it.
 - **Edit profile always offered on the reconnect overlay** (RDP-LIVE-22)
-  — every disconnect code now exposes the `Edit profile` button, not
+ - every disconnect code now exposes the `Edit profile` button, not
   just security/NLA codes. Profile-remediation codes (2055/2308/2311/
   2825/3080/3848/4360) keep `Edit profile` as the *primary* action;
   other codes leave Reconnect primary but still surface Edit profile
   for quick resolution/gateway tweaks without closing the overlay.
-- **SendKeys System section** (RDP-LIVE-20) — `Win+L` (lock workstation),
+- **SendKeys System section** (RDP-LIVE-20) - `Win+L` (lock workstation),
   `Win+D` (show desktop) and `Win+E` (file explorer) added to the
   SendKeys menu in a dedicated System sub-section.
-- **Multi-monitor tooltip rewritten** (RDP-LIVE-25) — the
+- **Multi-monitor tooltip rewritten** (RDP-LIVE-25) - the
   `Settings → RDP → Display → Multi-monitor` checkbox tooltip now
   describes the per-profile picker introduced by `RDP-PROF-13` instead
   of the obsolete "uses all local monitors" wording.
-- **ServerDialog Options mini-toc** (RDP-PROF-07) — RDP profile editor
+- **ServerDialog Options mini-toc** (RDP-PROF-07) - RDP profile editor
   Options tab gains four ghost chips (Display / Audio / Devices /
   Performance) at the top that scroll the form to the matching anchor
   on click.
-- **Multi-monitor as a separate toggle** (RDP-PROF-08) — Display section
+- **Multi-monitor as a separate toggle** (RDP-PROF-08) - Display section
   now exposes an `Enable multi-monitor mode` checkbox bound two-way to
   `RdpResolutionMode == Multimon`, on top of the existing mode
   ComboBox. Disabled when the host has only one screen attached.
-- **Common resolution presets** (RDP-PROF-12) — new `Common
+- **Common resolution presets** (RDP-PROF-12) - new `Common
   resolutions` ComboBox in Fixed mode pre-fills `RdpFixedWidth` and
   `RdpFixedHeight` from a curated list (1280×720, 1366×768, 1920×1080,
   2560×1440, 3840×2160) without forcing the user to type the values.
-- **Sectioned NLA / DynamicResolution / AudioCapture** (RDP-PROF-11) —
+- **Sectioned NLA / DynamicResolution / AudioCapture** (RDP-PROF-11) - 
   the three flat checkboxes at the bottom of the Options tab gain
   `Security:` / `Display:` / `Audio:` section labels for visual
   hierarchy.
-- **Smart reset of the Advanced expander** (RDP-PROF-09) — when
+- **Smart reset of the Advanced expander** (RDP-PROF-09) - when
   `RdpDialogAdvancedDefault` is on but no advanced field is customized
   (UseGlobalDefaults, AntiIdle, BitmapCaching, Compression,
   AutoReconnect, AdminMode, FullScreen all at their defaults), the
   Advanced expander auto-collapses on a profile re-open. Users keep the
   Advanced view only when they actually need it.
-- **Clickable protocol chip in Step 2** (RDP-PROF-10) — replaces the
+- **Clickable protocol chip in Step 2** (RDP-PROF-10) - replaces the
   static badge + separate `Back` button with a single chip carrying the
   protocol icon (`Geo.Protocol.*`) and label. Click returns to the Step
   1 protocol selector in add mode; the chip is disabled in edit mode.
-- **Resolution presets editable from Settings** (RDP-SET-01a) — new
+- **Resolution presets editable from Settings** (RDP-SET-01a) - new
   `Server dialog` card at the bottom of `Settings → RDP` exposes the
   previously hidden `RdpResolutionPresets` array as a multi-line
   TextBox (one preset per line, format `WIDTHxHEIGHT`) with a
   `Reset to defaults` link, and the `RdpDialogAdvancedDefault` flag
   as an explicit checkbox.
-- **Per-host palette protocol bias** (RDP-DISC-04) — when typing a bare
+- **Per-host palette protocol bias** (RDP-DISC-04) - when typing a bare
   IP/hostname in the Ctrl+K palette, the SSH and RDP ad-hoc suggestions
   reorder to match the protocol last used for that host.
-- **Recent connections in the empty palette** (RDP-DISC-05) — opening
+- **Recent connections in the empty palette** (RDP-DISC-05) - opening
   Ctrl+K with no query bubbles the servers whose host appears in the
   recent-connections log to the top of the suggestion list, ordered
   most-recent-first.
-- **Letterbox bands now match the SurfaceBrush** (RDP-LIVE-24) — the
+- **Letterbox bands now match the SurfaceBrush** (RDP-LIVE-24) - the
   `WindowsFormsHost` is now pinned to the exact RDP region size in
   letterbox mode, so the Win32 HWND no longer bleeds the system gray
   background through the bands. The bands now render in
@@ -1094,7 +1094,7 @@ User-visible changes:
 
 New abstractions worth knowing:
 
-- `RdpResolutionModeIndicator` (`Heimdall.App/Views/EmbeddedRdp/`) —
+- `RdpResolutionModeIndicator` (`Heimdall.App/Views/EmbeddedRdp/`) - 
   pure, stateless static helpers behind the toolbar Resolution button:
   `Resolve(profileMode, manualW, manualH, profileW, profileH)` returns
   a `RdpEffectiveResolutionState` record; `GetGlyph(mode)` and
@@ -1104,12 +1104,12 @@ New abstractions worth knowing:
   submenu (via `EmbeddedRdpView.GetEffectiveResolutionState()` exposed
   to `SessionTabContextMenuFactory`).
 - `RdpRedirectionVisibilityPolicy` (`Heimdall.App/Views/EmbeddedRdp/`)
-  — pure helpers for the `+N` expand badge and per-icon visibility:
+ - pure helpers for the `+N` expand badge and per-icon visibility:
   `IsIndicatorVisible(isActive, alwaysExpanded, sessionOverride)`,
   `ShouldShowExpandBadge(disabledCount, alwaysExpanded,
   sessionOverride)`, `CountDisabled(states)`.
 - `IRecentConnectionTracker` / `RecentConnectionTracker`
-  (`Heimdall.App/Services/`) — in-memory log of successful host /
+  (`Heimdall.App/Services/`) - in-memory log of successful host /
   protocol pairs (max 50 entries, deduped by `(host, protocol)`). Fed
   from `ServerListViewModel.OnConnectionStateChanged` whenever a
   session reaches `Connected` or `LaunchedExternalClient`. Consumed by
@@ -1118,14 +1118,14 @@ New abstractions worth knowing:
   the new `ResolveAdvancedDefault(persistedDefault, isEditMode,
   AdvancedRdpSnapshot)` policy used for `RDP-PROF-09`.
 - `AppSettings.RdpRedirectionIndicatorsAlwaysExpanded` (`bool`,
-  default `false`) — opt-in to keep all redirection indicators
+  default `false`) - opt-in to keep all redirection indicators
   visible regardless of state. Not exposed in the Settings UI in
   this iteration; users who want it edit `settings.json` directly.
 
 Test baseline: **5,311 passing + 6 skipped** (was 5,281), zero
 warnings, i18n parity preserved (en=fr=5,485 leaf keys, +27).
 
-## 2026-05-04 — RDP UX audit cycle implementation
+## 2026-05-04 - RDP UX audit cycle implementation
 
 Pair-architect cycle implementing the RDP UX audit
 (`docs/audit/audit-ux-rdp-2026-05-04.md`). 8 prompts + 2 mini-correctifs,
@@ -1134,47 +1134,47 @@ implementation log in the audit report.
 
 User-visible changes:
 
-- **External RDP applies the profile** (RDP-DISC-06) — the generated `.rdp`
+- **External RDP applies the profile** (RDP-DISC-06) - the generated `.rdp`
   now respects per-server `RdpResolutionMode`, `RdpFixedWidth/Height`,
   multi-monitor and smart sizing settings instead of falling back to the
   global defaults. `RdpProfileResolver.ResolveResolution` mirrors the
   existing color-depth resolution pattern.
-- **Honest "external client launched" status** (RDP-LIVE-23) — the
+- **Honest "external client launched" status** (RDP-LIVE-23) - the
   `LaunchedExternalClient` state is now painted in `WarningBrush` (orange)
   instead of `SuccessBrush` (green). A dedicated status text and tooltip
   make clear that Heimdall cannot directly observe the remote session
   state until the external client exits.
-- **One-shot Embedded/External override** (RDP-DISC-03) — right-click any
+- **One-shot Embedded/External override** (RDP-DISC-03) - right-click any
   RDP profile to open *Connect with...* and pick `Connect (embedded)` or
   `Connect (external mstsc)` for a single launch without editing the
   profile. Forced sessions show a discreet `(forced embedded/external)`
   suffix in the tab title.
-- **Per-monitor selection in Multimon mode** (RDP-PROF-13) — when the
+- **Per-monitor selection in Multimon mode** (RDP-PROF-13) - when the
   resolution mode is set to `Multi-monitor`, a `Selected monitors`
   sub-section lists detected screens with their resolution and a
   `(primary)` / `(vertical)` suffix where relevant. Empty selection keeps
   the existing behaviour ("use all monitors") for backward compatibility.
-- **Settings → RDP reorganized** (RDP-SET-02) — the previously flat list
+- **Settings → RDP reorganized** (RDP-SET-02) - the previously flat list
   of 18 controls is now grouped into 6 cards: Defaults / Display / Audio
   / Performance / Devices / Advanced timeouts. The 3 RDP timeouts
   (`RdpResizeEnableDelayMs`, `RdpArtifactCleanupDelayMs`,
   `RdpCredentialAutofillTimeoutMs`) move from the Advanced tab into the
   RDP tab. Added a `Reset RDP defaults` link with confirmation, plus
   tooltips on every checkbox using the localized `Rdp*Hint` keys.
-- **`Apply to all` confirmation** (RDP-SET-05) — the destructive bulk
+- **`Apply to all` confirmation** (RDP-SET-05) - the destructive bulk
   mutation that overwrites RDP mode on every existing profile now
   triggers a confirmation dialog stating the affected profile count.
-- **Embedded RDP toolbar grouping** (RDP-LIVE-18) — two thin vertical
+- **Embedded RDP toolbar grouping** (RDP-LIVE-18) - two thin vertical
   separators split the toolbar into 3 logical groups
   (Session control / Session interaction / Display configuration). Same
   separator style applied to SFTP for consistency.
-- **Letterbox region delimited** (RDP-LIVE-17, structural) — a 1px Border
+- **Letterbox region delimited** (RDP-LIVE-17, structural) - a 1px Border
   now materializes the active RDP region in fixed-resolution sessions, so
   the letterbox bands no longer read as a display bug. A first-letterbox
   hint badge fades in/out to explain the mode. Visual polish on the band
   colour (currently system gray instead of `SurfaceBrush`) tracked as
   follow-up `RDP-LIVE-24`.
-- **Unified `.rdp` import** (RDP-DISC-07) — the `Settings → Import`
+- **Unified `.rdp` import** (RDP-DISC-07) - the `Settings → Import`
   button and the drag-and-drop drop handler now share a single
   `IProfileImportService`, so both entry points get the rich
   preview/conflict resolution flow. Historic formats
@@ -1182,7 +1182,7 @@ User-visible changes:
 
 New abstractions worth knowing:
 
-- `RdpProfileResolver.ResolveResolution(server, settings)` — returns
+- `RdpProfileResolver.ResolveResolution(server, settings)` - returns
   `(Width, Height, MultiMonitor, SmartSizing, SelectedMonitorIndices)`,
   centralising the per-server resolution decision for both Embedded and
   External paths.
@@ -1206,7 +1206,7 @@ default tooltip wording in Settings → RDP, made stale by the new
 per-profile picker). 14 lower-priority findings deferred to a future
 polish sprint, listed in the audit report.
 
-## 2026-05-02 — Post-Phase 3 documentation refresh
+## 2026-05-02 - Post-Phase 3 documentation refresh
 
 Phase 3.8 doc-only pass refreshing tracked living documentation after the
 Phase 3 cluster.
@@ -1221,7 +1221,7 @@ Phase 3 cluster.
 
 No code changes. Test baseline unchanged: **5,103 passing + 6 skipped**.
 
-## 2026-05-02 — Settings and header hygiene
+## 2026-05-02 - Settings and header hygiene
 
 Phase 3.7 pass cleaning up the main header's top-right controls and moving
 file-sharing/tool preferences into more coherent Settings locations.
@@ -1243,7 +1243,7 @@ new Settings property load/save path.
 
 Test baseline after this pass: **5,103 passing + 6 skipped**, zero warnings.
 
-## 2026-05-02 — Network cartography KB flake hardening
+## 2026-05-02 - Network cartography KB flake hardening
 
 Phase 3.6 pass fixing the transient
 `NetworkCartographyViewModelTests.ClearKb_ResetsStats` failure. Recon traced the
@@ -1264,7 +1264,7 @@ flake to the ViewModel's fire-and-forget initial KB stats load racing with
 
 Test baseline after this pass: **5,100 passing + 6 skipped**, zero warnings.
 
-## 2026-05-02 — Timezone type-to-select city bias
+## 2026-05-02 - Timezone type-to-select city bias
 
 Phase 3.5 pass improving DateTime Converter timezone type-to-select after
 Phase 3.4 smoke exposed that typing a city prefix such as `par` did not jump
@@ -1281,7 +1281,7 @@ to the Paris timezone because `TimeZoneInfo.DisplayName` starts with the
 
 Test baseline after this pass: **5,098 passing + 6 skipped**, zero warnings.
 
-## 2026-05-02 — Tool ComboBox text-search hardening
+## 2026-05-02 - Tool ComboBox text-search hardening
 
 Phase 3.4 pass hardening tool-view ComboBoxes after two runtime
 `NullReferenceException` observations in WPF `BindingExpression.Activate` paths:
@@ -1301,7 +1301,7 @@ one during Hacker Simulator timer-driven scenario re-selection, and one during
 
 Test baseline after this pass: **5,092 passing + 6 skipped**, zero warnings.
 
-## 2026-05-02 — RDP shortcut settings cleanup
+## 2026-05-02 - RDP shortcut settings cleanup
 
 Phase 3.3 pass retiring the unused `AppSettings` surface for remapping embedded
 RDP release-focus and fullscreen-toggle shortcuts.
@@ -1316,7 +1316,7 @@ RDP release-focus and fullscreen-toggle shortcuts.
 
 Test baseline after this pass: **5,092 passing + 6 skipped**, zero warnings.
 
-## 2026-05-02 — RDP legacy resolution DTO cleanup
+## 2026-05-02 - RDP legacy resolution DTO cleanup
 
 Phase 3.2 pass retiring runtime usage of the legacy per-server
 `RdpDefaultResolutionWidth` / `RdpDefaultResolutionHeight` fields.
@@ -1332,7 +1332,7 @@ Phase 3.2 pass retiring runtime usage of the legacy per-server
 
 Test baseline after this pass: **5,090 passing + 6 skipped**, zero warnings.
 
-## 2026-05-02 — Tunnels panel collapse-by-default
+## 2026-05-02 - Tunnels panel collapse-by-default
 
 Phase 3.1 pass changing the Tunnels panel from a single global expanded flag
 into a per-active-tab resolved state, with a per-server-profile override, an
@@ -1388,12 +1388,12 @@ Settings UI, panel state resolution, badge state aggregation, and badge visual.
 Test baseline after this pass: **5,087 passing + 6 skipped**, zero warnings
 under `TreatWarningsAsErrors`. EN/FR locale parity at 5,402 leaf keys.
 
-## 2026-05-01 — RDP resolution, DPI, fullscreen, and lifecycle hardening
+## 2026-05-01 - RDP resolution, DPI, fullscreen, and lifecycle hardening
 
 Two-phase RDP pass covering DPI correctness, per-server resolution profiles,
 ActiveX lifecycle cleanup, and fullscreen usability.
 
-### Phase 1 — RDP DPI plumbing
+### Phase 1 - RDP DPI plumbing
 
 - Injects `DesktopScaleFactor` and `DeviceScaleFactor` before `Connect()` via
   direct QI on `IMsRdpExtendedSettings` (`ocx as IMsRdpExtendedSettings`) with
@@ -1408,7 +1408,7 @@ ActiveX lifecycle cleanup, and fullscreen usability.
 - Removes the previous global forced `SmartSizing = true`; current default
   behavior is preserved through explicit initialization instead.
 
-### Phase 2 — Resolution profiles, fullscreen UX, lifecycle hardening
+### Phase 2 - Resolution profiles, fullscreen UX, lifecycle hardening
 
 - Adds per-server `RdpResolutionMode` schema (`FitWindow`, `Fixed`,
   `SmartSizing`, `Multimon`) with migration from legacy
@@ -1432,60 +1432,60 @@ ActiveX lifecycle cleanup, and fullscreen usability.
 
 Test baseline after this pass: **5,030 passing + 6 skipped**, zero warnings.
 
-## 2026-04-25 — SSH audit follow-up (Pageant DACL, known_hosts DoS caps, lifecycle)
+## 2026-04-25 - SSH audit follow-up (Pageant DACL, known_hosts DoS caps, lifecycle)
 
 Four-commit hardening pass on the SSH/SFTP/Tunnel surface following a
 multi-pass audit. Previous-pass findings vetted, two false positives dropped,
 one self-introduced regression caught and fixed in the same pass.
 
-- **Pageant IPC** — `PageantClient.SendMessage` now creates the shared file
+- **Pageant IPC** - `PageantClient.SendMessage` now creates the shared file
   mapping with a self-only DACL (`D:P(A;;FA;;;<currentUserSid>)`) and a
   cryptographically random suffix in the mapping name (64 bits of entropy via
   `RandomNumberGenerator.GetHexString(16)`). The new
   `SecurityAttributesScope` allocates `SECURITY_ATTRIBUTES` and the security
   descriptor under a try/catch that releases both pointers on any failure
   between alloc and ownership transfer.
-- **known_hosts parsing** — `KnownHostsParser` enforces a per-line cap of
+- **known_hosts parsing** - `KnownHostsParser` enforces a per-line cap of
   64 KB and exposes a streaming `TextReader` overload; `KnownHostsImporter`
   refuses files larger than 50 MB, streams via `StreamReader`, and degrades
   to an empty report (with `FileLogger.Warn`) on I/O / decoding failures
   instead of bubbling exceptions to the UI.
-- **Constant-time fingerprint compare** — `HostKeyStore.Verify` now uses
+- **Constant-time fingerprint compare** - `HostKeyStore.Verify` now uses
   `CryptographicOperations.FixedTimeEquals` after a length-equality guard
   (safe because OpenSSH host-key fingerprints are fixed-length).
-- **Plink stderr redaction and lifecycle** — `PlinkTunnelRunner.SanitizeForLog`
+- **Plink stderr redaction and lifecycle** - `PlinkTunnelRunner.SanitizeForLog`
   redacts password / passphrase / token / bearer assignments and `-pw` /
   `-pwfile` flags via compiled regexes; `Stop()` cancels and joins the stderr
   drain task (with a 500 ms timeout) before killing the process, so the
   background reader cannot outlive the pipe.
-- **SSH agent and shell** — `SshShellSession` links the read-loop CTS to the
+- **SSH agent and shell** - `SshShellSession` links the read-loop CTS to the
   caller's cancellation token (and now throws ahead of the link if the
   caller-supplied token is already cancelled). `OpenSshPipeAgent.SendRequest`
   is rebuilt on `PipeOptions.Asynchronous` + `ReadExactlyAsync` with a
   linked timeout token, replacing the best-effort `ReadTimeout` that
   `NamedPipeClientStream` silently ignores in some modes.
-- **Tunnel allocation** — `TunnelManager.AllocatePort` distinguishes
+- **Tunnel allocation** - `TunnelManager.AllocatePort` distinguishes
   `AddressAlreadyInUse` from other socket failures and logs the fallback
   to ephemeral.
-- **SFTP** — `SftpBrowser.DeleteDirectoryRecursive` is now an iterative
+- **SFTP** - `SftpBrowser.DeleteDirectoryRecursive` is now an iterative
   post-order traversal capped at 256 levels, eliminating the stack-overflow
   risk on hostile remote filesystems. `RemoteFileEditor.AutoUploadAsync`
   re-throws `HostKeyRejectedException` instead of folding it into a generic
   upload failure, surfacing host-key changes to the UI as a security event.
   `RemoteFileEditor.LaunchEditor` now uses `ProcessStartInfo.ArgumentList`
   for the local path.
-- **ServerHealthMonitor** — Start/Stop/Stop sequencing is serialized via an
+- **ServerHealthMonitor** - Start/Stop/Stop sequencing is serialized via an
   internal `Lock` and the cts/poll-task pair is snapshotted under the lock
   before any blocking await, so an immediately-following `StartAsync` sees a
   clean state.
-- **OpenSshConfigImporter** — `MakeUniqueName` caps its suffix loop at 1000
+- **OpenSshConfigImporter** - `MakeUniqueName` caps its suffix loop at 1000
   and falls back to a guid-tagged name beyond that.
-- **AuthPreflightChecker** — emits an aggregated warning when every
+- **AuthPreflightChecker** - emits an aggregated warning when every
   configured agent failed to enumerate identities, distinguishing
   "no agent has keys" from "every agent crashed".
-- **FtpBrowser** — warns at connect time when TLS is disabled (credentials
+- **FtpBrowser** - warns at connect time when TLS is disabled (credentials
   in clear text) and rejects LIST entries whose filename exceeds 4 KB.
-- **i18n / configuration** — new `PlinkTunnelRunnerOptions` record (timings as
+- **i18n / configuration** - new `PlinkTunnelRunnerOptions` record (timings as
   named values rather than positional ints) and `SshLocalizationKeys` const
   class consumed by `SshHandler` + `TunnelService`, so a typo in an i18n key
   fails to compile rather than silently surfacing the literal key in the UI.
@@ -1499,27 +1499,27 @@ remote temp dir for `RemoteFileEditor` (requires per-host probe cache),
 typed `FailureClassifier` properties (depends on SSH.NET surface),
 `SshHandler.cs` 834-LOC refactor (separate task).
 
-## 2026-04-25 — SSH runtime validation fixes
+## 2026-04-25 - SSH runtime validation fixes
 
 - Hardened embedded SSH terminal shutdown: late disconnect/output callbacks now stop posting to WebView2 once the terminal surface or dispatcher is disposed, preventing `TerminalWebView` object-disposed popups during app exit.
 - App shutdown now closes active sessions through the silent cleanup path instead of invoking the user-facing "close all sessions" confirmation while WPF is already shutting down.
 - Documented the `Heimdall-TestEnv` gateway setup split: imported server profiles reference gateway ids, but gateway definitions must exist in the runtime build's `config\settings.json` (`AppSettings.SshGateways`). Added smoke-test and troubleshooting notes for running `Inject-Gateway.ps1` against the exact Debug/Release build being launched.
 - Baseline after this pass: **4,454 passing + 6 skipped** tests.
 
-## 2026-04-24 — SSH hardening roadmap (lots 1-9)
+## 2026-04-24 - SSH hardening roadmap (lots 1-9)
 
 Full roadmap addressing the SSH review recommendations. Nine lots plus one follow-through patch, each landed as independently-green commits on `master`.
 
-- **Lot 1 — Host-key deadlock removed, trust path fail-closed.** Interactive host-key decisions now happen before the real `Connect()` via a dedicated pre-authentication probe (`SshConnectionFactory.ProbeHostKeyAsync` with `NoneAuthenticationMethod`). Real connections use a strict, synchronous `PinnedFingerprintVerifier` that accepts only the pre-resolved fingerprint. SSH.NET's `HostKeyReceived` callback is guaranteed to be pure-synchronous — no async, no UI dispatch, no sync-over-async from inside it. Production runtime paths no longer fall back to `AutoAcceptHostKeyVerifier.Instance` when `HostKeyStore` is provided without an `IHostKeyVerifier`: they fail closed with a clear exception. `ToolGatewayConnector` refuses to route tool traffic through a gateway that has no pinned fingerprint yet; the user must complete a normal interactive SSH session first.
-- **Lot 2 — Key passphrase separated from login password.** New `SshKeyPassphrase` field on `SshConnectionParams`, persisted encrypted via `SshKeyPassphraseEncrypted` alongside `SshPasswordEncrypted` in `servers.json`. The Server dialog now exposes two distinct `PasswordBox` fields; the passphrase field is visible only when a key path is configured. Password can now serve as a true fallback auth method when a key is also present, not as a silently-repurposed passphrase. Legacy profiles (key path set + password set, no `sshKeyPassphraseEncrypted` field) are kept read-only on disk; legacy mapping is applied at runtime (password tried both as passphrase and as password fallback, strictly more permissive than before), and an info log is emitted. Auto-migration happens only when the user saves from the UI. Plink fallback fails fast with a descriptive error when a passphrase is set, since plink cannot prompt for it.
-- **Lot 3 — Public SSH.NET resize API.** Removed the private-field reflection previously used in `SshShellSession.Resize()` and switched to SSH.NET 2025.1.0's public `ShellStream.ChangeWindowSize(uint columns, uint rows, uint width, uint height)`. A strict signature regression test guards future SSH.NET upgrades.
-- **Lot 4 — Windows OpenSSH Agent support.** New `ISshAgent` / `ISshAgentKey` abstraction with two implementations: `PageantAgent` (existing Pageant IPC refactored behind the interface) and `OpenSshPipeAgent` (new, named pipe `\\.\pipe\openssh-ssh-agent` per draft-ietf-sshm-ssh-agent). `SshAgentRegistry` enumerates agents in a user-configurable priority order via new `AppSettings.SshAgentPreference` (default: Windows OpenSSH first, Pageant second). RSA keys are advertised with their SHA2 variants (`rsa-sha2-256` flag 0x02, `rsa-sha2-512` flag 0x04, plus legacy `ssh-rsa`) so modern servers with `ssh-rsa` disabled still accept cached keys. Agent IPC handles are never kept alive across requests (no handle leaks on Windows).
-- **Lot 5 — `HostKeyTrustService` and known_hosts synchronization.** New centralized orchestration layer above `HostKeyStore`, with enriched `HostKeyEntry` metadata (`FirstSeen`, `LastSeen`, `Algorithm`, `Source`, `PublicKeyBase64`). `LastSeen` is updated on every successful verification, outside the SSH.NET callback. Added explicit import/export against OpenSSH `~/.ssh/known_hosts`, including parse support for hashed entries (HMAC-SHA1 per OpenSSH `HashKnownHosts`). Persistence schema bumped to `trustedHostKeysV2`; legacy `trustedHostKeys` is read without modification or deletion so downgrades remain safe. New `AppSettings.SyncKnownHostsAtStartup` (opt-in, off by default) runs the importer non-blocking at startup. CA-signed host keys (`@cert-authority`) and revoked lines (`@revoked`) are parsed and skipped with diagnostics; full CA support is a future lot.
-- **Lot 5B — UI import metadata propagation.** The pre-existing `ImportKnownHostsDialogViewModel` path now routes through `HostKeyTrustService.Import()` so imported entries carry `Source=ImportedKnownHosts` and a `PublicKeyBase64` blob, enabling round-trip export from the UI.
-- **Lot 6 — ProxyJump import.** `OpenSshConfigParser` now maps OpenSSH `ProxyJump` directives (single-hop and multi-hop chains) to `SshGatewayDto` gateways linked via `ParentGatewayId`, consumable by the existing `GatewayChainResolver` unchanged. `ProxyJump none` is accepted as "no proxy". Unsupported forms are explicitly rejected with localized diagnostics: `ProxyCommand` (any form), mixed `ProxyJump+ProxyCommand`, `%h`/`%p`/`%r` token substitution, quoted/malformed syntax, and cycles. Reuse rules: inside the same import batch `(host, port, user, keyPath)` identity; against existing Heimdall gateways, `(host, port, user)` — in both cases, no mutation of the existing gateway, just reference sharing. Cycle detection rejects the entire chain, never a partial import.
-- **Lot 7 — TunnelManager refactor.** Extracted shared helpers (`ResolvePinnedVerifierAsync`, `ConnectSshClientWithCancellationAsync`, `WireFinalForwardedPorts`, `BuildTunnelInfo`, `RegisterTunnelSession`, `ClassifyAndBuildFailureResult`) into a partial class `TunnelManager.Build.cs` with a `TunnelBuildContext` holder. `OpenTunnelAsync` and `OpenChainedTunnelAsync` became thin orchestrators sharing 100 % of post-connect logic. `TunnelManager.cs` trimmed from ~825 to 462 lines (-44 %). Nine characterization tests added in a dedicated prior commit; the `tests/` diff between the characterization commit and the refactor commit is empty, proving no behavior change.
-- **Lot 8 — Trusted host keys UI.** New sub-panel under `Settings > SSH & SFTP` exposing the `HostKeyTrustService` data. Dense grid with columns Host:Port, Algorithm, Source (localized label — no raw enum leaks to XAML), First seen, Last seen, truncated fingerprint, row actions. Sortable columns, substring filter on Host:Port. Row actions: copy full fingerprint, details modal (full fingerprint and public key base64), remove with a confirmation dialog that discourages habitual removal. Global actions: import from `~/.ssh/known_hosts`, export to it, refresh. Conflict resolution on import goes through a dedicated modal with per-row "Keep existing" default and explicit opt-in "Replace with imported"; the grid itself has no replace action by design, so a host-key mismatch always stays a notable decision.
-- **Lot 9 — Local bind retry.** `ForwardedPortLocal.Start()` and `ForwardedPortDynamic.Start()` calls now retry up to 3 times with 50 ms spacing on `SocketException(AddressAlreadyInUse)` only, closing the TOCTOU window between `AllocatePort` and the actual bind. `RemotePortForward.Start()` is not retried (server-side bind, different race surface). Chained-tunnel intermediate local ports also covered. The retry helper accepts an injectable sleep delegate so unit tests stay deterministic.
+- **Lot 1 - Host-key deadlock removed, trust path fail-closed.** Interactive host-key decisions now happen before the real `Connect()` via a dedicated pre-authentication probe (`SshConnectionFactory.ProbeHostKeyAsync` with `NoneAuthenticationMethod`). Real connections use a strict, synchronous `PinnedFingerprintVerifier` that accepts only the pre-resolved fingerprint. SSH.NET's `HostKeyReceived` callback is guaranteed to be pure-synchronous - no async, no UI dispatch, no sync-over-async from inside it. Production runtime paths no longer fall back to `AutoAcceptHostKeyVerifier.Instance` when `HostKeyStore` is provided without an `IHostKeyVerifier`: they fail closed with a clear exception. `ToolGatewayConnector` refuses to route tool traffic through a gateway that has no pinned fingerprint yet; the user must complete a normal interactive SSH session first.
+- **Lot 2 - Key passphrase separated from login password.** New `SshKeyPassphrase` field on `SshConnectionParams`, persisted encrypted via `SshKeyPassphraseEncrypted` alongside `SshPasswordEncrypted` in `servers.json`. The Server dialog now exposes two distinct `PasswordBox` fields; the passphrase field is visible only when a key path is configured. Password can now serve as a true fallback auth method when a key is also present, not as a silently-repurposed passphrase. Legacy profiles (key path set + password set, no `sshKeyPassphraseEncrypted` field) are kept read-only on disk; legacy mapping is applied at runtime (password tried both as passphrase and as password fallback, strictly more permissive than before), and an info log is emitted. Auto-migration happens only when the user saves from the UI. Plink fallback fails fast with a descriptive error when a passphrase is set, since plink cannot prompt for it.
+- **Lot 3 - Public SSH.NET resize API.** Removed the private-field reflection previously used in `SshShellSession.Resize()` and switched to SSH.NET 2025.1.0's public `ShellStream.ChangeWindowSize(uint columns, uint rows, uint width, uint height)`. A strict signature regression test guards future SSH.NET upgrades.
+- **Lot 4 - Windows OpenSSH Agent support.** New `ISshAgent` / `ISshAgentKey` abstraction with two implementations: `PageantAgent` (existing Pageant IPC refactored behind the interface) and `OpenSshPipeAgent` (new, named pipe `\\.\pipe\openssh-ssh-agent` per draft-ietf-sshm-ssh-agent). `SshAgentRegistry` enumerates agents in a user-configurable priority order via new `AppSettings.SshAgentPreference` (default: Windows OpenSSH first, Pageant second). RSA keys are advertised with their SHA2 variants (`rsa-sha2-256` flag 0x02, `rsa-sha2-512` flag 0x04, plus legacy `ssh-rsa`) so modern servers with `ssh-rsa` disabled still accept cached keys. Agent IPC handles are never kept alive across requests (no handle leaks on Windows).
+- **Lot 5 - `HostKeyTrustService` and known_hosts synchronization.** New centralized orchestration layer above `HostKeyStore`, with enriched `HostKeyEntry` metadata (`FirstSeen`, `LastSeen`, `Algorithm`, `Source`, `PublicKeyBase64`). `LastSeen` is updated on every successful verification, outside the SSH.NET callback. Added explicit import/export against OpenSSH `~/.ssh/known_hosts`, including parse support for hashed entries (HMAC-SHA1 per OpenSSH `HashKnownHosts`). Persistence schema bumped to `trustedHostKeysV2`; legacy `trustedHostKeys` is read without modification or deletion so downgrades remain safe. New `AppSettings.SyncKnownHostsAtStartup` (opt-in, off by default) runs the importer non-blocking at startup. CA-signed host keys (`@cert-authority`) and revoked lines (`@revoked`) are parsed and skipped with diagnostics; full CA support is a future lot.
+- **Lot 5B - UI import metadata propagation.** The pre-existing `ImportKnownHostsDialogViewModel` path now routes through `HostKeyTrustService.Import()` so imported entries carry `Source=ImportedKnownHosts` and a `PublicKeyBase64` blob, enabling round-trip export from the UI.
+- **Lot 6 - ProxyJump import.** `OpenSshConfigParser` now maps OpenSSH `ProxyJump` directives (single-hop and multi-hop chains) to `SshGatewayDto` gateways linked via `ParentGatewayId`, consumable by the existing `GatewayChainResolver` unchanged. `ProxyJump none` is accepted as "no proxy". Unsupported forms are explicitly rejected with localized diagnostics: `ProxyCommand` (any form), mixed `ProxyJump+ProxyCommand`, `%h`/`%p`/`%r` token substitution, quoted/malformed syntax, and cycles. Reuse rules: inside the same import batch `(host, port, user, keyPath)` identity; against existing Heimdall gateways, `(host, port, user)` - in both cases, no mutation of the existing gateway, just reference sharing. Cycle detection rejects the entire chain, never a partial import.
+- **Lot 7 - TunnelManager refactor.** Extracted shared helpers (`ResolvePinnedVerifierAsync`, `ConnectSshClientWithCancellationAsync`, `WireFinalForwardedPorts`, `BuildTunnelInfo`, `RegisterTunnelSession`, `ClassifyAndBuildFailureResult`) into a partial class `TunnelManager.Build.cs` with a `TunnelBuildContext` holder. `OpenTunnelAsync` and `OpenChainedTunnelAsync` became thin orchestrators sharing 100 % of post-connect logic. `TunnelManager.cs` trimmed from ~825 to 462 lines (-44 %). Nine characterization tests added in a dedicated prior commit; the `tests/` diff between the characterization commit and the refactor commit is empty, proving no behavior change.
+- **Lot 8 - Trusted host keys UI.** New sub-panel under `Settings > SSH & SFTP` exposing the `HostKeyTrustService` data. Dense grid with columns Host:Port, Algorithm, Source (localized label - no raw enum leaks to XAML), First seen, Last seen, truncated fingerprint, row actions. Sortable columns, substring filter on Host:Port. Row actions: copy full fingerprint, details modal (full fingerprint and public key base64), remove with a confirmation dialog that discourages habitual removal. Global actions: import from `~/.ssh/known_hosts`, export to it, refresh. Conflict resolution on import goes through a dedicated modal with per-row "Keep existing" default and explicit opt-in "Replace with imported"; the grid itself has no replace action by design, so a host-key mismatch always stays a notable decision.
+- **Lot 9 - Local bind retry.** `ForwardedPortLocal.Start()` and `ForwardedPortDynamic.Start()` calls now retry up to 3 times with 50 ms spacing on `SocketException(AddressAlreadyInUse)` only, closing the TOCTOU window between `AllocatePort` and the actual bind. `RemotePortForward.Start()` is not retried (server-side bind, different race surface). Chained-tunnel intermediate local ports also covered. The retry helper accepts an injectable sleep delegate so unit tests stay deterministic.
 
 Invariants preserved across all nine lots and verified at every merge:
 
@@ -1530,7 +1530,7 @@ Invariants preserved across all nine lots and verified at every merge:
 
 Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), **59 built-in tools**, **5,185 locale keys** per locale (EN and FR at strict parity enforced by CI). Zero build warnings, zero skipped changes in the 6-skip count across all 10 commits.
 
-## 2026-04-24 — SSH/RDP security audit remediation
+## 2026-04-24 - SSH/RDP security audit remediation
 - Hardened SSH host-key trust across SSH.NET and Plink: Plink now consumes pinned fingerprints from `HostKeyStore`, first-use and mismatch decisions route through `IHostKeyVerifier`, and the themed `HostKeyPromptDialog` handles deliberate acceptance or rejection.
 - Added explicit host-key mismatch diagnostics, localized user messages, and persistence semantics where `HostKeyEvent` fires only from `Trust()`.
 - Refactored `TunnelManager` cleanup through single cleanup helpers for partial simple and chained tunnel setup failures.
@@ -1539,7 +1539,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - Added root `SECURITY.md` with the current threat model, known limitations, and security test entry points.
 - Current baseline after this audit line: **4,318 passing + 6 skipped** (`4,324` discovered), **59 built-in tools**, and **~5,118 locale keys** per locale.
 
-## 2026-04-23 — release 2026.042302 — audit remediation patch release
+## 2026-04-23 - release 2026.042302 - audit remediation patch release
 - Version bump from `2026.042301` to `2026.042302` (`InformationalVersion`).
 - Packages the full 2026-04-22 audit-remediation line already merged on `master`: session/WebView handler leak cleanup, File Share bearer-token hardening with TFTP opt-in, startup async de-blocking, terminal asset caching, subprocess argument hardening, MVVM cleanup, UI polish, accessibility fixes, and repository housekeeping.
 - Follow-up release patch after the first publish:
@@ -1547,14 +1547,14 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
   - relaxes one `TcpPingViewModelTests` timeout under code coverage so GitHub Actions stays stable without changing runtime behavior
 - Current baseline for this release line: **4,233 passing + 6 skipped** in CI, **59 built-in tools**, and **5,105 locale keys** per locale.
 
-## 2026-04-22 — sessions diagnostics, NotesTool cleanup, and docs sync
+## 2026-04-22 - sessions diagnostics, NotesTool cleanup, and docs sync
 - Introduced a shared `SessionDiagnostic` / `SessionFailureStage` contract and surfaced pane-scoped SSH failure diagnostics end-to-end, including a `Details` disclosure in `SessionPaneControl`.
 - Wired RDP diagnostics on both pre-tab failure branches (`RdpHandler`) and mid-session host events (`RdpActiveXHost.Disconnected` / `FatalError`) while retiring the legacy local detail text block in `EmbeddedRdpView`.
 - Kept failed-session panes interactive by suppressing the tab-loading overlay when diagnostics already exist, and compacted the failure-overlay Reconnect / Close buttons for narrow panes.
 - Modernized `NotesTool` with `{loc:Translate}` migration, ViewModel-owned Confluence/HTML export payload generation, declarative tag-chip binding via `ItemsControl`, and a denser Obsidian-like explorer presentation.
 - Refreshed README / architecture / smoke documentation to match the current gate (**4195 passing + 6 skipped**, `4201` discovered) and locale catalog size (**5,102 keys per locale**).
 
-## 2026-04-21 — release 2026.042102 — ARP Monitor refactor + locale/parser fixes
+## 2026-04-21 - release 2026.042102 - ARP Monitor refactor + locale/parser fixes
 - Version bump from 2026.042101 to 2026.042102 (`InformationalVersion`).
 - Fixes the JWT Parser locale-switch crash by marshaling `OnLocaleChanged` back to the WPF dispatcher when locale changes originate from a non-UI thread.
 - Aligns the UI test harness locale-switch path with the production `LocalizationSource` bridge, restoring clone-clean UI smoke stability (`93/93` on repeated runs).
@@ -1566,7 +1566,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - Closes the `#52` audit follow-up by centralizing the duplicated `IsCollapsed(AutomationElement?)` helper into `UiTestBase`.
 - Housekeeping: tests now stand at **4156 passing + 6 skipped** (`4162` discovered), with clean local build/test gates before release.
 
-## 2026-04-21 — release 2026.042101 — Remote access audit package
+## 2026-04-21 - release 2026.042101 - Remote access audit package
 - Version bump from 2026.042003 to 2026.042101 (`InformationalVersion`).
 - Consolidates batches 55.1, 58, and 59 (see entries below dated 2026-04-19).
 - Adds the remote-access audit package:
@@ -1576,7 +1576,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
   - `archive/2026/audits/audit-roadmap-remote-access-2026-04-19.md`
 - No new runtime feature in this release.
 
-## 2026-04-19 — batch 55.1 — Remove legacy workspace path
+## 2026-04-19 - batch 55.1 - Remove legacy workspace path
 
 - Deleted `WorkspaceService` + `WorkspaceDto`/`WorkspaceSessionDto`.
 - Deleted the orphan `SessionCoordinator.RestoreWorkspaceAsync` method.
@@ -1588,7 +1588,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - Removed the legacy `EnableSessionPersistence = $false` line from the
   sidebar-favorites smoke script.
 
-## 2026-04-19 — batch 58 — Post-connect Command Library linkage
+## 2026-04-19 - batch 58 - Post-connect Command Library linkage
 
 - Extended `PostConnectStep` with optional `CommandLibraryId` and
   `CommandLibraryParams` so SSH embedded sessions can resolve Command Library
@@ -1601,7 +1601,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - Kept the scope SSH-embedded only; Plink, Telnet, and Local Shell post-connect
   flows remain unchanged in this batch.
 
-## 2026-04-19 — batch 59 — Post-connect parameter auto-prefill
+## 2026-04-19 - batch 59 - Post-connect parameter auto-prefill
 
 - Added one-shot auto-prefill for linked Command Library parameters in the
   picker, using server-profile host/port/user aliases captured at open time.
@@ -1613,7 +1613,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [Unreleased] - 2026-04-14
 
-### UX — session-tree move-to-group parity + sidebar favorites
+### UX - session-tree move-to-group parity + sidebar favorites
 
 - **Session tree move-to-group unified**: context-menu and drag-drop now converge on a single `ServerListViewModel` core move path, preserving in-memory expansion state by avoiding the previous `LoadServers` rebuild after drag-drop
 - **Drag/drop destination policy aligned**: drag-over and drop validate against the same project-scoped target set as the context menu, and the session tree now exposes an explicit no-group drop zone for drag-to-root parity
@@ -1622,22 +1622,22 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - **Right-click no longer launches sidebar tools**: a `_suppressSidebarLaunch` guard blocks the `SelectedItemChanged` launch path during right-click targeting, and the redundant sidebar double-click launcher was removed to avoid duplicate tabs on context/network tools
 - **Durable UIA smoke added**: `scripts/smoke/move-to-group-smoke.ps1` and `scripts/smoke/sidebar-favorites-smoke.ps1` were added to the repo harness, with WPF ContextMenu-specific gaps explicitly marked as skipped and delegated to human smoke
 
-### Refactor — MainWindow + MainViewModel decomposition (Phases 1–4)
+### Refactor - MainWindow + MainViewModel decomposition (Phases 1–4)
 
 **`MainWindow.xaml.cs`: 3,490 → 2,123 LOC (−39%)**
 
-- **Phase 1** — Extract 3 isolated low-risk domains:
+- **Phase 1** - Extract 3 isolated low-risk domains:
   - `OnboardingFlowViewModel` (first-launch 3-step overlay, resolved by `MainWindow` via DI)
   - `FileShareService` (ephemeral HTTP/TFTP folder sharing, event-based API, `IAsyncDisposable`)
   - `WindowUIState` POCO + `MainWindow.WindowUI.cs` partial (fullscreen, sidebar toggle, tree scroll persistence, folder expand/collapse memory, window-bounds save/restore)
 
-- **Phase 2** — Extract keyboard + sidebar + tools tab:
+- **Phase 2** - Extract keyboard + sidebar + tools tab:
   - `KeyboardShortcutService` (18 shortcuts, fluent registration, `canExecute` gating) replaces the monolithic `OnPreviewKeyDown` switch
   - `SidebarViewModel` with XAML bindings (Sessions/Tools toggle, tool filter, lazy population, Ctrl+Shift+T toggle)
-  - `ToolsTabViewModel` (full-page Tools browser VM state — favorites, recents, filter; section rendering still in `ToolsTabPopulationService` via Panel injection)
+  - `ToolsTabViewModel` (full-page Tools browser VM state - favorites, recents, filter; section rendering still in `ToolsTabPopulationService` via Panel injection)
   - **Fix**: remove dead `OnWindowDeactivated` Command Palette auto-close handler that had been closing the palette on every open (pre-existing bug)
 
-- **Phase 3** — Extract session/tree/tab interactions:
+- **Phase 3** - Extract session/tree/tab interactions:
   - `TreeInteractionState` POCO + `MainWindow.TreeInteractions.cs` partial (session TreeView drag-drop, filter box, inline rename)
   - `TabInteractionState` POCO + `MainWindow.TabInteractions.cs` partial (tab drag-to-reorder, drag-to-detach, drop target resolution, hover tracking)
   - `SessionTabContextMenuFactory` + `ISessionTabContextCallbacks` (335-LOC menu builder, 19 conditional items)
@@ -1646,19 +1646,19 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 **`MainViewModel.cs`: 1,917 → 628 LOC (−67%)**
 
-- **Phase 4** — `MainViewModel` decomposition into 4 sub-VMs (constructor-composed, not DI-registered; `IDisposable` for event-subscription cleanup):
+- **Phase 4** - `MainViewModel` decomposition into 4 sub-VMs (constructor-composed, not DI-registered; `IDisposable` for event-subscription cleanup):
   - `CommandPaletteViewModel` (14 methods: fuzzy search ranking, tool-command parsing, ad-hoc `user@host:port` parsing with protocol inference, connect/split flows, `SplitLayoutMemory` pairing)
   - `TunnelsViewModel` (tunnel panel + tab, `ResolveRoute(sessionId)` for session header display)
   - `ScheduledTasksViewModel` (`TaskSchedulerService` ownership, idempotent `_started` flag)
-  - `SessionCoordinator` (8 external wire-ups — 5 `Split.*` providers/setters + 3 `EmbeddedSessionManager` callbacks; broadcast cluster; `OnSessionReady` / `OnReconnectRequestedAsync` / `AutoOpenSftpAsync`)
+  - `SessionCoordinator` (8 external wire-ups - 5 `Split.*` providers/setters + 3 `EmbeddedSessionManager` callbacks; broadcast cluster; `OnSessionReady` / `OnReconnectRequestedAsync` / `AutoOpenSftpAsync`)
 
-### Refactor — Declarative i18n migration (Phase 5, in progress)
+### Refactor - Declarative i18n migration (Phase 5, in progress)
 
-- **Phase 5A** — Navigation + toolbar imperative labels → `{loc:Translate}` (58 sites). `ApplyNavigationLocalization` / `ApplyToolbarLocalization` now empty stubs pending Phase 5D cleanup
-- **Phase 5B** — Accessibility pass → `AutomationProperties.Name="{loc:Translate}"` (39 sites). `ApplyAccessibilityLocalization` deleted entirely
+- **Phase 5A** - Navigation + toolbar imperative labels → `{loc:Translate}` (58 sites). `ApplyNavigationLocalization` / `ApplyToolbarLocalization` now empty stubs pending Phase 5D cleanup
+- **Phase 5B** - Accessibility pass → `AutomationProperties.Name="{loc:Translate}"` (39 sites). `ApplyAccessibilityLocalization` deleted entirely
 - Phase 5C (Tunnel/Scheduled/Settings/About apply helpers) and Phase 5D (format-args + computed properties + composite strings) pending
 
-### Refactor — Command Library ViewModel extraction
+### Refactor - Command Library ViewModel extraction
 
 - `CommandLibraryViewModel` extracted from `CommandLibraryView` code-behind with XAML bindings migration (fuzzy filter, platform/category/risk filters, parameter editor, favorites, history, Git Sync). View code-behind now limited to WebView2 and dispatcher-bound glue
 
@@ -1677,41 +1677,41 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ---
 
-### Post-v2026.041301 audit follow-up (2026-04-13) — code-behind split, observability, assets diet
+### Post-v2026.041301 audit follow-up (2026-04-13) - code-behind split, observability, assets diet
 
-#### Code organization — MainWindow code-behind split (Chantier 1)
-- **`MainWindow.xaml.cs` shrunk from 4,895 → 3,490 lines** (−1,405 lines, −29%) via three structural extractions. Zero behavior change — pure file splits verified by build + full test suite
-- **`Services/ContextMenuFactory.cs`** (647 lines, new) — builds the four session `TreeView` context menus (server, folder, tool, empty area) and the "Detected Tools" submenu from `ExternalToolProviderService`. Constructor-injected via DI; reached from MainWindow through a small `IContextMenuCallbacks` interface so the menu builder never touches window-scoped state directly
-- **`Services/ToolsTabPopulationService.cs`** (605 lines, new) — owns the full-page Tools tab rebuild (Favorites / Recents / categories / 280px cards with search filter), the sidebar Tools `TreeView` data + filter logic, and the pure helpers `GetCategoryBrushKey` / `GetInheritedToolTargetHost` / `CreateInheritedToolContext` / `ResolveToolTabTitle`. Tool card click/pin callbacks are plain `Action<T>` delegates (no interface ceremony for two callbacks). Uses `Application.Current.FindResource` for theme tokens so the service stays decoupled from any specific `FrameworkElement`. `PopulateToolsTab` itself stayed in `MainWindow.xaml.cs` as a thin wrapper because it writes to named header elements (`Mw_ToolsTabTitle`, `Mw_ToolsTabCount`) that are tightly coupled to the XAML tree
-- **`MainWindow.Localization.cs`** (519 lines, new partial class) — holds the 8 `Apply*Localization` methods (`ApplyLocalization` orchestrator + Navigation / Toolbar / Tunnel / Scheduled / Settings / About / Accessibility) and the three helpers that are only ever called from `ApplySettingsLocalization` (`PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`). `UpdateExternalToolProviderStatus` and `UpdateTokenStatus` stayed in the main code-behind because they have additional callers (external-tool rescan, Git sync token save/clear handlers)
+#### Code organization - MainWindow code-behind split (Chantier 1)
+- **`MainWindow.xaml.cs` shrunk from 4,895 → 3,490 lines** (−1,405 lines, −29%) via three structural extractions. Zero behavior change - pure file splits verified by build + full test suite
+- **`Services/ContextMenuFactory.cs`** (647 lines, new) - builds the four session `TreeView` context menus (server, folder, tool, empty area) and the "Detected Tools" submenu from `ExternalToolProviderService`. Constructor-injected via DI; reached from MainWindow through a small `IContextMenuCallbacks` interface so the menu builder never touches window-scoped state directly
+- **`Services/ToolsTabPopulationService.cs`** (605 lines, new) - owns the full-page Tools tab rebuild (Favorites / Recents / categories / 280px cards with search filter), the sidebar Tools `TreeView` data + filter logic, and the pure helpers `GetCategoryBrushKey` / `GetInheritedToolTargetHost` / `CreateInheritedToolContext` / `ResolveToolTabTitle`. Tool card click/pin callbacks are plain `Action<T>` delegates (no interface ceremony for two callbacks). Uses `Application.Current.FindResource` for theme tokens so the service stays decoupled from any specific `FrameworkElement`. `PopulateToolsTab` itself stayed in `MainWindow.xaml.cs` as a thin wrapper because it writes to named header elements (`Mw_ToolsTabTitle`, `Mw_ToolsTabCount`) that are tightly coupled to the XAML tree
+- **`MainWindow.Localization.cs`** (519 lines, new partial class) - holds the 8 `Apply*Localization` methods (`ApplyLocalization` orchestrator + Navigation / Toolbar / Tunnel / Scheduled / Settings / About / Accessibility) and the three helpers that are only ever called from `ApplySettingsLocalization` (`PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`). `UpdateExternalToolProviderStatus` and `UpdateTokenStatus` stayed in the main code-behind because they have additional callers (external-tool rescan, Git sync token save/clear handlers)
 - All three extractions were carried out as pure structural moves with no logic change, no rename, and no signature change. `ContextMenuFactory` and `ToolsTabPopulationService` are registered as singletons in `App.xaml.cs` DI
 
-#### Observability — empty catch blocks (CQ-01)
-- **`FileLogger.Debug(string)` + `FileLogger.Debug(string, Exception)`** added to `Heimdall.Core.Logging.FileLogger` — mirrors the existing `Error` overloads, emits at level `DEBUG` through the same queue-and-flush pipeline
-- **`TunnelManager.cs`** — 21 empty `catch {}` blocks now log at Debug level: 18 `dispose?.Dispose()` pairs in the tunnel-establishment error handlers (`Dynamic port dispose suppressed` / `Remote port forward dispose suppressed`), plus 3 lambda `Disconnect()` calls wired to `CancellationToken.Register` (`Client disconnect on cancel suppressed` / `Root client` / `Hop client`). Inner catches use a local `cleanupEx` variable to avoid shadowing the outer exception dispatch
-- **`SshShellSession.cs`** — single `_client.Disconnect()` cancellation lambda now logs `SSH disconnect cleanup suppressed` at Debug level
+#### Observability - empty catch blocks (CQ-01)
+- **`FileLogger.Debug(string)` + `FileLogger.Debug(string, Exception)`** added to `Heimdall.Core.Logging.FileLogger` - mirrors the existing `Error` overloads, emits at level `DEBUG` through the same queue-and-flush pipeline
+- **`TunnelManager.cs`** - 21 empty `catch {}` blocks now log at Debug level: 18 `dispose?.Dispose()` pairs in the tunnel-establishment error handlers (`Dynamic port dispose suppressed` / `Remote port forward dispose suppressed`), plus 3 lambda `Disconnect()` calls wired to `CancellationToken.Register` (`Client disconnect on cancel suppressed` / `Root client` / `Hop client`). Inner catches use a local `cleanupEx` variable to avoid shadowing the outer exception dispatch
+- **`SshShellSession.cs`** - single `_client.Disconnect()` cancellation lambda now logs `SSH disconnect cleanup suppressed` at Debug level
 - Rationale: these sites are defensible (cleanup paths shouldn't throw) but silent failures hid any surprising exception at runtime. Logging at Debug is cheap, observable through the dev-console trace, and doesn't change behaviour
 
-#### Performance — NotesStorageService dispatcher starvation (PERF-03)
-- **`NotesStorageService.SaveNote()`** — the synchronous save path called from `IToolView.CanClose()` / `IDisposable.Dispose()` now waits on its `SemaphoreSlim` with a 2-second timeout instead of blocking indefinitely. On timeout it logs `SaveNote timed out waiting for write lock` via `FileLogger.Warn` and returns without writing — far better than stalling the WPF dispatcher if an async `SaveNoteAsync` is in flight
+#### Performance - NotesStorageService dispatcher starvation (PERF-03)
+- **`NotesStorageService.SaveNote()`** - the synchronous save path called from `IToolView.CanClose()` / `IDisposable.Dispose()` now waits on its `SemaphoreSlim` with a 2-second timeout instead of blocking indefinitely. On timeout it logs `SaveNote timed out waiting for write lock` via `FileLogger.Warn` and returns without writing - far better than stalling the WPF dispatcher if an async `SaveNoteAsync` is in flight
 
-#### Testing — SplitService unit tests (TEST-01)
-- **`tests/Heimdall.App.Tests/SplitServiceTests.cs`** (+14 tests) covering `SplitService`'s synchronous, self-contained methods — the service had zero direct coverage despite being the central owner of pane lifecycle
-- **Category A — CancellationTokenSource lifecycle (5 tests)**: `RegisterSession` token creation, `CancelSession` cancels a previously captured token, unknown-session `GetSessionToken` returns `CancellationToken.None`, unknown-session `CancelSession` no-op safety, idempotent re-register (second `TryAdd` keeps original)
-- **Category B — `CloseAllPanes` tool-pane blocking (4 tests)**: empty tree, single closable tool pane (disposed + host control cleared), single blocking tool pane (host control preserved, no dispose), mixed tree with one blocker (pre-check means neither pane is disposed)
-- **Category D — `ToggleSplitOrientation` (3 tests)**: Horizontal↔Vertical both directions plus unsplit no-op
-- **Category E — `SplitSessionWithTool` guards (2 tests)**: unknown tool id short-circuit + max-panes (8) cap with `SetStatusText` callback capture
-- **All 7 `SplitService` dependencies are `sealed`** — Moq cannot mock them. The fixture uses real instances for `ConfigManager` (temp dir), `LocalizationManager` (unlocalized, keys return verbatim), and `ToolRegistry` (built-in registry), and passes `null!` for `ConnectionStateMachine` / `TunnelManager` / `EmbeddedSessionManager` / `ConnectionService` because every tested code path was verified to never dereference them. A code comment in the fixture documents this rationale. **Moq was NOT added to the project** despite the initial plan suggesting it
-- **`SwapSplitPanesAsync` intentionally untested** — it early-returns when `System.Windows.Application.Current?.Dispatcher` is null, which is always the case in xUnit. Standing up a WPF `Application` + STA dispatcher pump is the same blocker that keeps `ThemeServiceTests` at `[Skip]` and is out of scope here
+#### Testing - SplitService unit tests (TEST-01)
+- **`tests/Heimdall.App.Tests/SplitServiceTests.cs`** (+14 tests) covering `SplitService`'s synchronous, self-contained methods - the service had zero direct coverage despite being the central owner of pane lifecycle
+- **Category A - CancellationTokenSource lifecycle (5 tests)**: `RegisterSession` token creation, `CancelSession` cancels a previously captured token, unknown-session `GetSessionToken` returns `CancellationToken.None`, unknown-session `CancelSession` no-op safety, idempotent re-register (second `TryAdd` keeps original)
+- **Category B - `CloseAllPanes` tool-pane blocking (4 tests)**: empty tree, single closable tool pane (disposed + host control cleared), single blocking tool pane (host control preserved, no dispose), mixed tree with one blocker (pre-check means neither pane is disposed)
+- **Category D - `ToggleSplitOrientation` (3 tests)**: Horizontal↔Vertical both directions plus unsplit no-op
+- **Category E - `SplitSessionWithTool` guards (2 tests)**: unknown tool id short-circuit + max-panes (8) cap with `SetStatusText` callback capture
+- **All 7 `SplitService` dependencies are `sealed`** - Moq cannot mock them. The fixture uses real instances for `ConfigManager` (temp dir), `LocalizationManager` (unlocalized, keys return verbatim), and `ToolRegistry` (built-in registry), and passes `null!` for `ConnectionStateMachine` / `TunnelManager` / `EmbeddedSessionManager` / `ConnectionService` because every tested code path was verified to never dereference them. A code comment in the fixture documents this rationale. **Moq was NOT added to the project** despite the initial plan suggesting it
+- **`SwapSplitPanesAsync` intentionally untested** - it early-returns when `System.Windows.Application.Current?.Dispatcher` is null, which is always the case in xUnit. Standing up a WPF `Application` + STA dispatcher pump is the same blocker that keeps `ThemeServiceTests` at `[Skip]` and is out of scope here
 
-#### Assets diet (Chantier 3 — PERF-04 + PERF-05)
+#### Assets diet (Chantier 3 - PERF-04 + PERF-05)
 - **Orphaned PNGs removed (−9.6 MB)**: `Assets/Icons/app/icon-flat.png` (4.19 MB), `icon-rays.png` (3.18 MB), `logo.png` (1.85 MB). Reference audit (`git grep` across source + XAML + csproj + installer scripts) turned up only historical `docs/CHANGELOG.md` mentions and unrelated `/logo.png` references inside `drawio/js/*.min.js` (which point at `Assets/drawio/images/logo.png`, a different file). The real app icon `src/Heimdall.App/app.ico`, wired via `<ApplicationIcon>` in the csproj, is untouched
-- **Draw.io locales pruned (−2.95 MB)**: `Assets/drawio/resources/` went from 59 files / 3.1 MB down to 4 files / 149 KB. Kept `dia.txt` (base / English fallback — draw.io's loader uses this name for English), `dia_fr.txt`, `dia_i18n.txt` (auto-generated key manifest), and `README.md`. Removed 55 other `dia_*.txt` locale files — Heimdall is English/French only and draw.io falls back to `dia.txt` for any missing locale
+- **Draw.io locales pruned (−2.95 MB)**: `Assets/drawio/resources/` went from 59 files / 3.1 MB down to 4 files / 149 KB. Kept `dia.txt` (base / English fallback - draw.io's loader uses this name for English), `dia_fr.txt`, `dia_i18n.txt` (auto-generated key manifest), and `README.md`. Removed 55 other `dia_*.txt` locale files - Heimdall is English/French only and draw.io falls back to `dia.txt` for any missing locale
 - **`Assets/drawio/VENDORED.md`** updated with three new sections documenting what was pruned, what is a candidate for further pruning *with a runtime test plan* (viewer bundles ~5.6 MB, `shapes-14-6-5.min.js` vs `shapes.min.js` duplication ~1.4 MB, clipart `img/` categories up to ~8 MB), and what is intentionally kept
-- **Total on-disk savings: ~12.55 MB** from source control. The `Assets\**\*` glob in `Heimdall.App.csproj` means removed files simply drop out of the deploy — no csproj edit required
+- **Total on-disk savings: ~12.55 MB** from source control. The `Assets\**\*` glob in `Heimdall.App.csproj` means removed files simply drop out of the deploy - no csproj edit required
 
 #### Housekeeping
-- Tests: **1,775 passing** (was 1,761) + 6 skipped (WPF Application context gating — intentional)
+- Tests: **1,775 passing** (was 1,761) + 6 skipped (WPF Application context gating - intentional)
 - Build: clean, 0 warnings, 0 errors
 - i18n: 4,855 keys (EN/FR parity maintained, no changes this round)
 - `MainWindow.xaml.cs`: 4,895 → 3,490 lines across Chantier 1 (Step 1 extracted `ContextMenuFactory`, Step 2 extracted `ToolsTabPopulationService`, Step 3 extracted `MainWindow.Localization.cs`)
@@ -1722,52 +1722,52 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ### Sessions rename + full project audit pass
 
-#### UX — Servers → Sessions rename
-- **Wholesale rename** of all user-facing "Servers" labels to "Sessions" across navigation tabs, sidebar tabs, dialog titles, status bar, tooltips, error messages, accessibility names, onboarding steps, and tree/empty-state hints — better reflects that Heimdall manages local shells (PowerShell, CMD, WSL) alongside remote SSH/RDP/VNC/SFTP/FTP/Citrix sessions
+#### UX - Servers → Sessions rename
+- **Wholesale rename** of all user-facing "Servers" labels to "Sessions" across navigation tabs, sidebar tabs, dialog titles, status bar, tooltips, error messages, accessibility names, onboarding steps, and tree/empty-state hints - better reflects that Heimdall manages local shells (PowerShell, CMD, WSL) alongside remote SSH/RDP/VNC/SFTP/FTP/Citrix sessions
 - **XAML element renames**: `TabServers → TabSessions`, `SidebarTabServers → SidebarTabSessions`, `SidebarServersContent → SidebarSessionsContent`, `ServerTreeView → SessionTreeView`, `ServerTreeColumn → SessionTreeColumn`, `ServerDetailPanel → SessionDetailPanel`, `Mw_AddMenuServer → Mw_AddMenuSession`, `Mw_EmptyBtnAddServer → Mw_EmptyBtnAddSession`, `Mw_EmptySelectServer → Mw_EmptySelectSession`
 - **MainViewModel**: `IsServersTabSelected → IsSessionsTabSelected`, `_selectedTab` / `_previousTab` defaults `"Servers" → "Sessions"`, all tab-routing string literals updated
 - **Event handlers**: `OnServersTabChecked → OnSessionsTabChecked`, `OnSidebarTabServersChecked → OnSidebarTabSessionsChecked`
 - **Preserved as-is** (intentional): `ServerListViewModel`, `ServerItemViewModel`, `ServerDialog`, `ServerProfileDto`, `ServerId` / `OriginalServerId` model properties, `EphemeralFileServer`, `X11ServerManager`, `servers.default.json` filename, and every `server` reference in tool help text that means an actual remote machine (HTTP / DNS / SMB / FTP / VNC / TLS / SSH server, host key verification, etc.)
 
-#### UX — Sidebar tab persistence (PERF-99 / DOC-03)
+#### UX - Sidebar tab persistence (PERF-99 / DOC-03)
 - **Bidirectional persistence**: new `PersistSidebarTabChoice(bool isTools)` writes the choice via `ConfigManager.MergeSettingAsync(s => s.ShowToolsPanel = isTools)` whenever either RadioButton is checked. Previously only the onboarding flow set `ShowToolsPanel = true`; manually switching back to Sessions never wrote `false`, so every subsequent launch defaulted to Tools
 - **`_sidebarTabRestored` startup guard**: prevents `InitializeComponent()`'s default `IsChecked="True"` from clobbering the persisted preference before the `Loaded` handler can restore it. The `OnSidebarTabSessionsChecked` / `OnSidebarTabToolsChecked` handlers no-op until the flag is set in the Loaded handler, immediately after the restore block
 - **Onboarding cleanup**: removed the dead in-memory `vm.CurrentSettings.ShowToolsPanel = true` assignment that never actually persisted (the subsequent `MergeSettingAsync(s => s.OnboardingCompleted = true)` reloads from disk and only mutates that one field). Now the RadioButton check naturally routes through the new persist helper
 
 #### Performance
-- **PERF-05 (critical) — Async/await replaces blocking `.GetAwaiter().GetResult()`** in 4 sites:
+- **PERF-05 (critical) - Async/await replaces blocking `.GetAwaiter().GetResult()`** in 4 sites:
   - `RestoreWindowBounds`: signature changed to `(AppSettings settings)`, settings now passed from the Loaded handler (already loaded by `LoadCommand.ExecuteAsync`)
-  - `OnClosing`: converted to `protected override async void` with a deferred-close pattern (`_closeConfirmed` guard). Cancels the close, awaits `ShowSaveDiscardCancelAsync`, then re-invokes `Close()` — previously deadlocked on the dispatcher when the dialog tried to post back
+  - `OnClosing`: converted to `protected override async void` with a deferred-close pattern (`_closeConfirmed` guard). Cancels the close, awaits `ShowSaveDiscardCancelAsync`, then re-invokes `Close()` - previously deadlocked on the dispatcher when the dialog tried to post back
   - `EphemeralFileServer.StartHttpServer` / `StartTftpServer` → renamed to `StartHttpServerAsync` / `StartTftpServerAsync` with `await StopHttpServerAsync()` / `await StopTftpServerAsync()` for the double-start path. Caller (`OnShareFolderClick`) converted to `async void`
-- **PERF-01 — Event cleanup in `MainWindow.OnClosed`**: stored 4 long-lived event handler delegates in fields (`_connectionPropertyChangedHandler`, `_serverListPropertyChangedHandler`, `_externalToolsChangedHandler`, `_localeChangedHandler`) so they can be unsubscribed via `-=` on close. Without this, the captured-`this` lambdas kept the window rooted past `Close()`
-- **PERF-07 — Draw.io excluded from Debug builds**: `Heimdall.App.csproj` `<Content Include="Assets\drawio\**">` now wrapped in `Condition="'$(Configuration)' != 'Debug'"`. Saves ~48 MB / 2258 files copied to `bin/Debug/` on every iterative dev build. `DiagramEditorView.InitializeWebViewAsync` shows a localized "Release-only" fallback panel (new key `DiagramEditorDebugOnly`) when the directory is missing instead of crashing
-- **PERF-09 — Lossless PNG re-compression**: `icon-flat.png` 4.41 → 4.19 MB (-224 KB), `icon-rays.png` 4.55 → 3.18 MB (-1.37 MB) via Pillow `optimize=True compress_level=9` with byte-perfect pixel verification. `logo.png` and `splash-screen.png` left untouched (already encoded by a stronger optimizer; Pillow output was *larger*). ~1.6 MB saved on disk
+- **PERF-01 - Event cleanup in `MainWindow.OnClosed`**: stored 4 long-lived event handler delegates in fields (`_connectionPropertyChangedHandler`, `_serverListPropertyChangedHandler`, `_externalToolsChangedHandler`, `_localeChangedHandler`) so they can be unsubscribed via `-=` on close. Without this, the captured-`this` lambdas kept the window rooted past `Close()`
+- **PERF-07 - Draw.io excluded from Debug builds**: `Heimdall.App.csproj` `<Content Include="Assets\drawio\**">` now wrapped in `Condition="'$(Configuration)' != 'Debug'"`. Saves ~48 MB / 2258 files copied to `bin/Debug/` on every iterative dev build. `DiagramEditorView.InitializeWebViewAsync` shows a localized "Release-only" fallback panel (new key `DiagramEditorDebugOnly`) when the directory is missing instead of crashing
+- **PERF-09 - Lossless PNG re-compression**: `icon-flat.png` 4.41 → 4.19 MB (-224 KB), `icon-rays.png` 4.55 → 3.18 MB (-1.37 MB) via Pillow `optimize=True compress_level=9` with byte-perfect pixel verification. `logo.png` and `splash-screen.png` left untouched (already encoded by a stronger optimizer; Pillow output was *larger*). ~1.6 MB saved on disk
 
 #### Code Quality
-- **CQ-08 — `sealed` modifier** added to **225 non-inherited declarations** (170 classes + 55 records) across 9 projects: TwinShell.Core (60), TwinShell.Infrastructure (48), Heimdall.Core (45), TwinShell.Persistence (33), Heimdall.App (20), Heimdall.Ssh (9), Heimdall.Sftp (5), Heimdall.Rdp (3), Heimdall.Terminal (2). Audit script applied skip rules for inherited types (built a cross-codebase derived-name index), WPF view bases (`Window`/`UserControl`/`Page`/`Control`/`MarkupExtension`), classes containing the `virtual` keyword in their body, and an explicit blocklist for COM event sinks (`MsTscAxEventSink`). Zero build errors, zero rollbacks
-- **CQ-06 — Empty `catch {}` blocks fixed in `BackupService.cs`** (3 sites): temp directory cleanup, backup metadata read, backup metadata write — all replaced with `catch (Exception ex) { _logger.LogWarning(ex, ...) }` using the existing injected `ILogger<BackupService>`. Other bare catches across the codebase already had inline rationale comments (`/* best effort */`, `/* already exited */`, etc.) and were left untouched
+- **CQ-08 - `sealed` modifier** added to **225 non-inherited declarations** (170 classes + 55 records) across 9 projects: TwinShell.Core (60), TwinShell.Infrastructure (48), Heimdall.Core (45), TwinShell.Persistence (33), Heimdall.App (20), Heimdall.Ssh (9), Heimdall.Sftp (5), Heimdall.Rdp (3), Heimdall.Terminal (2). Audit script applied skip rules for inherited types (built a cross-codebase derived-name index), WPF view bases (`Window`/`UserControl`/`Page`/`Control`/`MarkupExtension`), classes containing the `virtual` keyword in their body, and an explicit blocklist for COM event sinks (`MsTscAxEventSink`). Zero build errors, zero rollbacks
+- **CQ-06 - Empty `catch {}` blocks fixed in `BackupService.cs`** (3 sites): temp directory cleanup, backup metadata read, backup metadata write - all replaced with `catch (Exception ex) { _logger.LogWarning(ex, ...) }` using the existing injected `ILogger<BackupService>`. Other bare catches across the codebase already had inline rationale comments (`/* best effort */`, `/* already exited */`, etc.) and were left untouched
 
 #### Accessibility
-- **A11Y-04** — `LogViewerView` `BtnTail` `ToggleButton` now sets a descriptive `AutomationProperties.Name` (new key `A11yLogViewerTailToggle` — EN: "Toggle live tail mode" / FR: "Activer/désactiver le mode tail temps réel") via the existing code-behind localization pattern. The previous "Tail" label was non-descriptive for screen reader users. Every other tool-view `ToggleButton` was audited — this was the only gap
+- **A11Y-04** - `LogViewerView` `BtnTail` `ToggleButton` now sets a descriptive `AutomationProperties.Name` (new key `A11yLogViewerTailToggle` - EN: "Toggle live tail mode" / FR: "Activer/désactiver le mode tail temps réel") via the existing code-behind localization pattern. The previous "Tail" label was non-descriptive for screen reader users. Every other tool-view `ToggleButton` was audited - this was the only gap
 
 #### UI
-- **Settings toolbar button truncation** — replaced fixed `Width="130"` / `Width="160"` with `MinWidth` on 4 buttons (`Mw_SettingsResetBtn`, `Mw_SettingsExportBtn`, `Mw_SettingsImportBtn`, `Mw_SettingsCitrixBtn`). French translations now auto-size instead of clipping mid-word. `SecondaryButtonStyle` already defines `Padding="16,8"`, so no inline padding override needed
+- **Settings toolbar button truncation** - replaced fixed `Width="130"` / `Width="160"` with `MinWidth` on 4 buttons (`Mw_SettingsResetBtn`, `Mw_SettingsExportBtn`, `Mw_SettingsImportBtn`, `Mw_SettingsCitrixBtn`). French translations now auto-size instead of clipping mid-word. `SecondaryButtonStyle` already defines `Padding="16,8"`, so no inline padding override needed
 
 #### i18n
-- **fr.json mojibake repair (1170 substitutions across 631 lines)**: fixed double-UTF-8 encoding affecting all French accented characters (ô è é à ç î ê ù â É À) via a two-pass codec round-trip — pass 1 (latin-1) for accented lowercase forms, pass 2 (CP1252) for the uppercase `É` / `À` whose smart-punctuation second char (`‰` U+2030, `€` U+20AC) sits outside the latin-1 0x80-0xBF continuation range. `WindowTitle` now correctly displays "Centre de Contrôle d'Accès Distant"
-- **Stale Heimdall-profile values cleaned** (13 keys × 2 locales): `ErrorEmergencyResolveServers`, `ErrorEmergencySaveServers`, `ErrorRestoreServersFailed`, `SettingsApplyModeToAll`, `ConfirmDeleteGatewayDetailMessage`, `ToolSshConfigGenerateAllHint`, `AccessSearchFilter`, `SearchResultCount`, `AccessDetailConnect`, `AccessEmptyImport`, `A11ySearchAndFilter`, `OnboardingStep1Title`, `OnboardingStep1Desc` — all updated from "server(s)" to "session(s)" where the term refers to a saved profile, not an actual remote machine
+- **fr.json mojibake repair (1170 substitutions across 631 lines)**: fixed double-UTF-8 encoding affecting all French accented characters (ô è é à ç î ê ù â É À) via a two-pass codec round-trip - pass 1 (latin-1) for accented lowercase forms, pass 2 (CP1252) for the uppercase `É` / `À` whose smart-punctuation second char (`‰` U+2030, `€` U+20AC) sits outside the latin-1 0x80-0xBF continuation range. `WindowTitle` now correctly displays "Centre de Contrôle d'Accès Distant"
+- **Stale Heimdall-profile values cleaned** (13 keys × 2 locales): `ErrorEmergencyResolveServers`, `ErrorEmergencySaveServers`, `ErrorRestoreServersFailed`, `SettingsApplyModeToAll`, `ConfirmDeleteGatewayDetailMessage`, `ToolSshConfigGenerateAllHint`, `AccessSearchFilter`, `SearchResultCount`, `AccessDetailConnect`, `AccessEmptyImport`, `A11ySearchAndFilter`, `OnboardingStep1Title`, `OnboardingStep1Desc` - all updated from "server(s)" to "session(s)" where the term refers to a saved profile, not an actual remote machine
 - **Sessions rename** (locale value updates for the wholesale UX rename): `TabSessions`, `SidebarTabSessions`, `A11ySidebarTabSessions`, `A11ySessionsTab`, `StatusBarSessions`, `EmptyStateBtnAddSession`, `EmptyStateSelectSession`, `AddMenuSession`, plus 119 value-only updates across status messages, dialog titles, confirmations, tooltips, tree/empty-state hints, error messages, scheduled task labels, and accessibility names. Dropped the duplicate `NavTabServers` (`NavTabSessions` already existed)
 - **+2 keys** (EN/FR): `DiagramEditorDebugOnly`, `A11yLogViewerTailToggle`. Final state: 4855 keys per locale, parity verified, JSON valid
 
 #### DevOps
-- **DEVOPS-02** — `dotnet list package --vulnerable --include-transitive` step added to `.github/workflows/ci.yml` after the test step. Emits a `::warning::` instead of failing the build (vulnerability databases occasionally have false positives or no upgrade path; informational only). Implemented in `pwsh` to match the runner's default shell
+- **DEVOPS-02** - `dotnet list package --vulnerable --include-transitive` step added to `.github/workflows/ci.yml` after the test step. Emits a `::warning::` instead of failing the build (vulnerability databases occasionally have false positives or no upgrade path; informational only). Implemented in `pwsh` to match the runner's default shell
 
 #### Documentation
-- **DOC-03** — `CLAUDE.md` updated for the Sessions rename: 3 stale "Servers" references in the sidebar/tools description and Session-Grid airspace section. The 6 remaining "server" hits are all preserved C# class/file/property identifiers (`EphemeralFileServer`, `X11ServerManager`, `ServerListViewModel`, `servers.default.json`, `ServerId`, `### ServerDialog` section header)
+- **DOC-03** - `CLAUDE.md` updated for the Sessions rename: 3 stale "Servers" references in the sidebar/tools description and Session-Grid airspace section. The 6 remaining "server" hits are all preserved C# class/file/property identifiers (`EphemeralFileServer`, `X11ServerManager`, `ServerListViewModel`, `servers.default.json`, `ServerId`, `### ServerDialog` section header)
 
 #### Testing
 - **+37 new tests** in `tests/Heimdall.App.Tests/` covering services with previously zero coverage:
-  - `ThemeServiceTests` (10 — 4 active + 6 `[Skip]` for WPF Application context): `AvailableThemes` enumeration, constructor defaults, `ThemeRevision` initial value, no-throw under no-Application. Migration / idempotence / event / canonical-casing scaffolds wait for a future WPF fixture
+  - `ThemeServiceTests` (10 - 4 active + 6 `[Skip]` for WPF Application context): `AvailableThemes` enumeration, constructor defaults, `ThemeRevision` initial value, no-throw under no-Application. Migration / idempotence / event / canonical-casing scaffolds wait for a future WPF fixture
   - `MigrationServiceTests` (13): `DetectLegacyInstallation` positive/negative/null path, `ImportFromLegacyAsync` round-trip with valid settings + server inventory, empty arrays, malformed JSON, missing-file failure mode
   - `EphemeralFileServerTests` (14): HTTP/TFTP lifecycle, argument validation, idempotent stop-when-not-running, **PERF-05 double-start regression guard**, `Dispose`/`DisposeAsync` cleanup, `GetLocalIpAddress` static helper. Each test uses a distinct port in the IANA dynamic range (49510-49514) and silently skips when port acquisition fails for restricted CI environments
 - All new tests follow the existing project pattern: xUnit only, `IDisposable` cleanup with temp directories, no mocking library
@@ -1781,7 +1781,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [v2026.041202] - 2026-04-12
 
-### Theme system overhaul — centralized ThemeService, 7 Dracula variants only
+### Theme system overhaul - centralized ThemeService, 7 Dracula variants only
 
 #### ThemeService (single owner of the theme swap)
 - **`Services/ThemeService.cs`**: singleton DI service with `ApplyTheme(string?)` as the only code path that replaces the theme `ResourceDictionary` in `Application.Resources.MergedDictionaries`
@@ -1793,27 +1793,27 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 #### Themes removed
 - **Deleted**: `src/Heimdall.App/Themes/DarkTheme.xaml`, `src/Heimdall.App/Themes/LightTheme.xaml`
-- **Kept**: 7 Dracula variants — `DraculaProTheme` (default), `AlucardTheme`, `BladeTheme`, `BuffyTheme`, `LincolnTheme`, `MorbiusTheme`, `VanHelsingTheme`
+- **Kept**: 7 Dracula variants - `DraculaProTheme` (default), `AlucardTheme`, `BladeTheme`, `BuffyTheme`, `LincolnTheme`, `MorbiusTheme`, `VanHelsingTheme`
 - `App.xaml` default merged dictionary → `Themes/DraculaProTheme.xaml`
 - `config/settings.default.json`, `AppSettings.DefaultTheme`, `SettingsViewModel._defaultTheme`, `SchemaValidator.ValidThemes` all updated to `DraculaPro` / the 7-variant set
 - Settings theme `ComboBox` in `MainWindow.xaml` cleaned up (removed `Mw_ThemeDark` and `Mw_ThemeLight` items + their localization hooks)
 
-#### Theme reactivity — converters, code-behind, editor
+#### Theme reactivity - converters, code-behind, editor
 - **Brush-resolving converters** (`ConnectionTypeToColorConverter`, `ConnectionTypeToBrushConverter`, `ConnectionStateToBrushConverter`, `ServerStatusToColorConverter`) implement both `IValueConverter` *and* `IMultiValueConverter` with a shared `ResolveBrush` helper. XAML sites route them through `MultiBinding [value, DataContext.ThemeRevision]` so WPF re-runs the converter on each swap. `ElementName=MainWindowRoot` required (not `RelativeSource AncestorType=Window`) so the binding resolves from inside Command Palette `Popup` content
 - **Generic resource-key converters**: `ResourceKeyToBrushConverter` (dual `IValue`/`IMulti`, used by the sidebar Tools `TreeView`) and `ResourceKeyToGeometryConverter` (simple `IValue`, resolves `Geo.Tool.*` keys)
 - **Code-built UI in `MainWindow.xaml.cs`** (`PopulateToolsTab`, `RefreshToolsTabSections`, `CreateToolsTabCard`, `UpdateToolLaunchContextLabels`): `element.SetResourceReference(<DP>, "BrushKey")` instead of caching `Brush` instances from `FindResource`. Hover-state toggles call `SetResourceReference` with a conditional key rather than flipping pre-cached brushes
-- **`EmbeddedEditorView`**: reads AvalonEdit chrome colors (`Background`, `Foreground`, `LineNumbersForeground`, `SelectionBrush`, `CurrentLineBackground/Border`) via `ResolveColor("BrushKey", fallback)` — no more Dark/Light branches. Subscribes to `ThemeService.ThemeChanged` in `Loaded`, unsubscribes in `Unloaded`. Syntax token palette stays fixed Dracula (shared across all variants)
+- **`EmbeddedEditorView`**: reads AvalonEdit chrome colors (`Background`, `Foreground`, `LineNumbersForeground`, `SelectionBrush`, `CurrentLineBackground/Border`) via `ResolveColor("BrushKey", fallback)` - no more Dark/Light branches. Subscribes to `ThemeService.ThemeChanged` in `Loaded`, unsubscribes in `Unloaded`. Syntax token palette stays fixed Dracula (shared across all variants)
 - **Hardcoded hex cleanup in `MainWindow.xaml`**: `ContentDropZone` background → `{DynamicResource DragDropOverlayBackground}`, broadcast-mode `DataTrigger` → `{DynamicResource BroadcastActiveBrush}`
 
-### Sidebar UX redesign — tabbed Servers / Tools panel
+### Sidebar UX redesign - tabbed Servers / Tools panel
 
 - **Tabbed sidebar**: two `RadioButton`s (`SidebarTabServers` / `SidebarTabTools`, `GroupName=SidebarTabs`) replace the collapsible `ToolsQuickPanel` (`MaxHeight=350`, bottom-docked). Both tabs now share the full sidebar height; `Visibility` of `SidebarServersContent` / `SidebarToolsContent` is bound to each RadioButton's `IsChecked`
-- **`SidebarTabStyle`** (`CommonControls.xaml`): flat `RadioButton` template with accent underline on `IsChecked`, `HighlightBrush` on hover, `FocusIndicatorBrush` on keyboard focus — all colors via `DynamicResource`
-- **Servers tab**: unchanged — toolbar (search, add, expand/collapse) + `ServerTreeView`
+- **`SidebarTabStyle`** (`CommonControls.xaml`): flat `RadioButton` template with accent underline on `IsChecked`, `HighlightBrush` on hover, `FocusIndicatorBrush` on keyboard focus - all colors via `DynamicResource`
+- **Servers tab**: unchanged - toolbar (search, add, expand/collapse) + `ServerTreeView`
 - **Tools tab**: filter `TextBox` + context label + full-height `TreeView` with collapsible categories. Data model:
   - `SidebarToolCategoryViewModel` (ObservableObject): `CategoryName`, `BrushKey`, `Tools`, `VisibleCount`, `IsExpanded`, `IsVisible`
   - `SidebarToolItemViewModel`: `Id`, `Name`, `BrushKey`, `IconGeometryKey`, pre-lowercased `Searchable` blob (`name + aliases`)
-- **Lazy populate**: `BuildSidebarToolsData()` reads `ToolRegistry.All`, groups by `Category`, sorts alphabetically per group — invoked on first `SidebarTabTools.Checked` and rebuilt when `ToolRegistry.ExternalToolsChanged` fires
+- **Lazy populate**: `BuildSidebarToolsData()` reads `ToolRegistry.All`, groups by `Category`, sorts alphabetically per group - invoked on first `SidebarTabTools.Checked` and rebuilt when `ToolRegistry.ExternalToolsChanged` fires
 - **Filter**: `Searchable.Contains(filterLower)` per item, auto-expand matching categories, empty-state label when no results
 - **Launch flow**: `LaunchSidebarTool(item)` reuses the same primitives as the full-page Tools tab (`CreateInheritedToolContext` / `ResolveToolTabTitle` / `vm.OpenToolTabAsync` / `vm.TrackRecentTool`)
 - **Ctrl+Shift+T**: toggles the active sidebar tab. Gotcha: setting `RadioButton.IsChecked = false` on a grouped button does NOT auto-check the sibling; `ToggleSidebarTab()` explicitly assigns `IsChecked = true` on the target
@@ -1826,10 +1826,10 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - `Themes/DarkTheme.xaml`, `Themes/LightTheme.xaml`
 - `ToolsQuickPanel`, `BtnToggleToolsPanel`, `ToolsToggleChevron`, `Mw_ToolsToggleLabel`, `Mw_ToolsPanelHeaderLabel`, `Mw_ToolsPanelNoResults`, `Mw_ToolsPanelContextText`, `Mw_ToolsScanIndicator`, `ToolsCategoryStack`, `ToolsPanelScroll`, `ToolsPanelScrollHint`
 - `MainWindow.ToggleToolsPanel()`, `PopulateToolsPanel()`, `CreateToolCard()`, `PersistToolsPanelState()`, `OnToolsFilterChanged`, `OnToolsPanelScrollChanged`, `_toolsPanelPopulated`
-- `App.xaml.cs::ApplyThemeFromSettings()` and `MainViewModel::OnThemeChanged()` — both switch statements moved into the centralized `ThemeService`
+- `App.xaml.cs::ApplyThemeFromSettings()` and `MainViewModel::OnThemeChanged()` - both switch statements moved into the centralized `ThemeService`
 
-### CI fix — SDK 10.0.201 overload resolution
-- `dotnet format` on SDK 10.0.201 mis-inferred `var queryLower = query.ToLowerInvariant()` as `int` in 3 specific sites with lambda / nested `var` contexts, routing `string.Contains(string, StringComparison)` to the `char` overload (CS1503). Replaced `var` with explicit `string` types in `MainWindow.OnSettingsSearchTextChanged` and `OnSidebarToolsFilterChanged` — 67 other call sites in the codebase were unaffected
+### CI fix - SDK 10.0.201 overload resolution
+- `dotnet format` on SDK 10.0.201 mis-inferred `var queryLower = query.ToLowerInvariant()` as `int` in 3 specific sites with lambda / nested `var` contexts, routing `string.Contains(string, StringComparison)` to the `char` overload (CS1503). Replaced `var` with explicit `string` types in `MainWindow.OnSettingsSearchTextChanged` and `OnSidebarToolsFilterChanged` - 67 other call sites in the codebase were unaffected
 - `dotnet format` pass applied in a separate commit to fix ENDOFLINE / CHARSET / IMPORTS drift that had accumulated across recent PRs
 
 ### Housekeeping
@@ -1841,19 +1841,19 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [Unreleased] - 2026-04-02
 
-### Terminal keyboard fix — Delete key no longer triggers server deletion
+### Terminal keyboard fix - Delete key no longer triggers server deletion
 
 - **Root cause**: WebView2 SDK routes keys via `AcceleratorKeyPressed` → synthetic WPF `KeyDown`, but `Keyboard.FocusedElement` stays stale on the TreeView. The previous fallback (`FindAncestor<TreeView>` exclusion) was self-defeating in the most common scenario (user clicks TreeView then terminal).
-- **Fix**: Check `e.OriginalSource is WebView2` in the `OnKeyDown` handler — the SDK always sets `OriginalSource` to the WebView2 control for terminal-originated keys. Removed the unreliable `ActiveSession.ConnectionType` + `TreeView` exclusion fallback.
+- **Fix**: Check `e.OriginalSource is WebView2` in the `OnKeyDown` handler - the SDK always sets `OriginalSource` to the WebView2 control for terminal-originated keys. Removed the unreliable `ActiveSession.ConnectionType` + `TreeView` exclusion fallback.
 
 ## [Unreleased] - 2026-04-01
 
-### Command Library UX audit — layout, responsiveness, feedback, performance
+### Command Library UX audit - layout, responsiveness, feedback, performance
 
 #### Layout
-- **Generator panel sticky buttons**: Copy/Send/Edit/Delete action buttons moved outside the ScrollViewer into a fixed Grid row — always visible regardless of parameter count, notes, or examples in the scrollable area
-- **Generator ↔ History mutual exclusion**: selecting an action auto-closes the History panel; toggling History auto-closes the Generator — prevents both panels from crushing the action list on 1080p split panes
-- **Responsive filter bar**: replaced DockPanel with Grid+WrapPanel — search TextBox always gets full width (own row), filter ComboBoxes wrap gracefully on narrow panes instead of crushing the search input
+- **Generator panel sticky buttons**: Copy/Send/Edit/Delete action buttons moved outside the ScrollViewer into a fixed Grid row - always visible regardless of parameter count, notes, or examples in the scrollable area
+- **Generator ↔ History mutual exclusion**: selecting an action auto-closes the History panel; toggling History auto-closes the Generator - prevents both panels from crushing the action list on 1080p split panes
+- **Responsive filter bar**: replaced DockPanel with Grid+WrapPanel - search TextBox always gets full width (own row), filter ComboBoxes wrap gracefully on narrow panes instead of crushing the search input
 - **HistoryList themed hover/select**: added ControlTemplate with SurfaceBrush (hover) and CardBrush (select) matching the ActionList visual treatment
 
 #### Feedback
@@ -1864,19 +1864,19 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - **O(1) search filtering**: replaced `_searchResults.Any(r => r.Id == ...)` (O(n) per item) with a `HashSet<string>` lookup in `FilterPredicate`
 
 #### Dialog
-- **DefaultValue watermark**: both Windows and Linux parameter DefaultValue TextBoxes now use `WatermarkTextBoxStyle` — placeholder text ("Default value") visible when empty and unfocused
+- **DefaultValue watermark**: both Windows and Linux parameter DefaultValue TextBoxes now use `WatermarkTextBoxStyle` - placeholder text ("Default value") visible when empty and unfocused
 
 ---
 
 ## [v2026.033108] - 2026-03-31
 
-### Fix tunnel scan — host discovery, per-probe timeout, zombie prevention
+### Fix tunnel scan - host discovery, per-probe timeout, zombie prevention
 
 #### Network Cartography (critical fix)
-- **Root cause**: scanning via SSH tunnel found only 1 host (the gateway itself) instead of the full subnet. Two bugs: (1) no host discovery phase (ping sweep, ARP) — only hosts with open ports on the scanned list were returned, (2) sequential `/dev/tcp` probes with no per-probe timeout — a single filtered port blocked the entire scan per IP for 20-127 seconds (kernel TCP retransmit timeout), causing `CommandTimeout` to kill the command before most ports were tested
-- **Phase 1 — Host discovery**: batch ping sweep via SSH (all IPs as parallel background jobs in a single `CreateCommand`), ARP table read (`/proc/net/arp`) for ICMP-blocked hosts, automatic fallback to full-subnet scan when ping is restricted on the gateway
-- **Phase 2 — Batch reverse DNS**: single SSH command for all alive hosts (was one command per IP)
-- **Phase 3 — Parallel port probes**: all ports for a host run as background bash jobs simultaneously (`(echo >/dev/tcp/IP/$p && echo $p) &`), bounded by `sleep 5; kill $(jobs -p); wait` fence — no single filtered port can block the scan
+- **Root cause**: scanning via SSH tunnel found only 1 host (the gateway itself) instead of the full subnet. Two bugs: (1) no host discovery phase (ping sweep, ARP) - only hosts with open ports on the scanned list were returned, (2) sequential `/dev/tcp` probes with no per-probe timeout - a single filtered port blocked the entire scan per IP for 20-127 seconds (kernel TCP retransmit timeout), causing `CommandTimeout` to kill the command before most ports were tested
+- **Phase 1 - Host discovery**: batch ping sweep via SSH (all IPs as parallel background jobs in a single `CreateCommand`), ARP table read (`/proc/net/arp`) for ICMP-blocked hosts, automatic fallback to full-subnet scan when ping is restricted on the gateway
+- **Phase 2 - Batch reverse DNS**: single SSH command for all alive hosts (was one command per IP)
+- **Phase 3 - Parallel port probes**: all ports for a host run as background bash jobs simultaneously (`(echo >/dev/tcp/IP/$p && echo $p) &`), bounded by `sleep 5; kill $(jobs -p); wait` fence - no single filtered port can block the scan
 - **Explicit `bash -c`**: ensures `/dev/tcp` support regardless of the gateway's login shell (`dash`/`sh` lack it)
 - All alive hosts now included in results (even those with no open ports), matching direct scan behavior
 
@@ -1895,10 +1895,10 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [v2026.033006] - 2026-03-30
 
-### UX audit remediation — Dispose memory leaks, i18n format strings
+### UX audit remediation - Dispose memory leaks, i18n format strings
 
 #### Memory Leak Fixes
-- **18 tool views**: added event handler unsubscription (`-=`) in `Dispose()` for all subscriptions (`+=`) made in constructors — prevents views from being retained in memory after tab closure
+- **18 tool views**: added event handler unsubscription (`-=`) in `Dispose()` for all subscriptions (`+=`) made in constructors - prevents views from being retained in memory after tab closure
 - Affected views: ArpMonitor, Base64, CertInspector, CrontabBuilder, DateTimeConverter, HackerSimulator, HttpStatusCodes, IpConverter, NetworkCalculator, NetworkCartography, Notes, Ping, PortScanner, ServiceStatus, SubnetCalculator, TextCaseConverter, TextDiff, MilkdownEditor
 - Timer cleanup: `Tick -= handler` added before `Stop()` on all `DispatcherTimer` fields (Arp, Ping, ServiceStatus, HackerSimulator, TextDiff, DateTimeConverter)
 - WebView2 cleanup: `NavigationStarting` and `WebMessageReceived` unsubscribed with null guard in MilkdownEditorControl
@@ -1915,7 +1915,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [v2026.033005] - 2026-03-30
 
-### Security audit remediation — context-aware sanitization, external tools, a11y
+### Security audit remediation - context-aware sanitization, external tools, a11y
 
 #### Security
 - **Context-aware placeholder sanitization**: `InputValidator.IsShellTarget()` detects shell interpreters (cmd.exe, PowerShell, bash, sh, zsh, wsl, cscript, wscript, mshta) and script extensions (.bat, .cmd, .ps1, .vbs, .js, .wsf, .hta). Shell targets get strict metacharacter stripping; regular .exe targets get relaxed stripping that preserves `()`, `'`, `%` in legitimate values (double quotes always stripped for MSVC CRT safety)
@@ -1944,7 +1944,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 #### Housekeeping
 - `InternalsVisibleTo` added to `Heimdall.Core.csproj` for `Heimdall.Core.Tests` (ExpandTemplate testing)
-- `VENDORED.md` manifests added for Assets/Tools (plink 0.83, gsudo 2.5.1), Assets/vnc (noVNC 1.5.0, pako 1.0.3), Assets/drawio (26.0.9) — upstream versions, licenses, and review dates
+- `VENDORED.md` manifests added for Assets/Tools (plink 0.83, gsudo 2.5.1), Assets/vnc (noVNC 1.5.0, pako 1.0.3), Assets/drawio (26.0.9) - upstream versions, licenses, and review dates
 - i18n: +189 keys (4,685 total, EN/FR parity)
 - Tests: 1,714 passing (+81 new: IsShellTarget, context-aware sanitization, ExpandTemplate relaxed/strict paths)
 
@@ -1952,7 +1952,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [v2026.033004] - 2026-03-30
 
-### Network Cartography — multi-probe discovery, new columns, SNMP OID classifier
+### Network Cartography - multi-probe discovery, new columns, SNMP OID classifier
 
 #### Discovery Pipeline
 - ARP table seeded before ping sweep: hosts known to the OS bypass ICMP
@@ -1965,7 +1965,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - CSV export filters out empty hosts (no more 238 phantom rows on a /24)
 
 #### SNMP Enterprise OID Classifier
-- Cisco: routers (1.3.6.1.4.1.9.1), Catalyst switches (9.5), switches (9.6) — confidence 80-85%
+- Cisco: routers (1.3.6.1.4.1.9.1), Catalyst switches (9.5), switches (9.6) - confidence 80-85%
 - Juniper, MikroTik, Fortinet, Palo Alto, VMware, Microsoft OID branches
 - Boosts role classification confidence on OID match
 
@@ -1994,7 +1994,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - SecNumCloud Audit: auto-detect local CIDR on init, detect remote CIDR on gateway selection
 - Extract shared `SubnetDetector` helper from NetworkCartography (reusable across tools)
 
-#### Critical Bug Fix — Scan Timeout Resilience
+#### Critical Bug Fix - Scan Timeout Resilience
 - Fix scans silently aborting when per-operation timeouts fire: `CancellationTokenSource(timeout)` + linked token `OperationCanceledException` was indistinguishable from user cancellation
 - 13 catch sites fixed across 7 files: CartographyEngine (ProbePortAsync, InspectTlsWithHttpAsync), SecNumCloudAuditEngine (6 check methods), NetworkScanner, HttpFingerprinter, FaviconHasher, BannerGrabberView, CertInspectorView
 - Fix pattern: `catch (OperationCanceledException) when (!ct.IsCancellationRequested)` absorbs per-operation timeouts without aborting the entire scan
@@ -2007,7 +2007,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [v2026.032903] - 2026-03-29
 
-### Comprehensive UX audit — accessibility, async guards, empty states, keyboard across 49 tools
+### Comprehensive UX audit - accessibility, async guards, empty states, keyboard across 49 tools
 
 #### Accessibility
 - Explicit `TabIndex` on 45 tool views (top-to-bottom, left-to-right visual order)
@@ -2041,7 +2041,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ## [Unreleased] - 2026-03-28
 
-### Comprehensive audit — security, i18n, accessibility, and robustness across 49 files
+### Comprehensive audit - security, i18n, accessibility, and robustness across 49 files
 
 #### Security
 - Centralize shell escaping in `InputValidator`: `EscapeShellArg()`, `EscapeForDoubleQuotedString()`, `ValidateDomain()`, `SanitizeCsvCell()`
@@ -2077,7 +2077,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 #### Data Model
 - AuditScope.Targets: `List<string>` -> `IReadOnlyList<string>`
 
-### UX audit — a11y, design tokens, i18n, and interaction across 49 tools
+### UX audit - a11y, design tokens, i18n, and interaction across 49 tools
 
 Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines).
 
@@ -2087,8 +2087,8 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - 11 unnamed buttons given x:Name for a11y (ChmodCalculator presets, PasswordGenerator quick-lengths)
 
 #### Design Tokens
-- New `ToolContentMaxWidth` (700) token — 20 files migrated from hardcoded MaxWidth values
-- New `PaddingButtonToolbar` (8,4) token — 17 buttons migrated (DiagramEditor, NotesToolView)
+- New `ToolContentMaxWidth` (700) token - 20 files migrated from hardcoded MaxWidth values
+- New `PaddingButtonToolbar` (8,4) token - 17 buttons migrated (DiagramEditor, NotesToolView)
 - ~90 buttons migrated to padding tokens (PaddingButtonCopy, PaddingButtonPreset, PaddingButtonPrimary, PaddingButtonToolbar, PaddingButtonHelp)
 - Hardcoded `CornerRadius="3"` replaced with CornerRadiusXs token (SnmpWalker, CveLookup)
 - Hardcoded `Foreground="White"` replaced with TextOnAccentBrush (SshKeyAudit, CveLookup)
@@ -2107,7 +2107,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ## [v2026.032701] - 2026-03-27
 
-### Comprehensive tool audit — robustness, accessibility, and UX (15 tools, 26 files)
+### Comprehensive tool audit - robustness, accessibility, and UX (15 tools, 26 files)
 
 #### Password Generator overhaul
 - **3 generation modes**: Random, Syllable (CV/CVC), and Passphrase with per-mode presets
@@ -2122,7 +2122,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 #### Cross-tool robustness (12 files)
 - **Clipboard.SetText protection**: 21 unprotected calls across 12 tools wrapped in `try/catch(ExternalException)` to handle locked clipboard gracefully (Base64, CertGenerator, Chmod, Crontab, Json, JWT, SshConfig, TextDiff, HostsFile, Notes, PasswordGenerator)
-- **try/finally on boolean flags**: HackerSimulator (`_isRunning`, `_typingInProgress`, `_cursorVisible`), PingTool (`_isRunning`), PortScanner (`_isScanning`) — prevents UI freeze if setup code throws
+- **try/finally on boolean flags**: HackerSimulator (`_isRunning`, `_typingInProgress`, `_cursorVisible`), PingTool (`_isRunning`), PortScanner (`_isScanning`) - prevents UI freeze if setup code throws
 - **CanClose()** added to ServiceStatus and CronJobManager to prevent close during async operations
 
 #### Accessibility
@@ -2141,7 +2141,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 #### Extensible scenario system
 - **25 scenarios** across 6 categories (Visual, Attack, Deployment, Hardening, Incident, Identity) and 3 realism levels (Demo, Ops, Enterprise)
-- **External JSON scenario packs**: template engine with `{{pick:...}}`, `{{number:min-max}}`, `{{hex:N}}`, `{{ip}}`, `{{mac}}` variables — add custom scenarios without recompiling
+- **External JSON scenario packs**: template engine with `{{pick:...}}`, `{{number:min-max}}`, `{{hex:N}}`, `{{ip}}`, `{{mac}}` variables - add custom scenarios without recompiling
 - **Playlist system**: ordered scenario sequences with 5 built-in playlists (Client Demo, SOC, DevOps, Compliance, Red Team)
 - **Favorites**: star/unstar scenarios, filter by favorites
 - **Toolbar redesign**: scenario picker, category/realism filters, text search, speed slider, playlist selector
@@ -2176,15 +2176,15 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 #### Diagram Editor (P1)
 - **Empty diagram loading**: Canvas now initializes automatically on open (previously blocked on "Loading" until user clicked New)
-- **Native autosave**: Replaced custom polling autosave (manual graph serialization via mxCodec) with draw.io's native `autosave`/`save` embed events — preserves full .drawio context
+- **Native autosave**: Replaced custom polling autosave (manual graph serialization via mxCodec) with draw.io's native `autosave`/`save` embed events - preserves full .drawio context
 - **External link relay**: Help menu and external links now open in the default browser via `openLink` embed event
-- **Menu bar hidden**: draw.io's built-in menu bar (File/Edit/View/Arrange/Extras/Help) disabled — `mxPopupMenu` dropdowns cannot open inside a WebView2 iframe due to pointer event routing limitations; Heimdall's own toolbar provides New/Open/Save/Export PNG
+- **Menu bar hidden**: draw.io's built-in menu bar (File/Edit/View/Arrange/Extras/Help) disabled - `mxPopupMenu` dropdowns cannot open inside a WebView2 iframe due to pointer event routing limitations; Heimdall's own toolbar provides New/Open/Save/Export PNG
 
 #### Architecture constraint documented
-- draw.io embed mode requires `(window.opener || window.parent) != window` — iframe is mandatory (direct WebView2 load bypasses `initializeEmbedMode`)
+- draw.io embed mode requires `(window.opener || window.parent) != window` - iframe is mandatory (direct WebView2 load bypasses `initializeEmbedMode`)
 
 #### CLAUDE.md
-- Condensed from 495 to 170 lines (~65% reduction) — removed content derivable from code, kept all bug-prevention gotchas
+- Condensed from 495 to 170 lines (~65% reduction) - removed content derivable from code, kept all bug-prevention gotchas
 
 ---
 
@@ -2271,7 +2271,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **Button MinWidth**: Standardized to 80px across all dialogs
 
 #### i18n
-- 3,566 keys (EN/FR parity) — +87 keys
+- 3,566 keys (EN/FR parity) - +87 keys
 - `StringToBrushConverter` for project color dots in detail panel
 
 #### Tests
@@ -2284,7 +2284,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 ### Full UX audit implementation (P0-P2)
 
 #### WCAG Contrast Fixes (P0)
-- **FileIconColorConverter theme adaptation**: Replaced 6 hardcoded Dracula RGB brushes with theme-aware resources (FileScriptBrush, FileConfigBrush, etc.) — Light theme file icons now legible (was 1.5:1, now 4.5:1+)
+- **FileIconColorConverter theme adaptation**: Replaced 6 hardcoded Dracula RGB brushes with theme-aware resources (FileScriptBrush, FileConfigBrush, etc.) - Light theme file icons now legible (was 1.5:1, now 4.5:1+)
 - **Dark theme ErrorColor**: #FF6E6E → #FF5555 (4.2:1 → 4.6:1, meets WCAG AA)
 - **Dark theme TelnetBadgeBrush**: #A0A0B0 → #B0B4C8 (4.5:1 → 5.2:1)
 - **Light theme BorderColor**: #CBD5E1 → #94A3B8 (1.5:1 → 3.2:1, meets WCAG 2.1 § 1.4.11 non-text)
@@ -2296,7 +2296,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **Window size/position persistence**: Saves Width, Height, Left, Top, WindowState to AppSettings on close; restores on load with virtual screen bounds validation
 
 #### Accessibility (P1)
-- **Reduced-motion support**: Respects Windows "Show animations" setting (`SystemParameters.MenuAnimation`) — animation durations overridden to 0ms when disabled (WCAG 2.1 § 2.3.3)
+- **Reduced-motion support**: Respects Windows "Show animations" setting (`SystemParameters.MenuAnimation`) - animation durations overridden to 0ms when disabled (WCAG 2.1 § 2.3.3)
 
 #### Keyboard Shortcuts (P2)
 - **Ctrl+W**: Close current session tab (with confirmation if connected)
@@ -2308,7 +2308,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **Double-click connect guard**: `_connectingServerIds` HashSet prevents duplicate concurrent connections to the same server from rapid clicks
 
 #### i18n
-- 3,501 keys (EN/FR parity confirmed) — +2 keys (BtnDiscard)
+- 3,501 keys (EN/FR parity confirmed) - +2 keys (BtnDiscard)
 
 #### Tests
 - **1,586 tests** (1,196 Core + 283 SSH + 107 App), all passing
@@ -2319,13 +2319,13 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ### UX audit phase 2: validation, palette redesign, protocol-driven add server
 
-#### Server Dialog — Protocol-Driven Flow
+#### Server Dialog - Protocol-Driven Flow
 - **Protocol selector**: New Step 1 with 8 large card buttons (vector icons + protocol colors) replaces the connection type dropdown in add mode
-- **Contextual fields**: Form fields adapt to selected protocol — Local Shell shows only name, SSH shows host+port, etc.
+- **Contextual fields**: Form fields adapt to selected protocol - Local Shell shows only name, SSH shows host+port, etc.
 - **Edit mode**: Read-only protocol badge, form pre-populated, protocol selector bypassed
 - **Back button**: Returns to protocol selector in add mode without losing form data
 
-#### Server Dialog — Inline Validation
+#### Server Dialog - Inline Validation
 - **Per-field errors**: Inline error messages below DisplayName, Server, Port, LocalPort, AudioMode, ColorDepth
 - **Live re-validation**: Errors clear in real-time as user corrects fields (ValidateProperty per keystroke)
 - **Tab error badges**: Red count badges on Tunneling and Options tabs when they contain errors
@@ -2334,7 +2334,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **VNC port validation**: Added [Range] validation with i18n support
 - **Reusable style**: FieldValidationErrorStyle in DialogCommonStyles.xaml
 
-#### Command Palette (Ctrl+K) — Redesign
+#### Command Palette (Ctrl+K) - Redesign
 - **Two-line layout**: Line 1: protocol icon + name + badge; Line 2: host:port + username + project + group
 - **Responsive width**: 550-700px (MinWidth/MaxWidth) instead of fixed 550px, MaxHeight 450px
 - **Active session indicator**: Protocol-colored left rail on connected sessions
@@ -2377,18 +2377,18 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **Minimum font size**: Raised `FontSizeSmallCaption` from 9px to 11px for better readability on dense exploitation screens
 
 #### Zero Hardcoding compliance
-- **ComboBoxItems extracted to i18n**: Terminal color schemes (5), PowerShell execution policies (5), shell executables (5), SSH key algorithms (3), certificate algorithms (2), file encodings (4), HMAC formats (2), ping intervals (5) — all use `Tag` for stored value, `Content` set via `ApplyLocalization()`
+- **ComboBoxItems extracted to i18n**: Terminal color schemes (5), PowerShell execution policies (5), shell executables (5), SSH key algorithms (3), certificate algorithms (2), file encodings (4), HMAC formats (2), ping intervals (5) - all use `Tag` for stored value, `Content` set via `ApplyLocalization()`
 - **Hardcoded ToolTip="Copy" removed** from PasswordGenerator history button (now localized via `Loaded` event handler)
 
 #### Theme & Contrast
-- **Scrollbar thumb contrast fixed**: Dark theme #7B8298 → #A8B0CC (2.8:1 → 4.2:1), Light theme #C0C0C0 → #999999 (1.8:1 → 4.8:1) — meets WCAG 2.1 non-text contrast minimum
+- **Scrollbar thumb contrast fixed**: Dark theme #7B8298 → #A8B0CC (2.8:1 → 4.2:1), Light theme #C0C0C0 → #999999 (1.8:1 → 4.8:1) - meets WCAG 2.1 non-text contrast minimum
 - **Badge/protocol brush consolidation**: 5 new badge brushes (VNC, FTP, Citrix, Telnet, Local) + RDP/SSH/SFTP badge colors aligned with protocol accent brushes for visual consistency
 - **Toolbar ghost button pressed state**: Changed from TextSecondaryBrush (poor contrast) to HighlightBrush
 
 #### Discoverability & Navigation
 - **Tools panel visible by default**: 33 built-in tools now shown on first launch instead of hidden behind collapsed toggle
 - **Ctrl+Shift+T documented in F1 help** (EN/FR)
-- **Wording "server-first" updated**: StatusReady, EmptyStateSelectServer, SearchPlaceholder now reference tools and Ctrl+K — not just servers
+- **Wording "server-first" updated**: StatusReady, EmptyStateSelectServer, SearchPlaceholder now reference tools and Ctrl+K - not just servers
 - **Command Palette mode indicator**: Shows "Split Mode" / "Merge Mode" label when palette opens in split/merge context
 - **Command Palette auto-close**: Closes on sidebar tab change and window deactivation (preserves StaysOpen=True for ActiveX airspace compatibility)
 
@@ -2406,9 +2406,9 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **Mode persistence**: Advanced mode preference saved to AppSettings via `ConfigManager.MergeSettingAsync()`
 
 #### Declarative i18n (loc:Translate markup extension)
-- **TranslateExtension**: WPF `MarkupExtension` enabling `{loc:Translate Key}` syntax in XAML — auto-updates on runtime language switch via `INotifyPropertyChanged` on indexer
+- **TranslateExtension**: WPF `MarkupExtension` enabling `{loc:Translate Key}` syntax in XAML - auto-updates on runtime language switch via `INotifyPropertyChanged` on indexer
 - **LocalizationSource**: Singleton bridge between WPF binding system and `LocalizationManager` DI service
-- **PinDialog migrated**: Full POC — all 7 manual localization calls replaced with declarative XAML bindings, code-behind reduced to focus logic only
+- **PinDialog migrated**: Full POC - all 7 manual localization calls replaced with declarative XAML bindings, code-behind reduced to focus logic only
 
 #### Icon System Unification
 - **BitmapImage system removed**: Deleted `ConnectionTypeToIconConverter`, `ConnectionStateToIconConverter`, `IconResources.xaml`, and 37 PNG files
@@ -2418,7 +2418,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **Documented conventions**: Comprehensive header in IconGeometries.xaml describing naming pattern and extension procedure
 
 #### i18n
-- 3,457 keys (EN/FR parity confirmed) — +111 keys (tooltips, A11y, ComboBox content, empty states, palette modes, scan progress, disclosure, etc.)
+- 3,457 keys (EN/FR parity confirmed) - +111 keys (tooltips, A11y, ComboBox content, empty states, palette modes, scan progress, disclosure, etc.)
 
 #### Tests
 - **1,586 tests** (1,196 Core + 283 SSH + 107 App), all passing
@@ -2429,20 +2429,20 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ### Notes audit fixes, template i18n, Tools panel UX
 
-#### Notes tool — bug fixes from multi-model audit (Codex + Gemini)
-- **P1 — Milkdown fallback**: `TryInitializeMilkdownAsync` now checks `MilkdownEditorControl.IsHostInitialized` after `InitializeAsync()` — machines without WebView2 runtime correctly fall back to AvalonEdit instead of showing a non-functional Milkdown host
-- **P1 — camelCase settings mismatch**: `CreateStorageService()` and `LoadSidebarWidth()` now read camelCase property names (`notesDirectory`, `notesSidebarWidth`) matching `ConfigManager`'s `JsonNamingPolicy.CamelCase` serialization — configurable `NotesDirectory` path was silently ignored after any settings round-trip
-- **P2 — Sidebar width persistence race**: replaced ad-hoc `settings.json` direct write with `ConfigManager.MergeSettingAsync()` — prevents concurrent TOFU host key writes or other settings updates from being silently overwritten
-- **P2 — Wiki-link accent regression**: `Slugify()` now strips diacritics via Unicode normalization (`FormD` decomposition + `NonSpacingMark` removal) — `Procédure` slugifies to `procedure`, and `FindNotePathAsync()` uses accent-insensitive title fallback so `[[Procedure]]` resolves `# Procédure`
+#### Notes tool - bug fixes from multi-model audit (Codex + Gemini)
+- **P1 - Milkdown fallback**: `TryInitializeMilkdownAsync` now checks `MilkdownEditorControl.IsHostInitialized` after `InitializeAsync()` - machines without WebView2 runtime correctly fall back to AvalonEdit instead of showing a non-functional Milkdown host
+- **P1 - camelCase settings mismatch**: `CreateStorageService()` and `LoadSidebarWidth()` now read camelCase property names (`notesDirectory`, `notesSidebarWidth`) matching `ConfigManager`'s `JsonNamingPolicy.CamelCase` serialization - configurable `NotesDirectory` path was silently ignored after any settings round-trip
+- **P2 - Sidebar width persistence race**: replaced ad-hoc `settings.json` direct write with `ConfigManager.MergeSettingAsync()` - prevents concurrent TOFU host key writes or other settings updates from being silently overwritten
+- **P2 - Wiki-link accent regression**: `Slugify()` now strips diacritics via Unicode normalization (`FormD` decomposition + `NonSpacingMark` removal) - `Procédure` slugifies to `procedure`, and `FindNotePathAsync()` uses accent-insensitive title fallback so `[[Procedure]]` resolves `# Procédure`
 - **Sync save in CanClose/Dispose**: new `NotesStorageService.SaveNote()` synchronous method avoids `.GetAwaiter().GetResult()` sync-over-async pattern
 - **`_pendingReadOnly` nullable**: `MilkdownEditorControl` uses `bool?` to correctly handle `SetReadOnly(false)` before editor ready
 
-#### Notes tool — Zero Hardcoding compliance
-- **Template factory i18n**: all 26 hardcoded template strings extracted to locale files (`ToolNotesTpl*` keys) — `NotesTemplateFactory.Create()` accepts optional `LocalizationManager` parameter, propagated from view → storage → factory
+#### Notes tool - Zero Hardcoding compliance
+- **Template factory i18n**: all 26 hardcoded template strings extracted to locale files (`ToolNotesTpl*` keys) - `NotesTemplateFactory.Create()` accepts optional `LocalizationManager` parameter, propagated from view → storage → factory
 - **French translations**: templates fully localized (Objectifs, Chronologie, Résumé, Étapes, Retour arrière, etc.)
 
 #### Tools panel UX refonte
-- **Removed redundant header**: deleted the "Tools ▾" panel header and its close button — the toggle button at the bottom is the sole open/close control
+- **Removed redundant header**: deleted the "Tools ▾" panel header and its close button - the toggle button at the bottom is the sole open/close control
 - **Chevron state indicator**: toggle button shows `▲` when panel is closed, `▼` when open
 - **Category headers with colored accent**: each category section now displays a 3px colored bar (Network=blue, Security=amber, Encoding=purple, System=teal) with uppercase label in matching color
 - **Alphabetical sort**: tools within each category sorted alphabetically by localized name
@@ -2453,10 +2453,10 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - `NotesTemplateFactory.RemoveDiacritics()`: reusable Unicode diacritics stripping
 
 #### i18n
-- 3,346 keys (EN/FR parity confirmed) — +48 keys (26 template sections + 22 existing updates)
+- 3,346 keys (EN/FR parity confirmed) - +48 keys (26 template sections + 22 existing updates)
 
 #### Tests
-- **1,586 tests** (1,196 Core + 283 SSH + 107 App), all passing — +10 new (3 sync save, 3 diacritics, 2 accent-insensitive wiki-link, 2 template i18n)
+- **1,586 tests** (1,196 Core + 283 SSH + 107 App), all passing - +10 new (3 sync save, 3 diacritics, 2 accent-insensitive wiki-link, 2 template i18n)
 
 ---
 
@@ -2465,24 +2465,24 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 ### Notes tool enhancements and swap panes fix
 
 #### Notes: sidebar toggle, context menu, Dracula theme
-- **Sidebar toggle**: collapsible TreeView panel via hamburger button in header bar — saves/restores width across toggles
-- **Editor right-click context menu**: 17 Markdown formatting actions (Bold, Italic, Strikethrough, Inline Code, Code Block, Link, Image, Note Link, Headings 1–3, Bullet/Numbered/Task List, Blockquote, Table, Horizontal Rule) — works in both Milkdown (JS) and AvalonEdit (WPF) editors with localized labels (EN/FR)
+- **Sidebar toggle**: collapsible TreeView panel via hamburger button in header bar - saves/restores width across toggles
+- **Editor right-click context menu**: 17 Markdown formatting actions (Bold, Italic, Strikethrough, Inline Code, Code Block, Link, Image, Note Link, Headings 1–3, Bullet/Numbered/Task List, Blockquote, Table, Horizontal Rule) - works in both Milkdown (JS) and AvalonEdit (WPF) editors with localized labels (EN/FR)
 - **Dracula theme**: full Dracula palette for Milkdown dark mode (#282a36 bg, #f8f8f2 fg, #bd93f9 purple accents, #8be9fd cyan links, #ff79c6 pink inline code) via native Crepe `--crepe-*` CSS tokens (removed legacy `@milkdown/theme-nord` import). AvalonEdit syntax highlighting colors updated to match
 
 #### Fix: swap panes freeze
-- **Async two-phase handoff**: `SwapSplitPanesAsync` detaches host controls, awaits visual tree stabilization (`AwaitVisualTreeAsync` at Loaded + ContextIdle priority), swaps model references, awaits again, then restores controls — prevents UIElement single-parent race between old and new `SessionPaneControl` instances
-- **`SessionPaneControl` lifecycle guards**: `SyncContent()` and `UpdateOverlays()` gated by `IsLoaded`; `HostPresenter.Content` cleared in both `OnUnloaded` and `OnDataContextChanged`; PropertyChanged subscription only while loaded — prevents disconnected controls from stealing WebView2/ActiveX children
+- **Async two-phase handoff**: `SwapSplitPanesAsync` detaches host controls, awaits visual tree stabilization (`AwaitVisualTreeAsync` at Loaded + ContextIdle priority), swaps model references, awaits again, then restores controls - prevents UIElement single-parent race between old and new `SessionPaneControl` instances
+- **`SessionPaneControl` lifecycle guards**: `SyncContent()` and `UpdateOverlays()` gated by `IsLoaded`; `HostPresenter.Content` cleared in both `OnUnloaded` and `OnDataContextChanged`; PropertyChanged subscription only while loaded - prevents disconnected controls from stealing WebView2/ActiveX children
 
 ---
 
 ## [v2026.032404] - 2026-03-24
 
-### Notes tool — Obsidian-style Markdown editor with Milkdown
+### Notes tool - Obsidian-style Markdown editor with Milkdown
 
 #### New tool: Notes (#34 NOTES)
 - **Milkdown WYSIWYG editor** via WebView2 (ProseMirror-based, MIT licensed) with AvalonEdit + syntax highlighting fallback
 - **TreeView file explorer** mirroring filesystem hierarchy with folder icons, drag-and-drop between folders, and folder creation
-- **4 templates**: Blank, Daily, Incident, Procedure — with contextual server metadata pre-fill
+- **4 templates**: Blank, Daily, Incident, Procedure - with contextual server metadata pre-fill
 - **`[[wiki-link]]` support**: click navigation, back/forward history, auto-completion popup on `[[` keystroke
 - **Tag filtering**: `> tags: infra, prod` metadata line, dynamic filter buttons
 - **Export**: Confluence Storage Format XML (copy/export), HTML standalone
@@ -2510,20 +2510,20 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ## [v2026.032403] - 2026-03-24
 
-### Split/Merge audit — 7 fixes (bugs, robustness, cleanup dedup)
+### Split/Merge audit - 7 fixes (bugs, robustness, cleanup dedup)
 
 #### Bug fixes
-- **CancellationTokenSource leak**: `CancelSession` now disposes the CTS after a 5-second delay (deferred dispose) — previously cancelled but never disposed, leaking one CTS per tab close
-- **GridSplitter cursor**: cursor now updates dynamically (`SizeNS` for Horizontal, `SizeWE` for Vertical) in `ApplyLayout()` — previously hardcoded `SizeWE` regardless of orientation
+- **CancellationTokenSource leak**: `CancelSession` now disposes the CTS after a 5-second delay (deferred dispose) - previously cancelled but never disposed, leaking one CTS per tab close
+- **GridSplitter cursor**: cursor now updates dynamically (`SizeNS` for Horizontal, `SizeWE` for Vertical) in `ApplyLayout()` - previously hardcoded `SizeWE` regardless of orientation
 - **Reconnect self-referential LayoutMemory**: `ReconnectPaneAsync` no longer calls `LayoutMemory.Record` (was recording the same server as both primary and secondary, polluting palette suggestions)
-- **MergeExistingSession HostControl check**: now checks all source tree leaves via `EnumerateLeaves().Any(p => p.HostControl is not null)` instead of the primary shim — split tabs with a disconnected primary were incorrectly blocked from merging
+- **MergeExistingSession HostControl check**: now checks all source tree leaves via `EnumerateLeaves().Any(p => p.HostControl is not null)` instead of the primary shim - split tabs with a disconnected primary were incorrectly blocked from merging
 
 #### Robustness
-- **CancellationToken propagation**: `ConnectByProtocolAsync` now passes `ct` to all `ConnectionService.Connect*Async` protocol handlers — closing a tab during a slow tunnel or SSH handshake now actually cancels the connection attempt
-- **Merge blocked feedback**: `MergeExistingSession` now shows a status bar message (`SplitMergeBlockedByTool`) when a busy tool pane prevents the merge — previously returned silently with no user feedback
+- **CancellationToken propagation**: `ConnectByProtocolAsync` now passes `ct` to all `ConnectionService.Connect*Async` protocol handlers - closing a tab during a slow tunnel or SSH handshake now actually cancels the connection attempt
+- **Merge blocked feedback**: `MergeExistingSession` now shows a status bar message (`SplitMergeBlockedByTool`) when a busy tool pane prevents the merge - previously returned silently with no user feedback
 
 #### Cleanup deduplication
-- **`CloseAllPanes` extracted to SplitService**: centralized tab teardown (CanClose gate, cancellation, disconnect history, tunnel release, state reset, disposal) — `ConnectionViewModel.CloseSessionInternal` now delegates entirely to `SplitService.CloseAllPanes`, eliminating 30 lines of duplicated cleanup logic
+- **`CloseAllPanes` extracted to SplitService**: centralized tab teardown (CanClose gate, cancellation, disconnect history, tunnel release, state reset, disposal) - `ConnectionViewModel.CloseSessionInternal` now delegates entirely to `SplitService.CloseAllPanes`, eliminating 30 lines of duplicated cleanup logic
 - **ConnectionViewModel slimmed**: removed 3 unused DI dependencies (`ConnectionStateMachine`, `TunnelManager`, `ConfigManager`) and their imports after cleanup extraction
 
 #### i18n
@@ -2559,7 +2559,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 #### Code quality
 - **NotifyTreeDependentProperties**: Shared method replaces duplicated 12-line `OnPropertyChanged` blocks in both `OnRootContentChanged` and `NotifyShimPropertiesChanged` (DRY)
-- **_emptyPane per-instance**: Changed from `static readonly` to instance field — prevents cross-session state leakage if fallback pane properties are modified
+- **_emptyPane per-instance**: Changed from `static readonly` to instance field - prevents cross-session state leakage if fallback pane properties are modified
 - **CTS lifecycle**: `CancelSession` no longer immediately disposes the CTS (just cancels). In-flight operations holding token references remain valid for guard checks
 - **Diagnostic logging**: Added `FileLogger` calls at all guard points: pane not found, max panes reached, session cancelled, orphaned pane cleanup, double-close detection, tool CanClose blocked, reconnect skip (already in progress)
 
@@ -2567,7 +2567,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **SplitLayoutMemory**: `config/split-layouts.json` now uses versioned format `{ "version": 1, "entries": [...] }`. Load is backward-compatible with legacy bare-array format (auto-migrates on next save)
 
 #### Tests
-- **1,479 tests** (1,196 Core + 283 SSH), all passing — zero regressions from refactoring
+- **1,479 tests** (1,196 Core + 283 SSH), all passing - zero regressions from refactoring
 
 ## [v2026.032403] - 2026-03-24
 
@@ -2575,12 +2575,12 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 #### New features
 - **Mixed session + tool splits**: sessions and built-in tools can now be freely split and merged in any combination (e.g., SSH terminal left + Network Cartography right)
-- **`SplitSessionWithTool`**: new method docks a built-in tool directly into a split pane without requiring a network connection — tool creation is synchronous, no loading overlay needed
+- **`SplitSessionWithTool`**: new method docks a built-in tool directly into a split pane without requiring a network connection - tool creation is synchronous, no loading overlay needed
 - **Command Palette split mode**: tool tabs now appear as merge candidates alongside sessions; selecting a tool from search results in split mode docks it as a pane
 - **Context menu merge**: "Merge with..." submenu now lists both sessions and tool tabs
 
 #### Cleanup hardening
-- **Per-pane cleanup in `CloseSessionInternal`**: refactored from early-exit tool check to per-pane handling in the recursive leaf loop — mixed splits (session + tool in same tab) now clean up correctly: tool panes respect `CanClose()` and skip state machine/tunnel teardown, while connection panes get full disconnect/tunnel/state-machine cleanup
+- **Per-pane cleanup in `CloseSessionInternal`**: refactored from early-exit tool check to per-pane handling in the recursive leaf loop - mixed splits (session + tool in same tab) now clean up correctly: tool panes respect `CanClose()` and skip state machine/tunnel teardown, while connection panes get full disconnect/tunnel/state-machine cleanup
 - **`ClosePane` tool awareness**: closing a tool pane in a split tree now checks `IToolView.CanClose()` (e.g., blocks close during active scan) and skips state machine/tunnel operations
 - **Busy tool blocks tab close**: if any tool pane in a split tree has `CanClose() == false`, the entire tab close is blocked (consistent with standalone tool tab behavior)
 
@@ -2594,19 +2594,19 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 ### Split/Merge system hardening
 
 #### Bug fixes
-- **`ReplacePane` short-circuit**: extracted `ReplacePaneRecursive` with `bool` return — stops traversing after first match instead of processing both children
+- **`ReplacePane` short-circuit**: extracted `ReplacePaneRecursive` with `bool` return - stops traversing after first match instead of processing both children
 - **`RemovePane` null subtree**: when recursive removal empties a subtree, promotes the sibling instead of assigning `null` to `First`/`Second` (prevented potential `NullReferenceException`)
 - **`ReplaceContainer` short-circuit**: converted from `void` to `bool` return for early exit after match
-- **`MergeExistingSession` lookup**: added `OriginalServerId` fallback — context menu and palette merge no longer silently fail if `ServerId` is empty during connection
+- **`MergeExistingSession` lookup**: added `OriginalServerId` fallback - context menu and palette merge no longer silently fail if `ServerId` is empty during connection
 - **`OnSplitterDragCompleted` orientation guard**: explicit `SplitOrientation.Vertical` check prevents fallthrough to column calculation when horizontal grid is misconfigured
 
 #### Memory leak fixes
-- **`SessionPaneControl`**: added `Unloaded` handler — detaches `PropertyChanged`, `Button.Click`, `DataContextChanged`, `Loaded` subscriptions
-- **`SplitContainerControl`**: added `Unloaded` handler — detaches `PropertyChanged`, `DragCompleted`, `DataContextChanged`, `Loaded` subscriptions
+- **`SessionPaneControl`**: added `Unloaded` handler - detaches `PropertyChanged`, `Button.Click`, `DataContextChanged`, `Loaded` subscriptions
+- **`SplitContainerControl`**: added `Unloaded` handler - detaches `PropertyChanged`, `DragCompleted`, `DataContextChanged`, `Loaded` subscriptions
 
 #### Thread-safety & I/O hardening
 - **`SplitLayoutMemory`**: all public methods (`Record`, `FindPartner`, `FindAllPartners`) synchronized via `lock`; constructor `Load()` also under lock
-- **Atomic save**: unique temp file per write (`Guid`-suffixed) with `finally` cleanup on failure — prevents corruption on concurrent writes or crash
+- **Atomic save**: unique temp file per write (`Guid`-suffixed) with `finally` cleanup on failure - prevents corruption on concurrent writes or crash
 
 #### Zero-hardcoding cleanup
 - `SessionPaneControl.xaml`: replaced `Background="#B0000000"` → `{DynamicResource OverlayBackground}`, `FontSize="28"` → `{StaticResource FontSizeHeadline}`, `Foreground="#AAAAAA"/"White"` → theme brushes, removed English `FallbackValue`
@@ -2617,7 +2617,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - `SplitLayoutMemory.cs`: extracted `FileName` constant
 
 #### Model improvements
-- **`SplitRatio` auto-clamping**: `OnSplitRatioChanged` partial method clamps to `[MinRatio, MaxRatio]` — view no longer double-clamps
+- **`SplitRatio` auto-clamping**: `OnSplitRatioChanged` partial method clamps to `[MinRatio, MaxRatio]` - view no longer double-clamps
 - **Merge ratio restoration**: `MergeExistingSession` consults `SplitLayoutMemory` for prior ratio when merging a previously-paired server pair
 - **`SyncContent` optimization**: `ReferenceEquals` check prevents unnecessary `ContentPresenter.Content` reassignment
 
@@ -2642,7 +2642,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 #### Architecture overhaul
 - **Recursive split tree**: replaced flat `Secondary*` properties with binary tree model (`ISplitContent` → `SessionPaneModel` | `SplitContainerModel`)
 - Up to **8 panes per tab** in any layout: 2x2, L-shape, 3 side-by-side, deeply nested splits
-- All operations addressed by `PaneId` (GUID) — split, merge, swap, close, reconnect, detach
+- All operations addressed by `PaneId` (GUID) - split, merge, swap, close, reconnect, detach
 - WPF rendering via implicit `DataTemplate` resolution: `SessionPaneControl` (leaf) + `SplitContainerControl` (recursive container with `GridSplitter`)
 - `SplitTreeHelper` static utilities: `EnumerateLeaves`, `FindPane`, `FindParent`, `FindSibling`, `RemovePane`, `ReplacePane`, `CountLeaves`, `FirstLeaf`
 - 37 new unit tests for tree operations
@@ -2687,7 +2687,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ## [v2026.032312] - 2026-03-23
 
-### Network Cartography — Deep Fingerprinting Engine
+### Network Cartography - Deep Fingerprinting Engine
 
 #### OS fingerprinting overhaul
 - **Port-based OS inference**: RDP/WinRM → Windows, SSH-only → Linux, Kerberos+LDAP → Windows Server
@@ -2696,8 +2696,8 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - **MergeAll()**: Combines 5 sources (TTL, banner, ports, SNMP, NTLM) with multi-source confidence boosting
 
 #### New probe modules
-- **NtlmProbe**: SMB2 Negotiate + NTLMSSP Type 1/2 exchange — extracts hostname, domain, DNS forest, OS build, SMB dialect, signing policy, server GUID, uptime without credentials
-- **SshFingerprinter**: HASSH fingerprint (MD5 of KEX_INIT algorithm lists) — identifies SSH implementation precisely
+- **NtlmProbe**: SMB2 Negotiate + NTLMSSP Type 1/2 exchange - extracts hostname, domain, DNS forest, OS build, SMB dialect, signing policy, server GUID, uptime without credentials
+- **SshFingerprinter**: HASSH fingerprint (MD5 of KEX_INIT algorithm lists) - identifies SSH implementation precisely
 - **FaviconHasher**: Shodan-compatible MurmurHash3 favicon fingerprinting with 30+ known device hashes (FortiGate, VMware ESXi, Synology, Grafana, Jenkins, Freebox, TP-Link, Hikvision...)
 - **HttpFingerprinter**: Cookie detection (12 frameworks), error page regex (7 patterns), product URL probing (13 vendor-specific paths: Hikvision, Synology, QNAP, MikroTik, FortiGate, ESXi...)
 - **IanaPenDatabase**: SNMP sysObjectID → vendor decode via 50+ IANA Private Enterprise Numbers
@@ -2762,12 +2762,12 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 #### Session merge (new feature)
 - Right-click tab → **"Merge with..."** submenu lists all active sessions with horizontal/vertical orientation
-- Merges the selected session into the current tab's split pane without reconnecting — the live connection is reparented instantly
+- Merges the selected session into the current tab's split pane without reconnecting - the live connection is reparented instantly
 - Unsplit restores the merged session as an independent tab
 - Split palette also shows active sessions at the top for merge via keyboard (Enter)
 
 #### Airspace fix (Command Palette over RDP/VNC)
-- Command Palette converted from WPF Grid overlay to `Popup` (own HWND) — renders above WindowsFormsHost/ActiveX surfaces
+- Command Palette converted from WPF Grid overlay to `Popup` (own HWND) - renders above WindowsFormsHost/ActiveX surfaces
 - Win32 focus forced via `SetForegroundWindow`/`SetActiveWindow`/`SetFocus` P/Invoke on Popup open
 - Keyboard navigation via `PreviewKeyDown` on Border parent (intercepted before TextBox consumes arrows)
 - Click item resolved from `ListBoxItem.DataContext` via `PreviewMouseLeftButtonDown`
@@ -2777,14 +2777,14 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 ### Split Session Fix + RDP Improvements
 
 #### Airspace fix (Command Palette over RDP/VNC)
-- **Fix**: Command Palette (Ctrl+K) was invisible over RDP sessions due to WPF airspace issue — `WindowsFormsHost` HWND always rendered above WPF overlay content
+- **Fix**: Command Palette (Ctrl+K) was invisible over RDP sessions due to WPF airspace issue - `WindowsFormsHost` HWND always rendered above WPF overlay content
 - Replaced the `Grid` overlay with a WPF `Popup` that creates its own HWND, rendering above all Win32 surfaces
 - Drop shadow and proper `PlacementTarget` for consistent positioning
 - Deferred focus via `Dispatcher.BeginInvoke` (Popup content enters visual tree asynchronously)
 - Dismiss on outside click via `PreviewMouseDown` on the main Window
 
 #### Split session
-- **Fix**: split session was silently failing because default RDP/SSH mode was "External" — embedded mode is now the default
+- **Fix**: split session was silently failing because default RDP/SSH mode was "External" - embedded mode is now the default
 - Force embedded mode for split pane connections (external mstsc.exe cannot be docked)
 - Add missing VNC, FTP, Citrix protocol cases in split session switch
 
@@ -2795,7 +2795,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - USB device redirection, bandwidth auto-detect, network connection type
 - Performance flags and DisableUdp options in `.rdp` file generation
 - Fix `AudioCaptureRedirectionMode` COM property type (int, not bool)
-- Fix COM dispose — let AxHost handle RCW cleanup (prevents "COM object separated" errors)
+- Fix COM dispose - let AxHost handle RCW cleanup (prevents "COM object separated" errors)
 
 #### Settings
 - Default connection mode changed from "External" to "Embedded" for both RDP and SSH
@@ -2803,7 +2803,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ## [v2026.032303] - 2026-03-23
 
-### Network Cartography — Knowledge Base + Security Hardening
+### Network Cartography - Knowledge Base + Security Hardening
 
 #### Knowledge Base (persistent host data across scans)
 - New `KnowledgeBaseManager` with per-field `Observation<T>` timestamps and source tracking
@@ -2855,7 +2855,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ## [v2026.032302] - 2026-03-23
 
-### Local Shell Elevation — ElevationMode + AdminByRequest Compatibility
+### Local Shell Elevation - ElevationMode + AdminByRequest Compatibility
 
 #### Elevation Mode (replaces checkbox)
 - New `ElevationMode` enum: `None`, `Auto`, `Gsudo`, `Runas`
@@ -2880,7 +2880,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - 181 hardcoded padding values replaced with design tokens across all 33 tool views
 - All tools now use consistent tokenized spacing (global change via a single file)
 
-#### Tool Views (33 tools) — Structural Harmonization
+#### Tool Views (33 tools) - Structural Harmonization
 - Unified header Border: `Padding="12,8"`, no extra margin, across all 33 tools
 - Unified title TextBlock `x:Name="HeaderTitle"` (was split between `HeaderTitle` and `TitleText`)
 - Added `VerticalAlignment="Center"` on all title TextBlocks
@@ -2909,7 +2909,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - `SetBusyAction` callback in `ToolContext` for tools to signal long-running operations
 - Wired on Ping, Port Scanner, Network Cartography (pulse visible during active scans)
 
-#### Network Cartography — Remote Subnet Auto-Detection
+#### Network Cartography - Remote Subnet Auto-Detection
 - Selecting an SSH gateway in "Route via" now auto-detects remote subnets
 - SSH connection to gateway, runs `ip -4 addr show` (Linux), `ifconfig` (Unix/macOS), `ipconfig` (Windows)
 - Parses non-loopback IPv4 CIDRs, normalizes to network addresses, pre-fills TxtSubnet
@@ -2918,7 +2918,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ## [v2026.032210] - 2026-03-22
 
-### Comprehensive UX Audit — WCAG AA, Design Tokens, Accessibility
+### Comprehensive UX Audit - WCAG AA, Design Tokens, Accessibility
 
 #### Design System (40 tokens, WCAG AA compliant)
 - Add `ContentAreaMargin`, `SessionHeaderPadding`, `ToolHeaderPadding`, `ToolFooterPadding` spacing tokens
@@ -2963,7 +2963,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 
 ## [v2026.032204] - 2026-03-22
 
-### Network Cartography — Enhanced Device Detection
+### Network Cartography - Enhanced Device Detection
 - OS fingerprinting via ICMP TTL analysis (Windows/Linux/Network Equipment) and banner pattern matching (33 patterns)
 - NetBIOS NBSTAT probe (UDP 137): computer name, domain/workgroup, MAC address extraction
 - SNMPv2c GET probe (UDP 161): sysDescr, sysName, sysLocation with raw ASN.1/BER encoding
@@ -2991,7 +2991,7 @@ Three-pass cross-audit covering all 49 built-in tools (64 files, +809/-417 lines
 - ServerDialog: tabs stay visible but disabled (not hidden), with tooltip explanation
 - 33 tool icons: 4 category colors + per-tool glyphs replace uniform wrench
 - Ctrl+K palette: protocol icons, status dots, endpoint hints
-- VNC session parity: Split, Reconnect, overlay — fully wired in EmbeddedSessionManager
+- VNC session parity: Split, Reconnect, overlay - fully wired in EmbeddedSessionManager
 - Settings bar: WrapPanel, Save button separated from secondary actions
 - SFTP: bookmark overflow menu, optimized column widths
 - Broadcast button: icon + localized label replaces cryptic "B"

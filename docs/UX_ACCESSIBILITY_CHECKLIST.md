@@ -41,8 +41,8 @@ Use this checklist for every new tool and during significant UX refactors.
 
 ## Contrast And Color
 
-- Buttons, glyphs, and indicators painted on `AccentBrush` use `TextOnAccentBrush` (per-theme dark on light-accent variants, white on dark-accent variants). Direct `#FFFFFF` `Foreground` over an accent fill is a regression — the contrast collapses to ~2:1 on the 7 light-pastel-accent Dracula variants (DraculaPro, Drakula, Blade, Buffy, Bathory, Lincoln, VanHelsing, Morbius).
-- Semantic status text (Success / Warning / Error / Info) uses `SuccessTextBrush` / `WarningTextBrush` / `ErrorTextBrush` for `Foreground`. The plain `*Brush` keys remain reserved for borders, badge fills, and icon backgrounds — they are too saturated for text on the 5 light themes (Alucard, Carmilla, Helsing, Nosferatu, Renfield).
+- Buttons, glyphs, and indicators painted on `AccentBrush` use `TextOnAccentBrush` (per-theme dark on light-accent variants, white on dark-accent variants). Direct `#FFFFFF` `Foreground` over an accent fill is a regression - the contrast collapses to ~2:1 on the 7 light-pastel-accent Dracula variants (DraculaPro, Drakula, Blade, Buffy, Bathory, Lincoln, VanHelsing, Morbius).
+- Semantic status text (Success / Warning / Error / Info) uses `SuccessTextBrush` / `WarningTextBrush` / `ErrorTextBrush` for `Foreground`. The plain `*Brush` keys remain reserved for borders, badge fills, and icon backgrounds - they are too saturated for text on the 5 light themes (Alucard, Carmilla, Helsing, Nosferatu, Renfield).
 - Theme-aware brush converters follow the dual `IValueConverter` + `IMultiValueConverter` pattern with a `ThemeRevision` trigger so a runtime theme swap re-evaluates colors without a rebind.
 
 ## Localization

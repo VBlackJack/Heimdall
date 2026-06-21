@@ -16,13 +16,13 @@ or falls back gracefully to defaults at runtime.
 
 ### Already pruned (safe)
 
-- **Locales** (`resources/dia_*.txt`) — kept only `dia.txt` (English base /
+- **Locales** (`resources/dia_*.txt`) - kept only `dia.txt` (English base /
   fallback), `dia_fr.txt` (French), and `dia_i18n.txt` (auto-generated key
   manifest). Removed ~55 other language files (~2.95 MB). Heimdall is
   English/French only; draw.io falls back to `dia.txt` for any missing locale,
   so no runtime behaviour changes.
 
-### Candidates for further pruning (NOT yet removed — needs manual testing)
+### Candidates for further pruning (NOT yet removed - needs manual testing)
 
 These require running the Diagram Editor tool end-to-end to verify they are
 actually dead weight before deletion. Do NOT remove without a smoke test of

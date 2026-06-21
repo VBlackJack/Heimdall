@@ -53,11 +53,11 @@ including this one.
 `PageantClient.SendMessage` creates a named file mapping with **two layers of
 hardening** against same-session userland snooping:
 
-1. **Self-only DACL** via `SecurityAttributesScope.CreateSelfOnly` — the
+1. **Self-only DACL** via `SecurityAttributesScope.CreateSelfOnly` - the
    mapping handle is created with an explicit `SECURITY_ATTRIBUTES` whose SDDL
    is `D:P(A;;FA;;;<currentUserSid>)`, denying access even to other processes
    running under the **same** Windows user.
-2. **Cryptographically random mapping name** —
+2. **Cryptographically random mapping name** - 
    `RandomNumberGenerator.GetHexString(16)` provides 64 bits of entropy in the
    mapping name, defeating opportunistic enumeration by a malicious process
    that knows Heimdall's PID.
@@ -114,7 +114,7 @@ pre-authentication probe (`SshConnectionFactory.ProbeHostKeyAsync` with
 `NoneAuthenticationMethod`). The real connection then uses a strict,
 synchronous `PinnedFingerprintVerifier` that only accepts the pre-resolved
 fingerprint. SSH.NET's `HostKeyReceived` callback performs no async work, no
-UI dispatch, and no `IHostKeyVerifier.VerifyAsync` call from inside it — this
+UI dispatch, and no `IHostKeyVerifier.VerifyAsync` call from inside it - this
 invariant has a dedicated regression test
 (`IHostKeyVerifierIntegrationTests.AttachHostKeyVerification_RejectsInteractiveVerifierSynchronously`).
 
@@ -227,15 +227,15 @@ expose them) so this is defense-in-depth, not a load-bearing mitigation.
 The pattern is local to `HostKeyStore` and should not be copied verbatim
 to variable-length secret comparisons.
 
-### known_hosts import — DoS bounds
+### known_hosts import - DoS bounds
 
 `KnownHostsParser` enforces two hard caps when consuming externally-supplied
 `known_hosts` files:
 
-- **`MaxLineLength = 65 536`** — lines longer than 64 KB are skipped with a
+- **`MaxLineLength = 65 536`** - lines longer than 64 KB are skipped with a
   `MalformedLine` diagnostic; defends against a single giant line forcing a
   large allocation.
-- **`MaxFileSizeBytes = 50 MB`** — files larger than 50 MB are refused
+- **`MaxFileSizeBytes = 50 MB`** - files larger than 50 MB are refused
   outright with a typed `FileTooLarge` diagnostic. Both the core importer and
   the app-side importer stream via `StreamReader` rather than
   `File.ReadAllText`, and wrap I/O in `try/catch` so locked or unreadable

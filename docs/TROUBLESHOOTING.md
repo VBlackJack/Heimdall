@@ -7,63 +7,63 @@
 
       http://www.apache.org/licenses/LICENSE-2.0
 -->
-# Heimdall — Troubleshooting Guide
+# Heimdall - Troubleshooting Guide
 
 Index of all issues encountered during development and their solutions.
 
 ## Table of Contents
 
-1. [RDP Embedded — White Screen](#rdp-embedded-white-screen)
-2. [RDP Embedded — Disconnect Code 4360](#rdp-embedded-disconnect-code-4360)
-3. [RDP Embedded — COM RCW Crash on Tab Close](#rdp-embedded-com-rcw-crash-on-tab-close)
-4. [RDP Embedded — Resize HRESULT Error](#rdp-embedded-resize-hresult-error)
-5. [RDP CredUI Autofill — Dialog Not Detected](#rdp-credui-autofill-dialog-not-detected)
-6. [SSH — Pageant Keys Not Recognized by SSH.NET](#ssh-pageant-keys-not-recognized)
-7. [SSH Terminal — Arrow Keys Not Working](#ssh-terminal-arrow-keys-not-working)
-8. [SSH Terminal — No Colors, Strange Characters](#ssh-terminal-no-colors-strange-characters)
-9. [SSH Terminal — Cursor Blinks Too Fast](#ssh-terminal-cursor-blinks-too-fast)
-10. [WebView2 — DLL Not Found](#webview2-dll-not-found)
-11. [Tab Navigation — Tabs Blocked by Active Sessions](#tab-navigation-blocked-by-sessions)
-12. [WPF — DynamicResource in BasedOn](#wpf-dynamicresource-in-basedon)
-13. [WPF — XAML Click Handler in Style Setter](#wpf-xaml-click-handler-in-style-setter)
-14. [Build — Version Number Overflow](#build-version-number-overflow)
-15. [Build — Ambiguous Type References](#build-ambiguous-type-references)
-16. [TOFU — HostKeyFingerprint on PSCustomObject](#tofu-hostkeyfingerprint-on-pscustomobject)
-17. [Passwords — Not Saved After Edit](#passwords-not-saved-after-edit)
-18. [Pageant — AGENT_COPYDATA_ID Wrong Value](#pageant-agent_copydata_id-wrong-value)
-19. [Pageant — RSA-SHA2 Algorithm Registration](#pageant-rsa-sha2-algorithm-registration)
-20. [Pageant — Sign() Returns Raw Bytes Instead of Blob](#pageant-sign-returns-raw-bytes-instead-of-blob)
-21. [SFTP — CheckBox Fires During XAML Parse](#sftp-checkbox-fires-during-xaml-parse)
-22. [SFTP — Context Menu Intercepted by MainWindow](#sftp-context-menu-intercepted-by-mainwindow)
-23. [Citrix — storebrowse.exe Not Found](#citrix-storebrowseexe-not-found)
-24. [Theme Switching — Stale Colors After Swap](#theme-switching-stale-colors-after-swap)
-25. [Multi-Exec — Broadcast Sends to Wrong Terminals](#multi-exec-broadcast-sends-to-wrong-terminals)
-26. [RDP Embedded — Resize Flicker](#rdp-embedded-resize-flicker)
-27. [VNC — noVNC Library Unavailable](#vnc-novnc-unavailable)
-28. [VNC — WebSocket Proxy Port Conflict](#vnc-websocket-port-conflict)
-29. [X11 Forwarding — No Display](#x11-no-display)
-30. [Telnet — Connection Hangs](#telnet-connection-hangs)
-31. [FTP — Passive Mode Failures](#ftp-passive-mode)
-32. [Tab Detach — WebView2 Session Lost](#tab-detach-webview2)
-33. [Ephemeral Server — Port 69 Access Denied](#tftp-port-access-denied)
-34. [Quick Connect — Ad-Hoc SSH Fails](#quick-connect-ad-hoc-ssh-fails)
-35. [RDP Resize — Still Reconnecting (Delta/Debounce Tuning)](#rdp-resize-still-reconnecting-deltadebounce-tuning)
-36. [SFTP — Sudo Fallback Permission Denied (Auth Failure)](#sftp-sudo-fallback-auth-failure)
-37. [SFTP — Sudo ls Parser Shows Empty Directory](#sftp-sudo-ls-parser-empty)
-38. [SFTP — Sudo Fallback Uses Typed Permission Denied Only](#sftp-typed-permission-denied-only)
-39. [WebView2 — Side-by-Side Configuration Error (0x800736B1)](#webview2-sxs-error)
-40. [HTTP Traversal — Sibling Prefix Bypass](#http-traversal-sibling-prefix)
-41. [Tool Tunnel Scan — Few or No Hosts Found](#tool-tunnel-scan-few-hosts)
-42. [SSH — TestEnv Gateway Dropdown Empty After Import](#ssh-testenv-gateway-dropdown-empty)
-43. [RDP — IMsRdpExtendedSettings Not Reachable via dynamic Property Access](#rdp-extendedsettings-dynamic-access)
-44. [SSH — Host Key Unavailable on Plink Fallback](#ssh-host-key-unavailable-plink)
-45. [SSH/SFTP — Host Key Mismatch Mid-Session](#ssh-sftp-host-key-mismatch-mid-session)
-46. [FTP — Cleartext Credential Warning](#ftp-cleartext-credential-warning)
-47. [WinRM Gateway — HTTP 12152 Invalid Server Response](#winrm-gateway-12152)
+1. [RDP Embedded - White Screen](#rdp-embedded-white-screen)
+2. [RDP Embedded - Disconnect Code 4360](#rdp-embedded-disconnect-code-4360)
+3. [RDP Embedded - COM RCW Crash on Tab Close](#rdp-embedded-com-rcw-crash-on-tab-close)
+4. [RDP Embedded - Resize HRESULT Error](#rdp-embedded-resize-hresult-error)
+5. [RDP CredUI Autofill - Dialog Not Detected](#rdp-credui-autofill-dialog-not-detected)
+6. [SSH - Pageant Keys Not Recognized by SSH.NET](#ssh-pageant-keys-not-recognized)
+7. [SSH Terminal - Arrow Keys Not Working](#ssh-terminal-arrow-keys-not-working)
+8. [SSH Terminal - No Colors, Strange Characters](#ssh-terminal-no-colors-strange-characters)
+9. [SSH Terminal - Cursor Blinks Too Fast](#ssh-terminal-cursor-blinks-too-fast)
+10. [WebView2 - DLL Not Found](#webview2-dll-not-found)
+11. [Tab Navigation - Tabs Blocked by Active Sessions](#tab-navigation-blocked-by-sessions)
+12. [WPF - DynamicResource in BasedOn](#wpf-dynamicresource-in-basedon)
+13. [WPF - XAML Click Handler in Style Setter](#wpf-xaml-click-handler-in-style-setter)
+14. [Build - Version Number Overflow](#build-version-number-overflow)
+15. [Build - Ambiguous Type References](#build-ambiguous-type-references)
+16. [TOFU - HostKeyFingerprint on PSCustomObject](#tofu-hostkeyfingerprint-on-pscustomobject)
+17. [Passwords - Not Saved After Edit](#passwords-not-saved-after-edit)
+18. [Pageant - AGENT_COPYDATA_ID Wrong Value](#pageant-agent_copydata_id-wrong-value)
+19. [Pageant - RSA-SHA2 Algorithm Registration](#pageant-rsa-sha2-algorithm-registration)
+20. [Pageant - Sign() Returns Raw Bytes Instead of Blob](#pageant-sign-returns-raw-bytes-instead-of-blob)
+21. [SFTP - CheckBox Fires During XAML Parse](#sftp-checkbox-fires-during-xaml-parse)
+22. [SFTP - Context Menu Intercepted by MainWindow](#sftp-context-menu-intercepted-by-mainwindow)
+23. [Citrix - storebrowse.exe Not Found](#citrix-storebrowseexe-not-found)
+24. [Theme Switching - Stale Colors After Swap](#theme-switching-stale-colors-after-swap)
+25. [Multi-Exec - Broadcast Sends to Wrong Terminals](#multi-exec-broadcast-sends-to-wrong-terminals)
+26. [RDP Embedded - Resize Flicker](#rdp-embedded-resize-flicker)
+27. [VNC - noVNC Library Unavailable](#vnc-novnc-unavailable)
+28. [VNC - WebSocket Proxy Port Conflict](#vnc-websocket-port-conflict)
+29. [X11 Forwarding - No Display](#x11-no-display)
+30. [Telnet - Connection Hangs](#telnet-connection-hangs)
+31. [FTP - Passive Mode Failures](#ftp-passive-mode)
+32. [Tab Detach - WebView2 Session Lost](#tab-detach-webview2)
+33. [Ephemeral Server - Port 69 Access Denied](#tftp-port-access-denied)
+34. [Quick Connect - Ad-Hoc SSH Fails](#quick-connect-ad-hoc-ssh-fails)
+35. [RDP Resize - Still Reconnecting (Delta/Debounce Tuning)](#rdp-resize-still-reconnecting-deltadebounce-tuning)
+36. [SFTP - Sudo Fallback Permission Denied (Auth Failure)](#sftp-sudo-fallback-auth-failure)
+37. [SFTP - Sudo ls Parser Shows Empty Directory](#sftp-sudo-ls-parser-empty)
+38. [SFTP - Sudo Fallback Uses Typed Permission Denied Only](#sftp-typed-permission-denied-only)
+39. [WebView2 - Side-by-Side Configuration Error (0x800736B1)](#webview2-sxs-error)
+40. [HTTP Traversal - Sibling Prefix Bypass](#http-traversal-sibling-prefix)
+41. [Tool Tunnel Scan - Few or No Hosts Found](#tool-tunnel-scan-few-hosts)
+42. [SSH - TestEnv Gateway Dropdown Empty After Import](#ssh-testenv-gateway-dropdown-empty)
+43. [RDP - IMsRdpExtendedSettings Not Reachable via dynamic Property Access](#rdp-extendedsettings-dynamic-access)
+44. [SSH - Host Key Unavailable on Plink Fallback](#ssh-host-key-unavailable-plink)
+45. [SSH/SFTP - Host Key Mismatch Mid-Session](#ssh-sftp-host-key-mismatch-mid-session)
+46. [FTP - Cleartext Credential Warning](#ftp-cleartext-credential-warning)
+47. [WinRM Gateway - HTTP 12152 Invalid Server Response](#winrm-gateway-12152)
 
 ---
 
-## RDP Embedded — White Screen
+## RDP Embedded - White Screen
 
 **Symptom**: RDP ActiveX control connects (OnConnected fires) but the display area stays white.
 
@@ -77,7 +77,7 @@ SurfaceContainer.UpdateLayout();
 WinForms.Application.DoEvents();
 Dispatcher.Invoke(DispatcherPriority.Render, new Action(delegate { }));
 
-// EnsureHostHandle — force handle creation
+// EnsureHostHandle - force handle creation
 if (!_rdpHost.IsHandleCreated) { _ = _rdpHost.Handle; }
 
 // After Connect()
@@ -87,15 +87,15 @@ WinForms.Application.DoEvents();
 
 **Key Insight**: The `FormsHost` MUST be in the visible visual tree with a valid size BEFORE `Connect()`. Use retry loop if surface is not ready (up to 10 attempts, 120ms intervals).
 
-**Files**: `EmbeddedRdpView.xaml.cs` — `FlushLayoutPipeline()`, `BeginConnect()`
+**Files**: `EmbeddedRdpView.xaml.cs` - `FlushLayoutPipeline()`, `BeginConnect()`
 
 ---
 
-## RDP Embedded — Disconnect Code 4360
+## RDP Embedded - Disconnect Code 4360
 
 **Symptom**: RDP connects then disconnects after a few seconds with reason code 4360.
 
-**Root Cause**: Code 4360 means "session disconnected" — can be caused by:
+**Root Cause**: Code 4360 means "session disconnected" - can be caused by:
 1. `UpdateResolution()` called too early after `Connect()` crashes the COM object
 2. Server-side licensing or policy issues
 3. Dynamic resolution resize during the initial connection handshake
@@ -111,11 +111,11 @@ await Task.Delay(TimeSpan.FromSeconds(5));
 _allowResolutionUpdates = true;
 ```
 
-**Files**: `EmbeddedRdpView.xaml.cs` — `EnableResolutionUpdatesAsync()`
+**Files**: `EmbeddedRdpView.xaml.cs` - `EnableResolutionUpdatesAsync()`
 
 ---
 
-## RDP Embedded — COM RCW Crash on Tab Close
+## RDP Embedded - COM RCW Crash on Tab Close
 
 **Symptom**: `COM object that has been separated from its underlying RCW cannot be used` when closing a session tab.
 
@@ -131,11 +131,11 @@ _rdpHost.DetachEventSink();                   // Remove event sink
 _rdpHost.Dispose();                           // Finally dispose
 ```
 
-**Files**: `EmbeddedRdpView.xaml.cs` — `Dispose()`
+**Files**: `EmbeddedRdpView.xaml.cs` - `Dispose()`
 
 ---
 
-## RDP Embedded — Resize HRESULT Error
+## RDP Embedded - Resize HRESULT Error
 
 **Symptom**: `Unexpected HRESULT has been returned from a call to a COM component` during resize.
 
@@ -143,15 +143,15 @@ _rdpHost.Dispose();                           // Finally dispose
 
 **Solution**: Only call `UpdateResolution` when `IsConnected == true` AND after the stabilization delay.
 
-**Files**: `EmbeddedRdpView.xaml.cs` — `OnResizeTimerTick()`
+**Files**: `EmbeddedRdpView.xaml.cs` - `OnResizeTimerTick()`
 
 ---
 
-## RDP CredUI Autofill — Dialog Not Detected
+## RDP CredUI Autofill - Dialog Not Detected
 
 **Symptom**: CredUI autofill scans find only 8 top-level windows, never detecting the "Windows Security" credential dialog.
 
-**Root Cause**: The CredUI dialog from an embedded ActiveX control is NOT a top-level window — it's a child/owned window spawned by the RDP control's thread. `EnumWindows` only finds top-level windows.
+**Root Cause**: The CredUI dialog from an embedded ActiveX control is NOT a top-level window - it's a child/owned window spawned by the RDP control's thread. `EnumWindows` only finds top-level windows.
 
 **Solution**: In addition to `EnumWindows`, also scan all threads of the current process with `EnumThreadWindows`:
 ```csharp
@@ -165,11 +165,11 @@ Also use UI Automation (`System.Windows.Automation`) for modern XAML-based CredU
 
 When autofill silently fails, enable Debug-level logging for `CredentialAutofill` and inspect the broker enumeration entry added in `1d7c78c`: candidate window titles, process names, and rejection reasons show why a prompt was rejected. These diagnostics include metadata only; credential fields and edit-field contents do not appear in the log.
 
-**Files**: `CredentialAutofill.cs` — `GetVisibleWindows()`, `InjectPassword()`
+**Files**: `CredentialAutofill.cs` - `GetVisibleWindows()`, `InjectPassword()`
 
 ---
 
-## SSH — Pageant Keys Not Recognized
+## SSH - Pageant Keys Not Recognized
 
 **Symptom**: `Server rejected the SSH key` or `No suitable authentication method found` even with Pageant running and keys loaded.
 
@@ -183,7 +183,7 @@ When autofill silently fails, enable Debug-level logging for `CredentialAutofill
 
 ---
 
-## SSH Terminal — Arrow Keys Not Working
+## SSH Terminal - Arrow Keys Not Working
 
 **Symptom**: Arrow keys don't navigate command history in bash. Pressing Up shows `^[[A` instead.
 
@@ -198,17 +198,17 @@ bash → ESC[A response → stdout pipe → xterm.js
 
 **Key Rule**: NEVER use ConPTY for SSH terminals that go through plink. ConPTY is for local shells only.
 
-**Files**: `PipeModeSession.cs`, `ConnectionService.cs` — `ConnectSshViaPlinkAsync()`
+**Files**: `PipeModeSession.cs`, `ConnectionService.cs` - `ConnectSshViaPlinkAsync()`
 
 ---
 
-## SSH Terminal — No Colors, Strange Characters
+## SSH Terminal - No Colors, Strange Characters
 
 **Symptom**: Terminal shows raw ANSI escape codes like `[?2004h`, `[0;32m` instead of colors. No cursor.
 
 **Root Cause**: Initial implementation used a WPF `TextBlock` with ANSI stripping. A TextBlock cannot render terminal escape sequences.
 
-**Solution**: Replace with **WebView2 + xterm.js** — the industry standard terminal renderer:
+**Solution**: Replace with **WebView2 + xterm.js** - the industry standard terminal renderer:
 - xterm.js handles ALL VT100/xterm rendering (colors, cursor, scrollback, mouse)
 - Binary-safe base64 data transfer between process and xterm.js
 - `PostWebMessageAsString` for C# → JS, `WebMessageReceived` for JS → C#
@@ -217,7 +217,7 @@ bash → ESC[A response → stdout pipe → xterm.js
 
 ---
 
-## SSH Terminal — Cursor Blinks Too Fast
+## SSH Terminal - Cursor Blinks Too Fast
 
 **Symptom**: The xterm.js cursor blinks extremely rapidly, much faster than normal.
 
@@ -232,7 +232,7 @@ bash → ESC[A response → stdout pipe → xterm.js
 
 ---
 
-## WebView2 — DLL Not Found
+## WebView2 - DLL Not Found
 
 **Symptom**: `Unable to load DLL 'WebView2Loader.dll'` at runtime.
 
@@ -247,7 +247,7 @@ Copy-Item "src\Heimdall.App\lib\webview2\WebView2Loader.dll" $outputDir -Force
 
 ---
 
-## Tab Navigation — Tabs Blocked by Active Sessions
+## Tab Navigation - Tabs Blocked by Active Sessions
 
 **Symptom**: When an SSH or RDP session is open, clicking Tunnels/Scheduled/Settings tabs does nothing.
 
@@ -255,7 +255,7 @@ Copy-Item "src\Heimdall.App\lib\webview2\WebView2Loader.dll" $outputDir -Force
 1. **Sessions as global overlay** (`Panel.ZIndex=10`): Blocks all tabs underneath
 2. **Sessions in separate Grid**: Sessions hidden when switching tabs but not restored
 
-**Solution** (from Gemini architecture audit): Sessions live INSIDE the Servers Grid Column 2. When switching tabs, the entire Servers Grid is hidden (`Visibility=Collapsed`) — sessions are NOT destroyed, just visually suspended. Returning to Servers restores them.
+**Solution** (from Gemini architecture audit): Sessions live INSIDE the Servers Grid Column 2. When switching tabs, the entire Servers Grid is hidden (`Visibility=Collapsed`) - sessions are NOT destroyed, just visually suspended. Returning to Servers restores them.
 
 Additional fixes:
 - Toolbar `Panel.ZIndex=100` ensures clicks reach RadioButtons above WebView2
@@ -268,33 +268,33 @@ Additional fixes:
 
 ---
 
-## WPF — DynamicResource in BasedOn
+## WPF - DynamicResource in BasedOn
 
 **Symptom**: `A 'DynamicResourceExtension' cannot be set on the 'BasedOn' property of type 'Style'`
 
-**Root Cause**: WPF limitation — `BasedOn` only accepts `StaticResource`, not `DynamicResource`.
+**Root Cause**: WPF limitation - `BasedOn` only accepts `StaticResource`, not `DynamicResource`.
 
 **Solution**: Replace `BasedOn="{DynamicResource ...}"` with `BasedOn="{StaticResource ...}"`.
 
 ---
 
-## WPF — XAML Click Handler in Style Setter
+## WPF - XAML Click Handler in Style Setter
 
 **Symptom**: `Set connectionId threw an exception` when loading a window with a ContextMenu defined inside a Style Setter that uses `Click` event handlers.
 
-**Root Cause**: WPF cannot resolve event handlers in XAML when the ContextMenu is defined inside a `<Setter.Value>` — the handler method is not in scope.
+**Root Cause**: WPF cannot resolve event handlers in XAML when the ContextMenu is defined inside a `<Setter.Value>` - the handler method is not in scope.
 
 **Solution**: Build the ContextMenu programmatically in code-behind instead of XAML.
 
-**Files**: `MainWindow.xaml.cs` — `OnSessionTabRightClick()`
+**Files**: `MainWindow.xaml.cs` - `OnSessionTabRightClick()`
 
 ---
 
-## Build — Version Number Overflow
+## Build - Version Number Overflow
 
 **Symptom**: `Arithmetic operation resulted in an overflow` during Win32 resource generation.
 
-**Root Cause**: `<Version>2026.031614</Version>` — the segment `031614` exceeds the Win32 version field limit of 65535.
+**Root Cause**: `<Version>2026.031614</Version>` - the segment `031614` exceeds the Win32 version field limit of 65535.
 
 **Solution**: Use separate version properties:
 - `<Version>1.0.MMDD.xx</Version>` for Win32 compatibility (AssemblyVersion)
@@ -304,7 +304,7 @@ Additional fixes:
 
 ---
 
-## Build — Ambiguous Type References
+## Build - Ambiguous Type References
 
 **Symptom**: `'Point' is an ambiguous reference between 'System.Drawing.Point' and 'System.Windows.Point'`
 
@@ -314,7 +314,7 @@ Additional fixes:
 
 ---
 
-## Build — Build.ps1 -SkipTests with dotnet test --no-build
+## Build - Build.ps1 -SkipTests with dotnet test --no-build
 
 **Symptom**: After running `Build.ps1 -SkipTests`, invoking `dotnet test --no-build` runs stale test assemblies, or fails to find them outright.
 
@@ -324,7 +324,7 @@ Additional fixes:
 
 ---
 
-## Build — MSB3026 File Locks from Heimdall / testhost
+## Build - MSB3026 File Locks from Heimdall / testhost
 
 **Symptom**: `dotnet build` or `dotnet test` emits `MSB3026: Could not copy ...` or `MSB3027: Could not copy ...` on `Heimdall.App.dll`, `Heimdall.App.Tests.dll`, or similar output assemblies. The lock persists across retries.
 
@@ -350,7 +350,7 @@ Additional fixes:
 
 ---
 
-## TOFU — HostKeyFingerprint on PSCustomObject
+## TOFU - HostKeyFingerprint on PSCustomObject
 
 **Symptom**: `The property 'HostKeyFingerprint' cannot be found on this object` (Heimdall v1 legacy issue).
 
@@ -368,7 +368,7 @@ $gateway.HostKeyFingerprint = $fingerprint
 
 ---
 
-## Passwords — Not Saved After Edit
+## Passwords - Not Saved After Edit
 
 **Symptom**: Password field appears empty when re-opening server edit dialog after saving.
 
@@ -383,7 +383,7 @@ $gateway.HostKeyFingerprint = $fingerprint
 
 ---
 
-## Pageant — AGENT_COPYDATA_ID Wrong Value
+## Pageant - AGENT_COPYDATA_ID Wrong Value
 
 **Symptom**: `PageantClient` sends a request to Pageant but receives no response. Pageant appears running with keys loaded, but SSH.NET authentication fails with "no suitable method found".
 
@@ -398,7 +398,7 @@ private const uint AGENT_COPYDATA_ID = 0x804e50ba;
 
 ---
 
-## Pageant — RSA-SHA2 Algorithm Registration
+## Pageant - RSA-SHA2 Algorithm Registration
 
 **Symptom**: Pageant keys are loaded into SSH.NET but the server rejects authentication. Server logs show "no matching host key type found" or similar.
 
@@ -414,7 +414,7 @@ connectionInfo.HostKeyAlgorithms["rsa-sha2-512"] = ...;
 
 ---
 
-## Pageant — Sign() Returns Raw Bytes Instead of Blob
+## Pageant - Sign() Returns Raw Bytes Instead of Blob
 
 **Symptom**: SSH authentication starts (key is offered) but fails during the signature exchange. Server rejects the signature.
 
@@ -426,7 +426,7 @@ connectionInfo.HostKeyAlgorithms["rsa-sha2-512"] = ...;
 
 ---
 
-## SFTP — CheckBox Fires During XAML Parse
+## SFTP - CheckBox Fires During XAML Parse
 
 **Symptom**: `NullReferenceException` on startup when `EmbeddedSftpView` is loaded, originating from a `CheckBox.Checked` event handler.
 
@@ -445,7 +445,7 @@ private void OnShowHiddenChecked(object sender, RoutedEventArgs e)
 
 ---
 
-## SFTP — Context Menu Intercepted by MainWindow
+## SFTP - Context Menu Intercepted by MainWindow
 
 **Symptom**: Right-clicking an SFTP session tab opens the generic session context menu (disconnect/close) instead of the SFTP-specific context menu, or causes unexpected behavior.
 
@@ -457,11 +457,11 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
     return; // SFTP view handles its own context menu
 ```
 
-**Files**: `MainWindow.xaml.cs` — `OnSessionTabRightClick()`
+**Files**: `MainWindow.xaml.cs` - `OnSessionTabRightClick()`
 
 ---
 
-## Citrix — storebrowse.exe Not Found
+## Citrix - storebrowse.exe Not Found
 
 **Symptom**: Citrix connection fails immediately with an error indicating `storebrowse.exe` cannot be located.
 
@@ -470,13 +470,13 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 **Solution**:
 1. Verify Citrix Workspace App is installed (download from Citrix)
 2. If installed in a custom location, set the `CitrixStoreBrowsePath` in Settings > Paths to the full path of `storebrowse.exe`
-3. Ensure the Citrix Workspace App version is current — older versions may lack the `storebrowse.exe` CLI
+3. Ensure the Citrix Workspace App version is current - older versions may lack the `storebrowse.exe` CLI
 
 **Files**: `ConnectionService.Citrix.cs`
 
 ---
 
-## Theme Switching — Stale Colors After Swap
+## Theme Switching - Stale Colors After Swap
 
 **Symptom**: After switching themes at runtime, some controls appear with incorrect colors, missing borders, or unstyled backgrounds.
 
@@ -494,7 +494,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## Multi-Exec — Broadcast Sends to Wrong Terminals
+## Multi-Exec - Broadcast Sends to Wrong Terminals
 
 **Symptom**: Broadcast keystrokes appear in terminals that should not be receiving them, or do not appear in terminals that are opted in.
 
@@ -503,14 +503,14 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 **Solution**:
 1. Verify each terminal's broadcast toggle state in the session toolbar (broadcast icon should be highlighted when active)
 2. On session close, the `EmbeddedSessionManager` must remove the session from the broadcast subscriber list
-3. On session open, broadcast opt-in defaults to OFF — the user must explicitly enable it
+3. On session open, broadcast opt-in defaults to OFF - the user must explicitly enable it
 4. Check that `PostWebMessageAsString` targets the correct `WebView2` instance by session ID, not by tab index
 
 **Files**: `EmbeddedSessionManager.cs`, `EmbeddedSshView.xaml.cs`
 
 ---
 
-## Quick Connect — Ad-Hoc SSH Fails
+## Quick Connect - Ad-Hoc SSH Fails
 
 **Symptom**: Quick Connect (Ctrl+K) opens the overlay and parses the connection string, but the SSH connection fails with authentication errors or "no suitable method found".
 
@@ -526,7 +526,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## RDP Resize — Still Reconnecting (Delta/Debounce Tuning)
+## RDP Resize - Still Reconnecting (Delta/Debounce Tuning)
 
 **Symptom**: Resizing the application window causes the embedded RDP session to briefly disconnect and reconnect, producing a visible flicker or momentary black screen.
 
@@ -534,15 +534,15 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 **Solution**:
 1. Increase the resize debounce interval (default: 500ms). A value of 800-1000ms reduces reconnects during active resizing
-2. Increase the minimum resolution delta threshold — small changes (under 50px in either dimension) should be skipped entirely
+2. Increase the minimum resolution delta threshold - small changes (under 50px in either dimension) should be skipped entirely
 3. Ensure `_allowResolutionUpdates` is still gated by the 5-second post-connect stabilization guard
 4. If the issue persists, check that `OnResizeTimerTick` compares against the LAST APPLIED resolution, not the last requested one
 
-**Files**: `EmbeddedRdpView.xaml.cs` — `OnResizeTimerTick()`, `UpdateResolution()`
+**Files**: `EmbeddedRdpView.xaml.cs` - `OnResizeTimerTick()`, `UpdateResolution()`
 
 ---
 
-## 27. VNC — noVNC Library Unavailable {#vnc-novnc-unavailable}
+## 27. VNC - noVNC Library Unavailable {#vnc-novnc-unavailable}
 
 **Symptom**: VNC tab shows "noVNC Library Unavailable" error instead of the remote desktop.
 
@@ -557,19 +557,19 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 28. VNC — WebSocket Proxy Port Conflict {#vnc-websocket-port-conflict}
+## 28. VNC - WebSocket Proxy Port Conflict {#vnc-websocket-port-conflict}
 
 **Symptom**: VNC connection fails with a port binding error.
 
 **Root Cause**: The `WebSocketVncProxy` binds to a random local port. In rare cases, the port may already be in use.
 
-**Solution**: Retry the connection — a new random port will be selected. If the issue persists, check for processes hogging ephemeral ports.
+**Solution**: Retry the connection - a new random port will be selected. If the issue persists, check for processes hogging ephemeral ports.
 
 **Files**: `Services/WebSocketVncProxy.cs`
 
 ---
 
-## 29. X11 Forwarding — No Display {#x11-no-display}
+## 29. X11 Forwarding - No Display {#x11-no-display}
 
 **Symptom**: X11 forwarded applications fail with "Cannot open display" or similar errors.
 
@@ -585,7 +585,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 30. Telnet — Connection Hangs {#telnet-connection-hangs}
+## 30. Telnet - Connection Hangs {#telnet-connection-hangs}
 
 **Symptom**: Telnet connection appears to connect but no prompt appears.
 
@@ -600,7 +600,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 31. FTP — Passive Mode Failures {#ftp-passive-mode}
+## 31. FTP - Passive Mode Failures {#ftp-passive-mode}
 
 **Symptom**: FTP directory listing works but file transfers fail or time out.
 
@@ -615,14 +615,14 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 32. Tab Detach — WebView2 Session Lost {#tab-detach-webview2}
+## 32. Tab Detach - WebView2 Session Lost {#tab-detach-webview2}
 
 **Symptom**: After detaching an SSH tab to a floating window and re-docking it, the terminal may lose its WebView2 state.
 
 **Root Cause**: WebView2 controls can behave unpredictably when re-parented between WPF visual trees. The control maintains its internal state but the rendering context may need re-initialization.
 
 **Solution**:
-1. If the terminal appears blank after re-docking, the session is still alive — try clicking in the terminal area
+1. If the terminal appears blank after re-docking, the session is still alive - try clicking in the terminal area
 2. For RDP sessions, detach is one-way (ActiveX controls cannot be safely re-parented)
 3. Split sessions cannot be detached (by design)
 
@@ -630,7 +630,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 33. Ephemeral Server — Port 69 Access Denied {#tftp-port-access-denied}
+## 33. Ephemeral Server - Port 69 Access Denied {#tftp-port-access-denied}
 
 Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Advanced > File sharing. TFTP is opt-in since Phase 3.7 and the share runs HTTP-only by default.
 
@@ -647,7 +647,7 @@ Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Advanc
 
 ---
 
-## 36. SFTP — Sudo Fallback Permission Denied (Auth Failure) {#sftp-sudo-fallback-auth-failure}
+## 36. SFTP - Sudo Fallback Permission Denied (Auth Failure) {#sftp-sudo-fallback-auth-failure}
 
 **Symptom**: SFTP operations on root-owned files show "Permission denied" even though sudo fallback should trigger. Log shows `SshAuthenticationException: Permission denied (publickey,password)`.
 
@@ -664,7 +664,7 @@ Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Advanc
 
 ---
 
-## 37. SFTP — Sudo ls Parser Shows Empty Directory {#sftp-sudo-ls-parser-empty}
+## 37. SFTP - Sudo ls Parser Shows Empty Directory {#sftp-sudo-ls-parser-empty}
 
 **Symptom**: Enabling "Browse as root" (sudo mode) shows an empty or nearly-empty directory listing. Only symlinks (like `/bin -> usr/bin`) appear.
 
@@ -682,7 +682,7 @@ The parser used `Split(null, 9)` and checked `parts.Length < 9`, which skipped A
 
 ---
 
-## 38. SFTP — Sudo Fallback Uses Typed Permission Denied Only {#sftp-typed-permission-denied-only}
+## 38. SFTP - Sudo Fallback Uses Typed Permission Denied Only {#sftp-typed-permission-denied-only}
 
 **Symptom**: Uploading/downloading a root-owned file shows a generic transfer error instead of triggering sudo fallback. The log may show `SshException: Failure`.
 
@@ -696,7 +696,7 @@ The parser used `Split(null, 9)` and checked `parts.Length < 9`, which skipped A
 
 ---
 
-## 39. WebView2 — Side-by-Side Configuration Error (0x800736B1) {#webview2-sxs-error}
+## 39. WebView2 - Side-by-Side Configuration Error (0x800736B1) {#webview2-sxs-error}
 
 **Symptom**: Embedded SSH terminal shows "WebView2 initialization failed: The application has failed to start because its side-by-side configuration is incorrect (0x800736B1)".
 
@@ -710,7 +710,7 @@ The parser used `Split(null, 9)` and checked `parts.Length < 9`, which skipped A
 
 ---
 
-## 40. HTTP Traversal — Sibling Prefix Bypass {#http-traversal-sibling-prefix}
+## 40. HTTP Traversal - Sibling Prefix Bypass {#http-traversal-sibling-prefix}
 
 **Symptom**: Security audit found that the EphemeralFileServer `StartsWith` check could be bypassed with sibling directory names. E.g., serving `/data` would also allow access to `/data-other/secret.txt`.
 
@@ -728,7 +728,7 @@ Applied to both HTTP and TFTP handlers.
 
 **Files**: `Services/EphemeralFileServer.cs`
 
-## 41. Tool Tunnel Scan — Few or No Hosts Found {#tool-tunnel-scan-few-hosts}
+## 41. Tool Tunnel Scan - Few or No Hosts Found {#tool-tunnel-scan-few-hosts}
 
 **Symptom**: Network Cartography (or Port Scanner, Banner Grabber, Firewall Tester, Default Credential Scanner) via "Route via" SSH gateway finds only the gateway host or very few hosts, while a direct scan from the same subnet returns dozens.
 
@@ -736,7 +736,7 @@ Applied to both HTTP and TFTP handlers.
 
 1. **No per-probe timeout on `/dev/tcp`**: The bash built-in `echo >/dev/tcp/HOST/PORT` blocks for the kernel's full TCP retransmit timeout (20-127 seconds) on filtered ports (packets silently dropped by a firewall). With a 10-35 second `CommandTimeout` on the SSH channel, a single filtered port caused the entire scan command to be killed before reaching later ports.
 
-2. **No host discovery phase** (Network Cartography only): The tunnel scan went straight to port probing without ping sweep or ARP table lookup. Only hosts with open ports on the exact scanned list were returned — hosts responding to ICMP but with no matching open ports were invisible.
+2. **No host discovery phase** (Network Cartography only): The tunnel scan went straight to port probing without ping sweep or ARP table lookup. Only hosts with open ports on the exact scanned list were returned - hosts responding to ICMP but with no matching open ports were invisible.
 
 Additionally, `/dev/tcp` is a bash-only feature. If the gateway's login shell is `dash` or `sh`, all probes silently fail.
 
@@ -750,7 +750,7 @@ Additionally, `/dev/tcp` is a bash-only feature. If the gateway's login shell is
 
 ---
 
-## 42. SSH — TestEnv Gateway Dropdown Empty After Import {#ssh-testenv-gateway-dropdown-empty}
+## 42. SSH - TestEnv Gateway Dropdown Empty After Import {#ssh-testenv-gateway-dropdown-empty}
 
 **Symptom**: After importing `Heimdall-TestEnv` sessions, editing a tunneled SSH/SFTP/RDP session shows an empty gateway dropdown even though the imported profile has an `SshGatewayId`.
 
@@ -771,7 +771,7 @@ Alternatively, create the gateway manually in Settings > SSH & SFTP > SSH gatewa
 
 ---
 
-## 43. RDP — `IMsRdpExtendedSettings` Not Reachable via `dynamic` Property Access {#rdp-extendedsettings-dynamic-access}
+## 43. RDP - `IMsRdpExtendedSettings` Not Reachable via `dynamic` Property Access {#rdp-extendedsettings-dynamic-access}
 
 **Symptom**: Code accessing `ax.ExtendedSettings` where `ax` is the AxHost-wrapped OCX throws a runtime binder error similar to:
 
@@ -813,7 +813,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 44. SSH — Host Key Unavailable on Plink Fallback {#ssh-host-key-unavailable-plink}
+## 44. SSH - Host Key Unavailable on Plink Fallback {#ssh-host-key-unavailable-plink}
 
 **Symptom**: A Pageant-only SSH or tunneled session fails before launching plink with a localized host-key-unavailable message.
 
@@ -831,7 +831,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 45. SSH/SFTP — Host Key Mismatch Mid-Session {#ssh-sftp-host-key-mismatch-mid-session}
+## 45. SSH/SFTP - Host Key Mismatch Mid-Session {#ssh-sftp-host-key-mismatch-mid-session}
 
 **Symptom**: An existing SSH/SFTP session disconnects and the UI shows a security warning instead of a generic reconnect prompt. SSH auto-reconnect does not start.
 
@@ -849,7 +849,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 46. FTP — Cleartext Credential Warning {#ftp-cleartext-credential-warning}
+## 46. FTP - Cleartext Credential Warning {#ftp-cleartext-credential-warning}
 
 **Symptom**: Connecting to FTP succeeds but the status area warns that the channel is cleartext.
 
@@ -867,11 +867,11 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 47. WinRM Gateway — HTTP 12152 Invalid Server Response {#winrm-gateway-12152}
+## 47. WinRM Gateway - HTTP 12152 Invalid Server Response {#winrm-gateway-12152}
 
 **Symptom**: A WinRM profile routed through an SSH gateway fails with WinHTTP error `12152` ("the server returned an invalid or unrecognized response"). The Heimdall log shows the tunnel established cleanly; the error surfaces inside the PowerShell terminal.
 
-**Root cause**: Environmental, not a Heimdall fault. A hand-built `plink` tunnel reproduces the failure outside Heimdall — the TCP forward opens (`TcpTestSucceeded: True`) but the HTTP/WinRM exchange is closed by the target service or an application-layer device on the `bastion → target` path. An RDP profile through the same bastion works, confirming the tunnel machinery is sound.
+**Root cause**: Environmental, not a Heimdall fault. A hand-built `plink` tunnel reproduces the failure outside Heimdall - the TCP forward opens (`TcpTestSucceeded: True`) but the HTTP/WinRM exchange is closed by the target service or an application-layer device on the `bastion → target` path. An RDP profile through the same bastion works, confirming the tunnel machinery is sound.
 
 **Solution**: No code fix in Heimdall. Diagnose the environment path (bastion forwarding policy, target WinRM listener, intermediate IPS/proxy). Full isolation procedure and `plink` console reading grid: see [winrm-gateway-12152-diagnostic.md](winrm-gateway-12152-diagnostic.md).
 

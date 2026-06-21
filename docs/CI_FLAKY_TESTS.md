@@ -8,7 +8,7 @@
       http://www.apache.org/licenses/LICENSE-2.0
 -->
 
-# CI flaky tests — `Category=CIUnstable`
+# CI flaky tests - `Category=CIUnstable`
 
 A small set of tests that are stable on developer machines turn red
 intermittently on the GitHub Actions Windows runner. They are tagged
@@ -32,19 +32,19 @@ coverage pass by design while remaining visible in CI.
 Four distinct root causes share the same symptom (`TaskCanceledException`,
 `OperationCanceledException`, or `WaitUntil` timeouts):
 
-1. **Named-pipe handshake latency** — `OpenSshPipeAgentTests` create a
+1. **Named-pipe handshake latency** - `OpenSshPipeAgentTests` create a
    per-test named pipe and race a server-side `WaitForConnectionAsync`
    against the client-side connect. On the GitHub Actions runner, the
    handshake routinely exceeds 10 seconds even with generous
    `availabilityTimeoutMs` and server-side
    `CancellationTokenSource(TimeSpan.FromSeconds(10))`. Suspect: Defender
    / runner I/O contention scanning the pipe.
-2. **WPF + UIAutomation binding propagation latency** — `Pilots/*SmokeTests`
+2. **WPF + UIAutomation binding propagation latency** - `Pilots/*SmokeTests`
    wait for a value to propagate through a `Binding` / `INotifyPropertyChanged`
    chain. On a slow runner, the propagation outlasts even a 10-second
    `WaitHelpers.DefaultTimeout`. Bumping the timeout further only delays
    the failure window and slows down genuinely hung tests.
-3. **ConPTY process startup race** — `ConPtySessionTests` start
+3. **ConPTY process startup race** - `ConPtySessionTests` start
    `powershell.exe -NoLogo -NoProfile` inside a pseudo-console and assert
    `IsRunning` immediately after the first `DataReceived` callback fires. On
    a slow runner, PowerShell can print its banner and exit (or the ConPTY
@@ -52,7 +52,7 @@ Four distinct root causes share the same symptom (`TaskCanceledException`,
    check to fail. The `NotEmpty(text)` assertion that precedes it still
    covers the core contract (ConPTY delivers output); the lifecycle property
    is independently exercised by `Dispose_TerminatesPseudoConsoleAndProcess`.
-4. **ViewModel polling timeout** — `TcpPingViewModelTests` and similar
+4. **ViewModel polling timeout** - `TcpPingViewModelTests` and similar
    ViewModel tests use a file-local `WaitUntilAsync(condition, timeoutMs)`
    helper to observe property/collection updates that happen on background
    tasks. On a busy GitHub Actions Windows runner the polled condition can

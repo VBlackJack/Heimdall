@@ -38,15 +38,15 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 
 ### Remote Desktop (RDP)
 - Embedded sessions via ActiveX MsTscAx in a tabbed interface
-- External sessions via mstsc.exe with credential autofill — the generated `.rdp` honors the per-server resolution profile, and Auto mode now matches embedded Auto with Smart Sizing, windowed launch, single-monitor mode, and primary working-area dimensions (`ae0dd70`)
+- External sessions via mstsc.exe with credential autofill - the generated `.rdp` honors the per-server resolution profile, and Auto mode now matches embedded Auto with Smart Sizing, windowed launch, single-monitor mode, and primary working-area dimensions (`ae0dd70`)
 - **One-shot mode override**: right-click any RDP profile -> *Connect with...* to launch in embedded or external mode for a single session, leaving the saved profile untouched. Forced sessions show a discreet `(forced embedded/external)` tab-title suffix
 - Dynamic resolution resize with stabilization guard
 - Per-server resolution profiles: Fit Window, Fixed, Smart Sizing, and Multimon, with a per-profile **Selected monitors** picker in Multimon mode (empty selection = use all monitors, backward-compatible with existing profiles) and connect-time topology validation that falls back to single-monitor mode when the host cannot honor the saved selection (`2e9b938`)
 - Fit Window mode scales the remote desktop to the host area with Smart Sizing enabled by default, eliminating native Win32 scrollbars on real Windows RDP targets; use Fixed mode for pixel-perfect native rendering
 - Automatic DPI scale tracking via `IMsRdpExtendedSettings` with `Window.DpiChanged` updates
 - **Mode-aware Resolution menu and toolbar button**: the menu starts with an `Active mode: <mode>` header (showing `Fixed (1920×1080)` when applicable) and the toolbar button glyph changes per mode (Auto / Fit / Smart / Fixed / Multimon)
-- Tab context-menu resolution submenu with presets, Match Window, Custom, and Save as default — same `Active mode` header as the toolbar menu
-- Letterboxed fixed-resolution rendering when Smart Sizing is disabled — the active RDP region is materialized by a 1px border, with surrounding bands rendered in the theme `SurfaceBrush` (the `WindowsFormsHost` is pinned to the exact region so the Win32 HWND no longer bleeds the system-gray default through the letterbox), and a first-letterbox hint badge fades out after a few seconds
+- Tab context-menu resolution submenu with presets, Match Window, Custom, and Save as default - same `Active mode` header as the toolbar menu
+- Letterboxed fixed-resolution rendering when Smart Sizing is disabled - the active RDP region is materialized by a 1px border, with surrounding bands rendered in the theme `SurfaceBrush` (the `WindowsFormsHost` is pinned to the exact region so the Win32 HWND no longer bleeds the system-gray default through the letterbox), and a first-letterbox hint badge fades out after a few seconds
 - Fullscreen UX with a high-contrast exit chip plus F11, Esc, and Ctrl+Shift+F11 escape paths
 - Aspect ratio management (Stretch, 16:9, 4:3, 21:9) and anti-idle prevention
 - Full redirection surface: clipboard, drives, printers, COM ports, smart cards, webcam, USB, audio
@@ -65,7 +65,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - **Separate key passphrase field**: distinct from the login password, both persisted encrypted. Enables key-with-fallback-password workflows without the field ambiguity of legacy setups.
 - **OpenSSH config import with ProxyJump**: single-hop and multi-hop chains auto-mapped to Heimdall's gateway model with `ParentGatewayId` links. Unsupported forms (ProxyCommand, `%h`/`%p` tokens, cycles) rejected with explicit diagnostics rather than silently mis-imported.
 - SSH keepalive heartbeat (prevents TMOUT disconnects)
-- User-confirmed TOFU host key verification with persistent fingerprint pinning; trust decisions resolved *before* `Connect()` via a dedicated pre-authentication probe — SSH.NET's `HostKeyReceived` callback never performs async work or UI dispatch
+- User-confirmed TOFU host key verification with persistent fingerprint pinning; trust decisions resolved *before* `Connect()` via a dedicated pre-authentication probe - SSH.NET's `HostKeyReceived` callback never performs async work or UI dispatch
 - Fail-closed host-key enforcement for SSH.NET and Plink fallback paths, including `HostKeyUnavailable` when a pinned gateway key cannot be resolved without falling back to PuTTY/Plink's cache
 - Gateway-aware tunnel reuse identity (stable gateway IDs + normalized chain hash) prevents accidental sharing across overlapping private networks
 - Multi-gateway tunnel chaining with circular dependency detection
@@ -92,8 +92,8 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 ### SFTP Browser
 - Embedded file browser panel with directory tree and file list
 - Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save
-- **"Browse as root" sudo mode**: toggle in toolbar enables `sudo ls -la` directory listing via SSH exec channel — browse any directory regardless of SFTP user permissions
-- **Full sudo fallback** on all operations: upload (`sudo tee`), download (`sudo cat`), edit, chmod, rename, delete, mkdir — triggered only on typed permission-denied exceptions
+- **"Browse as root" sudo mode**: toggle in toolbar enables `sudo ls -la` directory listing via SSH exec channel - browse any directory regardless of SFTP user permissions
+- **Full sudo fallback** on all operations: upload (`sudo tee`), download (`sudo cat`), edit, chmod, rename, delete, mkdir - triggered only on typed permission-denied exceptions
 - Sudo edit sessions cache the pinned host-key verifier, detect mid-edit host-key rotation, track upload tasks, and clean temporary files even when the privileged write fails
 - Drag-and-drop upload and download
 - Chmod dialog, path bookmarks, filename filter
@@ -112,15 +112,15 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - Embedded session tabs with the same UX as RDP
 
 ### WinRM (PowerShell Remoting)
-- Remote PowerShell sessions over native WinRM / PS-Remoting — direct connections need no SSH
+- Remote PowerShell sessions over native WinRM / PS-Remoting - direct connections need no SSH
 - Embedded interactive terminal: a local `pwsh.exe` (PowerShell 7+, auto-detected) or `powershell.exe` (5.1 fallback) is hosted in a ConPTY and runs `Enter-PSSession`, reusing the Local Shell terminal view
 - HTTP (5985) and HTTPS (5986) transports with a `Use SSL` toggle and a dynamic default port; full TLS certificate validation by default
 - Two identity modes: an explicit stored credential (DPAPI-encrypted) or the current Windows identity (Kerberos SSO, no stored secret)
 - `Negotiate` authentication (Kerberos with NTLM fallback)
-- Credential mode injects the password via a self-deleting, ACL-restricted bootstrap script — no plaintext on disk or in PowerShell history
+- Credential mode injects the password via a self-deleting, ACL-restricted bootstrap script - no plaintext on disk or in PowerShell history
 - Transport pre-flight check (TCP reachability + TLS handshake) surfaces clear, localized errors before the session launches
 - Optional SSH gateway routing: a WinRM session can be tunneled through an SSH bastion, like RDP and SSH. Over the tunnel the WinRM transport is HTTP only (NTLM authentication); direct WinRM connections are unaffected.
-- Known gateway limitation: some environments accept the tunnel at TCP level but the target (or an intermediate device) closes the WinRM HTTP exchange — diagnosed as environmental, not a Heimdall fault. See [docs/winrm-gateway-12152-diagnostic.md](docs/winrm-gateway-12152-diagnostic.md).
+- Known gateway limitation: some environments accept the tunnel at TCP level but the target (or an intermediate device) closes the WinRM HTTP exchange - diagnosed as environmental, not a Heimdall fault. See [docs/winrm-gateway-12152-diagnostic.md](docs/winrm-gateway-12152-diagnostic.md).
 
 ### Local Shell
 - Embedded PowerShell, cmd, bash, or custom shell via ConPTY
@@ -185,7 +185,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 
 ### Built-in Sysops Toolbox (59 tools)
 
-All tools open as session tabs (split with any session or tool, detach, reorder). Accessible via **dedicated Tools tab**, **Ctrl+K** palette, the **sidebar Tools tab** (Sessions/Tools toggle at the top of the left panel, **Ctrl+Shift+T**), or **"+" → Add Tool** menu. The tabbed sidebar hosts the session `TreeView` and a full-height tool browser side by side — the Tools tab displays a collapsible `TreeView` of categories (Network, Security, Encoding, System, External) populated from `ToolRegistry`, with a filter box matching on name + aliases and an always-present **Favorites** section at the top. Right-click any sidebar tool leaf to pin or unpin it without launching the tool; the same persisted `FavoriteToolIds` feed both the sidebar Favorites section and the dedicated Tools tab, while favorites stay sorted alphabetically by localized display name and filtered like every other category. Tools can be saved in the session `TreeView` alongside real sessions. Centralized `ToolRegistry` with vector icons, categories, and command aliases. **Favorites** (pin/unpin with persistence) and **recently used** tools remain available on the dedicated Tools tab as well. Singleton behavior for context-free tools. Built-in help system with usage examples (? button). Dedicated detail panel for tools with descriptions. Password Generator supports saveable custom presets (JSON persistence), optional clipboard auto-clear, and 3 generation modes (Random, Syllable, Passphrase). Cross-tool navigation via right-click context menus (IP → Port Scanner → Cert Inspector). Network tools support scanning via SSH tunnel ("Route via" gateway selector). **First-launch onboarding** overlay with guided introduction.
+All tools open as session tabs (split with any session or tool, detach, reorder). Accessible via **dedicated Tools tab**, **Ctrl+K** palette, the **sidebar Tools tab** (Sessions/Tools toggle at the top of the left panel, **Ctrl+Shift+T**), or **"+" → Add Tool** menu. The tabbed sidebar hosts the session `TreeView` and a full-height tool browser side by side - the Tools tab displays a collapsible `TreeView` of categories (Network, Security, Encoding, System, External) populated from `ToolRegistry`, with a filter box matching on name + aliases and an always-present **Favorites** section at the top. Right-click any sidebar tool leaf to pin or unpin it without launching the tool; the same persisted `FavoriteToolIds` feed both the sidebar Favorites section and the dedicated Tools tab, while favorites stay sorted alphabetically by localized display name and filtered like every other category. Tools can be saved in the session `TreeView` alongside real sessions. Centralized `ToolRegistry` with vector icons, categories, and command aliases. **Favorites** (pin/unpin with persistence) and **recently used** tools remain available on the dedicated Tools tab as well. Singleton behavior for context-free tools. Built-in help system with usage examples (? button). Dedicated detail panel for tools with descriptions. Password Generator supports saveable custom presets (JSON persistence), optional clipboard auto-clear, and 3 generation modes (Random, Syllable, Passphrase). Cross-tool navigation via right-click context menus (IP → Port Scanner → Cert Inspector). Network tools support scanning via SSH tunnel ("Route via" gateway selector). **First-launch onboarding** overlay with guided introduction.
 
 | Category | Tools |
 |----------|-------|
@@ -223,7 +223,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Screenshot capture to clipboard (Ctrl+Shift+S)
 
 ### User Interface
-- Runtime theme switching across **17 ThemeForge themes** (Drakul default, plus Dracula, Striga, Cinder, Bracken, Tarn, Mortis, Slate, Magellan, Voivode, Carmilla, Whitby, Vesper, Wormwood, Sconce, Parchment, Folio — grouped Root / Dark / Light / Alt), plus a **9-tone accent selector** (Default, Blue, Cyan, Green, Orange, Pink, Purple, Red, Yellow). Powered by the public `ThemeForge.Theme` NuGet package (nuget.org) through the `HeimdallThemeService` wrapper; a `HeimdallThemeBridge` ResourceDictionary re-expresses Heimdall's app brushes on ThemeForge color slots and is re-merged on every theme swap so converters and code-built panels recolor live
+- Runtime theme switching across **17 ThemeForge themes** (Drakul default, plus Dracula, Striga, Cinder, Bracken, Tarn, Mortis, Slate, Magellan, Voivode, Carmilla, Whitby, Vesper, Wormwood, Sconce, Parchment, Folio - grouped Root / Dark / Light / Alt), plus a **9-tone accent selector** (Default, Blue, Cyan, Green, Orange, Pink, Purple, Red, Yellow). Powered by the public `ThemeForge.Theme` NuGet package (nuget.org) through the `HeimdallThemeService` wrapper; a `HeimdallThemeBridge` ResourceDictionary re-expresses Heimdall's app brushes on ThemeForge color slots and is re-merged on every theme swap so converters and code-built panels recolor live
 - 1,870+ lines of WPF control styles shared across all themes, reactive to runtime theme swaps (`DynamicResource` everywhere; `MultiBinding` + `ThemeRevision` trigger for brush-resolving converters; `SetResourceReference` in code-behind panels)
 - Design System with 45 tokens: typography (10 sizes, min 11px), spacing (8 tokens incl. asymmetric), button padding (4 roles), input padding, corner radius, opacity, icon sizes, monospace font family, micro-animations (150ms/250ms)
 - WCAG AA compliant: all foreground/background pairs verified at 4.5:1+ contrast ratio, scrollbar thumb 4.2:1+ across every ThemeForge theme
@@ -231,10 +231,10 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Unified two-tier icon system: vector geometries (`Geo.*`) for domain icons + Segoe MDL2 for UI chrome
 - Localized tooltips on all icon-only buttons; AutomationProperties.Name on all interactive controls via i18n
 - 19 themed control styles with complete hover/pressed/focused/disabled states
-- 5 terminal color schemes: Dracula, Solarized Dark, Monokai, Nord, Default — Dracula also applied to Notes Milkdown editor
+- 5 terminal color schemes: Dracula, Solarized Dark, Monokai, Nord, Default - Dracula also applied to Notes Milkdown editor
 - Configurable terminal font family and size
 - Settings panel with 6 left-navigation sub-tabs (General, Terminal, SSH & SFTP, RDP, Security, Advanced); the RDP sub-tab now exposes the previously hidden `RdpResolutionPresets` array as an editable multi-line list and the `RdpDialogAdvancedDefault` flag as a checkbox
-- Server Dialog: a two-step flow — protocol card selection, then a **four-tab editor** (General / Options / Network / Info) with a persistent protocol badge in the header, per-tab error badges, per-protocol tab visibility, and validation focus that jumps to the first invalid field across tabs. The window is freely resizable with native mouse-wheel scrolling. The RDP Options tab keeps a four-chip mini-toc (Display / Audio / Devices / Performance); its Display section offers a `Common resolutions` ComboBox to pre-fill Width/Height in Fixed mode and a dedicated `Enable multi-monitor` toggle
+- Server Dialog: a two-step flow - protocol card selection, then a **four-tab editor** (General / Options / Network / Info) with a persistent protocol badge in the header, per-tab error badges, per-protocol tab visibility, and validation focus that jumps to the first invalid field across tabs. The window is freely resizable with native mouse-wheel scrolling. The RDP Options tab keeps a four-chip mini-toc (Display / Audio / Devices / Performance); its Display section offers a `Common resolutions` ComboBox to pre-fill Width/Height in Fixed mode and a dedicated `Enable multi-monitor` toggle
 - TreeView hierarchy: Project > Group > Server with category-colored tool icons and status dots
 - Command Palette (Ctrl+K): protocol icons, status dots, endpoint hints, Ctrl+Enter for split
 - Connection inheritance: group-level defaults for gateway, SSH username, key path
@@ -255,7 +255,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Optional Windows Hello gate: requires a biometric/PIN verification before stored credentials are used on connect (single and bulk), fail-closed with a configurable grace window
 - PBKDF2-SHA256 PIN hashing (100,000 iterations) with lockout mechanics
 - Windows ACL enforcement on config directories, log files, and temp files
-- Centralized `InputValidator` security utilities: `EscapeShellArg()`, `EscapeForDoubleQuotedString()`, `ValidateDomain()`, `SanitizeCsvCell()`, `IsShellTarget()` — shell injection prevention (CWE-78) on all SSH tunnel and tool `CreateCommand()` calls, context-aware placeholder sanitization (strict for shell targets, relaxed for regular executables), CSV formula injection prevention on all exporters, CRLF sanitization on HTTP headers
+- Centralized `InputValidator` security utilities: `EscapeShellArg()`, `EscapeForDoubleQuotedString()`, `ValidateDomain()`, `SanitizeCsvCell()`, `IsShellTarget()` - shell injection prevention (CWE-78) on all SSH tunnel and tool `CreateCommand()` calls, context-aware placeholder sanitization (strict for shell targets, relaxed for regular executables), CSV formula injection prevention on all exporters, CRLF sanitization on HTTP headers
 - HTTP/TFTP directory traversal prevention with sibling-prefix check
 - WebSocket Origin validation on VNC proxy (CSWSH prevention)
 - Atomic file creation with restrictive ACL for sensitive temp files (TOCTOU-safe)
@@ -270,7 +270,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Plink password file: atomic ACL creation on Windows, mode 0600 on Unix (no fallback)
 - Wake-on-LAN via UDP magic packet (right-click context menu)
 - User-confirmed SSH host key first-use and mismatch handling across SSH.NET and Plink fallback paths, with interactive decisions resolved in a pre-authentication probe rather than inside SSH.NET's `HostKeyReceived` callback
-- Centralized `HostKeyTrustService` with per-entry metadata (first seen, last seen, algorithm, source) — production paths require host-key verifier dependencies at compile time; no silent auto-accept fallbacks in release code
+- Centralized `HostKeyTrustService` with per-entry metadata (first seen, last seen, algorithm, source) - production paths require host-key verifier dependencies at compile time; no silent auto-accept fallbacks in release code
 - Compile-time non-null host-key dependencies on SSH/SFTP/tunnel/sudo entry points; `RejectingHostKeyVerifier` is the safe fail-closed verifier and `AutoAcceptHostKeyVerifier` is test-only
 - Mid-session host-key mismatch events propagate through `SshSessionSecurityEvent` / `HostKeyRotatedDuringUpload` instead of being collapsed into generic disconnect text
 - `Settings > SSH & SFTP > Trusted host keys` sub-panel: dense auditable grid of every trusted host key with source provenance, import from `~/.ssh/known_hosts`, export to it, explicit per-row conflict resolution ("Keep existing" default), and copy/remove row actions
@@ -300,7 +300,7 @@ Two editions are available. Both include the full .NET runtime and require **no 
 
 | Edition | Size | WebView2 | Best for |
 |---------|------|----------|----------|
-| **Standard** | ~106 MB (installer) / ~159 MB (zip) | Requires Edge or WebView2 Evergreen Runtime (pre-installed on Windows 10/11) | Most users — workstations, laptops, any PC with Edge |
+| **Standard** | ~106 MB (installer) / ~159 MB (zip) | Requires Edge or WebView2 Evergreen Runtime (pre-installed on Windows 10/11) | Most users - workstations, laptops, any PC with Edge |
 | **Self-Contained** | ~267 MB (installer) / ~380 MB (zip) | Bundled (WebView2 Fixed Version Runtime included) | Air-gapped servers, restricted environments without Edge, isolated VMs |
 
 Both editions are available as **installer** (.exe with shortcuts, upgrade detection, uninstaller) or **zip** (extract and run, no installation required).
@@ -370,7 +370,7 @@ dotnet run --project src/Heimdall.App
 # Debug build (auto-increments version)
 powershell -File Build.ps1
 
-# Release build — both editions + installers
+# Release build - both editions + installers
 powershell -File Build.ps1 -Mode Release
 
 # Release + publish to GitHub

@@ -1,6 +1,6 @@
-# WinRM-over-SSH-gateway — `12152` diagnostic
+# WinRM-over-SSH-gateway - `12152` diagnostic
 
-Status: **closed — no code fix required in Heimdall.**
+Status: **closed - no code fix required in Heimdall.**
 
 ## Context
 
@@ -10,7 +10,7 @@ the SSH tunnel cleanly, but `Enter-PSSession` returns WinHTTP error **`12152`**
 ("the server returned an invalid or unrecognized response").
 
 The Heimdall log shows `Tunnel established ... port 59850` with no forwarded-port
-error — the `12152` surfaces downstream, inside the PowerShell terminal, not in
+error - the `12152` surfaces downstream, inside the PowerShell terminal, not in
 the Heimdall logger. An RDP profile through the *same* bastion and host works, so
 the Heimdall tunnel machinery itself is sound.
 
@@ -43,9 +43,9 @@ Kerberos SPN `HTTP/127.0.0.1`, which has no ticket.
 
 | Layer | Outcome |
 |---|---|
-| TCP tunnel | **OK** — `Test-NetConnection` reports `TcpTestSucceeded: True` |
-| HTTP / WinRM | **Fails** — `Invoke-WebRequest .../wsman`: "The underlying connection was closed: An unexpected error occurred on a receive." |
-| `Enter-PSSession` | **Fails** — `PSRemotingTransportException` |
+| TCP tunnel | **OK** - `Test-NetConnection` reports `TcpTestSucceeded: True` |
+| HTTP / WinRM | **Fails** - `Invoke-WebRequest .../wsman`: "The underlying connection was closed: An unexpected error occurred on a receive." |
+| `Enter-PSSession` | **Fails** - `PSRemotingTransportException` |
 
 The TCP forward reaches the target, but the HTTP/WinRM exchange is closed
 unexpectedly.
@@ -65,11 +65,11 @@ between the two links of the chain:
 | `plink` message | Meaning |
 |---|---|
 | `administratively prohibited` | The bastion SSH server refuses forwarding to the target (`AllowTcpForwarding` / ACL). Failure is at the SSH layer. |
-| `connection refused` | The bastion reaches the target but port 5985 returns a RST — service not bound to that interface, or a firewall. |
-| `remote host closed` / `remote side closed connection` | The forward opens, then the target closes the connection mid-exchange — points to the WinRM service or an application-layer IPS/proxy. |
+| `connection refused` | The bastion reaches the target but port 5985 returns a RST - service not bound to that interface, or a firewall. |
+| `remote host closed` / `remote side closed connection` | The forward opens, then the target closes the connection mid-exchange - points to the WinRM service or an application-layer IPS/proxy. |
 | *(no line)* | The SSH forward is healthy; the fault is purely the `winrm-target.example.internal:5985` service. |
 
-In every case the "outside Heimdall" conclusion stands — this line only
+In every case the "outside Heimdall" conclusion stands - this line only
 attributes the fault, it does not change the verdict.
 
 ## Status
