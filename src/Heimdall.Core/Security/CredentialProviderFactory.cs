@@ -52,6 +52,7 @@ public sealed class CredentialProviderFactory : ICredentialProviderFactory
             settings.CredentialProviderTimeoutMs,
             unlockSecret,
             settings.CredentialProviderUsernameCommand,
-            settings.CredentialProviderFirstLineOnly);
+            settings.CredentialProviderFirstLineOnly,
+            settings.CredentialProviderKeyFile);
     }
 }

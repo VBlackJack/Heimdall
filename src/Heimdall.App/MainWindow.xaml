@@ -2907,6 +2907,19 @@
                                                 <TextBox Text="{Binding Settings.CredentialProviderDatabase}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderDbLabel}"/>
                                             </DockPanel>
                                         </StackPanel>
+                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                            <TextBlock x:Name="Mw_SettingsCredProviderKeyFileLabel" Text="{loc:Translate SettingsLabelCredProviderKeyFile}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <DockPanel>
+                                                <Button x:Name="Mw_SettingsCredProvKeyFileBrowseBtn" DockPanel.Dock="Right" Padding="6,2" Margin="4,0,0,0" Click="OnCredProvKeyFileBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate A11yBrowseKeyFile}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                                <TextBox Text="{Binding Settings.CredentialProviderKeyFile}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderKeyFileLabel}"/>
+                                            </DockPanel>
+                                            <TextBlock x:Name="Mw_SettingsCredProvKeyFileHint" Text="{loc:Translate SettingsCredProviderKeyFileHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
                                         <DockPanel Margin="0,16,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <Button x:Name="Mw_SettingsCredProvTestBtn" DockPanel.Dock="Right" Content="{loc:Translate CredProvBtnTest}" Command="{Binding Settings.TestCredentialProviderCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate CredProvBtnTest}"/>
                                             <TextBlock x:Name="Mw_SettingsCredProvTestResult" Text="{Binding Settings.CredentialProviderTestResult}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" FontStyle="Italic" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>

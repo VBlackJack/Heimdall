@@ -82,4 +82,25 @@ public class CredentialProviderFactoryTests
         Assert.NotNull(result);
         Assert.Equal("thepass", result!.Password);
     }
+
+    [Fact]
+    public void Create_KeyFile_FlowsToCommandProvider()
+    {
+        // No public accessor for the key file, so assert it flowed through via ExpandTemplate:
+        // a {KeyFile} template must expand to the configured path (same technique as Database).
+        var factory = new CredentialProviderFactory();
+        var settings = new AppSettings
+        {
+            CredentialProviderType = CredentialProviderKind.Command,
+            CredentialProviderCommand = "keepassxc-cli.exe show -k {KeyFile}",
+            CredentialProviderKeyFile = @"C:\vault\company.keyx"
+        };
+
+        ICredentialProvider provider = factory.Create(settings);
+
+        var command = Assert.IsType<CommandCredentialProvider>(provider);
+        var expanded = command.ExpandTemplate(
+            "keepassxc-cli.exe show -k {KeyFile}", "host", 22, "user", "title");
+        Assert.Equal(@"keepassxc-cli.exe show -k C:\vault\company.keyx", expanded);
+    }
 }

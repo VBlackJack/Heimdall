@@ -30,6 +30,7 @@ namespace Heimdall.Core.Security;
 ///   <item><c>{User}</c> — Username hint</item>
 ///   <item><c>{Title}</c> — Server display name / entry title</item>
 ///   <item><c>{Database}</c> — Configured database path</item>
+///   <item><c>{KeyFile}</c> - Path to the key file (replaces <c>{KeyFile}</c>)</item>
 /// </list>
 /// The command's stdout is captured and trimmed as the password.
 /// </remarks>
@@ -39,6 +40,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
 
     private readonly string? _commandTemplate;
     private readonly string? _databasePath;
+    private readonly string? _keyFilePath;
     private readonly string? _unlockSecret;
     private readonly string? _usernameCommandTemplate;
     private readonly bool _firstLineOnly;
@@ -73,13 +75,19 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// <c>OK: ...</c> line, or <c>pass</c>'s notes after the password). Applies to both
     /// the password and username commands.
     /// </param>
+    /// <param name="keyFilePath">
+    /// Optional path to a key file (replaces <c>{KeyFile}</c>). Used by tools such as
+    /// <c>keepassxc-cli</c> that authenticate with a key file via <c>-k/--key-file</c>,
+    /// alone or combined with a master password.
+    /// </param>
     public CommandCredentialProvider(
         string? commandTemplate,
         string? databasePath,
         int timeoutMs = 10000,
         string? unlockSecret = null,
         string? usernameCommandTemplate = null,
-        bool firstLineOnly = false)
+        bool firstLineOnly = false,
+        string? keyFilePath = null)
     {
         _commandTemplate = commandTemplate;
         _databasePath = databasePath;
@@ -87,6 +95,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         _unlockSecret = unlockSecret;
         _usernameCommandTemplate = usernameCommandTemplate;
         _firstLineOnly = firstLineOnly;
+        _keyFilePath = keyFilePath;
     }
 
     /// <inheritdoc />
@@ -299,6 +308,8 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// stripping; regular executables (keepassxc-cli, bw, op) get relaxed
     /// stripping that preserves parentheses, single quotes, and percent signs
     /// in legitimate values (double quotes are always stripped).
+    /// The path placeholders (<c>{Database}</c>, <c>{KeyFile}</c>) use a path-aware
+    /// sanitizer for non-shell targets so legitimate path characters survive.
     /// </summary>
     internal string ExpandTemplate(
         string template,
@@ -308,16 +319,17 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         string? title)
     {
         var (executable, _) = SplitCommand(template);
-        Func<string?, string> sanitize = InputValidator.IsShellTarget(executable)
-            ? SanitizeStrict
-            : SanitizeRelaxed;
+        bool shellTarget = InputValidator.IsShellTarget(executable);
+        Func<string?, string> sanitize = shellTarget ? SanitizeStrict : SanitizeRelaxed;
+        Func<string?, string> sanitizePath = shellTarget ? SanitizeStrict : SanitizePathValue;
 
         return template
             .Replace("{Host}", sanitize(host), StringComparison.OrdinalIgnoreCase)
             .Replace("{Port}", port.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{User}", sanitize(username), StringComparison.OrdinalIgnoreCase)
             .Replace("{Title}", sanitize(title), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Database}", sanitize(_databasePath), StringComparison.OrdinalIgnoreCase);
+            .Replace("{Database}", sanitizePath(_databasePath), StringComparison.OrdinalIgnoreCase)
+            .Replace("{KeyFile}", sanitizePath(_keyFilePath), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -341,6 +353,19 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;
         return System.Text.RegularExpressions.Regex.Replace(value, @"[;&|`$<>""\r\n]", "");
+    }
+
+    /// <summary>
+    /// Sanitizes a filesystem path placeholder (<c>{Database}</c>, <c>{KeyFile}</c>) for
+    /// non-shell targets. The process runs with <c>UseShellExecute=false</c>, so no shell
+    /// interprets the arguments; the only argument-boundary metacharacter is the double
+    /// quote (itself illegal in Windows filenames). Stripping only " / CR / LF preserves
+    /// every legal path character (&amp; $ ( ) ' space) that SanitizeRelaxed wrongly removes.
+    /// </summary>
+    private static string SanitizePathValue(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        return System.Text.RegularExpressions.Regex.Replace(value, "[\"\\r\\n]", "");
     }
 
     /// <summary>

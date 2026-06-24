@@ -24,7 +24,9 @@ public sealed class CredentialProviderPresetService
     private static readonly CredentialProviderPreset[] Presets =
     [
         new("Custom", ""),
-        new("KeePassXC", "keepassxc-cli show -s -a Password \"{Database}\" \"{Title}\""),
+        new("KeePassXC", "keepassxc-cli show -s -q -a Password \"{Database}\" \"{Title}\""),
+        new("KeePassXC (key file)", "keepassxc-cli show -s -q -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\""),
+        new("KeePassXC (key file only)", "keepassxc-cli show -s -q --no-password -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\""),
         new("KeePass2 (KPScript)", "KPScript.exe -c:GetEntryString \"{Database}\" -Field:Password -ref-Title:\"{Title}\""),
         new("Bitwarden CLI", "bw get password \"{Title}\""),
         new("1Password CLI", "op read \"op://{Title}/password\""),

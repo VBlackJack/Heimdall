@@ -1804,6 +1804,20 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
+    private void OnCredProvKeyFileBrowseClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = BuildFileDialogFilter("FilterKeyFiles", "*.keyx;*.key")
+        };
+
+        if (dialog.ShowDialog(this) == true && DataContext is MainViewModel vm)
+        {
+            vm.Settings.CredentialProviderKeyFile = dialog.FileName;
+            vm.Settings.IsDirty = true;
+        }
+    }
+
     private void OnCredProvPresetChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (DataContext is not MainViewModel vm)

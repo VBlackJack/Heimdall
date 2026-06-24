@@ -257,6 +257,9 @@ public sealed class AppSettings
     public string? CredentialProviderCommand { get; set; }
     public string? CredentialProviderDatabase { get; set; }
 
+    // A file path (KeePassXC key file), not a secret -> plaintext. Mirrors CredentialProviderDatabase.
+    public string? CredentialProviderKeyFile { get; set; }
+
     // Optional second command that retrieves the username from the vault. Run only when
     // the profile has no username. A command template, not a secret -> plaintext.
     public string? CredentialProviderUsernameCommand { get; set; }

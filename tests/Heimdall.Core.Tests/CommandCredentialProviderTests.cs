@@ -32,11 +32,13 @@ public class CommandCredentialProviderTests
         string? databasePath = null,
         string? unlockSecret = null,
         string? usernameCommandTemplate = null,
-        bool firstLineOnly = false)
+        bool firstLineOnly = false,
+        string? keyFilePath = null)
     {
         return new CommandCredentialProvider(
             commandTemplate, databasePath, timeoutMs: TestTimeoutMs, unlockSecret: unlockSecret,
-            usernameCommandTemplate: usernameCommandTemplate, firstLineOnly: firstLineOnly);
+            usernameCommandTemplate: usernameCommandTemplate, firstLineOnly: firstLineOnly,
+            keyFilePath: keyFilePath);
     }
 
     // ---------------------------------------------------------------
@@ -526,7 +528,83 @@ public class CommandCredentialProviderTests
         var provider = CreateProvider("");
         var expanded = provider.ExpandTemplate(
             "", "host(test)", 22, "user", "title");
-        // Empty template → IsShellTarget returns true → strict
+        // Empty template -> IsShellTarget returns true -> strict
         Assert.DoesNotContain("(", expanded);
+    }
+
+    // ---------------------------------------------------------------
+    // Key file placeholder + path-aware sanitization
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void ExpandTemplate_KeyFile_IsExpandedForRegularExe()
+    {
+        var provider = CreateProvider(
+            "keepassxc-cli.exe show -k {KeyFile} {Title}",
+            keyFilePath: @"C:\vault\company.keyx");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli.exe show -k {KeyFile} {Title}", "host", 22, "user", "entry1");
+        Assert.Equal(@"keepassxc-cli.exe show -k C:\vault\company.keyx entry1", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_KeyFile_PreservesPathSpecialChars()
+    {
+        // A path-aware sanitizer must keep space, &, ( and ) intact for a non-shell target.
+        var provider = CreateProvider(
+            "keepassxc-cli.exe show -k {KeyFile}",
+            keyFilePath: @"C:\Team R&D\sub (x)\company.keyx");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli.exe show -k {KeyFile}", "host", 22, "user", "title");
+        Assert.Equal(@"keepassxc-cli.exe show -k C:\Team R&D\sub (x)\company.keyx", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_Database_PreservesPathSpecialChars()
+    {
+        // Regression lock for the latent {Database} corruption: the same special characters
+        // are now preserved by the path-aware sanitizer.
+        var provider = CreateProvider(
+            "keepassxc-cli.exe show {Database}",
+            databasePath: @"C:\Team R&D\sub (x)\company.kdbx");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli.exe show {Database}", "host", 22, "user", "title");
+        Assert.Equal(@"keepassxc-cli.exe show C:\Team R&D\sub (x)\company.kdbx", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_KeyFile_StripsDoubleQuote()
+    {
+        // The double quote is the one argument-boundary metacharacter and must be removed.
+        var provider = CreateProvider(
+            "keepassxc-cli.exe show -k {KeyFile}",
+            keyFilePath: "C:\\vault\\comp\"any.keyx");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli.exe show -k {KeyFile}", "host", 22, "user", "title");
+        Assert.Equal(@"keepassxc-cli.exe show -k C:\vault\company.keyx", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_EmptyKeyFile_ExpandsToEmptyQuotedArg()
+    {
+        // An empty key file with a -k "{KeyFile}" template must not throw; it expands to -k "".
+        var provider = CreateProvider(
+            "keepassxc-cli.exe show -k \"{KeyFile}\"",
+            keyFilePath: null);
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli.exe show -k \"{KeyFile}\"", "host", 22, "user", "title");
+        Assert.Equal("keepassxc-cli.exe show -k \"\"", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_ShellTarget_StillStripsKeyFilePathChars()
+    {
+        // For a shell target the path stays strictly stripped (& and parentheses removed).
+        var provider = CreateProvider(
+            "cmd.exe /c echo {KeyFile}",
+            keyFilePath: @"C:\Team R&D\sub (x)\company.keyx");
+        var expanded = provider.ExpandTemplate(
+            "cmd.exe /c echo {KeyFile}", "host", 22, "user", "title");
+        Assert.Equal(@"cmd.exe /c echo C:\Team RD\sub x\company.keyx", expanded);
     }
 }

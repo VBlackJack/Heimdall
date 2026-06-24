@@ -341,6 +341,52 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveThenLoad_PreservesCredentialProviderKeyFile()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config);
+        viewModel.CredentialProviderKeyFile = @"C:\vault\company.keyx";
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var saved = Assert.IsType<AppSettings>(config.SavedSettings);
+        Assert.Equal(@"C:\vault\company.keyx", saved.CredentialProviderKeyFile);
+
+        var reloaded = CreateViewModel(new FakeConfigManager());
+        reloaded.LoadFromSettings(saved);
+
+        Assert.Equal(@"C:\vault\company.keyx", reloaded.CredentialProviderKeyFile);
+    }
+
+    [Fact]
+    public async Task SaveCredentialProviderKeyFile_BlankBecomesNull()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config);
+        viewModel.CredentialProviderKeyFile = "   ";
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var saved = Assert.IsType<AppSettings>(config.SavedSettings);
+        Assert.Null(saved.CredentialProviderKeyFile);
+    }
+
+    [Fact]
+    public async Task TestCredentialProvider_KeyFileTemplateButBlankKeyFile_WarnsWithoutLaunching()
+    {
+        // A {KeyFile} template with a blank key file must surface the warning and return
+        // before constructing or launching any process.
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "keepassxc-cli show -s -k \"{KeyFile}\" -a Password";
+        viewModel.CredentialProviderKeyFile = "";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer["CredProvTestNoKeyFile"], viewModel.CredentialProviderTestResult);
+    }
+
+    [Fact]
     public void CollapseTunnelsPanelByDefault_LoadFromSettings_DefaultIsTrue()
     {
         var viewModel = CreateViewModel(new FakeConfigManager());

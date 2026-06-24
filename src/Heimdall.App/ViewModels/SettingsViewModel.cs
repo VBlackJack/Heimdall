@@ -433,6 +433,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string _credentialProviderDatabase = "";
 
+    // Path to the KeePassXC key file (replaces {KeyFile}). A file path, not a secret.
+    [ObservableProperty]
+    private string _credentialProviderKeyFile = "";
+
     // Optional command that retrieves the username from the vault (plaintext template).
     [ObservableProperty]
     private string _credentialProviderUsernameCommand = "";
@@ -881,6 +885,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         CredentialProviderType = settings.CredentialProviderType;
         CredentialProviderCommand = settings.CredentialProviderCommand ?? "";
         CredentialProviderDatabase = settings.CredentialProviderDatabase ?? "";
+        CredentialProviderKeyFile = settings.CredentialProviderKeyFile ?? "";
         CredentialProviderUsernameCommand = settings.CredentialProviderUsernameCommand ?? "";
         CredentialProviderFirstLineOnly = settings.CredentialProviderFirstLineOnly;
         CredentialProviderUnlockSecret =
@@ -1066,6 +1071,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.CredentialProviderType = CredentialProviderType;
             settings.CredentialProviderCommand = CredentialProviderCommand;
             settings.CredentialProviderDatabase = CredentialProviderDatabase;
+            settings.CredentialProviderKeyFile =
+                string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
+                    ? null
+                    : CredentialProviderKeyFile.Trim();
             settings.CredentialProviderUsernameCommand = CredentialProviderUsernameCommand;
             settings.CredentialProviderFirstLineOnly = CredentialProviderFirstLineOnly;
             settings.CredentialProviderUnlockSecretEncrypted =
@@ -1910,6 +1919,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             return;
         }
 
+        // A {KeyFile} template (KeePassXC key-file presets) requires a key file path;
+        // launching with an empty path would fail opaquely, so warn and stop here.
+        if (CredentialProviderCommand.Contains("{KeyFile}", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(CredentialProviderKeyFile))
+        {
+            CredentialProviderTestResult = _localizer["CredProvTestNoKeyFile"];
+            return;
+        }
+
         CredentialProviderTestResult = _localizer["CredProvTestRunning"];
 
         try
@@ -1923,7 +1941,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 string.IsNullOrWhiteSpace(CredentialProviderUsernameCommand)
                     ? null
                     : CredentialProviderUsernameCommand,
-                CredentialProviderFirstLineOnly);
+                CredentialProviderFirstLineOnly,
+                string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
+                    ? null
+                    : CredentialProviderKeyFile.Trim());
 
             var result = await provider.GetCredentialAsync(
                 "test.example.com", 22, "testuser", "TestEntry", cancellationToken);
