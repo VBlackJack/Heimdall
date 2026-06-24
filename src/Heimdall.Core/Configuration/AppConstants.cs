@@ -38,4 +38,13 @@ public static class AppConstants
 
     /// <summary>Subdirectory under BaseDirectory for embedded CLI tools.</summary>
     public const string EmbeddedToolsSubdir = "Assets/Tools";
+
+    /// <summary>
+    /// Maximum number of bytes a ConPTY session buffers before the first
+    /// <c>DataReceived</c> subscriber attaches. This preserves the child shell's
+    /// bootstrap output (e.g. the initial prompt/banner) that is otherwise emitted
+    /// before the terminal view subscribes. Once the cap is hit the session stops
+    /// buffering further bootstrap bytes.
+    /// </summary>
+    public const int MaxConPtyBootstrapBufferBytes = 256 * 1024;
 }

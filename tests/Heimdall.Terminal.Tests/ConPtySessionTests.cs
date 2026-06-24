@@ -73,6 +73,63 @@ public sealed class ConPtySessionTests
     }
 
     [Fact]
+    [Trait("Category", "CIUnstable")]
+    public async Task DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput()
+    {
+        // Producer: ConPtySession bootstrap buffering. StartReadLoop routes bytes
+        // through DeliverOrBuffer (ConPtySession.cs): with no subscriber yet they are
+        // buffered by BufferBootstrapChunk, and the DataReceived add-accessor replays
+        // the buffer to the first subscriber. Before this fix the bytes were dropped,
+        // so a late subscriber (the real Local Shell case) never saw the prompt.
+        //
+        // Uses an INTERACTIVE shell so the bootstrap prompt is emitted to the ConPTY
+        // output pipe (a non-interactive one-shot command writes to inherited stdout
+        // under the test runner -- see the class summary). The shell then idles, so
+        // the only way a late subscriber can receive non-empty output is via replay.
+        if (!ConPtySession.IsAvailable)
+        {
+            return;
+        }
+
+        ConPtySession session = new();
+        try
+        {
+            await session.StartAsync(
+                TerminalTestHelpers.ResolvePowerShellExecutable(),
+                "-NoLogo -NoProfile");
+
+            // Let the interactive shell print its prompt into the bootstrap buffer
+            // before any subscriber attaches (no subscriber == buffered, not delivered).
+            await Task.Delay(1500);
+
+            StringBuilder output = new();
+            object outputLock = new object();
+            TaskCompletionSource<string> outputObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            // Subscribe only now: the already-buffered bootstrap output must be replayed.
+            session.DataReceived += data =>
+            {
+                lock (outputLock)
+                {
+                    output.Append(Encoding.UTF8.GetString(data.Span));
+                    if (output.Length > 0)
+                    {
+                        outputObserved.TrySetResult(output.ToString());
+                    }
+                }
+            };
+
+            string text = await outputObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.NotEmpty(text);
+        }
+        finally
+        {
+            session.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task Dispose_TerminatesPseudoConsoleAndProcess()
     {
         if (!ConPtySession.IsAvailable)
