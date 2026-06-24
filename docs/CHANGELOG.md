@@ -12,6 +12,29 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-24: KeePassXC key-file authentication
+
+Added key-file (`.keyx`/`.key`) authentication for the external credential
+provider, the main gap for enterprise KeePassXC usage (commit `3472cda7`).
+
+- **Key-file support.** A new `{KeyFile}` command placeholder and the
+  `CredentialProviderKeyFile` setting (a plaintext file path, not a secret) feed
+  a key file into the command via `-k "{KeyFile}"`, used alone or with a master
+  password.
+- **Three KeePassXC presets.** `"KeePassXC"` (master password, now with `-q`),
+  `"KeePassXC (key file)"` (master password + key file), and
+  `"KeePassXC (key file only)"` (`--no-password`, key file alone).
+- **Path-aware sanitizer.** For non-shell targets, the path placeholders
+  `{Database}` and `{KeyFile}` now strip only the double quote and CR/LF. The
+  provider runs with `UseShellExecute=false`, so no shell interprets the
+  arguments and the double quote (illegal in Windows filenames) is the only
+  argument-boundary metacharacter. This also fixes latent corruption of
+  `{Database}` paths containing characters such as `&` or `$`.
+- **Settings.** A Key file field with a Browse dialog (`*.keyx;*.key`) and an
+  empty-key-file guard on the Test button; EN/FR locale keys at parity.
+- **Validation.** Verified against the real `keepassxc-cli` 2.7.11.
+- **Tests.** Baseline raised to 7,347 passing tests, 0 failures.
+
 ## 2026-06-21: External vault integration overhaul
 
 Hardened and extended the external credential provider after an audit found the

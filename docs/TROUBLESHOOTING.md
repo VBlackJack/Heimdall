@@ -60,6 +60,7 @@ Index of all issues encountered during development and their solutions.
 45. [SSH/SFTP - Host Key Mismatch Mid-Session](#ssh-sftp-host-key-mismatch-mid-session)
 46. [FTP - Cleartext Credential Warning](#ftp-cleartext-credential-warning)
 47. [WinRM Gateway - HTTP 12152 Invalid Server Response](#winrm-gateway-12152)
+48. [KeePassXC Credential Provider - Common Gotchas](#keepassxc-credential-provider)
 
 ---
 
@@ -876,3 +877,28 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Solution**: No code fix in Heimdall. Diagnose the environment path (bastion forwarding policy, target WinRM listener, intermediate IPS/proxy). Full isolation procedure and `plink` console reading grid: see [winrm-gateway-12152-diagnostic.md](winrm-gateway-12152-diagnostic.md).
 
 **Files**: none (environmental).
+
+---
+
+## 48. KeePassXC Credential Provider - Common Gotchas {#keepassxc-credential-provider}
+
+**Symptom**: The external credential provider returns nothing, reports "not found", or the Settings Test button fails when using KeePassXC.
+
+**Root cause**: Almost always a configuration mismatch rather than a bug. The usual suspects:
+
+- **`keepassxc-cli` is not installed or not found.** It must be on `PATH`, or installed at `C:\Program Files\KeePassXC\` (the bundle ships `keepassxc-cli.exe`). Install KeePassXC if it is missing.
+- **The vault entry title does not match.** The lookup uses the per-profile "Vault entry name" and falls back to the server display name. The KeePassXC entry **title** must match that value exactly. This is the number one cause of "not found".
+- **Wrong preset for the database type.** Pick the preset that matches the database: "KeePassXC (key file)" for password + key file, "KeePassXC (key file only)" for a key-file-only database (`--no-password`), or "KeePassXC" for a master-password-only database.
+- **Unlock secret confusion.** The Unlock secret field is the database **master password**, fed to the tool over stdin. Leave it empty for key-file-only databases (the preset uses `--no-password` and never reads stdin).
+
+**Solution**:
+
+1. Confirm `keepassxc-cli --version` runs (PATH or the full install path).
+2. Make the vault entry title equal the profile's "Vault entry name" (or display name).
+3. Select the preset matching the database, and set the Key file path when the preset includes `{KeyFile}`.
+4. Set the Unlock secret to the master password, or leave it empty for key-file-only databases.
+5. Use the Settings Test button to confirm retrieval before connecting.
+
+**Key lesson**: KeePassXC itself does not need to be running or unlocked - `keepassxc-cli` opens the `.kdbx` file directly using the master password and/or key file supplied by Heimdall.
+
+**Files**: `Security/CommandCredentialProvider.cs`, `Security/CredentialProviderFactory.cs`, `Services/CredentialProviderPresetService.cs`, `ViewModels/SettingsViewModel.cs`
