@@ -1104,6 +1104,11 @@
                                                         </Ellipse.Style>
                                                     </Ellipse>
                                                 </Grid>
+                                                <TextBlock x:Name="TabPinGlyph" Text="&#xE718;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           VerticalAlignment="Center" Margin="0,0,4,0"
+                                                           Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                           AutomationProperties.Name="{loc:Translate SessionPinTab}"/>
                                                 <TextBlock Text="{Binding DisplayTitle}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                                            VerticalAlignment="Center"

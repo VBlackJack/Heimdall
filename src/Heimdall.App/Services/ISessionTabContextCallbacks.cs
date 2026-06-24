@@ -58,4 +58,12 @@ public interface ISessionTabContextCallbacks
     /// standalone tab.
     /// </summary>
     void UnsplitSession(SessionTabViewModel session);
+
+    /// <summary>
+    /// Selects the source profile of the active session in the sessions tree,
+    /// expanding its ancestor folders and scrolling its node into view. Relaxes an
+    /// active search filter when it would hide the node and ensures the sessions
+    /// sidebar is visible. No-ops safely when <paramref name="serverId"/> is unknown.
+    /// </summary>
+    void RevealServerInTree(string serverId);
 }

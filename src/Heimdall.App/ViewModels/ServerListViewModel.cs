@@ -27,6 +27,7 @@ using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Network;
 using Heimdall.Core.Security;
 using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Core.SessionHealth;
@@ -43,6 +44,9 @@ namespace Heimdall.App.ViewModels;
 public partial class ServerListViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan SearchFilterDebounceDelay = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>Default SSH port; omitted from a generated <c>ssh</c> command line.</summary>
+    private const int DefaultSshPort = 22;
 
     private readonly IConfigManager _configManager;
     private readonly LocalizationManager _localizer;
@@ -1523,6 +1527,93 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         Clipboard.SetText(server.Username);
         StatusMessageRequested?.Invoke(
             _localizer.Format("StatusCopiedToClipboard", server.Username));
+    }
+
+    [RelayCommand]
+    private void CopyAddress(ServerItemViewModel? server)
+    {
+        if (server is null || string.IsNullOrWhiteSpace(server.RemoteServer))
+        {
+            return;
+        }
+
+        var address = BuildAddress(server);
+        Clipboard.SetText(address);
+        StatusMessageRequested?.Invoke(
+            _localizer.Format("StatusCopiedToClipboard", address));
+    }
+
+    [RelayCommand]
+    private void CopySshCommand(ServerItemViewModel? server)
+    {
+        if (server is null || string.IsNullOrWhiteSpace(server.RemoteServer))
+        {
+            return;
+        }
+
+        var command = BuildSshCommand(server);
+        Clipboard.SetText(command);
+        StatusMessageRequested?.Invoke(
+            _localizer.Format("StatusCopiedToClipboard", command));
+    }
+
+    [RelayCommand]
+    private async Task TestReachabilityAsync(ServerItemViewModel? server)
+    {
+        if (server is null || string.IsNullOrWhiteSpace(server.RemoteServer))
+        {
+            return;
+        }
+
+        var host = server.RemoteServer;
+        var port = server.RemotePort;
+
+        // Do not guess a port: a server without one cannot be probed deterministically.
+        if (port <= 0)
+        {
+            StatusMessageRequested?.Invoke(
+                _localizer.Format("StatusReachabilityNoPort", host));
+            return;
+        }
+
+        StatusMessageRequested?.Invoke(
+            _localizer.Format("StatusReachabilityTesting", host, port));
+
+        var result = await TcpReachabilityProbe.ProbeAsync(
+            host, port, TcpReachabilityProbe.DefaultTimeoutMs).ConfigureAwait(true);
+
+        StatusMessageRequested?.Invoke(result.Reachable
+            ? _localizer.Format("StatusReachabilitySuccess", host, port, result.LatencyMs.ToString("F0"))
+            : _localizer.Format("StatusReachabilityFailed", host, port, result.Error ?? string.Empty));
+    }
+
+    /// <summary>
+    /// Formats a server address as <c>host</c> when no port is configured, otherwise
+    /// <c>host:port</c>. Pure helper (no clipboard) so it can be unit tested directly.
+    /// </summary>
+    internal static string BuildAddress(ServerItemViewModel server)
+    {
+        return server.RemotePort > 0
+            ? $"{server.RemoteServer}:{server.RemotePort}"
+            : server.RemoteServer;
+    }
+
+    /// <summary>
+    /// Builds an <c>ssh</c> command line for a server: prefixes the username when present
+    /// (<c>user@host</c>) and appends <c>-p port</c> only for a non-default port. Pure
+    /// helper (no clipboard) so it can be unit tested directly.
+    /// </summary>
+    internal static string BuildSshCommand(ServerItemViewModel server)
+    {
+        var target = string.IsNullOrWhiteSpace(server.Username)
+            ? server.RemoteServer
+            : $"{server.Username}@{server.RemoteServer}";
+
+        var portSuffix = server.RemotePort > 0 && server.RemotePort != DefaultSshPort
+            ? $" -p {server.RemotePort}"
+            : string.Empty;
+
+        return $"ssh {target}{portSuffix}";
     }
 
     /// <summary>

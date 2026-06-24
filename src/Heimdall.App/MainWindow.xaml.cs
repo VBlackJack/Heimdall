@@ -2866,6 +2866,84 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         _sessionWindowService.UnsplitSession(session, vm);
     }
 
+    /// <inheritdoc />
+    void ISessionTabContextCallbacks.RevealServerInTree(string serverId)
+    {
+        if (string.IsNullOrEmpty(serverId) || DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        // Make sure the sessions tree is actually on screen: expand a hidden
+        // sidebar and switch it to the Sessions tab.
+        if (_uiState.IsSidebarHidden)
+        {
+            ToggleSidebar();
+        }
+
+        SidebarTabSessions.IsChecked = true;
+
+        // Relax an active search filter so a filtered-out node becomes visible.
+        if (!string.IsNullOrWhiteSpace(vm.ServerList.SearchText))
+        {
+            vm.ServerList.SearchText = string.Empty;
+        }
+
+        var server = vm.ServerList.Servers.FirstOrDefault(
+            candidate => string.Equals(candidate.Id, serverId, StringComparison.Ordinal));
+        if (server is null)
+        {
+            return;
+        }
+
+        // Expand every ancestor folder so the leaf container can be realized.
+        ExpandFoldersToServer(vm.ServerList.GroupedServers, server);
+
+        // Defer until WPF has generated the newly expanded containers, then select
+        // and scroll. Selecting the container raises SelectedItemChanged, which runs
+        // the existing SelectSingle + ShowTreeSelection path.
+        _ = Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Background,
+            new Action(() =>
+            {
+                var container = TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, server);
+                if (container is not null)
+                {
+                    container.IsSelected = true;
+                    container.BringIntoView();
+                }
+                else
+                {
+                    // Container not realized: at least drive the VM selection + detail panel.
+                    vm.ServerList.SelectSingle(server);
+                    ShowTreeSelection(vm, server);
+                }
+            }));
+    }
+
+    /// <summary>
+    /// Expands every folder on the path to <paramref name="server"/> so its
+    /// TreeViewItem becomes realizable. Returns <c>true</c> when the server was
+    /// located under <paramref name="folders"/>.
+    /// </summary>
+    private static bool ExpandFoldersToServer(
+        IEnumerable<FolderViewModel> folders,
+        ServerItemViewModel server)
+    {
+        foreach (var folder in folders)
+        {
+            var containsHere = folder.Servers.Contains(server);
+            var containsBelow = ExpandFoldersToServer(folder.SubFolders, server);
+            if (containsHere || containsBelow)
+            {
+                folder.IsExpanded = true;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void OnFileShareSharingStarted(object? sender, FileShareStartedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

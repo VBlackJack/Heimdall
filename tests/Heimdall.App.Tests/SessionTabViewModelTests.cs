@@ -173,6 +173,74 @@ public sealed class SessionTabViewModelTests
         Assert.Null(exception);
     }
 
+    [Fact]
+    public void DisplayTitle_CustomTitle_OverridesTitleAndSuffix()
+    {
+        var vm = new SessionTabViewModel
+        {
+            Title = "Prod RDP",
+            RdpModeOverride = RdpModeOverride.ForceEmbedded,
+            RdpModeOverrideSuffix = "(forced embedded)"
+        };
+
+        Assert.Equal("Prod RDP (forced embedded)", vm.DisplayTitle);
+
+        vm.CustomTitle = "My DB";
+
+        Assert.Equal("My DB", vm.DisplayTitle);
+        Assert.Equal("My DB", vm.HeaderToolTip);
+    }
+
+    [Fact]
+    public void DisplayTitle_BlankCustomTitle_FallsBackToAutoTitle()
+    {
+        var vm = new SessionTabViewModel { Title = "Auto" };
+
+        vm.CustomTitle = "   ";
+
+        Assert.Equal("Auto", vm.DisplayTitle);
+    }
+
+    [Fact]
+    public void CustomTitle_SetThenCleared_RestoresAutoTitle()
+    {
+        var vm = new SessionTabViewModel { Title = "Auto" };
+
+        vm.CustomTitle = "Custom";
+        Assert.Equal("Custom", vm.DisplayTitle);
+
+        vm.CustomTitle = null;
+        Assert.Equal("Auto", vm.DisplayTitle);
+    }
+
+    [Fact]
+    public void CustomTitle_Change_RaisesDisplayTitleNotification()
+    {
+        var vm = new SessionTabViewModel { Title = "Auto" };
+        List<string> changes = [];
+        vm.PropertyChanged += (_, args) => RecordChange(args, changes);
+
+        vm.CustomTitle = "Custom";
+
+        Assert.Contains(nameof(SessionTabViewModel.CustomTitle), changes);
+        Assert.Contains(nameof(SessionTabViewModel.DisplayTitle), changes);
+    }
+
+    [Fact]
+    public void IsPinned_DefaultsFalse_AndRaisesPropertyChanged()
+    {
+        var vm = new SessionTabViewModel();
+        List<string> changes = [];
+        vm.PropertyChanged += (_, args) => RecordChange(args, changes);
+
+        Assert.False(vm.IsPinned);
+
+        vm.IsPinned = true;
+
+        Assert.True(vm.IsPinned);
+        Assert.Contains(nameof(SessionTabViewModel.IsPinned), changes);
+    }
+
     private static void RecordChange(PropertyChangedEventArgs args, ICollection<string> changes)
     {
         if (!string.IsNullOrWhiteSpace(args.PropertyName))

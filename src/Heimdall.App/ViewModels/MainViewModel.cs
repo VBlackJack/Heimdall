@@ -28,6 +28,7 @@ using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Sidebar;
 using Heimdall.App.ViewModels.ToolsTab;
 using Heimdall.App.ViewModels.Tunnels;
+using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -618,6 +619,118 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         string? paneId = null)
     {
         await Split.SplitSessionWithServerAsync(session, serverId, orientation, paneId);
+    }
+
+    // --- Connect as... (transient ad-hoc protocol switch) ---
+
+    /// <summary>
+    /// Connects the given server's host using a chosen protocol as a transient
+    /// ad-hoc session, carrying the username only (no password is propagated across
+    /// protocols; credential autofill / external vault / prompt resolve the rest).
+    /// Mirrors the Command Palette ad-hoc connect flow without persisting a profile.
+    /// </summary>
+    public async Task ConnectServerAsProtocolAsync(ServerItemViewModel server, string protocol)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        if (string.IsNullOrWhiteSpace(protocol))
+        {
+            return;
+        }
+
+        var dto = BuildTransientProfile(server, protocol);
+        var connType = dto.ConnectionType;
+        var settings = await _configManager.LoadSettingsAsync();
+
+        // Credential-safe logging: host + protocol only, never username/password.
+        Core.Logging.FileLogger.Info($"Connect as {connType} to host={dto.RemoteServer}");
+
+        var connectionService = ServerList.ConnectionService;
+        ConnectionResult result = connType switch
+        {
+            "RDP" => await connectionService.ConnectRdpAsync(dto, settings),
+            "SFTP" => await connectionService.ConnectSftpAsync(dto, settings),
+            "VNC" => await connectionService.ConnectVncAsync(dto, settings),
+            "TELNET" => await connectionService.ConnectTelnetAsync(dto, settings),
+            _ => await connectionService.ConnectSshAsync(dto, settings),
+        };
+
+        if (result.Success && result.Session is not null)
+        {
+            var tab = Connection.AddSession(dto.Id, dto.DisplayName, connType);
+            tab.MarkAsAdHoc(dto);
+
+            tab.HostControl = _embeddedSessionManager.CreateHostControl(
+                tab, dto.DisplayName, connType, result.Session, settings);
+            if (tab.HostControl is EmbeddedRdpView rdpView)
+            {
+                rdpView.SetOwningPane(tab.PrimaryPane);
+            }
+
+            tab.Status = _localizer["StatusConnected"];
+            StatusText = _localizer.Format("StatusConnected",
+                !string.IsNullOrWhiteSpace(dto.DisplayName) ? dto.DisplayName : dto.RemoteServer);
+        }
+        else if (result.Success)
+        {
+            // External mode: a process was launched; keep a lightweight ad-hoc tab.
+            var tab = Connection.AddSession(dto.Id, dto.DisplayName, connType);
+            tab.MarkAsAdHoc(dto);
+            tab.Status = _localizer["StatusLaunchedExternalClient"];
+            StatusText = _localizer["StatusLaunchedExternalClient"];
+        }
+        else
+        {
+            StatusText = result.ErrorMessage ?? _localizer["ErrorConnectionFailed"];
+        }
+    }
+
+    /// <summary>
+    /// Builds a transient (never persisted) <see cref="ServerProfileDto"/> that connects
+    /// the server's host with the chosen protocol. Carries the host, the protocol default
+    /// port, and the username in the protocol's username field. No password is set. The Id
+    /// is prefixed <c>adhoc-</c> so the session is treated as ad-hoc. Pure helper (no
+    /// connection) for unit testing.
+    /// </summary>
+    internal static ServerProfileDto BuildTransientProfile(ServerItemViewModel server, string protocol)
+    {
+        var connType = protocol.ToUpperInvariant();
+        var host = server.RemoteServer ?? string.Empty;
+        var username = server.Username ?? string.Empty;
+        var displayName = !string.IsNullOrWhiteSpace(host) ? host : server.DisplayName;
+
+        var dto = new ServerProfileDto
+        {
+            Id = "adhoc-" + Guid.NewGuid().ToString("N"),
+            DisplayName = displayName,
+            RemoteServer = host,
+            ConnectionType = connType,
+        };
+
+        switch (connType)
+        {
+            case "RDP":
+                dto.RemotePort = DefaultPorts.Rdp;
+                dto.RdpUsername = username;
+                break;
+            case "SFTP":
+                dto.SshPort = DefaultPorts.Sftp;
+                dto.SshUsername = username;
+                break;
+            case "VNC":
+                // VNC has no username field; it authenticates with a password resolved at connect.
+                dto.VncPort = DefaultPorts.Vnc;
+                break;
+            case "TELNET":
+                dto.TelnetPort = DefaultPorts.Telnet;
+                dto.TelnetUsername = username;
+                break;
+            default: // SSH
+                dto.SshPort = DefaultPorts.Ssh;
+                dto.SshUsername = username;
+                break;
+        }
+
+        return dto;
     }
 
     public void MergeExistingSession(

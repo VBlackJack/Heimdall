@@ -60,6 +60,23 @@ public partial class SessionTabViewModel : ObservableObject
     private string _rdpModeOverrideSuffix = string.Empty;
 
     /// <summary>
+    /// User-supplied custom tab title. When non-blank it overrides the auto title
+    /// (and suppresses the RDP mode suffix). Session-lifetime only; never persisted.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayTitle))]
+    [NotifyPropertyChangedFor(nameof(HeaderToolTip))]
+    private string? _customTitle;
+
+    /// <summary>
+    /// True when the user pinned this tab. Pinned tabs sort before unpinned tabs
+    /// and are excluded from "Close others" / "Close to the right". Session-lifetime
+    /// only; never persisted.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isPinned;
+
+    /// <summary>
     /// True when this session was started ad-hoc from the Command Palette
     /// (typing a bare IP/hostname) and is not backed by a saved server profile.
     /// </summary>
@@ -157,9 +174,21 @@ public partial class SessionTabViewModel : ObservableObject
         }
     }
 
-    public string DisplayTitle => string.IsNullOrWhiteSpace(RdpModeOverrideSuffix)
-        ? Title
-        : $"{Title} {RdpModeOverrideSuffix}";
+    public string DisplayTitle
+    {
+        get
+        {
+            // A user-supplied custom title wins verbatim, with no RDP mode suffix.
+            if (!string.IsNullOrWhiteSpace(CustomTitle))
+            {
+                return CustomTitle;
+            }
+
+            return string.IsNullOrWhiteSpace(RdpModeOverrideSuffix)
+                ? Title
+                : $"{Title} {RdpModeOverrideSuffix}";
+        }
+    }
 
     public string ConnectionType
     {

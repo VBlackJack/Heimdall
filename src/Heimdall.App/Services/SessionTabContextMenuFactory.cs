@@ -70,11 +70,12 @@ public sealed class SessionTabContextMenuFactory
             "TOOL:", StringComparison.OrdinalIgnoreCase) == true;
 
         AppendCloseItem(menu, session, vm, isToolTab);
+        AppendTitleAndPinItems(menu, session, vm);
 
         if (!isToolTab)
         {
             AppendConnectionActions(menu, session, vm, callbacks);
-            AppendProfileActions(menu, session, vm);
+            AppendProfileActions(menu, session, vm, callbacks);
         }
 
         AppendDetachItem(menu, session, vm, callbacks);
@@ -86,12 +87,104 @@ public sealed class SessionTabContextMenuFactory
         }
 
         AppendCloseAllItem(menu, session, vm);
+        AppendCloseGroupItems(menu, session, vm);
 
         menu.Items.Add(new Separator());
 
         AppendSplitItems(menu, session, vm, callbacks);
 
         return menu;
+    }
+
+    /// <summary>
+    /// Every session except <paramref name="current"/> and any pinned tab,
+    /// preserving the order of <paramref name="ordered"/>. Pure (no side effects);
+    /// used by "Close others".
+    /// </summary>
+    internal static IReadOnlyList<SessionTabViewModel> SessionsToCloseOthers(
+        IReadOnlyList<SessionTabViewModel> ordered,
+        SessionTabViewModel current)
+    {
+        return ordered
+            .Where(session => !ReferenceEquals(session, current) && !session.IsPinned)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Every session positioned after <paramref name="current"/> in
+    /// <paramref name="ordered"/> (tab order) that is not pinned. Empty when
+    /// <paramref name="current"/> is the last tab or is not present. Pure; used by
+    /// "Close to the right".
+    /// </summary>
+    internal static IReadOnlyList<SessionTabViewModel> SessionsToCloseToRight(
+        IReadOnlyList<SessionTabViewModel> ordered,
+        SessionTabViewModel current)
+    {
+        var index = -1;
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            if (ReferenceEquals(ordered[i], current))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            return [];
+        }
+
+        var result = new List<SessionTabViewModel>(ordered.Count - index - 1);
+        for (var i = index + 1; i < ordered.Count; i++)
+        {
+            if (!ordered[i].IsPinned)
+            {
+                result.Add(ordered[i]);
+            }
+        }
+
+        return result;
+    }
+
+    // --- Rename / Reset title / Pin ---
+
+    private static void AppendTitleAndPinItems(
+        ContextMenu menu,
+        SessionTabViewModel session,
+        MainViewModel vm)
+    {
+        var renameItem = new MenuItem { Header = vm.Localize("SessionRenameTab") };
+        renameItem.Click += async (_, _) =>
+        {
+            var entered = await vm.DialogService.ShowInputAsync(
+                vm.Localize("SessionRenameTitle"),
+                vm.Localize("SessionRenamePrompt"),
+                session.DisplayTitle);
+
+            // Null = cancelled: leave the title unchanged. A cleared (blank) value
+            // resets to the auto title.
+            if (entered is not null)
+            {
+                var trimmed = entered.Trim();
+                session.CustomTitle = string.IsNullOrEmpty(trimmed) ? null : trimmed;
+            }
+        };
+        menu.Items.Add(renameItem);
+
+        if (!string.IsNullOrWhiteSpace(session.CustomTitle))
+        {
+            var resetItem = new MenuItem { Header = vm.Localize("SessionResetTitle") };
+            resetItem.Click += (_, _) => session.CustomTitle = null;
+            menu.Items.Add(resetItem);
+        }
+
+        var pinItem = new MenuItem
+        {
+            Header = vm.Localize(session.IsPinned ? "SessionUnpinTab" : "SessionPinTab")
+        };
+        pinItem.Click += (_, _) => vm.Connection.SetPinned(session, !session.IsPinned);
+        menu.Items.Add(pinItem);
     }
 
     // ── Close ────────────────────────────────────────────────────────
@@ -174,7 +267,8 @@ public sealed class SessionTabContextMenuFactory
     private static void AppendProfileActions(
         ContextMenu menu,
         SessionTabViewModel session,
-        MainViewModel vm)
+        MainViewModel vm,
+        ISessionTabContextCallbacks callbacks)
     {
         string lookupId = session.ProfileLookupServerId;
         ServerItemViewModel? serverVm = string.IsNullOrEmpty(lookupId)
@@ -215,6 +309,13 @@ public sealed class SessionTabContextMenuFactory
             IsEnabled = !string.IsNullOrWhiteSpace(serverVm.Username)
         };
         menu.Items.Add(copyUsernameItem);
+
+        MenuItem revealItem = new MenuItem
+        {
+            Header = vm.Localize("SessionRevealInTree")
+        };
+        revealItem.Click += (_, _) => callbacks.RevealServerInTree(serverVm.Id);
+        menu.Items.Add(revealItem);
     }
 
     // ── Resolution menu (RDP only) ───────────────────────────────────
@@ -521,6 +622,45 @@ public sealed class SessionTabContextMenuFactory
         closeAllItem.Click += async (_, _) =>
             await vm.Connection.CloseSessionAsync(session, DisconnectReason.UserAction);
         menu.Items.Add(closeAllItem);
+    }
+
+    // --- Close others / Close to the right ---
+
+    private static void AppendCloseGroupItems(
+        ContextMenu menu,
+        SessionTabViewModel session,
+        MainViewModel vm)
+    {
+        var ordered = vm.Connection.ActiveSessions;
+
+        var closeOthersItem = new MenuItem
+        {
+            Header = vm.Localize("SessionCloseOthers"),
+            IsEnabled = ordered.Count > 1
+        };
+        closeOthersItem.Click += async (_, _) =>
+        {
+            // Snapshot before closing: ActiveSessions mutates as each tab closes.
+            foreach (var target in SessionsToCloseOthers(ordered.ToList(), session))
+            {
+                await vm.Connection.CloseSessionAsync(target, DisconnectReason.UserAction);
+            }
+        };
+        menu.Items.Add(closeOthersItem);
+
+        var closeRightItem = new MenuItem
+        {
+            Header = vm.Localize("SessionCloseToRight"),
+            IsEnabled = SessionsToCloseToRight(ordered.ToList(), session).Count > 0
+        };
+        closeRightItem.Click += async (_, _) =>
+        {
+            foreach (var target in SessionsToCloseToRight(ordered.ToList(), session))
+            {
+                await vm.Connection.CloseSessionAsync(target, DisconnectReason.UserAction);
+            }
+        };
+        menu.Items.Add(closeRightItem);
     }
 
     // ── Split / merge / unsplit items ────────────────────────────────

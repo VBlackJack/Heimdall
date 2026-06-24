@@ -181,6 +181,8 @@ public sealed partial class SessionCoordinatorPreMountTests
 
     private sealed class NullSessionTabContextCallbacks : ISessionTabContextCallbacks
     {
+        public string? RevealedServerId { get; private set; }
+
         public void OnResolutionChanged(SessionPaneModel pane, ResolutionChoice choice)
         {
         }
@@ -203,6 +205,11 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         public void UnsplitSession(SessionTabViewModel session)
         {
+        }
+
+        public void RevealServerInTree(string serverId)
+        {
+            RevealedServerId = serverId;
         }
     }
 }

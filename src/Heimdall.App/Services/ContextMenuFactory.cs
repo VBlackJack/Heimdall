@@ -87,6 +87,8 @@ public sealed class ContextMenuFactory
         {
             menu.Items.Add(CreateConnectWithMenu(vm, server));
         }
+        menu.Items.Add(CreateConnectAsMenu(vm, server));
+        menu.Items.Add(CreateOpenInSplitMenu(vm, server));
         menu.Items.Add(CreateMenuItem(
             vm.Localize("TreeCtxEdit"),
             vm.ServerList.EditServerCommand,
@@ -109,6 +111,21 @@ public sealed class ContextMenuFactory
             vm.ServerList.CopyUsernameCommand,
             server,
             !string.IsNullOrWhiteSpace(server.Username)));
+        menu.Items.Add(CreateMenuItem(
+            vm.Localize("TreeCtxCopyAddress"),
+            vm.ServerList.CopyAddressCommand,
+            server));
+        if (string.Equals(server.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase))
+        {
+            menu.Items.Add(CreateMenuItem(
+                vm.Localize("TreeCtxCopySshCommand"),
+                vm.ServerList.CopySshCommandCommand,
+                server));
+        }
+        menu.Items.Add(CreateMenuItem(
+            vm.Localize("TreeCtxTestReachability"),
+            vm.ServerList.TestReachabilityCommand,
+            server));
 
         // Wake-on-LAN (only shown when MAC address is configured)
         if (Core.Security.WakeOnLan.IsValidMac(server.MacAddress))
@@ -250,6 +267,92 @@ public sealed class ContextMenuFactory
             server));
 
         return submenu;
+    }
+
+    /// <summary>
+    /// Interactive protocols offered by "Connect as...", paired with their display-label
+    /// localization key. The server's own protocol is filtered out at build time.
+    /// </summary>
+    private static readonly (string Protocol, string LabelKey)[] ConnectAsProtocols =
+    [
+        ("SSH", "ConnectionTypeSsh"),
+        ("RDP", "ConnectionTypeRdp"),
+        ("SFTP", "ConnectionTypeSftp"),
+        ("VNC", "ConnectionTypeVnc"),
+        ("TELNET", "ConnectionTypeTelnet"),
+    ];
+
+    /// <summary>
+    /// Builds the "Connect as..." submenu: connects the server's host with a chosen
+    /// protocol as a transient ad-hoc session. Lists the interactive protocols except
+    /// the server's own (case-insensitive).
+    /// </summary>
+    private static MenuItem CreateConnectAsMenu(MainViewModel vm, ServerItemViewModel server)
+    {
+        var submenu = new MenuItem { Header = vm.Localize("TreeCtxConnectAs") };
+
+        foreach (var (protocol, labelKey) in ConnectAsProtocols)
+        {
+            if (string.Equals(server.ConnectionType, protocol, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var captured = protocol;
+            var item = new MenuItem { Header = vm.Localize(labelKey) };
+            item.Click += (_, _) => _ = vm.ConnectServerAsProtocolAsync(server, captured);
+            submenu.Items.Add(item);
+        }
+
+        return submenu;
+    }
+
+    /// <summary>
+    /// Builds the "Open in split" submenu: opens the server in a new pane split
+    /// off the currently active session. Disabled (parent and children) when there
+    /// is no active session to split with.
+    /// </summary>
+    private static MenuItem CreateOpenInSplitMenu(MainViewModel vm, ServerItemViewModel server)
+    {
+        var hasActiveSession = vm.Connection.ActiveSession is not null;
+
+        var submenu = new MenuItem
+        {
+            Header = vm.Localize("TreeCtxOpenInSplit"),
+            IsEnabled = hasActiveSession
+        };
+
+        submenu.Items.Add(CreateOpenInSplitItem(
+            vm, server, "OrientationHorizontal", Core.Models.SplitOrientation.Horizontal, hasActiveSession));
+        submenu.Items.Add(CreateOpenInSplitItem(
+            vm, server, "OrientationVertical", Core.Models.SplitOrientation.Vertical, hasActiveSession));
+
+        return submenu;
+    }
+
+    private static MenuItem CreateOpenInSplitItem(
+        MainViewModel vm,
+        ServerItemViewModel server,
+        string labelKey,
+        Core.Models.SplitOrientation orientation,
+        bool isEnabled)
+    {
+        var item = new MenuItem
+        {
+            Header = vm.Localize(labelKey),
+            IsEnabled = isEnabled
+        };
+        item.Click += (_, _) =>
+        {
+            // Re-read the active session at click time; it may have changed since the
+            // menu was built. Cannot split without one.
+            var active = vm.Connection.ActiveSession;
+            if (active is not null)
+            {
+                _ = vm.SplitSessionWithServerAsync(active, server.Id, orientation);
+            }
+        };
+        return item;
     }
 
     private static bool IsRdpServer(ServerItemViewModel server)
@@ -782,12 +885,13 @@ public sealed class ContextMenuFactory
 
     /// <summary>
     /// Colors a destructive menu item with the themed error brush. When the
-    /// theme bridge is not merged (theoretical swap window), the item keeps
-    /// its inherited foreground instead of falling back to a hardcoded color.
+    /// theme bridge is not merged (theoretical swap window) or there is no
+    /// running <see cref="Application"/> (designer/test contexts), the item
+    /// keeps its inherited foreground instead of falling back to a hardcoded color.
     /// </summary>
     private static void ApplyDestructiveForeground(MenuItem item)
     {
-        if (Application.Current.TryFindResource("ErrorBrush") is Brush errorBrush)
+        if (Application.Current?.TryFindResource("ErrorBrush") is Brush errorBrush)
         {
             item.Foreground = errorBrush;
         }

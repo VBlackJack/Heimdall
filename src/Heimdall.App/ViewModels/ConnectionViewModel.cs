@@ -71,6 +71,56 @@ public partial class ConnectionViewModel : ObservableObject
         return session;
     }
 
+    /// <summary>
+    /// Sets the pinned state of a tab and enforces the invariant that all pinned
+    /// tabs precede all unpinned tabs, each group keeping its relative order. The
+    /// current selection (<see cref="ActiveSession"/>) is preserved across the
+    /// reorder. No-op when the session is not in <see cref="ActiveSessions"/>.
+    /// </summary>
+    public void SetPinned(SessionTabViewModel session, bool pinned)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (!ActiveSessions.Contains(session))
+        {
+            return;
+        }
+
+        session.IsPinned = pinned;
+
+        var desired = OrderByPinned(ActiveSessions);
+        var selected = ActiveSession;
+
+        for (var target = 0; target < desired.Count; target++)
+        {
+            var current = ActiveSessions.IndexOf(desired[target]);
+            if (current != target)
+            {
+                ActiveSessions.Move(current, target);
+            }
+        }
+
+        ActiveSession = selected;
+    }
+
+    /// <summary>
+    /// Stable partition: pinned sessions first, then unpinned, each group keeping
+    /// its relative input order. Pure helper for <see cref="SetPinned"/>.
+    /// </summary>
+    internal static IReadOnlyList<SessionTabViewModel> OrderByPinned(
+        IReadOnlyList<SessionTabViewModel> sessions)
+    {
+        var pinned = new List<SessionTabViewModel>();
+        var unpinned = new List<SessionTabViewModel>();
+        foreach (var session in sessions)
+        {
+            (session.IsPinned ? pinned : unpinned).Add(session);
+        }
+
+        pinned.AddRange(unpinned);
+        return pinned;
+    }
+
     [RelayCommand]
     private async Task CloseSession(SessionTabViewModel? session)
         => await CloseSessionAsync(session, DisconnectReason.TabClose);

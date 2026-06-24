@@ -115,6 +115,102 @@ public sealed class ConnectionViewModelCloseTests
         Assert.Equal(0, splitService.CloseAllPanesCallCount);
     }
 
+    [Fact]
+    public void SetPinned_PinsTab_MovesToFront_PreservesSelection()
+    {
+        ConnectionViewModel sut = CreateViewModel(new TrackingDialogService(true), new TrackingSplitService());
+        var a = Tab("a");
+        var b = Tab("b");
+        var c = Tab("c");
+        AddTabs(sut, a, b, c);
+        sut.ActiveSession = b;
+
+        sut.SetPinned(c, true);
+
+        Assert.Equal(new[] { c, a, b }, sut.ActiveSessions);
+        Assert.Same(b, sut.ActiveSession);
+        Assert.True(c.IsPinned);
+    }
+
+    [Fact]
+    public void SetPinned_MultiplePins_KeepRelativeOrderWithinGroups()
+    {
+        ConnectionViewModel sut = CreateViewModel(new TrackingDialogService(true), new TrackingSplitService());
+        var a = Tab("a");
+        var b = Tab("b");
+        var c = Tab("c");
+        var d = Tab("d");
+        AddTabs(sut, a, b, c, d);
+
+        sut.SetPinned(a, true);
+        sut.SetPinned(c, true);
+
+        // Pinned block keeps insertion order [a, c]; unpinned keeps [b, d].
+        Assert.Equal(new[] { a, c, b, d }, sut.ActiveSessions);
+    }
+
+    [Fact]
+    public void SetPinned_Unpin_MovesTabAfterLastPinned()
+    {
+        ConnectionViewModel sut = CreateViewModel(new TrackingDialogService(true), new TrackingSplitService());
+        var a = Tab("a");
+        var b = Tab("b");
+        var c = Tab("c");
+        var d = Tab("d");
+        AddTabs(sut, a, b, c, d);
+        sut.SetPinned(a, true);
+        sut.SetPinned(c, true); // order now [a, c, b, d]
+
+        sut.SetPinned(a, false);
+
+        // a unpinned: pinned [c] first, then unpinned in relative order [a, b, d].
+        Assert.Equal(new[] { c, a, b, d }, sut.ActiveSessions);
+        Assert.False(a.IsPinned);
+    }
+
+    [Fact]
+    public void SetPinned_SessionNotInCollection_IsNoOp()
+    {
+        ConnectionViewModel sut = CreateViewModel(new TrackingDialogService(true), new TrackingSplitService());
+        var a = Tab("a");
+        var b = Tab("b");
+        AddTabs(sut, a, b);
+        var stranger = Tab("stranger");
+
+        sut.SetPinned(stranger, true);
+
+        Assert.Equal(new[] { a, b }, sut.ActiveSessions);
+        Assert.False(stranger.IsPinned);
+    }
+
+    [Fact]
+    public void OrderByPinned_IsStablePartition()
+    {
+        var a = Tab("a");
+        var b = Tab("b");
+        var c = Tab("c");
+        var d = Tab("d");
+        b.IsPinned = true;
+        d.IsPinned = true;
+
+        var ordered = ConnectionViewModel.OrderByPinned([a, b, c, d]);
+
+        Assert.Equal(new[] { b, d, a, c }, ordered);
+    }
+
+    private static SessionTabViewModel Tab(string title) => new SessionTabViewModel { Title = title };
+
+    private static void AddTabs(ConnectionViewModel viewModel, params SessionTabViewModel[] sessions)
+    {
+        foreach (var session in sessions)
+        {
+            viewModel.ActiveSessions.Add(session);
+        }
+
+        viewModel.ActiveSession = sessions.LastOrDefault();
+        viewModel.HasActiveSessions = sessions.Length > 0;
+    }
+
     private static ConnectionViewModel CreateViewModel(
         TrackingDialogService dialogService,
         TrackingSplitService splitService)
