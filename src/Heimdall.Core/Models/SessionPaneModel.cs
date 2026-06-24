@@ -57,6 +57,14 @@ public partial class SessionPaneModel : ObservableObject, ISplitContent
     [ObservableProperty]
     private string _connectionType = "";
 
+    /// <summary>
+    /// Transient, session-scoped flag marking this pane as a broadcast target while
+    /// <see cref="BroadcastScope.SelectedPanes"/> is active. Never persisted; reset
+    /// when SelectedPanes is (re-)entered. Ignored for non-terminal panes.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isBroadcastTarget;
+
     [ObservableProperty]
     private string? _sftpReconnectPathHint;
 

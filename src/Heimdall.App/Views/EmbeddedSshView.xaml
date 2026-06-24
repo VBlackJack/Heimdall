@@ -91,6 +91,21 @@
                                Foreground="{DynamicResource BadgeTextBrush}"/>
                 </Border>
 
+                <!-- Per-pane broadcast target toggle (visible only in SelectedPanes mode).
+                     Docked Left so it is never squeezed out by the right-hand button cluster
+                     on narrow split panes. -->
+                <CheckBox x:Name="BroadcastTargetToggle"
+                          DockPanel.Dock="Left"
+                          Visibility="Collapsed"
+                          Click="OnBroadcastTargetToggleClick"
+                          Content="{loc:Translate BroadcastTargetToggleLabel}"
+                          ToolTip="{loc:Translate BroadcastTargetToggleTooltip}"
+                          AutomationProperties.Name="{loc:Translate A11yBroadcastTargetToggle}"
+                          VerticalAlignment="Center"
+                          Margin="8,0,0,0"
+                          FontSize="{StaticResource FontSizeSmallCaption}"
+                          Foreground="{DynamicResource TextPrimaryBrush}"/>
+
                 <!-- Broadcast mode indicator -->
                 <Border x:Name="BroadcastBadge"
                         DockPanel.Dock="Right"

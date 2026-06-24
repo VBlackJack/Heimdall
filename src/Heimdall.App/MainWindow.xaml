@@ -1065,6 +1065,17 @@
                                                     AutomationProperties.Name="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabControl}}"
                                                     Style="{DynamicResource SecondaryButtonStyle}"/>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- Broadcast target marker: pick this session as a SelectedPanes broadcast
+                                                     target straight from the tab strip. Visible only in SelectedPanes mode
+                                                     for sessions that have a terminal pane. -->
+                                                <CheckBox x:Name="Mw_SessionTabBroadcastTarget"
+                                                          VerticalAlignment="Center" Margin="0,0,6,0"
+                                                          IsChecked="{Binding IsBroadcastTarget, Mode=OneWay}"
+                                                          Visibility="{Binding ShowBroadcastTargetMarker, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                          Command="{Binding DataContext.Session.ToggleSessionBroadcastTargetCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
+                                                          CommandParameter="{Binding}"
+                                                          ToolTip="{loc:Translate BroadcastTabTargetTooltip}"
+                                                          AutomationProperties.Name="{loc:Translate A11yBroadcastTabTarget}"/>
                                                 <Grid Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0">
                                                     <Path Data="{Binding ConnectionType, Converter={StaticResource TypeToGeoConverter}}"
                                                           Style="{StaticResource GeoIconSmall}">
@@ -3687,6 +3698,22 @@
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
+                    </Button>
+                    <!-- Broadcast scope indicator (click to cycle Current tab / All tabs) -->
+                    <Button x:Name="Mw_BroadcastScopeBtn" Command="{Binding Session.CycleBroadcastScopeCommand}"
+                            ToolTip="{loc:Translate BroadcastScopeTooltip}"
+                            Padding="4,2" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,8,0"
+                            VerticalAlignment="Center"
+                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            AutomationProperties.Name="{loc:Translate A11yBroadcastScope}">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE71D;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"
+                                           VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                <TextBlock Text="{Binding Session.BroadcastScopeLabel}" FontSize="{StaticResource FontSizeCaption}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button.Content>
                     </Button>
                     <TextBlock FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}">

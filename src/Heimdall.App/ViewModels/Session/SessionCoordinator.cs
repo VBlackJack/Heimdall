@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Extensions;
@@ -25,6 +26,9 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
 using Heimdall.Core.SessionDiagnostics;
+using Heimdall.Terminal;
+using AppDialogs = Heimdall.App.Views.Dialogs;
+using AppDialogViewModels = Heimdall.App.ViewModels.Dialogs;
 
 namespace Heimdall.App.ViewModels.Session;
 
@@ -164,15 +168,42 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
     /// <summary>
     /// True while broadcast mode is active: keystrokes typed in one
-    /// terminal view fan out to every other terminal session.
+    /// terminal view fan out to the terminal panes in <see cref="BroadcastScope"/>.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBroadcastSelectionActive))]
     private bool _isBroadcastMode;
 
-    /// <summary>Localized tooltip for the broadcast toggle button.</summary>
+    /// <summary>
+    /// Active broadcast scope. CurrentTab (default), AllTabs, and SelectedPanes
+    /// (per-pane subset, Lot B). Mirrors <see cref="AppSettings.BroadcastScope"/> and
+    /// is persisted when changed.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BroadcastScopeLabel))]
+    [NotifyPropertyChangedFor(nameof(IsBroadcastSelectionActive))]
+    private BroadcastScope _broadcastScope = BroadcastScope.CurrentTab;
+
+    /// <summary>
+    /// True when per-session broadcast target selection is active (broadcast mode on
+    /// AND scope is SelectedPanes). Drives the visibility of the tab-strip target
+    /// markers. Notifies whenever broadcast mode or scope changes.
+    /// </summary>
+    public bool IsBroadcastSelectionActive =>
+        IsBroadcastMode && BroadcastScope == BroadcastScope.SelectedPanes;
+
+    /// <summary>Localized tooltip for the broadcast toggle button (scope-aware when on).</summary>
     public string BroadcastToggleTooltip => IsBroadcastMode
-        ? _localizer["BroadcastModeOn"]
+        ? _localizer.Format("BroadcastModeOn", BroadcastScopeLabel)
         : _localizer["TooltipToggleBroadcast"];
+
+    /// <summary>Localized label for the broadcast scope indicator near the toolbar button.</summary>
+    public string BroadcastScopeLabel => BroadcastScope switch
+    {
+        BroadcastScope.AllTabs => _localizer["BroadcastScopeAllTabs"],
+        BroadcastScope.SelectedPanes => _localizer.Format("BroadcastScopeSelectedPanes", CountBroadcastTargets()),
+        _ => _localizer["BroadcastScopeCurrentTab"],
+    };
 
     /// <summary>
     /// Generated partial: updates the per-view broadcast indicators and
@@ -182,42 +213,255 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     {
         UpdateBroadcastIndicators(value);
         OnPropertyChanged(nameof(BroadcastToggleTooltip));
+        RefreshBroadcastTabMarkers();
     }
 
     /// <summary>
     /// Toggles <see cref="IsBroadcastMode"/> and reports the transition in
-    /// the shell status bar.
+    /// the shell status bar. Enabling broadcast while the scope is
+    /// <see cref="Heimdall.Core.Models.BroadcastScope.AllTabs"/> first asks for
+    /// confirmation because input would reach terminal panes in other tabs;
+    /// <see cref="Heimdall.Core.Models.BroadcastScope.CurrentTab"/> never prompts.
     /// </summary>
     [RelayCommand]
-    private void ToggleBroadcast()
+    private async Task ToggleBroadcastAsync()
     {
-        IsBroadcastMode = !IsBroadcastMode;
-        _main.StatusText = IsBroadcastMode
-            ? _localizer["BroadcastModeOn"]
-            : _localizer["BroadcastModeOff"];
+        if (IsBroadcastMode)
+        {
+            IsBroadcastMode = false;
+            _main.StatusText = _localizer["BroadcastModeOff"];
+            return;
+        }
+
+        SyncBroadcastScopeFromSettings();
+
+        if (BroadcastScope == BroadcastScope.AllTabs
+            && !await ConfirmAllTabsBroadcastAsync())
+        {
+            return;
+        }
+
+        IsBroadcastMode = true;
+        _main.StatusText = _localizer.Format("BroadcastModeOn", BroadcastScopeLabel);
     }
 
     /// <summary>
-    /// Updates the broadcast badge on all active SSH/Local terminal views.
+    /// Cycles the broadcast scope CurrentTab -> AllTabs -> SelectedPanes -> CurrentTab.
+    /// Switching to AllTabs while broadcast is already active requires confirmation
+    /// (Lot A). Entering SelectedPanes resets every pane to "not a target" so the
+    /// subset starts empty (explicit opt-in); SelectedPanes never prompts.
+    /// </summary>
+    [RelayCommand]
+    private async Task CycleBroadcastScopeAsync()
+    {
+        SyncBroadcastScopeFromSettings();
+
+        var next = BroadcastScope switch
+        {
+            BroadcastScope.CurrentTab => BroadcastScope.AllTabs,
+            BroadcastScope.AllTabs => BroadcastScope.SelectedPanes,
+            _ => BroadcastScope.CurrentTab,
+        };
+
+        if (next == BroadcastScope.AllTabs
+            && IsBroadcastMode
+            && !await ConfirmAllTabsBroadcastAsync())
+        {
+            return;
+        }
+
+        if (next == BroadcastScope.SelectedPanes)
+        {
+            ResetBroadcastTargets();
+        }
+
+        BroadcastScope = next;
+        await PersistBroadcastScopeAsync(next);
+
+        // Reflect the new scope in the per-pane toggles/badges while broadcast is on.
+        if (IsBroadcastMode)
+        {
+            UpdateBroadcastIndicators(true);
+        }
+
+        RefreshBroadcastTabMarkers();
+        OnPropertyChanged(nameof(BroadcastScopeLabel));
+        OnPropertyChanged(nameof(BroadcastToggleTooltip));
+
+        // While broadcast is on, the status reflects the active scope; otherwise it
+        // just reports the new default scope.
+        _main.StatusText = IsBroadcastMode
+            ? _localizer.Format("BroadcastModeOn", BroadcastScopeLabel)
+            : _localizer.Format("BroadcastScopeStatus", BroadcastScopeLabel);
+    }
+
+    private Task<bool> ConfirmAllTabsBroadcastAsync()
+    {
+        return _main.DialogService.ShowConfirmAsync(
+            _localizer["BroadcastAllTabsConfirmTitle"],
+            _localizer["BroadcastAllTabsConfirmMessage"],
+            "warning");
+    }
+
+    private void SyncBroadcastScopeFromSettings()
+    {
+        if (_main.CurrentSettings?.BroadcastScope is { } scope && scope != BroadcastScope)
+        {
+            BroadcastScope = scope;
+        }
+    }
+
+    private async Task PersistBroadcastScopeAsync(BroadcastScope scope)
+    {
+        if (_main.CurrentSettings is not null)
+        {
+            _main.CurrentSettings.BroadcastScope = scope;
+        }
+
+        await _configManager.MergeSettingAsync(s => s.BroadcastScope = scope);
+    }
+
+    /// <summary>
+    /// Updates the per-pane broadcast chrome on all active SSH/Local terminal views.
+    /// In SelectedPanes mode each terminal pane shows an include/exclude toggle whose
+    /// state mirrors <see cref="SessionPaneModel.IsBroadcastTarget"/>; otherwise the
+    /// generic broadcast badge reflects whether broadcast mode is active.
     /// </summary>
     private void UpdateBroadcastIndicators(bool active)
+    {
+        bool selectionMode = active && BroadcastScope == BroadcastScope.SelectedPanes;
+        int matchedTerminalPanes = 0;
+
+        foreach (var session in _main.Connection.ActiveSessions)
+        {
+            foreach (var pane in SplitTreeHelper.EnumerateLeaves(session.RootContent))
+            {
+                if (pane.HostControl is not EmbeddedSshView sshView)
+                {
+                    continue;
+                }
+
+                matchedTerminalPanes++;
+                sshView.SetBroadcastSelectionMode(selectionMode);
+
+                if (selectionMode)
+                {
+                    var capturedPane = pane;
+                    var capturedView = sshView;
+                    capturedView.BroadcastTargetToggleRequested =
+                        () => ToggleBroadcastTarget(capturedPane, capturedView);
+                    capturedView.SetBroadcastTargetState(capturedPane.IsBroadcastTarget);
+                }
+                else
+                {
+                    sshView.BroadcastTargetToggleRequested = null;
+                    sshView.SetBroadcastIndicator(active);
+                }
+            }
+        }
+
+        // One-shot diagnostic so a missing per-pane toggle can be diagnosed from the
+        // log: confirms selection mode was entered and how many terminal panes matched.
+        if (selectionMode && !_broadcastIndicatorDiagnosticLogged)
+        {
+            _broadcastIndicatorDiagnosticLogged = true;
+            FileLogger.Info(
+                $"[Broadcast] UpdateBroadcastIndicators: selectionMode={selectionMode}, " +
+                $"matchedTerminalPanes={matchedTerminalPanes}");
+        }
+    }
+
+    private bool _broadcastIndicatorDiagnosticLogged;
+
+    /// <summary>
+    /// Toggles a whole session's broadcast-target membership from the tab strip:
+    /// flips <see cref="SessionPaneModel.IsBroadcastTarget"/> on every terminal pane
+    /// of the session, refreshes each pane's visual state, and updates the tab marker
+    /// and the "Selected panes (N)" count. No-op for sessions with no terminal pane
+    /// (RDP/VNC/SFTP/FTP/Citrix), which therefore cannot be selected.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleSessionBroadcastTarget(SessionTabViewModel? tab)
+    {
+        if (tab is null)
+        {
+            return;
+        }
+
+        bool? newValue = BroadcastTargetSelection.ToggleSession(
+            tab.RootContent, static p => p.HostControl is EmbeddedSshView);
+        if (newValue is null)
+        {
+            return; // Non-terminal session: not selectable.
+        }
+
+        foreach (var pane in SplitTreeHelper.EnumerateLeaves(tab.RootContent))
+        {
+            if (pane.HostControl is EmbeddedSshView view)
+            {
+                view.SetBroadcastTargetState(pane.IsBroadcastTarget);
+            }
+        }
+
+        tab.IsBroadcastTarget = newValue.Value;
+        OnPropertyChanged(nameof(BroadcastScopeLabel));
+    }
+
+    /// <summary>
+    /// Pushes per-tab broadcast-target state (CanBeBroadcastTarget, IsBroadcastTarget,
+    /// ShowBroadcastTargetMarker) onto every session tab so the tab-strip markers
+    /// reflect the current selection mode and pane flags.
+    /// </summary>
+    private void RefreshBroadcastTabMarkers()
+    {
+        bool selectionActive = IsBroadcastSelectionActive;
+        foreach (var tab in _main.Connection.ActiveSessions)
+        {
+            bool canTarget = BroadcastTargetSelection.SessionHasTerminal(
+                tab.RootContent, static p => p.HostControl is EmbeddedSshView);
+            tab.CanBeBroadcastTarget = canTarget;
+            tab.IsBroadcastTarget = BroadcastTargetSelection.IsSessionTargeted(
+                tab.RootContent, static p => p.HostControl is EmbeddedSshView);
+            tab.ShowBroadcastTargetMarker = selectionActive && canTarget;
+        }
+    }
+
+    /// <summary>
+    /// Flips a pane's broadcast-target membership in SelectedPanes mode, refreshes
+    /// the pane's visual state, and updates the scope indicator count.
+    /// </summary>
+    private void ToggleBroadcastTarget(SessionPaneModel pane, EmbeddedSshView view)
+    {
+        pane.IsBroadcastTarget = !pane.IsBroadcastTarget;
+        view.SetBroadcastTargetState(pane.IsBroadcastTarget);
+        RefreshBroadcastTabMarkers();
+        OnPropertyChanged(nameof(BroadcastScopeLabel));
+    }
+
+    /// <summary>Clears the broadcast-target flag on every pane (used when entering SelectedPanes).</summary>
+    private void ResetBroadcastTargets()
     {
         foreach (var session in _main.Connection.ActiveSessions)
         {
             foreach (var pane in SplitTreeHelper.EnumerateLeaves(session.RootContent))
             {
-                if (pane.HostControl is EmbeddedSshView sshView)
-                {
-                    sshView.SetBroadcastIndicator(active);
-                }
+                pane.IsBroadcastTarget = false;
             }
         }
     }
 
+    /// <summary>Counts terminal panes currently marked as broadcast targets, across every tab.</summary>
+    private int CountBroadcastTargets()
+        => BroadcastTargetSelection.CountTargets(
+            _main.Connection.ActiveSessions.Select(s => (ISplitContent?)s.RootContent),
+            static p => p.HostControl is EmbeddedSshView);
+
     /// <summary>
-    /// Sends raw byte input to all active terminal sessions except the
-    /// originating view. Called by <see cref="EmbeddedSshView"/> when
-    /// broadcast mode is enabled.
+    /// Fans broadcast input out to the terminal panes resolved for the active
+    /// <see cref="BroadcastScope"/>, excluding the originating view and routing
+    /// the payload through <see cref="BroadcastFanout"/> (the same
+    /// <see cref="SmartPasteGuard"/> the terminal paste path uses). Called by
+    /// <see cref="EmbeddedSshView"/> when broadcast mode is enabled.
     /// </summary>
     public void BroadcastToAllTerminals(byte[] data, object? sender)
     {
@@ -226,28 +470,85 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
-        foreach (var session in _main.Connection.ActiveSessions)
+        var targets = ResolveBroadcastTargets(sender);
+        if (targets.Count == 0)
         {
-            foreach (var pane in SplitTreeHelper.EnumerateLeaves(session.RootContent))
+            return;
+        }
+
+        var writers = new List<Action<byte[]>>(targets.Count);
+        foreach (var pane in targets)
+        {
+            if (pane.HostControl is EmbeddedSshView sshView)
             {
-                BroadcastToHostControl(pane.HostControl, data, sender);
+                writers.Add(sshView.WriteBytes);
             }
         }
+
+        var previewText = Encoding.UTF8.GetString(data);
+        BroadcastFanout.Dispatch(
+            data,
+            isProduction: false,
+            writers,
+            risk => ConfirmRiskyBroadcastPaste(risk, previewText));
     }
 
-    private static void BroadcastToHostControl(object? hostControl, byte[] data, object? sender)
+    /// <summary>
+    /// Resolves the in-scope terminal panes for broadcast using the pure
+    /// <see cref="BroadcastTargetResolver"/>. The terminal-pane predicate keys on
+    /// <see cref="EmbeddedSshView"/>, the shared SSH/local/telnet/WinRM terminal
+    /// surface; RDP/VNC/SFTP/FTP/Citrix host controls are never targeted.
+    /// </summary>
+    private IReadOnlyList<SessionPaneModel> ResolveBroadcastTargets(object? sender)
     {
-        if (hostControl is EmbeddedSshView sshView && sshView != sender)
+        var roots = new List<ISplitContent?>(_main.Connection.ActiveSessions.Count);
+        foreach (var session in _main.Connection.ActiveSessions)
         {
-            try
-            {
-                sshView.WriteBytes(data);
-            }
-            catch (ObjectDisposedException)
-            {
-                // Session already closed; skip.
-            }
+            roots.Add(session.RootContent);
         }
+
+        // In SelectedPanes mode only the panes the user explicitly marked are
+        // targets; the other scopes target every terminal pane in range.
+        Func<SessionPaneModel, bool> isBroadcastTarget = BroadcastScope == BroadcastScope.SelectedPanes
+            ? static pane => pane.HostControl is EmbeddedSshView && pane.IsBroadcastTarget
+            : static pane => pane.HostControl is EmbeddedSshView;
+
+        return BroadcastTargetResolver.ResolveTargets(
+            roots,
+            _main.Connection.ActiveSession?.RootContent,
+            BroadcastScope,
+            sender,
+            isBroadcastTarget);
+    }
+
+    /// <summary>
+    /// Synchronous confirmation for a risky broadcast payload, mirroring the
+    /// terminal paste guard dialog (<c>EmbeddedSshView.ConfirmPaste</c>). Returns
+    /// true when the user approves fanning the payload out to every in-scope
+    /// terminal.
+    /// </summary>
+    private bool ConfirmRiskyBroadcastPaste(SmartPasteGuard.PasteRisk risk, string previewText)
+    {
+        if (_localizer is null)
+        {
+            return false;
+        }
+
+        var dialogRisk = risk == SmartPasteGuard.PasteRisk.Dangerous
+            ? AppDialogViewModels.PasteRisk.Dangerous
+            : AppDialogViewModels.PasteRisk.MultiLine;
+
+        var viewModel = new AppDialogViewModels.PasteConfirmDialogViewModel(
+            dialogRisk,
+            previewText,
+            _localizer);
+        var dialog = new AppDialogs.PasteConfirmDialog
+        {
+            Owner = System.Windows.Application.Current?.MainWindow,
+            DataContext = viewModel,
+        };
+
+        return dialog.ShowDialog() == true;
     }
 
     // ── Session lifecycle handlers ───────────────────────────────────

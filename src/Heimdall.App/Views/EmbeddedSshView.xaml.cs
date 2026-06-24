@@ -1502,6 +1502,78 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             : new Thickness(0);
     }
 
+    /// <summary>
+    /// Invoked when the user clicks this pane's broadcast target toggle. The
+    /// coordinator owns the canonical per-pane state
+    /// (<c>SessionPaneModel.IsBroadcastTarget</c>); the view only requests the flip
+    /// and then reflects the new value via <see cref="SetBroadcastTargetState"/>.
+    /// </summary>
+    public Action? BroadcastTargetToggleRequested;
+
+    private void OnBroadcastTargetToggleClick(object sender, RoutedEventArgs e)
+    {
+        BroadcastTargetToggleRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Shows or hides the per-pane broadcast target toggle. Visible only while
+    /// broadcast mode is active and the scope is SelectedPanes; otherwise the pane
+    /// chrome stays uncluttered.
+    /// </summary>
+    public void SetBroadcastSelectionMode(bool selectionActive)
+    {
+        if (_disposed) return;
+
+        if (!Dispatcher.CheckAccess())
+        {
+            BeginInvokeIfAvailable(() => SetBroadcastSelectionMode(selectionActive));
+            return;
+        }
+
+        BroadcastTargetToggle.Visibility = selectionActive
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        // One-shot diagnostic so a missing per-pane toggle can be confirmed from the
+        // log (does selection mode actually drive the toggle to Visible?).
+        if (!_broadcastSelectionDiagnosticLogged)
+        {
+            _broadcastSelectionDiagnosticLogged = true;
+            Core.Logging.FileLogger.Info(
+                $"[Broadcast] SetBroadcastSelectionMode: selectionActive={selectionActive}, " +
+                $"toggleVisibility={BroadcastTargetToggle.Visibility}");
+        }
+
+        if (selectionActive)
+        {
+            // In selection mode the badge/border reflect target membership and are
+            // driven by SetBroadcastTargetState; start hidden until told otherwise.
+            BroadcastBadge.Visibility = Visibility.Collapsed;
+            BroadcastBorder.BorderThickness = new Thickness(0);
+        }
+    }
+
+    private bool _broadcastSelectionDiagnosticLogged;
+
+    /// <summary>
+    /// Reflects whether this pane is currently a broadcast target: checked toggle
+    /// plus a visible badge/border highlight. Only meaningful in SelectedPanes mode.
+    /// </summary>
+    public void SetBroadcastTargetState(bool isTarget)
+    {
+        if (_disposed) return;
+
+        if (!Dispatcher.CheckAccess())
+        {
+            BeginInvokeIfAvailable(() => SetBroadcastTargetState(isTarget));
+            return;
+        }
+
+        BroadcastTargetToggle.IsChecked = isTarget;
+        BroadcastBadge.Visibility = isTarget ? Visibility.Visible : Visibility.Collapsed;
+        BroadcastBorder.BorderThickness = isTarget ? new Thickness(2) : new Thickness(0);
+    }
+
     /// <summary>Whether a transcript recording is currently active.</summary>
     public bool IsTranscriptActive
     {

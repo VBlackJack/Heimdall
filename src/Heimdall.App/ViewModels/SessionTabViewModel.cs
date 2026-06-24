@@ -107,6 +107,31 @@ public partial class SessionTabViewModel : ObservableObject
     private TunnelBadgeState _tunnelBadgeState;
 
     /// <summary>
+    /// True when this session exposes at least one terminal pane and can therefore
+    /// be picked as a broadcast target from the tab strip. Pushed by
+    /// <c>SessionCoordinator</c>; non-terminal sessions (RDP/VNC/SFTP/FTP/Citrix)
+    /// stay false and show no marker.
+    /// </summary>
+    [ObservableProperty]
+    private bool _canBeBroadcastTarget;
+
+    /// <summary>
+    /// Aggregate broadcast-target membership for this session: true when it has
+    /// terminal panes and they are all marked. Kept in sync with the underlying
+    /// <see cref="SessionPaneModel.IsBroadcastTarget"/> flags by <c>SessionCoordinator</c>.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isBroadcastTarget;
+
+    /// <summary>
+    /// True when the tab-strip target marker should be shown for this session
+    /// (broadcast SelectedPanes mode active AND <see cref="CanBeBroadcastTarget"/>).
+    /// Pushed by <c>SessionCoordinator</c> so the marker stays uncluttered otherwise.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showBroadcastTargetMarker;
+
+    /// <summary>
     /// Returns the first leaf pane in the tree (the "primary" pane).
     /// Used for tab header display (title, icon, status).
     /// </summary>

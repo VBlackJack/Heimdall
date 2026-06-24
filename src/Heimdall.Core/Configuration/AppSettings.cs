@@ -181,6 +181,14 @@ public sealed class AppSettings
     public bool PreventSleepDuringSession { get; set; } = true;
     public bool SessionLoggingEnabled { get; set; }
     public string SessionLogDirectory { get; set; } = @"logs\sessions";
+
+    /// <summary>
+    /// Scope applied when broadcast (type-once, send-to-many) mode is active.
+    /// Defaults to <see cref="BroadcastScope.CurrentTab"/> so input never reaches
+    /// background tabs without an explicit, confirmed opt-in.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<BroadcastScope>))]
+    public BroadcastScope BroadcastScope { get; set; } = BroadcastScope.CurrentTab;
     public string NotesDirectory { get; set; } = @"config\notes";
     public int NotesSidebarWidth { get; set; } = 300;
 

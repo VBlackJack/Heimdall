@@ -1321,6 +1321,15 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             ModifierKeys.Control,
             OpenCommandPalette);
 
+        // Ctrl+Alt+B: toggle broadcast mode. Deliberately not terminal-gated so
+        // it works while typing inside a session terminal; Ctrl+B alone already
+        // toggles the sidebar, so the Alt modifier avoids that conflict.
+        _keyboardShortcutService.Register(Key.B, ModifierKeys.Control | ModifierKeys.Alt, () =>
+        {
+            if (GetMainVm() is { } vm)
+                vm.Session.ToggleBroadcastCommand.Execute(null);
+        });
+
         // ── Ctrl+Shift combos (NOT terminal-gated) ───────────────────
         // Ctrl+Shift+S: screenshot active session
         _keyboardShortcutService.Register(Key.S, ModifierKeys.Control | ModifierKeys.Shift, () =>
