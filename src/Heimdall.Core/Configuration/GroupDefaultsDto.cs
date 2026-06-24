@@ -56,7 +56,8 @@ public sealed class GroupDefaultsDto
         var result = new GroupDefaultsDto();
         var path = groupName;
 
-        // Walk from root to leaf so more specific values override
+        // Build the ancestor chain leaf-first: "PROD/Linux/Web" yields
+        // [PROD/Linux/Web, PROD/Linux, PROD].
         var ancestors = new List<string>();
         while (!string.IsNullOrEmpty(path))
         {
@@ -65,8 +66,10 @@ public sealed class GroupDefaultsDto
             path = lastSep > 0 ? path[..lastSep] : null;
         }
 
-        ancestors.Reverse(); // root first
-
+        // Most-specific group wins: walk from the deepest group up to the root and
+        // keep the first value found for each field (??=). The deepest group that
+        // sets a field therefore wins over its ancestors, while a group that leaves a
+        // field unset never blanks a value an ancestor provided.
         foreach (var ancestor in ancestors)
         {
             if (allDefaults.TryGetValue(ancestor, out var defaults))
@@ -77,20 +80,6 @@ public sealed class GroupDefaultsDto
                 result.SshPort ??= defaults.SshPort;
                 result.ConnectionType ??= defaults.ConnectionType;
                 result.Environment ??= defaults.Environment;
-            }
-        }
-
-        // Reverse priority: leaf overrides root
-        foreach (var ancestor in Enumerable.Reverse(ancestors))
-        {
-            if (allDefaults.TryGetValue(ancestor, out var defaults))
-            {
-                if (defaults.SshGatewayId is not null) result.SshGatewayId = defaults.SshGatewayId;
-                if (defaults.SshUsername is not null) result.SshUsername = defaults.SshUsername;
-                if (defaults.SshKeyPath is not null) result.SshKeyPath = defaults.SshKeyPath;
-                if (defaults.SshPort is not null) result.SshPort = defaults.SshPort;
-                if (defaults.ConnectionType is not null) result.ConnectionType = defaults.ConnectionType;
-                if (defaults.Environment is not null) result.Environment = defaults.Environment;
             }
         }
 
@@ -114,5 +103,15 @@ public sealed class GroupDefaultsDto
 
         if (server.SshPort == 22 && SshPort.HasValue)
             server.SshPort = SshPort.Value;
+
+        // ConnectionType is a non-nullable string defaulting to "RDP"; an explicitly
+        // empty value is the "unset" sentinel. Inherit only when the server leaves it
+        // empty, and never write a null/empty group default over it so the server's
+        // own protocol stays authoritative.
+        if (string.IsNullOrEmpty(server.ConnectionType) && !string.IsNullOrEmpty(ConnectionType))
+            server.ConnectionType = ConnectionType;
+
+        if (string.IsNullOrEmpty(server.Environment))
+            server.Environment = Environment;
     }
 }

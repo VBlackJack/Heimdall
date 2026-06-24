@@ -63,9 +63,10 @@ public class GroupDefaultsDtoTests
     }
 
     [Fact]
-    public void Resolve_RootValueOverridesLeaf_WhenBothProvided()
+    public void Resolve_LeafValueOverridesRoot_WhenBothProvided()
     {
-        // The second pass iterates leaf-first then root, so root writes last and wins.
+        // Most-specific group wins: the leaf "PROD/Linux" overrides the root "PROD"
+        // for any field both define, while leaf-absent fields still inherit from root.
         var defaults = new Dictionary<string, GroupDefaultsDto>
         {
             ["PROD"] = new()
@@ -81,8 +82,8 @@ public class GroupDefaultsDtoTests
 
         var result = GroupDefaultsDto.Resolve("PROD/Linux", defaults);
 
-        // Root "PROD" overwrites leaf "PROD/Linux" in the second pass
-        Assert.Equal("deploy", result.SshUsername);
+        // Leaf "PROD/Linux" wins on username; gateway falls back to root "PROD"
+        Assert.Equal("linux-admin", result.SshUsername);
         Assert.Equal("gw-prod", result.SshGatewayId);
     }
 
@@ -109,7 +110,7 @@ public class GroupDefaultsDtoTests
     }
 
     [Fact]
-    public void Resolve_ThreeLevelHierarchy_RootFieldsOverrideLeaf()
+    public void Resolve_ThreeLevelHierarchy_DeepestFieldsOverrideAncestors()
     {
         var defaults = new Dictionary<string, GroupDefaultsDto>
         {
@@ -131,9 +132,10 @@ public class GroupDefaultsDtoTests
 
         var result = GroupDefaultsDto.Resolve("PROD/Linux/Web", defaults);
 
-        // Root values win when specified at multiple levels
+        // The deepest group that sets a field wins: "PROD/Linux/Web" overrides the
+        // SshPort from "PROD"; fields only the ancestors set still inherit downward.
         Assert.Equal("root", result.SshUsername);
-        Assert.Equal(22, result.SshPort);
+        Assert.Equal(2222, result.SshPort);
         Assert.Equal("/keys/linux.pem", result.SshKeyPath);
         Assert.Equal("Production", result.Environment);
     }
@@ -280,5 +282,113 @@ public class GroupDefaultsDtoTests
         groupDefaults.ApplyTo(server);
 
         Assert.Equal(9999, server.SshPort);
+    }
+
+    // -- ApplyTo: ConnectionType / Environment inheritance ---------------
+    // Producer: GroupDefaultsDto.ApplyTo
+    // (src/Heimdall.Core/Configuration/GroupDefaultsDto.cs) now writes the resolved
+    // ConnectionType and Environment onto the profile using the same "apply only when
+    // the server's own value is unset" guard as the other inherited fields. Before
+    // this fix Resolve merged both fields but ApplyTo silently dropped them.
+
+    [Fact]
+    public void ApplyTo_SetsConnectionTypeWhenServerFieldEmpty()
+    {
+        // ServerProfileDto.ConnectionType (ServerProfileDto.cs) is a non-nullable
+        // string defaulting to "RDP"; an explicitly empty value is the unset sentinel.
+        var groupDefaults = new GroupDefaultsDto { ConnectionType = "SSH" };
+        var server = new ServerProfileDto { ConnectionType = "" };
+
+        groupDefaults.ApplyTo(server);
+
+        Assert.Equal("SSH", server.ConnectionType);
+    }
+
+    [Fact]
+    public void ApplyTo_SetsEnvironmentWhenServerFieldEmpty()
+    {
+        var groupDefaults = new GroupDefaultsDto { Environment = "Production" };
+        var server = new ServerProfileDto();
+
+        groupDefaults.ApplyTo(server);
+
+        Assert.Equal("Production", server.Environment);
+    }
+
+    [Fact]
+    public void ApplyTo_DoesNotOverrideServerConnectionType()
+    {
+        var groupDefaults = new GroupDefaultsDto { ConnectionType = "SSH" };
+        var server = new ServerProfileDto { ConnectionType = "RDP" };
+
+        groupDefaults.ApplyTo(server);
+
+        Assert.Equal("RDP", server.ConnectionType);
+    }
+
+    [Fact]
+    public void ApplyTo_DoesNotOverrideServerEnvironment()
+    {
+        var groupDefaults = new GroupDefaultsDto { Environment = "Production" };
+        var server = new ServerProfileDto { Environment = "Lab" };
+
+        groupDefaults.ApplyTo(server);
+
+        Assert.Equal("Lab", server.Environment);
+    }
+
+    [Fact]
+    public void ApplyTo_EmptyGroupConnectionType_DoesNotBlankServerProtocol()
+    {
+        // A group default without a ConnectionType must never overwrite the server's
+        // own (non-nullable) protocol with null/empty.
+        var groupDefaults = new GroupDefaultsDto { ConnectionType = null };
+        var server = new ServerProfileDto { ConnectionType = "" };
+
+        groupDefaults.ApplyTo(server);
+
+        Assert.Equal("", server.ConnectionType);
+    }
+
+    // -- Resolve + ApplyTo: nested-group precedence ----------------------
+
+    [Fact]
+    public void ResolveAndApplyTo_NestedGroups_AppliesLeafOnlyConnectionTypeAndEnvironment()
+    {
+        // When only the most-specific group declares the value (no conflict at higher
+        // levels), Resolve carries it down and ApplyTo writes it onto the profile.
+        var defaults = new Dictionary<string, GroupDefaultsDto>
+        {
+            ["PROD"] = new() { SshUsername = "deploy" },
+            ["PROD/Linux/Web"] = new() { ConnectionType = "SSH", Environment = "Production" }
+        };
+
+        var resolved = GroupDefaultsDto.Resolve("PROD/Linux/Web", defaults);
+        var server = new ServerProfileDto { ConnectionType = "" };
+        resolved.ApplyTo(server);
+
+        Assert.Equal("SSH", server.ConnectionType);
+        Assert.Equal("Production", server.Environment);
+    }
+
+    [Fact]
+    public void ResolveAndApplyTo_NestedGroups_MostSpecificValueWinsForBothFields()
+    {
+        // Producer: GroupDefaultsDto.Resolve leaf-first ??= pass
+        // (GroupDefaultsDto.cs) keeps the deepest group's value, so the
+        // most-specific group wins over its ancestors. ApplyTo then writes the
+        // resolved ConnectionType/Environment onto the profile.
+        var defaults = new Dictionary<string, GroupDefaultsDto>
+        {
+            ["PROD"] = new() { ConnectionType = "SSH", Environment = "Production" },
+            ["PROD/Linux/Web"] = new() { ConnectionType = "SFTP", Environment = "Staging" }
+        };
+
+        var resolved = GroupDefaultsDto.Resolve("PROD/Linux/Web", defaults);
+        var server = new ServerProfileDto { ConnectionType = "" };
+        resolved.ApplyTo(server);
+
+        Assert.Equal("SFTP", server.ConnectionType);
+        Assert.Equal("Staging", server.Environment);
     }
 }
