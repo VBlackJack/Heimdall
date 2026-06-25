@@ -1917,6 +1917,10 @@
   "SessionStopTranscript": "Stop Transcript",
   "SessionTranscriptStarted": "Transcript started: {0}",
   "SessionTranscriptStopped": "Transcript stopped",
+  "SessionLogHeader": "===== Session started {0} | {1} | host {2} | {3} =====",
+  "SessionLogFooter": "===== Session ended {0} | duration {1} =====",
+  "LogSessionLogRollover": "Session log reached its size cap, continuing in {0}",
+  "LogSessionLogWriteError": "Session log write failed for {0}: {1}",
 
   "LogInvalidThemeColor": "Invalid theme color value rejected: {0} (key: {1})",
   "LogProxyPasswordIgnored": "Inner gateway hop password ignored for security \u2014 use Pageant key auth for chained gateways (gateway: {0})",

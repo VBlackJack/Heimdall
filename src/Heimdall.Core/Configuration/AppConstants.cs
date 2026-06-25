@@ -47,4 +47,18 @@ public static class AppConstants
     /// buffering further bootstrap bytes.
     /// </summary>
     public const int MaxConPtyBootstrapBufferBytes = 256 * 1024;
+
+    /// <summary>
+    /// Default maximum size in bytes of a single session log file before rollover (4 MiB).
+    /// Chosen to bound per-file disk usage while keeping a whole interactive session readable
+    /// in one file for typical workloads; longer sessions spill into ".N.log" continuations.
+    /// </summary>
+    public const long DefaultSessionLogMaxBytes = 4 * 1024 * 1024;
+
+    /// <summary>
+    /// Flush interval in milliseconds for batching session log writes to disk.
+    /// 500 ms keeps transcripts near-live without forcing a disk write per terminal output
+    /// chunk on the hot read-loop path (mirrors the batched-flush philosophy of FileLogger).
+    /// </summary>
+    public const int SessionLogFlushIntervalMs = 500;
 }

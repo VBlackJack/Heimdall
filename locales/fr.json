@@ -1917,6 +1917,10 @@
   "SessionStopTranscript": "Arr\u00eater la transcription",
   "SessionTranscriptStarted": "Transcription d\u00e9marr\u00e9e : {0}",
   "SessionTranscriptStopped": "Transcription arr\u00eat\u00e9e",
+  "SessionLogHeader": "===== Session d\u00e9marr\u00e9e {0} | {1} | h\u00f4te {2} | {3} =====",
+  "SessionLogFooter": "===== Session termin\u00e9e {0} | dur\u00e9e {1} =====",
+  "LogSessionLogRollover": "Journal de session : taille maximale atteinte, poursuite dans {0}",
+  "LogSessionLogWriteError": "\u00c9chec d\u2019\u00e9criture du journal de session pour {0} : {1}",
 
   "LogInvalidThemeColor": "Valeur de couleur de th\u00e8me invalide rejet\u00e9e : {0} (cl\u00e9 : {1})",
   "LogProxyPasswordIgnored": "Mot de passe de passerelle interne ignor\u00e9 pour la s\u00e9curit\u00e9 \u2014 utilisez l\u2019authentification par cl\u00e9 Pageant pour les passerelles cha\u00een\u00e9es (passerelle : {0})",
