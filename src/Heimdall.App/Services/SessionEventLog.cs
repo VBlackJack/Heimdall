@@ -19,8 +19,8 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using Timer = System.Threading.Timer;
 using Heimdall.Core.Security;
+using Timer = System.Threading.Timer;
 
 namespace Heimdall.App.Services;
 

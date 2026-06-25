@@ -18,10 +18,10 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Timer = System.Threading.Timer;
 using Heimdall.Core.Security;
 using Heimdall.Terminal.Logging;
 using Microsoft.Extensions.Logging;
+using Timer = System.Threading.Timer;
 
 namespace Heimdall.App.Services;
 
