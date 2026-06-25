@@ -44,11 +44,33 @@ public partial class EmbeddedVncView : UserControl, IDisposable
     private bool _webViewReady;
     private bool _disposed;
 
+    // Server-supplied desktop name, captured from the "desktop-name:" web message; used as the
+    // event-log title when present, falling back to the host otherwise.
+    private string? _desktopName;
+
+    // Session-event state: at most one Connected and one Disconnected per view instance (VNC
+    // reconnect is a full teardown + recreate, so there is no in-place bounce to track).
+    private DateTime _eventConnectedAtUtc;
+    private bool _eventConnectEmitted;
+    private bool _eventDisconnectEmitted;
+
     /// <summary>Raised when the VNC session connects successfully. Parameter: ServerId.</summary>
     public event Action<string>? SessionConnected;
 
     /// <summary>Raised when the VNC session encounters an error. Parameters: ServerId, error message.</summary>
     public event Action<string, string>? SessionError;
+
+    /// <summary>
+    /// Shared sink for graphical-protocol connect/disconnect events. Injected by
+    /// <c>EmbeddedSessionManager</c>, mirroring the RDP wiring.
+    /// </summary>
+    public ISessionEventLog? SessionEventLog { get; set; }
+
+    /// <summary>
+    /// Provider for the LIVE global session-logging toggle, read at each emit so the setting takes
+    /// effect without a restart. The view never snapshots it.
+    /// </summary>
+    public Func<bool>? SessionLoggingEnabledProvider { get; set; }
 
     public EmbeddedVncView()
     {
@@ -216,6 +238,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
             {
                 SessionConnected?.Invoke(_session.ServerId);
             }
+            EmitConnect();
             return;
         }
 
@@ -250,6 +273,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
         if (message.StartsWith("disconnected:", StringComparison.Ordinal))
         {
+            EmitDisconnect("remote");
             Dispatcher.Invoke(() =>
             {
                 StatusTextBlock.Text = _localizer?["StatusVncDisconnected"] ?? "Disconnected";
@@ -262,6 +286,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         {
             var errorMsg = message["error:".Length..];
             Core.Logging.FileLogger.Error($"VNC error: {errorMsg}");
+
+            // Mid-session error ends the session; the latch makes this a no-op pre-connect.
+            EmitDisconnect("remote");
 
             Dispatcher.Invoke(() =>
             {
@@ -279,6 +306,10 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         if (message.StartsWith("desktop-name:", StringComparison.Ordinal))
         {
             var desktopName = message["desktop-name:".Length..];
+            if (!string.IsNullOrWhiteSpace(desktopName))
+            {
+                _desktopName = desktopName;
+            }
             Dispatcher.Invoke(() =>
             {
                 if (!string.IsNullOrWhiteSpace(desktopName))
@@ -379,6 +410,63 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         });
     }
 
+    // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the
+    // LIVE global toggle and the VNC event eligibility (the policy stays the single source of truth).
+    private bool ShouldLogSessionEvents()
+        => SessionEventLog is not null
+            && SessionEventGatePolicy.ShouldLog(SessionLoggingEnabledProvider?.Invoke() ?? false, "VNC");
+
+    // Event-log title: the server-supplied desktop name when received, else the host.
+    private string? ResolveEventTitle()
+        => string.IsNullOrWhiteSpace(_desktopName) ? _session?.Host : _desktopName;
+
+    // Emits a Connected event and opens the (single) connected segment for this view instance.
+    private void EmitConnect()
+    {
+        if (!ShouldLogSessionEvents() || _session is null)
+        {
+            return;
+        }
+
+        _eventConnectedAtUtc = DateTime.UtcNow;
+        _eventConnectEmitted = true;
+        _eventDisconnectEmitted = false;
+
+        try
+        {
+            SessionEventLog!.LogEvent(
+                VncSessionEventFactory.BuildConnected(_session.Host, ResolveEventTitle()));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedVNC session-event connect emit failed: {ex.Message}");
+        }
+    }
+
+    // Single idempotent disconnect funnel. The three native sinks and the Dispose backstop all call
+    // this with the honest trigger; the latch guarantees at most one Disconnected per session and
+    // suppresses a pre-connect failure (no Connected was ever emitted).
+    private void EmitDisconnect(string endTrigger)
+    {
+        if (!ShouldLogSessionEvents() || !_eventConnectEmitted || _eventDisconnectEmitted || _session is null)
+        {
+            return;
+        }
+
+        _eventDisconnectEmitted = true;
+
+        try
+        {
+            long? durationMs = GraphicalSessionEventHelpers.ResolveDurationMs(_eventConnectedAtUtc, DateTime.UtcNow);
+            SessionEventLog!.LogEvent(
+                VncSessionEventFactory.BuildDisconnected(_session.Host, ResolveEventTitle(), durationMs, endTrigger));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedVNC session-event disconnect emit failed: {ex.Message}");
+        }
+    }
+
     private void OnDisconnectClick(object sender, RoutedEventArgs e)
     {
         if (_disposed)
@@ -387,6 +475,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         }
 
         Core.Logging.FileLogger.Info("EmbeddedVNC Disconnect requested by user");
+        EmitDisconnect("user");
         PostWebMessage("disconnect:");
 
         // Mirror the SSH disconnect contract: the view stays alive in the
@@ -460,6 +549,12 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         {
             return;
         }
+
+        // Backstop: emit a teardown disconnect before any teardown, but only if no native signal
+        // (remote/user) already did. The event sink is an app singleton, not disposed per-view, so
+        // enqueuing here is safe. "teardown" can overstate duration if the remote died earlier and
+        // the user left a dead tab open; endTrigger makes that explicit in the log.
+        EmitDisconnect("teardown");
 
         _disposed = true;
 

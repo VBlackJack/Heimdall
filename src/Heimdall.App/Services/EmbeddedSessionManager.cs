@@ -45,6 +45,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     private readonly ToolRegistry _toolRegistry;
     private readonly ITunnelService _tunnelService;
     private readonly ISessionLogService _sessionLogService;
+    private readonly ISessionEventLog _sessionEventLog;
+    private readonly ConfigManager _configManager;
 
     /// <summary>
     /// Optional callback invoked when a terminal view broadcasts input.
@@ -110,7 +112,9 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         ConnectionStateMachine connectionSm,
         ToolRegistry toolRegistry,
         ITunnelService tunnelService,
-        ISessionLogService sessionLogService)
+        ISessionLogService sessionLogService,
+        ISessionEventLog sessionEventLog,
+        ConfigManager configManager)
     {
         _localizer = localizer;
         _dialogService = dialogService;
@@ -119,6 +123,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         _toolRegistry = toolRegistry;
         _tunnelService = tunnelService;
         _sessionLogService = sessionLogService;
+        _sessionEventLog = sessionEventLog;
+        _configManager = configManager;
     }
 
     public object CreateHostControl(
@@ -138,7 +144,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         if (string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase) &&
             session is RdpSessionResult rdp)
         {
-            var view = new EmbeddedRdpView();
+            var view = new EmbeddedRdpView
+            {
+                SessionEventLog = _sessionEventLog,
+                // Read the LIVE global toggle at the seam (ConfigManager.CurrentSettings is replaced
+                // on Save/Merge/Load), so enabling session logging takes effect without a restart.
+                SessionLoggingEnabledProvider = () =>
+                    _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
+            };
             var rdpSettings = settings ?? new AppSettings();
             var (runtimeServer, multimonFallbackStatusKey) = ResolveEmbeddedRdpRuntimeServer(rdp.Server);
             var globalResizeDelay = settings?.RdpResizeEnableDelayMs ?? DefaultRdpResizeEnableDelayMs;
@@ -364,7 +377,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         if (string.Equals(connectionType, "CITRIX", StringComparison.OrdinalIgnoreCase)
             && session is CitrixSessionResult citrix)
         {
-            var view = new EmbeddedCitrixView();
+            var view = new EmbeddedCitrixView
+            {
+                SessionEventLog = _sessionEventLog,
+                // Read the LIVE global toggle at the seam (mirrors the RDP/VNC wiring), so enabling
+                // session logging takes effect without a restart.
+                SessionLoggingEnabledProvider = () =>
+                    _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
+            };
             view.InitializeSession(citrix, sessionTab, displayName, _localizer, _dialogService);
             view.SetConnectionInfo(citrix.StoreFrontUrl, citrix.AppName, citrix.Mode);
             view.CloseRequested += () => CloseRequestedCallback?.Invoke(sessionTab);
@@ -374,7 +394,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         if (string.Equals(connectionType, "VNC", StringComparison.OrdinalIgnoreCase)
             && session is VncSessionResult vnc)
         {
-            var view = new EmbeddedVncView();
+            var view = new EmbeddedVncView
+            {
+                SessionEventLog = _sessionEventLog,
+                // Read the LIVE global toggle at the seam (mirrors the RDP wiring), so enabling
+                // session logging takes effect without a restart.
+                SessionLoggingEnabledProvider = () =>
+                    _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
+            };
             view.SessionConnected += (serverId) =>
             {
                 _connectionSm.TryTransition(serverId, ConnectionState.Connected);

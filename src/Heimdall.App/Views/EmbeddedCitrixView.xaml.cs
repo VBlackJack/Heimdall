@@ -74,6 +74,31 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     private bool _captureInProgress;
     private bool _disposed;
 
+    // Title fallback for the event log when neither application name nor StoreFront URL is known.
+    // Language-neutral token (the NDJSON event log carries no localized content).
+    private const string EventTitleFallback = "Citrix";
+
+    // Session-event state. Citrix has no view-level connect event and a binary 3s health poll, so
+    // connect is emitted once from the real embed/fallback moment and disconnect is edge-detected
+    // (the latch absorbs external mode's every-tick "dead" re-fire). Reconnect is a full recreate.
+    private string _eventHost = string.Empty;
+    private string _eventTitle = string.Empty;
+    private DateTime _eventConnectedAtUtc;
+    private bool _eventConnectEmitted;
+    private bool _eventDisconnectEmitted;
+
+    /// <summary>
+    /// Shared sink for graphical-protocol connect/disconnect events. Injected by
+    /// <c>EmbeddedSessionManager</c>, mirroring the RDP/VNC wiring.
+    /// </summary>
+    public ISessionEventLog? SessionEventLog { get; set; }
+
+    /// <summary>
+    /// Provider for the LIVE global session-logging toggle, read at each emit so the setting takes
+    /// effect without a restart. The view never snapshots it.
+    /// </summary>
+    public Func<bool>? SessionLoggingEnabledProvider { get; set; }
+
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -131,6 +156,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         _localizer = localizer;
         _dialogService = dialogService;
 
+        // Baseline event host/title; refined by SetConnectionInfo once StoreFront/app metadata is known.
+        _eventHost = string.Empty;
+        _eventTitle = string.IsNullOrWhiteSpace(displayName) ? EventTitleFallback : displayName;
+
         TerminateButton.Content = localizer?["BtnTerminateSession"] ?? "Terminate";
         BringToFrontButton.Content = localizer?["BtnBringToFront"] ?? "Bring to Front";
         CancelCaptureButton.Content = localizer?["CitrixCancelCapture"] ?? "Cancel";
@@ -173,6 +202,14 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         string? appName,
         CitrixLaunchMode mode = CitrixLaunchMode.Unknown)
     {
+        // Capture the event host/title: host = StoreFront URL (the factory strips any user@; these
+        // URLs can embed credentials), title = application name, falling back to the URL then to a
+        // non-empty constant.
+        _eventHost = storeFrontUrl ?? string.Empty;
+        _eventTitle = !string.IsNullOrWhiteSpace(appName)
+            ? appName
+            : (!string.IsNullOrWhiteSpace(storeFrontUrl) ? storeFrontUrl : EventTitleFallback);
+
         StoreFrontText.Text = !string.IsNullOrWhiteSpace(storeFrontUrl)
             ? _localizer?.Format("CitrixStoreFrontLabel", storeFrontUrl) ?? $"StoreFront: {storeFrontUrl}"
             : string.Empty;
@@ -547,6 +584,11 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         InfoPanel.Visibility = Visibility.Visible;
         BringToFrontButton.Visibility = Visibility.Visible;
         StatusTextBlock.Text = _localizer?["CitrixStatusExternal"] ?? "External window";
+
+        // External mode is a valid "connected" outcome (the session runs in its own window). This is
+        // also reached from EmbedWindow's failure path; EmitConnect is idempotent, so a prior embed
+        // success is not double-counted.
+        EmitConnect();
     }
 
     /// <summary>
@@ -571,6 +613,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             SetParent(hwnd, _hostPanel.Handle);
             _capturedHwnd = hwnd;
             _embedded = true;
+            EmitConnect();
 
             // Show embedded container, hide info panel
             CaptureLoadingPanel.Visibility = Visibility.Collapsed;
@@ -659,6 +702,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
 
         ReleaseEmbeddedWindow();
 
+        EmitDisconnect("user");
+
         if (_session?.Process is not null && !_session.Process.HasExited)
         {
             try { _session.Process.Kill(); }
@@ -668,6 +713,58 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         UpdateStatus(false);
     }
 
+    // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the
+    // LIVE global toggle and the Citrix event eligibility (the policy stays the single source of truth).
+    private bool ShouldLogSessionEvents()
+        => SessionEventLog is not null
+            && SessionEventGatePolicy.ShouldLog(SessionLoggingEnabledProvider?.Invoke() ?? false, "CITRIX");
+
+    // Emits the Connected event once, from the first real "connected" moment (window embed or
+    // external-mode fallback), never from the optimistic InitializeSession status or the handler.
+    private void EmitConnect()
+    {
+        if (!ShouldLogSessionEvents() || _eventConnectEmitted)
+        {
+            return;
+        }
+
+        _eventConnectedAtUtc = DateTime.UtcNow;
+        _eventConnectEmitted = true;
+        _eventDisconnectEmitted = false;
+
+        try
+        {
+            SessionEventLog!.LogEvent(CitrixSessionEventFactory.BuildConnected(_eventHost, _eventTitle));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedCitrix session-event connect emit failed: {ex.Message}");
+        }
+    }
+
+    // Single idempotent disconnect funnel. The latch gives edge semantics: external mode's every-3s
+    // "dead" re-fire collapses to a single Disconnected, and a session that never connected emits none.
+    private void EmitDisconnect(string endTrigger)
+    {
+        if (!ShouldLogSessionEvents() || !_eventConnectEmitted || _eventDisconnectEmitted)
+        {
+            return;
+        }
+
+        _eventDisconnectEmitted = true;
+
+        try
+        {
+            long? durationMs = GraphicalSessionEventHelpers.ResolveDurationMs(_eventConnectedAtUtc, DateTime.UtcNow);
+            SessionEventLog!.LogEvent(
+                CitrixSessionEventFactory.BuildDisconnected(_eventHost, _eventTitle, durationMs, endTrigger));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedCitrix session-event disconnect emit failed: {ex.Message}");
+        }
+    }
+
     private void OnHealthTimerTick(object? sender, EventArgs e)
     {
         if (_embedded && _capturedHwnd != IntPtr.Zero)
@@ -675,6 +772,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             // In embedded mode — only check if the captured window still exists
             if (!IsWindow(_capturedHwnd))
             {
+                EmitDisconnect("remote");
                 _embedded = false;
                 _capturedHwnd = IntPtr.Zero;
                 EmbeddedContainer.Visibility = Visibility.Collapsed;
@@ -694,6 +792,12 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
 
         // External mode (capture timed out) — monitor the last known process
         bool alive = _session?.Process is not null && !_session.Process.HasExited;
+        if (!alive)
+        {
+            // The latch collapses this every-3s "dead" re-fire to a single Disconnected.
+            EmitDisconnect("remote");
+        }
+
         UpdateStatus(alive);
     }
 
@@ -754,6 +858,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+
+        // Backstop: emit a teardown disconnect before any teardown, but only if no health-poll or
+        // user signal already did. The event sink is an app singleton, not disposed per-view, so
+        // enqueuing here is safe. "teardown" can overstate duration if the remote died earlier and
+        // the user left a dead tab open; endTrigger makes that explicit in the log.
+        EmitDisconnect("teardown");
+
         _disposed = true;
         StopAuthWatch();
 

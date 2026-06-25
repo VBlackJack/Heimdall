@@ -1,0 +1,92 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+using FluentAssertions;
+using Heimdall.App.Services;
+
+namespace Heimdall.App.Tests;
+
+/// <summary>
+/// Unit tests for <see cref="CitrixSessionEventFactory"/>, the pure builder behind the Citrix event
+/// seam. Producers (verified on live tip, src/Heimdall.App/Views/EmbeddedCitrixView.xaml.cs):
+/// connect emitted once from the real "connected" moments (EmbedWindow success after
+/// <c>_embedded = true</c>, and ShowExternalFallback) - never the optimistic InitializeSession
+/// status; disconnect funnelled through one idempotent <c>EmitDisconnect</c> from the health-poll
+/// embedded-gone path ("remote"), the health-poll external-dead transition ("remote"),
+/// <c>OnTerminateClick</c> ("user"), and the <c>Dispose</c> backstop ("teardown"). Citrix carries no
+/// protocol reason code.
+/// </summary>
+public sealed class CitrixSessionEventFactoryTests
+{
+    [Fact]
+    public void BuildConnected_SetsProtocolHostTitle_AndNoReasonOrDisconnectFields()
+    {
+        SessionEventRecord record = CitrixSessionEventFactory.BuildConnected(
+            "https://store.example/Citrix/Store", "Notepad");
+
+        record.Protocol.Should().Be("CITRIX");
+        record.Kind.Should().Be(SessionEventKind.Connected);
+        record.Host.Should().Be("https://store.example/Citrix/Store");
+        record.Title.Should().Be("Notepad");
+        record.ReasonKey.Should().BeNull();
+        record.ReasonCode.Should().BeNull();
+        record.DurationMs.Should().BeNull();
+        record.EndTrigger.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("remote")]
+    [InlineData("user")]
+    [InlineData("teardown")]
+    public void BuildDisconnected_PassesThroughEndTrigger_WithNullReasonFields(string endTrigger)
+    {
+        SessionEventRecord record = CitrixSessionEventFactory.BuildDisconnected(
+            "https://store.example/Citrix/Store", "Notepad", durationMs: 8_000, endTrigger);
+
+        record.Protocol.Should().Be("CITRIX");
+        record.Kind.Should().Be(SessionEventKind.Disconnected);
+        record.DurationMs.Should().Be(8_000);
+        record.EndTrigger.Should().Be(endTrigger);
+        record.ReasonKey.Should().BeNull();
+        record.ReasonCode.Should().BeNull();
+    }
+
+    [Fact]
+    public void BuildDisconnected_DefaultConnectInstant_YieldsNullDuration()
+    {
+        long? duration = GraphicalSessionEventHelpers.ResolveDurationMs(default, DateTime.UtcNow);
+
+        SessionEventRecord record = CitrixSessionEventFactory.BuildDisconnected(
+            "https://store.example/Citrix/Store", "Notepad", duration, "teardown");
+
+        record.DurationMs.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("admin@store.example", "store.example")]
+    [InlineData("store.example", "store.example")]
+    public void BuildConnected_StripsUserPrefixFromHost(string rawHost, string expected)
+    {
+        CitrixSessionEventFactory.BuildConnected(rawHost, "Notepad").Host.Should().Be(expected);
+    }
+
+    [Fact]
+    public void BuildConnected_EmptyHost_FallsBackToTitle()
+    {
+        CitrixSessionEventFactory.BuildConnected(rawHost: "  ", title: "Notepad")
+            .Host.Should().Be("Notepad");
+    }
+}

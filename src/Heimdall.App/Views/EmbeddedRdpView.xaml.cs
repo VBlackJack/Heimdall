@@ -144,6 +144,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private bool _dpiChangeDroppedDuringLockout;
     private Window? _dpiWindow;
 
+    // Session-event latches: at most one Disconnected per connected segment, paired with one
+    // Connected per (re)connect. Reset across the auto-reconnect bounce so each bounce is truthful.
+    private bool _eventConnectEmitted;
+    private bool _eventDisconnectEmitted;
+
     /// <summary>
     /// One-shot flag set when the header bar explicitly initiates the disconnect.
     /// </summary>
@@ -157,6 +162,23 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private DateTime _connectedAtUtc;
     private DateTime _stabilizationDeadlineUtc;
     private DateTime? _reconnectStartUtc;
+
+    // Connect instant used solely for event-log duration. Refreshed on auto-reconnect success so a
+    // post-reconnect Disconnected reports the duration of the new segment, not the original connect.
+    private DateTime _eventConnectedAtUtc;
+
+    /// <summary>
+    /// Shared sink for graphical-protocol connect/disconnect events. Injected by
+    /// <c>EmbeddedSessionManager</c>, mirroring how <c>EmbeddedSshView.SessionLogService</c> is wired.
+    /// </summary>
+    public ISessionEventLog? SessionEventLog { get; set; }
+
+    /// <summary>
+    /// Provider for the LIVE global session-logging toggle, read at each emit so the setting takes
+    /// effect without a restart. Supplied by <c>EmbeddedSessionManager</c> over
+    /// <c>ConfigManager.CurrentSettings</c>; the view never snapshots it.
+    /// </summary>
+    public Func<bool>? SessionLoggingEnabledProvider { get; set; }
 
     /// <summary>
     /// Raised when the user clicks the Split button in the header strip.
@@ -447,6 +469,14 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         {
             return;
         }
+
+        // Backstop: a user-initiated tab close/disconnect tears down here. The COM OnRdpDisconnected
+        // handler short-circuits once _disposed is set below (and the event sink is detached during
+        // teardown), so emit the teardown Disconnected now, before _disposed flips. Idempotent via the
+        // latch, so a real disconnect or reconnect bounce that already logged one is not double-counted.
+        // The teardown reason picks the trigger: a toolbar/menu Disconnect (UserAction) tags "user",
+        // every other teardown (tab close, failed session, app shutdown) tags "teardown".
+        EmitTeardownDisconnectEvent(reason);
 
         _disposed = true;
         Core.Logging.FileLogger.Info($"EmbeddedRDP Dispose started reason={reason}");
@@ -1583,6 +1613,117 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
     }
 
+    // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the
+    // LIVE global toggle and the RDP event eligibility. No snapshot, no second frozen gate.
+    private bool ShouldLogSessionEvents()
+        => SessionEventLog is not null
+            && SessionEventGatePolicy.ShouldLog(SessionLoggingEnabledProvider?.Invoke() ?? false, "RDP");
+
+    // Emits a Connected event and opens a connected segment. Refreshes the event connect timestamp
+    // so the matching Disconnected reports this segment's duration. The latch is set regardless of
+    // the gate so a later toggle-off/on cannot desynchronize the connect/disconnect pairing.
+    private void EmitConnectEvent()
+    {
+        _eventConnectedAtUtc = DateTime.UtcNow;
+        _eventConnectEmitted = true;
+        _eventDisconnectEmitted = false;
+
+        if (!ShouldLogSessionEvents() || _server is null)
+        {
+            return;
+        }
+
+        try
+        {
+            SessionEventLog!.LogEvent(
+                RdpSessionEventFactory.BuildConnected(_server.RemoteServer, _server.DisplayName));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedRDP session-event connect emit failed: {ex.Message}");
+        }
+    }
+
+    // Emits a Disconnected event at most once per connected segment (idempotency latch). Closes the
+    // segment. Safe to call from the final OnRdpDisconnected and from the auto-reconnect bounce; the
+    // second caller is a no-op once the first has emitted. Requires a live connected segment
+    // (_eventConnectEmitted): a connect FAILURE fires OnRdpDisconnected with a reason but no preceding
+    // Connected, and must NOT log an orphaned Disconnected - parity with VNC/Citrix.
+    private void EmitDisconnectEvent(int reason, int extendedReason)
+    {
+        if (!_eventConnectEmitted || _eventDisconnectEmitted)
+        {
+            return;
+        }
+
+        _eventDisconnectEmitted = true;
+        _eventConnectEmitted = false;
+
+        if (!ShouldLogSessionEvents() || _server is null)
+        {
+            return;
+        }
+
+        try
+        {
+            SessionEventLog!.LogEvent(RdpSessionEventFactory.BuildDisconnected(
+                _server.RemoteServer,
+                _server.DisplayName,
+                reason,
+                extendedReason,
+                _eventConnectedAtUtc,
+                DateTime.UtcNow));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedRDP session-event disconnect emit failed: {ex.Message}");
+        }
+    }
+
+    // Bounce start: emit the segment-ending Disconnected only when a connected segment is actually
+    // live (it ends here), never for a failed connect or a repeated reconnect attempt.
+    private void EmitBounceDisconnectEvent(int reason, int extendedReason)
+    {
+        if (_eventConnectEmitted && !_eventDisconnectEmitted)
+        {
+            EmitDisconnectEvent(reason, extendedReason);
+        }
+    }
+
+    // Dispose backstop: a user-initiated tab close/disconnect tears down through Dispose, where the
+    // COM OnRdpDisconnected handler short-circuits on _disposed and never reaches EmitDisconnectEvent.
+    // Emit a reasonless "teardown" Disconnected here. Idempotent: a no-op when a real disconnect or a
+    // reconnect bounce already logged one this cycle, and never fires for a never-connected session.
+    private void EmitTeardownDisconnectEvent(DisconnectReason reason)
+    {
+        if (!_eventConnectEmitted || _eventDisconnectEmitted)
+        {
+            return;
+        }
+
+        _eventDisconnectEmitted = true;
+        _eventConnectEmitted = false;
+
+        if (!ShouldLogSessionEvents() || _server is null)
+        {
+            return;
+        }
+
+        try
+        {
+            SessionEventLog!.LogEvent(RdpSessionEventFactory.BuildTeardownDisconnected(
+                _server.RemoteServer,
+                _server.DisplayName,
+                reason,
+                _eventConnectedAtUtc,
+                DateTime.UtcNow));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedRDP session-event teardown emit failed: {ex.Message}");
+        }
+    }
+
     private void OnRdpConnected()
     {
         Core.Logging.FileLogger.Info("EmbeddedRDP OnConnected fired");
@@ -1631,6 +1772,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             }
 
             _connectedAtUtc = DateTime.UtcNow;
+            EmitConnectEvent();
             _allowResolutionUpdates = false;
             ClearPaneDiagnostic();
             TransitionPhase(RdpConnectionPhase.Connected);
@@ -1750,6 +1892,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
+        // Record the end of the session segment. Idempotent: a no-op if the auto-reconnect bounce
+        // already emitted a Disconnected for this segment, or if the COM stack re-fires during the
+        // teardown Disconnect() call.
+        EmitDisconnectEvent(reason, extendedReason);
+
         var wasUserInitiated = _userInitiatedDisconnect;
         _userInitiatedDisconnect = false;
         var suppressOverlay = ShouldSuppressReconnectOverlay(wasUserInitiated, reason);
@@ -1844,6 +1991,13 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             $"EmbeddedRDP OnAutoReconnecting: reason={disconnectReason} extendedReason={extendedReason} attempt={attemptCount}");
         if (_disposed) return;
 
+        // The session segment dropped: close it with one Disconnected on the first attempt of the
+        // bounce. MsTscAx fires OnAutoReconnecting (not OnDisconnected) per attempt; a successful
+        // bounce ends in OnAutoReconnected with no OnDisconnected, so this is the only disconnect
+        // signal for a recovered drop. A cancelled/failed bounce later reaches OnDisconnected, which
+        // then idempotently skips.
+        EmitBounceDisconnectEvent(disconnectReason, extendedReason);
+
         SessionDiagnostic? gatewayDiagnostic = TryBuildTunnelFailureDiagnostic(disconnectReason);
         if (gatewayDiagnostic is not null)
         {
@@ -1926,6 +2080,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         Dispatcher.Invoke(() =>
         {
+            // OnRdpConnected is not re-entered on an auto-reconnect, and _connectedAtUtc is not
+            // refreshed here, so the event log opens a fresh segment at the reconnect-success point.
+            // This keeps the next Disconnected duration measured from the reconnect, not the original
+            // connect, and pairs the bounce as one Disconnected then one Connected.
+            EmitConnectEvent();
             ClearPaneDiagnostic();
             StopReconnectElapsedTracking();
             TransitionPhase(RdpConnectionPhase.Connected);
