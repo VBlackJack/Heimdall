@@ -61,4 +61,12 @@ public static class AppConstants
     /// chunk on the hot read-loop path (mirrors the batched-flush philosophy of FileLogger).
     /// </summary>
     public const int SessionLogFlushIntervalMs = 500;
+
+    /// <summary>
+    /// Default maximum size in bytes of the shared graphical-protocol session-event log before
+    /// rollover (4 MiB). Mirrors <see cref="DefaultSessionLogMaxBytes"/>: events are low-volume
+    /// (two lines per session), so this cap is reached only over very long-lived installs and the
+    /// overflow spills into ".N.log" continuations.
+    /// </summary>
+    public const long DefaultSessionEventLogMaxBytes = 4 * 1024 * 1024;
 }

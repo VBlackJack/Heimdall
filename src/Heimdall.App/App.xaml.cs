@@ -473,6 +473,28 @@ public partial class App : System.Windows.Application
                 logger,
                 localizer.GetString);
         });
+
+        // Session event log (Lot 2): single shared append-only NDJSON record of graphical-protocol
+        // (RDP/VNC/Citrix) connect/disconnect events. Same writable base + root as the transcript
+        // service. This sink is a dumb writer with no gate of its own; the per-connect protocol +
+        // LIVE-toggle gate (SessionEventGatePolicy against ConfigManager.CurrentSettings) is applied
+        // by the views, so the global toggle takes effect without a restart. The DI container
+        // disposes this singleton on shutdown alongside the transcript service.
+        services.AddSingleton<ISessionEventLog>(sp =>
+        {
+            ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
+            AppSettings currentSettings = configManager.CurrentSettings ?? new AppSettings();
+
+            string fileLoggerLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+            string sessionLogBaseDirectory = Directory.GetParent(fileLoggerLogDirectory)?.FullName
+                ?? AppDomain.CurrentDomain.BaseDirectory;
+            string root = SessionLogPathResolver.Resolve(currentSettings, sessionLogBaseDirectory);
+
+            return new SessionEventLog(
+                root,
+                AppConstants.DefaultSessionEventLogMaxBytes,
+                AppConstants.SessionLogFlushIntervalMs);
+        });
         services.AddSingleton<IEmbeddedSessionManager, EmbeddedSessionManager>();
         services.AddSingleton<EmbeddedSessionManager>(sp =>
             (EmbeddedSessionManager)sp.GetRequiredService<IEmbeddedSessionManager>());
