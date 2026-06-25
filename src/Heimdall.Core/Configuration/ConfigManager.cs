@@ -92,6 +92,13 @@ public sealed class ConfigManager : IConfigManager
     public event Action<AppSettings>? SettingsChanged;
 
     /// <summary>
+    /// The most recently loaded or persisted settings snapshot, or <c>null</c> before the first
+    /// load. Lets composition-root factories read the current configuration synchronously without
+    /// re-reading the settings file or blocking on the async load path.
+    /// </summary>
+    public AppSettings? CurrentSettings { get; private set; }
+
+    /// <summary>
     /// Performs first-run initialization: creates directories,
     /// copies default files if runtime files are missing, and sets file/directory ACLs.
     /// ACL enforcement is fail-closed during initialization — if ACLs cannot be
@@ -164,13 +171,16 @@ public sealed class ConfigManager : IConfigManager
     {
         if (!File.Exists(_settingsPath))
         {
-            return new AppSettings();
+            var defaults = new AppSettings();
+            CurrentSettings = defaults;
+            return defaults;
         }
 
         var json = await File.ReadAllTextAsync(_settingsPath, Utf8NoBom)
             .ConfigureAwait(false);
         var settings = JsonSerializer.Deserialize<AppSettings>(json, ReadOptions) ?? new AppSettings();
         NormalizeTrustedHostKeys(settings);
+        CurrentSettings = settings;
         return settings;
     }
 
@@ -194,6 +204,7 @@ public sealed class ConfigManager : IConfigManager
             _writeLock.Release();
         }
 
+        CurrentSettings = settings;
         SettingsChanged?.Invoke(settings);
     }
 
@@ -301,6 +312,7 @@ public sealed class ConfigManager : IConfigManager
             _writeLock.Release();
         }
 
+        CurrentSettings = settings;
         SettingsChanged?.Invoke(settings);
     }
 

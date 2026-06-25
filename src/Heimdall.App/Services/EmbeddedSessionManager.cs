@@ -44,6 +44,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     private readonly ConnectionStateMachine _connectionSm;
     private readonly ToolRegistry _toolRegistry;
     private readonly ITunnelService _tunnelService;
+    private readonly ISessionLogService _sessionLogService;
 
     /// <summary>
     /// Optional callback invoked when a terminal view broadcasts input.
@@ -108,7 +109,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         HostKeyStore hostKeyStore,
         ConnectionStateMachine connectionSm,
         ToolRegistry toolRegistry,
-        ITunnelService tunnelService)
+        ITunnelService tunnelService,
+        ISessionLogService sessionLogService)
     {
         _localizer = localizer;
         _dialogService = dialogService;
@@ -116,6 +118,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         _connectionSm = connectionSm;
         _toolRegistry = toolRegistry;
         _tunnelService = tunnelService;
+        _sessionLogService = sessionLogService;
     }
 
     public object CreateHostControl(
@@ -646,7 +649,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         ArgumentNullException.ThrowIfNull(sessionTab);
         ArgumentNullException.ThrowIfNull(server);
 
-        var view = new EmbeddedSshView { Localizer = _localizer, TerminalSettings = settings };
+        var view = new EmbeddedSshView
+        {
+            Localizer = _localizer,
+            TerminalSettings = settings,
+            SessionLogService = _sessionLogService
+        };
         view.InitializeConnecting(sessionTab, displayName, BuildSshEndpointLabel(server));
 
         WireBroadcast(view);
@@ -709,7 +717,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         int keepAliveIntervalSeconds,
         AppSettings? settings = null)
     {
-        var view = new EmbeddedSshView { Localizer = _localizer, TerminalSettings = settings };
+        var view = new EmbeddedSshView
+        {
+            Localizer = _localizer,
+            TerminalSettings = settings,
+            SessionLogService = _sessionLogService
+        };
         view.InitializeSession(session, tab, displayName, string.Empty, keepAliveIntervalSeconds);
         WireBroadcast(view);
         WireSplitRequested(view, tab);
@@ -727,7 +740,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         string? endpoint = null,
         string connectedStatus = "Connected")
     {
-        var view = new EmbeddedSshView { Localizer = _localizer, TerminalSettings = settings };
+        var view = new EmbeddedSshView
+        {
+            Localizer = _localizer,
+            TerminalSettings = settings,
+            SessionLogService = _sessionLogService
+        };
         bool autoReconnectOnProcessExit = TerminalReconnectPolicy.ReconnectsOnProcessExit(
             tab.ConnectionType);
         view.InitializeTerminalSession(

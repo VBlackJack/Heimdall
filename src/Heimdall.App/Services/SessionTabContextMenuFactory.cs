@@ -508,20 +508,11 @@ public sealed class SessionTabContextMenuFactory
             }
             else
             {
-                var logDir = vm.CurrentSettings?.SessionLogDirectory ?? @"logs\sessions";
-                if (!Path.IsPathRooted(logDir))
-                {
-                    logDir = Path.Combine(AppContext.BaseDirectory, logDir);
-                }
-
-                var invalidChars = Path.GetInvalidFileNameChars();
-                var serverName = string.Concat(
-                    session.Title.Select(c => Array.IndexOf(invalidChars, c) >= 0 ? '_' : c));
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var logFile = Path.Combine(logDir, $"transcript_{serverName}_{timestamp}.log");
-
-                sshView.StartTranscript(logFile);
-                vm.StatusText = string.Format(vm.Localize("SessionTranscriptStarted"), logFile);
+                // The service owns file naming, path resolution, and ACLs; we only surface the result.
+                string? logFile = sshView.StartTranscript();
+                vm.StatusText = logFile is not null
+                    ? string.Format(vm.Localize("SessionTranscriptStarted"), logFile)
+                    : vm.Localize("SessionTranscriptStopped");
             }
         };
         menu.Items.Add(transcriptItem);

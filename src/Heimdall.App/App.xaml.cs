@@ -39,6 +39,7 @@ using Heimdall.Core.Updates;
 using Heimdall.Sftp;
 using Heimdall.Ssh;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 using SshKnownHostsExporter = Heimdall.Ssh.KnownHostsExporter;
@@ -449,6 +450,29 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IProtocolHandler, CitrixHandler>();
         services.AddSingleton<IProtocolHandler, LocalShellHandler>();
         services.AddSingleton<IProtocolHandler, WinRmHandler>();
+        // Session transcript writer (Lot 1b). Root directory is resolved once at first
+        // resolution (after settings load) from the writable base FileLogger uses; the gate that
+        // auto-starts logging is applied per-connect in the terminal view.
+        services.AddSingleton<ISessionLogService>(sp =>
+        {
+            ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
+            AppSettings currentSettings = configManager.CurrentSettings ?? new AppSettings();
+            LocalizationManager localizer = sp.GetRequiredService<LocalizationManager>();
+            ILogger<SessionLogService> logger = sp.GetRequiredService<ILogger<SessionLogService>>();
+
+            // FileLogger writes to "<base>/logs"; root session logs under the same writable base so
+            // a relative SessionLogDirectory (default "logs/sessions") lands beside heimdall_*.log.
+            string fileLoggerLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+            string sessionLogBaseDirectory = Directory.GetParent(fileLoggerLogDirectory)?.FullName
+                ?? AppDomain.CurrentDomain.BaseDirectory;
+            string root = SessionLogPathResolver.Resolve(currentSettings, sessionLogBaseDirectory);
+
+            return new SessionLogService(
+                root,
+                SessionLogOptions.CreateDefault(),
+                logger,
+                localizer.GetString);
+        });
         services.AddSingleton<IEmbeddedSessionManager, EmbeddedSessionManager>();
         services.AddSingleton<EmbeddedSessionManager>(sp =>
             (EmbeddedSessionManager)sp.GetRequiredService<IEmbeddedSessionManager>());

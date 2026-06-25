@@ -182,11 +182,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     private readonly ConcurrentQueue<string> _pendingTerminalMessages = new();
-    private readonly object _logLock = new();
     private readonly ResizeFailureLogThrottle _resizeLogThrottle = new ResizeFailureLogThrottle();
 
-    private StreamWriter? _logStream;
-    private string? _logFilePath;
+    private string? _sessionLogKey;
+    private string _sessionLogDisplayName = string.Empty;
+    private string _sessionLogEndpoint = string.Empty;
     private SshShellSession? _session;
     private Heimdall.Terminal.ITerminalSession? _terminalSession;
     private SessionTabViewModel? _sessionTab;
@@ -199,8 +199,6 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private WinRmEarlyOutputDiagnostic? _winRmEarlyOutputDiagnostic;
     private readonly List<MacroEntry> _macroEntries = [];
     private readonly Stopwatch _macroStopwatch = new();
-    private readonly StreamingUtf8Decoder _transcriptDecoder = new StreamingUtf8Decoder();
-    private readonly StreamingAnsiStripper _transcriptStripper = new StreamingAnsiStripper();
 
     private bool _healthPanelVisible;
     private bool _disposed;
@@ -231,6 +229,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     /// <summary>Terminal appearance settings (font, color scheme). Set by EmbeddedSessionManager before Loaded fires.</summary>
     public AppSettings? TerminalSettings { get; set; }
+
+    /// <summary>
+    /// Session transcript writer. Set by EmbeddedSessionManager. When null, transcript recording
+    /// (auto and manual) is unavailable for this view.
+    /// </summary>
+    public ISessionLogService? SessionLogService { get; set; }
 
     private bool IsSessionConnected =>
         (_session?.IsConnected ?? false) || (_terminalSession?.IsRunning ?? false);
@@ -340,6 +344,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _sessionTab = sessionTab;
+        _sessionLogDisplayName = displayName;
+        _sessionLogEndpoint = endpoint;
 
         LocalizeButtons();
         SessionTitleText.Text = displayName;
@@ -385,6 +391,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
         _autoReconnectAttempt = 0;
+
+        TryAutoStartSessionLog();
     }
 
     /// <summary>
@@ -439,6 +447,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
         _autoReconnectAttempt = 0;
+
+        TryAutoStartSessionLog();
     }
 
     public void Dispose()
@@ -1241,7 +1251,14 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
-        WriteToTranscript(data);
+        if (SessionLogService is not null && _sessionLogKey is not null)
+        {
+            // Forward raw bytes; the service owns decoding + ANSI stripping. No-op until a
+            // transcript is active for this key, so replayed bootstrap bytes that arrive before
+            // StartSession are not logged, and live bytes after it are logged exactly once.
+            SessionLogService.WriteOutput(_sessionLogKey, data);
+        }
+
         ObserveWinRmEarlyOutput(data);
 
         var message = "data:" + Convert.ToBase64String(data);
@@ -1574,117 +1591,70 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         BroadcastBorder.BorderThickness = isTarget ? new Thickness(2) : new Thickness(0);
     }
 
-    /// <summary>Whether a transcript recording is currently active.</summary>
-    public bool IsTranscriptActive
+    /// <summary>Whether a transcript recording is currently active for this session.</summary>
+    public bool IsTranscriptActive =>
+        SessionLogService is not null
+        && _sessionLogKey is not null
+        && SessionLogService.IsSessionActive(_sessionLogKey);
+
+    /// <summary>
+    /// Starts (or restarts) transcript recording for this session through the shared
+    /// <see cref="ISessionLogService"/>, bypassing the auto-start gate. Used by the manual
+    /// Start Transcript menu action.
+    /// </summary>
+    /// <returns>The log file path, or <c>null</c> if recording could not start.</returns>
+    public string? StartTranscript() => StartSessionLog();
+
+    /// <summary>Stops the active transcript recording for this session, if any.</summary>
+    public void StopTranscript()
     {
-        get { lock (_logLock) { return _logStream is not null; } }
+        if (SessionLogService is not null && _sessionLogKey is not null)
+        {
+            SessionLogService.StopSession(_sessionLogKey);
+        }
     }
 
     /// <summary>
-    /// Starts recording terminal output to a log file.
-    /// If a transcript is already active, it is stopped first.
+    /// Auto-starts transcript recording when the gate policy allows it for this session's
+    /// protocol and the global logging toggle is on. No-op otherwise.
     /// </summary>
-    public void StartTranscript(string logFilePath)
+    private void TryAutoStartSessionLog()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(logFilePath);
-
-        lock (_logLock)
+        bool enabled = TerminalSettings?.SessionLoggingEnabled ?? false;
+        if (SessionLogGatePolicy.ShouldAutoStart(enabled, _sessionTab?.ConnectionType))
         {
-            StopTranscriptInternal();
-            _transcriptDecoder.Reset();
-            _transcriptStripper.Reset();
-
-            string? dir = Path.GetDirectoryName(logFilePath);
-            if (!string.IsNullOrEmpty(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            _logStream = new StreamWriter(logFilePath, append: true, Encoding.UTF8)
-            {
-                AutoFlush = true
-            };
-            _logFilePath = logFilePath;
-
-            Core.Logging.FileLogger.Info($"Transcript started: {logFilePath}");
+            StartSessionLog();
         }
     }
 
-    /// <summary>Stops the active transcript recording, if any.</summary>
-    public void StopTranscript()
+    /// <summary>
+    /// Builds the session-log context and starts recording through the service. The session key
+    /// is generated once and reused for the tap, manual start/stop, and teardown.
+    /// </summary>
+    private string? StartSessionLog()
     {
-        lock (_logLock)
+        if (SessionLogService is null || _sessionTab is null)
         {
-            StopTranscriptInternal();
+            return null;
         }
-    }
 
-    private void StopTranscriptInternal()
-    {
-        if (_logStream is not null)
-        {
-            StreamWriter logStream = _logStream;
-            string residue = _transcriptDecoder.Flush();
-            if (residue.Length > 0)
-            {
-                string cleanResidue = _transcriptStripper.Strip(residue);
-                if (cleanResidue.Length > 0)
-                {
-                    try
-                    {
-                        logStream.Write(cleanResidue);
-                    }
-                    catch (Exception ex)
-                    {
-                        Core.Logging.FileLogger.Warn($"Transcript flush error: {ex.Message}");
-                    }
-                }
-            }
+        _sessionLogKey ??= Guid.NewGuid().ToString("N");
 
-            _transcriptStripper.Flush();
-            _transcriptDecoder.Reset();
-            _transcriptStripper.Reset();
+        string protocol = string.IsNullOrWhiteSpace(_sessionTab.ConnectionType)
+            ? "SESSION"
+            : _sessionTab.ConnectionType;
+        string host = string.IsNullOrWhiteSpace(_sessionLogEndpoint)
+            ? _sessionLogDisplayName
+            : _sessionLogEndpoint;
 
-            try
-            {
-                logStream.Flush();
-                logStream.Dispose();
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn($"Transcript close error: {ex.Message}");
-            }
+        SessionLogContext context = new SessionLogContext(
+            _sessionLogKey,
+            protocol,
+            host,
+            _sessionLogDisplayName,
+            DateTime.UtcNow);
 
-            Core.Logging.FileLogger.Info($"Transcript stopped: {_logFilePath}");
-            _logStream = null;
-            _logFilePath = null;
-        }
-    }
-
-    /// <summary>Writes raw terminal data to the transcript file, stripping ANSI escape sequences.</summary>
-    private void WriteToTranscript(ReadOnlySpan<byte> data)
-    {
-        lock (_logLock)
-        {
-            if (_logStream is null)
-            {
-                return;
-            }
-
-            try
-            {
-                string text = _transcriptDecoder.DecodeChunk(data);
-                string clean = _transcriptStripper.Strip(text);
-                if (clean.Length > 0)
-                {
-                    _logStream.Write(clean);
-                }
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn($"Transcript write error: {ex.Message}");
-            }
-        }
+        return SessionLogService.StartSession(context);
     }
 
     private void WriteToSession(string text, bool marksTerminalInput = true)

@@ -102,7 +102,7 @@ public sealed class EmbeddedSessionManagerDisconnectTests
     }
 
     private static EmbeddedSessionManager CreateManager()
-        => new EmbeddedSessionManager(null!, null!, null!, null!, null!, null!);
+        => new EmbeddedSessionManager(null!, null!, null!, null!, null!, null!, null!);
 
     private static SessionPaneModel CreatePane(object? hostControl)
     {
