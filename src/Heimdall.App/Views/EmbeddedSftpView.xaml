@@ -547,6 +547,31 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator/>
+                    <MenuItem x:Name="CtxCut" Header="{loc:Translate SftpCtxCut}" Command="{Binding CutSelectedCommand}"
+                              AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
+                        <MenuItem.Icon>
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C6;" FontSize="{StaticResource FontSizeSubtitle}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="CtxCopy" Header="{loc:Translate SftpCtxCopy}" Command="{Binding CopySelectedCommand}"
+                              AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
+                        <MenuItem.Icon>
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="{StaticResource FontSizeSubtitle}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="CtxPaste" Header="{loc:Translate SftpCtxPaste}" Command="{Binding PasteCommand}"
+                              AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
+                        <MenuItem.Icon>
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE77F;" FontSize="{StaticResource FontSizeSubtitle}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="CtxDuplicate" Header="{loc:Translate SftpCtxDuplicate}" Command="{Binding DuplicateSelectedCommand}"
+                              AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
+                        <MenuItem.Icon>
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="{StaticResource FontSizeSubtitle}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator/>
                     <MenuItem x:Name="CtxCopyPath" Header="{loc:Translate SftpCopyPath}" Click="OnCtxCopyPathClick" InputGestureText="Ctrl+C"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                         <MenuItem.Icon>

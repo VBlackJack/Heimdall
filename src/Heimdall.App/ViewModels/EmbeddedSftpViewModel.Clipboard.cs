@@ -1,0 +1,256 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+using System.Linq;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Heimdall.Sftp;
+
+namespace Heimdall.App.ViewModels;
+
+/// <summary>
+/// Clipboard half of the embedded SFTP/FTP browser: the Cut / Copy / Paste / Duplicate operations and
+/// the non-destructive name-collision resolver. All transport goes through the same (operations-logged)
+/// browser the other view-model operations use, so a paste/duplicate is journaled as a Copy record and a
+/// cut-paste as a Rename record without any extra wiring here.
+/// </summary>
+public sealed partial class EmbeddedSftpViewModel
+{
+    /// <summary>
+    /// The current clipboard content, or null when empty. Drives <see cref="HasClipboard"/> and the
+    /// paste command's executability.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasClipboard))]
+    [NotifyCanExecuteChangedFor(nameof(PasteCommand))]
+    private SftpClipboardContent? _clipboard;
+
+    /// <summary>Whether the clipboard currently holds at least one entry.</summary>
+    public bool HasClipboard => Clipboard is { Entries.Count: > 0 };
+
+    [RelayCommand]
+    private void CutSelected() => SetClipboard(SftpClipboardMode.Cut);
+
+    [RelayCommand]
+    private void CopySelected() => SetClipboard(SftpClipboardMode.Copy);
+
+    [RelayCommand(CanExecute = nameof(CanPaste))]
+    private Task Paste() => PasteClipboardAsync();
+
+    [RelayCommand]
+    private Task DuplicateSelected() => DuplicateEntriesAsync(SelectedFiles);
+
+    private bool CanPaste() => HasClipboard && IsConnected;
+
+    // Captures the current multi-selection plus the source directory and the cut/copy mode. No transport.
+    private void SetClipboard(SftpClipboardMode mode)
+    {
+        IReadOnlyList<SftpFileInfo> selection = SelectedFiles;
+        if (selection.Count == 0)
+        {
+            return;
+        }
+
+        Clipboard = new SftpClipboardContent([.. selection], CurrentPath, mode);
+
+        string statusKey = mode == SftpClipboardMode.Cut ? "SftpStatusCut" : "SftpStatusCopied";
+        UpdateStatus(_localizer?.Format(statusKey, selection.Count.ToString())
+            ?? $"{selection.Count} item(s)");
+    }
+
+    /// <summary>
+    /// Pastes the clipboard into the current directory. Copy mode copies each entry (clipboard kept,
+    /// repeatable); cut mode moves each entry and then clears the clipboard (consumed once). Every
+    /// destination name is resolved to be collision-free, so nothing is ever overwritten. A cut entry
+    /// that would resolve to its own path (same directory, same name) is skipped.
+    /// </summary>
+    public async Task PasteClipboardAsync()
+    {
+        if (_disposed || _browser is null)
+        {
+            return;
+        }
+
+        SftpClipboardContent? clipboard = Clipboard;
+        if (clipboard is null || clipboard.Entries.Count == 0)
+        {
+            return;
+        }
+
+        string targetDirectory = CurrentPath;
+        bool cut = clipboard.Mode == SftpClipboardMode.Cut;
+        bool sameDirectory = string.Equals(
+            clipboard.SourceDirectory.TrimEnd('/'),
+            targetDirectory.TrimEnd('/'),
+            StringComparison.Ordinal);
+
+        var existingNames = new HashSet<string>(
+            UnfilteredEntries.Select(entry => entry.Name),
+            StringComparer.Ordinal);
+
+        // A cut back into the same directory must leave the original names "free" so the self-move guard
+        // recognizes an unchanged target; a copy into the same directory keeps them as collisions so a
+        // second copy is created instead of being skipped.
+        if (cut && sameDirectory)
+        {
+            foreach (SftpFileInfo entry in clipboard.Entries)
+            {
+                existingNames.Remove(entry.Name);
+            }
+        }
+
+        try
+        {
+            foreach (SftpFileInfo entry in clipboard.Entries)
+            {
+                string targetName = BuildNonCollidingName(existingNames, entry.Name);
+                string destination = CombineRemotePath(targetDirectory, targetName);
+
+                if (cut)
+                {
+                    if (string.Equals(destination, entry.FullPath, StringComparison.Ordinal))
+                    {
+                        // Self-move (same directory, same name): nothing to do.
+                        continue;
+                    }
+
+                    await _browser.RenameAsync(entry.FullPath, destination);
+                }
+                else
+                {
+                    await _browser.CopyAsync(entry.FullPath, destination, entry.IsDirectory);
+                }
+
+                existingNames.Add(targetName);
+            }
+
+            if (cut)
+            {
+                await RunOnUiAsync(() => Clipboard = null);
+            }
+
+            await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusPasteComplete")));
+            await Refresh().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await RunOnUiAsync(() => SetTransferError(ex));
+        }
+    }
+
+    /// <summary>
+    /// Duplicates each entry into the current directory under a collision-free "(copy)" name. Never
+    /// overwrites; the clipboard is not involved.
+    /// </summary>
+    public async Task DuplicateEntriesAsync(IReadOnlyList<SftpFileInfo> entries)
+    {
+        if (entries.Count == 0 || _disposed || _browser is null)
+        {
+            return;
+        }
+
+        string targetDirectory = CurrentPath;
+        var existingNames = new HashSet<string>(
+            UnfilteredEntries.Select(entry => entry.Name),
+            StringComparer.Ordinal);
+
+        try
+        {
+            foreach (SftpFileInfo entry in entries)
+            {
+                string targetName = BuildNonCollidingName(existingNames, entry.Name);
+                string destination = CombineRemotePath(targetDirectory, targetName);
+
+                await _browser.CopyAsync(entry.FullPath, destination, entry.IsDirectory);
+
+                existingNames.Add(targetName);
+            }
+
+            await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusDuplicateComplete")));
+            await Refresh().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await RunOnUiAsync(() => SetTransferError(ex));
+        }
+    }
+
+    /// <summary>
+    /// Resolves a non-colliding child name: returns <paramref name="desiredName"/> when it is free,
+    /// otherwise inserts " (copy)" before the extension, then " (copy 2)", " (copy 3)", and so on.
+    /// Dotfiles (for example ".bashrc") are treated as having no extension.
+    /// </summary>
+    public static string BuildNonCollidingName(IReadOnlyCollection<string> existingNames, string desiredName)
+    {
+        ArgumentNullException.ThrowIfNull(existingNames);
+        ArgumentException.ThrowIfNullOrWhiteSpace(desiredName);
+
+        var taken = new HashSet<string>(existingNames, StringComparer.Ordinal);
+        if (!taken.Contains(desiredName))
+        {
+            return desiredName;
+        }
+
+        (string stem, string extension) = SplitNameAndExtension(desiredName);
+
+        string firstCandidate = $"{stem} (copy){extension}";
+        if (!taken.Contains(firstCandidate))
+        {
+            return firstCandidate;
+        }
+
+        for (int counter = 2; ; counter++)
+        {
+            string candidate = $"{stem} (copy {counter}){extension}";
+            if (!taken.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    // Splits a leaf name into (stem, extension-including-dot). A leading dot (dotfile) or a trailing dot
+    // is not treated as an extension boundary, so ".bashrc" -> (".bashrc", "") and "a.txt" -> ("a", ".txt").
+    private static (string Stem, string Extension) SplitNameAndExtension(string name)
+    {
+        int lastDot = name.LastIndexOf('.');
+        if (lastDot <= 0 || lastDot == name.Length - 1)
+        {
+            return (name, string.Empty);
+        }
+
+        return (name[..lastDot], name[lastDot..]);
+    }
+}
+
+/// <summary>Whether a clipboard capture is a move (cut) or a copy.</summary>
+public enum SftpClipboardMode
+{
+    /// <summary>Entries will be moved (renamed) on paste, then the clipboard is cleared.</summary>
+    Cut,
+
+    /// <summary>Entries will be copied on paste; the clipboard is kept for repeated pastes.</summary>
+    Copy,
+}
+
+/// <summary>Immutable snapshot of a cut/copy operation: the captured entries, their source directory, and the mode.</summary>
+/// <param name="Entries">The captured remote entries.</param>
+/// <param name="SourceDirectory">The directory the entries were captured from.</param>
+/// <param name="Mode">Whether the capture is a cut or a copy.</param>
+public sealed record SftpClipboardContent(
+    IReadOnlyList<SftpFileInfo> Entries,
+    string SourceDirectory,
+    SftpClipboardMode Mode);

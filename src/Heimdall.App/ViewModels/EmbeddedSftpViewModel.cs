@@ -172,6 +172,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsToolbarEnabled))]
     [NotifyPropertyChangedFor(nameof(CanNavigateBack))]
     [NotifyPropertyChangedFor(nameof(IsDisconnected))]
+    [NotifyCanExecuteChangedFor(nameof(PasteCommand))]
     private bool _isConnected;
 
     /// <summary>The current text filter applied to file names.</summary>
@@ -521,7 +522,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     [RelayCommand]
     private Task ChmodSelected()
     {
-        return SelectedFile is { } file ? ChmodAsync(file) : Task.CompletedTask;
+        return ChmodEntriesAsync(SelectedFiles);
     }
 
     [RelayCommand]
@@ -1365,19 +1366,26 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Prompts for new octal permissions and applies chmod to the selected entry.
+    /// Prompts once for new octal permissions and applies chmod to every selected entry. The default
+    /// shown is the primary entry's current mode; the entered mode is applied to all entries.
     /// </summary>
-    public async Task ChmodAsync(SftpFileInfo file)
+    public async Task ChmodEntriesAsync(IReadOnlyList<SftpFileInfo> entries)
     {
-        if (_disposed || _browser is null || _dialogService is null)
+        if (entries.Count == 0 || _disposed || _browser is null || _dialogService is null)
         {
             return;
         }
 
-        string currentOctal = PermissionsToOctal(file.Permissions);
+        SftpFileInfo primary = SelectedFile ?? entries[0];
+        string currentOctal = PermissionsToOctal(primary.Permissions);
+
+        string title = entries.Count == 1
+            ? (_localizer?.Format("SftpChmodTitle", primary.Name) ?? $"chmod {primary.Name}")
+            : (_localizer?.Format("SftpChmodTitleMultiple", entries.Count.ToString())
+                ?? $"chmod {entries.Count} items");
 
         string? newPerms = await _dialogService.ShowInputAsync(
-            _localizer?.Format("SftpChmodTitle", file.Name) ?? $"chmod {file.Name}",
+            title,
             L10n("SftpChmodLabel"),
             currentOctal);
 
@@ -1395,17 +1403,22 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
+        short mode = Convert.ToInt16(newPerms, 8);
+
         try
         {
-            try
+            foreach (SftpFileInfo entry in entries)
             {
-                await _browser.ChmodAsync(file.FullPath, Convert.ToInt16(newPerms, 8));
-            }
-            catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
-            {
-                Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
-                await RunSudoCommandAsync(
-                    $"chmod {newPerms} {PathEscaper.EscapeForShell(file.FullPath)}");
+                try
+                {
+                    await _browser.ChmodAsync(entry.FullPath, mode);
+                }
+                catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
+                {
+                    Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
+                    await RunSudoCommandAsync(
+                        $"chmod {newPerms} {PathEscaper.EscapeForShell(entry.FullPath)}");
+                }
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpChmodSuccess")));

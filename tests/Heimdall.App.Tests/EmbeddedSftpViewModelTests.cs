@@ -640,6 +640,121 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public void CutSelectedCommand_CapturesSelectionAndSourceDirectoryAsCut()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src" };
+        SftpFileInfo entry = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
+        viewModel.SetSelection([entry], entry);
+
+        viewModel.CutSelectedCommand.Execute(null);
+
+        Assert.True(viewModel.HasClipboard);
+        Assert.NotNull(viewModel.Clipboard);
+        Assert.Equal(SftpClipboardMode.Cut, viewModel.Clipboard!.Mode);
+        Assert.Equal("/src", viewModel.Clipboard.SourceDirectory);
+        Assert.Single(viewModel.Clipboard.Entries);
+    }
+
+    [Fact]
+    public void CopySelectedCommand_CapturesSelectionAsCopy()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src" };
+        SftpFileInfo entry = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
+        viewModel.SetSelection([entry], entry);
+
+        viewModel.CopySelectedCommand.Execute(null);
+
+        Assert.NotNull(viewModel.Clipboard);
+        Assert.Equal(SftpClipboardMode.Copy, viewModel.Clipboard!.Mode);
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_CopyMode_CopiesIntoCurrentDirectoryAndKeepsClipboard()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src", IsConnected = true };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SftpFileInfo directory = CreateRemoteEntry("project", "/src/project", isDirectory: true);
+        viewModel.SetSelection([directory], directory);
+        viewModel.CopySelectedCommand.Execute(null);
+
+        viewModel.CurrentPath = "/dst";
+        viewModel.UnfilteredEntries = [];
+
+        await viewModel.PasteClipboardAsync();
+
+        (string Source, string Destination, bool Recursive) copy = Assert.Single(browser.CopyCalls);
+        Assert.Equal("/src/project", copy.Source);
+        Assert.Equal("/dst/project", copy.Destination);
+        Assert.True(copy.Recursive);
+        Assert.NotNull(viewModel.Clipboard);
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_CutMode_MovesWithFullCrossDirectoryPathAndClearsClipboard()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src", IsConnected = true };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SftpFileInfo file = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
+        viewModel.SetSelection([file], file);
+        viewModel.CutSelectedCommand.Execute(null);
+
+        viewModel.CurrentPath = "/dst";
+        viewModel.UnfilteredEntries = [];
+
+        await viewModel.PasteClipboardAsync();
+
+        Assert.Equal(1, browser.RenameCallCount);
+        Assert.Equal("/src/a.txt", browser.LastRenamedOldPath);
+        Assert.Equal("/dst/a.txt", browser.LastRenamedNewPath);
+        Assert.Null(viewModel.Clipboard);
+        Assert.False(viewModel.HasClipboard);
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_CutMode_SameDirectorySameName_SkipsSelfMoveButConsumesClipboard()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src", IsConnected = true };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SftpFileInfo file = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
+        viewModel.SetSelection([file], file);
+        viewModel.CutSelectedCommand.Execute(null);
+
+        // Paste back into the same directory; the listing still contains the entry itself.
+        viewModel.UnfilteredEntries = [file];
+
+        await viewModel.PasteClipboardAsync();
+
+        Assert.Equal(0, browser.RenameCallCount);
+        Assert.Null(viewModel.Clipboard);
+    }
+
+    [Fact]
+    public async Task DuplicateEntriesAsync_IntoSameDirectory_CopiesWithCollisionFreeCopyName()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src", IsConnected = true };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SftpFileInfo file = CreateRemoteEntry("report.txt", "/src/report.txt", isDirectory: false);
+        viewModel.UnfilteredEntries = [file];
+
+        await viewModel.DuplicateEntriesAsync([file]);
+
+        (string Source, string Destination, bool Recursive) copy = Assert.Single(browser.CopyCalls);
+        Assert.Equal("/src/report.txt", copy.Source);
+        Assert.Equal("/src/report (copy).txt", copy.Destination);
+        Assert.False(copy.Recursive);
+    }
+
+    [Fact]
     public void CancelTransferCommand_NoTransferRunning_DoesNotThrow()
     {
         FakeUiDispatcher dispatcher = new();
@@ -896,8 +1011,13 @@ public sealed class EmbeddedSftpViewModelTests
             return Task.CompletedTask;
         }
 
-        public Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default) =>
-            Task.CompletedTask;
+        public List<(string Source, string Destination, bool Recursive)> CopyCalls { get; } = [];
+
+        public Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default)
+        {
+            CopyCalls.Add((sourcePath, destinationPath, recursive));
+            return Task.CompletedTask;
+        }
 
         public void Disconnect()
         {

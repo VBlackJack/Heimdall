@@ -639,13 +639,25 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         bool hasSelection = FileListView.SelectedItem is not null;
         bool isFile = FileListView.SelectedItem is SftpFileInfo f && !f.IsDirectory;
         bool isDir = FileListView.SelectedItem is SftpFileInfo d && d.IsDirectory;
+        bool singleSelection = FileListView.SelectedItems.Count == 1;
 
         CtxOpen.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxEdit.Visibility = isFile ? Visibility.Visible : Visibility.Collapsed;
+        // Editing with an external editor is a single-file action, mirror CtxEdit's isFile gate so it no
+        // longer shows on directories or an empty selection.
+        CtxEditExternal.Visibility = isFile ? Visibility.Visible : Visibility.Collapsed;
         CtxDownload.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
-        CtxRename.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        // Rename targets exactly one entry, so hide it on a multi-selection.
+        CtxRename.Visibility = singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxDelete.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        // Chmod now applies to the whole selection, so it stays visible on multi-selection.
         CtxChmod.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        CtxCut.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        CtxCopy.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        CtxPaste.Visibility = _viewModel.HasClipboard && _viewModel.IsConnected
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CtxDuplicate.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxCopyPath.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxProperties.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
 

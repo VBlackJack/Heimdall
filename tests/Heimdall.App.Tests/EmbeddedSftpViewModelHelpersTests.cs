@@ -47,6 +47,35 @@ public sealed class EmbeddedSftpViewModelHelpersTests
         Assert.Equal(expected, actual);
     }
 
+    [Fact]
+    public void BuildNonCollidingName_FreeName_ReturnedUnchanged()
+    {
+        string actual = EmbeddedSftpViewModel.BuildNonCollidingName(["other.txt"], "report.txt");
+
+        Assert.Equal("report.txt", actual);
+    }
+
+    [Theory]
+    // Single collision inserts " (copy)" before the extension.
+    [InlineData("report.txt", new[] { "report.txt" }, "report (copy).txt")]
+    // Second collision bumps the counter, extension still preserved.
+    [InlineData("report.txt", new[] { "report.txt", "report (copy).txt" }, "report (copy 2).txt")]
+    // No extension (a directory name) keeps the suffix at the end.
+    [InlineData("data", new[] { "data" }, "data (copy)")]
+    // A dotfile has no extension: the suffix goes after the whole name.
+    [InlineData(".bashrc", new[] { ".bashrc" }, ".bashrc (copy)")]
+    // Only the last extension segment is preserved.
+    [InlineData("archive.tar.gz", new[] { "archive.tar.gz" }, "archive.tar (copy).gz")]
+    public void BuildNonCollidingName_Collision_InsertsCopySuffixPreservingExtension(
+        string desired,
+        string[] existing,
+        string expected)
+    {
+        string actual = EmbeddedSftpViewModel.BuildNonCollidingName(existing, desired);
+
+        Assert.Equal(expected, actual);
+    }
+
     [Theory]
     [InlineData("rwxr-xr-x", "755")]
     [InlineData("rw-r--r--", "644")]
