@@ -83,12 +83,16 @@ public static class DraculaSyntaxPalette
             }
         }
 
-        ApplyColorsToRuleSet(highlighting.MainRuleSet);
+        // A highlighting definition's rule sets form a graph that can contain cycles (a span's rule
+        // set may reference an ancestor or itself, e.g. the nested rule sets in MarkDown). Track the
+        // rule sets already visited so a cyclic graph cannot drive this walk into infinite recursion
+        // (which previously overflowed the stack and crashed the process on editor open).
+        ApplyColorsToRuleSet(highlighting.MainRuleSet, []);
     }
 
-    private static void ApplyColorsToRuleSet(HighlightingRuleSet? ruleSet)
+    private static void ApplyColorsToRuleSet(HighlightingRuleSet? ruleSet, HashSet<HighlightingRuleSet> visited)
     {
-        if (ruleSet is null)
+        if (ruleSet is null || !visited.Add(ruleSet))
         {
             return;
         }
@@ -108,7 +112,7 @@ public static class DraculaSyntaxPalette
                 span.SpanColor.Foreground = new SimpleHighlightingBrush(ColorFromHex(hex));
             }
 
-            ApplyColorsToRuleSet(span.RuleSet);
+            ApplyColorsToRuleSet(span.RuleSet, visited);
         }
     }
 
