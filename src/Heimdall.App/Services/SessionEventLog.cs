@@ -14,13 +14,10 @@
  * limitations under the License.
  */
 
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using Heimdall.Core.Security;
-using Timer = System.Threading.Timer;
 
 namespace Heimdall.App.Services;
 
@@ -45,37 +42,14 @@ public interface ISessionEventLog : IDisposable
 /// <summary>
 /// Single shared append-only NDJSON writer for graphical-protocol session events. One JSON
 /// object per line, with language-neutral English property names so the file is machine-readable
-/// without any locale dependency. Events are buffered on a lock-free queue and drained by one
-/// background timer (the FileLogger / SessionLogService pattern), so the UI thread is never
-/// blocked. The file is hardened with a restrictive ACL on first write and rolls over to a
-/// ".N.log" continuation past a size cap.
+/// without any locale dependency. The writer mechanics (buffered queue, background drain, retry,
+/// size rollover, lazy ACL-hardened creation) live in <see cref="NdjsonAppendLog{TRecord}"/>; this
+/// type supplies the fixed file name and the per-event serializer.
 /// </summary>
-public sealed class SessionEventLog : ISessionEventLog
+public sealed class SessionEventLog : NdjsonAppendLog<SessionEventRecord>, ISessionEventLog
 {
     /// <summary>Fixed name of the shared event log under the session-log root directory.</summary>
     private const string EventLogFileName = "session-events.log";
-
-    private const string LogFileExtension = ".log";
-
-    /// <summary>Newline terminator for each NDJSON record (platform-neutral, per the NDJSON spec).</summary>
-    private const string LineTerminator = "\n";
-
-    /// <summary>Backoff schedule (ms) for transient IO failures; mirrors <c>FileLogger</c>/<c>SessionLogService</c>.</summary>
-    private static readonly int[] RetryDelaysMs = [10, 50, 200];
-
-    private readonly string _rootDirectory;
-    private readonly string _basePath;
-    private readonly long _maxBytes;
-    private readonly ConcurrentQueue<string> _queue = new();
-    private readonly Timer _flushTimer;
-    private readonly object _writeLock = new();
-
-    private string _currentPath;
-    private long _currentBytes;
-    private bool _currentBytesKnown;
-    private int _rolloverIndex;
-    private bool _writeErrorLogged;
-    private bool _disposed;
 
     /// <summary>
     /// Creates the event log. Nothing is written until the first <see cref="LogEvent"/> call; the
@@ -86,182 +60,22 @@ public sealed class SessionEventLog : ISessionEventLog
     /// <param name="maxBytes">Size cap in bytes before rolling over to a ".N.log" continuation. Must be strictly positive.</param>
     /// <param name="flushIntervalMs">Drain interval in milliseconds. Must be strictly positive.</param>
     public SessionEventLog(string rootDirectory, long maxBytes, int flushIntervalMs)
+        : base(rootDirectory, EventLogFileName, maxBytes, flushIntervalMs)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(flushIntervalMs);
-
-        _rootDirectory = rootDirectory;
-        _maxBytes = maxBytes;
-        _basePath = Path.Combine(rootDirectory, EventLogFileName);
-        _currentPath = _basePath;
-
-        TimeSpan interval = TimeSpan.FromMilliseconds(flushIntervalMs);
-        _flushTimer = new Timer(_ => Flush(), null, interval, interval);
     }
 
     /// <inheritdoc />
-    public void LogEvent(SessionEventRecord record)
-    {
-        ArgumentNullException.ThrowIfNull(record);
-
-        if (_disposed)
-        {
-            return;
-        }
-
-        _queue.Enqueue(ToNdjsonLine(record));
-    }
+    protected override string DiagnosticName => "Session event log";
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        // Stop the timer first, then drain the remainder while still marked live (Flush short-circuits
-        // once disposed would be true), then mark disposed. Mirrors FileLogger's teardown ordering.
-        _flushTimer.Dispose();
-        Flush();
-        _disposed = true;
-    }
-
-    // Drains the queued NDJSON lines to disk with bounded retry on transient IO faults. Never throws.
-    private void Flush()
-    {
-        if (_queue.IsEmpty)
-        {
-            return;
-        }
-
-        lock (_writeLock)
-        {
-            if (_queue.IsEmpty)
-            {
-                return;
-            }
-
-            List<string> batch = [];
-            while (_queue.TryDequeue(out string? entry))
-            {
-                batch.Add(entry);
-            }
-
-            int written = 0;
-            for (int attempt = 0; attempt <= RetryDelaysMs.Length; attempt++)
-            {
-                try
-                {
-                    for (; written < batch.Count; written++)
-                    {
-                        WriteLine(batch[written]);
-                    }
-
-                    return;
-                }
-                catch (IOException) when (attempt < RetryDelaysMs.Length)
-                {
-                    Thread.Sleep(RetryDelaysMs[attempt]);
-                }
-                catch (IOException ex)
-                {
-                    // Persistent failure: preserve the unwritten remainder for the next drain and emit
-                    // a single diagnostic so the hot path is never crashed or spammed.
-                    for (int i = written; i < batch.Count; i++)
-                    {
-                        _queue.Enqueue(batch[i]);
-                    }
-
-                    LogWriteErrorOnce(ex.Message);
-                    return;
-                }
-                catch
-                {
-                    // Event logging must never propagate; drop the batch rather than crash shutdown.
-                    return;
-                }
-            }
-        }
-    }
-
-    // Assumes _writeLock is held. Appends one NDJSON line, rolling the file over first if the cap is reached.
-    private void WriteLine(string jsonLine)
-    {
-        string text = jsonLine + LineTerminator;
-        long byteCount = Encoding.UTF8.GetByteCount(text);
-
-        EnsureCurrentBytesInitialized();
-        if (_currentBytes > 0 && _currentBytes + byteCount > _maxBytes)
-        {
-            RollOver();
-        }
-
-        Directory.CreateDirectory(_rootDirectory);
-
-        if (!File.Exists(_currentPath))
-        {
-            // Create the file closed, then apply the restrictive ACL before any data is written.
-            // Mirrors SessionLogService/FileLogger: SetFileAcl runs on a handle-free file so it
-            // cannot hit a sharing violation against an open writer.
-            using (new FileStream(_currentPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            {
-            }
-
-            if (OperatingSystem.IsWindows())
-            {
-                AclEnforcer.SetFileAcl(_currentPath);
-            }
-        }
-
-        File.AppendAllText(_currentPath, text, Encoding.UTF8);
-        _currentBytes += byteCount;
-    }
-
-    // Assumes _writeLock is held. Lazily seeds the current byte count from any pre-existing file so
-    // that appends across app restarts still respect the size cap.
-    private void EnsureCurrentBytesInitialized()
-    {
-        if (_currentBytesKnown)
-        {
-            return;
-        }
-
-        _currentBytes = File.Exists(_currentPath) ? new FileInfo(_currentPath).Length : 0;
-        _currentBytesKnown = true;
-    }
-
-    // Assumes _writeLock is held. Switches to the next ".N.log" continuation file.
-    private void RollOver()
-    {
-        _rolloverIndex++;
-        string stem = _basePath.EndsWith(LogFileExtension, StringComparison.OrdinalIgnoreCase)
-            ? _basePath[..^LogFileExtension.Length]
-            : _basePath;
-        _currentPath = $"{stem}.{_rolloverIndex.ToString(CultureInfo.InvariantCulture)}{LogFileExtension}";
-        _currentBytes = 0;
-        _currentBytesKnown = true;
-
-        Core.Logging.FileLogger.Info($"Session event log reached its size cap, continuing in {_currentPath}");
-    }
-
-    private void LogWriteErrorOnce(string detail)
-    {
-        if (_writeErrorLogged)
-        {
-            return;
-        }
-
-        _writeErrorLogged = true;
-        Core.Logging.FileLogger.Warn($"Session event log write failed for {_currentPath}: {detail}");
-    }
+    public void LogEvent(SessionEventRecord record) => Enqueue(record);
 
     // Serializes a record to a single NDJSON object. Property names are stable, language-neutral
     // English; the timestamp is ISO-8601 round-trip UTC. Null optional fields are OMITTED (not
     // emitted as null) to keep connect lines compact and unambiguous. The host has any leading
     // "user@" prefix stripped here, defensively, so a credential-bearing endpoint never lands on disk.
-    private static string ToNdjsonLine(SessionEventRecord record)
+    /// <inheritdoc />
+    protected override string ToNdjsonLine(SessionEventRecord record)
     {
         using MemoryStream buffer = new MemoryStream();
         using (Utf8JsonWriter writer = new Utf8JsonWriter(buffer))

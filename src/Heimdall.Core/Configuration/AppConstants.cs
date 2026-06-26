@@ -69,4 +69,12 @@ public static class AppConstants
     /// overflow spills into ".N.log" continuations.
     /// </summary>
     public const long DefaultSessionEventLogMaxBytes = 4 * 1024 * 1024;
+
+    /// <summary>
+    /// Default maximum size in bytes of the shared SFTP/FTP session-operations log before rollover
+    /// (4 MiB). Mirrors <see cref="DefaultSessionEventLogMaxBytes"/>: one line per file operation, so
+    /// the cap is reached only over very long-lived installs and the overflow spills into ".N.log"
+    /// continuations.
+    /// </summary>
+    public const long DefaultSessionOperationLogMaxBytes = 4 * 1024 * 1024;
 }

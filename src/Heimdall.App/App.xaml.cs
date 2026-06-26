@@ -495,6 +495,29 @@ public partial class App : System.Windows.Application
                 AppConstants.DefaultSessionEventLogMaxBytes,
                 AppConstants.SessionLogFlushIntervalMs);
         });
+
+        // Session operations log (Lot 3): single shared append-only NDJSON record of SFTP/FTP
+        // file-transfer operations (upload/download/delete/rename/mkdir). Same writable base + root as
+        // the transcript and event logs. This sink is a dumb writer with no gate of its own; the
+        // per-operation protocol + LIVE-toggle gate (SessionOperationGatePolicy against
+        // ConfigManager.CurrentSettings) is applied at the seam, so the global toggle takes effect
+        // without a restart. The DI container disposes this singleton on shutdown alongside the other
+        // session logs.
+        services.AddSingleton<ISessionOperationLog>(sp =>
+        {
+            ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
+            AppSettings currentSettings = configManager.CurrentSettings ?? new AppSettings();
+
+            string fileLoggerLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+            string sessionLogBaseDirectory = Directory.GetParent(fileLoggerLogDirectory)?.FullName
+                ?? AppDomain.CurrentDomain.BaseDirectory;
+            string root = SessionLogPathResolver.Resolve(currentSettings, sessionLogBaseDirectory);
+
+            return new SessionOperationLog(
+                root,
+                AppConstants.DefaultSessionOperationLogMaxBytes,
+                AppConstants.SessionLogFlushIntervalMs);
+        });
         services.AddSingleton<IEmbeddedSessionManager, EmbeddedSessionManager>();
         services.AddSingleton<EmbeddedSessionManager>(sp =>
             (EmbeddedSessionManager)sp.GetRequiredService<IEmbeddedSessionManager>());
