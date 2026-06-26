@@ -21,11 +21,12 @@ using Heimdall.Sftp;
 namespace Heimdall.App.Services;
 
 /// <summary>
-/// Transparent <see cref="IRemoteBrowser"/> decorator that records each of the five file-transfer
-/// operations (upload / download / delete / rename / mkdir) to the shared operations log. Every call
-/// is forwarded verbatim to the inner browser; exactly one <see cref="SessionOperationRecord"/> is
+/// Transparent <see cref="IRemoteBrowser"/> decorator that records each of the six file-transfer
+/// operations (upload / download / delete / rename / mkdir / copy) to the shared operations log. Every
+/// call is forwarded verbatim to the inner browser; exactly one <see cref="SessionOperationRecord"/> is
 /// emitted per operation (success / error / cancelled), and every exception is rethrown so the
-/// existing view-model error handling is preserved.
+/// existing view-model error handling is preserved. A copy emits a single Copy record even though its
+/// inner roundtrip performs a download and an upload: those hit the undecorated inner browser directly.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -159,6 +160,14 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
             ms => SessionOperationRecord.Rename.Success(_protocol, _host, oldPath, newPath, ms),
             ms => SessionOperationRecord.Rename.Cancelled(_protocol, _host, oldPath, newPath, ms),
             (ms, category) => SessionOperationRecord.Rename.Error(_protocol, _host, oldPath, newPath, ms, category));
+
+    /// <inheritdoc />
+    public Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default)
+        => RunLoggedAsync(
+            () => _inner.CopyAsync(sourcePath, destinationPath, recursive, ct),
+            ms => SessionOperationRecord.Copy.Success(_protocol, _host, sourcePath, destinationPath, ms),
+            ms => SessionOperationRecord.Copy.Cancelled(_protocol, _host, sourcePath, destinationPath, ms),
+            (ms, category) => SessionOperationRecord.Copy.Error(_protocol, _host, sourcePath, destinationPath, ms, category));
 
     /// <inheritdoc />
     public void Disconnect() => _inner.Disconnect();

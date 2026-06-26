@@ -35,7 +35,10 @@ public enum SessionOperationKind
     Rename,
 
     /// <summary>A remote directory creation.</summary>
-    Mkdir
+    Mkdir,
+
+    /// <summary>A same-server remote copy (source to destination).</summary>
+    Copy
 }
 
 /// <summary>
@@ -56,12 +59,12 @@ public enum SessionOperationResult
 
 /// <summary>
 /// Immutable description of a single SFTP / FTP file-transfer operation (one upload, download,
-/// delete, rename, or mkdir). Construct exclusively through the per-operation factories
+/// delete, rename, mkdir, or copy). Construct exclusively through the per-operation factories
 /// (<see cref="Upload"/>, <see cref="Download"/>, <see cref="Delete"/>, <see cref="Rename"/>,
-/// <see cref="Mkdir"/>) so the operation-specific fields can never be set in incoherent combinations:
-/// <see cref="Bytes"/> and <see cref="LocalPath"/> only on transfers, <see cref="RemotePathTo"/> only
-/// on rename, and <see cref="ErrorCategory"/> only when <see cref="Result"/> is
-/// <see cref="SessionOperationResult.Error"/>.
+/// <see cref="Mkdir"/>, <see cref="Copy"/>) so the operation-specific fields can never be set in
+/// incoherent combinations: <see cref="Bytes"/> and <see cref="LocalPath"/> only on transfers,
+/// <see cref="RemotePathTo"/> only on rename and copy, and <see cref="ErrorCategory"/> only when
+/// <see cref="Result"/> is <see cref="SessionOperationResult.Error"/>.
 /// </summary>
 /// <remarks>
 /// <see cref="Host"/> is expected to be pre-sanitized by the caller; this record additionally strips
@@ -113,7 +116,7 @@ public sealed record SessionOperationRecord
     /// <summary>Remote path the operation acted on (the source path for a rename).</summary>
     public string RemotePath { get; }
 
-    /// <summary>Destination remote path for a rename; null for every other operation.</summary>
+    /// <summary>Destination remote path for a rename or copy; null for every other operation.</summary>
     public string? RemotePathTo { get; }
 
     /// <summary>Local path for a transfer (upload source / download target); null for delete/rename/mkdir.</summary>
@@ -270,6 +273,34 @@ public sealed record SessionOperationRecord
                 durationMs, SessionOperationResult.Cancelled, errorCategory: null, privileged);
     }
 
+    /// <summary>Factories for copy operations (source plus destination remote path on the same server).</summary>
+    public static class Copy
+    {
+        /// <summary>Builds a successful copy record carrying the destination path.</summary>
+        public static SessionOperationRecord Success(
+            string protocol, string host, string remotePath, string remotePathTo, long durationMs,
+            bool privileged = false)
+            => CreateCopy(
+                protocol, host, remotePath, remotePathTo,
+                durationMs, SessionOperationResult.Success, errorCategory: null, privileged);
+
+        /// <summary>Builds a failed copy record tagged with an error category.</summary>
+        public static SessionOperationRecord Error(
+            string protocol, string host, string remotePath, string remotePathTo, long durationMs, string errorCategory,
+            bool privileged = false)
+            => CreateCopy(
+                protocol, host, remotePath, remotePathTo,
+                durationMs, SessionOperationResult.Error, RequireCategory(errorCategory), privileged);
+
+        /// <summary>Builds a cancelled copy record.</summary>
+        public static SessionOperationRecord Cancelled(
+            string protocol, string host, string remotePath, string remotePathTo, long durationMs,
+            bool privileged = false)
+            => CreateCopy(
+                protocol, host, remotePath, remotePathTo,
+                durationMs, SessionOperationResult.Cancelled, errorCategory: null, privileged);
+    }
+
     private static SessionOperationRecord CreateTransfer(
         SessionOperationKind op,
         string protocol,
@@ -322,6 +353,24 @@ public sealed record SessionOperationRecord
 
         return new SessionOperationRecord(
             DateTime.UtcNow, protocol, SessionOperationKind.Rename, host, remotePath,
+            remotePathTo, localPath: null, bytes: null, durationMs, result, errorCategory, privileged);
+    }
+
+    private static SessionOperationRecord CreateCopy(
+        string protocol,
+        string host,
+        string remotePath,
+        string remotePathTo,
+        long durationMs,
+        SessionOperationResult result,
+        string? errorCategory,
+        bool privileged)
+    {
+        ValidateCommon(protocol, host, remotePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePathTo);
+
+        return new SessionOperationRecord(
+            DateTime.UtcNow, protocol, SessionOperationKind.Copy, host, remotePath,
             remotePathTo, localPath: null, bytes: null, durationMs, result, errorCategory, privileged);
     }
 

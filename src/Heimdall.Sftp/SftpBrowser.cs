@@ -36,6 +36,16 @@ public sealed class SftpBrowser : IRemoteBrowser
     private bool _disposed;
     private readonly SemaphoreSlim _clientLock = new(1, 1);
 
+    // Connection context retained so a short-lived SSH exec channel can be opened later for a
+    // server-side copy, pinned to the SAME host key resolved at connect time (fail-closed: no
+    // re-prompt, no auto-accept). Both are cleared on Disconnect alongside the SFTP client.
+    private SshConnectionParams? _connectionParams;
+    private PinnedFingerprintVerifier? _pinnedHostKeyVerifier;
+
+    // Generous bound on a server-side cp; a server-local copy is fast, but a large tree may take a
+    // while. On timeout the copy falls back to the roundtrip path rather than failing.
+    private static readonly TimeSpan ServerSideCopyCommandTimeout = TimeSpan.FromMinutes(10);
+
     /// <summary>Raised when the current working directory changes.</summary>
     public event Action<string>? DirectoryChanged;
 
@@ -100,6 +110,10 @@ public sealed class SftpBrowser : IRemoteBrowser
             connectionParams,
             pinnedVerifier);
 
+        // Retain the resolved params + pinned verifier for the later server-side-copy exec channel.
+        _connectionParams = connectionParams;
+        _pinnedHostKeyVerifier = pinnedVerifier;
+
         client.ErrorOccurred += OnErrorOccurred;
 
         try
@@ -115,6 +129,8 @@ public sealed class SftpBrowser : IRemoteBrowser
             client.ErrorOccurred -= OnErrorOccurred;
             client.Dispose();
             _client = null;
+            _connectionParams = null;
+            _pinnedHostKeyVerifier = null;
             throw;
         }
 
@@ -507,6 +523,215 @@ public sealed class SftpBrowser : IRemoteBrowser
         }
     }
 
+    /// <summary>Copies a remote file or directory to another path on the same server.</summary>
+    /// <param name="sourcePath">Existing remote source path.</param>
+    /// <param name="destinationPath">New remote destination path; must not already exist.</param>
+    /// <param name="recursive">When the source is a directory, copies it and its contents recursively.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <remarks>
+    /// Prefers a server-side <c>cp</c> over a pinned SSH exec channel: instant, no client bandwidth, and
+    /// it preserves POSIX mode/timestamps (<c>cp -p</c>/<c>cp -a</c>). Falls back to the download-to-temp
+    /// + re-upload roundtrip when the exec channel is unavailable, the command fails, or no pinned
+    /// connection context was retained. The roundtrip remains the correctness backstop. Neither path is
+    /// atomic.
+    /// </remarks>
+    public async Task CopyAsync(
+        string sourcePath,
+        string destinationPath,
+        bool recursive,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        _ = GetConnectedClient();
+
+        // No-overwrite + source-type/recursive validation runs up front so the fast (server-side) and
+        // slow (roundtrip) paths share identical semantics. The roundtrip planner re-checks these
+        // defensively; the destination still does not exist at that point, so the re-probe is harmless.
+        if (await RemoteExistsAsync(destinationPath, ct).ConfigureAwait(false))
+        {
+            throw new IOException($"Refused to copy: destination already exists: {destinationPath}");
+        }
+
+        bool sourceIsDirectory = await RemoteIsDirectoryAsync(sourcePath, ct).ConfigureAwait(false);
+        if (sourceIsDirectory && !recursive)
+        {
+            throw new IOException("Source is a directory; set recursive=true.");
+        }
+
+        if (await TryServerSideCopyAsync(sourcePath, destinationPath, recursive, ct).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        await RunRoundtripCopyAsync(sourcePath, destinationPath, recursive, ct).ConfigureAwait(false);
+    }
+
+    private Task RunRoundtripCopyAsync(
+        string sourcePath,
+        string destinationPath,
+        bool recursive,
+        CancellationToken ct)
+    {
+        var ops = new RemoteCopyOps(
+            DestinationExistsAsync: RemoteExistsAsync,
+            SourceIsDirectoryAsync: RemoteIsDirectoryAsync,
+            ListChildNamesAsync: ListChildNamesAsync,
+            CopyFileAsync: CopyFileViaRoundtripAsync,
+            CreateDirectoryAsync: CreateDirectoryAsync);
+
+        return RemoteCopyPlanner.CopyAsync(sourcePath, destinationPath, recursive, ops, ct);
+    }
+
+    /// <summary>
+    /// Attempts a server-side <c>cp</c> over a short-lived SSH exec channel pinned to the host key
+    /// resolved at connect time. Returns true on exit status 0; returns false (fall back to roundtrip)
+    /// when no pinned context was retained, the command exits non-zero, or the channel/transport fails.
+    /// Cancellation propagates; programming errors are never swallowed.
+    /// </summary>
+    private async Task<bool> TryServerSideCopyAsync(
+        string sourcePath,
+        string destinationPath,
+        bool recursive,
+        CancellationToken ct)
+    {
+        SshConnectionParams? connectionParams = _connectionParams;
+        PinnedFingerprintVerifier? pinnedVerifier = _pinnedHostKeyVerifier;
+        if (connectionParams is null || pinnedVerifier is null)
+        {
+            return false;
+        }
+
+        string command = ServerSideCopyCommand.Build(sourcePath, destinationPath, recursive);
+        SshClient? ssh = null;
+        try
+        {
+            var connectionInfo = SshConnectionFactory.Create(connectionParams);
+            ssh = new SshClient(connectionInfo);
+            SshConnectionFactory.AttachPinnedHostKeyVerification(ssh, connectionParams, pinnedVerifier);
+
+            return await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                ssh.Connect();
+
+                using SshCommand cmd = ssh.CreateCommand(command);
+                cmd.CommandTimeout = ServerSideCopyCommandTimeout;
+                cmd.Execute();
+
+                if (cmd.ExitStatus == 0)
+                {
+                    return true;
+                }
+
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"[SftpBrowser] SFTP server-side copy on {connectionParams.Host} exited {cmd.ExitStatus}; "
+                    + $"falling back to roundtrip. stderr: {cmd.Error}");
+                return false;
+            }, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (
+            ex is Renci.SshNet.Common.SshException
+                or System.Net.Sockets.SocketException
+                or IOException
+                or TimeoutException
+                or HostKeyRejectedException)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] SFTP server-side copy unavailable on {connectionParams.Host} "
+                + $"({ex.GetType().Name}); falling back to roundtrip. {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            if (ssh is not null)
+            {
+                try
+                {
+                    ssh.Disconnect();
+                }
+                catch (Exception ex)
+                {
+                    Heimdall.Core.Logging.FileLogger.Debug(
+                        $"[SftpBrowser] server-side copy exec disconnect suppressed: {ex.Message}");
+                }
+
+                ssh.Dispose();
+            }
+        }
+    }
+
+    private async Task<bool> RemoteExistsAsync(string path, CancellationToken ct)
+    {
+        var client = GetConnectedClient();
+
+        await _clientLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return client.Exists(path);
+            }, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
+    }
+
+    private async Task<bool> RemoteIsDirectoryAsync(string path, CancellationToken ct)
+    {
+        var client = GetConnectedClient();
+
+        await _clientLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return client.Get(path).IsDirectory;
+            }, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> ListChildNamesAsync(string path, CancellationToken ct)
+    {
+        IReadOnlyList<SftpFileInfo> entries = await ListDirectoryAsync(path, ct).ConfigureAwait(false);
+        var names = new List<string>(entries.Count);
+        foreach (SftpFileInfo entry in entries)
+        {
+            names.Add(entry.Name);
+        }
+
+        return names;
+    }
+
+    private async Task CopyFileViaRoundtripAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken ct)
+    {
+        string localTemp = RemoteCopyLocalTemp.Create();
+        try
+        {
+            await DownloadFileAsync(sourcePath, localTemp, ct).ConfigureAwait(false);
+            await UploadFileAsync(localTemp, destinationPath, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            RemoteCopyLocalTemp.TryDelete(localTemp);
+        }
+    }
+
     /// <summary>Disconnects from the remote host and releases the SFTP client.</summary>
     public void Disconnect()
     {
@@ -531,6 +756,10 @@ public sealed class SftpBrowser : IRemoteBrowser
 
         _client.Dispose();
         _client = null;
+
+        // Drop the retained server-side-copy context so a torn-down session cannot open an exec channel.
+        _connectionParams = null;
+        _pinnedHostKeyVerifier = null;
 
         Disconnected?.Invoke(null);
     }

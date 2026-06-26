@@ -361,6 +361,9 @@ public sealed class RemoteFileEditorTaskTrackingTests
         public Task RenameAsync(string oldPath, string newPath, CancellationToken ct = default) =>
             Task.CompletedTask;
 
+        public Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
         public void Disconnect()
         {
         }

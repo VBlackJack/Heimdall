@@ -76,6 +76,13 @@ public interface IRemoteBrowser : IDisposable
     /// <summary>Renames (moves) a remote file or directory.</summary>
     Task RenameAsync(string oldPath, string newPath, CancellationToken ct = default);
 
+    /// <summary>
+    /// Copies a remote file or directory to another path on the SAME server.
+    /// <paramref name="recursive"/> applies when the source is a directory.
+    /// Implementations must NOT overwrite: if <paramref name="destinationPath"/> already exists, throw <see cref="System.IO.IOException"/>.
+    /// </summary>
+    Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default);
+
     /// <summary>Disconnects from the remote host.</summary>
     void Disconnect();
 }

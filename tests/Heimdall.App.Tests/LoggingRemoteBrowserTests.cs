@@ -142,6 +142,26 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
     }
 
     [Fact]
+    public async Task CopyAsync_Success_ForwardsToInnerAndLogsSingleCopyRecord()
+    {
+        CapturingOperationLog sink = new();
+        FakeRemoteBrowser inner = new();
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+
+        await decorator.CopyAsync("/srv/data/a.txt", "/srv/data/a-copy.txt", recursive: false);
+
+        inner.CopyCalls.Should().ContainSingle()
+            .Which.Should().Be(("/srv/data/a.txt", "/srv/data/a-copy.txt", false));
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(SessionOperationKind.Copy);
+        record.Result.Should().Be(SessionOperationResult.Success);
+        record.RemotePath.Should().Be("/srv/data/a.txt");
+        record.RemotePathTo.Should().Be("/srv/data/a-copy.txt");
+        record.Bytes.Should().BeNull();
+        record.LocalPath.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Operation_InnerThrows_LogsErrorWithCategoryAndRethrows()
     {
         string localPath = NewTempFileOfSize(16);
@@ -341,6 +361,15 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
         public Task ChmodAsync(string path, short mode, CancellationToken ct = default) => Run();
 
         public Task RenameAsync(string oldPath, string newPath, CancellationToken ct = default) => Run();
+
+        /// <summary>Records every CopyAsync call so forwarding can be asserted.</summary>
+        public List<(string Source, string Destination, bool Recursive)> CopyCalls { get; } = [];
+
+        public Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default)
+        {
+            CopyCalls.Add((sourcePath, destinationPath, recursive));
+            return Run();
+        }
 
         public void Disconnect() => DisconnectCalled = true;
 

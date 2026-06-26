@@ -1,7 +1,0 @@
-Série de tests pour G:\_dev\SnapConnect\Heimdall.Next\tests\Heimdall.Core.Tests\bin\Debug\net10.0\Heimdall.Core.Tests.dll (.NETCoreApp,Version=v10.0)
-Version de VSTest 18.0.1 (x64)
-
-Démarrage de l'exécution de tests, patientez...
-Au total, 1 fichiers de test ont correspondu au modèle spécifié.
-
-Réussi!  - échec :     0, réussite :  1196, ignorée(s) :     0, total :  1196, durée : 9 s - Heimdall.Core.Tests.dll (net10.0)

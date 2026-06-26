@@ -388,6 +388,98 @@ public sealed class FtpBrowser : IRemoteBrowser
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Copies files by roundtrip (remote download to a local temp, then remote upload) under the
+    /// existing per-operation lock; FTP has no server-side copy command. The copy is not atomic.
+    /// </remarks>
+    public async Task CopyAsync(
+        string sourcePath,
+        string destinationPath,
+        bool recursive,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        _ = GetConnectedClient();
+
+        RemoteCopyOps ops = new RemoteCopyOps(
+            DestinationExistsAsync: RemoteExistsAsync,
+            SourceIsDirectoryAsync: RemoteIsDirectoryAsync,
+            ListChildNamesAsync: ListChildNamesAsync,
+            CopyFileAsync: CopyFileViaRoundtripAsync,
+            CreateDirectoryAsync: CreateDirectoryAsync);
+
+        await RemoteCopyPlanner.CopyAsync(sourcePath, destinationPath, recursive, ops, ct)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<bool> RemoteExistsAsync(string path, CancellationToken ct)
+    {
+        AsyncFtpClient client = GetConnectedClient();
+        string normalized = NormalizePath(path);
+
+        await _opLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (await client.DirectoryExists(normalized, ct).ConfigureAwait(false))
+            {
+                return true;
+            }
+
+            return await client.FileExists(normalized, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _opLock.Release();
+        }
+    }
+
+    private async Task<bool> RemoteIsDirectoryAsync(string path, CancellationToken ct)
+    {
+        AsyncFtpClient client = GetConnectedClient();
+        string normalized = NormalizePath(path);
+
+        await _opLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await client.DirectoryExists(normalized, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _opLock.Release();
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> ListChildNamesAsync(string path, CancellationToken ct)
+    {
+        IReadOnlyList<SftpFileInfo> entries = await ListDirectoryAsync(path, ct).ConfigureAwait(false);
+        List<string> names = new List<string>(entries.Count);
+        foreach (SftpFileInfo entry in entries)
+        {
+            names.Add(entry.Name);
+        }
+
+        return names;
+    }
+
+    private async Task CopyFileViaRoundtripAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken ct)
+    {
+        string localTemp = RemoteCopyLocalTemp.Create();
+        try
+        {
+            await DownloadFileAsync(sourcePath, localTemp, ct).ConfigureAwait(false);
+            await UploadFileAsync(localTemp, destinationPath, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            RemoteCopyLocalTemp.TryDelete(localTemp);
+        }
+    }
+
+    /// <inheritdoc/>
     public void Disconnect()
     {
         _client?.Dispose();

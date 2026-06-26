@@ -896,6 +896,9 @@ public sealed class EmbeddedSftpViewModelTests
             return Task.CompletedTask;
         }
 
+        public Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
         public void Disconnect()
         {
         }
