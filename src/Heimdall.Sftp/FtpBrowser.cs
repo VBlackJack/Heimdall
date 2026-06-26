@@ -62,6 +62,9 @@ public sealed class FtpBrowser : IRemoteBrowser
     /// <summary>Whether FTP over TLS is enabled for the current session.</summary>
     public bool IsTlsEnabled => _useSsl;
 
+    /// <summary>The host the browser is currently connected to, or null when disconnected.</summary>
+    public string? Host => _host;
+
     public FtpBrowser()
         : this(new FtpsCertificateStore(), RejectingFtpsCertificateVerifier.Instance)
     {

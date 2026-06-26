@@ -61,6 +61,13 @@ public sealed class RemoteFileEditor : IDisposable
     public event Action<HostKeyRotationEvent>? HostKeyRotatedDuringUpload;
 
     /// <summary>
+    /// Raised after a privileged (sudo) auto-upload completes, on BOTH success and failure, carrying
+    /// the true remote target and the local edited file path. The App layer subscribes to record an
+    /// operations entry. The non-sudo branch never raises this; it is logged via the browser decorator.
+    /// </summary>
+    public event Action<RemoteEditorSudoSaveCompleted>? SudoSaveCompleted;
+
+    /// <summary>
     /// Creates a new <see cref="RemoteFileEditor"/> backed by the given SFTP browser.
     /// </summary>
     /// <param name="browser">Connected SFTP browser used for file transfers.</param>
@@ -430,7 +437,20 @@ public sealed class RemoteFileEditor : IDisposable
 
             if (session.IsSudo && session.SshParams is not null)
             {
-                await UploadWithSudoAsync(session, ct).ConfigureAwait(false);
+                try
+                {
+                    await UploadWithSudoAsync(session, ct).ConfigureAwait(false);
+                    SudoSaveCompleted?.Invoke(new RemoteEditorSudoSaveCompleted(
+                        session.RemotePath, session.LocalPath, Success: true));
+                }
+                catch
+                {
+                    // Signal the failure (the App layer records it), then rethrow so the existing
+                    // FileUploaded / HostKeyRotatedDuringUpload handling below runs unchanged.
+                    SudoSaveCompleted?.Invoke(new RemoteEditorSudoSaveCompleted(
+                        session.RemotePath, session.LocalPath, Success: false));
+                    throw;
+                }
             }
             else
             {
@@ -722,6 +742,18 @@ public sealed record HostKeyRotationEvent(
     string? StoredFingerprint,
     string Host,
     int Port);
+
+/// <summary>
+/// Carries the outcome of a privileged (sudo) editor auto-upload so the App layer can record an
+/// operations entry. The non-sudo branch is logged via the browser decorator and never raises this.
+/// </summary>
+/// <param name="RemotePath">The true remote target path of the edited file.</param>
+/// <param name="LocalPath">The local edited file path (the upload source).</param>
+/// <param name="Success">Whether the privileged save completed successfully.</param>
+public sealed record RemoteEditorSudoSaveCompleted(
+    string RemotePath,
+    string LocalPath,
+    bool Success);
 
 /// <summary>
 /// Tracks state for a single remote file editing session.

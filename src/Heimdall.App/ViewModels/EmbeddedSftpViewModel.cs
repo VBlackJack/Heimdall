@@ -61,6 +61,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private readonly Stack<string> _navigationHistory = new();
     private readonly IUiDispatcher _uiDispatcher;
     private IRemoteBrowser? _browser;
+    // The RAW (undecorated) browser, used only for sudo-upload temp staging and temp cleanup so the
+    // logging decorator does not record misleading temp-path operations.
+    private IRemoteBrowser? _rawBrowser;
+    // Emits operation records for the SFTP sudo fallbacks (which bypass the decorated browser).
+    private SessionOperationEmitter _sudoEmitter = SessionOperationEmitter.Disabled;
     private SshConnectionParams? _sshParams;
     private HostKeyStore _hostKeyStore = null!;
     private IHostKeyVerifier _hostKeyVerifier = null!;
@@ -238,7 +243,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         IDialogService dialogService,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
-        SshConnectionParams? sshParams = null)
+        SshConnectionParams? sshParams = null,
+        IRemoteBrowser? rawBrowser = null,
+        ISessionOperationLog? operationLog = null,
+        Func<bool>? sessionLoggingEnabledProvider = null,
+        string? operationProtocol = null,
+        string? operationHost = null)
     {
         ArgumentNullException.ThrowIfNull(browser);
         ArgumentNullException.ThrowIfNull(sessionTab);
@@ -249,6 +259,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         bool firstInitialization = _browser is null;
         _browser = browser;
+        // Fall back to the decorated browser when no raw browser is supplied (e.g. legacy callers); the
+        // sudo temp-staging paths only avoid the decorator when the view wires the raw browser.
+        _rawBrowser = rawBrowser ?? browser;
+        _sudoEmitter = operationLog is not null
+            && !string.IsNullOrWhiteSpace(operationProtocol)
+            && !string.IsNullOrWhiteSpace(operationHost)
+            ? new SessionOperationEmitter(
+                operationLog,
+                sessionLoggingEnabledProvider ?? (static () => false),
+                operationProtocol,
+                operationHost)
+            : SessionOperationEmitter.Disabled;
         SessionTab = sessionTab;
         _localizer = localizer;
         _dialogService = dialogService;
@@ -985,7 +1007,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// Downloads a file via <c>sudo base64</c> over a direct SSH exec channel,
     /// bypassing SFTP permission restrictions.
     /// </summary>
-    internal async Task DownloadViaSudoAsync(string remotePath, string localPath, CancellationToken ct)
+    internal Task DownloadViaSudoAsync(string remotePath, string localPath, CancellationToken ct)
+        => _sudoEmitter.RunDownloadAsync(
+            remotePath,
+            localPath,
+            () => DownloadViaSudoCoreAsync(remotePath, localPath, ct),
+            () => new FileInfo(localPath).Length,
+            privileged: true);
+
+    private async Task DownloadViaSudoCoreAsync(string remotePath, string localPath, CancellationToken ct)
     {
         string privilegedBody = BuildSudoBase64DownloadBody(remotePath);
         string tempPath = AtomicLocalFile.CreateTempPath(localPath);
@@ -1027,30 +1057,47 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             throw new InvalidOperationException("Browser not available for sudo upload.");
         }
 
+        // Prefer the RAW browser for temp staging so the logging decorator does NOT record a
+        // misleading temp-path upload; fall back to the (possibly decorated) browser when no raw
+        // browser was wired.
+        IRemoteBrowser rawBrowser = _rawBrowser ?? _browser;
+
         string tempRemote = $"{RemoteTempPaths.Prefix}upload_{Guid.NewGuid():N}";
         (string write, string cleanup) = SudoUploadCommands.Build(tempRemote, remotePath);
         bool sudoCleanupAttempted = false;
 
-        await _browser.UploadFileAsync(localPath, tempRemote, ct).ConfigureAwait(false);
+        // Stage the upload to a temp path via the RAW browser; the real privileged write to the user's
+        // target is logged below.
+        await rawBrowser.UploadFileAsync(localPath, tempRemote, ct).ConfigureAwait(false);
         try
         {
+            // chmod is not one of the five logged operations; the decorator forwards it without logging.
             await _browser.ChmodAsync(tempRemote, SudoUploadTempPermissions, ct).ConfigureAwait(false);
 
             using Renci.SshNet.SshClient ssh = await CreateSudoSshClientAsync(ct).ConfigureAwait(false);
             try
             {
-                try
-                {
-                    using Renci.SshNet.SshCommand cmd = await ExecuteSudoBodyAsync(ssh, write, ct)
-                        .ConfigureAwait(false);
+                // Log the privileged copy against the user's TRUE target path, not the temp path.
+                await _sudoEmitter.RunUploadAsync(
+                    localPath,
+                    remotePath,
+                    async () =>
+                    {
+                        try
+                        {
+                            using Renci.SshNet.SshCommand cmd = await ExecuteSudoBodyAsync(ssh, write, ct)
+                                .ConfigureAwait(false);
 
-                    EnsureSudoSucceeded(cmd, "cp");
-                }
-                finally
-                {
-                    sudoCleanupAttempted = true;
-                    await TryRemoveSudoTempAsync(ssh, cleanup, tempRemote).ConfigureAwait(false);
-                }
+                            EnsureSudoSucceeded(cmd, "cp");
+                        }
+                        finally
+                        {
+                            sudoCleanupAttempted = true;
+                            await TryRemoveSudoTempAsync(ssh, cleanup, tempRemote).ConfigureAwait(false);
+                        }
+                    },
+                    () => new FileInfo(localPath).Length,
+                    privileged: true).ConfigureAwait(false);
             }
             finally
             {
@@ -1128,7 +1175,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         try
         {
-            await _browser!.DeleteAsync(tempRemote, CancellationToken.None).ConfigureAwait(false);
+            // Use the RAW browser so the decorator does not record a temp-path delete; fall back to the
+            // (possibly decorated) browser when no raw browser was wired.
+            await (_rawBrowser ?? _browser)!.DeleteAsync(tempRemote, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -1174,7 +1223,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
                 Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
-                await RunSudoCommandAsync($"mkdir -p {PathEscaper.EscapeForShell(remotePath)}");
+                await _sudoEmitter.RunMkdirAsync(
+                    remotePath,
+                    () => RunSudoCommandAsync($"mkdir -p {PathEscaper.EscapeForShell(remotePath)}"),
+                    privileged: true);
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessMkdir")));
@@ -1230,8 +1282,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
                 Core.Logging.FileLogger.Info("EmbeddedSFTP rename permission denied, falling back to sudo");
-                await RunSudoCommandAsync(
-                    $"mv {PathEscaper.EscapeForShell(file.FullPath)} {PathEscaper.EscapeForShell(newPath)}");
+                await _sudoEmitter.RunRenameAsync(
+                    file.FullPath,
+                    newPath,
+                    () => RunSudoCommandAsync(
+                        $"mv {PathEscaper.EscapeForShell(file.FullPath)} {PathEscaper.EscapeForShell(newPath)}"),
+                    privileged: true);
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessRename")));
@@ -1290,8 +1346,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     Core.Logging.FileLogger.Info(
                         $"EmbeddedSFTP delete permission denied, falling back to sudo for {file.Name}");
                     string flag = file.IsDirectory ? "-rf" : "-f";
-                    await RunSudoCommandAsync(
-                        $"rm {flag} {PathEscaper.EscapeForShell(file.FullPath)}");
+                    await _sudoEmitter.RunDeleteAsync(
+                        file.FullPath,
+                        () => RunSudoCommandAsync(
+                            $"rm {flag} {PathEscaper.EscapeForShell(file.FullPath)}"),
+                        privileged: true);
                 }
             }
 

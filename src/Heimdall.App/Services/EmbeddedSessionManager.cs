@@ -46,6 +46,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     private readonly ITunnelService _tunnelService;
     private readonly ISessionLogService _sessionLogService;
     private readonly ISessionEventLog _sessionEventLog;
+    private readonly ISessionOperationLog _sessionOperationLog;
     private readonly ConfigManager _configManager;
 
     /// <summary>
@@ -114,6 +115,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         ITunnelService tunnelService,
         ISessionLogService sessionLogService,
         ISessionEventLog sessionEventLog,
+        ISessionOperationLog sessionOperationLog,
         ConfigManager configManager)
     {
         _localizer = localizer;
@@ -124,6 +126,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         _tunnelService = tunnelService;
         _sessionLogService = sessionLogService;
         _sessionEventLog = sessionEventLog;
+        _sessionOperationLog = sessionOperationLog;
         _configManager = configManager;
     }
 
@@ -820,7 +823,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         SshConnectionParams? sshParams,
         string? initialRemotePath = null)
     {
-        var view = new EmbeddedSftpView();
+        var view = new EmbeddedSftpView
+        {
+            SessionOperationLog = _sessionOperationLog,
+            // Read the LIVE global toggle at the seam (mirrors the RDP/VNC/Citrix wiring), so enabling
+            // session logging takes effect without a restart.
+            SessionLoggingEnabledProvider = () =>
+                _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
+        };
         view.InitializeSession(
             browser, tab, displayName, string.Empty,
             _localizer, _dialogService, _hostKeyStore, sshParams, initialRemotePath);

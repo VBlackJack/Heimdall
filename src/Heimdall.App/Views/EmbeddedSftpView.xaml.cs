@@ -60,7 +60,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private readonly IHostKeyVerifier _hostKeyVerifier;
 
     private IRemoteBrowser? _browser;
+    // The decorated browser (LoggingRemoteBrowser when wired) used for the inline editor's own
+    // transfers so its open-download and non-sudo save are journaled like every other operation. The
+    // raw _browser is kept only for events, is-checks, and lifecycle.
+    private IRemoteBrowser? _operationsBrowser;
     private RemoteFileEditor? _editor;
+    // Records the editor's privileged (sudo) saves, which bypass both the decorator and the ViewModel.
+    private SessionOperationEmitter _operationEmitter = SessionOperationEmitter.Disabled;
     private SessionTabViewModel? _sessionTab;
     private LocalizationManager? _localizer;
     private IDialogService? _dialogService;
@@ -73,6 +79,18 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
     private bool _disposed;
     private bool _toolbarCompact;
+
+    /// <summary>
+    /// Optional shared operations-log sink. When set, transfer operations are recorded through a
+    /// <see cref="LoggingRemoteBrowser"/> decorator. Wired by <c>EmbeddedSessionManager</c>.
+    /// </summary>
+    public ISessionOperationLog? SessionOperationLog { get; set; }
+
+    /// <summary>
+    /// Reads the LIVE global session-logging toggle. Wired by <c>EmbeddedSessionManager</c> so the
+    /// gate decision honours toggle changes without a restart.
+    /// </summary>
+    public Func<bool>? SessionLoggingEnabledProvider { get; set; }
 
     /// <summary>
     /// Raised when the user clicks the Split button in the header strip.
@@ -142,14 +160,38 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             throw new ObjectDisposedException(nameof(EmbeddedSftpView));
         }
 
+        // Keep the RAW browser for the view's own event subscriptions and the
+        // is SftpBrowser / is FtpBrowser checks below. The ViewModel and the editor receive a
+        // LoggingRemoteBrowser decorator (when the operations log is wired) so the NON-sudo transfer
+        // operations are recorded; the raw browser's lifecycle stays owned by this view's teardown.
         _browser = browser;
         _sessionTab = sessionTab;
         _localizer = localizer;
         _dialogService = dialogService;
         _sshParams = sshParams;
         _hostKeyStore = hostKeyStore;
+
+        string operationProtocol = browser is SftpBrowser ? "SFTP" : "FTP";
+        string? rawOperationHost = browser is FtpBrowser ftpOperationHost
+            ? ftpOperationHost.Host
+            : sshParams?.Host;
+        string operationHost = GraphicalSessionEventHelpers.ResolveHost(rawOperationHost, displayName);
+
+        IRemoteBrowser operationsBrowser = CreateOperationsBrowser(browser, operationProtocol, operationHost);
+        _operationsBrowser = operationsBrowser;
+
+        // View-owned emitter for the editor sudo-save signal (same sink/provider/protocol/host as the
+        // decorator and the ViewModel sudo emitter, so all operation records stay consistent).
+        _operationEmitter = SessionOperationLog is not null && !string.IsNullOrWhiteSpace(operationHost)
+            ? new SessionOperationEmitter(
+                SessionOperationLog,
+                SessionLoggingEnabledProvider ?? (static () => false),
+                operationProtocol,
+                operationHost)
+            : SessionOperationEmitter.Disabled;
+
         _viewModel.Initialize(
-            browser,
+            operationsBrowser,
             sessionTab,
             displayName,
             endpoint,
@@ -157,14 +199,20 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             dialogService,
             hostKeyStore,
             _hostKeyVerifier,
-            sshParams);
+            sshParams,
+            rawBrowser: browser,
+            operationLog: SessionOperationLog,
+            sessionLoggingEnabledProvider: SessionLoggingEnabledProvider,
+            operationProtocol: operationProtocol,
+            operationHost: operationHost);
 
         _editor = new RemoteFileEditor(
-            browser,
+            operationsBrowser,
             hostKeyStore: hostKeyStore,
             hostKeyVerifier: _hostKeyVerifier);
         _editor.FileUploaded += OnEditorFileUploaded;
         _editor.HostKeyRotatedDuringUpload += OnHostKeyRotatedDuringUpload;
+        _editor.SudoSaveCompleted += OnEditorSudoSaveCompleted;
 
         // Hide sudo toggle for FTP sessions (no SSH channel for sudo)
         BtnSudoMode.Visibility = sshParams is not null
@@ -195,6 +243,31 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         _ = NavigateInitialAsync(initialRemotePath);
     }
 
+    /// <summary>
+    /// Wraps the raw browser in a <see cref="LoggingRemoteBrowser"/> when the operations log is wired,
+    /// so the NON-sudo transfer operations are recorded. Returns the raw browser unchanged when no sink
+    /// is set or no usable host could be resolved (defensive fallback). The <paramref name="protocol"/>
+    /// and <paramref name="host"/> are the same values handed to the ViewModel's sudo emitter, so the
+    /// decorator and the sudo records stay consistent.
+    /// </summary>
+    private IRemoteBrowser CreateOperationsBrowser(
+        IRemoteBrowser browser,
+        string protocol,
+        string host)
+    {
+        if (SessionOperationLog is null || string.IsNullOrWhiteSpace(host))
+        {
+            return browser;
+        }
+
+        return new LoggingRemoteBrowser(
+            browser,
+            SessionOperationLog,
+            SessionLoggingEnabledProvider ?? (static () => false),
+            protocol,
+            host);
+    }
+
     public string CurrentPath => _viewModel.CurrentPath;
 
     public void Dispose()
@@ -213,6 +286,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         {
             _editor.FileUploaded -= OnEditorFileUploaded;
             _editor.HostKeyRotatedDuringUpload -= OnHostKeyRotatedDuringUpload;
+            _editor.SudoSaveCompleted -= OnEditorSudoSaveCompleted;
             _editor.Dispose();
             _editor = null;
         }
@@ -240,6 +314,10 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
             _browser = null;
         }
+
+        // The decorator wraps the raw browser and owns no resources of its own (its Dispose is a no-op);
+        // drop the reference so a late edit cannot run against a torn-down session.
+        _operationsBrowser = null;
 
         List<string> activeEditTempDirs = _activeEditTempDirs.ToList();
         foreach (string tempPath in activeEditTempDirs)
@@ -648,7 +726,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
     private async Task EditFileAsync(SftpFileInfo file)
     {
-        if (_disposed || _browser is null)
+        if (_disposed || _operationsBrowser is null)
         {
             return;
         }
@@ -669,7 +747,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             bool useSudo = false;
             try
             {
-                await _browser.DownloadFileAsync(file.FullPath, localPath);
+                await _operationsBrowser.DownloadFileAsync(file.FullPath, localPath);
             }
             catch (Exception ex) when (_sshParams is not null && EmbeddedSftpViewModel.IsPermissionDenied(ex))
             {
@@ -716,7 +794,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
                         try
                         {
-                            await _browser.UploadFileAsync(localPath, remotePath);
+                            await _operationsBrowser.UploadFileAsync(localPath, remotePath);
                             UpdateStatus(_localizer?.Format("SftpStatusAutoUploaded", file.Name)
                                 ?? $"Uploaded: {file.Name}");
                             editorView.ConfirmRemoteSaved();
@@ -1091,6 +1169,33 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                 ?? $"Host key for {evt.Host}:{evt.Port} changed while saving {evt.RemotePath}. Save aborted.");
             _editor?.CloseEdit(evt.RemotePath);
         });
+    }
+
+    // Records the editor's privileged (sudo) save as a single operations entry. This is the ONLY log
+    // for a sudo editor save: that path uses its own SSH/SFTP clients and bypasses both the browser
+    // decorator and the ViewModel sudo emitter. Non-sudo editor saves go through the decorated browser
+    // and are NOT signalled here, so they are never double-logged. Logging only; no UI marshalling.
+    private void OnEditorSudoSaveCompleted(RemoteEditorSudoSaveCompleted evt)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _operationEmitter.EmitUploadCompleted(
+                evt.LocalPath,
+                evt.RemotePath,
+                evt.Success,
+                () => new FileInfo(evt.LocalPath).Length,
+                privileged: true);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP: failed to record sudo editor save for {evt.RemotePath}: {ex.Message}");
+        }
     }
 
     private void OnBrowserSecurityEvent(SshSessionSecurityEvent evt)

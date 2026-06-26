@@ -147,6 +147,28 @@ public sealed class RemoteFileEditorTaskTrackingTests
     }
 
     [Fact]
+    public async Task OnFileChangedAsync_NonSudoSave_DoesNotRaiseSudoSaveCompleted()
+    {
+        // A non-sudo save goes through the decorated browser (logged there); it must NOT raise the
+        // sudo signal, so the App layer never double-logs it.
+        var browser = new FakeRemoteBrowser();
+        using var editor = CreateEditor(browser);
+        using var session = CreateSession();
+        var sudoSignals = new List<RemoteEditorSudoSaveCompleted>();
+        var uploadEvents = new List<(string RemotePath, bool Success)>();
+        editor.SudoSaveCompleted += e => sudoSignals.Add(e);
+        editor.FileUploaded += (path, success) => uploadEvents.Add((path, success));
+
+        editor.TriggerOnFileChangedForTesting(session);
+        await WaitUntilAsync(() => session.CurrentUpload is not null);
+        await WaitForTaskAsync(session.CurrentUpload!);
+
+        Assert.Equal(1, browser.UploadCallCount);
+        Assert.Single(uploadEvents);
+        Assert.Empty(sudoSignals);
+    }
+
+    [Fact]
     public void EditSession_Dispose_DisposesUploadCts()
     {
         var session = CreateSession();
