@@ -16,8 +16,6 @@
     Licensed under the Apache License, Version 2.0
 #>
 
-Set-StrictMode -Version Latest
-
 # Single source of truth: code point -> Unicode name. Keep all banned characters
 # here (no scattered literals elsewhere). Allowed on purpose and absent below:
 # French accents, and the French guillemets U+00AB / U+00BB.
@@ -49,6 +47,10 @@ function Get-NotesTypographyViolations {
         [Parameter(Mandatory = $true)]
         [string]$Path
     )
+
+    # Function-scoped strict mode: enforced during validation without leaking to
+    # a dot-sourcing caller (Build.ps1 relies on its own non-strict runtime).
+    Set-StrictMode -Version Latest
 
     $violations = @()
     $lines = [System.IO.File]::ReadAllLines($Path, [System.Text.UTF8Encoding]::new($false))

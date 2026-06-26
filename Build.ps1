@@ -151,7 +151,7 @@ if ($Version) {
         }
     } catch {}
 
-    $existingBuilds = $existingBuilds | Sort-Object -Descending
+    $existingBuilds = @($existingBuilds | Sort-Object -Descending)
     $sequence = if ($existingBuilds.Count -gt 0) { $existingBuilds[0] + 1 } else { 1 }
     $buildNumber = "{0}{1:D2}" -f $datePrefix, $sequence
 }
