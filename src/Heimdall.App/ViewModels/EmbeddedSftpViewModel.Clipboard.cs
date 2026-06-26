@@ -112,6 +112,12 @@ public sealed partial class EmbeddedSftpViewModel
             }
         }
 
+        // Source paths of cut entries that have been fully processed (moved, or skipped as a self-move).
+        // On a mid-loop failure these are dropped from the clipboard so a re-paste cannot target sources
+        // that have already moved away; the entries not yet processed (including the one that failed,
+        // whose source still exists) are retained.
+        var processedCutSources = new HashSet<string>(StringComparer.Ordinal);
+
         try
         {
             foreach (SftpFileInfo entry in clipboard.Entries)
@@ -123,11 +129,13 @@ public sealed partial class EmbeddedSftpViewModel
                 {
                     if (string.Equals(destination, entry.FullPath, StringComparison.Ordinal))
                     {
-                        // Self-move (same directory, same name): nothing to do.
+                        // Self-move (same directory, same name): nothing to do, but it is consumed.
+                        processedCutSources.Add(entry.FullPath);
                         continue;
                     }
 
                     await _browser.RenameAsync(entry.FullPath, destination);
+                    processedCutSources.Add(entry.FullPath);
                 }
                 else
                 {
@@ -147,6 +155,19 @@ public sealed partial class EmbeddedSftpViewModel
         }
         catch (Exception ex)
         {
+            if (cut)
+            {
+                // Retain only the entries not yet moved, so the clipboard stays consistent for a re-paste.
+                List<SftpFileInfo> remaining = clipboard.Entries
+                    .Where(entry => !processedCutSources.Contains(entry.FullPath))
+                    .ToList();
+
+                await RunOnUiAsync(() =>
+                    Clipboard = remaining.Count > 0
+                        ? clipboard with { Entries = remaining }
+                        : null);
+            }
+
             await RunOnUiAsync(() => SetTransferError(ex));
         }
     }

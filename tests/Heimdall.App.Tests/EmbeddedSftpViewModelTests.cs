@@ -755,6 +755,36 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task PasteClipboardAsync_CutMode_MidBatchFailure_RetainsUnmovedEntriesAndSurfacesError()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src", IsConnected = true };
+        FakeRemoteBrowser browser = new() { RenameFailurePath = "/src/b.txt" };
+        SetBrowser(viewModel, browser);
+        SftpFileInfo a = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
+        SftpFileInfo b = CreateRemoteEntry("b.txt", "/src/b.txt", isDirectory: false);
+        SftpFileInfo c = CreateRemoteEntry("c.txt", "/src/c.txt", isDirectory: false);
+        viewModel.SetSelection([a, b, c], a);
+        viewModel.CutSelectedCommand.Execute(null);
+
+        viewModel.CurrentPath = "/dst";
+        viewModel.UnfilteredEntries = [];
+
+        await viewModel.PasteClipboardAsync();
+
+        // a moved, b threw, c was never reached: clipboard retains exactly b and c, still Cut.
+        Assert.NotNull(viewModel.Clipboard);
+        Assert.Equal(SftpClipboardMode.Cut, viewModel.Clipboard!.Mode);
+        Assert.Equal("/src", viewModel.Clipboard.SourceDirectory);
+        List<string> retained = viewModel.Clipboard.Entries.Select(e => e.FullPath).ToList();
+        Assert.Equal(2, retained.Count);
+        Assert.DoesNotContain("/src/a.txt", retained);
+        Assert.Contains("/src/b.txt", retained);
+        Assert.Contains("/src/c.txt", retained);
+        Assert.True(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
     public void CancelTransferCommand_NoTransferRunning_DoesNotThrow()
     {
         FakeUiDispatcher dispatcher = new();
@@ -1003,11 +1033,19 @@ public sealed class EmbeddedSftpViewModelTests
             return Task.CompletedTask;
         }
 
+        /// <summary>When set, RenameAsync throws for an entry whose old path equals this value.</summary>
+        public string? RenameFailurePath { get; set; }
+
         public Task RenameAsync(string oldPath, string newPath, CancellationToken ct = default)
         {
             LastRenamedOldPath = oldPath;
             LastRenamedNewPath = newPath;
             Interlocked.Increment(ref _renameCallCount);
+            if (string.Equals(oldPath, RenameFailurePath, StringComparison.Ordinal))
+            {
+                return Task.FromException(new IOException($"rename failed for {oldPath}"));
+            }
+
             return Task.CompletedTask;
         }
 

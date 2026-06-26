@@ -642,10 +642,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         bool singleSelection = FileListView.SelectedItems.Count == 1;
 
         CtxOpen.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
-        CtxEdit.Visibility = isFile ? Visibility.Visible : Visibility.Collapsed;
-        // Editing with an external editor is a single-file action, mirror CtxEdit's isFile gate so it no
-        // longer shows on directories or an empty selection.
-        CtxEditExternal.Visibility = isFile ? Visibility.Visible : Visibility.Collapsed;
+        // Editing (integrated or external) is a single-file action: require a single file selection so it
+        // is hidden on directories, an empty selection, and a multi-selection (where it would silently
+        // act on the primary item alone).
+        CtxEdit.Visibility = isFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
+        CtxEditExternal.Visibility = isFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxDownload.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         // Rename targets exactly one entry, so hide it on a multi-selection.
         CtxRename.Visibility = singleSelection ? Visibility.Visible : Visibility.Collapsed;

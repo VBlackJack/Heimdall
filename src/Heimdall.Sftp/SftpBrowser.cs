@@ -634,12 +634,22 @@ public sealed class SftpBrowser : IRemoteBrowser
         {
             throw;
         }
+        catch (HostKeyRejectedException)
+        {
+            // A host-key mismatch on the freshly-opened exec connection is a potential MITM signal, so it
+            // gets its own explicit log line rather than being lumped in with routine failures. Fail
+            // closed: never proceed on the unverified channel; fall back to the roundtrip over the
+            // already-pinned, already-trusted SftpClient. Host + protocol context only, no credentials.
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] host-key mismatch on server-side copy exec channel for {connectionParams.Host} "
+                + "(possible MITM); falling back to roundtrip over the trusted SFTP channel.");
+            return false;
+        }
         catch (Exception ex) when (
             ex is Renci.SshNet.Common.SshException
                 or System.Net.Sockets.SocketException
                 or IOException
-                or TimeoutException
-                or HostKeyRejectedException)
+                or TimeoutException)
         {
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[SftpBrowser] SFTP server-side copy unavailable on {connectionParams.Host} "
