@@ -32,6 +32,7 @@ using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.SessionHealth;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
@@ -59,6 +60,11 @@ public partial class App : System.Windows.Application
 
     // Timeout for the single long-lived updater HttpClient (no magic number inline).
     private static readonly TimeSpan UpdateHttpTimeout = TimeSpan.FromSeconds(30);
+
+    // Vault unlock-gate brute-force lockout (defense-in-depth on top of Argon2id,
+    // which is the primary per-attempt rate-limiter). Mirrors the PIN gate defaults.
+    private const int VaultUnlockMaxAttempts = 5;
+    private static readonly TimeSpan VaultUnlockLockoutDuration = TimeSpan.FromMinutes(5);
 
     public IServiceProvider? Services => _serviceProvider;
 
@@ -169,6 +175,10 @@ public partial class App : System.Windows.Application
 
             // Initialize HMAC key for credential protection
             await InitializeHmacKeyAsync(configManager, settings);
+
+            // Make the write-downgrade guard live from the start: when a vault is
+            // configured, Protect fails closed until the DEK is unlocked below.
+            CredentialProtector.SetVaultEnabled(settings.VaultEnabled);
 
             // Load trusted SSH host keys into the TOFU store
             var hostKeyStore = _serviceProvider.GetRequiredService<HostKeyStore>();
@@ -288,6 +298,56 @@ public partial class App : System.Windows.Application
                 }
 
                 Heimdall.Core.Logging.FileLogger.Info("PIN gate satisfied.");
+            }
+
+            // Vault unlock gate: when a master-password vault is configured, the user
+            // must enter the master password (unwrapping the DEK) before the main
+            // window. Runs AFTER the PIN gate. Fail-closed: a cancel/close exits the
+            // app, mirroring the PIN gate, so MainWindow is never reached locked.
+            if (VaultUnlockGate.ShouldShowUnlockGate(settings))
+            {
+                VaultLifecycleService vaultLifecycle =
+                    _serviceProvider.GetRequiredService<VaultLifecycleService>();
+
+                PinManager vaultLockout = new PinManager(VaultUnlockMaxAttempts, VaultUnlockLockoutDuration);
+                vaultLockout.RestoreLockoutState(
+                    settings.VaultUnlockFailureCount, settings.VaultUnlockLockoutUntilUtc);
+
+                // Persist lockout state as it changes, so a lockout reached mid-prompt
+                // survives even if the process is killed without closing the dialog.
+                vaultLockout.StateChanged += () =>
+                {
+                    _ = configManager.MergeSettingAsync((AppSettings persistedSettings) =>
+                    {
+                        persistedSettings.VaultUnlockFailureCount = vaultLockout.FailureCount;
+                        persistedSettings.VaultUnlockLockoutUntilUtc = vaultLockout.LockoutUntilUtc;
+                    });
+                };
+
+                IDialogService dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+                VaultUnlockDialogViewModel vaultViewModel = new VaultUnlockDialogViewModel(
+                    masterPassword => vaultLifecycle.UnlockAsync(masterPassword),
+                    vaultLockout,
+                    localization,
+                    settings.VaultMigrationState == VaultMigrationState.InProgress);
+
+                await dialogService.ShowVaultUnlockDialogAsync(vaultViewModel);
+
+                // Final awaited persist covers the clean-close path.
+                await configManager.MergeSettingAsync((AppSettings persistedSettings) =>
+                {
+                    persistedSettings.VaultUnlockFailureCount = vaultLockout.FailureCount;
+                    persistedSettings.VaultUnlockLockoutUntilUtc = vaultLockout.LockoutUntilUtc;
+                });
+
+                if (!vaultViewModel.IsVerified)
+                {
+                    Heimdall.Core.Logging.FileLogger.Info("Vault unlock gate not satisfied; exiting.");
+                    Shutdown(0);
+                    return;
+                }
+
+                Heimdall.Core.Logging.FileLogger.Info("Vault unlock gate satisfied.");
             }
 
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
@@ -410,6 +470,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<FtpsCertificateStore>();
         services.AddSingleton<IFtpsCertificateVerifier, DialogFtpsCertificateVerifier>();
         services.AddSingleton<PinManager>();
+
+        // Vault lifecycle owns the session DEK holder, so a single instance.
+        services.AddSingleton<VaultLifecycleService>();
 
         // SSH/Tunnel services
         services.AddSingleton<TunnelManager>();

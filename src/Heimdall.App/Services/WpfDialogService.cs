@@ -274,6 +274,26 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task ShowVaultUnlockDialogAsync(VaultUnlockDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+
+        VaultUnlockDialog dialog = new VaultUnlockDialog
+        {
+            DataContext = viewModel
+        };
+
+        Window? owner = GetOwnerWindow();
+        if (owner is not null && !ReferenceEquals(owner, dialog) && owner.IsVisible)
+        {
+            dialog.Owner = owner;
+        }
+
+        dialog.ShowDialog();
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     public Task<PinSetupResult?> ShowPinSetupDialogAsync(PinSetupDialogViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);

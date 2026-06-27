@@ -117,6 +117,14 @@ public interface IDialogService
     Task ShowPinDialogAsync(PinDialogViewModel viewModel);
 
     /// <summary>
+    /// Shows the blocking master-password unlock dialog for the vault at startup.
+    /// Default no-op so headless test doubles need not implement it; the WPF
+    /// implementation overrides it.
+    /// </summary>
+    /// <param name="viewModel">The unlock dialog ViewModel managing unlock + lockout state.</param>
+    Task ShowVaultUnlockDialogAsync(VaultUnlockDialogViewModel viewModel) => Task.CompletedTask;
+
+    /// <summary>
     /// Shows the PIN setup dialog for setting, changing, or removing the application PIN.
     /// </summary>
     /// <param name="viewModel">The PIN setup dialog ViewModel managing setup state.</param>

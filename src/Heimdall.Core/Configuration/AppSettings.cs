@@ -336,4 +336,13 @@ public sealed class AppSettings
 
     /// <summary>UTC timestamp (ISO-8601) of when the vault was first enabled. Non-secret.</summary>
     public string? VaultCreatedAt { get; set; }
+
+    /// <summary>Persisted count of consecutive failed master-password unlock attempts,
+    /// restored on startup so the unlock-gate lockout survives an application restart.
+    /// Mirrors <see cref="PinFailureCount"/>.</summary>
+    public int VaultUnlockFailureCount { get; set; }
+
+    /// <summary>Persisted absolute UTC instant until which the unlock gate is locked out,
+    /// or null when not locked out. Mirrors <see cref="PinLockoutUntilUtc"/>.</summary>
+    public DateTime? VaultUnlockLockoutUntilUtc { get; set; }
 }
