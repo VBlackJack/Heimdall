@@ -245,20 +245,15 @@ internal static class TwinShellBootstrapper
 
         public UserSettings CurrentSettings => _cached;
 
-        private static string? DecryptToken(string? encrypted)
-        {
-            if (string.IsNullOrWhiteSpace(encrypted)) return null;
-            try { return Heimdall.Core.Security.DpapiProvider.Unprotect(encrypted); }
-            catch { return null; }
-        }
-
         private void OnSettingsChanged(Heimdall.Core.Configuration.AppSettings s)
             => _cached = MapSettings(s);
 
         private static UserSettings MapSettings(Heimdall.Core.Configuration.AppSettings s) => new()
         {
             GitRemoteUrl = s.CmdLibGitSyncUrl,
-            GitAccessToken = DecryptToken(s.CmdLibGitSyncToken),
+            // Vault-aware read: v2 token when unlocked, legacy DPAPI when no vault,
+            // null (Git deferred) when a v2 token is encountered while locked.
+            GitAccessToken = GitTokenReader.Decrypt(s.CmdLibGitSyncToken),
             GitBranch = s.CmdLibGitSyncBranch,
             GitUserName = s.CmdLibGitSyncAuthorName,
             GitUserEmail = s.CmdLibGitSyncAuthorEmail,

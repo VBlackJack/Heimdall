@@ -36,8 +36,9 @@ namespace Heimdall.Core.Security.Vault;
 /// TelnetPasswordEncrypted, VncPassword (all read via CredentialProtector), and
 /// CitrixLaunchCommandLine (PLAINTEXT at rest -> brought under v2).</item>
 /// <item>settings.json: CredentialProviderUnlockSecretEncrypted (read via
-/// CredentialProtector) and CmdLibGitSyncToken (read via plain DPAPI by its
-/// consumer, so its legacy form is plain DPAPI).</item>
+/// CredentialProtector) and CmdLibGitSyncToken (read vault-aware via
+/// CredentialProtector, but written by its producer as plain DPAPI, so its
+/// non-vault form is plain DPAPI).</item>
 /// </list>
 /// Plaintext is materialized transiently as managed strings through the
 /// CredentialProtector string API (the same non-zeroable boundary as the rest of
@@ -84,8 +85,9 @@ internal static class VaultMigrationEngine
             Apply(settings.CredentialProviderUnlockSecretEncrypted,
                 v => settings.CredentialProviderUnlockSecretEncrypted = v, ReverseToCredentialProtectorLegacy);
 
-            // CmdLibGitSyncToken is read by its consumer via plain DPAPI, so it
-            // must return to the plain-DPAPI form, not the HMAC-wrapped one.
+            // CmdLibGitSyncToken is written by its producer (TrySaveTokenAsync) as
+            // plain DPAPI, so disable restores that form. Its reader is vault-aware
+            // (GitTokenReader -> CredentialProtector), which also reads plain DPAPI.
             Apply(settings.CmdLibGitSyncToken,
                 v => settings.CmdLibGitSyncToken = v, ReverseToDpapi);
         }).ConfigureAwait(false);
@@ -172,7 +174,7 @@ internal static class VaultMigrationEngine
         return CredentialProtector.ProtectLegacy(plaintext!);
     }
 
-    /// <summary>A v2 field whose consumer reads via plain DPAPI (CmdLibGitSyncToken).</summary>
+    /// <summary>A v2 field written by its producer as plain DPAPI (CmdLibGitSyncToken).</summary>
     internal static string? ReverseToDpapi(string? current)
     {
         if (string.IsNullOrEmpty(current) || !VaultSecretBlob.IsSecretBlob(current))
