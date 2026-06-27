@@ -16,6 +16,8 @@
 
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
+using System.Text;
+using Heimdall.Core.Security.Vault;
 
 namespace Heimdall.Core.Security;
 
@@ -32,6 +34,40 @@ namespace Heimdall.Core.Security;
 public static class CredentialProtector
 {
     private static string? _hmacKeyRaw;
+
+    /// <summary>
+    /// The current vault DEK, borrowed from the unlock flow. When set (and not
+    /// disposed), Protect emits version-2 vault secret blobs and Unprotect reads
+    /// them; the holder is owned and disposed by the caller, not by this class.
+    /// </summary>
+    private static VaultDekHolder? _vaultDek;
+
+    /// <summary>
+    /// Whether a usable vault DEK is currently set (the vault is unlocked).
+    /// </summary>
+    public static bool IsVaultUnlocked => _vaultDek is { IsDisposed: false };
+
+    /// <summary>
+    /// Install the vault DEK at unlock. Mirrors the <see cref="Initialize"/>
+    /// static-slot pattern. The holder is borrowed, not owned: the caller keeps
+    /// ownership and is responsible for disposing it on lock.
+    /// </summary>
+    /// <param name="dekHolder">The unlocked vault DEK holder.</param>
+    public static void SetVaultKey(VaultDekHolder dekHolder)
+    {
+        ArgumentNullException.ThrowIfNull(dekHolder);
+        _vaultDek = dekHolder;
+    }
+
+    /// <summary>
+    /// Clear the borrowed vault DEK reference at lock. Does not dispose the
+    /// holder (the caller owns its lifetime); after this call Protect reverts to
+    /// the legacy path and Unprotect of a v2 blob fails closed.
+    /// </summary>
+    public static void ClearVaultKey()
+    {
+        _vaultDek = null;
+    }
 
     /// <summary>
     /// Initialize the protector with the raw HMAC key (Base64).
@@ -56,6 +92,27 @@ public static class CredentialProtector
     {
         ArgumentNullException.ThrowIfNull(plainText);
 
+        // Vault mode: when a usable DEK is set, emit a version-2 secret blob.
+        var dek = _vaultDek;
+        if (dek is { IsDisposed: false })
+        {
+            byte[]? plainBytes = null;
+            try
+            {
+                plainBytes = Encoding.UTF8.GetBytes(plainText);
+                return VaultSecretBlob.Seal(dek.Key, plainBytes);
+            }
+            finally
+            {
+                if (plainBytes is not null)
+                {
+                    CryptographicOperations.ZeroMemory(plainBytes);
+                }
+            }
+        }
+
+        // Legacy mode (no master password): unchanged DPAPI + HMAC output, so
+        // vaults without a master password stay byte-for-byte compatible.
         if (_hmacKeyRaw is not null)
         {
             return HmacIntegrity.ProtectWithHmac(plainText, _hmacKeyRaw);
@@ -75,6 +132,34 @@ public static class CredentialProtector
         if (string.IsNullOrWhiteSpace(protectedValue))
             return null;
 
+        // Version-2 vault secret blob: fail-closed and downgrade-resistant. A v2
+        // blob is NEVER returned as null when locked and NEVER reinterpreted as a
+        // legacy blob; a missing DEK is an explicit locked signal and a decrypt
+        // failure propagates rather than degrading to null.
+        if (VaultSecretBlob.IsSecretBlob(protectedValue))
+        {
+            var dek = _vaultDek;
+            if (dek is not { IsDisposed: false })
+            {
+                throw new VaultLockedException();
+            }
+
+            byte[]? plainBytes = null;
+            try
+            {
+                plainBytes = VaultSecretBlob.Open(dek.Key, protectedValue);
+                return Encoding.UTF8.GetString(plainBytes);
+            }
+            finally
+            {
+                if (plainBytes is not null)
+                {
+                    CryptographicOperations.ZeroMemory(plainBytes);
+                }
+            }
+        }
+
+        // Legacy path (HMAC or plain DPAPI) — unchanged, preserves migration reads.
         try
         {
             if (HmacIntegrity.IsHmacProtected(protectedValue) && _hmacKeyRaw is not null)
@@ -109,6 +194,19 @@ public static class CredentialProtector
         if (string.IsNullOrWhiteSpace(protectedValue))
         {
             return null;
+        }
+
+        // Version-2 vault secret blob: same fail-closed, downgrade-resistant
+        // contract as Unprotect. Returns pinned plaintext bytes the caller zeroes.
+        if (VaultSecretBlob.IsSecretBlob(protectedValue))
+        {
+            var dek = _vaultDek;
+            if (dek is not { IsDisposed: false })
+            {
+                throw new VaultLockedException();
+            }
+
+            return VaultSecretBlob.Open(dek.Key, protectedValue);
         }
 
         try

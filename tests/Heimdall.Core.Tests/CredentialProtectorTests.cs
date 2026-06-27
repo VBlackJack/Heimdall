@@ -18,9 +18,11 @@ using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using Heimdall.Core.Security;
+using Heimdall.Core.Tests.Vault;
 
 namespace Heimdall.Core.Tests;
 
+[Collection(CredentialProtectorStaticCollection.Name)]
 [SupportedOSPlatform("windows")]
 public class CredentialProtectorTests
 {

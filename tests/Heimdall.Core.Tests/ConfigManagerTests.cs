@@ -21,9 +21,11 @@ using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
+using Heimdall.Core.Tests.Vault;
 
 namespace Heimdall.Core.Tests;
 
+[Collection(CredentialProtectorStaticCollection.Name)]
 [SupportedOSPlatform("windows")]
 public class ConfigManagerTests : IDisposable
 {
