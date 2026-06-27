@@ -111,18 +111,6 @@ public sealed class VaultMigrationEngineTests : IDisposable
     }
 
     [Fact]
-    public void ReverseToDpapi_V2_BecomesPlainDpapiReadable()
-    {
-        var v2 = CredentialProtector.Protect("git-token");
-
-        var dpapi = VaultMigrationEngine.ReverseToDpapi(v2);
-
-        Assert.False(VaultSecretBlob.IsSecretBlob(dpapi));
-        // The consumer reads this field with plain DPAPI, not CredentialProtector.
-        Assert.Equal("git-token", DpapiProvider.Unprotect(dpapi!));
-    }
-
-    [Fact]
     public void ReverseToPlaintext_V2_ReturnsRawPlaintext()
     {
         const string plaintext = "C:\\SelfService.exe /launch token=xyz";

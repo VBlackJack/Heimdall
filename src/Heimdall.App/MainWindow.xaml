@@ -2881,6 +2881,41 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Master password vault -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsVaultTitle" Text="{loc:Translate SettingsSectionVault}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsVaultExplanation" Text="{loc:Translate SettingsVaultExplanation}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                <Button x:Name="Mw_SettingsVaultEnableBtn"
+                                                        Content="{loc:Translate SettingsVaultBtnEnable}"
+                                                        Command="{Binding Settings.EnableVaultCommand}"
+                                                        Visibility="{Binding Settings.VaultDisabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        Style="{DynamicResource PrimaryButtonStyle}"
+                                                        AutomationProperties.Name="{loc:Translate SettingsVaultBtnEnable}"/>
+                                                <Button x:Name="Mw_SettingsVaultChangeBtn"
+                                                        Content="{loc:Translate SettingsVaultBtnChange}"
+                                                        Command="{Binding Settings.ChangeMasterPasswordCommand}"
+                                                        Visibility="{Binding Settings.VaultEnabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        Margin="0,0,8,0"
+                                                        AutomationProperties.Name="{loc:Translate SettingsVaultBtnChange}"/>
+                                                <Button x:Name="Mw_SettingsVaultDisableBtn"
+                                                        Content="{loc:Translate SettingsVaultBtnDisable}"
+                                                        Command="{Binding Settings.DisableVaultCommand}"
+                                                        Visibility="{Binding Settings.VaultEnabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        AutomationProperties.Name="{loc:Translate SettingsVaultBtnDisable}"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Settings.VaultStatusText}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center"
+                                                       TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsCredProviderTitle" Text="{loc:Translate SettingsSectionCredentialProvider}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>

@@ -151,6 +151,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 dialogService,
                 null!,
                 new PinManager(),
+                new Heimdall.Core.Security.Vault.VaultLifecycleService(configManager),
                 null!,
                 null!,
                 null!,

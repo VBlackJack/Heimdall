@@ -24,13 +24,12 @@ using Heimdall.App.ViewModels.Dialogs;
 namespace Heimdall.App.Views.Dialogs;
 
 /// <summary>
-/// Master-password unlock dialog shown at startup when a vault is configured.
-/// Code-behind handles PasswordBox interaction and closes on successful unlock.
-/// Localization is declarative in XAML via <c>{loc:Translate}</c>.
+/// "Disable master password" dialog. Reads the authorization password via
+/// <c>SecurePassword</c>; the ViewModel zeroes the buffer.
 /// </summary>
-public partial class VaultUnlockDialog : Window
+public partial class VaultDisableDialog : Window
 {
-    public VaultUnlockDialog()
+    public VaultDisableDialog()
     {
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
@@ -54,38 +53,35 @@ public partial class VaultUnlockDialog : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(VaultUnlockDialogViewModel.IsVerified)
-            && DataContext is VaultUnlockDialogViewModel { IsVerified: true })
+        if (e.PropertyName == nameof(VaultDisableDialogViewModel.IsCompleted)
+            && DataContext is VaultDisableDialogViewModel { IsCompleted: true })
         {
             PasswordBox.Clear();
             DialogResult = true;
         }
     }
 
-    private void OnUnlockClick(object sender, RoutedEventArgs e) => SubmitPassword();
+    private void OnDisableClick(object sender, RoutedEventArgs e) => Submit();
 
     private void OnPasswordKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
-            SubmitPassword();
+            Submit();
             e.Handled = true;
         }
     }
 
-    private void SubmitPassword()
+    private void Submit()
     {
-        if (DataContext is not VaultUnlockDialogViewModel vm)
+        if (DataContext is not VaultDisableDialogViewModel vm)
         {
             return;
         }
 
-        // Read via SecurePassword (encrypted in memory) and marshal to a pinned
-        // char[] without a managed string; the ViewModel zeroes it after use.
         using var secure = PasswordBox.SecurePassword;
         var password = SecurePasswordHelper.ToChars(secure);
-        PasswordBox.Clear();
-        vm.UnlockCommand.Execute(password);
+        vm.DisableCommand.Execute(password); // ViewModel owns and zeroes the buffer.
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e)

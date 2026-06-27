@@ -57,9 +57,13 @@ public sealed class CommandLibrarySettingsService
             return false;
         }
 
-        string encrypted = DpapiProvider.Protect(plaintext);
         try
         {
+            // Vault-aware write: a v2 (HMS1, master-password-protected) blob when the
+            // vault is active, legacy DPAPI when no vault. Matches the vault-aware
+            // reader (GitTokenReader). Protect throws if the vault is enabled but
+            // locked; that is caught below and reported as a failed save.
+            string encrypted = CredentialProtector.Protect(plaintext);
             await _configManager.MergeSettingAsync(
                     (AppSettings settings) => settings.CmdLibGitSyncToken = encrypted)
                 .ConfigureAwait(false);

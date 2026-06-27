@@ -193,8 +193,10 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
         Assert.False(settings.VaultEnabled);
         Assert.Null(settings.VaultWrappedDek);
         Assert.Equal(VaultMigrationState.None, settings.VaultMigrationState);
+        // The token now reverses to the CredentialProtector legacy format (its
+        // vault-aware reader/writer), not plain DPAPI; readable with no DEK.
         Assert.False(VaultSecretBlob.IsSecretBlob(settings.CmdLibGitSyncToken));
-        Assert.Equal("git-token", DpapiProvider.Unprotect(settings.CmdLibGitSyncToken!));
+        Assert.Equal("git-token", CredentialProtector.Unprotect(settings.CmdLibGitSyncToken));
         Assert.Equal("unlock-secret", CredentialProtector.Unprotect(settings.CredentialProviderUnlockSecretEncrypted));
 
         Assert.False(CredentialProtector.IsVaultUnlocked);

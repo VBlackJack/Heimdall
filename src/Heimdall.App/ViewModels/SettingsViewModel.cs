@@ -31,6 +31,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Updates;
 using SshAgentPreferenceEnum = Heimdall.Core.Ssh.SshAgentPreference;
 
@@ -96,6 +97,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
     private readonly PinManager _pinManager;
+    private readonly VaultLifecycleService _vaultLifecycle;
     private readonly IUpdateService _updateService;
     private readonly IAppVersionProvider _appVersionProvider;
     private readonly IUpdateInstallFlow _installFlow;
@@ -470,6 +472,26 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ? _localizer["SettingsPinStatusEnabled"]
         : _localizer["SettingsPinStatusDisabled"];
 
+    [ObservableProperty]
+    private bool _isVaultEnabled;
+
+    partial void OnIsVaultEnabledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(VaultStatusText));
+        OnPropertyChanged(nameof(VaultDisabledActionsVisible));
+        OnPropertyChanged(nameof(VaultEnabledActionsVisible));
+    }
+
+    public string VaultStatusText => IsVaultEnabled
+        ? _localizer["SettingsVaultStatusEnabled"]
+        : _localizer["SettingsVaultStatusDisabled"];
+
+    /// <summary>Visibility flag for the "Enable" action (vault not yet configured).</summary>
+    public bool VaultDisabledActionsVisible => !IsVaultEnabled;
+
+    /// <summary>Visibility flag for the "Change" / "Disable" actions (vault configured).</summary>
+    public bool VaultEnabledActionsVisible => IsVaultEnabled;
+
     // --- UI state (persisted but not exposed in Settings tab) ---
 
     [ObservableProperty]
@@ -590,6 +612,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IDialogService dialogService,
         TrustedHostKeysSettingsViewModel trustedHostKeys,
         PinManager pinManager,
+        VaultLifecycleService vaultLifecycle,
         IUpdateService updateService,
         IAppVersionProvider appVersionProvider,
         IUpdateInstallFlow installFlow,
@@ -600,6 +623,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _localizer = localizer;
         _dialogService = dialogService;
         _pinManager = pinManager;
+        _vaultLifecycle = vaultLifecycle;
         _updateService = updateService;
         _appVersionProvider = appVersionProvider;
         _installFlow = installFlow;
@@ -895,6 +919,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RequireWindowsHelloOnConnect = settings.RequireWindowsHelloOnConnect;
         WindowsHelloGraceMinutes = settings.WindowsHelloGraceMinutes;
         IsPinConfigured = !string.IsNullOrEmpty(settings.PinHash) && !string.IsNullOrEmpty(settings.PinSalt);
+        IsVaultEnabled = settings.VaultEnabled;
 
         // Advanced / Logging
         EnableLogging = settings.EnableLogging;
@@ -1908,6 +1933,42 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         IsPinConfigured = false;
         FileLogger.Info("PIN configured: removed.");
+    }
+
+    [RelayCommand]
+    private async Task EnableVaultAsync()
+    {
+        VaultEnableDialogViewModel dialogViewModel = new VaultEnableDialogViewModel(
+            password => _vaultLifecycle.EnableAsync(password, Argon2idParameters.Recommended),
+            _localizer);
+        await _dialogService.ShowVaultEnableDialogAsync(dialogViewModel);
+        await RefreshVaultStatusAsync();
+    }
+
+    [RelayCommand]
+    private async Task ChangeMasterPasswordAsync()
+    {
+        VaultChangePasswordDialogViewModel dialogViewModel = new VaultChangePasswordDialogViewModel(
+            (current, next) => _vaultLifecycle.ChangeMasterPasswordAsync(current, next, Argon2idParameters.Recommended),
+            _localizer);
+        await _dialogService.ShowVaultChangePasswordDialogAsync(dialogViewModel);
+        await RefreshVaultStatusAsync();
+    }
+
+    [RelayCommand]
+    private async Task DisableVaultAsync()
+    {
+        VaultDisableDialogViewModel dialogViewModel = new VaultDisableDialogViewModel(
+            password => _vaultLifecycle.DisableAsync(password),
+            _localizer);
+        await _dialogService.ShowVaultDisableDialogAsync(dialogViewModel);
+        await RefreshVaultStatusAsync();
+    }
+
+    private async Task RefreshVaultStatusAsync()
+    {
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        IsVaultEnabled = settings.VaultEnabled;
     }
 
     [RelayCommand]

@@ -28,6 +28,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.Updates;
 using Heimdall.Ssh;
@@ -1084,6 +1085,7 @@ public sealed class SettingsViewModelTests
             dialog,
             trustedHostKeys,
             new PinManager(),
+            new VaultLifecycleService(new FakeConfigManager()),
             new FakeUpdateService(),
             new AppVersionProvider("2026.061501"),
             new FakeUpdateInstallFlow(),
@@ -1132,6 +1134,7 @@ public sealed class SettingsViewModelTests
             dialog,
             trustedHostKeys,
             new PinManager(),
+            new VaultLifecycleService(config),
             updateService,
             appVersionProvider,
             installFlow,

@@ -26,6 +26,7 @@ namespace Heimdall.App.Tests;
 /// no vault (backward compat), and Git deferred (null, no throw) when a v2 token
 /// is read while locked. Resets the static CredentialProtector slots per test.
 /// </summary>
+[Collection(CredentialProtectorAppCollection.Name)]
 [SupportedOSPlatform("windows")]
 public sealed class GitTokenReaderTests : IDisposable
 {

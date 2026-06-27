@@ -124,6 +124,18 @@ public interface IDialogService
     /// <param name="viewModel">The unlock dialog ViewModel managing unlock + lockout state.</param>
     Task ShowVaultUnlockDialogAsync(VaultUnlockDialogViewModel viewModel) => Task.CompletedTask;
 
+    /// <summary>Shows the "Enable master password" dialog. Default no-op for test doubles.</summary>
+    /// <param name="viewModel">The enable dialog ViewModel.</param>
+    Task ShowVaultEnableDialogAsync(VaultEnableDialogViewModel viewModel) => Task.CompletedTask;
+
+    /// <summary>Shows the "Change master password" dialog. Default no-op for test doubles.</summary>
+    /// <param name="viewModel">The change-password dialog ViewModel.</param>
+    Task ShowVaultChangePasswordDialogAsync(VaultChangePasswordDialogViewModel viewModel) => Task.CompletedTask;
+
+    /// <summary>Shows the "Disable master password" dialog. Default no-op for test doubles.</summary>
+    /// <param name="viewModel">The disable dialog ViewModel.</param>
+    Task ShowVaultDisableDialogAsync(VaultDisableDialogViewModel viewModel) => Task.CompletedTask;
+
     /// <summary>
     /// Shows the PIN setup dialog for setting, changing, or removing the application PIN.
     /// </summary>

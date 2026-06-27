@@ -181,6 +181,7 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 dialogService,
                 trustedHostKeys,
                 new PinManager(),
+                new Heimdall.Core.Security.Vault.VaultLifecycleService(configManager),
                 new FakeUpdateService(),
                 new AppVersionProvider("2026.061501"),
                 new FakeUpdateInstallFlow(),

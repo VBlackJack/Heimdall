@@ -294,6 +294,41 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task ShowVaultEnableDialogAsync(VaultEnableDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        ShowVaultModal(new VaultEnableDialog { DataContext = viewModel });
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task ShowVaultChangePasswordDialogAsync(VaultChangePasswordDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        ShowVaultModal(new VaultChangePasswordDialog { DataContext = viewModel });
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task ShowVaultDisableDialogAsync(VaultDisableDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        ShowVaultModal(new VaultDisableDialog { DataContext = viewModel });
+        return Task.CompletedTask;
+    }
+
+    private void ShowVaultModal(Window dialog)
+    {
+        Window? owner = GetOwnerWindow();
+        if (owner is not null && !ReferenceEquals(owner, dialog) && owner.IsVisible)
+        {
+            dialog.Owner = owner;
+        }
+
+        dialog.ShowDialog();
+    }
+
+    /// <inheritdoc/>
     public Task<PinSetupResult?> ShowPinSetupDialogAsync(PinSetupDialogViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
