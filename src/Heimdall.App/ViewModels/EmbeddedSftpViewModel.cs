@@ -683,11 +683,24 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Uploads local files to the current remote directory.
+    /// Uploads local files to the current remote directory. Thin wrapper over
+    /// <see cref="UploadEntriesAsync"/> that targets <see cref="CurrentPath"/>, so the toolbar Upload
+    /// button and the "upload here" command share the single recursive upload path.
     /// </summary>
     /// <remarks>Must be invoked on the UI thread.</remarks>
-    public async Task UploadFilesAsync(IReadOnlyList<string> localPaths)
+    public Task UploadFilesAsync(IReadOnlyList<string> localPaths)
+        => UploadEntriesAsync(localPaths, CurrentPath);
+
+    /// <summary>
+    /// Uploads dropped local entries (files and/or directories) into <paramref name="targetRemoteDir"/>,
+    /// recursing into directories. Directories are created before their contents and an existing remote
+    /// directory is tolerated so re-dropping a tree merges rather than aborting.
+    /// </summary>
+    /// <remarks>Must be invoked on the UI thread.</remarks>
+    public async Task UploadEntriesAsync(IReadOnlyList<string> localPaths, string targetRemoteDir)
     {
+        ArgumentNullException.ThrowIfNull(localPaths);
+
         if (_disposed || _browser is null)
         {
             return;
@@ -709,30 +722,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
-            for (int i = 0; i < localPaths.Count; i++)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                string localPath = localPaths[i];
-                string fileName = Path.GetFileName(localPath);
-                string remotePath = CombineRemotePath(CurrentPath, fileName);
-
-                TransferStatusText = _localizer?.Format(
-                    "SftpStatusUploadingProgress", fileName,
-                    $"{i + 1}", $"{localPaths.Count}") ?? $"Uploading {fileName}...";
-
-                try
-                {
-                    await _browser.UploadFileAsync(localPath, remotePath, ct);
-                }
-                catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
-                {
-                    Core.Logging.FileLogger.Info(
-                        $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
-                    await UploadViaSudoAsync(localPath, remotePath, ct);
-                }
-            }
-
+            await UploadPlannedEntriesAsync(localPaths, targetRemoteDir, ct);
             UpdateStatus(_localizer?["SftpStatusTransferComplete"] ?? "Transfer complete");
         }
         catch (OperationCanceledException)
@@ -750,6 +740,142 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             IsTransferInProgress = false;
             TransferProgressValue = 0;
             _ = Refresh();
+        }
+    }
+
+    /// <summary>
+    /// Plans the dropped tree with <see cref="RemoteUploadTreePlanner"/> and executes the resulting
+    /// ordered operations against the (decorated, journaling) browser: <c>CreateDirectoryAsync</c> for
+    /// each directory and <c>UploadFileAsync</c> for each file, keeping the sudo permission fallback.
+    /// </summary>
+    private async Task UploadPlannedEntriesAsync(
+        IReadOnlyList<string> localPaths,
+        string targetRemoteDir,
+        CancellationToken ct)
+    {
+        if (_browser is null)
+        {
+            return;
+        }
+
+        var roots = new List<LocalUploadEntry>(localPaths.Count);
+        foreach (string path in localPaths)
+        {
+            bool isDirectory = Directory.Exists(path);
+            if (!isDirectory && !File.Exists(path))
+            {
+                // Skip paths that no longer exist; a drop can race a delete on the source side.
+                continue;
+            }
+
+            roots.Add(ToLocalUploadEntry(path, isDirectory));
+        }
+
+        if (roots.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<RemoteUploadOp> ops =
+            RemoteUploadTreePlanner.Plan(roots, targetRemoteDir, EnumerateLocalChildren);
+
+        int totalFiles = ops.Count(op => op.Kind == RemoteUploadOpKind.UploadFile);
+        int uploadedFiles = 0;
+
+        if (ops.Any(op => op.Kind == RemoteUploadOpKind.MakeDirectory))
+        {
+            TransferStatusText = _localizer?["SftpStatusUploadingFolder"] ?? "Uploading folder...";
+        }
+
+        foreach (RemoteUploadOp op in ops)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (op.Kind == RemoteUploadOpKind.MakeDirectory)
+            {
+                try
+                {
+                    await _browser.CreateDirectoryAsync(op.RemotePath, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // mkdir fails either because the directory already exists (re-dropping into an
+                    // existing tree, which must MERGE) or for a real reason (permission, quota). The
+                    // transports expose no typed already-exists error - SSH.NET raises SftpException
+                    // with the generic message "Failure" - so probe the remote: tolerate only when the
+                    // directory actually exists, otherwise propagate the genuine failure.
+                    if (!await RemoteDirectoryExistsAsync(op.RemotePath, ct))
+                    {
+                        throw;
+                    }
+
+                    Core.Logging.FileLogger.Info(
+                        $"EmbeddedSFTP upload merge: remote directory already exists, continuing: {op.RemotePath}");
+                }
+
+                continue;
+            }
+
+            uploadedFiles++;
+            string fileName = Path.GetFileName(op.LocalPath);
+            TransferStatusText = _localizer?.Format(
+                "SftpStatusUploadingProgress", fileName,
+                $"{uploadedFiles}", $"{totalFiles}") ?? $"Uploading {fileName}...";
+
+            try
+            {
+                await _browser.UploadFileAsync(op.LocalPath, op.RemotePath, ct);
+            }
+            catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
+            {
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
+                await UploadViaSudoAsync(op.LocalPath, op.RemotePath, ct);
+            }
+        }
+    }
+
+    // Reads a local directory's immediate children into planner entries. The impure walk lives here;
+    // the planner stays pure and is driven through this delegate.
+    private static IReadOnlyList<LocalUploadEntry> EnumerateLocalChildren(string localDirectory)
+    {
+        var children = new List<LocalUploadEntry>();
+        foreach (string entry in Directory.EnumerateFileSystemEntries(localDirectory))
+        {
+            children.Add(ToLocalUploadEntry(entry, Directory.Exists(entry)));
+        }
+
+        return children;
+    }
+
+    private static LocalUploadEntry ToLocalUploadEntry(string localPath, bool isDirectory)
+    {
+        string name = Path.GetFileName(localPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        return new LocalUploadEntry(localPath, name, isDirectory);
+    }
+
+    // Probes whether a remote directory exists by listing it through the (decorated) browser. Used to
+    // tell an already-exists mkdir (merge) apart from a genuine failure without relying on the
+    // transport's error text. Cancellation propagates; any other listing failure means "absent".
+    private async Task<bool> RemoteDirectoryExistsAsync(string path, CancellationToken ct)
+    {
+        if (_browser is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            await _browser.ListDirectoryAsync(path, ct);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1582,6 +1708,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         return ex is SftpPermissionDeniedException
             or UnauthorizedAccessException;
     }
+
+    /// <summary>
+    /// Resolves the remote directory a drop should land in: the hovered entry's path when it is a
+    /// directory row, otherwise the current directory. Pure so it can be unit-tested without a view.
+    /// </summary>
+    public static string ResolveDropTargetDirectory(SftpFileInfo? hoveredEntry, string currentDirectory)
+        => hoveredEntry is { IsDirectory: true } ? hoveredEntry.FullPath : currentDirectory;
 
     private async Task LoadDirectoryCoreAsync(
         string path,

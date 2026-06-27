@@ -48,6 +48,50 @@ public sealed class EmbeddedSftpViewModelHelpersTests
     }
 
     [Fact]
+    public void ResolveDropTargetDirectory_DirectoryHovered_ReturnsItsFullPath()
+    {
+        SftpFileInfo folder = new(
+            Name: "uploads",
+            FullPath: "/srv/uploads",
+            IsDirectory: true,
+            Size: 0,
+            LastModified: default,
+            Permissions: "rwxr-xr-x",
+            Owner: "0",
+            Group: "0");
+
+        string actual = EmbeddedSftpViewModel.ResolveDropTargetDirectory(folder, "/srv");
+
+        Assert.Equal("/srv/uploads", actual);
+    }
+
+    [Fact]
+    public void ResolveDropTargetDirectory_FileHovered_ReturnsCurrentDirectory()
+    {
+        SftpFileInfo file = new(
+            Name: "notes.txt",
+            FullPath: "/srv/notes.txt",
+            IsDirectory: false,
+            Size: 12,
+            LastModified: default,
+            Permissions: "rw-r--r--",
+            Owner: "0",
+            Group: "0");
+
+        string actual = EmbeddedSftpViewModel.ResolveDropTargetDirectory(file, "/srv");
+
+        Assert.Equal("/srv", actual);
+    }
+
+    [Fact]
+    public void ResolveDropTargetDirectory_NoRowHovered_ReturnsCurrentDirectory()
+    {
+        string actual = EmbeddedSftpViewModel.ResolveDropTargetDirectory(null, "/srv");
+
+        Assert.Equal("/srv", actual);
+    }
+
+    [Fact]
     public void BuildNonCollidingName_FreeName_ReturnedUnchanged()
     {
         string actual = EmbeddedSftpViewModel.BuildNonCollidingName(["other.txt"], "report.txt");

@@ -69,7 +69,6 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private SessionOperationEmitter _operationEmitter = SessionOperationEmitter.Disabled;
     private SessionTabViewModel? _sessionTab;
     private LocalizationManager? _localizer;
-    private IDialogService? _dialogService;
     private SshConnectionParams? _sshParams;
     private Heimdall.Ssh.HostKeyStore _hostKeyStore = null!;
     private readonly HashSet<string> _activeEditTempDirs =
@@ -167,7 +166,6 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         _browser = browser;
         _sessionTab = sessionTab;
         _localizer = localizer;
-        _dialogService = dialogService;
         _sshParams = sshParams;
         _hostKeyStore = hostKeyStore;
 
@@ -971,35 +969,26 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             return;
         }
 
-        var files = paths.Where(p => File.Exists(p)).ToArray();
-        int folderCount = paths.Length - files.Length;
+        // Impure hit-test: find the row under the cursor (if any); the pure helper turns it into the
+        // target directory. Dropping onto a folder row uploads into it; anywhere else uses CurrentPath.
+        SftpFileInfo? hoveredEntry = HitTestFileRow(e.GetPosition(FileListView));
+        string targetDir = EmbeddedSftpViewModel.ResolveDropTargetDirectory(
+            hoveredEntry, _viewModel.CurrentPath);
 
-        if (folderCount > 0 && _dialogService is not null)
+        await _viewModel.UploadEntriesAsync(paths, targetDir);
+    }
+
+    // Maps a point in FileListView coordinates to the SftpFileInfo of the row beneath it, or null when
+    // the drop lands on empty space (or the header). Walks the visual tree up to the row container.
+    private SftpFileInfo? HitTestFileRow(System.Windows.Point point)
+    {
+        if (FileListView.InputHitTest(point) is not DependencyObject hit)
         {
-            string msg = _localizer?.Format("SftpDropFoldersSkipped", folderCount.ToString())
-                ?? $"{folderCount} folder(s) will be skipped. Continue?";
-
-            if (files.Length == 0)
-            {
-                UpdateStatus(_localizer?["SftpStatusFoldersNotSupported"]
-                    ?? "Folder upload not supported.");
-                return;
-            }
-
-            bool proceed = await _dialogService.ShowConfirmAsync(
-                _localizer?["SftpDropFoldersTitle"] ?? "Folders detected",
-                msg);
-
-            if (!proceed)
-            {
-                return;
-            }
+            return null;
         }
 
-        if (files.Length > 0)
-        {
-            await _viewModel.UploadFilesAsync(files);
-        }
+        DependencyObject? container = ItemsControl.ContainerFromElement(FileListView, hit);
+        return (container as System.Windows.Controls.ListViewItem)?.DataContext as SftpFileInfo;
     }
 
     // ------------------------------------------------------------------
