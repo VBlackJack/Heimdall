@@ -197,7 +197,6 @@ public sealed class ConfigManager : IConfigManager
             NormalizeTrustedHostKeys(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
-            ApplyFileAcl(_settingsPath);
         }
         finally
         {
@@ -235,7 +234,6 @@ public sealed class ConfigManager : IConfigManager
             settings.TrustedHostKeys.TryAdd(hostPortKey, fingerprint);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
-            ApplyFileAcl(_settingsPath);
             return true;
         }
         finally
@@ -278,7 +276,6 @@ public sealed class ConfigManager : IConfigManager
             {
                 var json = JsonSerializer.Serialize(settings, JsonOptions);
                 await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
-                ApplyFileAcl(_settingsPath);
             }
 
             return added;
@@ -305,7 +302,6 @@ public sealed class ConfigManager : IConfigManager
             mutate(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
-            ApplyFileAcl(_settingsPath);
         }
         finally
         {
@@ -416,7 +412,6 @@ public sealed class ConfigManager : IConfigManager
 
             var json = JsonSerializer.Serialize(servers, JsonOptions);
             await WriteTextAsync(_serversPath, json).ConfigureAwait(false);
-            ApplyFileAcl(_serversPath);
         }
         finally
         {
@@ -436,7 +431,18 @@ public sealed class ConfigManager : IConfigManager
             Directory.CreateDirectory(directory);
         }
 
-        await File.WriteAllTextAsync(path, content, Utf8NoBom);
+        if (OperatingSystem.IsWindows())
+        {
+            // Atomic write-temp-then-rename with the restrictive ACL applied at
+            // temp-create: a crash mid-write can never truncate the target, and the
+            // final file always carries the restrictive ACL (no separate post-write
+            // ApplyFileAcl needed for these paths).
+            await Security.SecureFileWriter.WriteAllTextAtomicAsync(path, content).ConfigureAwait(false);
+        }
+        else
+        {
+            await File.WriteAllTextAsync(path, content, Utf8NoBom).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
