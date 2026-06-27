@@ -43,9 +43,32 @@ public static class CredentialProtector
     private static VaultDekHolder? _vaultDek;
 
     /// <summary>
+    /// Whether a master-password vault is configured. Set at startup from
+    /// <c>AppSettings.VaultEnabled</c> and by the lifecycle service. When the
+    /// vault is enabled but locked, Protect fails closed instead of writing a
+    /// weaker legacy blob (write-downgrade resistance).
+    /// </summary>
+    private static bool _vaultEnabled;
+
+    /// <summary>
     /// Whether a usable vault DEK is currently set (the vault is unlocked).
     /// </summary>
     public static bool IsVaultUnlocked => _vaultDek is { IsDisposed: false };
+
+    /// <summary>
+    /// Whether a master-password vault is configured (independent of unlock state).
+    /// </summary>
+    public static bool IsVaultEnabled => _vaultEnabled;
+
+    /// <summary>
+    /// Set the "vault configured" flag. Set at startup from settings and toggled
+    /// by the lifecycle service on enable/disable.
+    /// </summary>
+    /// <param name="enabled">True when a master-password vault is configured.</param>
+    public static void SetVaultEnabled(bool enabled)
+    {
+        _vaultEnabled = enabled;
+    }
 
     /// <summary>
     /// Install the vault DEK at unlock. Mirrors the <see cref="Initialize"/>
@@ -111,8 +134,31 @@ public static class CredentialProtector
             }
         }
 
-        // Legacy mode (no master password): unchanged DPAPI + HMAC output, so
-        // vaults without a master password stay byte-for-byte compatible.
+        // Write-downgrade resistance: if a vault IS configured but no usable DEK
+        // is set (locked), refuse to write — NEVER fall back to the weaker legacy
+        // format while the vault is enabled.
+        if (_vaultEnabled)
+        {
+            throw new VaultLockedException();
+        }
+
+        // Legacy mode (no vault configured): unchanged DPAPI + HMAC output, so
+        // installs without a master password stay byte-for-byte compatible.
+        return ProtectLegacy(plainText);
+    }
+
+    /// <summary>
+    /// Encrypt with the legacy DPAPI(+HMAC) format, ignoring the vault DEK and
+    /// the enabled flag. Used only by the vault reverse-migration (disable) to
+    /// return secrets to their pre-vault at-rest form; it is an explicit,
+    /// non-silent operation, not a fallback path.
+    /// </summary>
+    /// <param name="plainText">The plaintext to protect.</param>
+    /// <returns>A legacy HMAC-protected blob, or plain DPAPI when no HMAC key is set.</returns>
+    internal static string ProtectLegacy(string plainText)
+    {
+        ArgumentNullException.ThrowIfNull(plainText);
+
         if (_hmacKeyRaw is not null)
         {
             return HmacIntegrity.ProtectWithHmac(plainText, _hmacKeyRaw);

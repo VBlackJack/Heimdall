@@ -17,6 +17,7 @@
 using System.Text.Json.Serialization;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Ssh;
 
 namespace Heimdall.Core.Configuration;
@@ -318,4 +319,21 @@ public sealed class AppSettings
     public string CmdLibGitSyncAuthorEmail { get; set; } = "heimdall@local";
     public bool CmdLibGitSyncOnStartup { get; set; }
     public bool CmdLibGitSyncAutoPush { get; set; } = true;
+
+    // Master-password vault (DEK/KEK + DPAPI). These are NOT bare secrets:
+    // VaultWrappedDek is already double-protected (Argon2id KEK wrap + DPAPI).
+    /// <summary>Whether the master-password vault is configured (the "vault enabled" flag).</summary>
+    public bool VaultEnabled { get; set; }
+
+    /// <summary>DPAPI-wrapped <c>VaultEnvelope</c> holding the DEK (output of
+    /// <c>VaultKeyManager.WrapDek</c>). The Argon2id parameters live inside the envelope,
+    /// so no separate parameter fields are needed.</summary>
+    public string? VaultWrappedDek { get; set; }
+
+    /// <summary>Resumable forward-migration state for the vault.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<VaultMigrationState>))]
+    public VaultMigrationState VaultMigrationState { get; set; } = VaultMigrationState.None;
+
+    /// <summary>UTC timestamp (ISO-8601) of when the vault was first enabled. Non-secret.</summary>
+    public string? VaultCreatedAt { get; set; }
 }

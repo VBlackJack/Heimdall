@@ -180,7 +180,26 @@ public static partial class SchemaValidator
             1, MaxEmbeddedSessionsLimit, nameof(settings.MaxEmbeddedSessions));
         ValidateRange(errors, settings.SidebarWidth, 0, 1000, nameof(settings.SidebarWidth));
 
+        ValidateVault(errors, settings);
+
         return new ValidationResult(errors.Count == 0, errors);
+    }
+
+    /// <summary>
+    /// Validates the master-password vault settings for internal consistency.
+    /// </summary>
+    private static void ValidateVault(List<string> errors, AppSettings settings)
+    {
+        if (settings.VaultEnabled && string.IsNullOrEmpty(settings.VaultWrappedDek))
+        {
+            errors.Add(
+                $"{nameof(settings.VaultEnabled)}: an enabled vault requires a non-empty {nameof(settings.VaultWrappedDek)}.");
+        }
+
+        if (!Enum.IsDefined(settings.VaultMigrationState))
+        {
+            errors.Add($"{nameof(settings.VaultMigrationState)}: unknown migration state.");
+        }
     }
 
     /// <summary>
