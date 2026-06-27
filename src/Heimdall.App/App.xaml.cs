@@ -350,6 +350,15 @@ public partial class App : System.Windows.Application
                 Heimdall.Core.Logging.FileLogger.Info("Vault unlock gate satisfied.");
             }
 
+            // Configure the workspace lock (manual + idle auto-lock). No-op when no
+            // vault is enabled. Re-applied on settings changes (idle minutes / policy).
+            var workspaceLock = _serviceProvider.GetRequiredService<WorkspaceLockService>();
+            workspaceLock.Configure(
+                settings.VaultEnabled, settings.AutoLockIdleMinutes, settings.DisconnectOnLock);
+            configManager.SettingsChanged += changed => Dispatcher.Invoke(() =>
+                workspaceLock.Configure(
+                    changed.VaultEnabled, changed.AutoLockIdleMinutes, changed.DisconnectOnLock));
+
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             _mainViewModel = mainWindow.DataContext as MainViewModel;
             MainWindow = mainWindow;
@@ -473,6 +482,7 @@ public partial class App : System.Windows.Application
 
         // Vault lifecycle owns the session DEK holder, so a single instance.
         services.AddSingleton<VaultLifecycleService>();
+        services.AddSingleton<WorkspaceLockService>();
 
         // SSH/Tunnel services
         services.AddSingleton<TunnelManager>();

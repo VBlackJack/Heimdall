@@ -32,6 +32,7 @@ using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Sftp;
@@ -54,6 +55,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private readonly HeimdallThemeService _themeService;
     private readonly ISessionSnapshotService _sessionSnapshotService;
     private readonly IUiDispatcher _uiDispatcher;
+    private readonly WorkspaceLockService _workspaceLock;
 
     private bool _disposed;
     private Action? _onConfigurationChanged;
@@ -313,6 +315,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ToolsTabPopulationService toolsTabPopulation,
         IToolContextProvider toolContextProvider,
         IUiDispatcher uiDispatcher,
+        WorkspaceLockService workspaceLock,
         ServerListViewModel serverList,
         ConnectionViewModel connection,
         SettingsViewModel settings,
@@ -321,6 +324,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         IRecentConnectionTracker? recentConnections = null)
     {
         _configManager = configManager;
+        _workspaceLock = workspaceLock;
         _localizer = localizer;
         _appStatus = appStatus;
         _hostKeyStore = hostKeyStore;
@@ -350,6 +354,12 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             configManager);
         Scheduled = new ScheduledTasksViewModel(this, localizer, dialogService, configManager, _uiDispatcher);
         Session = new SessionCoordinator(this, localizer, configManager, embeddedSessionManager, postConnectSequenceRunner, postConnectStepResolver, _uiDispatcher);
+
+        // Workspace lock: mask the session host + show the re-unlock overlay on lock,
+        // disconnect sessions on lock when the policy requires it (D3).
+        IsWorkspaceLocked = _workspaceLock.IsWorkspaceLocked;
+        _workspaceLock.SetSessionDisconnector(DisconnectAllSessionsForLock);
+        _workspaceLock.LockStateChanged += OnWorkspaceLockStateChanged;
 
         _appStatus.StatusChanged += OnApplicationStatusChanged;
 
@@ -402,6 +412,61 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         Connection.PropertyChanged += _connectionPropertyChangedHandler;
 
         StatusText = _localizer["StatusReady"];
+    }
+
+    // ── Workspace lock ───────────────────────────────────────────────────────
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSessionHostVisible))]
+    private bool _isWorkspaceLocked;
+
+    /// <summary>
+    /// Whether the embedded session host is visible. Hidden while locked so its
+    /// Win32 (RDP ActiveX) and WebView2 (terminal/VNC) child HWNDs are masked — a
+    /// WPF overlay alone cannot cover those, so the host must be collapsed.
+    /// </summary>
+    public bool IsSessionHostVisible => !IsWorkspaceLocked;
+
+    /// <summary>The re-unlock ViewModel bound by the lock overlay (null while unlocked).</summary>
+    [ObservableProperty]
+    private VaultUnlockDialogViewModel? _lockOverlayViewModel;
+
+    [RelayCommand(CanExecute = nameof(CanLockWorkspace))]
+    private void LockWorkspace() => _workspaceLock.Lock();
+
+    private bool CanLockWorkspace() => _workspaceLock.CanLock;
+
+    private void OnWorkspaceLockStateChanged()
+    {
+        _uiDispatcher.Invoke(() =>
+        {
+            IsWorkspaceLocked = _workspaceLock.IsWorkspaceLocked;
+            LockWorkspaceCommand.NotifyCanExecuteChanged();
+
+            if (IsWorkspaceLocked)
+            {
+                // Reuse the unlock VM for the overlay; in-memory (non-persisted) lockout.
+                LockOverlayViewModel = new VaultUnlockDialogViewModel(
+                    password => _workspaceLock.UnlockAsync(password),
+                    new PinManager(),
+                    _localizer,
+                    migrationInProgress: false);
+            }
+            else
+            {
+                LockOverlayViewModel = null;
+                Session.ResumeDeferredReconnects();
+            }
+        });
+    }
+
+    private void DisconnectAllSessionsForLock()
+    {
+        foreach (var tab in Connection.ActiveSessions.ToList())
+        {
+            Connection.CloseSessionAsync(tab, DisconnectReason.UserAction, confirm: false)
+                .SafeFireAndForget();
+        }
     }
 
     /// <summary>

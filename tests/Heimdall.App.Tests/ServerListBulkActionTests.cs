@@ -33,6 +33,8 @@ using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
 namespace Heimdall.App.Tests;
 
+// Bulk password mutation encrypts via CredentialProtector; serialized with the vault tests.
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerListBulkActionTests
 {
     [Fact]

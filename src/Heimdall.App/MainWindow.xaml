@@ -153,6 +153,25 @@
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
+                    <!-- Lock workspace (only when a master-password vault is enabled).
+                         Primary trigger: a button click works regardless of which
+                         embedded surface owns focus, unlike a hotkey a terminal may eat. -->
+                    <Button x:Name="LockWorkspaceButton"
+                            Command="{Binding LockWorkspaceCommand}"
+                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Padding="6"
+                            Width="32" Height="32"
+                            Margin="0,0,4,0"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding Settings.VaultEnabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                            ToolTip="{loc:Translate BtnLockWorkspace}"
+                            AutomationProperties.Name="{loc:Translate BtnLockWorkspace}">
+                        <TextBlock Text="&#xE72E;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="{StaticResource FontSizeBodyLarge}"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"/>
+                    </Button>
                     <!-- Share Folder toggle -->
                     <Button x:Name="ShareFolderButton"
                             Click="OnShareFolderClick"
@@ -999,8 +1018,11 @@
                         AutomationProperties.Name="{loc:Translate TooltipShowSidebar}"/>
 
                 <!-- RIGHT PANEL: sessions + tunnel bottom panel -->
+                <!-- Collapsed while the workspace is locked so the embedded Win32 (RDP ActiveX)
+                     and WebView2 (terminal/VNC) child HWNDs are masked (airspace). -->
                 <Grid x:Name="Mw_SessionsGrid" Grid.Column="2"
                       ClipToBounds="True"
+                      Visibility="{Binding IsSessionHostVisible, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Visible}"
                       Tag="{loc:Translate A11yOperationInProgress}">
                     <Grid.RowDefinitions>
                         <!-- Row 0: Sessions / server details -->
@@ -2913,6 +2935,16 @@
                                                        VerticalAlignment="Center"
                                                        TextWrapping="Wrap"/>
                                         </DockPanel>
+
+                                        <!-- Auto-lock + D3 policy (only meaningful when the vault is enabled) -->
+                                        <StackPanel Margin="0,16,0,0"
+                                                    Visibility="{Binding Settings.VaultEnabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock x:Name="Mw_SettingsAutoLockLabel" Text="{loc:Translate SettingsAutoLockLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="Mw_SettingsAutoLockMinutes" Text="{Binding Settings.AutoLockIdleMinutes}" Width="80" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsAutoLockLabel}"/>
+                                            <TextBlock Text="{loc:Translate SettingsAutoLockHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                            <CheckBox x:Name="Mw_SettingsDisconnectOnLock" Content="{loc:Translate SettingsDisconnectOnLock}" IsChecked="{Binding Settings.DisconnectOnLock}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"/>
+                                            <TextBlock Text="{loc:Translate SettingsDisconnectOnLockHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 
@@ -4411,6 +4443,57 @@
                                 Padding="20,8" FontSize="{StaticResource FontSizeBody}"
                                 HorizontalAlignment="Right"/>
                     </DockPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- ═══════ WORKSPACE LOCK OVERLAY ═══════ -->
+        <!-- Covers the whole window when the master-password workspace is locked. The
+             session host (Mw_SessionsGrid) is collapsed separately so no Win32/WebView2
+             HWND leaks through; this WPF overlay then blocks all other interaction. -->
+        <Border Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="1000"
+                Background="{DynamicResource BackgroundBrush}"
+                Visibility="{Binding IsWorkspaceLocked, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Width="400" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}"
+                    Padding="{StaticResource SpacingXl}"
+                    DataContext="{Binding LockOverlayViewModel}">
+                <StackPanel>
+                    <TextBlock Text="{loc:Translate VaultLockOverlayTitle}"
+                               FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="{loc:Translate VaultLockOverlayPrompt}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               HorizontalAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,14"/>
+                    <PasswordBox x:Name="Mw_LockOverlayPasswordBox"
+                                 AutomationProperties.Name="{loc:Translate VaultFieldMasterPassword}"
+                                 IsEnabled="{Binding CanSubmit, FallbackValue=True}"
+                                 FontSize="{StaticResource FontSizeBody}"
+                                 Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8,6"
+                                 CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                 IsVisibleChanged="OnLockOverlayVisibleChanged"
+                                 KeyDown="OnLockOverlayPasswordKeyDown"/>
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="{DynamicResource ErrorTextBrush}"
+                               FontSize="{StaticResource FontSizeBody}" HorizontalAlignment="Center"
+                               Margin="0,8,0,0" TextWrapping="Wrap"/>
+                    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="{StaticResource CornerRadiusSm}"
+                            Padding="12,8" Margin="0,12,0,0"
+                            Visibility="{Binding IsLockedOut, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{Binding LockoutMessage}" Foreground="{DynamicResource WarningTextBrush}"
+                                   FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+                    </Border>
+                    <Button x:Name="Mw_LockOverlayUnlockBtn"
+                            Content="{loc:Translate BtnUnlock}"
+                            AutomationProperties.Name="{loc:Translate BtnUnlock}"
+                            HorizontalAlignment="Right" MinWidth="80" Margin="0,16,0,0"
+                            IsEnabled="{Binding CanSubmit, FallbackValue=True}"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            Click="OnLockOverlayUnlockClick"/>
                 </StackPanel>
             </Border>
         </Border>

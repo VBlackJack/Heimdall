@@ -25,6 +25,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Terminal;
 using AppDialogs = Heimdall.App.Views.Dialogs;
@@ -802,9 +803,45 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// entry point wired as the <see cref="IEmbeddedSessionManager"/>
     /// callback; delegates to <see cref="OnReconnectRequestedAsync"/>.
     /// </summary>
+    // Reconnects requested while the vault workspace is locked: the stored
+    // credential cannot be decrypted (CredentialProtector.Unprotect throws
+    // VaultLockedException), so they are queued here and replayed after unlock
+    // instead of being attempted (and failing/throwing) or wasting bounded retries.
+    private readonly List<(SessionTabViewModel Tab, string ServerId, string ConnectionType)> _deferredReconnects = new();
+
     private void OnReconnectRequested(SessionTabViewModel tab, string serverId, string connectionType)
     {
+        if (VaultReconnectPolicy.ShouldDeferReconnect(_main.IsWorkspaceLocked))
+        {
+            if (!_deferredReconnects.Any(d => ReferenceEquals(d.Tab, tab)))
+            {
+                _deferredReconnects.Add((tab, serverId, connectionType));
+                FileLogger.Info("Reconnect deferred: vault workspace locked.");
+            }
+
+            return;
+        }
+
         OnReconnectRequestedAsync(tab, serverId, connectionType).SafeFireAndForget();
+    }
+
+    /// <summary>
+    /// Replay reconnects that were deferred while the workspace was locked. Called
+    /// after a successful unlock.
+    /// </summary>
+    public void ResumeDeferredReconnects()
+    {
+        if (_deferredReconnects.Count == 0)
+        {
+            return;
+        }
+
+        var pending = _deferredReconnects.ToList();
+        _deferredReconnects.Clear();
+        foreach (var (tab, serverId, connectionType) in pending)
+        {
+            OnReconnectRequestedAsync(tab, serverId, connectionType).SafeFireAndForget();
+        }
     }
 
     /// <summary>

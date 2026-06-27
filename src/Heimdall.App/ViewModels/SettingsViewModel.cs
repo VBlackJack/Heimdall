@@ -463,6 +463,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private int _windowsHelloGraceMinutes = AppSettings.DefaultWindowsHelloGraceMinutes;
 
+    /// <summary>Idle auto-lock threshold (minutes) for the vault workspace; 0 disables it.</summary>
+    [ObservableProperty]
+    private int _autoLockIdleMinutes;
+
+    /// <summary>Whether locking the workspace also disconnects active sessions (D3).</summary>
+    [ObservableProperty]
+    private bool _disconnectOnLock;
+
     [ObservableProperty]
     private bool _isPinConfigured;
 
@@ -918,6 +926,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RequireCredentialGuard = settings.RequireCredentialGuard;
         RequireWindowsHelloOnConnect = settings.RequireWindowsHelloOnConnect;
         WindowsHelloGraceMinutes = settings.WindowsHelloGraceMinutes;
+        AutoLockIdleMinutes = settings.AutoLockIdleMinutes;
+        DisconnectOnLock = settings.DisconnectOnLock;
         IsPinConfigured = !string.IsNullOrEmpty(settings.PinHash) && !string.IsNullOrEmpty(settings.PinSalt);
         IsVaultEnabled = settings.VaultEnabled;
 
@@ -1110,6 +1120,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.RequireCredentialGuard = RequireCredentialGuard;
             settings.RequireWindowsHelloOnConnect = RequireWindowsHelloOnConnect;
             settings.WindowsHelloGraceMinutes = WindowsHelloGraceMinutes;
+            settings.AutoLockIdleMinutes = AutoLockIdleMinutes;
+            settings.DisconnectOnLock = DisconnectOnLock;
 
             // Advanced / Logging
             settings.EnableLogging = EnableLogging;

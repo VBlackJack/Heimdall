@@ -351,6 +351,24 @@ public partial class MainWindow
                 return true;
             }
 
+            // Ctrl+L: lock the workspace even while an embedded terminal/RDP/VNC surface
+            // owns focus. WebView2 runs out-of-process (its keystrokes never reach the UI
+            // thread's message pump) and a shell binds Ctrl+L to "clear screen", so neither
+            // the bubbling KeyDown nor OnThreadPreprocessMessage sees it. The low-level hook
+            // does. Absorb it (return true) so the surface does not also act on it. Gated on
+            // IsActive so Ctrl+L is never intercepted while Heimdall is in the background.
+            if (key == Key.L
+                && modifiers == ModifierKeys.Control
+                && IsActive
+                && GetMainVm()?.LockWorkspaceCommand is { } lockCommand
+                && lockCommand.CanExecute(null))
+            {
+                Dispatcher.BeginInvoke(
+                    DispatcherPriority.Input,
+                    new Action(() => lockCommand.Execute(null)));
+                return true;
+            }
+
             return false;
         }
 

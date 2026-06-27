@@ -39,6 +39,8 @@ namespace Heimdall.App.Tests;
 /// fake <see cref="ICredentialProviderFactory"/> and stub <see cref="ICredentialProvider"/>
 /// (no external processes are spawned).
 /// </summary>
+// Touches the static CredentialProtector; serialized with the vault tests.
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerListExternalCredentialWiringTests
 {
     [Fact]

@@ -21,6 +21,10 @@ using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
 
+// TrySaveTokenAsync now writes through CredentialProtector (vault-aware), so this
+// class shares the static CredentialProtector state with the vault tests and must
+// not run concurrently with them.
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class CommandLibrarySettingsServiceTests
 {
     [Fact]

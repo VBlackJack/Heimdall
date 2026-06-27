@@ -1321,6 +1321,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             ModifierKeys.Control,
             OpenCommandPalette);
 
+        // Ctrl+L (lock workspace) is intentionally NOT registered here: it is handled by
+        // the system-wide low-level keyboard hook (OnLowLevelKeyboardHookKeyDown) so it
+        // wins even while an out-of-process WebView2 terminal or an ActiveX RDP surface
+        // owns focus (the bubbling KeyDown path used by this service is swallowed by those
+        // surfaces, and a shell binds Ctrl+L to clear-screen). See MainWindow.WindowUI.cs.
+
         // Ctrl+Alt+B: toggle broadcast mode. Deliberately not terminal-gated so
         // it works while typing inside a session terminal; Ctrl+B alone already
         // toggles the sidebar, so the Alt modifier avoids that conflict.
@@ -1426,6 +1432,41 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     }
 
     private MainViewModel? GetMainVm() => DataContext as MainViewModel;
+
+    // ── Workspace lock overlay ───────────────────────────────────────────────
+
+    private void OnLockOverlayUnlockClick(object sender, RoutedEventArgs e) => SubmitLockOverlay();
+
+    private void OnLockOverlayPasswordKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            SubmitLockOverlay();
+            e.Handled = true;
+        }
+    }
+
+    private void OnLockOverlayVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is true && sender is System.Windows.Controls.PasswordBox box)
+        {
+            box.Focus();
+        }
+    }
+
+    private void SubmitLockOverlay()
+    {
+        if (GetMainVm()?.LockOverlayViewModel is not { } vm)
+        {
+            return;
+        }
+
+        // Read via SecurePassword and marshal to a pinned char[]; the VM zeroes it.
+        using var secure = Mw_LockOverlayPasswordBox.SecurePassword;
+        var password = Services.SecurePasswordHelper.ToChars(secure);
+        Mw_LockOverlayPasswordBox.Clear();
+        vm.UnlockCommand.Execute(password);
+    }
 
     private void OpenCommandPalette()
     {

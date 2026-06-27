@@ -345,4 +345,13 @@ public sealed class AppSettings
     /// <summary>Persisted absolute UTC instant until which the unlock gate is locked out,
     /// or null when not locked out. Mirrors <see cref="PinLockoutUntilUtc"/>.</summary>
     public DateTime? VaultUnlockLockoutUntilUtc { get; set; }
+
+    /// <summary>Idle auto-lock threshold in minutes for the master-password workspace.
+    /// 0 disables idle auto-lock. Measured system-wide (GetLastInputInfo). Only active
+    /// when the vault is enabled.</summary>
+    public int AutoLockIdleMinutes { get; set; }
+
+    /// <summary>When true, locking the workspace also disconnects every active session
+    /// (D3 teardown). Default false = survive-and-mask (sessions keep running, hidden).</summary>
+    public bool DisconnectOnLock { get; set; }
 }

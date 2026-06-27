@@ -207,6 +207,8 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 new ToolsTabPopulationService(toolRegistry),
                 new FakeToolContextProvider(),
                 dispatcher,
+                new Heimdall.App.Services.WorkspaceLockService(
+                    new Heimdall.Core.Security.Vault.VaultLifecycleService(configManager)),
                 serverList,
                 connection,
                 settings,

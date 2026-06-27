@@ -110,6 +110,8 @@ public static partial class SchemaValidator
             nameof(settings.CredentialProviderTimeoutMs));
         ValidateRange(errors, settings.WindowsHelloGraceMinutes, 0, 1440,
             nameof(settings.WindowsHelloGraceMinutes));
+        ValidateRange(errors, settings.AutoLockIdleMinutes, 0, 1440,
+            nameof(settings.AutoLockIdleMinutes));
         ValidateRange(errors, settings.RdpCredentialAutofillTimeoutMs, 5000, 300000,
             nameof(settings.RdpCredentialAutofillTimeoutMs));
         ValidateRange(errors, settings.RdpArtifactCleanupDelayMs, 1000, 60000,

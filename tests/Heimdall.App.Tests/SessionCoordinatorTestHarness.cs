@@ -176,6 +176,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                 new ToolsTabPopulationService(toolRegistry),
                 new FakeToolContextProvider(),
                 dispatcher,
+                new Heimdall.App.Services.WorkspaceLockService(
+                    new Heimdall.Core.Security.Vault.VaultLifecycleService(configManager)),
                 serverList,
                 connection,
                 settings,

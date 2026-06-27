@@ -18,6 +18,9 @@ using Heimdall.App.ViewModels.Dialogs;
 
 namespace Heimdall.App.Tests;
 
+// Encrypts SSH credentials through CredentialProtector (via ToDto), so it shares the
+// static CredentialProtector state with the vault tests and must not run concurrently.
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class GatewayDialogSshCredentialTests
 {
     [Fact]
