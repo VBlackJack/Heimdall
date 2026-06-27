@@ -500,6 +500,83 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task UploadEntriesAsync_RemoteDirectoryAlreadyExists_MergesAndUploadsFiles()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher)
+        {
+            CurrentPath = "/srv"
+        };
+        FakeRemoteBrowser browser = new()
+        {
+            // SSH.NET reports an existing directory with the generic message "Failure" (not
+            // "already exists"); tolerance must not depend on the error text.
+            CreateDirectoryException = new IOException("Failure"),
+            // The existence probe lists the directory; a successful listing means it exists -> merge.
+            ListDirectoryHandler = (_, _) => Task.FromResult<IReadOnlyList<SftpFileInfo>>([])
+        };
+        SetBrowser(viewModel, browser);
+
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        string projectDir = Path.Combine(root, "proj");
+        Directory.CreateDirectory(projectDir);
+        string filePath = Path.Combine(projectDir, "a.txt");
+        await File.WriteAllTextAsync(filePath, "payload");
+
+        try
+        {
+            await viewModel.UploadEntriesAsync([projectDir], "/srv");
+
+            // mkdir failed, the probe confirmed the directory exists, so the upload proceeded.
+            Assert.Equal(1, browser.CreateDirectoryCallCount);
+            Assert.Equal(1, browser.UploadCallCount);
+            Assert.Equal("/srv/proj/a.txt", browser.LastUploadedRemotePath);
+            Assert.False(viewModel.IsTransferInProgress);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_MkdirFailsAndDirectoryAbsent_AbortsWithoutUploading()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher)
+        {
+            CurrentPath = "/srv"
+        };
+        FakeRemoteBrowser browser = new()
+        {
+            // A genuine mkdir failure (e.g. permission), and the probe finds no such directory.
+            CreateDirectoryException = new IOException("Failure"),
+            ListDirectoryHandler = (_, _) =>
+                Task.FromException<IReadOnlyList<SftpFileInfo>>(new IOException("No such file")),
+        };
+        SetBrowser(viewModel, browser);
+
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        string projectDir = Path.Combine(root, "proj");
+        Directory.CreateDirectory(projectDir);
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "a.txt"), "payload");
+
+        try
+        {
+            await viewModel.UploadEntriesAsync([projectDir], "/srv");
+
+            // The directory does not exist, so the failure is genuine: nothing is uploaded.
+            Assert.Equal(1, browser.CreateDirectoryCallCount);
+            Assert.Equal(0, browser.UploadCallCount);
+            Assert.False(viewModel.IsTransferInProgress);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task UploadViaSudoAsync_SetsPrivateTempPermissionsAndDeletesTempWhenSshSetupFails()
     {
         FakeUiDispatcher dispatcher = new();
@@ -1010,11 +1087,16 @@ public sealed class EmbeddedSftpViewModelTests
             return Task.CompletedTask;
         }
 
+        /// <summary>When set, CreateDirectoryAsync throws this exception (to simulate an existing dir).</summary>
+        public Exception? CreateDirectoryException { get; set; }
+
         public Task CreateDirectoryAsync(string path, CancellationToken ct = default)
         {
             LastCreatedDirectoryPath = path;
             Interlocked.Increment(ref _createDirectoryCallCount);
-            return Task.CompletedTask;
+            return CreateDirectoryException is not null
+                ? Task.FromException(CreateDirectoryException)
+                : Task.CompletedTask;
         }
 
         public Task DeleteAsync(string path, CancellationToken ct = default)
