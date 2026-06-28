@@ -51,14 +51,17 @@ namespace Heimdall.Core.Security.Vault;
 public sealed class VaultLifecycleService : IDisposable
 {
     private readonly IConfigManager _configManager;
+    private readonly IVaultHelloService? _vaultHelloService;
     private VaultDekHolder? _unlockedDek;
 
     /// <summary>Create the service over a configuration manager.</summary>
     /// <param name="configManager">The settings + servers persistence manager.</param>
-    public VaultLifecycleService(IConfigManager configManager)
+    /// <param name="vaultHelloService">Optional Windows Hello DEK-wrapper service.</param>
+    public VaultLifecycleService(IConfigManager configManager, IVaultHelloService? vaultHelloService = null)
     {
         ArgumentNullException.ThrowIfNull(configManager);
         _configManager = configManager;
+        _vaultHelloService = vaultHelloService;
     }
 
     /// <summary>Whether the vault is currently unlocked (a usable DEK is held).</summary>
@@ -97,6 +100,7 @@ public sealed class VaultLifecycleService : IDisposable
         }
 
         var createdAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+        var vaultId = Guid.NewGuid().ToString("N");
 
         // Persist the wrapped DEK + InProgress BEFORE migrating: crash-recoverable.
         await _configManager.MergeSettingAsync(s =>
@@ -105,6 +109,7 @@ public sealed class VaultLifecycleService : IDisposable
             s.VaultEnabled = true;
             s.VaultMigrationState = VaultMigrationState.InProgress;
             s.VaultCreatedAt = createdAt;
+            s.VaultId = vaultId;
         }).ConfigureAwait(false);
 
         // Activate the DEK (Protect now writes v2), then run the forward pass.
@@ -146,6 +151,124 @@ public sealed class VaultLifecycleService : IDisposable
             await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
                 .ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Enroll a Windows Hello-wrapped copy of the current vault DEK. Requires the
+    /// vault to already be unlocked via the master password.
+    /// </summary>
+    public async Task EnrollHelloAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (_vaultHelloService is null)
+        {
+            throw new VaultHelloException(VaultHelloFailureReason.Unavailable);
+        }
+
+        if (_unlockedDek is not { IsDisposed: false })
+        {
+            throw new InvalidOperationException("The vault must be unlocked before Windows Hello enrollment.");
+        }
+
+        if (!await _vaultHelloService.IsEnrollmentAvailableAsync(ct).ConfigureAwait(false))
+        {
+            throw new VaultHelloException(VaultHelloFailureReason.Unavailable);
+        }
+
+        var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
+        if (!settings.VaultEnabled)
+        {
+            throw new InvalidOperationException("The vault is not enabled.");
+        }
+
+        var vaultId = string.IsNullOrWhiteSpace(settings.VaultId)
+            ? Guid.NewGuid().ToString("N")
+            : settings.VaultId;
+
+        var dekCopy = GC.AllocateArray<byte>(VaultCipher.KeySizeBytes, pinned: true);
+        try
+        {
+            _unlockedDek.Key.CopyTo(dekCopy);
+            var enrollment = await _vaultHelloService.EnrollAsync(dekCopy, vaultId, ct).ConfigureAwait(false);
+
+            await _configManager.MergeSettingAsync(s =>
+            {
+                s.VaultId = vaultId;
+                s.VaultHelloEnrolled = true;
+                s.VaultHelloWrappedDek = enrollment.WrappedDek;
+                s.VaultHelloChallenge = enrollment.Challenge;
+                s.VaultHelloSalt = enrollment.Salt;
+                s.VaultHelloCredentialName = enrollment.CredentialName;
+                s.VaultHelloPublicKeyHash = enrollment.PublicKeyHash;
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(dekCopy);
+        }
+    }
+
+    /// <summary>
+    /// Try to unlock the vault with the persisted Windows Hello enrollment. Any
+    /// failure leaves the vault locked and returns false so callers can fall back
+    /// to the master password path.
+    /// </summary>
+    public async Task<bool> UnlockWithHelloAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (_vaultHelloService is null)
+        {
+            return false;
+        }
+
+        var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
+        if (!settings.VaultEnabled || !settings.VaultHelloEnrolled)
+        {
+            return false;
+        }
+
+        var enrollment = CreateHelloEnrollment(settings);
+        if (enrollment is null)
+        {
+            return false;
+        }
+
+        VaultDekHolder dek;
+        try
+        {
+            dek = await _vaultHelloService.UnlockAsync(enrollment, ct).ConfigureAwait(false);
+        }
+        catch (VaultHelloException)
+        {
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
+        }
+
+        SetUnlockedDek(dek);
+
+        if (settings.VaultMigrationState == VaultMigrationState.InProgress)
+        {
+            await VaultMigrationEngine.MigrateForwardAsync(_configManager).ConfigureAwait(false);
+            await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
+                .ConfigureAwait(false);
+        }
+
+        return true;
+    }
+
+    /// <summary>Remove the Windows Hello credential and clear Hello enrollment metadata.</summary>
+    public async Task RemoveHelloAsync(CancellationToken ct = default)
+    {
+        var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
+        await RemoveHelloCredentialIfPresentAsync(settings, ct).ConfigureAwait(false);
+        await _configManager.MergeSettingAsync(ClearHelloSettings).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -198,6 +321,7 @@ public sealed class VaultLifecycleService : IDisposable
         // Reverse-migrate while still enabled so v2 fields stay readable; flip the
         // flags only after the reverse pass completes.
         await VaultMigrationEngine.MigrateReverseAsync(_configManager).ConfigureAwait(false);
+        await RemoveHelloCredentialIfPresentAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         await _configManager.MergeSettingAsync(s =>
         {
@@ -205,6 +329,8 @@ public sealed class VaultLifecycleService : IDisposable
             s.VaultEnabled = false;
             s.VaultMigrationState = VaultMigrationState.None;
             s.VaultCreatedAt = null;
+            s.VaultId = null;
+            ClearHelloSettings(s);
         }).ConfigureAwait(false);
 
         CredentialProtector.SetVaultEnabled(false);
@@ -236,6 +362,47 @@ public sealed class VaultLifecycleService : IDisposable
         {
             previous?.Dispose();
         }
+    }
+
+    private async Task RemoveHelloCredentialIfPresentAsync(AppSettings settings, CancellationToken ct)
+    {
+        if (_vaultHelloService is null || string.IsNullOrWhiteSpace(settings.VaultHelloCredentialName))
+        {
+            return;
+        }
+
+        await _vaultHelloService.RemoveAsync(settings.VaultHelloCredentialName, ct).ConfigureAwait(false);
+    }
+
+    private static VaultHelloEnrollment? CreateHelloEnrollment(AppSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.VaultId) ||
+            string.IsNullOrWhiteSpace(settings.VaultHelloWrappedDek) ||
+            string.IsNullOrWhiteSpace(settings.VaultHelloChallenge) ||
+            string.IsNullOrWhiteSpace(settings.VaultHelloSalt) ||
+            string.IsNullOrWhiteSpace(settings.VaultHelloCredentialName) ||
+            string.IsNullOrWhiteSpace(settings.VaultHelloPublicKeyHash))
+        {
+            return null;
+        }
+
+        return new VaultHelloEnrollment(
+            settings.VaultId,
+            settings.VaultHelloWrappedDek,
+            settings.VaultHelloChallenge,
+            settings.VaultHelloSalt,
+            settings.VaultHelloCredentialName,
+            settings.VaultHelloPublicKeyHash);
+    }
+
+    private static void ClearHelloSettings(AppSettings settings)
+    {
+        settings.VaultHelloEnrolled = false;
+        settings.VaultHelloWrappedDek = null;
+        settings.VaultHelloChallenge = null;
+        settings.VaultHelloSalt = null;
+        settings.VaultHelloCredentialName = null;
+        settings.VaultHelloPublicKeyHash = null;
     }
 
     private static void RequirePolicy(char[] password)
