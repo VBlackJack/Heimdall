@@ -33,10 +33,12 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Sftp;
 using Heimdall.Ssh;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.ViewModels;
 
@@ -56,6 +58,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private readonly ISessionSnapshotService _sessionSnapshotService;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly WorkspaceLockService _workspaceLock;
+    private readonly IServiceProvider _serviceProvider;
 
     private bool _disposed;
     private Action? _onConfigurationChanged;
@@ -333,6 +336,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _themeService = themeService;
         _sessionSnapshotService = sessionSnapshotService;
         _uiDispatcher = uiDispatcher;
+        _serviceProvider = serviceProvider;
         ToolRegistry = toolRegistry;
         Split = splitService;
         ServerList = serverList;
@@ -446,11 +450,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             if (IsWorkspaceLocked)
             {
                 // Reuse the unlock VM for the overlay; in-memory (non-persisted) lockout.
-                LockOverlayViewModel = new VaultUnlockDialogViewModel(
-                    password => _workspaceLock.UnlockAsync(password),
-                    new PinManager(),
-                    _localizer,
-                    migrationInProgress: false);
+                LockOverlayViewModel = CreateLockOverlayViewModel();
             }
             else
             {
@@ -458,6 +458,29 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                 Session.ResumeDeferredReconnects();
             }
         });
+    }
+
+    private VaultUnlockDialogViewModel CreateLockOverlayViewModel()
+    {
+        bool showHelloUnlock = _currentSettings is not null
+            && VaultHelloUnlockOfferPolicy.ShouldOfferHelloUnlock(_currentSettings, DateTimeOffset.UtcNow);
+
+        return new VaultUnlockDialogViewModel(
+            password => _workspaceLock.UnlockAsync(password),
+            new PinManager(),
+            _localizer,
+            migrationInProgress: false,
+            () => _workspaceLock.UnlockWithHelloAsync(),
+            showHelloUnlock,
+            () => _dialogService.ShowConfirmAsync(
+                _localizer["VaultHelloReenrollTitle"],
+                _localizer["VaultHelloReenrollPrompt"],
+                "warning"),
+            async () =>
+            {
+                var lifecycle = _serviceProvider.GetRequiredService<VaultLifecycleService>();
+                await lifecycle.EnrollHelloAsync().ConfigureAwait(true);
+            });
     }
 
     private void DisconnectAllSessionsForLock()
@@ -498,6 +521,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             await Tunnels.ResolveAndApplyPanelStateAsync();
             ServerList.LoadServers(servers, settings);
             Settings.LoadFromSettings(settings);
+            await Settings.RefreshVaultStatusAsync();
             Scheduled.Load(settings);
 
             await RestoreSessionSnapshotAsync(cancellationToken);
@@ -908,6 +932,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ServerCount = currentServers.Count;
         ServerList.LoadServers(currentServers, settings);
         Settings.LoadFromSettings(settings);
+        await Settings.RefreshVaultStatusAsync();
         Scheduled.Load(settings);
         WindowTitle = _localizer.Format("WindowTitle", ServerCount);
     }

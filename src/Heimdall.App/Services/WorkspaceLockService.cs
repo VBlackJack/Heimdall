@@ -135,6 +135,26 @@ public sealed class WorkspaceLockService : IDisposable
         LockStateChanged?.Invoke();
     }
 
+    /// <summary>
+    /// Re-unlock the workspace with Windows Hello. Failure leaves the workspace
+    /// locked and returns a coarse reason so the UI can fall back to the master
+    /// password path.
+    /// </summary>
+    public async Task<VaultHelloUnlockResult> UnlockWithHelloAsync(CancellationToken ct = default)
+    {
+        var result = await _lifecycle.UnlockWithHelloDetailedAsync(ct).ConfigureAwait(true);
+        if (!result.Succeeded)
+        {
+            return result;
+        }
+
+        IsWorkspaceLocked = false;
+        RefreshIdleTimer();
+        FileLogger.Info("Workspace unlocked with Windows Hello.");
+        LockStateChanged?.Invoke();
+        return result;
+    }
+
     private void RefreshIdleTimer()
     {
         var shouldWatch = _vaultEnabled && !IsWorkspaceLocked && _autoLockIdleMinutes > 0;

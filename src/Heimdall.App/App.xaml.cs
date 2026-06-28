@@ -325,11 +325,21 @@ public partial class App : System.Windows.Application
                 };
 
                 IDialogService dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+                bool showHelloUnlock = VaultHelloUnlockOfferPolicy.ShouldOfferHelloUnlock(
+                    settings,
+                    DateTimeOffset.UtcNow);
                 VaultUnlockDialogViewModel vaultViewModel = new VaultUnlockDialogViewModel(
                     masterPassword => vaultLifecycle.UnlockAsync(masterPassword),
                     vaultLockout,
                     localization,
-                    settings.VaultMigrationState == VaultMigrationState.InProgress);
+                    settings.VaultMigrationState == VaultMigrationState.InProgress,
+                    () => vaultLifecycle.UnlockWithHelloDetailedAsync(),
+                    showHelloUnlock,
+                    () => dialogService.ShowConfirmAsync(
+                        localization["VaultHelloReenrollTitle"],
+                        localization["VaultHelloReenrollPrompt"],
+                        "warning"),
+                    () => vaultLifecycle.EnrollHelloAsync());
 
                 await dialogService.ShowVaultUnlockDialogAsync(vaultViewModel);
 

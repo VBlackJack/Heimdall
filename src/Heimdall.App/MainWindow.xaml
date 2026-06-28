@@ -2936,6 +2936,32 @@
                                                        TextWrapping="Wrap"/>
                                         </DockPanel>
 
+                                        <!-- Windows Hello wrapper (only meaningful when the master-password vault is enabled) -->
+                                        <StackPanel Margin="0,16,0,0"
+                                                    Visibility="{Binding Settings.VaultHelloSectionVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{Binding Settings.VaultHelloStatusText}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,8"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button x:Name="Mw_SettingsVaultHelloEnableBtn"
+                                                        Content="{loc:Translate SettingsVaultHelloBtnEnable}"
+                                                        Command="{Binding Settings.EnableVaultHelloCommand}"
+                                                        Visibility="{Binding Settings.VaultHelloEnrollVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        IsEnabled="{Binding Settings.CanEnableVaultHello}"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        AutomationProperties.Name="{loc:Translate SettingsVaultHelloBtnEnable}"/>
+                                                <Button x:Name="Mw_SettingsVaultHelloDisableBtn"
+                                                        Content="{loc:Translate SettingsVaultHelloBtnDisable}"
+                                                        Command="{Binding Settings.DisableVaultHelloCommand}"
+                                                        Visibility="{Binding Settings.VaultHelloDisableVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        IsEnabled="{Binding Settings.CanDisableVaultHello}"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        AutomationProperties.Name="{loc:Translate SettingsVaultHelloBtnDisable}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+
                                         <!-- Auto-lock + D3 policy (only meaningful when the vault is enabled) -->
                                         <StackPanel Margin="0,16,0,0"
                                                     Visibility="{Binding Settings.VaultEnabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -4494,6 +4520,25 @@
                             IsEnabled="{Binding CanSubmit, FallbackValue=True}"
                             Style="{DynamicResource PrimaryButtonStyle}"
                             Click="OnLockOverlayUnlockClick"/>
+                    <Button x:Name="Mw_LockOverlayHelloUnlockBtn"
+                            AutomationProperties.Name="{loc:Translate VaultHelloUnlockButton}"
+                            ToolTip="{loc:Translate VaultHelloUnlockButton}"
+                            HorizontalAlignment="Right" MinWidth="80" Height="35" Margin="0,8,0,0"
+                            Command="{Binding UnlockWithHelloCommand}"
+                            IsEnabled="{Binding CanUnlockWithHello}"
+                            Visibility="{Binding ShowHelloUnlock, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Style="{DynamicResource SecondaryButtonStyle}">
+                        <Viewbox Width="20" Height="20" Stretch="Uniform">
+                            <Canvas Width="20" Height="20">
+                                <Path Data="{StaticResource Geo.Security.Fingerprint}"
+                                      Stroke="{DynamicResource TextPrimaryBrush}"
+                                      StrokeThickness="1.5"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
                 </StackPanel>
             </Border>
         </Border>

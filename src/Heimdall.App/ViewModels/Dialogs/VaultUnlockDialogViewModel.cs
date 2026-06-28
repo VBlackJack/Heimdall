@@ -37,6 +37,9 @@ namespace Heimdall.App.ViewModels.Dialogs;
 public partial class VaultUnlockDialogViewModel : ObservableObject
 {
     private readonly Func<char[], Task> _unlockAsync;
+    private readonly Func<Task<VaultHelloUnlockResult>>? _unlockWithHelloAsync;
+    private readonly Func<Task<bool>>? _confirmHelloReenrollAsync;
+    private readonly Func<Task>? _reenrollHelloAsync;
     private readonly PinManager _lockout;
     private readonly LocalizationManager _localizer;
     private readonly bool _migrationInProgress;
@@ -46,6 +49,8 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSubmit))]
+    [NotifyPropertyChangedFor(nameof(CanUnlockWithHello))]
+    [NotifyCanExecuteChangedFor(nameof(UnlockWithHelloCommand))]
     private bool _isLockedOut;
 
     [ObservableProperty]
@@ -53,6 +58,8 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSubmit))]
+    [NotifyPropertyChangedFor(nameof(CanUnlockWithHello))]
+    [NotifyCanExecuteChangedFor(nameof(UnlockWithHelloCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -60,6 +67,17 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isVerified;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanUnlockWithHello))]
+    [NotifyCanExecuteChangedFor(nameof(UnlockWithHelloCommand))]
+    private bool _showHelloUnlock;
+
+    [ObservableProperty]
+    private bool _hasPendingHelloReenroll;
+
+    [ObservableProperty]
+    private bool _isMasterPasswordVerified;
 
     /// <summary>
     /// Create the unlock ViewModel.
@@ -72,18 +90,31 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
         Func<char[], Task> unlockAsync,
         PinManager lockout,
         LocalizationManager localizer,
-        bool migrationInProgress)
+        bool migrationInProgress,
+        Func<Task<VaultHelloUnlockResult>>? unlockWithHelloAsync = null,
+        bool showHelloUnlock = false,
+        Func<Task<bool>>? confirmHelloReenrollAsync = null,
+        Func<Task>? reenrollHelloAsync = null)
     {
         _unlockAsync = unlockAsync;
+        _unlockWithHelloAsync = unlockWithHelloAsync;
+        _confirmHelloReenrollAsync = confirmHelloReenrollAsync;
+        _reenrollHelloAsync = reenrollHelloAsync;
         _lockout = lockout;
         _localizer = localizer;
         _migrationInProgress = migrationInProgress;
+        ShowHelloUnlock = showHelloUnlock && unlockWithHelloAsync is not null;
 
         UpdateLockoutState();
     }
 
     /// <summary>Whether the unlock action is currently available.</summary>
     public bool CanSubmit => !IsLockedOut && !IsBusy;
+
+    /// <summary>Whether the Windows Hello unlock action is currently available.</summary>
+    public bool CanUnlockWithHello => ShowHelloUnlock && !IsLockedOut && !IsBusy;
+
+    private bool CanRunUnlockWithHello() => CanUnlockWithHello;
 
     /// <summary>
     /// Attempt to unlock the vault with the supplied master password. The buffer
@@ -122,6 +153,8 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
                 // CPU-bound, so this keeps the busy indicator responsive.
                 await Task.Run(() => _unlockAsync(password)).ConfigureAwait(true);
                 _lockout.ResetFailures();
+                IsMasterPasswordVerified = true;
+                await OfferHelloReenrollAfterMasterUnlockAsync().ConfigureAwait(true);
                 IsVerified = true;
             }
             catch (VaultUnlockException)
@@ -152,6 +185,84 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
         finally
         {
             Array.Clear(password);
+        }
+    }
+
+    /// <summary>Attempt to unlock with Windows Hello instead of the master password.</summary>
+    [RelayCommand(CanExecute = nameof(CanRunUnlockWithHello))]
+    private async Task UnlockWithHello()
+    {
+        if (_unlockWithHelloAsync is null || !CanUnlockWithHello)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ErrorMessage = "";
+        BusyMessage = _localizer.GetString("VaultHelloUnlockBusy");
+
+        try
+        {
+            var result = await _unlockWithHelloAsync().ConfigureAwait(true);
+            if (result.Succeeded)
+            {
+                _lockout.ResetFailures();
+                IsVerified = true;
+                return;
+            }
+
+            var mapped = VaultHelloUnlockUx.Map(result.FailureReason);
+            if (mapped.Action == VaultHelloUnlockUxAction.SilentFallback)
+            {
+                ErrorMessage = "";
+                return;
+            }
+
+            if (mapped.Action == VaultHelloUnlockUxAction.TriggerReenroll)
+            {
+                HasPendingHelloReenroll = true;
+            }
+
+            ErrorMessage = mapped.MessageKey is null ? "" : _localizer.GetString(mapped.MessageKey);
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMessage = "";
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error("Windows Hello vault unlock encountered an unexpected error", ex);
+            ErrorMessage = _localizer.GetString("VaultHelloUnlockGenericFailure");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task OfferHelloReenrollAfterMasterUnlockAsync()
+    {
+        if (!HasPendingHelloReenroll || _confirmHelloReenrollAsync is null || _reenrollHelloAsync is null)
+        {
+            return;
+        }
+
+        bool confirmed = await _confirmHelloReenrollAsync().ConfigureAwait(true);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        BusyMessage = _localizer.GetString("VaultHelloReenrollBusy");
+        try
+        {
+            await _reenrollHelloAsync().ConfigureAwait(true);
+            HasPendingHelloReenroll = false;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Windows Hello vault re-enrollment failed: {ex.Message}");
+            ErrorMessage = _localizer.GetString("VaultHelloReenrollError");
         }
     }
 

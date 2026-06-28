@@ -151,6 +151,8 @@ public sealed class VaultLifecycleService : IDisposable
             await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
                 .ConfigureAwait(false);
         }
+
+        await StampLastMasterUnlockAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -215,22 +217,31 @@ public sealed class VaultLifecycleService : IDisposable
     /// </summary>
     public async Task<bool> UnlockWithHelloAsync(CancellationToken ct = default)
     {
+        return (await UnlockWithHelloDetailedAsync(ct).ConfigureAwait(false)).Succeeded;
+    }
+
+    /// <summary>
+    /// Try to unlock with Windows Hello and return a coarse failure reason without
+    /// installing a DEK on failure.
+    /// </summary>
+    public async Task<VaultHelloUnlockResult> UnlockWithHelloDetailedAsync(CancellationToken ct = default)
+    {
         ct.ThrowIfCancellationRequested();
         if (_vaultHelloService is null)
         {
-            return false;
+            return VaultHelloUnlockResult.Failure(VaultHelloFailureReason.Unavailable);
         }
 
         var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
         if (!settings.VaultEnabled || !settings.VaultHelloEnrolled)
         {
-            return false;
+            return VaultHelloUnlockResult.Failure(VaultHelloFailureReason.Unavailable);
         }
 
         var enrollment = CreateHelloEnrollment(settings);
         if (enrollment is null)
         {
-            return false;
+            return VaultHelloUnlockResult.Failure(VaultHelloFailureReason.CryptoFailure);
         }
 
         VaultDekHolder dek;
@@ -238,9 +249,9 @@ public sealed class VaultLifecycleService : IDisposable
         {
             dek = await _vaultHelloService.UnlockAsync(enrollment, ct).ConfigureAwait(false);
         }
-        catch (VaultHelloException)
+        catch (VaultHelloException ex)
         {
-            return false;
+            return VaultHelloUnlockResult.Failure(ex.Reason);
         }
         catch (OperationCanceledException)
         {
@@ -248,7 +259,7 @@ public sealed class VaultLifecycleService : IDisposable
         }
         catch
         {
-            return false;
+            return VaultHelloUnlockResult.Failure(VaultHelloFailureReason.CryptoFailure);
         }
 
         SetUnlockedDek(dek);
@@ -260,7 +271,15 @@ public sealed class VaultLifecycleService : IDisposable
                 .ConfigureAwait(false);
         }
 
-        return true;
+        return VaultHelloUnlockResult.Success;
+    }
+
+    /// <summary>Whether this machine can enroll a Windows Hello wrapper now.</summary>
+    public async Task<bool> IsHelloEnrollmentAvailableAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return _vaultHelloService is not null
+            && await _vaultHelloService.IsEnrollmentAvailableAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>Remove the Windows Hello credential and clear Hello enrollment metadata.</summary>
@@ -362,6 +381,12 @@ public sealed class VaultLifecycleService : IDisposable
         {
             previous?.Dispose();
         }
+    }
+
+    private Task StampLastMasterUnlockAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        return _configManager.MergeSettingAsync(s => s.VaultLastMasterUnlockUtc = now);
     }
 
     private async Task RemoveHelloCredentialIfPresentAsync(AppSettings settings, CancellationToken ct)

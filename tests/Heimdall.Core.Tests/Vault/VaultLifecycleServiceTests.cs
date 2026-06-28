@@ -278,6 +278,38 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task UnlockAsync_MasterPassword_StampsLastMasterUnlock()
+    {
+        await SeedLegacyVaultAsync();
+        var service = NewService();
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        service.Lock();
+
+        await NewService().UnlockAsync(Pw(StrongPassword));
+
+        var settings = await _configManager.LoadSettingsAsync();
+        Assert.NotNull(settings.VaultLastMasterUnlockUtc);
+        Assert.True(settings.VaultLastMasterUnlockUtc <= DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task UnlockWithHelloAsync_Success_DoesNotStampLastMasterUnlock()
+    {
+        await SeedLegacyVaultAsync();
+        var hello = new FakeVaultHelloService();
+        var service = NewService(hello);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        await service.EnrollHelloAsync();
+        service.Lock();
+
+        var result = await NewService(hello).UnlockWithHelloDetailedAsync();
+
+        Assert.True(result.Succeeded);
+        var settings = await _configManager.LoadSettingsAsync();
+        Assert.Null(settings.VaultLastMasterUnlockUtc);
+    }
+
+    [Fact]
     public async Task UnlockWithHelloAsync_Failure_StaysLockedAndReturnsFalse()
     {
         await SeedLegacyVaultAsync();

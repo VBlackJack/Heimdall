@@ -106,6 +106,28 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">
+            <Button x:Name="UnlockWithHelloBtn"
+                    AutomationProperties.Name="{loc:Translate VaultHelloUnlockButton}"
+                    ToolTip="{loc:Translate VaultHelloUnlockButton}"
+                    Command="{Binding UnlockWithHelloCommand}"
+                    Visibility="{Binding ShowHelloUnlock, Converter={StaticResource BoolToVisibilityConverter}}"
+                    IsEnabled="{Binding CanUnlockWithHello}"
+                    TabIndex="3"
+                    MinWidth="80"
+                    Height="35"
+                    Margin="0,0,8,0"
+                    Style="{DynamicResource SecondaryButtonStyle}">
+                <Viewbox Width="20" Height="20" Stretch="Uniform">
+                    <Canvas Width="20" Height="20">
+                        <Path Data="{StaticResource Geo.Security.Fingerprint}"
+                              Stroke="{DynamicResource TextPrimaryBrush}"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round"/>
+                    </Canvas>
+                </Viewbox>
+            </Button>
             <Button x:Name="CancelBtn"
                     Content="{loc:Translate BtnCancel}"
                     AutomationProperties.Name="{loc:Translate BtnCancel}"

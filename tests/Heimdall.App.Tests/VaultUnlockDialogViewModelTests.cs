@@ -148,4 +148,133 @@ public sealed class VaultUnlockDialogViewModelTests
 
         Assert.Equal("VaultUnlockBusy", busyDuringCall);
     }
+
+    [Fact]
+    public void Constructor_ShowHelloFalse_DisablesHelloCommand()
+    {
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask,
+            new PinManager(),
+            Localizer(),
+            migrationInProgress: false,
+            () => Task.FromResult(VaultHelloUnlockResult.Success),
+            showHelloUnlock: false);
+
+        Assert.False(viewModel.ShowHelloUnlock);
+        Assert.False(viewModel.CanUnlockWithHello);
+    }
+
+    [Fact]
+    public async Task UnlockWithHello_Success_VerifiesWithoutMasterPassword()
+    {
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => throw new InvalidOperationException("master path should not run"),
+            new PinManager(),
+            Localizer(),
+            migrationInProgress: false,
+            () => Task.FromResult(VaultHelloUnlockResult.Success),
+            showHelloUnlock: true);
+
+        await viewModel.UnlockWithHelloCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsVerified);
+        Assert.False(viewModel.IsMasterPasswordVerified);
+        Assert.Equal("", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task UnlockWithHello_NotFound_SetsReenrollGateButDoesNotReenroll()
+    {
+        var confirmCalls = 0;
+        var enrollCalls = 0;
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask,
+            new PinManager(),
+            Localizer(),
+            migrationInProgress: false,
+            () => Task.FromResult(VaultHelloUnlockResult.Failure(VaultHelloFailureReason.NotFound)),
+            showHelloUnlock: true,
+            () =>
+            {
+                confirmCalls++;
+                return Task.FromResult(true);
+            },
+            () =>
+            {
+                enrollCalls++;
+                return Task.CompletedTask;
+            });
+
+        await viewModel.UnlockWithHelloCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsVerified);
+        Assert.True(viewModel.HasPendingHelloReenroll);
+        Assert.Equal("VaultHelloUnlockNotFound", viewModel.ErrorMessage);
+        Assert.Equal(0, confirmCalls);
+        Assert.Equal(0, enrollCalls);
+    }
+
+    [Fact]
+    public async Task Unlock_MasterPasswordSuccessAfterHelloNotFound_OffersReenroll()
+    {
+        var confirmCalls = 0;
+        var enrollCalls = 0;
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask,
+            new PinManager(),
+            Localizer(),
+            migrationInProgress: false,
+            () => Task.FromResult(VaultHelloUnlockResult.Failure(VaultHelloFailureReason.NotFound)),
+            showHelloUnlock: true,
+            () =>
+            {
+                confirmCalls++;
+                return Task.FromResult(true);
+            },
+            () =>
+            {
+                enrollCalls++;
+                return Task.CompletedTask;
+            });
+
+        await viewModel.UnlockWithHelloCommand.ExecuteAsync(null);
+        await viewModel.UnlockCommand.ExecuteAsync(Pw("MasterPass1!"));
+
+        Assert.True(viewModel.IsVerified);
+        Assert.True(viewModel.IsMasterPasswordVerified);
+        Assert.False(viewModel.HasPendingHelloReenroll);
+        Assert.Equal(1, confirmCalls);
+        Assert.Equal(1, enrollCalls);
+    }
+
+    [Fact]
+    public async Task Unlock_MasterPasswordSuccessWithoutBrokenHello_DoesNotOfferReenroll()
+    {
+        var confirmCalls = 0;
+        var enrollCalls = 0;
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask,
+            new PinManager(),
+            Localizer(),
+            migrationInProgress: false,
+            () => Task.FromResult(VaultHelloUnlockResult.Failure(VaultHelloFailureReason.NotFound)),
+            showHelloUnlock: true,
+            () =>
+            {
+                confirmCalls++;
+                return Task.FromResult(true);
+            },
+            () =>
+            {
+                enrollCalls++;
+                return Task.CompletedTask;
+            });
+
+        await viewModel.UnlockCommand.ExecuteAsync(Pw("MasterPass1!"));
+
+        Assert.True(viewModel.IsVerified);
+        Assert.True(viewModel.IsMasterPasswordVerified);
+        Assert.Equal(0, confirmCalls);
+        Assert.Equal(0, enrollCalls);
+    }
 }

@@ -488,6 +488,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         OnPropertyChanged(nameof(VaultStatusText));
         OnPropertyChanged(nameof(VaultDisabledActionsVisible));
         OnPropertyChanged(nameof(VaultEnabledActionsVisible));
+        RefreshVaultHelloUiState();
     }
 
     public string VaultStatusText => IsVaultEnabled
@@ -499,6 +500,36 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     /// <summary>Visibility flag for the "Change" / "Disable" actions (vault configured).</summary>
     public bool VaultEnabledActionsVisible => IsVaultEnabled;
+
+    [ObservableProperty]
+    private bool _isVaultHelloAvailable;
+
+    partial void OnIsVaultHelloAvailableChanged(bool value) => RefreshVaultHelloUiState();
+
+    [ObservableProperty]
+    private bool _isVaultHelloEnrolled;
+
+    partial void OnIsVaultHelloEnrolledChanged(bool value) => RefreshVaultHelloUiState();
+
+    [ObservableProperty]
+    private bool _isVaultHelloBusy;
+
+    partial void OnIsVaultHelloBusyChanged(bool value) => RefreshVaultHelloUiState();
+
+    [ObservableProperty]
+    private string _vaultHelloStatusText = "";
+
+    public bool VaultHelloSectionVisible => IsVaultEnabled;
+
+    public bool VaultHelloEnrollVisible => IsVaultEnabled && IsVaultHelloAvailable && !IsVaultHelloEnrolled;
+
+    public bool VaultHelloDisableVisible => IsVaultEnabled && IsVaultHelloAvailable && IsVaultHelloEnrolled;
+
+    public bool VaultHelloUnavailableVisible => IsVaultEnabled && !IsVaultHelloAvailable;
+
+    public bool CanEnableVaultHello => VaultHelloEnrollVisible && !IsVaultHelloBusy;
+
+    public bool CanDisableVaultHello => VaultHelloDisableVisible && !IsVaultHelloBusy;
 
     // --- UI state (persisted but not exposed in Settings tab) ---
 
@@ -930,6 +961,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         DisconnectOnLock = settings.DisconnectOnLock;
         IsPinConfigured = !string.IsNullOrEmpty(settings.PinHash) && !string.IsNullOrEmpty(settings.PinSalt);
         IsVaultEnabled = settings.VaultEnabled;
+        IsVaultHelloEnrolled = settings.VaultHelloEnrolled;
+        IsVaultHelloAvailable = false;
+        RefreshVaultHelloUiState();
 
         // Advanced / Logging
         EnableLogging = settings.EnableLogging;
@@ -1977,10 +2011,95 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         await RefreshVaultStatusAsync();
     }
 
-    private async Task RefreshVaultStatusAsync()
+    private bool CanRunEnableVaultHello() => CanEnableVaultHello;
+
+    [RelayCommand(CanExecute = nameof(CanRunEnableVaultHello))]
+    private async Task EnableVaultHelloAsync(CancellationToken cancellationToken)
+    {
+        IsVaultHelloBusy = true;
+        VaultHelloStatusText = _localizer["SettingsVaultHelloStatusEnrolling"];
+        try
+        {
+            await _vaultLifecycle.EnrollHelloAsync(cancellationToken);
+        }
+        catch (VaultHelloException)
+        {
+            VaultHelloStatusText = _localizer["SettingsVaultHelloStatusUnavailable"];
+            return;
+        }
+        catch (InvalidOperationException)
+        {
+            VaultHelloStatusText = _localizer["SettingsVaultHelloStatusUnlockRequired"];
+            return;
+        }
+        finally
+        {
+            IsVaultHelloBusy = false;
+        }
+
+        await RefreshVaultStatusAsync();
+    }
+
+    private bool CanRunDisableVaultHello() => CanDisableVaultHello;
+
+    [RelayCommand(CanExecute = nameof(CanRunDisableVaultHello))]
+    private async Task DisableVaultHelloAsync(CancellationToken cancellationToken)
+    {
+        IsVaultHelloBusy = true;
+        VaultHelloStatusText = _localizer["SettingsVaultHelloStatusRemoving"];
+        try
+        {
+            await _vaultLifecycle.RemoveHelloAsync(cancellationToken);
+        }
+        finally
+        {
+            IsVaultHelloBusy = false;
+        }
+
+        await RefreshVaultStatusAsync();
+    }
+
+    public async Task RefreshVaultStatusAsync()
     {
         AppSettings settings = await _configManager.LoadSettingsAsync();
         IsVaultEnabled = settings.VaultEnabled;
+        IsVaultHelloEnrolled = settings.VaultHelloEnrolled;
+        IsVaultHelloAvailable = IsVaultEnabled
+            && await _vaultLifecycle.IsHelloEnrollmentAvailableAsync().ConfigureAwait(true);
+        RefreshVaultHelloUiState();
+    }
+
+    private void RefreshVaultHelloUiState()
+    {
+        OnPropertyChanged(nameof(VaultHelloSectionVisible));
+        OnPropertyChanged(nameof(VaultHelloEnrollVisible));
+        OnPropertyChanged(nameof(VaultHelloDisableVisible));
+        OnPropertyChanged(nameof(VaultHelloUnavailableVisible));
+        OnPropertyChanged(nameof(CanEnableVaultHello));
+        OnPropertyChanged(nameof(CanDisableVaultHello));
+        EnableVaultHelloCommand.NotifyCanExecuteChanged();
+        DisableVaultHelloCommand.NotifyCanExecuteChanged();
+
+        if (IsVaultHelloBusy)
+        {
+            return;
+        }
+
+        if (!IsVaultEnabled)
+        {
+            VaultHelloStatusText = "";
+            return;
+        }
+
+        if (IsVaultHelloEnrolled)
+        {
+            VaultHelloStatusText = _localizer["SettingsVaultHelloStatusEnabled"];
+            return;
+        }
+
+        VaultHelloStatusText = IsVaultHelloAvailable
+            ? _localizer["SettingsVaultHelloStatusAvailable"]
+            : _localizer["SettingsVaultHelloStatusUnavailable"];
     }
 
     [RelayCommand]
@@ -2106,6 +2225,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             or nameof(SelectedGateway) or nameof(SelectedProject)
             or nameof(SelectedExternalTool) or nameof(HasValidationErrors)
             or nameof(IsPinConfigured) or nameof(PinStatusText)
+            or nameof(IsVaultHelloAvailable) or nameof(IsVaultHelloEnrolled)
+            or nameof(IsVaultHelloBusy) or nameof(VaultHelloStatusText)
+            or nameof(VaultHelloSectionVisible) or nameof(VaultHelloEnrollVisible)
+            or nameof(VaultHelloDisableVisible) or nameof(VaultHelloUnavailableVisible)
+            or nameof(CanEnableVaultHello) or nameof(CanDisableVaultHello)
             or nameof(ValidationSummary)
             or nameof(GeneralTabErrorCount) or nameof(HasGeneralTabErrors)
             or nameof(TerminalTabErrorCount) or nameof(HasTerminalTabErrors)

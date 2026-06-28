@@ -364,6 +364,13 @@ public sealed class AppSettings
     /// </summary>
     public int VaultHelloMaxDaysBeforeMasterPassword { get; set; }
 
+    /// <summary>
+    /// UTC timestamp of the last successful master-password vault unlock.
+    /// Hello unlocks do not update this value; it drives periodic master-password
+    /// re-authentication for Windows Hello.
+    /// </summary>
+    public DateTimeOffset? VaultLastMasterUnlockUtc { get; set; }
+
     /// <summary>Persisted count of consecutive failed master-password unlock attempts,
     /// restored on startup so the unlock-gate lockout survives an application restart.
     /// Mirrors <see cref="PinFailureCount"/>.</summary>
