@@ -23,6 +23,7 @@ using Heimdall.App.Views.Dialogs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -505,6 +506,25 @@ public sealed class WpfDialogService(
             : null;
 
         return result;
+    }
+
+    /// <inheritdoc/>
+    public Task<MacroEditorDialogResult?> ShowMacroEditorAsync(TerminalMacro macro)
+    {
+        ArgumentNullException.ThrowIfNull(macro);
+
+        var viewModel = new MacroEditorDialogViewModel(macro, _localizer);
+        var dialog = new MacroEditorDialog(_localizer)
+        {
+            DataContext = viewModel,
+            Owner = GetOwnerWindow()
+        };
+
+        MacroEditorDialogResult? result = dialog.ShowDialog() == true
+            ? viewModel.Result
+            : null;
+
+        return Task.FromResult(result);
     }
 
     /// <inheritdoc/>

@@ -18,6 +18,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Import;
+using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 
 namespace Heimdall.App.Services;
@@ -194,6 +195,16 @@ public interface IDialogService
         AutoPrefillContext? prefillContext = null,
         string? existingActionId = null,
         IReadOnlyDictionary<string, string>? existingValues = null);
+
+    /// <summary>
+    /// Shows the terminal macro editor dialog and returns the requested save/delete action,
+    /// or <c>null</c> when the user cancels.
+    /// </summary>
+    Task<MacroEditorDialogResult?> ShowMacroEditorAsync(TerminalMacro macro)
+    {
+        ArgumentNullException.ThrowIfNull(macro);
+        return Task.FromResult<MacroEditorDialogResult?>(null);
+    }
 
     /// <summary>
     /// Shows the bulk port edit dialog and returns the validated port value,

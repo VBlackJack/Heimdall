@@ -18,6 +18,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views;
 using Heimdall.App.Views.EmbeddedRdp;
 using Heimdall.Core.Logging;
@@ -565,6 +566,7 @@ public sealed class SessionTabContextMenuFactory
 
         // Play macro submenu
         var playMenu = new MenuItem { Header = vm.Localize("MacroPlaySubmenu") };
+        var editMenu = new MenuItem { Header = vm.Localize("MacroEditSubmenu") };
 
         var macros = MacroService.LoadMacros();
         if (macros.Count == 0)
@@ -575,6 +577,11 @@ public sealed class SessionTabContextMenuFactory
                 IsEnabled = false
             };
             playMenu.Items.Add(emptyItem);
+            editMenu.Items.Add(new MenuItem
+            {
+                Header = vm.Localize("MacroNoMacros"),
+                IsEnabled = false
+            });
         }
         else
         {
@@ -597,9 +604,46 @@ public sealed class SessionTabContextMenuFactory
                     }
                 };
                 playMenu.Items.Add(macroItem);
+
+                var editItem = new MenuItem { Header = macro.Name, Tag = macro };
+                editItem.Click += async (s, _) =>
+                {
+                    if (s is not MenuItem { Tag: TerminalMacro m })
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        var result = await vm.DialogService.ShowMacroEditorAsync(m);
+                        if (result is null)
+                        {
+                            return;
+                        }
+
+                        if (result.Action == MacroEditorDialogAction.Delete)
+                        {
+                            MacroService.DeleteMacro(m.Id);
+                            vm.StatusText = string.Format(vm.Localize("MacroDeleted"), m.Name);
+                            return;
+                        }
+
+                        if (result.Macro is not null)
+                        {
+                            await MacroService.SaveMacroAsync(result.Macro);
+                            vm.StatusText = string.Format(vm.Localize("MacroEdited"), result.Macro.Name);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        FileLogger.Warn($"Macro edit failed: {ex.Message}");
+                    }
+                };
+                editMenu.Items.Add(editItem);
             }
         }
         menu.Items.Add(playMenu);
+        menu.Items.Add(editMenu);
     }
 
     // ── Close session (always present) ───────────────────────────────
