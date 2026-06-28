@@ -25,12 +25,14 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Heimdall.App.Services;
+using Heimdall.App.Services.Macros;
 using Heimdall.App.Services.WinRm;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 using Heimdall.Ssh;
 using Heimdall.Terminal.Logging;
+using Heimdall.Terminal.Macros;
 using Microsoft.Web.WebView2.Core;
 using AppDialogs = Heimdall.App.Views.Dialogs;
 using AppDialogViewModels = Heimdall.App.ViewModels.Dialogs;
@@ -183,6 +185,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private readonly ConcurrentQueue<string> _pendingTerminalMessages = new();
     private readonly ResizeFailureLogThrottle _resizeLogThrottle = new ResizeFailureLogThrottle();
+    private readonly object _macroExpectSync = new();
 
     private string? _sessionLogKey;
     private string _sessionLogDisplayName = string.Empty;
@@ -197,6 +200,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private Core.Localization.LocalizationManager? _localizer;
     private ServerHealthMonitor? _healthMonitor;
     private WinRmEarlyOutputDiagnostic? _winRmEarlyOutputDiagnostic;
+    private MacroExpectObserver? _activeMacroExpectObserver;
     private readonly List<MacroEntry> _macroEntries = [];
     private readonly Stopwatch _macroStopwatch = new();
 
@@ -1251,6 +1255,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        ForwardToActiveMacroExpect(data);
+
         if (SessionLogService is not null && _sessionLogKey is not null)
         {
             // Forward raw bytes; the service owns decoding + ANSI stripping. No-op until a
@@ -1713,20 +1719,152 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         Core.Logging.FileLogger.Info($"Macro playback started: {macro.Name} ({macro.Entries.Count} entries)");
 
-        foreach (var entry in macro.Entries)
+        var result = await MacroPlaybackExecutor.RunAsync(
+            macro.Entries,
+            WaitForMacroExpectAsync,
+            static (delayMs, token) => Task.Delay(delayMs, token),
+            bytes => WriteToSession(bytes),
+            OnMacroExpectTimedOut,
+            ct);
+
+        if (result.WasStoppedByExpectTimeout)
         {
-            ct.ThrowIfCancellationRequested();
-
-            if (entry.DelayMs > 0)
-            {
-                await Task.Delay(entry.DelayMs, ct);
-            }
-
-            var bytes = Encoding.UTF8.GetBytes(entry.Input);
-            WriteToSession(bytes);
+            Core.Logging.FileLogger.Warn(
+                $"Macro playback stopped after expect timeout ({result.ExpectTimeoutMs ?? 0} ms): {macro.Name}");
+            return;
         }
 
         Core.Logging.FileLogger.Info($"Macro playback completed: {macro.Name}");
+    }
+
+    private async Task<MacroExpectWaitResult> WaitForMacroExpectAsync(MacroEntry entry, CancellationToken ct)
+    {
+        if (entry.ExpectPattern is null)
+        {
+            return MacroExpectWaitResult.NotRequired;
+        }
+
+        var timeoutMs = entry.GetEffectiveExpectTimeoutMs();
+        var observer = new MacroExpectObserver(entry.ExpectPattern, entry.ExpectIsRegex);
+        SetActiveMacroExpectObserver(observer);
+
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var timeoutTask = Task.Delay(timeoutMs, timeoutCts.Token);
+            var completedTask = await Task.WhenAny(observer.Completion, timeoutTask);
+            if (completedTask == observer.Completion)
+            {
+                timeoutCts.Cancel();
+                return await observer.Completion;
+            }
+
+            ct.ThrowIfCancellationRequested();
+            return MacroExpectWaitResult.TimedOut(timeoutMs);
+        }
+        finally
+        {
+            ClearActiveMacroExpectObserver(observer);
+        }
+    }
+
+    private void OnMacroExpectTimedOut(MacroEntry entry, MacroExpectWaitResult result)
+    {
+        Core.Logging.FileLogger.Warn(
+            $"Macro expect timed out after {result.TimeoutMs} ms; action={entry.ExpectOnTimeout}.");
+
+        if (entry.ExpectOnTimeout != ExpectTimeoutAction.Abort)
+        {
+            return;
+        }
+
+        BeginInvokeIfAvailable(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            UpdateStatus(
+                "MacroExpectTimeout",
+                displayTextOverride: $"Macro expect timed out after {result.TimeoutMs} ms",
+                forceErrorBrush: true);
+        });
+    }
+
+    private void ForwardToActiveMacroExpect(ReadOnlySpan<byte> data)
+    {
+        MacroExpectObserver? observer;
+        lock (_macroExpectSync)
+        {
+            observer = _activeMacroExpectObserver;
+        }
+
+        observer?.Observe(data);
+    }
+
+    private void SetActiveMacroExpectObserver(MacroExpectObserver observer)
+    {
+        lock (_macroExpectSync)
+        {
+            if (_activeMacroExpectObserver is not null)
+            {
+                throw new InvalidOperationException("A macro expect wait is already active.");
+            }
+
+            _activeMacroExpectObserver = observer;
+        }
+    }
+
+    private void ClearActiveMacroExpectObserver(MacroExpectObserver observer)
+    {
+        lock (_macroExpectSync)
+        {
+            if (ReferenceEquals(_activeMacroExpectObserver, observer))
+            {
+                _activeMacroExpectObserver = null;
+            }
+        }
+    }
+
+    private sealed class MacroExpectObserver
+    {
+        private readonly object _sync = new();
+        private readonly ExpectMatcher _matcher = new();
+        private readonly string _pattern;
+        private readonly bool _isRegex;
+        private readonly TaskCompletionSource<MacroExpectWaitResult> _completion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public MacroExpectObserver(string pattern, bool isRegex)
+        {
+            _pattern = pattern;
+            _isRegex = isRegex;
+        }
+
+        public Task<MacroExpectWaitResult> Completion => _completion.Task;
+
+        public void Observe(ReadOnlySpan<byte> data)
+        {
+            if (_completion.Task.IsCompleted)
+            {
+                return;
+            }
+
+            lock (_sync)
+            {
+                if (_completion.Task.IsCompleted)
+                {
+                    return;
+                }
+
+                _matcher.Feed(data);
+                if (_matcher.TryMatch(_pattern, _isRegex))
+                {
+                    _completion.TrySetResult(MacroExpectWaitResult.Matched);
+                }
+            }
+        }
     }
 
     /// <summary>Resolves a locale key, falling back to the key name if no localizer is set.</summary>

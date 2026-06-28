@@ -28,12 +28,34 @@ public sealed class TerminalMacro
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public enum ExpectTimeoutAction
+{
+    Abort,
+    Continue
+}
+
 /// <summary>
 /// A single input entry within a terminal macro, capturing the text sent
 /// and the delay since the previous entry.
 /// </summary>
 public sealed class MacroEntry
 {
+    public const int DefaultExpectTimeoutMs = 30_000;
+    public const int MinExpectTimeoutMs = 100;
+    public const int MaxExpectTimeoutMs = 600_000;
+
     public string Input { get; set; } = "";
     public int DelayMs { get; set; }
+    public string? ExpectPattern { get; set; }
+    public int? ExpectTimeoutMs { get; set; }
+    public bool ExpectIsRegex { get; set; }
+    public ExpectTimeoutAction ExpectOnTimeout { get; set; } = ExpectTimeoutAction.Abort;
+
+    public int GetEffectiveExpectTimeoutMs()
+    {
+        return Math.Clamp(
+            ExpectTimeoutMs ?? DefaultExpectTimeoutMs,
+            MinExpectTimeoutMs,
+            MaxExpectTimeoutMs);
+    }
 }
