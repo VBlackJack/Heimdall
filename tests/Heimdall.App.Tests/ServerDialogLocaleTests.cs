@@ -112,6 +112,27 @@ public sealed class ServerDialogLocaleTests
     }
 
     [Theory]
+    [InlineData("en", "ServerDialogSessionLoggingOverrideLabel")]
+    [InlineData("en", "ServerDialogSessionLoggingOverrideInherit")]
+    [InlineData("en", "ServerDialogSessionLoggingOverrideOn")]
+    [InlineData("en", "ServerDialogSessionLoggingOverrideOff")]
+    [InlineData("en", "ServerDialogSessionLoggingOverrideHint")]
+    [InlineData("fr", "ServerDialogSessionLoggingOverrideLabel")]
+    [InlineData("fr", "ServerDialogSessionLoggingOverrideInherit")]
+    [InlineData("fr", "ServerDialogSessionLoggingOverrideOn")]
+    [InlineData("fr", "ServerDialogSessionLoggingOverrideOff")]
+    [InlineData("fr", "ServerDialogSessionLoggingOverrideHint")]
+    public async Task SessionLoggingOverrideKeys_ExistInBothLocales(string locale, string key)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync(locale);
+
+        string text = localizer[key];
+
+        Assert.False(string.IsNullOrWhiteSpace(text));
+        Assert.NotEqual(key, text);
+    }
+
+    [Theory]
     [InlineData("en", "RdpAutofillRetryAction")]
     [InlineData("en", "RdpAutofillRetryTooltip")]
     [InlineData("en", "RdpAutofillDismissAction")]

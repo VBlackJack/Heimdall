@@ -1163,6 +1163,32 @@
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="{StaticResource SpacingSm}">
+                                <!-- Session logging override -->
+                                <Border Style="{StaticResource DialogSectionCardStyle}">
+                                    <StackPanel>
+                                        <TextBlock x:Name="DlgSrv_SessionLoggingOverrideLabel"
+                                                   Text="{loc:Translate ServerDialogSessionLoggingOverrideLabel}"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,0,0,4"/>
+                                        <ComboBox TabIndex="59"
+                                                  AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_SessionLoggingOverrideLabel}"
+                                                  SelectedValue="{Binding SessionLoggingOverrideSelection, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  SelectedValuePath="Tag"
+                                                  Style="{StaticResource DialogFormComboBoxStyle}">
+                                            <ComboBoxItem Content="{loc:Translate ServerDialogSessionLoggingOverrideInherit}"
+                                                          Tag="{x:Static vm:SessionLoggingOverrideSelection.Inherit}"/>
+                                            <ComboBoxItem Content="{loc:Translate ServerDialogSessionLoggingOverrideOn}"
+                                                          Tag="{x:Static vm:SessionLoggingOverrideSelection.On}"/>
+                                            <ComboBoxItem Content="{loc:Translate ServerDialogSessionLoggingOverrideOff}"
+                                                          Tag="{x:Static vm:SessionLoggingOverrideSelection.Off}"/>
+                                        </ComboBox>
+                                        <TextBlock Text="{loc:Translate ServerDialogSessionLoggingOverrideHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- RDP options -->
                                 <Border>
                                     <Border.Style>

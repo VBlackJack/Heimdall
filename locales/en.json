@@ -2259,6 +2259,11 @@
   "ServerDialogTabInfo": "Info",
   "ServerDialogTabDisabledHint": "Not available for this connection type",
   "ServerDialogTunnelingUnavailable": "Tunneling is not available for this protocol type.",
+  "ServerDialogSessionLoggingOverrideLabel": "Session logging",
+  "ServerDialogSessionLoggingOverrideInherit": "Inherit",
+  "ServerDialogSessionLoggingOverrideOn": "On",
+  "ServerDialogSessionLoggingOverrideOff": "Off",
+  "ServerDialogSessionLoggingOverrideHint": "Inherit follows the global session logging setting. WinRM sessions do not create transcript logs even when this profile is set to On because the local PowerShell host owns the REPL.",
 
   "ServerDialogConnectionBasics": "Connection basics",
   "ServerDialogConnectionBasicsDesc": "Set the destination host and the service port Heimdall should open.",

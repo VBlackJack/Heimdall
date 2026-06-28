@@ -48,6 +48,13 @@ public enum SshTestChipState
     Cancelled
 }
 
+public enum SessionLoggingOverrideSelection
+{
+    Inherit,
+    On,
+    Off
+}
+
 /// <summary>
 /// ViewModel for the redesigned server add/edit dialog.
 /// Keeps the persisted DTO model intact while exposing UX-friendly
@@ -244,6 +251,39 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     private bool? _sessionLoggingOverride;
+
+    [ObservableProperty]
+    private SessionLoggingOverrideSelection _sessionLoggingOverrideSelection = SessionLoggingOverrideSelection.Inherit;
+
+    partial void OnSessionLoggingOverrideChanged(bool? value)
+    {
+        var selection = value switch
+        {
+            true => SessionLoggingOverrideSelection.On,
+            false => SessionLoggingOverrideSelection.Off,
+            _ => SessionLoggingOverrideSelection.Inherit
+        };
+
+        if (SessionLoggingOverrideSelection != selection)
+        {
+            SessionLoggingOverrideSelection = selection;
+        }
+    }
+
+    partial void OnSessionLoggingOverrideSelectionChanged(SessionLoggingOverrideSelection value)
+    {
+        bool? profileOverride = value switch
+        {
+            SessionLoggingOverrideSelection.On => true,
+            SessionLoggingOverrideSelection.Off => false,
+            _ => null
+        };
+
+        if (SessionLoggingOverride != profileOverride)
+        {
+            SessionLoggingOverride = profileOverride;
+        }
+    }
 
     /// <summary>
     /// Optional override for the external password-manager entry name (substituted for

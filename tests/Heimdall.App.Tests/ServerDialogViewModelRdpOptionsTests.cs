@@ -474,6 +474,78 @@ public sealed class ServerDialogViewModelRdpOptionsTests
         Assert.Equal(nameof(ServerDialogViewModel.RdpResizeEnableDelayMs), vm.FirstInvalidField);
     }
 
+    [Theory]
+    [MemberData(nameof(SessionLoggingOverrideSelectionCases))]
+    public void Session_logging_override_selection_maps_to_dto(
+        SessionLoggingOverrideSelection selection,
+        bool? expectedOverride)
+    {
+        var vm = new ServerDialogViewModel
+        {
+            DisplayName = "Server",
+            RemoteServer = "server.example.com",
+            ConnectionType = "SSH",
+            SessionLoggingOverrideSelection = selection
+        };
+
+        var dto = vm.ToDto();
+
+        Assert.Equal(expectedOverride, vm.SessionLoggingOverride);
+        Assert.Equal(expectedOverride, dto.SessionLoggingOverride);
+    }
+
+    [Theory]
+    [MemberData(nameof(SessionLoggingOverrideDtoCases))]
+    public void Session_logging_override_loads_from_dto(
+        bool? storedOverride,
+        SessionLoggingOverrideSelection expectedSelection)
+    {
+        var vm = ServerDialogViewModel.FromDto(new ServerProfileDto
+        {
+            DisplayName = "Server",
+            RemoteServer = "server.example.com",
+            ConnectionType = "SSH",
+            SessionLoggingOverride = storedOverride
+        });
+
+        Assert.Equal(storedOverride, vm.SessionLoggingOverride);
+        Assert.Equal(expectedSelection, vm.SessionLoggingOverrideSelection);
+    }
+
+    [Theory]
+    [MemberData(nameof(SessionLoggingOverrideDtoCases))]
+    public void Session_logging_override_round_trips_through_dto(
+        bool? storedOverride,
+        SessionLoggingOverrideSelection expectedSelection)
+    {
+        var original = new ServerProfileDto
+        {
+            DisplayName = "Server",
+            RemoteServer = "server.example.com",
+            ConnectionType = "SSH",
+            SessionLoggingOverride = storedOverride
+        };
+
+        var roundTripped = ServerDialogViewModel.FromDto(original).ToDto();
+
+        Assert.Equal(storedOverride, roundTripped.SessionLoggingOverride);
+        Assert.Equal(expectedSelection, ServerDialogViewModel.FromDto(roundTripped).SessionLoggingOverrideSelection);
+    }
+
+    public static TheoryData<SessionLoggingOverrideSelection, bool?> SessionLoggingOverrideSelectionCases => new()
+    {
+        { SessionLoggingOverrideSelection.Inherit, null },
+        { SessionLoggingOverrideSelection.On, true },
+        { SessionLoggingOverrideSelection.Off, false }
+    };
+
+    public static TheoryData<bool?, SessionLoggingOverrideSelection> SessionLoggingOverrideDtoCases => new()
+    {
+        { null, SessionLoggingOverrideSelection.Inherit },
+        { true, SessionLoggingOverrideSelection.On },
+        { false, SessionLoggingOverrideSelection.Off }
+    };
+
     private sealed class FakeMonitorEnumerator : IMonitorEnumerator
     {
         private readonly Queue<IReadOnlyList<MonitorInfo>> _snapshots;

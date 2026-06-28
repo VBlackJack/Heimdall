@@ -2259,6 +2259,11 @@
   "ServerDialogTabInfo": "Info",
   "ServerDialogTabDisabledHint": "Non disponible pour ce type de connexion",
   "ServerDialogTunnelingUnavailable": "Le tunneling n'est pas disponible pour ce type de protocole.",
+  "ServerDialogSessionLoggingOverrideLabel": "Journalisation des sessions",
+  "ServerDialogSessionLoggingOverrideInherit": "H\u00e9riter",
+  "ServerDialogSessionLoggingOverrideOn": "Activ\u00e9",
+  "ServerDialogSessionLoggingOverrideOff": "D\u00e9sactiv\u00e9",
+  "ServerDialogSessionLoggingOverrideHint": "H\u00e9riter suit le param\u00e8tre global de journalisation des sessions. Les sessions WinRM ne cr\u00e9ent pas de journaux de transcript m\u00eame si ce profil est sur Activ\u00e9, car l'h\u00f4te PowerShell local poss\u00e8de le REPL.",
 
   "ServerDialogConnectionBasics": "Param\u00e8tres de connexion",
   "ServerDialogConnectionBasicsDesc": "Indiquez l'h\u00f4te de destination et le port de service que Heimdall doit ouvrir.",
