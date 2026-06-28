@@ -60,6 +60,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     private readonly Stack<string> _navigationHistory = new();
     private readonly IUiDispatcher _uiDispatcher;
+    private readonly IRemoteClipboardService _remoteClipboard;
     private IRemoteBrowser? _browser;
     // The RAW (undecorated) browser, used only for sudo-upload temp staging and temp cleanup so the
     // logging decorator does not record misleading temp-path operations.
@@ -74,14 +75,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private System.Threading.Timer? _errorHighlightTimer;
     private CancellationTokenSource? _lifecycleCts = new();
     private CancellationTokenSource? _transferCts;
+    private string _endpointKey = string.Empty;
     private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EmbeddedSftpViewModel"/> class.
     /// </summary>
     public EmbeddedSftpViewModel(IUiDispatcher uiDispatcher)
+        : this(uiDispatcher, new RemoteClipboardService())
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EmbeddedSftpViewModel"/> class.
+    /// </summary>
+    public EmbeddedSftpViewModel(
+        IUiDispatcher uiDispatcher,
+        IRemoteClipboardService remoteClipboard)
     {
         _uiDispatcher = uiDispatcher ?? throw new ArgumentNullException(nameof(uiDispatcher));
+        _remoteClipboard = remoteClipboard ?? throw new ArgumentNullException(nameof(remoteClipboard));
+        _remoteClipboard.Changed += OnRemoteClipboardChanged;
         Files = [];
         Bookmarks = [];
         UnfilteredEntries = [];
@@ -172,6 +186,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsToolbarEnabled))]
     [NotifyPropertyChangedFor(nameof(CanNavigateBack))]
     [NotifyPropertyChangedFor(nameof(IsDisconnected))]
+    [NotifyPropertyChangedFor(nameof(HasClipboard))]
     [NotifyCanExecuteChangedFor(nameof(PasteCommand))]
     private bool _isConnected;
 
@@ -221,6 +236,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     /// <summary>The selected remote entries.</summary>
     public IReadOnlyList<SftpFileInfo> SelectedFiles { get; private set; } = [];
+
+    /// <summary>The normalized host:port:user key for the active remote endpoint.</summary>
+    public string EndpointKey => _endpointKey;
 
     /// <summary>
     /// Raised when the user requests a split action from the embedded view.
@@ -280,6 +298,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         _sshParams = sshParams;
         _hostKeyStore = hostKeyStore;
         _hostKeyVerifier = hostKeyVerifier;
+        SetEndpointKey(RemoteClipboardEndpointKey.FromConnection(browser, endpoint, sshParams));
 
         if (firstInitialization)
         {
@@ -313,6 +332,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         _transferCts?.Dispose();
         _transferCts = null;
         IsConnected = false;
+        _remoteClipboard.Changed -= OnRemoteClipboardChanged;
     }
 
     /// <summary>
@@ -1901,6 +1921,47 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(action);
         return _uiDispatcher.InvokeAsync(action);
+    }
+
+    private void SetEndpointKey(string endpointKey)
+    {
+        if (SetProperty(ref _endpointKey, endpointKey, nameof(EndpointKey)))
+        {
+            RefreshRemoteClipboardState();
+        }
+    }
+
+    private bool IsClipboardForCurrentEndpoint(SftpClipboardContent clipboard)
+    {
+        return string.Equals(clipboard.SourceEndpointKey, EndpointKey, StringComparison.Ordinal);
+    }
+
+    private void OnRemoteClipboardChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_uiDispatcher.CheckAccess())
+        {
+            RefreshRemoteClipboardState();
+            return;
+        }
+
+        _ = _uiDispatcher.InvokeAsync(RefreshRemoteClipboardState);
+    }
+
+    private void RefreshRemoteClipboardState()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(Clipboard));
+        OnPropertyChanged(nameof(HasClipboard));
+        PasteCommand.NotifyCanExecuteChanged();
     }
 
     private void ArmErrorHighlightTimer()

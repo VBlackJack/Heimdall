@@ -662,6 +662,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IPostConnectSequenceRunner, PostConnectSequenceRunner>();
         services.AddSingleton<IPostConnectStepResolver, CommandLibraryStepResolver>();
         services.AddSingleton<IClipboardService, WpfClipboardService>();
+        services.AddSingleton<IRemoteClipboardService, RemoteClipboardService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
 
         // TwinShell command library

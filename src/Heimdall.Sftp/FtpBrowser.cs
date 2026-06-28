@@ -39,6 +39,7 @@ public sealed class FtpBrowser : IRemoteBrowser
     private readonly IFtpsCertificateVerifier _certificateVerifier;
     private AsyncFtpClient? _client;
     private string? _host;
+    private string? _username;
     private int _port;
     private bool _disposed;
     private bool _connected;
@@ -64,6 +65,12 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     /// <summary>The host the browser is currently connected to, or null when disconnected.</summary>
     public string? Host => _host;
+
+    /// <summary>The port the browser is currently connected to, or 0 when disconnected.</summary>
+    public int Port => _port;
+
+    /// <summary>The username used for the current FTP session, or null when disconnected.</summary>
+    public string? Username => _username;
 
     public FtpBrowser()
         : this(new FtpsCertificateStore(), RejectingFtpsCertificateVerifier.Instance)
@@ -108,6 +115,7 @@ public sealed class FtpBrowser : IRemoteBrowser
         }
 
         string effectiveUsername = string.IsNullOrEmpty(username) ? "anonymous" : username;
+        _username = effectiveUsername;
         FtpConfig config = CreateConfig(passiveMode, useSsl);
         AsyncFtpClient client = new AsyncFtpClient(host, effectiveUsername, password ?? string.Empty, _port, config);
         FtpsCertificateRejectedException? certificateRejection = null;
@@ -139,6 +147,8 @@ public sealed class FtpBrowser : IRemoteBrowser
         {
             client.Dispose();
             _host = null;
+            _username = null;
+            _port = 0;
             _connected = false;
             if (certificateRejection is not null)
             {
@@ -486,6 +496,8 @@ public sealed class FtpBrowser : IRemoteBrowser
         _client = null;
         _connected = false;
         _host = null;
+        _username = null;
+        _port = 0;
         Disconnected?.Invoke(null);
     }
 

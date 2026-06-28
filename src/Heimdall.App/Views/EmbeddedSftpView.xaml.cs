@@ -130,9 +130,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         var services = (Application.Current as App)?.Services;
         var uiDispatcher = services?.GetRequiredService<IUiDispatcher>()
             ?? throw new InvalidOperationException("IUiDispatcher is not registered.");
+        var remoteClipboard = services?.GetRequiredService<IRemoteClipboardService>()
+            ?? throw new InvalidOperationException("IRemoteClipboardService is not registered.");
         _hostKeyVerifier = services?.GetRequiredService<IHostKeyVerifier>()
             ?? throw new InvalidOperationException("IHostKeyVerifier is not registered.");
-        _viewModel = new EmbeddedSftpViewModel(uiDispatcher);
+        _viewModel = new EmbeddedSftpViewModel(uiDispatcher, remoteClipboard);
         DataContext = _viewModel;
     }
 

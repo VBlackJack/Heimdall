@@ -15,8 +15,8 @@
  */
 
 using System.Linq;
-using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services;
 using Heimdall.Sftp;
 
 namespace Heimdall.App.ViewModels;
@@ -30,16 +30,13 @@ namespace Heimdall.App.ViewModels;
 public sealed partial class EmbeddedSftpViewModel
 {
     /// <summary>
-    /// The current clipboard content, or null when empty. Drives <see cref="HasClipboard"/> and the
-    /// paste command's executability.
+    /// The current shared remote clipboard content, or null when empty.
     /// </summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasClipboard))]
-    [NotifyCanExecuteChangedFor(nameof(PasteCommand))]
-    private SftpClipboardContent? _clipboard;
+    public SftpClipboardContent? Clipboard => _remoteClipboard.Current;
 
-    /// <summary>Whether the clipboard currently holds at least one entry.</summary>
-    public bool HasClipboard => Clipboard is { Entries.Count: > 0 };
+    /// <summary>Whether this pane can see clipboard entries from the same remote endpoint.</summary>
+    public bool HasClipboard => Clipboard is { Entries.Count: > 0 } clipboard
+        && IsClipboardForCurrentEndpoint(clipboard);
 
     [RelayCommand]
     private void CutSelected() => SetClipboard(SftpClipboardMode.Cut);
@@ -64,7 +61,7 @@ public sealed partial class EmbeddedSftpViewModel
             return;
         }
 
-        Clipboard = new SftpClipboardContent([.. selection], CurrentPath, mode);
+        _remoteClipboard.Set(new SftpClipboardContent([.. selection], CurrentPath, mode, EndpointKey));
 
         string statusKey = mode == SftpClipboardMode.Cut ? "SftpStatusCut" : "SftpStatusCopied";
         UpdateStatus(_localizer?.Format(statusKey, selection.Count.ToString())
@@ -85,7 +82,7 @@ public sealed partial class EmbeddedSftpViewModel
         }
 
         SftpClipboardContent? clipboard = Clipboard;
-        if (clipboard is null || clipboard.Entries.Count == 0)
+        if (clipboard is null || clipboard.Entries.Count == 0 || !IsClipboardForCurrentEndpoint(clipboard))
         {
             return;
         }
@@ -147,7 +144,7 @@ public sealed partial class EmbeddedSftpViewModel
 
             if (cut)
             {
-                await RunOnUiAsync(() => Clipboard = null);
+                _remoteClipboard.Clear();
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusPasteComplete")));
@@ -163,9 +160,16 @@ public sealed partial class EmbeddedSftpViewModel
                     .ToList();
 
                 await RunOnUiAsync(() =>
-                    Clipboard = remaining.Count > 0
-                        ? clipboard with { Entries = remaining }
-                        : null);
+                {
+                    if (remaining.Count > 0)
+                    {
+                        _remoteClipboard.Set(clipboard with { Entries = remaining });
+                    }
+                    else
+                    {
+                        _remoteClipboard.Clear();
+                    }
+                });
             }
 
             await RunOnUiAsync(() => SetTransferError(ex));
@@ -256,22 +260,3 @@ public sealed partial class EmbeddedSftpViewModel
         return (name[..lastDot], name[lastDot..]);
     }
 }
-
-/// <summary>Whether a clipboard capture is a move (cut) or a copy.</summary>
-public enum SftpClipboardMode
-{
-    /// <summary>Entries will be moved (renamed) on paste, then the clipboard is cleared.</summary>
-    Cut,
-
-    /// <summary>Entries will be copied on paste; the clipboard is kept for repeated pastes.</summary>
-    Copy,
-}
-
-/// <summary>Immutable snapshot of a cut/copy operation: the captured entries, their source directory, and the mode.</summary>
-/// <param name="Entries">The captured remote entries.</param>
-/// <param name="SourceDirectory">The directory the entries were captured from.</param>
-/// <param name="Mode">Whether the capture is a cut or a copy.</param>
-public sealed record SftpClipboardContent(
-    IReadOnlyList<SftpFileInfo> Entries,
-    string SourceDirectory,
-    SftpClipboardMode Mode);
