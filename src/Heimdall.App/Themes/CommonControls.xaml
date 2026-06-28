@@ -1403,12 +1403,6 @@
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
                                       Visibility="Collapsed"/>
-                                <ContentPresenter x:Name="IconContent"
-                                                  Grid.Column="0"
-                                                  ContentSource="Icon"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  Visibility="Collapsed"/>
                                 <ContentPresenter Grid.Column="1"
                                                   Margin="8,0,8,0"
                                                   VerticalAlignment="Center"

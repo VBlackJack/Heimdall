@@ -295,15 +295,9 @@
                                           Header="{loc:Translate SftpBtnBookmark}"
                                           Command="{Binding AddBookmarkCommand}"
                                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem.Icon>
-                                        <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"/>
-                                    </MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem x:Name="MnuBookmarkManage" Header="{loc:Translate SftpBtnBookmarks}" Click="OnBookmarksClick"
                                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem.Icon>
-                                        <TextBlock Text="&#xE735;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"/>
-                                    </MenuItem.Icon>
                                 </MenuItem>
                             </ContextMenu>
                         </Button.ContextMenu>
@@ -328,31 +322,19 @@
                                 <MenuItem Header="{loc:Translate SftpBtnUpload}"
                                           Click="OnUploadClick"
                                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem.Icon>
-                                        <TextBlock Text="&#xE898;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"/>
-                                    </MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{loc:Translate SftpBtnNewFolder}"
                                           Command="{Binding CreateFolderCommand}"
                                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem.Icon>
-                                        <TextBlock Text="&#xE8F4;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"/>
-                                    </MenuItem.Icon>
                                 </MenuItem>
                                 <Separator/>
                                 <MenuItem Header="{loc:Translate SftpBtnBookmark}"
                                           Command="{Binding AddBookmarkCommand}"
                                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem.Icon>
-                                        <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"/>
-                                    </MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{loc:Translate SftpBtnBookmarks}"
                                           Click="OnBookmarksClick"
                                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem.Icon>
-                                        <TextBlock Text="&#xE735;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"/>
-                                    </MenuItem.Icon>
                                 </MenuItem>
                             </ContextMenu>
                         </Button.ContextMenu>
@@ -504,104 +486,55 @@
                              Opened="OnContextMenuOpened">
                     <MenuItem x:Name="CtxOpen" Header="{loc:Translate SftpCtxOpen}" Click="OnCtxOpenClick" InputGestureText="Enter"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8E5;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxEdit" Header="{loc:Translate SftpCtxEdit}" Click="OnCtxEditClick"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxEditExternal" Header="{loc:Translate SftpCtxEditExternal}" Click="OnCtxEditExternalClick"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A7;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxDownload" Header="{loc:Translate SftpBtnDownload}" Click="OnCtxDownloadClick"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE896;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <Separator/>
                     <MenuItem x:Name="CtxRename" Header="{loc:Translate SftpBtnRename}" Command="{Binding RenameSelectedCommand}" InputGestureText="F2"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8AC;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxDelete" Header="{loc:Translate SftpBtnDelete}" Command="{Binding DeleteSelectedCommand}" InputGestureText="Del"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="{StaticResource FontSizeSubtitle}"
-                                       Foreground="{DynamicResource ErrorTextBrush}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxChmod" Header="{loc:Translate SftpCtxChmod}" Command="{Binding ChmodSelectedCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8D7;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <Separator/>
                     <MenuItem x:Name="CtxCut" Header="{loc:Translate SftpCtxCut}" Command="{Binding CutSelectedCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C6;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxCopy" Header="{loc:Translate SftpCtxCopy}" Command="{Binding CopySelectedCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxPaste" Header="{loc:Translate SftpCtxPaste}" Command="{Binding PasteCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE77F;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxPasteFromExplorer" Header="{loc:Translate SftpCtxPasteFromExplorer}" Click="OnCtxPasteFromExplorerClick"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE898;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxDuplicate" Header="{loc:Translate SftpCtxDuplicate}" Command="{Binding DuplicateSelectedCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <Separator/>
                     <MenuItem x:Name="CtxCopyPath" Header="{loc:Translate SftpCopyPath}" Click="OnCtxCopyPathClick" InputGestureText="Ctrl+C"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxProperties" Header="{loc:Translate SftpCtxProperties}" Command="{Binding ShowSelectedPropertiesCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE946;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <Separator/>
                     <MenuItem x:Name="CtxUploadHere" Header="{loc:Translate SftpCtxUploadHere}" Click="OnUploadClick"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE898;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="CtxOpenInTerminal" Header="{loc:Translate SftpCtxOpenInTerminal}" Command="{Binding OpenSelectedInTerminalCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
-                        <MenuItem.Icon>
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE756;" FontSize="{StaticResource FontSizeSubtitle}"/>
-                        </MenuItem.Icon>
                     </MenuItem>
                 </ContextMenu>
             </ListView.ContextMenu>
