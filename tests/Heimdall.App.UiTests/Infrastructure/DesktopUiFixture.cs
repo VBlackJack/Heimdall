@@ -25,17 +25,11 @@ public sealed class DesktopUiFixture
     {
         TryPurge(Path.Combine(AppContext.BaseDirectory, "config", "session-snapshot.json"));
 
-        var debugSnapshot = Path.Combine(
-            WpfTestHost.RepoRoot,
-            "src",
-            "Heimdall.App",
-            "bin",
-            "Debug",
-            "net10.0-windows",
-            "config",
-            "session-snapshot.json");
-
-        TryPurge(debugSnapshot);
+        var debugDir = WpfTestHost.ResolveAppBuildDir("Debug");
+        if (debugDir is not null)
+        {
+            TryPurge(Path.Combine(debugDir, "config", "session-snapshot.json"));
+        }
 
         // TODO: Add Release-path coverage if the UIA suite starts running against Release outputs.
     }

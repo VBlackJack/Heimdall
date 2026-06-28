@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows.Threading;
+using System.Xml.Linq;
 using Heimdall.App.Localization;
 using Heimdall.Core.Localization;
 using WpfApplication = System.Windows.Application;
@@ -61,6 +64,37 @@ public static class WpfTestHost
             EnsureStarted();
             return _repoRoot!;
         }
+    }
+
+    /// <summary>
+    /// Resolves the Heimdall.App build output directory for a given configuration by reading
+    /// the app project's current target framework, so a TFM bump does not break UI test paths.
+    /// Returns the matching directory that contains Heimdall.exe, or null when none is present.
+    /// </summary>
+    public static string? ResolveAppBuildDir(string configuration)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration);
+
+        var configRoot = Path.Combine(RepoRoot, "src", "Heimdall.App", "bin", configuration);
+        if (!Directory.Exists(configRoot))
+        {
+            return null;
+        }
+
+        var targetFrameworks = ResolveAppTargetFrameworks();
+        if (targetFrameworks.Count == 0)
+        {
+            return null;
+        }
+
+        return Directory.GetDirectories(configRoot)
+            .Select(dir => (Path: dir, TargetFramework: new DirectoryInfo(dir).Name))
+            .Where(candidate => targetFrameworks.Contains(candidate.TargetFramework))
+            .Where(candidate => File.Exists(Path.Combine(candidate.Path, "Heimdall.exe")))
+            .OrderByDescending(candidate => candidate.TargetFramework.Length)
+            .ThenBy(candidate => candidate.Path, StringComparer.Ordinal)
+            .Select(candidate => candidate.Path)
+            .FirstOrDefault();
     }
 
     public static void EnsureStarted()
@@ -200,6 +234,21 @@ public static class WpfTestHost
         {
             // Process is exiting; ignore teardown failures.
         }
+    }
+
+    private static HashSet<string> ResolveAppTargetFrameworks()
+    {
+        var appProjectPath = Path.Combine(RepoRoot, "src", "Heimdall.App", "Heimdall.App.csproj");
+        if (!File.Exists(appProjectPath))
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        return XDocument.Load(appProjectPath)
+            .Descendants()
+            .Where(element => element.Name.LocalName is "TargetFramework" or "TargetFrameworks")
+            .SelectMany(element => element.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static string LocateRepoRoot()

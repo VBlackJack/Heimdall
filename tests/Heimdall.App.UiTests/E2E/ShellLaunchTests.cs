@@ -65,12 +65,20 @@ public sealed class ShellLaunchTests
 
     private static string LocateHeimdallExe()
     {
-        var debugPath = Path.Combine(WpfTestHost.RepoRoot, "src", "Heimdall.App", "bin", "Debug", "net10.0-windows", "Heimdall.exe");
-        if (File.Exists(debugPath))
+        var debugDir = WpfTestHost.ResolveAppBuildDir("Debug");
+        if (debugDir is not null)
         {
-            return debugPath;
+            return Path.Combine(debugDir, "Heimdall.exe");
         }
 
-        return Path.Combine(WpfTestHost.RepoRoot, "src", "Heimdall.App", "bin", "Release", "net10.0-windows", "Heimdall.exe");
+        var releaseDir = WpfTestHost.ResolveAppBuildDir("Release");
+        if (releaseDir is not null)
+        {
+            return Path.Combine(releaseDir, "Heimdall.exe");
+        }
+
+        // No built output found; return a deterministic Debug-style path so the caller's
+        // File.Exists guard fails cleanly with a sensible diagnostic instead of throwing here.
+        return Path.Combine(WpfTestHost.RepoRoot, "src", "Heimdall.App", "bin", "Debug", "Heimdall.exe");
     }
 }
