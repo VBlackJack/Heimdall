@@ -96,6 +96,9 @@ internal sealed class TelnetHandler : IProtocolHandler
         return new ConnectionResult(
             true,
             null,
-            new TerminalSessionResult(session, $"{server.RemoteServer}:{port}"));
+            new TerminalSessionResult(
+                session,
+                $"{server.RemoteServer}:{port}",
+                server.SessionLoggingOverride));
     }
 }

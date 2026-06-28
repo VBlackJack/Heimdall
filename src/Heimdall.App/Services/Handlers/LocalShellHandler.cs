@@ -173,7 +173,12 @@ internal sealed class LocalShellHandler : IProtocolHandler
         return new ConnectionResult(
             true,
             null,
-            new LocalShellBundle(session, workingDir, executable, server.LocalShellElevated));
+            new LocalShellBundle(
+                session,
+                workingDir,
+                executable,
+                server.LocalShellElevated,
+                server.SessionLoggingOverride));
     }
 
     /// <summary>
@@ -213,7 +218,13 @@ internal sealed class LocalShellHandler : IProtocolHandler
             return new ConnectionResult(
                 true,
                 null,
-                new LocalShellBundle(null, workingDir, executable, true, ExternalProcessId: process.Id));
+                new LocalShellBundle(
+                    null,
+                    workingDir,
+                    executable,
+                    true,
+                    server.SessionLoggingOverride,
+                    ExternalProcessId: process.Id));
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {

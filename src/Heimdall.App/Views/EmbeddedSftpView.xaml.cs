@@ -91,6 +91,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     /// </summary>
     public Func<bool>? SessionLoggingEnabledProvider { get; set; }
 
+    /// <summary>Per-profile session-logging override. Null means inherit the live global setting.</summary>
+    public bool? SessionLoggingOverride { get; set; }
+
     /// <summary>
     /// Raised when the user clicks the Split button in the header strip.
     /// The subscriber (EmbeddedSessionManager) shows the split picker context menu.
@@ -185,7 +188,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                 SessionOperationLog,
                 SessionLoggingEnabledProvider ?? (static () => false),
                 operationProtocol,
-                operationHost)
+                operationHost,
+                SessionLoggingOverride)
             : SessionOperationEmitter.Disabled;
 
         _viewModel.Initialize(
@@ -202,7 +206,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             operationLog: SessionOperationLog,
             sessionLoggingEnabledProvider: SessionLoggingEnabledProvider,
             operationProtocol: operationProtocol,
-            operationHost: operationHost);
+            operationHost: operationHost,
+            sessionLoggingOverride: SessionLoggingOverride);
 
         _editor = new RemoteFileEditor(
             operationsBrowser,
@@ -263,7 +268,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             SessionOperationLog,
             SessionLoggingEnabledProvider ?? (static () => false),
             protocol,
-            host);
+            host,
+            SessionLoggingOverride);
     }
 
     public string CurrentPath => _viewModel.CurrentPath;

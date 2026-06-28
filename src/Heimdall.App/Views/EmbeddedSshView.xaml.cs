@@ -234,6 +234,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// <summary>Terminal appearance settings (font, color scheme). Set by EmbeddedSessionManager before Loaded fires.</summary>
     public AppSettings? TerminalSettings { get; set; }
 
+    /// <summary>Per-profile session-logging override. Null means inherit the live global setting.</summary>
+    public bool? SessionLoggingOverride { get; set; }
+
     /// <summary>
     /// Session transcript writer. Set by EmbeddedSessionManager. When null, transcript recording
     /// (auto and manual) is unavailable for this view.
@@ -1626,7 +1629,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// </summary>
     private void TryAutoStartSessionLog()
     {
-        bool enabled = TerminalSettings?.SessionLoggingEnabled ?? false;
+        bool globalEnabled = TerminalSettings?.SessionLoggingEnabled ?? false;
+        bool enabled = SessionLoggingResolver.ResolveSessionLogging(SessionLoggingOverride, globalEnabled);
         if (SessionLogGatePolicy.ShouldAutoStart(enabled, _sessionTab?.ConnectionType))
         {
             StartSessionLog();

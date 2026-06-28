@@ -49,6 +49,7 @@ public sealed class ServerProfileDto
     public bool UseDirectConnection { get; set; }
     public string? ProjectId { get; set; }
     public string ConnectionType { get; set; } = "RDP";
+    public bool? SessionLoggingOverride { get; set; }
 
     /// <summary>
     /// Optional name or reference of this profile's entry in the external password

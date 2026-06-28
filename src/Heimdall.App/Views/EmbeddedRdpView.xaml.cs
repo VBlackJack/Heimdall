@@ -180,6 +180,9 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     /// </summary>
     public Func<bool>? SessionLoggingEnabledProvider { get; set; }
 
+    /// <summary>Per-profile session-logging override. Null means inherit the live global setting.</summary>
+    public bool? SessionLoggingOverride { get; set; }
+
     /// <summary>
     /// Raised when the user clicks the Split button in the header strip.
     /// The subscriber (EmbeddedSessionManager) shows the split picker context menu.
@@ -1616,8 +1619,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the
     // LIVE global toggle and the RDP event eligibility. No snapshot, no second frozen gate.
     private bool ShouldLogSessionEvents()
-        => SessionEventLog is not null
-            && SessionEventGatePolicy.ShouldLog(SessionLoggingEnabledProvider?.Invoke() ?? false, "RDP");
+    {
+        bool globalEnabled = SessionLoggingEnabledProvider?.Invoke() ?? false;
+        bool enabled = SessionLoggingResolver.ResolveSessionLogging(SessionLoggingOverride, globalEnabled);
+        return SessionEventLog is not null && SessionEventGatePolicy.ShouldLog(enabled, "RDP");
+    }
 
     // Emits a Connected event and opens a connected segment. Refreshes the event connect timestamp
     // so the matching Disconnected reports this segment's duration. The latch is set regardless of

@@ -79,7 +79,8 @@ internal sealed class VncHandler : IProtocolHandler
             server.RemoteServer,
             vncPort,
             password,
-            server.VncViewOnly);
+            server.VncViewOnly,
+            server.SessionLoggingOverride);
         return Task.FromResult(new ConnectionResult(true, null, session));
     }
 }

@@ -134,7 +134,7 @@ internal sealed class FtpHandler : IProtocolHandler
         return new ConnectionResult(
             true,
             null,
-            new FtpSessionBundle(browser),
+            new FtpSessionBundle(browser, server.SessionLoggingOverride),
             Warning: warning);
     }
 

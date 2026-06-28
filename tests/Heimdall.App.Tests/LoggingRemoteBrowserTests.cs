@@ -47,8 +47,15 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
         IRemoteBrowser inner,
         CapturingOperationLog sink,
         bool gateEnabled = true,
-        string host = Host)
-        => new LoggingRemoteBrowser(inner, sink, () => gateEnabled, Protocol, host);
+        string host = Host,
+        bool? sessionLoggingOverride = null)
+        => new LoggingRemoteBrowser(
+            inner,
+            sink,
+            () => gateEnabled,
+            Protocol,
+            host,
+            sessionLoggingOverride);
 
     [Fact]
     public async Task UploadFileAsync_Success_LogsSuccessWithBytes()
@@ -218,6 +225,33 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
 
         await decorator.UploadFileAsync(localPath, "/srv/data/file.bin");
         await decorator.DeleteAsync("/srv/data/old.bin");
+
+        sink.Records.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Operation_OverrideOn_LogsWhenGlobalDisabled()
+    {
+        string localPath = NewTempFileOfSize(8);
+        CapturingOperationLog sink = new();
+        FakeRemoteBrowser inner = new();
+        LoggingRemoteBrowser decorator = Create(inner, sink, gateEnabled: false, sessionLoggingOverride: true);
+
+        await decorator.UploadFileAsync(localPath, "/srv/data/file.bin");
+
+        sink.Records.Should().ContainSingle()
+            .Which.Result.Should().Be(SessionOperationResult.Success);
+    }
+
+    [Fact]
+    public async Task Operation_OverrideOff_LogsNothingWhenGlobalEnabled()
+    {
+        string localPath = NewTempFileOfSize(8);
+        CapturingOperationLog sink = new();
+        FakeRemoteBrowser inner = new();
+        LoggingRemoteBrowser decorator = Create(inner, sink, gateEnabled: true, sessionLoggingOverride: false);
+
+        await decorator.UploadFileAsync(localPath, "/srv/data/file.bin");
 
         sink.Records.Should().BeEmpty();
     }

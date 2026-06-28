@@ -169,7 +169,10 @@ internal sealed class SftpHandler : IProtocolHandler
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
-        return new ConnectionResult(true, null, new SftpSessionBundle(browser, sshParams));
+        return new ConnectionResult(true, null, new SftpSessionBundle(
+            browser,
+            sshParams,
+            server.SessionLoggingOverride));
     }
 
     private static bool IsValidSftpHost(string host)

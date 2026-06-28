@@ -719,6 +719,54 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal(expanded, server.TunnelsPanelExpanded);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SaveServersAsync_ThenLoadServersAsync_PreservesSessionLoggingOverride(bool? sessionLoggingOverride)
+    {
+        var original = new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = "srv-logging",
+                DisplayName = "Logging Override",
+                RemoteServer = "10.0.0.1",
+                SessionLoggingOverride = sessionLoggingOverride
+            }
+        };
+
+        await _manager.SaveServersAsync(original);
+        var loaded = await _manager.LoadServersAsync();
+
+        var server = Assert.Single(loaded);
+        Assert.Equal(sessionLoggingOverride, server.SessionLoggingOverride);
+    }
+
+    [Fact]
+    public async Task LoadServersAsync_MissingSessionLoggingOverride_DefaultsNull()
+    {
+        string configDir = Path.Combine(_tempDir, "config");
+        Directory.CreateDirectory(configDir);
+
+        const string Json = """
+        [
+            {
+                "id": "srv-logging-legacy",
+                "displayName": "Legacy Logging",
+                "remoteServer": "10.0.0.1",
+                "connectionType": "SSH"
+            }
+        ]
+        """;
+        await File.WriteAllTextAsync(_manager.ServersPath, Json, new UTF8Encoding(false));
+
+        List<ServerProfileDto> loaded = await _manager.LoadServersAsync();
+
+        ServerProfileDto server = Assert.Single(loaded);
+        Assert.Null(server.SessionLoggingOverride);
+    }
+
     [Fact]
     public async Task SaveServersAsync_ThenLoadServersAsync_PreservesExecutionConfirmed()
     {

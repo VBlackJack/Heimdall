@@ -31,8 +31,16 @@ public sealed class SessionOperationEmitterTests
     private const string Host = "host.example";
 
     private static SessionOperationEmitter Create(
-        CapturingOperationLog sink, bool gateEnabled = true, string host = Host)
-        => new SessionOperationEmitter(sink, () => gateEnabled, Protocol, host);
+        CapturingOperationLog sink,
+        bool gateEnabled = true,
+        string host = Host,
+        bool? sessionLoggingOverride = null)
+        => new SessionOperationEmitter(
+            sink,
+            () => gateEnabled,
+            Protocol,
+            host,
+            sessionLoggingOverride);
 
     [Fact]
     public async Task RunMkdirAsync_Success_EmitsPrivilegedSuccessRecord()
@@ -141,6 +149,29 @@ public sealed class SessionOperationEmitterTests
         await emitter.RunMkdirAsync("/srv/data/newdir", () => { ran = true; return Task.CompletedTask; }, privileged: true);
 
         ran.Should().BeTrue();
+        sink.Records.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_OverrideOn_EmitsWhenGlobalDisabled()
+    {
+        CapturingOperationLog sink = new();
+        SessionOperationEmitter emitter = Create(sink, gateEnabled: false, sessionLoggingOverride: true);
+
+        await emitter.RunMkdirAsync("/srv/data/newdir", () => Task.CompletedTask, privileged: true);
+
+        sink.Records.Should().ContainSingle()
+            .Which.Result.Should().Be(SessionOperationResult.Success);
+    }
+
+    [Fact]
+    public async Task RunAsync_OverrideOff_EmitsNothingWhenGlobalEnabled()
+    {
+        CapturingOperationLog sink = new();
+        SessionOperationEmitter emitter = Create(sink, gateEnabled: true, sessionLoggingOverride: false);
+
+        await emitter.RunMkdirAsync("/srv/data/newdir", () => Task.CompletedTask, privileged: true);
+
         sink.Records.Should().BeEmpty();
     }
 

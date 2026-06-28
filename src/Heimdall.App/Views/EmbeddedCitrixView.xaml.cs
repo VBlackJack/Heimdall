@@ -99,6 +99,9 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     /// </summary>
     public Func<bool>? SessionLoggingEnabledProvider { get; set; }
 
+    /// <summary>Per-profile session-logging override. Null means inherit the live global setting.</summary>
+    public bool? SessionLoggingOverride { get; set; }
+
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -716,8 +719,11 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the
     // LIVE global toggle and the Citrix event eligibility (the policy stays the single source of truth).
     private bool ShouldLogSessionEvents()
-        => SessionEventLog is not null
-            && SessionEventGatePolicy.ShouldLog(SessionLoggingEnabledProvider?.Invoke() ?? false, "CITRIX");
+    {
+        bool globalEnabled = SessionLoggingEnabledProvider?.Invoke() ?? false;
+        bool enabled = SessionLoggingResolver.ResolveSessionLogging(SessionLoggingOverride, globalEnabled);
+        return SessionEventLog is not null && SessionEventGatePolicy.ShouldLog(enabled, "CITRIX");
+    }
 
     // Emits the Connected event once, from the first real "connected" moment (window embed or
     // external-mode fallback), never from the optimistic InitializeSession status or the handler.

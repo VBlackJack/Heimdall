@@ -171,7 +171,7 @@ internal sealed class WinRmHandler : IProtocolHandler
             return new ConnectionResult(
                 true,
                 null,
-                new TerminalSessionResult(session, server.RemoteServer),
+                new TerminalSessionResult(session, server.RemoteServer, server.SessionLoggingOverride),
                 Warning: warning);
         }
         catch (OperationCanceledException)

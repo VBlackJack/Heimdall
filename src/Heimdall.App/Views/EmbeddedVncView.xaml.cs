@@ -72,6 +72,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable
     /// </summary>
     public Func<bool>? SessionLoggingEnabledProvider { get; set; }
 
+    /// <summary>Per-profile session-logging override. Null means inherit the live global setting.</summary>
+    public bool? SessionLoggingOverride { get; set; }
+
     public EmbeddedVncView()
     {
         InitializeComponent();
@@ -413,8 +416,11 @@ public partial class EmbeddedVncView : UserControl, IDisposable
     // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the
     // LIVE global toggle and the VNC event eligibility (the policy stays the single source of truth).
     private bool ShouldLogSessionEvents()
-        => SessionEventLog is not null
-            && SessionEventGatePolicy.ShouldLog(SessionLoggingEnabledProvider?.Invoke() ?? false, "VNC");
+    {
+        bool globalEnabled = SessionLoggingEnabledProvider?.Invoke() ?? false;
+        bool enabled = SessionLoggingResolver.ResolveSessionLogging(SessionLoggingOverride, globalEnabled);
+        return SessionEventLog is not null && SessionEventGatePolicy.ShouldLog(enabled, "VNC");
+    }
 
     // Event-log title: the server-supplied desktop name when received, else the host.
     private string? ResolveEventTitle()

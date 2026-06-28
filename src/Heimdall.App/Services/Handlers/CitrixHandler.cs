@@ -159,7 +159,12 @@ internal sealed class CitrixHandler : IProtocolHandler
             return Task.FromResult(new ConnectionResult(
                 true,
                 null,
-                new CitrixSessionResult(process, resultStoreFrontUrl, resultAppName, mode)));
+                new CitrixSessionResult(
+                    process,
+                    resultStoreFrontUrl,
+                    resultAppName,
+                    mode,
+                    server.SessionLoggingOverride)));
         }
         catch (Exception ex)
         {

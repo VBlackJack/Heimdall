@@ -37,6 +37,7 @@ public sealed class SessionOperationEmitter
     private readonly Func<bool> _sessionLoggingEnabledProvider;
     private readonly string _protocol;
     private readonly string _host;
+    private readonly bool? _sessionLoggingOverride;
 
     /// <summary>
     /// Creates an emitter that records sudo operations to <paramref name="sink"/> when the live gate
@@ -50,7 +51,8 @@ public sealed class SessionOperationEmitter
         ISessionOperationLog sink,
         Func<bool> sessionLoggingEnabledProvider,
         string protocol,
-        string host)
+        string host,
+        bool? sessionLoggingOverride = null)
     {
         ArgumentNullException.ThrowIfNull(sink);
         ArgumentNullException.ThrowIfNull(sessionLoggingEnabledProvider);
@@ -61,6 +63,7 @@ public sealed class SessionOperationEmitter
         _sessionLoggingEnabledProvider = sessionLoggingEnabledProvider;
         _protocol = protocol;
         _host = GraphicalSessionEventHelpers.ResolveHost(host, host);
+        _sessionLoggingOverride = sessionLoggingOverride;
     }
 
     private SessionOperationEmitter()
@@ -71,6 +74,7 @@ public sealed class SessionOperationEmitter
         _sessionLoggingEnabledProvider = static () => false;
         _protocol = string.Empty;
         _host = string.Empty;
+        _sessionLoggingOverride = null;
     }
 
     /// <summary>A shared no-op emitter that runs operations but never records (logging not wired).</summary>
@@ -190,7 +194,12 @@ public sealed class SessionOperationEmitter
     }
 
     private bool ShouldLog()
-        => _sink is not null && SessionOperationGatePolicy.ShouldLog(_sessionLoggingEnabledProvider(), _protocol);
+    {
+        bool enabled = SessionLoggingResolver.ResolveSessionLogging(
+            _sessionLoggingOverride,
+            _sessionLoggingEnabledProvider());
+        return _sink is not null && SessionOperationGatePolicy.ShouldLog(enabled, _protocol);
+    }
 
     // Builds and enqueues a record without ever throwing into the operation thread. Logging is
     // best-effort: a build or enqueue failure is swallowed with a single diagnostic rather than masking

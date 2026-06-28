@@ -157,6 +157,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             };
             var rdpSettings = settings ?? new AppSettings();
             var (runtimeServer, multimonFallbackStatusKey) = ResolveEmbeddedRdpRuntimeServer(rdp.Server);
+            view.SessionLoggingOverride = runtimeServer.SessionLoggingOverride;
             var globalResizeDelay = settings?.RdpResizeEnableDelayMs ?? DefaultRdpResizeEnableDelayMs;
             if (globalResizeDelay < 0)
             {
@@ -198,7 +199,13 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             // Legacy SSH materialization path. The normal SSH pipeline now mounts
             // the view earlier via CreateConnectingSshHostControl and attaches here
             // only as a defensive fallback if SessionStarting was bypassed.
-            return CreateSshView(sessionTab, sshResult.Session, displayName, sshKeepAliveInterval, settings);
+            return CreateSshView(
+                sessionTab,
+                sshResult.Session,
+                displayName,
+                sshKeepAliveInterval,
+                settings,
+                sshResult.SessionLoggingOverride);
         }
 
         if (string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase) &&
@@ -210,7 +217,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 displayName,
                 sshKeepAliveInterval,
                 settings,
-                endpoint: termResult.Endpoint);
+                endpoint: termResult.Endpoint,
+                sessionLoggingOverride: termResult.SessionLoggingOverride);
         }
 
         if (string.Equals(connectionType, "LOCAL", StringComparison.OrdinalIgnoreCase) &&
@@ -232,7 +240,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 return infoPanel;
             }
 
-            var termView = CreateTerminalSshView(sessionTab, localBundle.Session!, displayName, 0, settings, localBundle.IsElevated);
+            var termView = CreateTerminalSshView(
+                sessionTab,
+                localBundle.Session!,
+                displayName,
+                0,
+                settings,
+                localBundle.IsElevated,
+                sessionLoggingOverride: localBundle.SessionLoggingOverride);
 
             // Auto-attach local file browser panel in a vertical split
             var fileBrowser = new Views.LocalFileBrowserView(
@@ -363,7 +378,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 bundle.Browser,
                 displayName,
                 bundle.SshParams,
-                initialRemotePath);
+                initialRemotePath,
+                bundle.SessionLoggingOverride);
         }
 
         if (string.Equals(connectionType, "FTP", StringComparison.OrdinalIgnoreCase) &&
@@ -374,7 +390,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 ftpBundle.Browser,
                 displayName,
                 null,
-                initialRemotePath);
+                initialRemotePath,
+                ftpBundle.SessionLoggingOverride);
         }
 
         if (string.Equals(connectionType, "CITRIX", StringComparison.OrdinalIgnoreCase)
@@ -388,6 +405,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 SessionLoggingEnabledProvider = () =>
                     _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
             };
+            view.SessionLoggingOverride = citrix.SessionLoggingOverride;
             view.InitializeSession(citrix, sessionTab, displayName, _localizer, _dialogService);
             view.SetConnectionInfo(citrix.StoreFrontUrl, citrix.AppName, citrix.Mode);
             view.CloseRequested += () => CloseRequestedCallback?.Invoke(sessionTab);
@@ -405,6 +423,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 SessionLoggingEnabledProvider = () =>
                     _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
             };
+            view.SessionLoggingOverride = vnc.SessionLoggingOverride;
             view.SessionConnected += (serverId) =>
             {
                 _connectionSm.TryTransition(serverId, ConnectionState.Connected);
@@ -442,7 +461,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 displayName,
                 0,
                 settings,
-                endpoint: telnetResult.Endpoint);
+                endpoint: telnetResult.Endpoint,
+                sessionLoggingOverride: telnetResult.SessionLoggingOverride);
         }
 
         if (string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
@@ -455,7 +475,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 0,
                 settings,
                 endpoint: winRmResult.Endpoint,
-                connectedStatus: "RemoteSessionHandedOff");
+                connectedStatus: "RemoteSessionHandedOff",
+                sessionLoggingOverride: winRmResult.SessionLoggingOverride);
         }
 
         return new DisposablePlaceholderView(displayName, connectionType, session);
@@ -683,6 +704,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         {
             Localizer = _localizer,
             TerminalSettings = settings,
+            SessionLoggingOverride = server.SessionLoggingOverride,
             SessionLogService = _sessionLogService
         };
         view.InitializeConnecting(sessionTab, displayName, BuildSshEndpointLabel(server));
@@ -716,9 +738,11 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         switch (sessionResult)
         {
             case SshSessionResult sshResult:
+                view.SessionLoggingOverride = sshResult.SessionLoggingOverride;
                 view.AttachSession(sshResult.Session, keepAlive);
                 break;
             case TerminalSessionResult terminalResult:
+                view.SessionLoggingOverride = terminalResult.SessionLoggingOverride;
                 bool autoReconnectOnProcessExit = TerminalReconnectPolicy.ReconnectsOnProcessExit(
                     sessionTab.ConnectionType);
                 view.AttachTerminalSession(
@@ -745,12 +769,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         SshShellSession session,
         string displayName,
         int keepAliveIntervalSeconds,
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        bool? sessionLoggingOverride = null)
     {
         var view = new EmbeddedSshView
         {
             Localizer = _localizer,
             TerminalSettings = settings,
+            SessionLoggingOverride = sessionLoggingOverride,
             SessionLogService = _sessionLogService
         };
         view.InitializeSession(session, tab, displayName, string.Empty, keepAliveIntervalSeconds);
@@ -768,12 +794,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         AppSettings? settings = null,
         bool isElevated = false,
         string? endpoint = null,
-        string connectedStatus = "Connected")
+        string connectedStatus = "Connected",
+        bool? sessionLoggingOverride = null)
     {
         var view = new EmbeddedSshView
         {
             Localizer = _localizer,
             TerminalSettings = settings,
+            SessionLoggingOverride = sessionLoggingOverride,
             SessionLogService = _sessionLogService
         };
         bool autoReconnectOnProcessExit = TerminalReconnectPolicy.ReconnectsOnProcessExit(
@@ -821,7 +849,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         IRemoteBrowser browser,
         string displayName,
         SshConnectionParams? sshParams,
-        string? initialRemotePath = null)
+        string? initialRemotePath = null,
+        bool? sessionLoggingOverride = null)
     {
         var view = new EmbeddedSftpView
         {
@@ -829,7 +858,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             // Read the LIVE global toggle at the seam (mirrors the RDP/VNC/Citrix wiring), so enabling
             // session logging takes effect without a restart.
             SessionLoggingEnabledProvider = () =>
-                _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
+                _configManager.CurrentSettings?.SessionLoggingEnabled ?? false,
+            SessionLoggingOverride = sessionLoggingOverride
         };
         view.InitializeSession(
             browser, tab, displayName, string.Empty,

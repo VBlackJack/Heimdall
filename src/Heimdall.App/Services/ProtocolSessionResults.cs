@@ -42,17 +42,23 @@ public sealed record ConnectionResult(
 public sealed record RdpSessionResult(ServerProfileDto Server, int? TunnelPort = null) : ISessionResult;
 
 /// <summary>Wraps an SSH.NET shell session.</summary>
-public sealed record SshSessionResult(SshShellSession Session) : ISessionResult;
+public sealed record SshSessionResult(
+    SshShellSession Session,
+    bool? SessionLoggingOverride = null) : ISessionResult;
 
 /// <summary>Wraps a terminal session (Plink pipe mode, Telnet, or ConPTY).</summary>
 public sealed record TerminalSessionResult(
     Heimdall.Terminal.ITerminalSession Session,
-    string? Endpoint = null) : ISessionResult;
+    string? Endpoint = null,
+    bool? SessionLoggingOverride = null) : ISessionResult;
 
 /// <summary>
 /// Bundles an SFTP browser session with the SSH connection parameters needed for sudo operations.
 /// </summary>
-public sealed record SftpSessionBundle(SftpBrowser Browser, SshConnectionParams SshParams) : ISessionResult;
+public sealed record SftpSessionBundle(
+    SftpBrowser Browser,
+    SshConnectionParams SshParams,
+    bool? SessionLoggingOverride = null) : ISessionResult;
 
 /// <summary>
 /// Bundles a local shell terminal session with the resolved working directory.
@@ -62,6 +68,7 @@ public sealed record LocalShellBundle(
     string WorkingDirectory,
     string ShellExecutable,
     bool IsElevated = false,
+    bool? SessionLoggingOverride = null,
     int? ExternalProcessId = null) : ISessionResult
 {
     /// <summary>True when the shell was launched in a separate elevated window.</summary>
@@ -77,12 +84,15 @@ public sealed record VncSessionResult(
     string Host,
     int Port,
     string? Password = null,
-    bool ViewOnly = false) : ISessionResult;
+    bool ViewOnly = false,
+    bool? SessionLoggingOverride = null) : ISessionResult;
 
 /// <summary>
 /// Bundles an FTP browser session for use by the embedded SFTP/FTP view.
 /// </summary>
-public sealed record FtpSessionBundle(FtpBrowser Browser) : ISessionResult;
+public sealed record FtpSessionBundle(
+    FtpBrowser Browser,
+    bool? SessionLoggingOverride = null) : ISessionResult;
 
 /// <summary>
 /// Describes which Citrix launch path was selected for the current session.
@@ -102,4 +112,5 @@ public sealed record CitrixSessionResult(
     Process? Process,
     string? StoreFrontUrl = null,
     string? AppName = null,
-    CitrixLaunchMode Mode = CitrixLaunchMode.Unknown) : ISessionResult;
+    CitrixLaunchMode Mode = CitrixLaunchMode.Unknown,
+    bool? SessionLoggingOverride = null) : ISessionResult;

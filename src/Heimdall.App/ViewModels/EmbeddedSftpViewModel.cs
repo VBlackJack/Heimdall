@@ -249,7 +249,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         ISessionOperationLog? operationLog = null,
         Func<bool>? sessionLoggingEnabledProvider = null,
         string? operationProtocol = null,
-        string? operationHost = null)
+        string? operationHost = null,
+        bool? sessionLoggingOverride = null)
     {
         ArgumentNullException.ThrowIfNull(browser);
         ArgumentNullException.ThrowIfNull(sessionTab);
@@ -270,7 +271,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 operationLog,
                 sessionLoggingEnabledProvider ?? (static () => false),
                 operationProtocol,
-                operationHost)
+                operationHost,
+                sessionLoggingOverride)
             : SessionOperationEmitter.Disabled;
         SessionTab = sessionTab;
         _localizer = localizer;

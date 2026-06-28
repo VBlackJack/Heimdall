@@ -269,7 +269,7 @@ internal sealed class SshHandler : IProtocolHandler
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
-        return new ConnectionResult(true, null, new SshSessionResult(session));
+        return new ConnectionResult(true, null, new SshSessionResult(session, server.SessionLoggingOverride));
     }
 
     private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
@@ -616,7 +616,8 @@ internal sealed class SshHandler : IProtocolHandler
             releaseTunnel = false;
             return new ConnectionResult(true, null, new TerminalSessionResult(
                 terminalSession,
-                BuildDisplayEndpoint(server)));
+                BuildDisplayEndpoint(server),
+                server.SessionLoggingOverride));
         }
         finally
         {

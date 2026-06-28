@@ -48,6 +48,7 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
     private readonly Func<bool> _sessionLoggingEnabledProvider;
     private readonly string _protocol;
     private readonly string _host;
+    private readonly bool? _sessionLoggingOverride;
 
     /// <summary>
     /// Wraps <paramref name="inner"/> so its transfer operations are recorded to
@@ -63,7 +64,8 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
         ISessionOperationLog sink,
         Func<bool> sessionLoggingEnabledProvider,
         string protocol,
-        string host)
+        string host,
+        bool? sessionLoggingOverride = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(sink);
@@ -76,6 +78,7 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
         _sessionLoggingEnabledProvider = sessionLoggingEnabledProvider;
         _protocol = protocol;
         _host = GraphicalSessionEventHelpers.ResolveHost(host, host);
+        _sessionLoggingOverride = sessionLoggingOverride;
     }
 
     /// <inheritdoc />
@@ -217,7 +220,12 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
     }
 
     private bool ShouldLog()
-        => SessionOperationGatePolicy.ShouldLog(_sessionLoggingEnabledProvider(), _protocol);
+    {
+        bool enabled = SessionLoggingResolver.ResolveSessionLogging(
+            _sessionLoggingOverride,
+            _sessionLoggingEnabledProvider());
+        return SessionOperationGatePolicy.ShouldLog(enabled, _protocol);
+    }
 
     // Builds and enqueues a record without ever throwing into the operation thread. Logging is
     // best-effort: a failure to build (e.g. a transient FileInfo read) or enqueue is swallowed with a
