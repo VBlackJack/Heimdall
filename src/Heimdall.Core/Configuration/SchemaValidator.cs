@@ -112,6 +112,8 @@ public static partial class SchemaValidator
             nameof(settings.WindowsHelloGraceMinutes));
         ValidateRange(errors, settings.AutoLockIdleMinutes, 0, 1440,
             nameof(settings.AutoLockIdleMinutes));
+        ValidateRange(errors, settings.VaultHelloMaxDaysBeforeMasterPassword, 0, 3650,
+            nameof(settings.VaultHelloMaxDaysBeforeMasterPassword));
         ValidateRange(errors, settings.RdpCredentialAutofillTimeoutMs, 5000, 300000,
             nameof(settings.RdpCredentialAutofillTimeoutMs));
         ValidateRange(errors, settings.RdpArtifactCleanupDelayMs, 1000, 60000,
@@ -196,6 +198,45 @@ public static partial class SchemaValidator
         {
             errors.Add(
                 $"{nameof(settings.VaultEnabled)}: an enabled vault requires a non-empty {nameof(settings.VaultWrappedDek)}.");
+        }
+
+        if (settings.VaultHelloEnrolled)
+        {
+            if (string.IsNullOrEmpty(settings.VaultId))
+            {
+                errors.Add(
+                    $"{nameof(settings.VaultHelloEnrolled)}: an enrolled Windows Hello vault requires a non-empty {nameof(settings.VaultId)}.");
+            }
+
+            if (string.IsNullOrEmpty(settings.VaultHelloWrappedDek))
+            {
+                errors.Add(
+                    $"{nameof(settings.VaultHelloEnrolled)}: an enrolled Windows Hello vault requires a non-empty {nameof(settings.VaultHelloWrappedDek)}.");
+            }
+
+            if (string.IsNullOrEmpty(settings.VaultHelloChallenge))
+            {
+                errors.Add(
+                    $"{nameof(settings.VaultHelloEnrolled)}: an enrolled Windows Hello vault requires a non-empty {nameof(settings.VaultHelloChallenge)}.");
+            }
+
+            if (string.IsNullOrEmpty(settings.VaultHelloSalt))
+            {
+                errors.Add(
+                    $"{nameof(settings.VaultHelloEnrolled)}: an enrolled Windows Hello vault requires a non-empty {nameof(settings.VaultHelloSalt)}.");
+            }
+
+            if (string.IsNullOrEmpty(settings.VaultHelloCredentialName))
+            {
+                errors.Add(
+                    $"{nameof(settings.VaultHelloEnrolled)}: an enrolled Windows Hello vault requires a non-empty {nameof(settings.VaultHelloCredentialName)}.");
+            }
+
+            if (string.IsNullOrEmpty(settings.VaultHelloPublicKeyHash))
+            {
+                errors.Add(
+                    $"{nameof(settings.VaultHelloEnrolled)}: an enrolled Windows Hello vault requires a non-empty {nameof(settings.VaultHelloPublicKeyHash)}.");
+            }
         }
 
         if (!Enum.IsDefined(settings.VaultMigrationState))

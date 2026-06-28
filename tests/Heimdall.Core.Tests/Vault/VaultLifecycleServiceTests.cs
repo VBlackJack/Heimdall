@@ -69,9 +69,9 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private VaultLifecycleService NewService()
+    private VaultLifecycleService NewService(IVaultHelloService? vaultHelloService = null)
     {
-        var service = new VaultLifecycleService(_configManager);
+        var service = new VaultLifecycleService(_configManager, vaultHelloService);
         _services.Add(service);
         return service;
     }
@@ -228,6 +228,118 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task EnrollHelloAsync_RequiresUnlockedVault()
+    {
+        await SeedLegacyVaultAsync();
+        var service = NewService(new FakeVaultHelloService());
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        service.Lock();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.EnrollHelloAsync());
+    }
+
+    [Fact]
+    public async Task EnrollHelloAsync_PersistsHelloMetadata()
+    {
+        await SeedLegacyVaultAsync();
+        var hello = new FakeVaultHelloService();
+        var service = NewService(hello);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+
+        await service.EnrollHelloAsync();
+
+        var settings = await _configManager.LoadSettingsAsync();
+        Assert.True(settings.VaultHelloEnrolled);
+        Assert.False(string.IsNullOrWhiteSpace(settings.VaultId));
+        Assert.False(string.IsNullOrWhiteSpace(settings.VaultHelloWrappedDek));
+        Assert.False(string.IsNullOrWhiteSpace(settings.VaultHelloChallenge));
+        Assert.False(string.IsNullOrWhiteSpace(settings.VaultHelloSalt));
+        Assert.False(string.IsNullOrWhiteSpace(settings.VaultHelloCredentialName));
+        Assert.False(string.IsNullOrWhiteSpace(settings.VaultHelloPublicKeyHash));
+        Assert.Equal(1, hello.EnrollCalls);
+    }
+
+    [Fact]
+    public async Task UnlockWithHelloAsync_Success_SetsVaultKey()
+    {
+        await SeedLegacyVaultAsync();
+        var hello = new FakeVaultHelloService();
+        var service = NewService(hello);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        await service.EnrollHelloAsync();
+        service.Lock();
+
+        bool unlocked = await NewService(hello).UnlockWithHelloAsync();
+
+        Assert.True(unlocked);
+        Assert.True(CredentialProtector.IsVaultUnlocked);
+        var profile = (await _configManager.LoadServersAsync())[0];
+        Assert.Equal("rdp-pw", CredentialProtector.Unprotect(profile.RdpPasswordEncrypted));
+    }
+
+    [Fact]
+    public async Task UnlockWithHelloAsync_Failure_StaysLockedAndReturnsFalse()
+    {
+        await SeedLegacyVaultAsync();
+        var hello = new FakeVaultHelloService();
+        var service = NewService(hello);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        await service.EnrollHelloAsync();
+        service.Lock();
+        hello.UnlockFailure = VaultHelloFailureReason.UserCanceled;
+
+        bool unlocked = await NewService(hello).UnlockWithHelloAsync();
+
+        Assert.False(unlocked);
+        Assert.False(CredentialProtector.IsVaultUnlocked);
+    }
+
+    [Fact]
+    public async Task ChangeMasterPasswordAsync_LeavesHelloWrapperDecryptable()
+    {
+        const string newPassword = "NewMaster2!Word";
+        await SeedLegacyVaultAsync();
+        var hello = new FakeVaultHelloService();
+        var service = NewService(hello);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        await service.EnrollHelloAsync();
+        var before = await _configManager.LoadSettingsAsync();
+        var helloWrappedBefore = before.VaultHelloWrappedDek;
+
+        await service.ChangeMasterPasswordAsync(Pw(StrongPassword), Pw(newPassword), FastParams);
+        service.Lock();
+        bool unlocked = await NewService(hello).UnlockWithHelloAsync();
+
+        var after = await _configManager.LoadSettingsAsync();
+        Assert.True(unlocked);
+        Assert.Equal(helloWrappedBefore, after.VaultHelloWrappedDek);
+        var profile = (await _configManager.LoadServersAsync())[0];
+        Assert.Equal("rdp-pw", CredentialProtector.Unprotect(profile.RdpPasswordEncrypted));
+    }
+
+    [Fact]
+    public async Task DisableAsync_RemovesHelloCredentialAndMetadata()
+    {
+        await SeedLegacyVaultAsync();
+        var hello = new FakeVaultHelloService();
+        var service = NewService(hello);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        await service.EnrollHelloAsync();
+        var enrolled = await _configManager.LoadSettingsAsync();
+
+        await service.DisableAsync(Pw(StrongPassword));
+
+        var settings = await _configManager.LoadSettingsAsync();
+        Assert.Contains(enrolled.VaultHelloCredentialName!, hello.RemovedCredentialNames);
+        Assert.False(settings.VaultHelloEnrolled);
+        Assert.Null(settings.VaultHelloWrappedDek);
+        Assert.Null(settings.VaultHelloChallenge);
+        Assert.Null(settings.VaultHelloSalt);
+        Assert.Null(settings.VaultHelloCredentialName);
+        Assert.Null(settings.VaultHelloPublicKeyHash);
+    }
+
+    [Fact]
     public async Task ChangeMasterPasswordAsync_WeakNew_Throws()
     {
         await SeedLegacyVaultAsync();
@@ -308,5 +420,74 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
 
         Assert.False(service.IsUnlocked);
         Assert.Throws<VaultLockedException>(() => CredentialProtector.Protect("secret"));
+    }
+
+    private sealed class FakeVaultHelloService : IVaultHelloService
+    {
+        private static readonly byte[] Signature = Enumerable.Range(0, 256).Select(i => (byte)i).ToArray();
+        private static readonly byte[] Salt = Enumerable.Range(0, VaultHelloProtector.SaltSizeBytes)
+            .Select(i => (byte)(0xA0 + i)).ToArray();
+        private static readonly byte[] Challenge = Enumerable.Range(0, VaultHelloProtector.ChallengeSizeBytes)
+            .Select(i => (byte)(0x30 + i)).ToArray();
+
+        public int EnrollCalls { get; private set; }
+
+        public VaultHelloFailureReason? UnlockFailure { get; set; }
+
+        public List<string> RemovedCredentialNames { get; } = new();
+
+        public Task<bool> IsEnrollmentAvailableAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult(true);
+        }
+
+        public Task<VaultHelloEnrollment> EnrollAsync(ReadOnlyMemory<byte> dek, string vaultId, CancellationToken ct)
+        {
+            EnrollCalls++;
+            var publicKeyHash = "FAKEPUBLICKEYHASH";
+            var credentialName = VaultHelloProtector.CreateCredentialName(vaultId);
+            var binding = new VaultHelloBinding(vaultId, publicKeyHash, Challenge.ToArray(), Salt.ToArray());
+            var helloKek = VaultHelloProtector.DeriveHelloKek(Signature, Salt);
+            try
+            {
+                var wrapped = VaultHelloProtector.WrapDek(dek.Span, helloKek, binding);
+                return Task.FromResult(new VaultHelloEnrollment(
+                    vaultId,
+                    wrapped,
+                    Convert.ToBase64String(Challenge),
+                    Convert.ToBase64String(Salt),
+                    credentialName,
+                    publicKeyHash));
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(helloKek);
+            }
+        }
+
+        public Task<VaultDekHolder> UnlockAsync(VaultHelloEnrollment stored, CancellationToken ct)
+        {
+            if (UnlockFailure is { } failure)
+            {
+                throw new VaultHelloException(failure);
+            }
+
+            var binding = stored.ToBinding();
+            var helloKek = VaultHelloProtector.DeriveHelloKek(Signature, binding.Salt);
+            try
+            {
+                return Task.FromResult(VaultHelloProtector.UnwrapDek(stored.WrappedDek, helloKek, binding));
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(helloKek);
+            }
+        }
+
+        public Task RemoveAsync(string credentialName, CancellationToken ct = default)
+        {
+            RemovedCredentialNames.Add(credentialName);
+            return Task.CompletedTask;
+        }
     }
 }

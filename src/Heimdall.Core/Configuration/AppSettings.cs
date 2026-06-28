@@ -337,6 +337,33 @@ public sealed class AppSettings
     /// <summary>UTC timestamp (ISO-8601) of when the vault was first enabled. Non-secret.</summary>
     public string? VaultCreatedAt { get; set; }
 
+    /// <summary>Stable non-secret vault identifier bound into Windows Hello AAD.</summary>
+    public string? VaultId { get; set; }
+
+    /// <summary>Whether a Windows Hello-wrapped DEK copy is enrolled.</summary>
+    public bool VaultHelloEnrolled { get; set; }
+
+    /// <summary>DPAPI-wrapped Hello envelope holding the DEK copy.</summary>
+    public string? VaultHelloWrappedDek { get; set; }
+
+    /// <summary>Base64 challenge signed by the Windows Hello KeyCredential.</summary>
+    public string? VaultHelloChallenge { get; set; }
+
+    /// <summary>Base64 HKDF salt for the Windows Hello KEK derivation.</summary>
+    public string? VaultHelloSalt { get; set; }
+
+    /// <summary>Windows Hello KeyCredential name for this vault.</summary>
+    public string? VaultHelloCredentialName { get; set; }
+
+    /// <summary>SHA-256 hash of the enrolled Hello public key, encoded as uppercase hex.</summary>
+    public string? VaultHelloPublicKeyHash { get; set; }
+
+    /// <summary>
+    /// Maximum days before requiring a master-password unlock instead of Hello.
+    /// 0 disables the periodic re-authentication policy.
+    /// </summary>
+    public int VaultHelloMaxDaysBeforeMasterPassword { get; set; }
+
     /// <summary>Persisted count of consecutive failed master-password unlock attempts,
     /// restored on startup so the unlock-gate lockout survives an application restart.
     /// Mirrors <see cref="PinFailureCount"/>.</summary>

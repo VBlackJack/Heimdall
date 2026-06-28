@@ -481,6 +481,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<PinManager>();
 
         // Vault lifecycle owns the session DEK holder, so a single instance.
+        services.AddSingleton<ITpmPresenceService, WindowsTpmPresenceService>();
+        services.AddSingleton<IVaultHelloService, WindowsVaultHelloService>();
         services.AddSingleton<VaultLifecycleService>();
         services.AddSingleton<WorkspaceLockService>();
 
