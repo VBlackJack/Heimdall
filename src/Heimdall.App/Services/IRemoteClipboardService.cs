@@ -54,8 +54,13 @@ public enum SftpClipboardMode
 /// <param name="SourceDirectory">The directory the entries were captured from.</param>
 /// <param name="Mode">Whether the capture is a cut or a copy.</param>
 /// <param name="SourceEndpointKey">The normalized endpoint key of the source pane.</param>
+/// <param name="SourceBrowser">
+/// The source pane browser captured with the clipboard. It is used only for cross-endpoint paste; if
+/// the source pane closes, this browser may be disconnected or disposed and paste must fail gracefully.
+/// </param>
 public sealed record SftpClipboardContent(
     IReadOnlyList<SftpFileInfo> Entries,
     string SourceDirectory,
     SftpClipboardMode Mode,
-    string SourceEndpointKey);
+    string SourceEndpointKey,
+    IRemoteBrowser? SourceBrowser = null);

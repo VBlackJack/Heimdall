@@ -886,9 +886,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return false;
         }
 
+        return await RemoteDirectoryExistsAsync(_browser, path, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> RemoteDirectoryExistsAsync(
+        IRemoteBrowser browser,
+        string path,
+        CancellationToken ct)
+    {
         try
         {
-            await _browser.ListDirectoryAsync(path, ct);
+            await browser.ListDirectoryAsync(path, ct);
             return true;
         }
         catch (OperationCanceledException)

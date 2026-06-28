@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
@@ -34,9 +35,9 @@ public sealed partial class EmbeddedSftpViewModel
     /// </summary>
     public SftpClipboardContent? Clipboard => _remoteClipboard.Current;
 
-    /// <summary>Whether this pane can see clipboard entries from the same remote endpoint.</summary>
+    /// <summary>Whether this pane can paste the current shared remote clipboard content.</summary>
     public bool HasClipboard => Clipboard is { Entries.Count: > 0 } clipboard
-        && IsClipboardForCurrentEndpoint(clipboard);
+        && CanPasteClipboard(clipboard);
 
     [RelayCommand]
     private void CutSelected() => SetClipboard(SftpClipboardMode.Cut);
@@ -50,7 +51,9 @@ public sealed partial class EmbeddedSftpViewModel
     [RelayCommand]
     private Task DuplicateSelected() => DuplicateEntriesAsync(SelectedFiles);
 
-    private bool CanPaste() => HasClipboard && IsConnected;
+    private bool CanPaste() => Clipboard is { Entries.Count: > 0 } clipboard
+        && IsConnected
+        && CanPasteClipboard(clipboard);
 
     // Captures the current multi-selection plus the source directory and the cut/copy mode. No transport.
     private void SetClipboard(SftpClipboardMode mode)
@@ -61,7 +64,12 @@ public sealed partial class EmbeddedSftpViewModel
             return;
         }
 
-        _remoteClipboard.Set(new SftpClipboardContent([.. selection], CurrentPath, mode, EndpointKey));
+        _remoteClipboard.Set(new SftpClipboardContent(
+            [.. selection],
+            CurrentPath,
+            mode,
+            EndpointKey,
+            _browser));
 
         string statusKey = mode == SftpClipboardMode.Cut ? "SftpStatusCut" : "SftpStatusCopied";
         UpdateStatus(_localizer?.Format(statusKey, selection.Count.ToString())
@@ -82,7 +90,23 @@ public sealed partial class EmbeddedSftpViewModel
         }
 
         SftpClipboardContent? clipboard = Clipboard;
-        if (clipboard is null || clipboard.Entries.Count == 0 || !IsClipboardForCurrentEndpoint(clipboard))
+        if (clipboard is null || clipboard.Entries.Count == 0)
+        {
+            return;
+        }
+
+        if (IsClipboardForCurrentEndpoint(clipboard))
+        {
+            await PasteSameEndpointClipboardAsync(clipboard).ConfigureAwait(false);
+            return;
+        }
+
+        await PasteCrossEndpointClipboardAsync(clipboard).ConfigureAwait(false);
+    }
+
+    private async Task PasteSameEndpointClipboardAsync(SftpClipboardContent clipboard)
+    {
+        if (_browser is null)
         {
             return;
         }
@@ -173,6 +197,306 @@ public sealed partial class EmbeddedSftpViewModel
             }
 
             await RunOnUiAsync(() => SetTransferError(ex));
+        }
+    }
+
+    private async Task PasteCrossEndpointClipboardAsync(SftpClipboardContent clipboard)
+    {
+        if (_browser is null)
+        {
+            return;
+        }
+
+        IRemoteBrowser? sourceBrowser = clipboard.SourceBrowser;
+        if (!IsSourceBrowserAvailable(sourceBrowser))
+        {
+            await RunOnUiAsync(() => SetErrorStatus("Source session no longer available."))
+                .ConfigureAwait(false);
+            return;
+        }
+
+        _transferCts?.Cancel();
+        _transferCts?.Dispose();
+        _transferCts = new CancellationTokenSource();
+        CancellationToken ct = _transferCts.Token;
+
+        TransferProgressValue = 0;
+        IsTransferInProgress = true;
+
+        bool cut = clipboard.Mode == SftpClipboardMode.Cut;
+        var processedCutSources = new HashSet<string>(StringComparer.Ordinal);
+        Action<SftpTransferProgress> sourceProgress = progress =>
+        {
+            _ = _uiDispatcher.InvokeAsync(() =>
+            {
+                if (!_disposed)
+                {
+                    UpdateTransferProgress(progress);
+                }
+            });
+        };
+
+        sourceBrowser!.TransferProgress += sourceProgress;
+
+        try
+        {
+            string targetDirectory = CurrentPath;
+            var existingNames = new HashSet<string>(
+                UnfilteredEntries.Select(entry => entry.Name),
+                StringComparer.Ordinal);
+
+            int totalEntries = clipboard.Entries.Count;
+            for (int index = 0; index < totalEntries; index++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                SftpFileInfo entry = clipboard.Entries[index];
+                string targetName = BuildNonCollidingName(existingNames, entry.Name);
+                SftpFileInfo plannedRoot = entry with { Name = targetName };
+
+                TransferStatusText = $"Transferring {entry.Name} ({index + 1}/{totalEntries})...";
+                await TransferCrossEndpointRootAsync(sourceBrowser, plannedRoot, targetDirectory, ct)
+                    .ConfigureAwait(false);
+
+                if (cut)
+                {
+                    await DeleteCrossEndpointSourceAsync(sourceBrowser, entry.FullPath, ct)
+                        .ConfigureAwait(false);
+                    processedCutSources.Add(entry.FullPath);
+                }
+
+                existingNames.Add(targetName);
+            }
+
+            if (cut)
+            {
+                _remoteClipboard.Clear();
+            }
+
+            await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusPasteComplete")))
+                .ConfigureAwait(false);
+            await Refresh().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            await RunOnUiAsync(() =>
+                UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled"))
+                .ConfigureAwait(false);
+        }
+        catch (SourceSessionUnavailableException)
+        {
+            await RunOnUiAsync(() => SetErrorStatus("Source session no longer available."))
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            if (cut)
+            {
+                List<SftpFileInfo> remaining = clipboard.Entries
+                    .Where(entry => !processedCutSources.Contains(entry.FullPath))
+                    .ToList();
+
+                await RunOnUiAsync(() =>
+                {
+                    if (remaining.Count > 0)
+                    {
+                        _remoteClipboard.Set(clipboard with { Entries = remaining });
+                    }
+                    else
+                    {
+                        _remoteClipboard.Clear();
+                    }
+                }).ConfigureAwait(false);
+            }
+
+            await RunOnUiAsync(() => SetTransferError(ex)).ConfigureAwait(false);
+        }
+        finally
+        {
+            sourceBrowser.TransferProgress -= sourceProgress;
+            IsTransferInProgress = false;
+            TransferProgressValue = 0;
+        }
+    }
+
+    private async Task TransferCrossEndpointRootAsync(
+        IRemoteBrowser sourceBrowser,
+        SftpFileInfo root,
+        string targetDirectory,
+        CancellationToken ct)
+    {
+        IReadOnlyList<RemoteTransferOp> ops = await RemoteTransferTreePlanner.PlanAsync(
+            [root],
+            targetDirectory,
+            (path, listCt) => ListCrossEndpointSourceDirectoryAsync(sourceBrowser, path, listCt),
+            ct).ConfigureAwait(false);
+
+        int totalFiles = ops.Count(op => op.Kind == RemoteTransferOpKind.TransferFile);
+        int transferredFiles = 0;
+
+        foreach (RemoteTransferOp op in ops)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (op.Kind == RemoteTransferOpKind.MakeDirectory)
+            {
+                await CreateCrossEndpointDirectoryAsync(op.DestinationRemotePath, ct).ConfigureAwait(false);
+                continue;
+            }
+
+            transferredFiles++;
+            string fileName = Path.GetFileName(op.SourceRemotePath);
+            TransferStatusText = $"Transferring {fileName} ({transferredFiles}/{totalFiles})...";
+            await TransferCrossEndpointFileAsync(sourceBrowser, op, ct).ConfigureAwait(false);
+        }
+    }
+
+    private async Task CreateCrossEndpointDirectoryAsync(string destinationPath, CancellationToken ct)
+    {
+        if (_browser is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _browser.CreateDirectoryAsync(destinationPath, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (!await RemoteDirectoryExistsAsync(_browser, destinationPath, ct).ConfigureAwait(false))
+            {
+                throw;
+            }
+
+            Core.Logging.FileLogger.Info(
+                $"EmbeddedSFTP cross-server paste merge: remote directory already exists, continuing: {destinationPath}");
+        }
+    }
+
+    private async Task TransferCrossEndpointFileAsync(
+        IRemoteBrowser sourceBrowser,
+        RemoteTransferOp op,
+        CancellationToken ct)
+    {
+        if (_browser is null)
+        {
+            return;
+        }
+
+        string localTemp = CreateCrossEndpointTempPath();
+        try
+        {
+            try
+            {
+                await sourceBrowser.DownloadFileAsync(op.SourceRemotePath, localTemp, ct)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (IsSourceUnavailableException(ex))
+            {
+                throw new SourceSessionUnavailableException(ex);
+            }
+
+            await _browser.UploadFileAsync(localTemp, op.DestinationRemotePath, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            TryDeleteCrossEndpointTempPath(localTemp);
+        }
+    }
+
+    private static async Task<IReadOnlyList<SftpFileInfo>> ListCrossEndpointSourceDirectoryAsync(
+        IRemoteBrowser sourceBrowser,
+        string path,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await sourceBrowser.ListDirectoryAsync(path, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsSourceUnavailableException(ex))
+        {
+            throw new SourceSessionUnavailableException(ex);
+        }
+    }
+
+    private static async Task DeleteCrossEndpointSourceAsync(
+        IRemoteBrowser sourceBrowser,
+        string sourcePath,
+        CancellationToken ct)
+    {
+        try
+        {
+            await sourceBrowser.DeleteAsync(sourcePath, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsSourceUnavailableException(ex))
+        {
+            throw new SourceSessionUnavailableException(ex);
+        }
+    }
+
+    private bool CanPasteClipboard(SftpClipboardContent clipboard)
+    {
+        if (IsClipboardForCurrentEndpoint(clipboard))
+        {
+            return true;
+        }
+
+        return IsSourceBrowserAvailable(clipboard.SourceBrowser);
+    }
+
+    private static bool IsSourceBrowserAvailable(IRemoteBrowser? sourceBrowser)
+    {
+        if (sourceBrowser is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return sourceBrowser.IsConnected;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsSourceUnavailableException(Exception ex)
+    {
+        return ex is ObjectDisposedException
+            || (ex is InvalidOperationException
+                && ex.Message.Contains("connected", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed class SourceSessionUnavailableException : Exception
+    {
+        public SourceSessionUnavailableException(Exception innerException)
+            : base("Source session no longer available.", innerException)
+        {
+        }
+    }
+
+    private static string CreateCrossEndpointTempPath()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "Heimdall", "cross-server-paste");
+        Directory.CreateDirectory(directory);
+        return Path.Combine(directory, Guid.NewGuid().ToString("N"));
+    }
+
+    private static void TryDeleteCrossEndpointTempPath(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"[CrossServerPaste] failed to delete staging file '{path}': {ex.Message}");
         }
     }
 
