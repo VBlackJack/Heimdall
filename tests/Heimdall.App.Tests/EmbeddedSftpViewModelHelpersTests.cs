@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using FluentAssertions;
 using Heimdall.App.ViewModels;
 using Heimdall.Sftp;
 using Renci.SshNet.Common;
@@ -89,6 +90,23 @@ public sealed class EmbeddedSftpViewModelHelpersTests
         string actual = EmbeddedSftpViewModel.ResolveDropTargetDirectory(null, "/srv");
 
         Assert.Equal("/srv", actual);
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void CanPasteFromExternalClipboard_ReturnsTrueOnlyWhenClipboardHasFileDropAndConnected(
+        bool clipboardHasFileDrop,
+        bool isConnected,
+        bool expected)
+    {
+        bool actual = EmbeddedSftpViewModel.CanPasteFromExternalClipboard(
+            clipboardHasFileDrop,
+            isConnected);
+
+        actual.Should().Be(expected);
     }
 
     [Fact]

@@ -39,6 +39,11 @@ public sealed partial class EmbeddedSftpViewModel
     public bool HasClipboard => Clipboard is { Entries.Count: > 0 } clipboard
         && CanPasteClipboard(clipboard);
 
+    /// <summary>True when an external-clipboard (Explorer) paste should be offered: the Windows
+    /// clipboard carries file drops AND this pane is connected.</summary>
+    public static bool CanPasteFromExternalClipboard(bool clipboardHasFileDrop, bool isConnected)
+        => clipboardHasFileDrop && isConnected;
+
     [RelayCommand]
     private void CutSelected() => SetClipboard(SftpClipboardMode.Cut);
 

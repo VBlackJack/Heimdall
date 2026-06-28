@@ -664,6 +664,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         CtxPaste.Visibility = _viewModel.HasClipboard && _viewModel.IsConnected
             ? Visibility.Visible
             : Visibility.Collapsed;
+        CtxPasteFromExplorer.Visibility = EmbeddedSftpViewModel.CanPasteFromExternalClipboard(
+            ClipboardHasFileDrop(),
+            _viewModel.IsConnected)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         CtxDuplicate.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxCopyPath.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxProperties.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
@@ -671,6 +676,51 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         // Always visible
         CtxUploadHere.Visibility = Visibility.Visible;
         CtxOpenInTerminal.Visibility = Visibility.Visible;
+    }
+
+    private async void OnCtxPasteFromExplorerClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed || _browser is null || !_browser.IsConnected)
+        {
+            return;
+        }
+
+        string[]? paths;
+        try
+        {
+            var data = Clipboard.GetDataObject();
+            if (data?.GetDataPresent(System.Windows.DataFormats.FileDrop) != true)
+            {
+                return;
+            }
+
+            paths = (string[]?)data.GetData(System.Windows.DataFormats.FileDrop);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"[EmbeddedSftpView] paste from Explorer clipboard read failed: {ex.Message}");
+            return;
+        }
+
+        if (paths is null || paths.Length == 0)
+        {
+            return;
+        }
+
+        await _viewModel.UploadFilesAsync(paths);
+    }
+
+    private static bool ClipboardHasFileDrop()
+    {
+        try
+        {
+            return Clipboard.GetDataObject()?.GetDataPresent(System.Windows.DataFormats.FileDrop) == true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private void OnCtxOpenClick(object sender, RoutedEventArgs e)

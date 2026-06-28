@@ -565,6 +565,12 @@
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE77F;" FontSize="{StaticResource FontSizeSubtitle}"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="CtxPasteFromExplorer" Header="{loc:Translate SftpCtxPasteFromExplorer}" Click="OnCtxPasteFromExplorerClick"
+                              AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
+                        <MenuItem.Icon>
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE898;" FontSize="{StaticResource FontSizeSubtitle}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <MenuItem x:Name="CtxDuplicate" Header="{loc:Translate SftpCtxDuplicate}" Command="{Binding DuplicateSelectedCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                         <MenuItem.Icon>

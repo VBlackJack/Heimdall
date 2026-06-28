@@ -857,6 +857,7 @@
   "SftpCtxCut": "Cut",
   "SftpCtxCopy": "Copy",
   "SftpCtxPaste": "Paste",
+  "SftpCtxPasteFromExplorer": "Paste from Explorer",
   "SftpCtxDuplicate": "Duplicate",
   "SftpStatusCut": "{0} item(s) cut",
   "SftpStatusCopied": "{0} item(s) copied",
