@@ -156,6 +156,10 @@ public sealed class TunnelSession : IDisposable
         {
             // Already disposed
         }
+        catch (Exception ex)
+        {
+            FileLogger.Debug("TunnelSession local port cleanup suppressed", ex);
+        }
     }
 
     private static void DisconnectClientSafe(SshClient client)
@@ -172,6 +176,10 @@ public sealed class TunnelSession : IDisposable
         catch (ObjectDisposedException)
         {
             // Already disposed
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Debug("TunnelSession SSH client cleanup suppressed", ex);
         }
     }
 }

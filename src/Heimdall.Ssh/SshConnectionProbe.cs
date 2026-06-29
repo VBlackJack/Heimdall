@@ -111,13 +111,16 @@ public static class SshConnectionProbe
         NetworkStream stream,
         CancellationToken ct)
     {
-        var buffer = new byte[MaxBannerBytes];
-        var read = 0;
+        var buffer = new byte[128];
+        var line = new StringBuilder();
+        string? firstNonEmptyLine = null;
+        var totalRead = 0;
 
-        while (read < buffer.Length)
+        while (totalRead < MaxBannerBytes)
         {
+            var bytesToRead = Math.Min(buffer.Length, MaxBannerBytes - totalRead);
             var bytesRead = await stream.ReadAsync(
-                    buffer.AsMemory(read, 1),
+                    buffer.AsMemory(0, bytesToRead),
                     ct)
                 .ConfigureAwait(false);
             if (bytesRead == 0)
@@ -125,14 +128,53 @@ public static class SshConnectionProbe
                 break;
             }
 
-            read += bytesRead;
-            if (buffer[read - 1] == '\n')
+            totalRead += bytesRead;
+
+            for (var i = 0; i < bytesRead; i++)
             {
-                break;
+                if (buffer[i] == '\n')
+                {
+                    if (TryCaptureBannerLine(line.ToString(), ref firstNonEmptyLine, out var sshBanner))
+                    {
+                        return sshBanner;
+                    }
+
+                    line.Clear();
+                    continue;
+                }
+
+                line.Append((char)buffer[i]);
             }
         }
 
-        return read == 0 ? null : Encoding.ASCII.GetString(buffer, 0, read);
+        if (line.Length > 0
+            && TryCaptureBannerLine(line.ToString(), ref firstNonEmptyLine, out var partialSshBanner))
+        {
+            return partialSshBanner;
+        }
+
+        return firstNonEmptyLine;
+    }
+
+    private static bool TryCaptureBannerLine(
+        string rawLine,
+        ref string? firstNonEmptyLine,
+        out string? sshBanner)
+    {
+        var line = rawLine.TrimEnd('\r');
+        if (!string.IsNullOrWhiteSpace(line) && firstNonEmptyLine is null)
+        {
+            firstNonEmptyLine = line;
+        }
+
+        if (line.StartsWith("SSH-", StringComparison.Ordinal))
+        {
+            sshBanner = line;
+            return true;
+        }
+
+        sshBanner = null;
+        return false;
     }
 
     private static ProbeResult ClassifySocketException(SocketException ex)

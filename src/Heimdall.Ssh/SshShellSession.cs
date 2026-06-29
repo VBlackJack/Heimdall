@@ -15,6 +15,7 @@
  */
 
 using System.Text;
+using Heimdall.Core.Logging;
 using Heimdall.Core.Ssh;
 using Renci.SshNet;
 
@@ -459,7 +460,14 @@ public sealed class SshShellSession : IDisposable
                 stream.Close();
                 stream.Dispose();
             }
-            catch (ObjectDisposedException) { /* Expected when disposing already-closed resources */ }
+            catch (ObjectDisposedException)
+            {
+                // Expected when disposing already-closed resources.
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Debug("SSH shell stream cleanup suppressed", ex);
+            }
         }
     }
 
@@ -478,7 +486,14 @@ public sealed class SshShellSession : IDisposable
 
                 client.Dispose();
             }
-            catch (ObjectDisposedException) { /* Expected when disposing already-closed resources */ }
+            catch (ObjectDisposedException)
+            {
+                // Expected when disposing already-closed resources.
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Debug("SSH shell client cleanup suppressed", ex);
+            }
         }
     }
 }

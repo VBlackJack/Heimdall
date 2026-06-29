@@ -1275,9 +1275,6 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             return;
         }
 
-        var message = FormatHostKeyMismatchMidSession(evt);
-        _pendingBrowserSecurityStatus = message;
-
         _ = Dispatcher.BeginInvoke(() =>
         {
             if (_disposed)
@@ -1285,6 +1282,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                 return;
             }
 
+            var message = FormatHostKeyMismatchMidSession(evt);
+            _pendingBrowserSecurityStatus = message;
             ShowError(message);
         });
     }

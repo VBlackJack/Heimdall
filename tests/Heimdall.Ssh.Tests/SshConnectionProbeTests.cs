@@ -70,6 +70,21 @@ public sealed class SshConnectionProbeTests
     }
 
     [Fact]
+    public async Task ProbeAsync_PreLoginLineBeforeSshBanner_ReturnsSuccess()
+    {
+        var (port, serverTask) = StartSingleResponseServer("Authorized access only\r\nSSH-2.0-OpenSSH_9\r\n");
+
+        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, 1000);
+        await serverTask;
+
+        Assert.True(result.Success);
+        Assert.Equal("SSH-2.0-OpenSSH_9", result.Banner);
+        Assert.Null(result.FailureCode);
+        Assert.Null(result.MessageKey);
+        Assert.Empty(result.MessageArguments);
+    }
+
+    [Fact]
     public async Task ProbeAsync_SshBanner_ReturnsSuccess()
     {
         var (port, serverTask) = StartSingleResponseServer("SSH-2.0-MockServer\r\n");

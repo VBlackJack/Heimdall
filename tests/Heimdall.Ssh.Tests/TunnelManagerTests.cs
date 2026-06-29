@@ -86,6 +86,59 @@ public class TunnelManagerTests : IDisposable
         }
     }
 
+    private class RecordingForwardedPortLocal : ForwardedPortLocal
+    {
+        public RecordingForwardedPortLocal()
+            : base("127.0.0.1", 0u, "remote.invalid", 22u)
+        {
+        }
+
+        public int DisposeCount { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            DisposeCount++;
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class ThrowingStopForwardedPortLocal : RecordingForwardedPortLocal
+    {
+        public override bool IsStarted => true;
+
+        public int StopCount { get; private set; }
+
+        public override void Stop()
+        {
+            StopCount++;
+            throw new InvalidOperationException("Synthetic forwarded port stop failure.");
+        }
+    }
+
+    private class RecordingSshClient : SshClient
+    {
+        public RecordingSshClient()
+            : base("127.0.0.1", "u", "p")
+        {
+        }
+
+        public int DisposeCount { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            DisposeCount++;
+        }
+    }
+
+    private sealed class ThrowingDisposeSshClient : RecordingSshClient
+    {
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            throw new InvalidOperationException("Synthetic SSH client dispose failure.");
+        }
+    }
+
     private bool RegisterFake(int localPort, IDisposable? handle = null, Func<bool>? isAlive = null)
     {
         return _manager.TryRegisterExternalTunnel(
@@ -935,6 +988,35 @@ public class TunnelManagerTests : IDisposable
         Assert.False(result);
         Assert.Equal(0, openedCount);
         Assert.Equal(0, closedCount);
+    }
+
+    // ── TunnelSession.Dispose ─────────────────────────────────────────
+
+    [Fact]
+    public void TunnelSession_Dispose_WhenIntermediateCleanupThrows_ContinuesWithRemainingResources()
+    {
+        RecordingForwardedPortLocal remainingIntermediatePort = new();
+        ThrowingStopForwardedPortLocal throwingIntermediatePort = new();
+        RecordingSshClient remainingIntermediateClient = new();
+        ThrowingDisposeSshClient throwingIntermediateClient = new();
+        RecordingSshClient finalClient = new();
+        RecordingForwardedPortLocal finalPort = new();
+        TunnelSession session = new(
+            finalClient,
+            finalPort,
+            MakeInfo(10001),
+            [remainingIntermediateClient, throwingIntermediateClient],
+            [remainingIntermediatePort, throwingIntermediatePort]);
+
+        Exception? exception = Record.Exception(session.Dispose);
+
+        Assert.Null(exception);
+        Assert.Equal(1, throwingIntermediatePort.StopCount);
+        Assert.Equal(1, finalPort.DisposeCount);
+        Assert.Equal(1, remainingIntermediatePort.DisposeCount);
+        Assert.Equal(1, finalClient.DisposeCount);
+        Assert.Equal(1, throwingIntermediateClient.DisposeCount);
+        Assert.Equal(1, remainingIntermediateClient.DisposeCount);
     }
 
     // ── TunnelBuildContext.Cleanup ───────────────────────────────────
