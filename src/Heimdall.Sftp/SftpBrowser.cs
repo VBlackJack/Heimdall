@@ -103,6 +103,11 @@ public sealed class SftpBrowser : IRemoteBrowser
 
         var connectionInfo = SshConnectionFactory.Create(connectionParams);
         var client = new SftpClient(connectionInfo);
+        if (connectionParams.KeepAliveIntervalSeconds is > 0)
+        {
+            client.KeepAliveInterval = TimeSpan.FromSeconds(connectionParams.KeepAliveIntervalSeconds.Value);
+        }
+
         _client = client;
 
         SshConnectionFactory.AttachPinnedHostKeyVerification(
@@ -149,12 +154,12 @@ public sealed class SftpBrowser : IRemoteBrowser
         string? path = null,
         CancellationToken ct = default)
     {
-        var client = GetConnectedClient();
         string targetPath = path ?? CurrentDirectory;
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             var entries = await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -184,15 +189,22 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <param name="ct">Cancellation token.</param>
     public async Task<string> GetCurrentDirectoryAsync(CancellationToken ct = default)
     {
-        var client = GetConnectedClient();
-
-        string dir = await Task.Run(() =>
+        await _clientLock.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            return client.WorkingDirectory ?? "/";
-        }, ct).ConfigureAwait(false);
+            var client = GetConnectedClient();
+            string dir = await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return client.WorkingDirectory ?? "/";
+            }, ct).ConfigureAwait(false);
 
-        return dir;
+            return dir;
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
     }
 
     /// <summary>
@@ -204,11 +216,11 @@ public sealed class SftpBrowser : IRemoteBrowser
     public async Task ChangeDirectoryAsync(string path, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var client = GetConnectedClient();
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -238,7 +250,6 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
-        var client = GetConnectedClient();
 
         string fileName = Path.GetFileName(remotePath);
         long totalBytes = 0;
@@ -247,6 +258,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             // Retrieve file size for progress reporting
             await Task.Run(() =>
             {
@@ -315,7 +327,6 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
-        var client = GetConnectedClient();
 
         string fileName = Path.GetFileName(localPath);
         var fileInfo = new FileInfo(localPath);
@@ -325,6 +336,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             try
             {
                 await using var fileStream = new FileStream(
@@ -396,11 +408,11 @@ public sealed class SftpBrowser : IRemoteBrowser
     public async Task CreateDirectoryAsync(string path, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var client = GetConnectedClient();
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -422,11 +434,11 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         SftpPathGuard.ThrowIfProtectedRoot(path, "delete");
-        var client = GetConnectedClient();
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -466,11 +478,11 @@ public sealed class SftpBrowser : IRemoteBrowser
     public async Task ChmodAsync(string path, short mode, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var client = GetConnectedClient();
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -506,11 +518,11 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(oldPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(newPath);
-        var client = GetConnectedClient();
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -543,7 +555,6 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
-        _ = GetConnectedClient();
 
         // No-overwrite + source-type/recursive validation runs up front so the fast (server-side) and
         // slow (roundtrip) paths share identical semantics. The roundtrip planner re-checks these
@@ -677,11 +688,10 @@ public sealed class SftpBrowser : IRemoteBrowser
 
     private async Task<bool> RemoteExistsAsync(string path, CancellationToken ct)
     {
-        var client = GetConnectedClient();
-
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             return await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -696,11 +706,10 @@ public sealed class SftpBrowser : IRemoteBrowser
 
     private async Task<bool> RemoteIsDirectoryAsync(string path, CancellationToken ct)
     {
-        var client = GetConnectedClient();
-
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var client = GetConnectedClient();
             return await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -745,33 +754,46 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <summary>Disconnects from the remote host and releases the SFTP client.</summary>
     public void Disconnect()
     {
-        if (_client is null)
+        var disconnected = false;
+        _clientLock.Wait();
+        try
         {
-            return;
+            if (_client is null)
+            {
+                return;
+            }
+
+            _client.ErrorOccurred -= OnErrorOccurred;
+
+            if (_client.IsConnected)
+            {
+                try
+                {
+                    _client.Disconnect();
+                }
+                catch (Exception ex)
+                {
+                    Heimdall.Core.Logging.FileLogger.Warn($"[SftpBrowser] disconnect: {ex.Message}");
+                }
+            }
+
+            _client.Dispose();
+            _client = null;
+
+            // Drop the retained server-side-copy context so a torn-down session cannot open an exec channel.
+            _connectionParams = null;
+            _pinnedHostKeyVerifier = null;
+            disconnected = true;
+        }
+        finally
+        {
+            _clientLock.Release();
         }
 
-        _client.ErrorOccurred -= OnErrorOccurred;
-
-        if (_client.IsConnected)
+        if (disconnected)
         {
-            try
-            {
-                _client.Disconnect();
-            }
-            catch (Exception ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Warn($"[SftpBrowser] disconnect: {ex.Message}");
-            }
+            Disconnected?.Invoke(null);
         }
-
-        _client.Dispose();
-        _client = null;
-
-        // Drop the retained server-side-copy context so a torn-down session cannot open an exec channel.
-        _connectionParams = null;
-        _pinnedHostKeyVerifier = null;
-
-        Disconnected?.Invoke(null);
     }
 
     /// <inheritdoc/>

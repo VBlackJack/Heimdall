@@ -17,6 +17,7 @@
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
 
@@ -154,5 +155,54 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         reconnectHandler.Result.SetResult(SuccessWithTerminalSession());
         await WaitUntilAsync(() => harness.EmbeddedSessionManager.AttachSshSessionCalls == 2);
+    }
+
+    [Fact]
+    public async Task SftpPaneReconnectCallback_ReconnectsPaneWithoutClosingSshTab()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler sshHandler = harness.GetHandler("SSH");
+        ControlledProtocolHandler sftpHandler = harness.GetHandler("SFTP");
+        ServerProfileDto server = harness.CreateServer("SSH");
+        await harness.PersistServerAsync(server);
+
+        SessionTabViewModel tab = harness.Main.Connection.AddSession("ssh-session", server.DisplayName, "SSH");
+        tab.OriginalServerId = server.Id;
+        SessionPaneModel sshPane = tab.PrimaryPane;
+        sshPane.ServerId = "ssh-session";
+        sshPane.OriginalServerId = server.Id;
+        sshPane.ConnectionType = "SSH";
+        sshPane.Title = "SSH";
+        sshPane.HostControl = new object();
+
+        SessionPaneModel sftpPane = new()
+        {
+            PaneId = "sftp-pane",
+            ServerId = "sftp-session",
+            OriginalServerId = server.Id,
+            ConnectionType = "SFTP",
+            Title = "SFTP",
+            HostControl = new object()
+        };
+        tab.RootContent = new SplitContainerModel
+        {
+            First = sshPane,
+            Second = sftpPane,
+            Orientation = SplitOrientation.Vertical
+        };
+
+        harness.EmbeddedSessionManager.ReconnectPaneRequestedCallback?.Invoke(tab, sftpPane);
+
+        CancellationToken paneReconnectToken = await sftpHandler.Started.Task.WaitAsync(TestTimeout);
+        Assert.False(paneReconnectToken.IsCancellationRequested);
+        Assert.False(sshHandler.Started.Task.IsCompleted);
+        Assert.Contains(tab, harness.Main.Connection.ActiveSessions);
+        Assert.Single(harness.Main.Connection.ActiveSessions);
+
+        sftpHandler.Result.SetResult(SuccessWithTerminalSession());
+        await WaitUntilAsync(() => sftpPane.Status == "Connected");
+
+        Assert.Contains(tab, harness.Main.Connection.ActiveSessions);
+        Assert.Same(sshPane, ((SplitContainerModel)tab.RootContent).First);
     }
 }

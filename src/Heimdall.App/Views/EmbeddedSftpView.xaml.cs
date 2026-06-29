@@ -21,6 +21,7 @@ using System.Windows.Input;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.Utilities;
 using Heimdall.Sftp;
@@ -68,6 +69,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     // Records the editor's privileged (sudo) saves, which bypass both the decorator and the ViewModel.
     private SessionOperationEmitter _operationEmitter = SessionOperationEmitter.Disabled;
     private SessionTabViewModel? _sessionTab;
+    private SessionPaneModel? _ownerPane;
     private LocalizationManager? _localizer;
     private SshConnectionParams? _sshParams;
     private Heimdall.Ssh.HostKeyStore _hostKeyStore = null!;
@@ -123,6 +125,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     /// Raised when the user asks the shared pane lifecycle to close this session tab.
     /// </summary>
     public event Action? CloseRequested;
+
+    public void SetOwningPane(SessionPaneModel pane)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        _ownerPane = pane;
+    }
+
+    internal SessionPaneModel? OwningPane => _ownerPane;
 
     public EmbeddedSftpView()
     {

@@ -67,6 +67,13 @@ internal sealed class SftpHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(settings);
 
+        if (!settings.SftpBrowserEnabled)
+        {
+            var msg = _localizer["ErrorSftpBrowserDisabled"];
+            _connectionSm.SetError(server.Id, msg);
+            return new ConnectionResult(false, msg, null);
+        }
+
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
 
         if (string.IsNullOrWhiteSpace(server.RemoteServer))
@@ -117,7 +124,8 @@ internal sealed class SftpHandler : IProtocolHandler
             UseLegacyPasswordAsKeyPassphrase = server.UsesLegacySshCredentialMapping,
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,
-            Compression = server.SshCompression
+            Compression = server.SshCompression,
+            KeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds
         };
 
         var browser = new SftpBrowser();

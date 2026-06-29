@@ -55,6 +55,13 @@ public interface IEmbeddedSessionManager
     Action<SessionTabViewModel, string, string>? ReconnectRequestedCallback { get; set; }
 
     /// <summary>
+    /// Optional callback invoked when an embedded split-pane view requests reconnection.
+    /// Parameters: (SessionTabViewModel session, SessionPaneModel pane).
+    /// Wired by MainViewModel to reconnect only the owning pane.
+    /// </summary>
+    Action<SessionTabViewModel, SessionPaneModel>? ReconnectPaneRequestedCallback { get; set; }
+
+    /// <summary>
     /// Optional callback invoked when an embedded view requests user-driven disconnect.
     /// Parameters: (SessionTabViewModel session, SessionPaneModel pane, DisconnectReason reason).
     /// Wired by MainViewModel to close the owning pane or tab through the shared lifecycle path.

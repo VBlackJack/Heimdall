@@ -92,6 +92,24 @@ public sealed class SftpHandlerConnectTests
     }
 
     [Fact]
+    public async Task ConnectAsync_WhenSftpBrowserDisabled_ReturnsErrorBeforeTunnelSetup()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService();
+        SftpHandler handler = CreateHandler(tunnelService);
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings { SftpBrowserEnabled = false },
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("ErrorSftpBrowserDisabled", result.ErrorMessage);
+        Assert.Null(result.Session);
+        Assert.Equal(0, tunnelService.SetupCallCount);
+    }
+
+    [Fact]
     public async Task ConnectAsync_RejectsInvalidHost_BeforeTunnelSetup()
     {
         FakeTunnelService tunnelService = new FakeTunnelService();

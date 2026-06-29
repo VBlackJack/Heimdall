@@ -300,6 +300,52 @@ public sealed class SplitServiceTests : IDisposable
     }
 
     [Fact]
+    public void ClosePane_SftpCompanionWithDistinctSessionKey_LeavesSshStateAndReleasesOneTunnelReference()
+    {
+        const string sshSessionId = "ssh-session";
+        const string sftpSessionId = "sftp-companion-session";
+        const int localPort = 45127;
+
+        var info = new TunnelInfo("gateway", localPort, "target.internal", 22, DateTime.UtcNow, true);
+        Assert.True(_tunnelManager.TryRegisterExternalTunnel(info, new DisposableHost(), () => true));
+        _tunnelManager.AddReference(localPort);
+        RegisterConnectedState(sshSessionId, ConnectionState.LaunchingSsh, localPort);
+        RegisterConnectedState(sftpSessionId, ConnectionState.LaunchingSftp, localPort);
+
+        var sshPane = MakePane(paneId: "ssh-pane", serverId: sshSessionId, connectionType: "SSH");
+        sshPane.OriginalServerId = "profile-server";
+        sshPane.Title = "SSH";
+        sshPane.HostControl = new DisposableHost();
+
+        var sftpHost = new DisposableHost();
+        var sftpPane = MakePane(paneId: "sftp-pane", serverId: sftpSessionId, connectionType: "SFTP");
+        sftpPane.OriginalServerId = "profile-server";
+        sftpPane.Title = "SFTP";
+        sftpPane.HostControl = sftpHost;
+
+        var session = new SessionTabViewModel
+        {
+            RootContent = new SplitContainerModel
+            {
+                First = sshPane,
+                Second = sftpPane,
+                Orientation = SplitOrientation.Vertical
+            }
+        };
+
+        _sut.ClosePane(session, sftpPane.PaneId);
+
+        Assert.Same(sshPane, session.RootContent);
+        Assert.True(sftpHost.Disposed);
+        Assert.Equal(ConnectionState.Connected, _connectionSm.GetState(sshSessionId));
+        Assert.Equal(localPort, _connectionSm.GetStateData(sshSessionId)?.TunnelLocalPort);
+        Assert.Equal(ConnectionState.Disconnected, _connectionSm.GetState(sftpSessionId));
+        Assert.True(_tunnelManager.HasTunnel(localPort));
+        Assert.True(_tunnelManager.ReleaseReference(localPort));
+        Assert.False(_tunnelManager.HasTunnel(localPort));
+    }
+
+    [Fact]
     public void ClosePane_ToolPaneBlocking_PreservesTreeAndHost()
     {
         var blockingView = new StubToolView(canClose: false);
@@ -606,6 +652,54 @@ public sealed class SplitServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ReconnectPaneAsync_UsesPaneProtocolAndStateKey_ForSftpCompanionOfSshProfile()
+    {
+        var newSession = new DisposableSessionResult();
+        var hostManager = new FakeEmbeddedSessionManager();
+        hostManager.CreateHostControlCallback = (_, _, connectionType, sessionResult, _, _) =>
+        {
+            Assert.Equal("SFTP", connectionType);
+            Assert.Same(newSession, sessionResult);
+            return new DisposableHost();
+        };
+
+        var connectionService = new RecordingConnectionService(successfulSftpSession: newSession);
+        var sut = CreateSplitService(connectionService, hostManager);
+
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = "server-1",
+                DisplayName = "Server 1",
+                ConnectionType = "SSH",
+                RemoteServer = "server.example.com",
+                SshUsername = "operator"
+            }
+        });
+
+        const string sftpSessionId = "sftp-server-1-session";
+        var pane = MakePane(paneId: "pane-1", serverId: sftpSessionId, connectionType: "SFTP");
+        pane.OriginalServerId = "server-1";
+        pane.Title = "Server 1";
+        pane.HostControl = new DisposableHost();
+
+        var session = new SessionTabViewModel { RootContent = pane };
+        sut.ActiveSessionsProvider = () => new ObservableCollection<SessionTabViewModel> { session };
+
+        var ex = await Record.ExceptionAsync(() => sut.ReconnectPaneAsync(session, pane.PaneId));
+
+        Assert.Null(ex);
+        Assert.Equal("SFTP", connectionService.LastProtocol);
+        Assert.NotNull(connectionService.LastServer);
+        Assert.Equal(sftpSessionId, connectionService.LastServer.Id);
+        Assert.Equal("SFTP", connectionService.LastServer.ConnectionType);
+        Assert.Equal(sftpSessionId, pane.ServerId);
+        Assert.Equal("SFTP", pane.ConnectionType);
+        Assert.Equal("Connected", pane.Status);
+    }
+
+    [Fact]
     public async Task ReconnectPaneAsync_HostFactoryFailure_DisposesNewSessionAndResetsNewState()
     {
         var newSession = new DisposableSessionResult();
@@ -901,6 +995,15 @@ public sealed class SplitServiceTests : IDisposable
         _connectionSm.SetTunnelInfo(serverId, localPort, processId: 123);
     }
 
+    private void RegisterConnectedState(string serverId, ConnectionState launchingState, int localPort)
+    {
+        Assert.True(_connectionSm.TryTransition(serverId, ConnectionState.Initializing));
+        Assert.True(_connectionSm.TryTransition(serverId, ConnectionState.ValidatingConfig));
+        _connectionSm.SetTunnelInfo(serverId, localPort, processId: 123);
+        Assert.True(_connectionSm.TryTransition(serverId, launchingState));
+        Assert.True(_connectionSm.TryTransition(serverId, ConnectionState.Connected));
+    }
+
     private void AssertServerStateReset(string serverId)
     {
         Assert.Equal(ConnectionState.Disconnected, _connectionSm.GetState(serverId));
@@ -987,6 +1090,8 @@ public sealed class SplitServiceTests : IDisposable
         }
 
         public bool ConnectInvoked { get; private set; }
+        public string? LastProtocol { get; private set; }
+        public ServerProfileDto? LastServer { get; private set; }
 
         public AppSettings? CurrentSettings => null;
 
@@ -997,27 +1102,26 @@ public sealed class SplitServiceTests : IDisposable
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync();
+            => RecordConnectAsync("SSH", server, ct);
 
         public Task<ConnectionResult> ConnectRdpAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default,
             RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
-            => RecordConnectAsync();
+            => RecordConnectAsync("RDP", server, ct);
 
         public Task<ConnectionResult> ConnectSftpAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
         {
+            RecordConnect("SFTP", server, ct);
             if (_successfulSftpSession is null)
             {
-                return RecordConnectAsync();
+                return Task.FromResult(_failureResult ?? new ConnectionResult(false, "unexpected connect", null));
             }
 
-            ct.ThrowIfCancellationRequested();
-            ConnectInvoked = true;
             return Task.FromResult(new ConnectionResult(true, null, _successfulSftpSession));
         }
 
@@ -1025,44 +1129,55 @@ public sealed class SplitServiceTests : IDisposable
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync();
+            => RecordConnectAsync("VNC", server, ct);
 
         public Task<ConnectionResult> ConnectTelnetAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync();
+            => RecordConnectAsync("TELNET", server, ct);
 
         public Task<ConnectionResult> ConnectFtpAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync();
+            => RecordConnectAsync("FTP", server, ct);
 
         public Task<ConnectionResult> ConnectCitrixAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync();
+            => RecordConnectAsync("CITRIX", server, ct);
 
         public Task<ConnectionResult> ConnectLocalShellAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync();
+            => RecordConnectAsync("LOCAL", server, ct);
 
         public Task<ConnectionResult> ConnectWinRmAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync();
+            => RecordConnectAsync("WINRM", server, ct);
 
         public void Dispose() { }
 
-        private Task<ConnectionResult> RecordConnectAsync()
+        private Task<ConnectionResult> RecordConnectAsync(
+            string protocol,
+            ServerProfileDto server,
+            CancellationToken ct)
         {
-            ConnectInvoked = true;
+            RecordConnect(protocol, server, ct);
             return Task.FromResult(_failureResult ?? new ConnectionResult(false, "unexpected connect", null));
+        }
+
+        private void RecordConnect(string protocol, ServerProfileDto server, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            ConnectInvoked = true;
+            LastProtocol = protocol;
+            LastServer = server;
         }
     }
 
@@ -1239,6 +1354,7 @@ public sealed class SplitServiceTests : IDisposable
         public Action<SessionTabViewModel>? SplitRequestedCallback { get; set; }
         public Func<bool>? IsBroadcastActive { get; set; }
         public Action<SessionTabViewModel, string, string>? ReconnectRequestedCallback { get; set; }
+        public Action<SessionTabViewModel, SessionPaneModel>? ReconnectPaneRequestedCallback { get; set; }
         public Action<SessionTabViewModel, SessionPaneModel, DisconnectReason>? DisconnectRequestedCallback { get; set; }
         public Action<string>? EditServerRequestedCallback { get; set; }
         public Action<SessionTabViewModel>? CloseRequestedCallback { get; set; }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Ssh;
 
 namespace Heimdall.Ssh;
@@ -82,6 +83,9 @@ public sealed class SshConnectionParams
 
     /// <summary>TCP connection timeout. Defaults to 15 seconds.</summary>
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>SSH transport keepalive interval in seconds.</summary>
+    public int? KeepAliveIntervalSeconds { get; init; } = AppSettings.DefaultSshKeepAliveIntervalSeconds;
 
     /// <summary>Host identity used for host-key verification and storage.</summary>
     public string HostKeyVerificationHost =>

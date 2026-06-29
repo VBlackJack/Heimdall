@@ -16,6 +16,7 @@
 
 using System.Reflection;
 using System.Security.Cryptography;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh.Agents;
@@ -411,6 +412,21 @@ public sealed class SshConnectionFactoryTests
         var info = SshConnectionFactory.Create(connParams);
 
         Assert.NotEmpty(info.AuthenticationMethods);
+    }
+
+    [Fact]
+    public void SshConnectionParams_DefaultKeepAliveInterval_UsesAppSettingsDefault()
+    {
+        var connParams = new SshConnectionParams
+        {
+            Host = "example.com",
+            Port = 22,
+            Username = "user"
+        };
+
+        Assert.Equal(
+            AppSettings.DefaultSshKeepAliveIntervalSeconds,
+            connParams.KeepAliveIntervalSeconds);
     }
 
     [Fact]

@@ -342,6 +342,7 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
         public Action<SessionTabViewModel>? SplitRequestedCallback { get; set; }
         public Func<bool>? IsBroadcastActive { get; set; }
         public Action<SessionTabViewModel, string, string>? ReconnectRequestedCallback { get; set; }
+        public Action<SessionTabViewModel, SessionPaneModel>? ReconnectPaneRequestedCallback { get; set; }
         public Action<SessionTabViewModel, SessionPaneModel, DisconnectReason>? DisconnectRequestedCallback { get; set; }
         public Action<SessionTabViewModel>? CloseRequestedCallback { get; set; }
         public Action<string>? EditServerRequestedCallback { get; set; }

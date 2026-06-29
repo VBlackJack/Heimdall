@@ -197,7 +197,7 @@ public sealed class SplitService : ISplitService
                 session.RootContent, targetPane.PaneId, container);
 
             // Async connection — can be cancelled or session can be closed while waiting
-            var result = await ConnectByProtocolAsync(serverDto, settings, ct);
+            var result = await ConnectByProtocolAsync(serverDto, settings, ct, newPane.ConnectionType);
 
             if (!result.Success || result.Session is null)
             {
@@ -246,6 +246,10 @@ public sealed class SplitService : ISplitService
             if (hostControl is EmbeddedRdpView rdpView)
             {
                 rdpView.SetOwningPane(newPane);
+            }
+            else if (hostControl is EmbeddedSftpView sftpView)
+            {
+                sftpView.SetOwningPane(newPane);
             }
             newPane.ServerId = serverDto.Id;
             newPane.Status = "Connected";
@@ -590,12 +594,24 @@ public sealed class SplitService : ISplitService
                 return;
             }
 
-            if (ForceEmbeddedMode(serverDto))
+            var effectiveConnectionType = ResolvePaneConnectionType(
+                pane.ConnectionType,
+                serverDto.ConnectionType);
+            var paneScopedServerDto = CreatePaneScopedServerProfile(
+                serverDto,
+                oldServerId,
+                effectiveConnectionType);
+
+            if (ForceEmbeddedMode(paneScopedServerDto))
             {
-                NotifyForcedEmbeddedMode(serverDto);
+                NotifyForcedEmbeddedMode(paneScopedServerDto);
             }
 
-            var result = await ConnectByProtocolAsync(serverDto, settings, ct);
+            var result = await ConnectByProtocolAsync(
+                paneScopedServerDto,
+                settings,
+                ct,
+                effectiveConnectionType);
 
             if (!result.Success || result.Session is null)
             {
@@ -603,7 +619,7 @@ public sealed class SplitService : ISplitService
                 pane.FailureDetails = result.Failure;
                 SetStatusText?.Invoke(result.ErrorMessage ?? _localizer["ErrorSplitSessionFailed"]);
                 Core.Logging.FileLogger.Warn(
-                    $"ReconnectPane failed for '{serverDto.DisplayName}': {result.ErrorMessage}");
+                    $"ReconnectPane failed for '{paneScopedServerDto.DisplayName}': {result.ErrorMessage}");
                 return;
             }
 
@@ -614,9 +630,9 @@ public sealed class SplitService : ISplitService
                 || SplitTreeHelper.FindPane(session.RootContent, paneId) is null)
             {
                 SafeDisposeSessionResult(result.Session);
-                CleanupOrphanedPane(serverDto.Id);
+                CleanupOrphanedPane(paneScopedServerDto.Id);
                 Core.Logging.FileLogger.Info(
-                    $"ReconnectPane cancelled for '{serverDto.DisplayName}' — session or pane removed.");
+                    $"ReconnectPane cancelled for '{paneScopedServerDto.DisplayName}' — session or pane removed.");
                 return;
             }
 
@@ -626,7 +642,7 @@ public sealed class SplitService : ISplitService
                 try
                 {
                     hostControl = _sessionManager.CreateHostControl(
-                        session, serverDto.DisplayName, serverDto.ConnectionType ?? "SSH",
+                        session, paneScopedServerDto.DisplayName, effectiveConnectionType,
                         result.Session, settings, pane.SftpReconnectPathHint);
                 }
                 finally
@@ -637,11 +653,11 @@ public sealed class SplitService : ISplitService
             catch (Exception ex)
             {
                 SafeDisposeSessionResult(result.Session);
-                CleanupOrphanedPane(serverDto.Id);
+                CleanupOrphanedPane(paneScopedServerDto.Id);
                 pane.Status = "Error";
                 SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
                 Core.Logging.FileLogger.Error(
-                    $"ReconnectPane host creation failed for '{serverDto.DisplayName}': {ex.Message}", ex);
+                    $"ReconnectPane host creation failed for '{paneScopedServerDto.DisplayName}': {ex.Message}", ex);
                 return;
             }
 
@@ -650,7 +666,12 @@ public sealed class SplitService : ISplitService
             {
                 rdpView.SetOwningPane(pane);
             }
-            pane.ServerId = serverDto.Id;
+            else if (hostControl is EmbeddedSftpView sftpView)
+            {
+                sftpView.SetOwningPane(pane);
+            }
+            pane.ServerId = paneScopedServerDto.Id;
+            pane.ConnectionType = effectiveConnectionType;
             pane.Status = "Connected";
 
             // No LayoutMemory.Record here — reconnect targets the same server,
@@ -870,11 +891,18 @@ public sealed class SplitService : ISplitService
     /// Deduplicates the switch statement used by split and reconnect flows.
     /// </summary>
     private async Task<ConnectionResult> ConnectByProtocolAsync(
-        ServerProfileDto serverDto, AppSettings settings, CancellationToken ct)
+        ServerProfileDto serverDto,
+        AppSettings settings,
+        CancellationToken ct,
+        string? paneConnectionType = null)
     {
         ct.ThrowIfCancellationRequested();
 
-        return (serverDto.ConnectionType?.ToUpperInvariant()) switch
+        string connectionType = ResolvePaneConnectionType(
+            paneConnectionType,
+            serverDto.ConnectionType);
+
+        return connectionType.ToUpperInvariant() switch
         {
             "SSH" => await _connectionService.ConnectSshAsync(serverDto, settings, ct),
             "SFTP" => await _connectionService.ConnectSftpAsync(serverDto, settings, ct),
@@ -886,6 +914,147 @@ public sealed class SplitService : ISplitService
             "WINRM" => await _connectionService.ConnectWinRmAsync(serverDto, settings, ct),
             _ => await _connectionService.ConnectRdpAsync(serverDto, settings, ct),
         };
+    }
+
+    private static string ResolvePaneConnectionType(
+        string? paneConnectionType,
+        string? inventoryConnectionType)
+    {
+        return !string.IsNullOrWhiteSpace(paneConnectionType)
+            ? paneConnectionType
+            : inventoryConnectionType ?? "RDP";
+    }
+
+    private static ServerProfileDto CreatePaneScopedServerProfile(
+        ServerProfileDto serverDto,
+        string paneServerId,
+        string connectionType)
+    {
+        string stateKey = string.IsNullOrWhiteSpace(paneServerId)
+            ? serverDto.Id
+            : paneServerId;
+
+        if (string.Equals(stateKey, serverDto.Id, StringComparison.Ordinal)
+            && string.Equals(connectionType, serverDto.ConnectionType, StringComparison.OrdinalIgnoreCase))
+        {
+            return serverDto;
+        }
+
+        var clone = CloneServerProfile(serverDto);
+        clone.Id = stateKey;
+        clone.ConnectionType = connectionType;
+        return clone;
+    }
+
+    private static ServerProfileDto CloneServerProfile(ServerProfileDto server)
+    {
+        var clone = new ServerProfileDto
+        {
+            Id = server.Id,
+            DisplayName = server.DisplayName,
+            Origin = server.Origin,
+            RemoteServer = server.RemoteServer,
+            RemotePort = server.RemotePort,
+            LocalPort = server.LocalPort,
+            Group = server.Group,
+            SshGatewayId = server.SshGatewayId,
+            RdpUsername = server.RdpUsername,
+            RdpPasswordEncrypted = server.RdpPasswordEncrypted,
+            RdpDomain = server.RdpDomain,
+            UseDirectConnection = server.UseDirectConnection,
+            ProjectId = server.ProjectId,
+            ConnectionType = server.ConnectionType,
+            SessionLoggingOverride = server.SessionLoggingOverride,
+            VaultEntryName = server.VaultEntryName,
+            WinRmPort = server.WinRmPort,
+            WinRmUsername = server.WinRmUsername,
+            WinRmPasswordEncrypted = server.WinRmPasswordEncrypted,
+            WinRmUseSsl = server.WinRmUseSsl,
+            WinRmSkipCertificateCheck = server.WinRmSkipCertificateCheck,
+            WinRmIdentityMode = server.WinRmIdentityMode,
+            SshUsername = server.SshUsername,
+            SshPort = server.SshPort,
+            SshMode = server.SshMode,
+            SshAgentForwarding = server.SshAgentForwarding,
+            SshKeyPath = server.SshKeyPath,
+            SshPasswordEncrypted = server.SshPasswordEncrypted,
+            SshCompression = server.SshCompression,
+            SshX11Forwarding = server.SshX11Forwarding,
+            SocksProxyPort = server.SocksProxyPort,
+            RemoteBindPort = server.RemoteBindPort,
+            RemoteLocalPort = server.RemoteLocalPort,
+            PostConnectSteps = [.. server.PostConnectSteps],
+            PostConnectCommand = server.PostConnectCommand,
+            PostConnectDelayMs = server.PostConnectDelayMs,
+            RdpAntiIdle = server.RdpAntiIdle,
+            RdpAspectRatio = server.RdpAspectRatio,
+            RdpResolutionMode = server.RdpResolutionMode,
+            RdpFixedWidth = server.RdpFixedWidth,
+            RdpFixedHeight = server.RdpFixedHeight,
+            RdpInitialSmartSizing = server.RdpInitialSmartSizing,
+            RdpResizeEnableDelayMs = server.RdpResizeEnableDelayMs,
+            TunnelsPanelExpanded = server.TunnelsPanelExpanded,
+            IsFavorite = server.IsFavorite,
+            SortOrder = server.SortOrder,
+            Tags = server.Tags,
+            RdpMode = server.RdpMode,
+            RdpUseGlobalDefaults = server.RdpUseGlobalDefaults,
+            RdpRedirectClipboard = server.RdpRedirectClipboard,
+            RdpRedirectDrives = server.RdpRedirectDrives,
+            RdpRedirectPrinters = server.RdpRedirectPrinters,
+            RdpRedirectComPorts = server.RdpRedirectComPorts,
+            RdpRedirectSmartCards = server.RdpRedirectSmartCards,
+            RdpRedirectWebcam = server.RdpRedirectWebcam,
+            RdpRedirectUsb = server.RdpRedirectUsb,
+            RdpAudioMode = server.RdpAudioMode,
+            RdpAudioCapture = server.RdpAudioCapture,
+            RdpMultiMonitor = server.RdpMultiMonitor,
+            RdpSelectedMonitorIndices = [.. server.RdpSelectedMonitorIndices],
+            RdpDynamicResolution = server.RdpDynamicResolution,
+            RdpNla = server.RdpNla,
+            RdpStrictServerAuthentication = server.RdpStrictServerAuthentication,
+            RdpColorDepth = server.RdpColorDepth,
+            RdpBitmapCaching = server.RdpBitmapCaching,
+            RdpCompression = server.RdpCompression,
+            RdpAutoReconnect = server.RdpAutoReconnect,
+            RdpAdminMode = server.RdpAdminMode,
+            RdpFullScreen = server.RdpFullScreen,
+            RdpPerformanceFlags = server.RdpPerformanceFlags,
+            RdpDisableUdp = server.RdpDisableUdp,
+            RdpGateway = server.RdpGateway,
+            Environment = server.Environment,
+            MacAddress = server.MacAddress,
+            LocalShellExecutable = server.LocalShellExecutable,
+            LocalShellArguments = server.LocalShellArguments,
+            LocalShellWorkingDirectory = server.LocalShellWorkingDirectory,
+            LocalShellElevated = server.LocalShellElevated,
+            ElevationMode = server.ElevationMode,
+            ExecutionConfirmed = server.ExecutionConfirmed,
+            CitrixStoreFrontUrl = server.CitrixStoreFrontUrl,
+            CitrixAppName = server.CitrixAppName,
+            CitrixIcaFilePath = server.CitrixIcaFilePath,
+            CitrixSeamlessMode = server.CitrixSeamlessMode,
+            CitrixUseSso = server.CitrixUseSso,
+            CitrixLaunchCommandLine = server.CitrixLaunchCommandLine,
+            FtpPort = server.FtpPort,
+            FtpUsername = server.FtpUsername,
+            FtpPasswordEncrypted = server.FtpPasswordEncrypted,
+            VncPort = server.VncPort,
+            VncPassword = server.VncPassword,
+            FtpPassiveMode = server.FtpPassiveMode,
+            FtpUseSsl = server.FtpUseSsl,
+            VncViewOnly = server.VncViewOnly,
+            TelnetPort = server.TelnetPort,
+            TelnetUsername = server.TelnetUsername,
+            TelnetPasswordEncrypted = server.TelnetPasswordEncrypted
+        };
+
+        if (server.HasSshKeyPassphraseEncryptedField)
+        {
+            clone.SshKeyPassphraseEncrypted = server.SshKeyPassphraseEncrypted;
+        }
+
+        return clone;
     }
 
     /// <summary>

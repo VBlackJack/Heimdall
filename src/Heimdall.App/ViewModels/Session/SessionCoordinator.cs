@@ -153,6 +153,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         // Wire SSH reconnect: close the old session tab and re-connect from scratch
         _embeddedSessionManager.ReconnectRequestedCallback = OnReconnectRequested;
+        _embeddedSessionManager.ReconnectPaneRequestedCallback = OnReconnectPaneRequested;
         _embeddedSessionManager.DisconnectRequestedCallback = OnDisconnectRequested;
         _embeddedSessionManager.EditServerRequestedCallback = OnEditServerRequested;
         // Wire overlay Close button: tear down the whole tab through the shared lifecycle path.
@@ -707,6 +708,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         {
             rdpView.SetOwningPane(tab.PrimaryPane);
         }
+        else if (tab.HostControl is EmbeddedSftpView sftpView)
+        {
+            sftpView.SetOwningPane(tab.PrimaryPane);
+        }
         tab.Status = string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase)
             ? _localizer["StatusConnectingProgress"]
             : _localizer["StatusConnected"];
@@ -732,6 +737,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         // Auto-open SFTP alongside SSH - use original server ID for inventory lookup
         if (string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+            && _main.CurrentSettings?.SftpBrowserEnabled == true
             && _main.CurrentSettings?.SftpAutoOpenOnSsh == true)
         {
             AutoOpenSftpAsync(tab, originalServerId, _main.Split.GetSessionToken(tab))
@@ -808,6 +814,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     // VaultLockedException), so they are queued here and replayed after unlock
     // instead of being attempted (and failing/throwing) or wasting bounded retries.
     private readonly List<(SessionTabViewModel Tab, string ServerId, string ConnectionType)> _deferredReconnects = new();
+    private readonly List<(SessionTabViewModel Tab, string PaneId)> _deferredPaneReconnects = new();
 
     private void OnReconnectRequested(SessionTabViewModel tab, string serverId, string connectionType)
     {
@@ -825,22 +832,47 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         OnReconnectRequestedAsync(tab, serverId, connectionType).SafeFireAndForget();
     }
 
+    private void OnReconnectPaneRequested(SessionTabViewModel tab, SessionPaneModel pane)
+    {
+        if (VaultReconnectPolicy.ShouldDeferReconnect(_main.IsWorkspaceLocked))
+        {
+            if (!_deferredPaneReconnects.Any(d =>
+                    ReferenceEquals(d.Tab, tab)
+                    && string.Equals(d.PaneId, pane.PaneId, StringComparison.Ordinal)))
+            {
+                _deferredPaneReconnects.Add((tab, pane.PaneId));
+                FileLogger.Info("Pane reconnect deferred: vault workspace locked.");
+            }
+
+            return;
+        }
+
+        _main.Split.ReconnectPaneAsync(tab, pane.PaneId).SafeFireAndForget();
+    }
+
     /// <summary>
     /// Replay reconnects that were deferred while the workspace was locked. Called
     /// after a successful unlock.
     /// </summary>
     public void ResumeDeferredReconnects()
     {
-        if (_deferredReconnects.Count == 0)
+        if (_deferredReconnects.Count == 0 && _deferredPaneReconnects.Count == 0)
         {
             return;
         }
 
         var pending = _deferredReconnects.ToList();
         _deferredReconnects.Clear();
+        var pendingPanes = _deferredPaneReconnects.ToList();
+        _deferredPaneReconnects.Clear();
         foreach (var (tab, serverId, connectionType) in pending)
         {
             OnReconnectRequestedAsync(tab, serverId, connectionType).SafeFireAndForget();
+        }
+
+        foreach (var (tab, paneId) in pendingPanes)
+        {
+            _main.Split.ReconnectPaneAsync(tab, paneId).SafeFireAndForget();
         }
     }
 
@@ -1057,8 +1089,11 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
+            var sftpSessionId = BuildCompanionSftpSessionId(tab.ServerId);
+            var sftpProfile = CreateCompanionSftpProfile(server, sftpSessionId);
+
             var sftpResult = await _main.ServerList.ConnectionService
-                .ConnectSftpAsync(server, _main.CurrentSettings!, ct)
+                .ConnectSftpAsync(sftpProfile, _main.CurrentSettings!, ct)
                 .ConfigureAwait(false);
 
             if (!sftpResult.Success || sftpResult.Session is null)
@@ -1070,19 +1105,40 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
+            if (ct.IsCancellationRequested)
+            {
+                SafeDisposeSessionResult(sftpResult.Session);
+                _main.Split.CleanupOrphanedPane(sftpSessionId);
+                return;
+            }
+
             // Create the SFTP host control on the UI thread and wrap root in a split container
+            var attached = false;
             InvokeOnUi(() =>
             {
+                if (ct.IsCancellationRequested || !_main.Connection.ActiveSessions.Contains(tab))
+                {
+                    return;
+                }
+
                 var sftpPane = new SessionPaneModel
                 {
-                    ServerId = serverId,
-                    OriginalServerId = tab.OriginalServerId,
+                    // ServerId is the session/tunnel/state key. The companion SFTP
+                    // pane gets a distinct key so closing or reconnecting it cannot
+                    // reset the SSH pane's state entry. OriginalServerId remains the
+                    // inventory id used for profile lookup and history.
+                    ServerId = sftpSessionId,
+                    OriginalServerId = serverId,
                     ConnectionType = "SFTP",
                     Title = tab.Title,
                     Status = "Connected"
                 };
                 sftpPane.HostControl = _embeddedSessionManager.CreateHostControl(
                     tab, tab.Title, "SFTP", sftpResult.Session, _main.CurrentSettings);
+                if (sftpPane.HostControl is EmbeddedSftpView sftpView)
+                {
+                    sftpView.SetOwningPane(sftpPane);
+                }
 
                 var currentRoot = tab.RootContent;
                 tab.RootContent = new SplitContainerModel
@@ -1092,13 +1148,118 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     Orientation = SplitOrientation.Vertical,
                     SplitRatio = 0.5
                 };
+                attached = true;
             });
+
+            if (!attached)
+            {
+                SafeDisposeSessionResult(sftpResult.Session);
+                _main.Split.CleanupOrphanedPane(sftpSessionId);
+                return;
+            }
 
             FileLogger.Info($"SFTP auto-open succeeded for {serverId}.");
         }
         catch (Exception ex)
         {
             FileLogger.Warn($"SFTP auto-open error for {serverId}: {ex.Message}");
+        }
+    }
+
+    private static string BuildCompanionSftpSessionId(string sshSessionId)
+    {
+        var baseId = string.IsNullOrWhiteSpace(sshSessionId) ? "ssh" : sshSessionId;
+        return $"sftp-{baseId}-{Guid.NewGuid():N}";
+    }
+
+    private static ServerProfileDto CreateCompanionSftpProfile(
+        ServerProfileDto server,
+        string sftpSessionId)
+    {
+        var profile = new ServerProfileDto
+        {
+            Id = sftpSessionId,
+            DisplayName = server.DisplayName,
+            Origin = server.Origin,
+            RemoteServer = server.RemoteServer,
+            RemotePort = server.RemotePort,
+            LocalPort = server.LocalPort,
+            Group = server.Group,
+            SshGatewayId = server.SshGatewayId,
+            UseDirectConnection = server.UseDirectConnection,
+            ProjectId = server.ProjectId,
+            ConnectionType = "SFTP",
+            SessionLoggingOverride = server.SessionLoggingOverride,
+            VaultEntryName = server.VaultEntryName,
+            SshUsername = server.SshUsername,
+            SshPort = server.SshPort,
+            SshMode = server.SshMode,
+            SshAgentForwarding = server.SshAgentForwarding,
+            SshKeyPath = server.SshKeyPath,
+            SshPasswordEncrypted = server.SshPasswordEncrypted,
+            SshCompression = server.SshCompression,
+            SshX11Forwarding = server.SshX11Forwarding,
+            SocksProxyPort = server.SocksProxyPort,
+            RemoteBindPort = server.RemoteBindPort,
+            RemoteLocalPort = server.RemoteLocalPort,
+            ExecutionConfirmed = server.ExecutionConfirmed
+        };
+
+        if (server.HasSshKeyPassphraseEncryptedField)
+        {
+            profile.SshKeyPassphraseEncrypted = server.SshKeyPassphraseEncrypted;
+        }
+
+        return profile;
+    }
+
+    private static void SafeDisposeSessionResult(ISessionResult? session)
+    {
+        switch (session)
+        {
+            case null:
+                return;
+            case IDisposable disposable:
+                SafeDispose(disposable);
+                return;
+            case SshSessionResult ssh:
+                SafeDispose(ssh.Session);
+                return;
+            case TerminalSessionResult terminal:
+                SafeDispose(terminal.Session);
+                return;
+            case LocalShellBundle local:
+                SafeDispose(local.Session);
+                return;
+            case SftpSessionBundle sftp:
+                SafeDispose(sftp.Browser);
+                return;
+            case FtpSessionBundle ftp:
+                SafeDispose(ftp.Browser);
+                return;
+            case CitrixSessionResult citrix:
+                SafeDispose(citrix.Process);
+                return;
+        }
+    }
+
+    private static void SafeDispose(IDisposable? disposable)
+    {
+        if (disposable is null)
+        {
+            return;
+        }
+
+        try
+        {
+            disposable.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Unexpected exception during session result disposal: {ex.Message}");
         }
     }
 

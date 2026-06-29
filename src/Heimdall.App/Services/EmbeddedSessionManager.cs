@@ -77,6 +77,13 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     public Action<SessionTabViewModel, string, string>? ReconnectRequestedCallback { get; set; }
 
     /// <summary>
+    /// Optional callback invoked when an embedded split-pane view requests reconnection.
+    /// Parameters: (SessionTabViewModel session, SessionPaneModel pane).
+    /// Wired by MainViewModel to reconnect only the owning pane.
+    /// </summary>
+    public Action<SessionTabViewModel, SessionPaneModel>? ReconnectPaneRequestedCallback { get; set; }
+
+    /// <summary>
     /// Optional callback invoked when an embedded view requests user-driven disconnect.
     /// Parameters: (SessionTabViewModel session, SessionPaneModel pane, DisconnectReason reason).
     /// Wired by MainViewModel to close the owning pane or tab through the shared lifecycle path.
@@ -897,10 +904,18 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     private void WireReconnectRequested(EmbeddedSftpView view, SessionTabViewModel tab)
     {
         view.ReconnectRequested += () =>
+        {
+            if (tab.IsSplit && view.OwningPane is { } ownerPane)
+            {
+                ReconnectPaneRequestedCallback?.Invoke(tab, ownerPane);
+                return;
+            }
+
             ReconnectRequestedCallback?.Invoke(
                 tab,
                 tab.ProfileLookupServerId,
                 tab.ConnectionType);
+        };
         view.CloseRequested += () => CloseRequestedCallback?.Invoke(tab);
     }
 
