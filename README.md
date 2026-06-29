@@ -14,7 +14,7 @@
 
 [![CI](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml/badge.svg)](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-7289%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-7%2C900%2B%20passing-brightgreen.svg)]()
 [![Tools](https://img.shields.io/badge/tools-59%20sysops-blue.svg)]()
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)]()
 
@@ -27,7 +27,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 ## Why Heimdall?
 
 - **9 protocols, one interface** --- RDP, SSH, SFTP, VNC, Telnet, FTP, Citrix, WinRM, and local shell sessions in a single tabbed window
-- **Zero-trust credential storage** --- DPAPI encryption + HMAC-SHA256 integrity, PBKDF2 PIN protection, Windows ACL enforcement, optional Windows Hello (biometric/PIN) gate before connect
+- **Zero-trust credential storage** --- DPAPI + HMAC-SHA256 integrity, an optional **master-password vault** (Argon2id key derivation, AES-256-GCM) with a startup unlock gate and idle workspace lock, PBKDF2 PIN protection, Windows ACL enforcement, and optional **Windows Hello** (biometric/PIN) to unlock the vault and as a gate before connect
 - **External vault integration** --- KeePassXC, KeePass2 (KPScript), Bitwarden CLI, 1Password CLI, `pass`, the native Windows Credential Manager, or any command-line password manager
 - **Pageant-native** --- Direct IPC with PuTTY Pageant via shared memory (no agent forwarding hacks)
 - **Portable** --- Self-contained build with no installer required
@@ -96,6 +96,11 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - **Full sudo fallback** on all operations: upload (`sudo tee`), download (`sudo cat`), edit, chmod, rename, delete, mkdir - triggered only on typed permission-denied exceptions
 - Sudo edit sessions cache the pinned host-key verifier, detect mid-edit host-key rotation, track upload tasks, and clean temporary files even when the privileged write fails
 - Drag-and-drop upload and download
+- **Cut / Copy / Paste / Duplicate** with non-destructive collision handling; server-side copy (host-key-pinned) with a roundtrip fallback, journaled as a single operation
+- **Recursive folder upload** and drop-into-folder targeting
+- **Cross-pane paste** between two file browsers, same server or across servers
+- **Paste from Explorer**: upload files/folders from the Windows clipboard (CF_HDROP) into the current directory
+- SFTP/FTP file operations journaled (download / upload / mkdir / delete / rename / copy)
 - Chmod dialog, path bookmarks, filename filter
 
 ### FTP Browser
@@ -156,6 +161,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 ### Macro Recorder
 - Record terminal input with timing between keystrokes
 - Save macros to JSON files, replay with original delays
+- **Expect steps**: a macro can wait for an expected output pattern before sending the next step (wait-for-pattern), authored in a dedicated macro editor
 - Accessible from session context menu
 
 ### Network Scanner
@@ -218,7 +224,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Merge feedback**: status bar message when a busy tool blocks a merge operation
 - Command Palette renders as a WPF `Popup` (own HWND) above RDP/VNC ActiveX surfaces
 - **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/group, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog)
-- Session transcript logging with ANSI code stripping
+- Global session logging (opt-in): per-session text transcripts for SSH / Telnet / Local Shell and a connect/disconnect event log (reason + duration) for RDP / VNC / Citrix, restrictive ACLs and size rollover; **per-profile tri-state override** (force on / off / inherit) in the server dialog
 - Connection history log (JSONL with auto-rotation)
 - Screenshot capture to clipboard (Ctrl+Shift+S)
 
@@ -251,6 +257,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 
 ### Security
 - DPAPI encryption + HMAC-SHA256 integrity via unified `CredentialProtector`
+- **Master-password vault (optional, encryption at rest)**: an Argon2id key-encryption key wraps a data-encryption key (DEK/KEK); `CredentialProtector` is version-aware and backward compatible with legacy DPAPI blobs. Enable / change / disable from Settings, with a migration engine that re-wraps existing credentials and atomic (temp-then-rename) config writes
+- **Startup unlock gate and workspace lock**: when a master password is set, the workspace is locked at launch until unlocked; manual lock plus idle auto-lock (`AutoLockIdleMinutes`) with an overlay, locked sessions masked rather than disconnected (opt-in disconnect-on-lock)
+- **Windows Hello vault unlock**: a TPM-bound Hello key (sign -> HKDF -> AES-GCM, composed with DPAPI) optionally unlocks the vault by biometric/PIN instead of the master password; fail-closed with a master-password fallback, gated on TPM presence
 - External credential provider: choose a command-line provider (preset templates for KeePassXC, KeePass2/KPScript, Bitwarden CLI, 1Password CLI, pass - with an optional unlock secret fed via stdin, a separate username command, a per-profile vault entry name, and a "first line only" output mode) or the native Windows Credential Manager; the provider is built through `ICredentialProviderFactory` and covers SSH/SFTP, RDP/Citrix, WinRM, FTP, Telnet and VNC - database path browser, placeholder hints, test button with inline feedback; KeePassXC also supports key-file authentication (.keyx/.key), alone or combined with a master password
 - Optional Windows Hello gate: requires a biometric/PIN verification before stored credentials are used on connect (single and bulk), fail-closed with a configurable grace window
 - PBKDF2-SHA256 PIN hashing (100,000 iterations) with lockout mechanics
@@ -412,7 +421,7 @@ Release mode also produces Inno Setup `.exe` installers in `Dist/installers/` wi
 | RDP | ActiveX MsTscAx (WindowsFormsHost) |
 | Citrix | StoreBrowse CLI integration |
 | Crypto | System.Security.Cryptography.ProtectedData (DPAPI) |
-| Testing | xUnit (7,289 passing tests across 8 projects) |
+| Testing | xUnit (7,900+ passing tests across 8 projects) |
 | Built-in Tools | 59 sysops tools (Ctrl+K → `tools` or Ctrl+Shift+T) |
 | Serialization | System.Text.Json |
 
