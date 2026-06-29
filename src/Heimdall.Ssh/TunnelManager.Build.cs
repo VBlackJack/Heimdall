@@ -222,12 +222,21 @@ public sealed partial class TunnelManager
         return new TunnelResult(true, info, null, null);
     }
 
-    private static TunnelResult ClassifyAndBuildFailureResult(
+    internal static TunnelResult ClassifyAndBuildFailureResult(
         Exception ex,
         Action cleanup,
         bool isChained)
     {
         cleanup();
+
+        if (HostKeyRejectionFinder.TryFind(ex, out HostKeyRejectedException? rejectedHostKey))
+        {
+            return new TunnelResult(
+                false,
+                null,
+                rejectedHostKey.Message,
+                rejectedHostKey.IsMismatch ? SshFailureCode.HostKeyMismatch : SshFailureCode.Cancelled);
+        }
 
         return ex switch
         {
@@ -236,11 +245,11 @@ public sealed partial class TunnelManager
                 null,
                 isChained ? "Chained tunnel establishment was cancelled." : "Tunnel establishment was cancelled.",
                 SshFailureCode.Cancelled),
-            HostKeyRejectedException hostKeyEx => new TunnelResult(
+            HostKeyRejectedException directHostKeyRejected => new TunnelResult(
                 false,
                 null,
-                hostKeyEx.Message,
-                hostKeyEx.IsMismatch ? SshFailureCode.HostKeyMismatch : SshFailureCode.Cancelled),
+                directHostKeyRejected.Message,
+                directHostKeyRejected.IsMismatch ? SshFailureCode.HostKeyMismatch : SshFailureCode.Cancelled),
             SshAuthenticationException authEx => new TunnelResult(
                 false,
                 null,

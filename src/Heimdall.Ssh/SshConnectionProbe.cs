@@ -112,7 +112,7 @@ public static class SshConnectionProbe
         CancellationToken ct)
     {
         var buffer = new byte[128];
-        var line = new StringBuilder();
+        var lineBytes = new List<byte>(MaxBannerBytes);
         string? firstNonEmptyLine = null;
         var totalRead = 0;
 
@@ -134,21 +134,21 @@ public static class SshConnectionProbe
             {
                 if (buffer[i] == '\n')
                 {
-                    if (TryCaptureBannerLine(line.ToString(), ref firstNonEmptyLine, out var sshBanner))
+                    if (TryCaptureBannerLine(lineBytes, ref firstNonEmptyLine, out var sshBanner))
                     {
                         return sshBanner;
                     }
 
-                    line.Clear();
+                    lineBytes.Clear();
                     continue;
                 }
 
-                line.Append((char)buffer[i]);
+                lineBytes.Add(buffer[i]);
             }
         }
 
-        if (line.Length > 0
-            && TryCaptureBannerLine(line.ToString(), ref firstNonEmptyLine, out var partialSshBanner))
+        if (lineBytes.Count > 0
+            && TryCaptureBannerLine(lineBytes, ref firstNonEmptyLine, out var partialSshBanner))
         {
             return partialSshBanner;
         }
@@ -157,11 +157,11 @@ public static class SshConnectionProbe
     }
 
     private static bool TryCaptureBannerLine(
-        string rawLine,
+        List<byte> rawLineBytes,
         ref string? firstNonEmptyLine,
         out string? sshBanner)
     {
-        var line = rawLine.TrimEnd('\r');
+        var line = DecodeUtf8Line(rawLineBytes);
         if (!string.IsNullOrWhiteSpace(line) && firstNonEmptyLine is null)
         {
             firstNonEmptyLine = line;
@@ -175,6 +175,17 @@ public static class SshConnectionProbe
 
         sshBanner = null;
         return false;
+    }
+
+    private static string DecodeUtf8Line(List<byte> rawLineBytes)
+    {
+        int byteCount = rawLineBytes.Count;
+        if (byteCount > 0 && rawLineBytes[byteCount - 1] == '\r')
+        {
+            byteCount--;
+        }
+
+        return Encoding.UTF8.GetString(rawLineBytes.ToArray(), 0, byteCount);
     }
 
     private static ProbeResult ClassifySocketException(SocketException ex)

@@ -697,6 +697,20 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 return;
             }
 
+            if (!data.IsSupported)
+            {
+                SetHealthProgressEnabled(false);
+                string unsupported = L("HealthPanelUnsupported");
+                CpuProgressBar.Value = 0;
+                CpuPercentText.Text = unsupported;
+                RamProgressBar.Value = 0;
+                RamDetailText.Text = unsupported;
+                DiskProgressBar.Value = 0;
+                DiskDetailText.Text = unsupported;
+                return;
+            }
+
+            SetHealthProgressEnabled(true);
             CpuProgressBar.Value = data.CpuPercent;
             CpuPercentText.Text = $"{data.CpuPercent:F1}%";
 
@@ -709,6 +723,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             DiskProgressBar.Value = data.DiskPercent;
             DiskDetailText.Text = $"{data.DiskUsed} / {data.DiskTotal}";
         });
+    }
+
+    private void SetHealthProgressEnabled(bool isEnabled)
+    {
+        CpuProgressBar.IsEnabled = isEnabled;
+        RamProgressBar.IsEnabled = isEnabled;
+        DiskProgressBar.IsEnabled = isEnabled;
     }
 
     private void LocalizeHealthLabels()

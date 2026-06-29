@@ -15,6 +15,7 @@
  */
 
 using FluentAssertions;
+using System.Globalization;
 using Heimdall.App.ViewModels;
 using Heimdall.Sftp;
 using Renci.SshNet.Common;
@@ -208,6 +209,30 @@ public sealed class EmbeddedSftpViewModelHelpersTests
         Assert.Equal("root", entry.Owner);
         Assert.Equal("wheel", entry.Group);
         Assert.NotEqual(default, entry.LastModified);
+    }
+
+    [Fact]
+    public void ParseLsOutput_ParsesSizeAndTimestampWithInvariantCulture()
+    {
+        CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ar-SA");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ar-SA");
+            const string output = "-rw-r--r-- 1 root wheel 1234 2026-05-20 14:30 report.txt\n";
+
+            IReadOnlyList<SftpFileInfo> entries = EmbeddedSftpViewModel.ParseLsOutput(output, "/var/reports");
+
+            Assert.Single(entries);
+            Assert.Equal(1234, entries[0].Size);
+            Assert.Equal(new DateTime(2026, 5, 20, 14, 30, 0), entries[0].LastModified);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 
     [Fact]

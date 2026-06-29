@@ -761,6 +761,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 ?? "SftpErrorSudoEditFileTooLarge";
         }
 
+        if (ex is LocalUploadFileValidationException localUploadException)
+        {
+            return localUploadException.Failure switch
+            {
+                LocalUploadFileValidationFailure.Missing =>
+                    L10n("SftpErrorLocalUploadFileMissing"),
+                LocalUploadFileValidationFailure.NotRegularFile =>
+                    L10n("SftpErrorLocalUploadNotRegularFile"),
+                _ => L10n("SftpErrorUnknown"),
+            };
+        }
+
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSFTP transfer failed [{ex.GetType().Name}]: {ex.Message}");
         return L10n("SftpStatusTransferFailed");
@@ -1986,10 +1998,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             string owner = parts[2];
             string group = parts[3];
-            _ = long.TryParse(parts[4], out long size);
+            _ = long.TryParse(
+                parts[4],
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out long size);
 
             DateTime lastModified = DateTime.MinValue;
-            _ = DateTime.TryParse($"{parts[5]} {parts[6]}", out lastModified);
+            _ = DateTime.TryParse(
+                $"{parts[5]} {parts[6]}",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out lastModified);
 
             string name = parts[7];
             if (name is "." or "..")

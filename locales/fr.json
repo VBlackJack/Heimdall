@@ -844,6 +844,8 @@
   "SftpStatusDownloadNoFilesFoldersSkipped": "Aucun fichier t\u00e9l\u00e9charg\u00e9 \u2014 les dossiers ne sont pas pris en charge.",
   "SftpStatusTransferFailed": "\u00c9chec du transfert.",
   "SftpErrorSudoEditFileTooLarge": "\u00c9dition sudo refus\u00e9e : le fichier distant fait {0}, ce qui d\u00e9passe la limite de {1}.",
+  "SftpErrorLocalUploadFileMissing": "Le fichier local \u00e0 envoyer est introuvable.",
+  "SftpErrorLocalUploadNotRegularFile": "La source locale \u00e0 envoyer doit \u00eatre un fichier, pas un dossier.",
   "SftpErrorProtectedRoot": "Impossible de supprimer la racine distante prot\u00e9g\u00e9e.",
   "SftpTransferInProgress": "Un transfert de fichier est d\u00e9j\u00e0 en cours.",
   "SftpStatusConnected": "Connect\u00e9",
@@ -2966,6 +2968,7 @@
   "HealthPanelCpu": "CPU",
   "HealthPanelRam": "M\u00e9moire",
   "HealthPanelDisk": "Disque",
+  "HealthPanelUnsupported": "Non pris en charge",
   "HealthPanelToggle": "Sant\u00e9 serveur",
 
   "SettingsCredentialProvider": "Fournisseur d'identifiants externe",

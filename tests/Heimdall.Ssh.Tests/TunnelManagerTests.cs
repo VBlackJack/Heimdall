@@ -16,6 +16,7 @@
 
 using Heimdall.Core.Ssh;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace Heimdall.Ssh.Tests;
 
@@ -676,6 +677,29 @@ public class TunnelManagerTests : IDisposable
 
         Assert.Null(exception);
         Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public void ClassifyAndBuildFailureResult_WrappedHostKeyRejected_ReturnsNonReconnectableHostKeyMismatch()
+    {
+        var hostKeyRejected = new HostKeyRejectedException(
+            "gw.example.com",
+            22,
+            "ssh-ed25519",
+            "SHA256:NEW",
+            "SHA256:OLD");
+        var ex = new SshConnectionException("Connection refused", hostKeyRejected);
+        var cleanupCalled = false;
+
+        TunnelResult result = TunnelManager.ClassifyAndBuildFailureResult(
+            ex,
+            () => cleanupCalled = true,
+            isChained: false);
+
+        Assert.True(cleanupCalled);
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.HostKeyMismatch, result.FailureCode);
+        Assert.False(SshReconnectPolicy.AllowsAutoReconnect(result.FailureCode!.Value));
     }
 
     // ── Dispose ───────────────────────────────────────────────────────

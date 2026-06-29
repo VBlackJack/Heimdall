@@ -297,7 +297,7 @@ public sealed class FtpBrowser : IRemoteBrowser
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
 
         string fileName = Path.GetFileName(localPath);
-        long totalBytes = Math.Max(0, new FileInfo(localPath).Length);
+        long totalBytes = LocalUploadSource.GetRequiredRegularFile(localPath).Length;
         string tempRemotePath = CreateUploadTempRemotePath(remotePath);
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);

@@ -844,6 +844,8 @@
   "SftpStatusDownloadNoFilesFoldersSkipped": "No files downloaded \u2014 folders aren't supported.",
   "SftpStatusTransferFailed": "Transfer failed.",
   "SftpErrorSudoEditFileTooLarge": "Sudo edit refused: the remote file is {0}, which exceeds the {1} limit.",
+  "SftpErrorLocalUploadFileMissing": "Local upload file was not found.",
+  "SftpErrorLocalUploadNotRegularFile": "Local upload source must be a file, not a folder.",
   "SftpErrorProtectedRoot": "Cannot delete the protected root directory.",
   "SftpTransferInProgress": "A file transfer is already in progress.",
   "SftpStatusConnected": "Connected",
@@ -2969,6 +2971,7 @@
   "HealthPanelCpu": "CPU",
   "HealthPanelRam": "Memory",
   "HealthPanelDisk": "Disk",
+  "HealthPanelUnsupported": "Unsupported",
   "HealthPanelToggle": "Server health",
 
   "SettingsCredentialProvider": "External Credential Provider",

@@ -74,6 +74,33 @@ public sealed class SshSessionFailureDispatcherTests
     }
 
     [Fact]
+    public void Dispatch_WrappedHostKeyRejectedException_RaisesSecurityEventAndNonReconnectableDisconnect()
+    {
+        var hostKeyRejected = new HostKeyRejectedException(
+            "gw.example.com",
+            22,
+            "ssh-ed25519",
+            "SHA256:NEW",
+            "SHA256:OLD");
+        var ex = new SshConnectionException("Transport failed", hostKeyRejected);
+
+        SshSessionSecurityEvent? captured = null;
+        SshSessionDisconnectInfo? disconnect = null;
+
+        SshSessionFailureDispatcher.Dispatch(
+            ex,
+            evt => captured = evt,
+            info => disconnect = info);
+
+        Assert.NotNull(captured);
+        Assert.Equal(SshFailureCode.HostKeyMismatch, captured!.Code);
+        Assert.Equal("SHA256:NEW", captured.PresentedFingerprint);
+        Assert.NotNull(disconnect);
+        Assert.Equal(SshFailureCode.HostKeyMismatch, disconnect!.Failure?.Code);
+        Assert.False(SshReconnectPolicy.AllowsAutoReconnect(disconnect));
+    }
+
+    [Fact]
     public void Dispatch_GenericException_OnlyRaisesDisconnect()
     {
         var ex = new InvalidOperationException("connection reset");

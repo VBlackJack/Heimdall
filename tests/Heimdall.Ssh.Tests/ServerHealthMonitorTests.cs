@@ -56,6 +56,52 @@ public sealed class ServerHealthMonitorTests
     }
 
     [Fact]
+    public async Task CollectHealthDataAsync_NonMatchingOutput_ReturnsUnsupportedState()
+    {
+        var runner = new StaticHealthCommandRunner("busybox output");
+
+        ServerHealthData? data = await ServerHealthMonitor.CollectHealthDataAsync(
+            runner,
+            CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.False(data!.IsSupported);
+        Assert.Equal(0, data.CpuPercent);
+        Assert.Equal(0, data.MemTotalMb);
+        Assert.Equal("?", data.DiskUsed);
+        Assert.Equal(0, data.DiskPercent);
+    }
+
+    [Fact]
+    public async Task CollectHealthDataAsync_LinuxOutput_ReturnsSupportedState()
+    {
+        var runner = new StaticHealthCommandRunner(command =>
+        {
+            if (command.Contains("top", StringComparison.Ordinal))
+            {
+                return "%Cpu(s):  1.3 us,  0.5 sy,  0.0 ni, 98.2 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st";
+            }
+
+            if (command.Contains("free", StringComparison.Ordinal))
+            {
+                return "Mem:          15896        8340        1234         456        6322        6789";
+            }
+
+            return "/dev/sda1       120G   45G   69G  40% /";
+        });
+
+        ServerHealthData? data = await ServerHealthMonitor.CollectHealthDataAsync(
+            runner,
+            CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.True(data!.IsSupported);
+        Assert.Equal(1.8, data.CpuPercent, 1);
+        Assert.Equal(15896, data.MemTotalMb);
+        Assert.Equal(40, data.DiskPercent);
+    }
+
+    [Fact]
     public async Task StopAsync_AllowsImmediateRestart()
     {
         // Regression test for the Start/Stop race fix: the post-Stop state
@@ -145,6 +191,27 @@ public sealed class ServerHealthMonitorTests
                 Interlocked.Increment(ref _cancellationCount);
                 throw;
             }
+        }
+    }
+
+    private sealed class StaticHealthCommandRunner : IHealthCommandRunner
+    {
+        private readonly Func<string, string> _responseFactory;
+
+        public StaticHealthCommandRunner(string response)
+            : this(_ => response)
+        {
+        }
+
+        public StaticHealthCommandRunner(Func<string, string> responseFactory)
+        {
+            _responseFactory = responseFactory;
+        }
+
+        public Task<string> RunAsync(string command, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_responseFactory(command));
         }
     }
 

@@ -995,6 +995,30 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.DoesNotContain(exception.RemotePath, message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(
+        nameof(LocalUploadFileValidationFailure.Missing),
+        "SftpErrorLocalUploadFileMissing")]
+    [InlineData(
+        nameof(LocalUploadFileValidationFailure.NotRegularFile),
+        "SftpErrorLocalUploadNotRegularFile")]
+    public async Task DescribeTransferError_LocalUploadValidationException_ReturnsLocalizedMessage(
+        string failureName,
+        string expectedKey)
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+        var failure = Enum.Parse<LocalUploadFileValidationFailure>(failureName);
+        var exception = new LocalUploadFileValidationException(@"C:\secret\source", failure);
+
+        string message = viewModel.DescribeTransferError(exception);
+
+        Assert.Equal(localizer[expectedKey], message);
+        Assert.DoesNotContain(exception.LocalPath, message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task RunOnUiAsync_OffUiThread_PostsToDispatcher()
     {

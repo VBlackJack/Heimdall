@@ -49,10 +49,15 @@ public static class FailureClassifier
     {
         ArgumentNullException.ThrowIfNull(ex);
 
+        if (HostKeyRejectionFinder.TryFind(ex, out HostKeyRejectedException? rejectedHostKey))
+        {
+            return ClassifyHostKeyRejected(rejectedHostKey);
+        }
+
         return ex switch
         {
-            HostKeyRejectedException hostKeyRejected =>
-                ClassifyHostKeyRejected(hostKeyRejected),
+            HostKeyRejectedException directHostKeyRejected =>
+                ClassifyHostKeyRejected(directHostKeyRejected),
 
             SshAuthenticationException authEx =>
                 ClassifyAuthException(authEx, connectionParams),

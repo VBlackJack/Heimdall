@@ -37,7 +37,7 @@ public static class SshSessionFailureDispatcher
 
         var failure = FailureClassifier.Classify(ex);
 
-        if (ex is HostKeyRejectedException hostKeyRejected)
+        if (HostKeyRejectionFinder.TryFind(ex, out HostKeyRejectedException? hostKeyRejected))
         {
             securityHandler?.Invoke(new SshSessionSecurityEvent(
                 failure.Code,

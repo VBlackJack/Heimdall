@@ -140,6 +140,25 @@ public class FailureClassifierTests
     }
 
     [Fact]
+    public void Classify_ConnectionExceptionWrappingHostKeyRejected_ReturnsHostKeyMismatch()
+    {
+        var hostKeyRejected = new HostKeyRejectedException(
+            "gw.example.com",
+            22,
+            "ssh-ed25519",
+            "SHA256:NEW",
+            "SHA256:OLD");
+        var ex = new SshConnectionException("Connection refused", hostKeyRejected);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.HostKeyMismatch, result.Code);
+        Assert.True(result.IsFatal);
+        Assert.Same(hostKeyRejected, result.OriginalException);
+        Assert.False(SshReconnectPolicy.AllowsAutoReconnect(result.Code));
+    }
+
+    [Fact]
     public void Classify_ConnectionException_Reset_ReturnsNetworkReset()
     {
         var ex = new SshConnectionException("Connection reset by peer");

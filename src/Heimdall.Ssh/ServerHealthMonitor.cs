@@ -31,7 +31,8 @@ public sealed record ServerHealthData(
     long MemFreeMb,
     string DiskUsed,
     string DiskTotal,
-    int DiskPercent);
+    int DiskPercent,
+    bool IsSupported);
 
 internal interface IHealthCommandRunner
 {
@@ -280,7 +281,7 @@ public sealed class ServerHealthMonitor : IDisposable
         }
     }
 
-    private static async Task<ServerHealthData?> CollectHealthDataAsync(
+    internal static async Task<ServerHealthData?> CollectHealthDataAsync(
         IHealthCommandRunner commandRunner,
         CancellationToken cancellationToken)
     {
@@ -309,23 +310,46 @@ public sealed class ServerHealthMonitor : IDisposable
         var cpuResult = results[0];
         var memResult = results[1];
         var diskResult = results[2];
+        bool cpuHasOutput = !string.IsNullOrWhiteSpace(cpuResult);
+        bool memoryHasOutput = !string.IsNullOrWhiteSpace(memResult);
+        bool diskHasOutput = !string.IsNullOrWhiteSpace(diskResult);
+        bool cpuParsed = false;
+        bool memoryParsed = false;
+        bool diskParsed = false;
 
-        if (!string.IsNullOrWhiteSpace(cpuResult))
+        if (cpuHasOutput)
         {
-            cpuPercent = ParseCpuUsage(cpuResult);
+            cpuParsed = TryParseCpuUsage(cpuResult, out cpuPercent);
         }
 
-        if (!string.IsNullOrWhiteSpace(memResult))
+        if (memoryHasOutput)
         {
-            ParseMemory(memResult, out memTotal, out memUsed, out memFree);
+            memoryParsed = TryParseMemory(memResult, out memTotal, out memUsed, out memFree);
         }
 
-        if (!string.IsNullOrWhiteSpace(diskResult))
+        if (diskHasOutput)
         {
-            ParseDisk(diskResult, out diskUsed, out diskTotal, out diskPercent);
+            diskParsed = TryParseDisk(diskResult, out diskUsed, out diskTotal, out diskPercent);
         }
 
-        return new ServerHealthData(cpuPercent, memTotal, memUsed, memFree, diskUsed, diskTotal, diskPercent);
+        bool hasAnyOutput = cpuHasOutput || memoryHasOutput || diskHasOutput;
+        bool hasParseFailure =
+            (cpuHasOutput && !cpuParsed)
+            || (memoryHasOutput && !memoryParsed)
+            || (diskHasOutput && !diskParsed);
+        bool isSupported = hasAnyOutput
+            && !hasParseFailure
+            && (cpuParsed || memoryParsed || diskParsed);
+
+        return new ServerHealthData(
+            cpuPercent,
+            memTotal,
+            memUsed,
+            memFree,
+            diskUsed,
+            diskTotal,
+            diskPercent,
+            isSupported);
     }
 
     private static async Task<string> RunHealthCommandAsync(
@@ -351,14 +375,23 @@ public sealed class ServerHealthMonitor : IDisposable
 
     internal static double ParseCpuUsage(string topOutput)
     {
+        return TryParseCpuUsage(topOutput, out double cpuUsage)
+            ? cpuUsage
+            : 0;
+    }
+
+    internal static bool TryParseCpuUsage(string topOutput, out double cpuUsage)
+    {
         // Try to extract idle percentage and compute usage = 100 - idle
+        cpuUsage = 0;
         var idleMatch = CpuIdleRegex.Match(topOutput);
         if (idleMatch.Success)
         {
             var idleStr = idleMatch.Groups[1].Value.Replace(',', '.');
             if (double.TryParse(idleStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var idle))
             {
-                return Math.Round(Math.Max(0, 100.0 - idle), 1);
+                cpuUsage = Math.Round(Math.Max(0, 100.0 - idle), 1);
+                return true;
             }
         }
 
@@ -369,40 +402,55 @@ public sealed class ServerHealthMonitor : IDisposable
             var usStr = usMatch.Groups[1].Value.Replace(',', '.');
             if (double.TryParse(usStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var us))
             {
-                return Math.Round(us, 1);
+                cpuUsage = Math.Round(us, 1);
+                return true;
             }
         }
 
-        return 0;
+        return false;
     }
 
     internal static void ParseMemory(string freeOutput, out long total, out long used, out long free)
+    {
+        _ = TryParseMemory(freeOutput, out total, out used, out free);
+    }
+
+    internal static bool TryParseMemory(string freeOutput, out long total, out long used, out long free)
     {
         total = 0;
         used = 0;
         free = 0;
 
         var match = MemRegex.Match(freeOutput);
-        if (match.Success)
-        {
-            long.TryParse(match.Groups[1].Value, out total);
-            long.TryParse(match.Groups[2].Value, out used);
-            long.TryParse(match.Groups[3].Value, out free);
-        }
+        return match.Success
+            && long.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out total)
+            && long.TryParse(match.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out used)
+            && long.TryParse(match.Groups[3].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out free);
     }
 
     internal static void ParseDisk(string dfOutput, out string used, out string total, out int percent)
+    {
+        _ = TryParseDisk(dfOutput, out used, out total, out percent);
+    }
+
+    internal static bool TryParseDisk(string dfOutput, out string used, out string total, out int percent)
     {
         used = "?";
         total = "?";
         percent = 0;
 
         var match = DiskRegex.Match(dfOutput);
-        if (match.Success)
+        if (!match.Success)
         {
-            total = match.Groups[2].Value;
-            used = match.Groups[3].Value;
-            int.TryParse(match.Groups[5].Value, out percent);
+            return false;
         }
+
+        total = match.Groups[2].Value;
+        used = match.Groups[3].Value;
+        return int.TryParse(
+            match.Groups[5].Value,
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out percent);
     }
 }

@@ -334,7 +334,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
 
         string fileName = Path.GetFileName(localPath);
-        var fileInfo = new FileInfo(localPath);
+        var fileInfo = LocalUploadSource.GetRequiredRegularFile(localPath);
         long totalBytes = fileInfo.Length;
         string tempRemotePath = SftpAtomicUpload.CreateRemoteTempPath(remotePath);
 
