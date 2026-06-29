@@ -12,6 +12,63 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-29: SSH/SFTP companion, follow-directory, and reliability hardening
+
+Merged to `master`; intended for the next release. A focused robustness + interop
+campaign on the SSH/SFTP surface (the most-used, production paths), audited and
+verified finding-by-finding.
+
+### Integrated SFTP companion
+
+- **Pane-scoped reconnect.** Reconnecting the auto-opened SFTP companion no longer
+  tears down the SSH terminal or loses its scrollback: the SFTP overlay reconnect now
+  routes through the pane-scoped `ReconnectPaneAsync` and honors the pane's own
+  protocol, and the companion gets an isolated session/state key so closing or
+  reconnecting it can never reset the sibling SSH session (`5c19050a`).
+- **SFTP keepalive.** The SFTP channel now sets `KeepAliveInterval` like the SSH
+  session, so idle companion sessions are no longer dropped by the server/gateway/NAT
+  (`5c19050a`).
+- **Runtime gate.** `SftpBrowserEnabled` is now an honored runtime switch for the
+  integrated browser, surfaced in Settings; auto-open is additionally guarded against
+  cancellation / closed-tab races (`5c19050a`).
+
+### Follow the SSH working directory (opt-in)
+
+- **OSC 7 directory following.** The companion SFTP pane can follow the SSH terminal's
+  current directory via the OSC 7 escape sequence (best-effort; inert on shells that do
+  not emit it). Global setting plus a per-pane live toggle; the remote path is treated
+  as untrusted input (redacted logs) (`1cd24018`).
+
+### Robustness & resilience
+
+- **Deterministic SSH teardown.** `SshShellSession` disconnect/dispose now run through a
+  single synchronized, idempotent teardown that no longer blocks the UI thread (the
+  read-loop join moves to the background) and notifies disconnect exactly once
+  (`1f103a14` and follow-ups).
+- **Lock discipline.** `FtpBrowser.Disconnect()` now takes the operation lock (matching
+  `SftpBrowser`), and `DirectoryChanged` is raised outside the client lock to avoid a
+  re-entrancy deadlock; transfer and lifecycle `CancellationTokenSource` swaps are
+  synchronized.
+- **Resilient auto-upload.** A transient SFTP auto-upload failure now re-arms the
+  debounce timer and retries, and the last-upload timestamp only advances on success.
+- **Resource hygiene.** Tunnel event callbacks are exception-isolated, the plink stderr
+  drain uses a per-iteration process reference, and `PrivateKeyFile` is now disposed
+  with its owning client (no key-material handle leak). Teardown helpers no longer abort
+  on non-`ObjectDisposedException` cleanup errors (`1f103a14`).
+- **Bounded inputs.** A bounded, drop-oldest buffer caps pre-ready terminal output;
+  inbound WebView2 terminal messages are length-capped before decoding; and sudo file
+  edits are size-checked (16 MiB) before download.
+
+### Fail-closed & interop
+
+- **Host-key fail-closed even when wrapped.** A `HostKeyRejectedException` nested inside
+  an outer exception is now recognized at every classification site and remains
+  non-reconnectable, so a possible MITM is never silently retried (`5dbb8f9d`).
+- **Interop edge cases.** Server-health output now reports an explicit unsupported state
+  on non-GNU/Linux shells instead of showing 0%; sudo `ls` parsing is culture-invariant;
+  SSH pre-login banners decode as UTF-8; the SSH probe tolerates RFC 4253 pre-login
+  banner lines; and local upload sources are validated up front (`5dbb8f9d`).
+
 ## 2026-06-29: Master password vault, Windows Hello unlock, macros and file-browser workflows
 
 Merged to `master` since v2026.062601; intended for the next release.

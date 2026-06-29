@@ -91,7 +91,9 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 
 ### SFTP Browser
 - Embedded file browser panel with directory tree and file list
-- Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save
+- **Auto-open companion**: opens automatically alongside an SSH session as a vertical split (gated by a setting). Reconnecting the SFTP pane is pane-scoped, so the sibling SSH terminal and its scrollback are preserved; an SSH keepalive keeps idle SFTP sessions alive
+- **Follow the SSH directory** (opt-in): the companion can track the SSH terminal's current working directory via the OSC 7 escape sequence, with a per-pane toggle (best-effort; inert on shells that do not emit OSC 7)
+- Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save (transient upload failures are retried)
 - **"Browse as root" sudo mode**: toggle in toolbar enables `sudo ls -la` directory listing via SSH exec channel - browse any directory regardless of SFTP user permissions
 - **Full sudo fallback** on all operations: upload (`sudo tee`), download (`sudo cat`), edit, chmod, rename, delete, mkdir - triggered only on typed permission-denied exceptions
 - Sudo edit sessions cache the pinned host-key verifier, detect mid-edit host-key rotation, track upload tasks, and clean temporary files even when the privileged write fails

@@ -217,7 +217,7 @@ SSH host-key trust is orchestrated by `HostKeyTrustService`, which composes the 
 
 Plink fallback follows the same trust model through `PlinkHostKeyDecider`: stored fingerprints are passed as `-hostkey`; first-use probes go through the normal verifier; unresolved fingerprints fail with `HostKeyUnavailable`. Steady-state matches refresh `LastSeen` silently. Mismatches display stored and presented fingerprints side by side, allow deliberate replacement after out-of-band verification, and reject with `SshFailureCode.HostKeyMismatch` when the user declines. Optional known_hosts import/export is explicit, except for the opt-in startup import flag.
 
-Mid-session host-key failures do not collapse into generic disconnect text. `SshSessionFailureDispatcher` maps `HostKeyRejectedException` to `SshSessionSecurityEvent` for `SftpBrowser` and `SshShellSession`; the SSH UI suppresses auto-reconnect on MITM signals. `RemoteFileEditor` raises `HostKeyRotatedDuringUpload` when a sudo edit session sees a changed host key during auto-upload.
+Mid-session host-key failures do not collapse into generic disconnect text. `SshSessionFailureDispatcher` maps `HostKeyRejectedException` to `SshSessionSecurityEvent` for `SftpBrowser` and `SshShellSession`; the SSH UI suppresses auto-reconnect on MITM signals. A `HostKeyRejectedException` nested inside an outer exception is recognized at every classification site via `HostKeyRejectionFinder`, so a wrapped rejection still classifies fail-closed and never becomes auto-reconnect-eligible (`SshReconnectPolicy` allow-lists only transient network codes). `RemoteFileEditor` raises `HostKeyRotatedDuringUpload` when a sudo edit session sees a changed host key during auto-upload.
 
 ### 7. SSH Failure Classification
 
