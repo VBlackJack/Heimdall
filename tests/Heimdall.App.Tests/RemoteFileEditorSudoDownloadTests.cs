@@ -30,6 +30,63 @@ public sealed class RemoteFileEditorSudoDownloadTests
     }
 
     [Fact]
+    public void BuildSudoFileSizeCommand_EscapesRemotePath()
+    {
+        var command = RemoteFileEditor.BuildSudoFileSizeCommand("/etc/ssh/it's config; rm -rf /");
+
+        Assert.Equal(@"sudo stat -c %s -- '/etc/ssh/it'\''s config; rm -rf /'", command);
+    }
+
+    [Theory]
+    [InlineData("0", 0)]
+    [InlineData("42\n", 42)]
+    [InlineData(" 1048576 ", 1048576)]
+    public void TryParseSudoFileSize_ParsesNonNegativeByteCounts(
+        string output,
+        long expected)
+    {
+        bool parsed = RemoteFileEditor.TryParseSudoFileSize(output, out long fileSize);
+
+        Assert.True(parsed);
+        Assert.Equal(expected, fileSize);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("-1")]
+    [InlineData("not a number")]
+    public void TryParseSudoFileSize_RejectsInvalidSizes(string output)
+    {
+        bool parsed = RemoteFileEditor.TryParseSudoFileSize(output, out _);
+
+        Assert.False(parsed);
+    }
+
+    [Fact]
+    public void EnsureSudoEditFileSizeWithinLimit_AcceptsFilesAtLimit()
+    {
+        RemoteFileEditor.EnsureSudoEditFileSizeWithinLimit(
+            "/etc/ssh/config",
+            RemoteFileEditor.MaxSudoEditFileBytes);
+    }
+
+    [Fact]
+    public void EnsureSudoEditFileSizeWithinLimit_RejectsOversizeFile()
+    {
+        long fileSize = RemoteFileEditor.MaxSudoEditFileBytes + 1;
+
+        var ex = Assert.Throws<SudoEditFileTooLargeException>(() =>
+            RemoteFileEditor.EnsureSudoEditFileSizeWithinLimit(
+                "/etc/ssh/config",
+                fileSize));
+
+        Assert.Equal("/etc/ssh/config", ex.RemotePath);
+        Assert.Equal(fileSize, ex.FileSizeBytes);
+        Assert.Equal(RemoteFileEditor.MaxSudoEditFileBytes, ex.MaxSizeBytes);
+        Assert.Contains("limit", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task WriteBase64DecodedFileAsync_PreservesBinaryBytes()
     {
         byte[] expected = [0x00, 0xff, 0xfe, 0x41, 0x0a, 0xc3, 0x28];

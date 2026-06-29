@@ -843,6 +843,7 @@
   "SftpStatusDownloadCompleteWithSkipped": "Downloaded {0} file(s); skipped {1} folder(s) (folders aren't supported).",
   "SftpStatusDownloadNoFilesFoldersSkipped": "No files downloaded \u2014 folders aren't supported.",
   "SftpStatusTransferFailed": "Transfer failed.",
+  "SftpErrorSudoEditFileTooLarge": "Sudo edit refused: the remote file is {0}, which exceeds the {1} limit.",
   "SftpErrorProtectedRoot": "Cannot delete the protected root directory.",
   "SftpTransferInProgress": "A file transfer is already in progress.",
   "SftpStatusConnected": "Connected",

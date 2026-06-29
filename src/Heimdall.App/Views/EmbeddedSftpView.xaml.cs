@@ -269,7 +269,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         UpdateStatus(_localizer["SftpStatusConnected"]);
         StartHealthTimer();
 
-        _ = NavigateInitialAsync(initialRemotePath);
+        _ = ObserveFaultedTask(NavigateInitialAsync(initialRemotePath), "initial navigation");
     }
 
     /// <summary>
@@ -628,23 +628,46 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             return;
         }
 
-        OpenFileDialog dialog = new()
+        string[] fileNames;
+        try
         {
-            Multiselect = true,
-            Title = _localizer?["SftpBtnUpload"] ?? "Upload"
-        };
+            OpenFileDialog dialog = new()
+            {
+                Multiselect = true,
+                Title = _localizer?["SftpBtnUpload"] ?? "Upload"
+            };
 
-        if (dialog.ShowDialog() != true || dialog.FileNames.Length == 0)
+            if (dialog.ShowDialog() != true || dialog.FileNames.Length == 0)
+            {
+                return;
+            }
+
+            fileNames = dialog.FileNames;
+        }
+        catch (Exception ex)
         {
+            Core.Logging.FileLogger.Warn(
+                $"[EmbeddedSftpView] upload dialog failed: {ex.Message}");
             return;
         }
 
-        await _viewModel.UploadFilesAsync(dialog.FileNames);
+        await _viewModel.UploadFilesAsync(fileNames);
     }
 
     private async void OnCtxDownloadClick(object sender, RoutedEventArgs e)
     {
-        List<SftpFileInfo> selected = GetSelectedFiles();
+        List<SftpFileInfo> selected;
+        try
+        {
+            selected = GetSelectedFiles();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"[EmbeddedSftpView] download selection read failed: {ex.Message}");
+            return;
+        }
+
         if (selected.Count == 0 || _browser is null)
         {
             return;
@@ -656,17 +679,29 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             return;
         }
 
-        System.Windows.Forms.FolderBrowserDialog dialog = new()
+        string targetDirectory;
+        try
         {
-            Description = _localizer?["SftpBtnDownload"] ?? "Download"
-        };
+            System.Windows.Forms.FolderBrowserDialog dialog = new()
+            {
+                Description = _localizer?["SftpBtnDownload"] ?? "Download"
+            };
 
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            {
+                return;
+            }
+
+            targetDirectory = dialog.SelectedPath;
+        }
+        catch (Exception ex)
         {
+            Core.Logging.FileLogger.Warn(
+                $"[EmbeddedSftpView] download folder dialog failed: {ex.Message}");
             return;
         }
 
-        await _viewModel.DownloadFilesAsync(selected, dialog.SelectedPath);
+        await _viewModel.DownloadFilesAsync(selected, targetDirectory);
     }
 
     // ------------------------------------------------------------------
@@ -979,7 +1014,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         }
         catch (Exception ex)
         {
-            ShowError(_localizer?.Format("SftpStatusEditOpenFailed", ex.Message) ?? ex.Message);
+            ShowError(ex is SudoEditFileTooLargeException
+                ? _viewModel.DescribeTransferError(ex)
+                : _localizer?.Format("SftpStatusEditOpenFailed", ex.Message) ?? ex.Message);
             if (tempPath is not null)
             {
                 CleanupEditTempDir(tempPath);
@@ -1049,22 +1086,34 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             return;
         }
 
-        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        string[] paths;
+        string targetDir;
+
+        try
         {
+            if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+            {
+                return;
+            }
+
+            paths = (string[]?)e.Data.GetData(System.Windows.DataFormats.FileDrop) ?? [];
+            if (paths.Length == 0)
+            {
+                return;
+            }
+
+            // Impure hit-test: find the row under the cursor (if any); the pure helper turns it into the
+            // target directory. Dropping onto a folder row uploads into it; anywhere else uses CurrentPath.
+            SftpFileInfo? hoveredEntry = HitTestFileRow(e.GetPosition(FileListView));
+            targetDir = EmbeddedSftpViewModel.ResolveDropTargetDirectory(
+                hoveredEntry, _viewModel.CurrentPath);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"[EmbeddedSftpView] drop payload preparation failed: {ex.Message}");
             return;
         }
-
-        var paths = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop);
-        if (paths is null || paths.Length == 0)
-        {
-            return;
-        }
-
-        // Impure hit-test: find the row under the cursor (if any); the pure helper turns it into the
-        // target directory. Dropping onto a folder row uploads into it; anywhere else uses CurrentPath.
-        SftpFileInfo? hoveredEntry = HitTestFileRow(e.GetPosition(FileListView));
-        string targetDir = EmbeddedSftpViewModel.ResolveDropTargetDirectory(
-            hoveredEntry, _viewModel.CurrentPath);
 
         await _viewModel.UploadEntriesAsync(paths, targetDir);
     }
@@ -1354,6 +1403,30 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private Task NavigateInitialAsync(string? initialRemotePath)
     {
         return _viewModel.NavigateInitialAsync(initialRemotePath);
+    }
+
+    internal static Task ObserveFaultedTask(
+        Task task,
+        string operationName,
+        Action<string>? logWarning = null)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationName);
+
+        Action<string> logger = logWarning ?? Core.Logging.FileLogger.Warn;
+
+        return task.ContinueWith(
+            static (faultedTask, state) =>
+            {
+                var (operation, logger) = ((string Operation, Action<string> Logger))state!;
+                Exception exception = faultedTask.Exception?.GetBaseException()
+                    ?? new InvalidOperationException("Task faulted without an exception.");
+                logger($"[EmbeddedSftpView] {operation} failed: {exception.Message}");
+            },
+            (operationName, logger),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     private Task RefreshRemoteAsync()

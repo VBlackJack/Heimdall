@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -64,6 +63,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgClipboardRead = "clipboard-read:";
     private const string TerminalPageMessageSource = "about:blank";
     private const int LoggedWebViewTextLimit = 256;
+    internal const int MaxPendingTerminalMessageBytes = 4 * 1024 * 1024;
+    internal const int MaxInboundWebMessageDecodedBytes = 1 * 1024 * 1024;
+    internal const int MaxInboundWebMessageBase64Length = ((MaxInboundWebMessageDecodedBytes + 2) / 3) * 4;
     private const int MaxResizeColumns = 999;
     private const int MaxResizeRows = 999;
 
@@ -184,7 +186,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             ["Default"] = "{}"
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
-    private readonly ConcurrentQueue<string> _pendingTerminalMessages = new();
+    private readonly PendingTerminalMessageBuffer _pendingTerminalMessages =
+        new(MaxPendingTerminalMessageBytes, static () =>
+            Core.Logging.FileLogger.Debug(
+                "EmbeddedSSH pending terminal output exceeded the pre-ready buffer limit; oldest buffered output was dropped."));
     private readonly ResizeFailureLogThrottle _resizeLogThrottle = new ResizeFailureLogThrottle();
     private readonly object _macroExpectSync = new();
 
@@ -554,10 +559,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             try { disposableWebView.Dispose(); } catch (Exception ex) { Core.Logging.FileLogger.Warn($"[EmbeddedSshView] WebView dispose: {ex.Message}"); }
         }
 
-        while (_pendingTerminalMessages.TryDequeue(out _))
-        {
-            // Drain pending messages to release buffers.
-        }
+        _pendingTerminalMessages.Clear();
 
         Core.Logging.FileLogger.Info("EmbeddedSSH Dispose completed");
     }
@@ -1072,6 +1074,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (message.StartsWith(MsgInput, StringComparison.Ordinal))
         {
             string base64 = message[MsgInput.Length..];
+            if (!TryAcceptInboundBase64Payload("input", base64))
+            {
+                return;
+            }
 
             try
             {
@@ -1098,6 +1104,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (message.StartsWith(MsgCwd, StringComparison.Ordinal))
         {
             string base64 = message[MsgCwd.Length..];
+            if (!TryAcceptInboundBase64Payload("cwd", base64))
+            {
+                return;
+            }
+
             if (TryDecodeCurrentDirectoryPayload(base64, out string? path))
             {
                 CurrentDirectoryChanged?.Invoke(path);
@@ -1109,9 +1120,14 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         // Clipboard write: terminal wants to copy text to system clipboard
         if (message.StartsWith(MsgClipboardWrite, StringComparison.Ordinal))
         {
+            string base64 = message[MsgClipboardWrite.Length..];
+            if (!TryAcceptInboundBase64Payload("clipboard-write", base64))
+            {
+                return;
+            }
+
             try
             {
-                string base64 = message[MsgClipboardWrite.Length..];
                 // Safe: the JS host posts a single complete UTF-8 message in one chunk;
                 // boundaries cannot fall mid-character. No stateful decoder needed.
                 string text = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
@@ -1187,6 +1203,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return false;
         }
 
+        if (!IsInboundWebMessageBase64PayloadWithinLimit(base64))
+        {
+            return false;
+        }
+
         try
         {
             string decodedPath = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
@@ -1202,6 +1223,24 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             return false;
         }
+    }
+
+    internal static bool IsInboundWebMessageBase64PayloadWithinLimit(string base64)
+    {
+        ArgumentNullException.ThrowIfNull(base64);
+        return base64.Length <= MaxInboundWebMessageBase64Length;
+    }
+
+    private static bool TryAcceptInboundBase64Payload(string messageKind, string base64)
+    {
+        if (IsInboundWebMessageBase64PayloadWithinLimit(base64))
+        {
+            return true;
+        }
+
+        Core.Logging.FileLogger.Debug(
+            $"EmbeddedSSH {messageKind} payload ignored because it exceeds the inbound WebView message limit.");
+        return false;
     }
 
     private static bool IsTrustedTerminalMessageSource(string? source)
@@ -2133,9 +2172,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _terminalReady = false;
         _webViewUnavailable = true;
 
-        while (_pendingTerminalMessages.TryDequeue(out _))
-        {
-        }
+        _pendingTerminalMessages.Clear();
     }
 
     private void ApplyInitialTerminalFocus()
@@ -2178,10 +2215,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _webViewUnavailable = true;
         _terminalReady = false;
 
-        while (_pendingTerminalMessages.TryDequeue(out _))
-        {
-            // Drop buffered output when no renderer is available.
-        }
+        _pendingTerminalMessages.Clear();
 
         TerminalWebView.Visibility = System.Windows.Visibility.Collapsed;
         FallbackPanel.Visibility = System.Windows.Visibility.Visible;

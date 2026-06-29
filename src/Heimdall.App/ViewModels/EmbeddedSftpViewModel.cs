@@ -753,6 +753,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return GetSudoAuthenticationErrorMessage(sudoException.Kind);
         }
 
+        if (ex is SudoEditFileTooLargeException tooLargeException)
+        {
+            string fileSize = FormatSize(tooLargeException.FileSizeBytes);
+            string maxSize = FormatSize(tooLargeException.MaxSizeBytes);
+            return _localizer?.Format("SftpErrorSudoEditFileTooLarge", fileSize, maxSize)
+                ?? "SftpErrorSudoEditFileTooLarge";
+        }
+
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSFTP transfer failed [{ex.GetType().Name}]: {ex.Message}");
         return L10n("SftpStatusTransferFailed");

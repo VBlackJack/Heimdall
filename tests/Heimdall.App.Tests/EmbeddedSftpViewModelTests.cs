@@ -973,6 +973,29 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task DescribeTransferError_SudoEditFileTooLargeException_ReturnsLocalizedSizeLimit()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+        long fileSize = RemoteFileEditor.MaxSudoEditFileBytes + 1;
+        var exception = new SudoEditFileTooLargeException(
+            "/etc/ssh/config",
+            fileSize,
+            RemoteFileEditor.MaxSudoEditFileBytes);
+
+        string message = viewModel.DescribeTransferError(exception);
+
+        string expected = localizer.Format(
+            "SftpErrorSudoEditFileTooLarge",
+            EmbeddedSftpViewModel.FormatSize(fileSize),
+            EmbeddedSftpViewModel.FormatSize(RemoteFileEditor.MaxSudoEditFileBytes));
+        Assert.Equal(expected, message);
+        Assert.DoesNotContain(exception.RemotePath, message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunOnUiAsync_OffUiThread_PostsToDispatcher()
     {
         var dispatcher = new FakeUiDispatcher(checkAccess: false);

@@ -55,4 +55,88 @@ public sealed class EmbeddedSshViewCurrentDirectoryTests
         Assert.False(decoded);
         Assert.Null(result);
     }
+
+    [Fact]
+    public void TryDecodeCurrentDirectoryPayload_RejectsOverLimitPayloadBeforeDecoding()
+    {
+        string payload = new('A', EmbeddedSshView.MaxInboundWebMessageBase64Length + 1);
+
+        bool decoded = EmbeddedSshView.TryDecodeCurrentDirectoryPayload(payload, out string? result);
+
+        Assert.False(decoded);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void IsInboundWebMessageBase64PayloadWithinLimit_AcceptsNormalPayload()
+    {
+        string payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("pwd"));
+
+        Assert.True(EmbeddedSshView.IsInboundWebMessageBase64PayloadWithinLimit(payload));
+    }
+
+    [Fact]
+    public void IsInboundWebMessageBase64PayloadWithinLimit_RejectsOverLimitPayload()
+    {
+        string payload = new('A', EmbeddedSshView.MaxInboundWebMessageBase64Length + 1);
+
+        Assert.False(EmbeddedSshView.IsInboundWebMessageBase64PayloadWithinLimit(payload));
+    }
+}
+
+public sealed class PendingTerminalMessageBufferTests
+{
+    [Fact]
+    public void Enqueue_DropsOldestMessagesWhenBufferedBytesExceedLimit()
+    {
+        const int maxBufferedBytes = 20;
+        var dropNotifications = 0;
+        var buffer = new PendingTerminalMessageBuffer(
+            maxBufferedBytes,
+            () => dropNotifications++);
+        string first = new('a', maxBufferedBytes / sizeof(char));
+        string second = "bb";
+
+        buffer.Enqueue(first);
+        buffer.Enqueue(second);
+
+        Assert.Equal(1, buffer.Count);
+        Assert.True(buffer.BufferedBytes <= maxBufferedBytes);
+        Assert.Equal(1, dropNotifications);
+        Assert.True(buffer.TryDequeue(out string? remaining));
+        Assert.Equal(second, remaining);
+    }
+
+    [Fact]
+    public void Enqueue_LogsOnlyOnceWhenMultipleDropsOccur()
+    {
+        const int maxBufferedBytes = 20;
+        var dropNotifications = 0;
+        var buffer = new PendingTerminalMessageBuffer(
+            maxBufferedBytes,
+            () => dropNotifications++);
+        string fill = new('a', maxBufferedBytes / sizeof(char));
+
+        buffer.Enqueue(fill);
+        buffer.Enqueue(fill);
+        buffer.Enqueue(fill);
+
+        Assert.Equal(1, dropNotifications);
+        Assert.True(buffer.BufferedBytes <= maxBufferedBytes);
+    }
+
+    [Fact]
+    public void Enqueue_DoesNotGrowBeyondLimitWhenManyMessagesArriveBeforeReady()
+    {
+        const int maxBufferedBytes = 40;
+        const int messageCount = 100;
+        var buffer = new PendingTerminalMessageBuffer(maxBufferedBytes, static () => { });
+
+        for (var i = 0; i < messageCount; i++)
+        {
+            buffer.Enqueue("data:" + Convert.ToBase64String([1, 2, 3, 4]));
+        }
+
+        Assert.True(buffer.BufferedBytes <= maxBufferedBytes);
+    }
 }

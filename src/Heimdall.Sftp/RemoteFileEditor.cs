@@ -16,6 +16,7 @@
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
 using Renci.SshNet;
@@ -40,6 +41,7 @@ public sealed class RemoteFileEditor : IDisposable
     /// </remarks>
     public static TimeSpan UploadDebounceInterval { get; set; } = TimeSpan.FromSeconds(2);
     private const short OwnerReadWritePermissions = 600;
+    internal const long MaxSudoEditFileBytes = 16L * 1024 * 1024;
     private static readonly TimeSpan UploadDrainTimeout = TimeSpan.FromSeconds(2);
 
     private readonly IRemoteBrowser _browser;
@@ -187,6 +189,12 @@ public sealed class RemoteFileEditor : IDisposable
 
             try
             {
+                long remoteSize = await GetSudoFileSizeAsync(
+                    sshClient,
+                    remotePath,
+                    ct).ConfigureAwait(false);
+                EnsureSudoEditFileSizeWithinLimit(remotePath, remoteSize);
+
                 using var downloadCmd = await Task.Run(() =>
                     sshClient.RunCommand(BuildSudoDownloadCommand(remotePath)),
                     ct).ConfigureAwait(false);
@@ -530,6 +538,64 @@ public sealed class RemoteFileEditor : IDisposable
         return $"sudo base64 -- {escapedPath}";
     }
 
+    internal static string BuildSudoFileSizeCommand(string remotePath)
+    {
+        string escapedPath = PathEscaper.EscapeForShell(remotePath);
+        return $"sudo stat -c %s -- {escapedPath}";
+    }
+
+    internal static bool TryParseSudoFileSize(string? output, out long fileSize)
+    {
+        fileSize = 0;
+        string? trimmed = output?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return false;
+        }
+
+        return long.TryParse(
+                trimmed,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out fileSize)
+            && fileSize >= 0;
+    }
+
+    internal static void EnsureSudoEditFileSizeWithinLimit(string remotePath, long fileSizeBytes)
+    {
+        if (fileSizeBytes > MaxSudoEditFileBytes)
+        {
+            throw new SudoEditFileTooLargeException(
+                remotePath,
+                fileSizeBytes,
+                MaxSudoEditFileBytes);
+        }
+    }
+
+    private static async Task<long> GetSudoFileSizeAsync(
+        SshClient sshClient,
+        string remotePath,
+        CancellationToken ct)
+    {
+        using var sizeCmd = await Task.Run(
+                () => sshClient.RunCommand(BuildSudoFileSizeCommand(remotePath)),
+                ct)
+            .ConfigureAwait(false);
+
+        if (sizeCmd.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"sudo stat failed (exit {sizeCmd.ExitStatus}): {sizeCmd.Error}");
+        }
+
+        if (!TryParseSudoFileSize(sizeCmd.Result, out long fileSize))
+        {
+            throw new InvalidOperationException("sudo stat returned an invalid file size.");
+        }
+
+        return fileSize;
+    }
+
     internal static async Task WriteBase64DecodedFileAsync(
         string localPath,
         string? base64Content,
@@ -753,6 +819,30 @@ public sealed record RemoteEditorSudoSaveCompleted(
     string RemotePath,
     string LocalPath,
     bool Success);
+
+/// <summary>
+/// Indicates that a privileged edit was refused because the remote file is too large to buffer safely.
+/// </summary>
+public sealed class SudoEditFileTooLargeException : InvalidOperationException
+{
+    public SudoEditFileTooLargeException(
+        string remotePath,
+        long fileSizeBytes,
+        long maxSizeBytes)
+        : base(
+            $"Sudo edit refused for '{remotePath}' because the file is {fileSizeBytes} bytes and the limit is {maxSizeBytes} bytes.")
+    {
+        RemotePath = remotePath;
+        FileSizeBytes = fileSizeBytes;
+        MaxSizeBytes = maxSizeBytes;
+    }
+
+    public string RemotePath { get; }
+
+    public long FileSizeBytes { get; }
+
+    public long MaxSizeBytes { get; }
+}
 
 /// <summary>
 /// Tracks state for a single remote file editing session.
