@@ -45,7 +45,9 @@ public sealed class SshShellSession : IDisposable
     private ShellStream? _stream;
     private CancellationTokenSource? _readCts;
     private Task? _readLoopTask;
+    private readonly object _teardownGate = new();
     private int _disconnectNotified;
+    private bool _teardownStarted;
     private bool _disposed;
 
     /// <summary>Raised when data is received from the remote shell.</summary>
@@ -97,12 +99,20 @@ public sealed class SshShellSession : IDisposable
         // cancellation, leaving the caller unaware that nothing happened.
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_client is not null)
+        lock (_teardownGate)
         {
-            throw new InvalidOperationException("Session is already connected. Call Disconnect() first.");
-        }
+            if (_teardownStarted)
+            {
+                throw new InvalidOperationException("Session teardown is in progress.");
+            }
 
-        _disconnectNotified = 0;
+            if (_client is not null)
+            {
+                throw new InvalidOperationException("Session is already connected. Call Disconnect() first.");
+            }
+
+            _disconnectNotified = 0;
+        }
 
         var pinnedVerifier = await SshConnectionFactory.ResolveHostKeyAsync(
                 connectionParams,
@@ -204,72 +214,12 @@ public sealed class SshShellSession : IDisposable
     /// </summary>
     public void Disconnect()
     {
-        if (_disposed || _client is null)
-        {
-            return;
-        }
-
-        var loopExited = StopReadLoop();
-        if (!loopExited && _readLoopTask is { } pending)
-        {
-            try
-            {
-                if (!pending.Wait(StopReadLoopFinal))
-                {
-                    Core.Logging.FileLogger.Error(
-                        "SshShellSession: read loop is still running after a "
-                        + $"{StopReadLoopFinal.TotalSeconds:F0}-second wait during Disconnect. "
-                        + "Underlying SSH.NET pipe may be stuck; task will be leaked.");
-                }
-            }
-            catch (AggregateException)
-            {
-                // The loop observes and logs non-cancellation failures itself.
-            }
-        }
-
-        DisposeReadLoopCancellationSource();
-        _readLoopTask = null;
-
-        CleanupStream();
-        DisconnectClient();
-
-        NotifyDisconnected(SshSessionDisconnectInfo.Clean());
+        BeginTeardown(notifyDisconnected: true, markDisposed: false, operationName: nameof(Disconnect));
     }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
-        var loopExited = StopReadLoop();
-        if (!loopExited && _readLoopTask is { } pending)
-        {
-            try
-            {
-                if (!pending.Wait(StopReadLoopFinal))
-                {
-                    Core.Logging.FileLogger.Error(
-                        "SshShellSession: read loop is still running after a "
-                        + $"{StopReadLoopFinal.TotalSeconds:F0}-second wait during Dispose. "
-                        + "Underlying SSH.NET pipe may be stuck; task will be leaked.");
-                }
-            }
-            catch (AggregateException)
-            {
-                // The loop observes and logs non-cancellation failures itself.
-            }
-        }
-
-        DisposeReadLoopCancellationSource();
-        _readLoopTask = null;
-
-        CleanupStream();
-        DisconnectClient();
+        BeginTeardown(notifyDisconnected: false, markDisposed: true, operationName: nameof(Dispose));
     }
 
     /// <summary>
@@ -383,6 +333,148 @@ public sealed class SshShellSession : IDisposable
         DisposeReadLoopCancellationSource();
         CleanupStream();
         DisconnectClient();
+    }
+
+    private void BeginTeardown(
+        bool notifyDisconnected,
+        bool markDisposed,
+        string operationName)
+    {
+        Task? pending;
+        lock (_teardownGate)
+        {
+            if (markDisposed)
+            {
+                _disposed = true;
+            }
+
+            if (_teardownStarted)
+            {
+                return;
+            }
+
+            if (!markDisposed && (_disposed || _client is null))
+            {
+                return;
+            }
+
+            if (markDisposed
+                && _client is null
+                && _stream is null
+                && _readLoopTask is null
+                && _readCts is null)
+            {
+                return;
+            }
+
+            _teardownStarted = true;
+            pending = _readLoopTask;
+        }
+
+        bool loopExited = StopReadLoop();
+        pending = _readLoopTask ?? pending;
+        if (loopExited || pending is null || pending.IsCompleted)
+        {
+            ObserveCompletedReadLoop(pending);
+            FinishTeardown(notifyDisconnected);
+            return;
+        }
+
+        QueueBackgroundTeardown(pending, notifyDisconnected, operationName);
+    }
+
+    private void QueueBackgroundTeardown(
+        Task pending,
+        bool notifyDisconnected,
+        string operationName)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                Task timeout = Task.Delay(StopReadLoopFinal);
+                Task completed = await Task.WhenAny(pending, timeout).ConfigureAwait(false);
+                if (completed == pending)
+                {
+                    await ObserveReadLoopAsync(pending).ConfigureAwait(false);
+                }
+                else
+                {
+                    Core.Logging.FileLogger.Error(
+                        "SshShellSession: read loop is still running after a "
+                        + $"{StopReadLoopFinal.TotalSeconds:F0}-second background wait during {operationName}. "
+                        + "Underlying SSH.NET pipe may be stuck; task will be leaked.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Debug("SSH shell background teardown suppressed", ex);
+            }
+            finally
+            {
+                FinishTeardown(notifyDisconnected);
+            }
+        });
+    }
+
+    private static async Task ObserveReadLoopAsync(Task pending)
+    {
+        try
+        {
+            await pending.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SshShellSession read loop teardown observed: {ex.Message}");
+        }
+    }
+
+    private static void ObserveCompletedReadLoop(Task? pending)
+    {
+        if (pending is null || !pending.IsCompleted)
+        {
+            return;
+        }
+
+        try
+        {
+            pending.GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SshShellSession read loop teardown observed: {ex.Message}");
+        }
+    }
+
+    private void FinishTeardown(bool notifyDisconnected)
+    {
+        DisposeReadLoopCancellationSource();
+        Interlocked.Exchange(ref _readLoopTask, null);
+
+        CleanupStream();
+        DisconnectClient();
+
+        if (notifyDisconnected)
+        {
+            NotifyDisconnected(SshSessionDisconnectInfo.Clean());
+        }
+
+        lock (_teardownGate)
+        {
+            _teardownStarted = false;
+        }
     }
 
     /// <summary>

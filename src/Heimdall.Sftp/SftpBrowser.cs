@@ -217,6 +217,7 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
+        string? changedDirectory = null;
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -228,11 +229,16 @@ public sealed class SftpBrowser : IRemoteBrowser
             }, ct).ConfigureAwait(false);
 
             CurrentDirectory = client.WorkingDirectory ?? "/";
-            DirectoryChanged?.Invoke(CurrentDirectory);
+            changedDirectory = CurrentDirectory;
         }
         finally
         {
             _clientLock.Release();
+        }
+
+        if (changedDirectory is not null)
+        {
+            DirectoryChanged?.Invoke(changedDirectory);
         }
     }
 

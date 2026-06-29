@@ -15,6 +15,7 @@
  */
 
 using Heimdall.Sftp;
+using System.Reflection;
 
 namespace Heimdall.Sftp.Tests;
 
@@ -49,9 +50,40 @@ public sealed class FtpBrowserAtomicUploadTests
         Assert.NotEqual(first, second);
     }
 
+    [Fact]
+    public async Task Disconnect_WaitsForOperationLock()
+    {
+        using FtpBrowser browser = new();
+        SemaphoreSlim opLock = GetOperationLock(browser);
+
+        await opLock.WaitAsync();
+        Task disconnectTask = Task.Run(browser.Disconnect);
+
+        try
+        {
+            Task completed = await Task.WhenAny(disconnectTask, Task.Delay(TimeSpan.FromMilliseconds(100)));
+            Assert.NotSame(disconnectTask, completed);
+        }
+        finally
+        {
+            opLock.Release();
+        }
+
+        await disconnectTask.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
     private static string GetRemoteDirectory(string remotePath)
     {
         int separator = remotePath.LastIndexOf('/');
         return separator <= 0 ? "/" : remotePath[..separator];
+    }
+
+    private static SemaphoreSlim GetOperationLock(FtpBrowser browser)
+    {
+        FieldInfo? field = typeof(FtpBrowser).GetField(
+            "_opLock",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsType<SemaphoreSlim>(field!.GetValue(browser));
     }
 }

@@ -169,12 +169,11 @@ public sealed class FtpBrowser : IRemoteBrowser
         string? path = null,
         CancellationToken ct = default)
     {
-        AsyncFtpClient client = GetConnectedClient();
-        string targetPath = NormalizePath(path ?? CurrentDirectory);
-
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
+            string targetPath = NormalizePath(path ?? CurrentDirectory);
             FtpListItem[] items = await client.GetListing(targetPath, ct).ConfigureAwait(false);
             List<SftpFileInfo> result = new List<SftpFileInfo>();
 
@@ -200,21 +199,30 @@ public sealed class FtpBrowser : IRemoteBrowser
     public Task<string> GetCurrentDirectoryAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        EnsureConnected();
-        return Task.FromResult(CurrentDirectory);
+        _opLock.Wait(ct);
+        try
+        {
+            EnsureConnected();
+            return Task.FromResult(CurrentDirectory);
+        }
+        finally
+        {
+            _opLock.Release();
+        }
     }
 
     /// <inheritdoc/>
     public async Task ChangeDirectoryAsync(string path, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        AsyncFtpClient client = GetConnectedClient();
 
-        string resolved = ResolvePath(path, CurrentDirectory);
+        string? changedDirectory = null;
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
+            string resolved = ResolvePath(path, CurrentDirectory);
             bool exists = await client.DirectoryExists(resolved, ct).ConfigureAwait(false);
             if (!exists)
             {
@@ -222,11 +230,16 @@ public sealed class FtpBrowser : IRemoteBrowser
             }
 
             CurrentDirectory = resolved;
-            DirectoryChanged?.Invoke(CurrentDirectory);
+            changedDirectory = CurrentDirectory;
         }
         finally
         {
             _opLock.Release();
+        }
+
+        if (changedDirectory is not null)
+        {
+            DirectoryChanged?.Invoke(changedDirectory);
         }
     }
 
@@ -238,7 +251,6 @@ public sealed class FtpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
-        AsyncFtpClient client = GetConnectedClient();
 
         string fileName = Path.GetFileName(remotePath);
         string tempPath = AtomicLocalFile.CreateTempPath(localPath);
@@ -246,6 +258,7 @@ public sealed class FtpBrowser : IRemoteBrowser
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
             try
             {
                 long totalBytes = await client.GetFileSize(remotePath, 0, ct).ConfigureAwait(false);
@@ -282,7 +295,6 @@ public sealed class FtpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
-        AsyncFtpClient client = GetConnectedClient();
 
         string fileName = Path.GetFileName(localPath);
         long totalBytes = Math.Max(0, new FileInfo(localPath).Length);
@@ -291,6 +303,7 @@ public sealed class FtpBrowser : IRemoteBrowser
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
             try
             {
                 IProgress<FtpProgress> progress = CreateProgress(fileName, totalBytes, isUpload: true);
@@ -332,11 +345,11 @@ public sealed class FtpBrowser : IRemoteBrowser
     public async Task CreateDirectoryAsync(string path, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        AsyncFtpClient client = GetConnectedClient();
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
             await client.CreateDirectory(path, ct).ConfigureAwait(false);
         }
         finally
@@ -349,12 +362,12 @@ public sealed class FtpBrowser : IRemoteBrowser
     public async Task DeleteAsync(string path, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        AsyncFtpClient client = GetConnectedClient();
         string normalizedPath = NormalizePath(path);
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
             if (await client.DirectoryExists(normalizedPath, ct).ConfigureAwait(false))
             {
                 await client.DeleteDirectory(normalizedPath, ct).ConfigureAwait(false);
@@ -384,11 +397,11 @@ public sealed class FtpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(oldPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(newPath);
-        AsyncFtpClient client = GetConnectedClient();
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
             await client.Rename(oldPath, newPath, ct).ConfigureAwait(false);
         }
         finally
@@ -410,7 +423,6 @@ public sealed class FtpBrowser : IRemoteBrowser
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
-        _ = GetConnectedClient();
 
         RemoteCopyOps ops = new RemoteCopyOps(
             DestinationExistsAsync: RemoteExistsAsync,
@@ -425,12 +437,12 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     private async Task<bool> RemoteExistsAsync(string path, CancellationToken ct)
     {
-        AsyncFtpClient client = GetConnectedClient();
         string normalized = NormalizePath(path);
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
             if (await client.DirectoryExists(normalized, ct).ConfigureAwait(false))
             {
                 return true;
@@ -446,12 +458,12 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     private async Task<bool> RemoteIsDirectoryAsync(string path, CancellationToken ct)
     {
-        AsyncFtpClient client = GetConnectedClient();
         string normalized = NormalizePath(path);
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            AsyncFtpClient client = GetConnectedClient();
             return await client.DirectoryExists(normalized, ct).ConfigureAwait(false);
         }
         finally
@@ -492,13 +504,37 @@ public sealed class FtpBrowser : IRemoteBrowser
     /// <inheritdoc/>
     public void Disconnect()
     {
-        _client?.Dispose();
-        _client = null;
-        _connected = false;
-        _host = null;
-        _username = null;
-        _port = 0;
-        Disconnected?.Invoke(null);
+        if (_disposed && _client is null)
+        {
+            return;
+        }
+
+        var disconnected = false;
+        _opLock.Wait();
+        try
+        {
+            if (_client is null)
+            {
+                return;
+            }
+
+            _client.Dispose();
+            _client = null;
+            _connected = false;
+            _host = null;
+            _username = null;
+            _port = 0;
+            disconnected = true;
+        }
+        finally
+        {
+            _opLock.Release();
+        }
+
+        if (disconnected)
+        {
+            Disconnected?.Invoke(null);
+        }
     }
 
     /// <inheritdoc/>

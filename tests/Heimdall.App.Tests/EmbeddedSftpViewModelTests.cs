@@ -500,6 +500,55 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task UploadEntriesAsync_ConcurrentStarts_RunExactlyOneTransfer()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher)
+        {
+            CurrentPath = "/srv"
+        };
+        TaskCompletionSource uploadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseUpload = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser browser = new()
+        {
+            UploadFileHandler = async (_, _, ct) =>
+            {
+                uploadStarted.TrySetResult();
+                await releaseUpload.Task.WaitAsync(ct);
+            }
+        };
+        SetBrowser(viewModel, browser);
+
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string filePath = Path.Combine(root, "app.log");
+        await File.WriteAllTextAsync(filePath, "payload");
+
+        try
+        {
+            Task first = viewModel.UploadEntriesAsync([filePath], "/srv");
+            await uploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Task second = viewModel.UploadEntriesAsync([filePath], "/srv");
+            await second.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(1, browser.UploadCallCount);
+            Assert.True(viewModel.IsTransferInProgress);
+
+            releaseUpload.SetResult();
+            await first.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(1, browser.UploadCallCount);
+            Assert.False(viewModel.IsTransferInProgress);
+        }
+        finally
+        {
+            releaseUpload.TrySetResult();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task UploadEntriesAsync_RemoteDirectoryAlreadyExists_MergesAndUploadsFiles()
     {
         FakeUiDispatcher dispatcher = new();
@@ -1030,6 +1079,8 @@ public sealed class EmbeddedSftpViewModelTests
 
         public string? LastUploadedRemotePath { get; private set; }
 
+        public Func<string, string, CancellationToken, Task>? UploadFileHandler { get; set; }
+
         public string? LastCreatedDirectoryPath { get; private set; }
 
         public string? LastChmodPath { get; private set; }
@@ -1084,7 +1135,9 @@ public sealed class EmbeddedSftpViewModelTests
         {
             LastUploadedRemotePath = remotePath;
             Interlocked.Increment(ref _uploadCallCount);
-            return Task.CompletedTask;
+            return UploadFileHandler is null
+                ? Task.CompletedTask
+                : UploadFileHandler(localPath, remotePath, ct);
         }
 
         /// <summary>When set, CreateDirectoryAsync throws this exception (to simulate an existing dir).</summary>

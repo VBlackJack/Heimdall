@@ -48,6 +48,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         Empty
     }
 
+    private enum TransferStartState
+    {
+        Started,
+        Busy,
+        Unavailable
+    }
+
     private const string SudoStderrTerminalRequired = "a terminal is required";
     private const string SudoStderrNoTtyPresent = "no tty present";
     private const string SudoStderrNoAskpass = "no askpass";
@@ -73,6 +80,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private LocalizationManager? _localizer;
     private IDialogService? _dialogService;
     private System.Threading.Timer? _errorHighlightTimer;
+    private readonly object _lifecycleCtsGate = new();
+    private readonly object _transferCtsGate = new();
     private CancellationTokenSource? _lifecycleCts = new();
     private CancellationTokenSource? _transferCts;
     private string _endpointKey = string.Empty;
@@ -325,14 +334,85 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         _disposed = true;
         DisposeErrorHighlightTimer();
-        _lifecycleCts?.Cancel();
-        _lifecycleCts?.Dispose();
-        _lifecycleCts = null;
-        _transferCts?.Cancel();
-        _transferCts?.Dispose();
-        _transferCts = null;
+        lock (_lifecycleCtsGate)
+        {
+            _lifecycleCts?.Cancel();
+            _lifecycleCts?.Dispose();
+            _lifecycleCts = null;
+        }
+
+        lock (_transferCtsGate)
+        {
+            _transferCts?.Cancel();
+            _transferCts?.Dispose();
+            _transferCts = null;
+            IsTransferInProgress = false;
+        }
+
         IsConnected = false;
         _remoteClipboard.Changed -= OnRemoteClipboardChanged;
+    }
+
+    private bool TryCaptureLifecycleToken(out CancellationToken token)
+    {
+        lock (_lifecycleCtsGate)
+        {
+            if (_disposed || _lifecycleCts is null)
+            {
+                token = CancellationToken.None;
+                return false;
+            }
+
+            try
+            {
+                token = _lifecycleCts.Token;
+                return true;
+            }
+            catch (ObjectDisposedException)
+            {
+                token = CancellationToken.None;
+                return false;
+            }
+        }
+    }
+
+    private TransferStartState TryBeginTransfer(out CancellationTokenSource? transferCts)
+    {
+        lock (_transferCtsGate)
+        {
+            transferCts = null;
+            if (_disposed || _browser is null)
+            {
+                return TransferStartState.Unavailable;
+            }
+
+            if (IsTransferInProgress)
+            {
+                return TransferStartState.Busy;
+            }
+
+            _transferCts?.Cancel();
+            _transferCts?.Dispose();
+            _transferCts = new CancellationTokenSource();
+            transferCts = _transferCts;
+            IsTransferInProgress = true;
+            return TransferStartState.Started;
+        }
+    }
+
+    private void CompleteTransfer(CancellationTokenSource transferCts)
+    {
+        lock (_transferCtsGate)
+        {
+            if (ReferenceEquals(_transferCts, transferCts))
+            {
+                _transferCts = null;
+            }
+
+            transferCts.Dispose();
+            IsTransferInProgress = false;
+            TransferProgressValue = 0;
+        }
     }
 
     /// <summary>
@@ -738,24 +818,20 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(localPaths);
 
-        if (_disposed || _browser is null)
-        {
-            return;
-        }
-
-        if (IsTransferInProgress)
+        TransferStartState startState = TryBeginTransfer(out CancellationTokenSource? transferCts);
+        if (startState == TransferStartState.Busy)
         {
             UpdateStatus(_localizer?["SftpTransferInProgress"] ?? "A file transfer is already in progress.");
             return;
         }
 
-        _transferCts?.Cancel();
-        _transferCts?.Dispose();
-        _transferCts = new CancellationTokenSource();
-        CancellationToken ct = _transferCts.Token;
+        if (startState == TransferStartState.Unavailable || transferCts is null)
+        {
+            return;
+        }
 
+        CancellationToken ct = transferCts.Token;
         TransferProgressValue = 0;
-        IsTransferInProgress = true;
 
         try
         {
@@ -774,8 +850,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
         finally
         {
-            IsTransferInProgress = false;
-            TransferProgressValue = 0;
+            CompleteTransfer(transferCts);
             _ = Refresh();
         }
     }
@@ -930,18 +1005,21 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// <remarks>Must be invoked on the UI thread.</remarks>
     public async Task DownloadFilesAsync(IReadOnlyList<SftpFileInfo> files, string targetFolder)
     {
-        if (_disposed || _browser is null || IsTransferInProgress)
+        TransferStartState startState = TryBeginTransfer(out CancellationTokenSource? transferCts);
+        if (startState is not TransferStartState.Started || transferCts is null)
         {
             return;
         }
 
-        _transferCts?.Cancel();
-        _transferCts?.Dispose();
-        _transferCts = new CancellationTokenSource();
-        CancellationToken ct = _transferCts.Token;
+        IRemoteBrowser? browser = _browser;
+        if (browser is null)
+        {
+            CompleteTransfer(transferCts);
+            return;
+        }
 
+        CancellationToken ct = transferCts.Token;
         TransferProgressValue = 0;
-        IsTransferInProgress = true;
         var downloadedFiles = 0;
         var skippedDirectories = 0;
 
@@ -971,7 +1049,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
                 try
                 {
-                    await _browser.DownloadFileAsync(file.FullPath, localPath, ct);
+                    await browser.DownloadFileAsync(file.FullPath, localPath, ct);
                 }
                 catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
                 {
@@ -1015,15 +1093,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
         finally
         {
-            IsTransferInProgress = false;
-            TransferProgressValue = 0;
+            CompleteTransfer(transferCts);
         }
     }
 
     [RelayCommand]
     private void CancelTransfer()
     {
-        _transferCts?.Cancel();
+        lock (_transferCtsGate)
+        {
+            _transferCts?.Cancel();
+        }
     }
 
     /// <summary>
@@ -1767,13 +1847,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         bool suppressErrorStatus = false,
         bool redactPathInLogs = false)
     {
-        CancellationTokenSource? lifecycleCts = _lifecycleCts;
-        if (_disposed || _browser is null || !_browser.IsConnected || IsLoading)
+        if (!TryCaptureLifecycleToken(out CancellationToken ct)
+            || _browser is null
+            || !_browser.IsConnected
+            || IsLoading)
         {
             return;
         }
 
-        CancellationToken ct = lifecycleCts?.Token ?? CancellationToken.None;
         await RunOnUiAsync(() => IsLoading = true);
 
         try

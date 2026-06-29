@@ -15,6 +15,8 @@
  */
 
 using System.Diagnostics;
+using System.Reflection;
+using Renci.SshNet;
 
 namespace Heimdall.Ssh.Tests;
 
@@ -90,6 +92,40 @@ public sealed class SshShellSessionTeardownTests
     }
 
     [Fact]
+    public void Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait()
+    {
+        var session = CreateSessionWithReadLoop(Task.Delay(Timeout.InfiniteTimeSpan));
+        var disconnectCount = 0;
+        session.Disconnected += _ => Interlocked.Increment(ref disconnectCount);
+
+        var stopwatch = Stopwatch.StartNew();
+        session.Disconnect();
+        stopwatch.Stop();
+
+        Assert.True(
+            stopwatch.Elapsed < TimeSpan.FromSeconds(1.5),
+            $"Disconnect took {stopwatch.ElapsedMilliseconds} ms with a stuck read loop.");
+        Assert.True(
+            SpinWait.SpinUntil(() => Volatile.Read(ref disconnectCount) == 1, TimeSpan.FromSeconds(5)),
+            "Background teardown did not complete clean disconnect notification.");
+    }
+
+    [Fact]
+    public async Task DisconnectAndDispose_Concurrent_DoNotThrowOrDoubleNotify()
+    {
+        var session = CreateSessionWithReadLoop(Task.CompletedTask);
+        var disconnectCount = 0;
+        session.Disconnected += _ => Interlocked.Increment(ref disconnectCount);
+
+        Task disconnect = Task.Run(session.Disconnect);
+        Task dispose = Task.Run(session.Dispose);
+
+        await Task.WhenAll(disconnect, dispose).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.InRange(Volatile.Read(ref disconnectCount), 0, 1);
+    }
+
+    [Fact]
     public void Resize_OnDisposedSession_Throws()
     {
         var session = new SshShellSession();
@@ -105,5 +141,23 @@ public sealed class SshShellSessionTeardownTests
         session.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => session.Write("x"));
+    }
+
+    private static SshShellSession CreateSessionWithReadLoop(Task readLoopTask)
+    {
+        var session = new SshShellSession();
+        SetPrivateField(session, "_client", new SshClient("127.0.0.1", "user", "password"));
+        SetPrivateField(session, "_readCts", new CancellationTokenSource());
+        SetPrivateField(session, "_readLoopTask", readLoopTask);
+        return session;
+    }
+
+    private static void SetPrivateField<T>(SshShellSession session, string fieldName, T value)
+    {
+        FieldInfo? field = typeof(SshShellSession).GetField(
+            fieldName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(session, value);
     }
 }
