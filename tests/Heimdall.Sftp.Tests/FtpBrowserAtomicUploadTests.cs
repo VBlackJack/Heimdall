@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-using Heimdall.Sftp;
 using System.Reflection;
+using Heimdall.Sftp;
 
 namespace Heimdall.Sftp.Tests;
 
