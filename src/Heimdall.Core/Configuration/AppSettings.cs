@@ -178,6 +178,7 @@ public sealed class AppSettings
     public int EmbeddedIdleTimeoutMs { get; set; }
     public bool SftpBrowserEnabled { get; set; } = true;
     public bool SftpAutoOpenOnSsh { get; set; } = true;
+    public bool SftpFollowSshDirectory { get; set; }
     public string ExternalEditorPath { get; set; } = @"%windir%\system32\notepad.exe";
     public bool PreventSleepDuringSession { get; set; } = true;
     public bool SessionLoggingEnabled { get; set; }

@@ -59,6 +59,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgReady = "ready:";
     private const string MsgResize = "resize:";
     private const string MsgInput = "input:";
+    private const string MsgCwd = "cwd:";
     private const string MsgClipboardWrite = "clipboard-write:";
     private const string MsgClipboardRead = "clipboard-read:";
     private const string TerminalPageMessageSource = "about:blank";
@@ -257,6 +258,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// The subscriber (MainViewModel) decides whether to relay to other terminals.
     /// </summary>
     public event Action<byte[]>? BroadcastInput;
+
+    public event Action<string>? CurrentDirectoryChanged;
 
     /// <summary>
     /// Raised when the user clicks the Reconnect button after a disconnection.
@@ -1092,6 +1095,17 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (message.StartsWith(MsgCwd, StringComparison.Ordinal))
+        {
+            string base64 = message[MsgCwd.Length..];
+            if (TryDecodeCurrentDirectoryPayload(base64, out string? path))
+            {
+                CurrentDirectoryChanged?.Invoke(path);
+            }
+
+            return;
+        }
+
         // Clipboard write: terminal wants to copy text to system clipboard
         if (message.StartsWith(MsgClipboardWrite, StringComparison.Ordinal))
         {
@@ -1160,6 +1174,34 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSSH dropped unknown WebView2 terminal message: {DescribeWebViewText(message)}");
+    }
+
+    internal static bool TryDecodeCurrentDirectoryPayload(
+        string base64,
+        [NotNullWhen(true)] out string? path)
+    {
+        path = null;
+
+        if (string.IsNullOrWhiteSpace(base64))
+        {
+            return false;
+        }
+
+        try
+        {
+            string decodedPath = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+            if (string.IsNullOrWhiteSpace(decodedPath))
+            {
+                return false;
+            }
+
+            path = decodedPath;
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     private static bool IsTrustedTerminalMessageSource(string? source)

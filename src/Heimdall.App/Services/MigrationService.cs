@@ -201,6 +201,7 @@ public sealed class MigrationService
         MapInt(legacy, "EmbeddedIdleTimeoutMs", v => target.EmbeddedIdleTimeoutMs = v);
         MapBool(legacy, "SftpBrowserEnabled", v => target.SftpBrowserEnabled = v);
         MapBool(legacy, "SftpAutoOpenOnSsh", v => target.SftpAutoOpenOnSsh = v);
+        MapBool(legacy, "SftpFollowSshDirectory", v => target.SftpFollowSshDirectory = v);
         MapString(legacy, "ExternalEditorPath", v => target.ExternalEditorPath = v);
         MapBool(legacy, "PreventSleepDuringSession", v => target.PreventSleepDuringSession = v);
         MapBool(legacy, "SessionLoggingEnabled", v => target.SessionLoggingEnabled = v);

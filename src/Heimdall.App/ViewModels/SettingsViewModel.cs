@@ -241,6 +241,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _sftpAutoOpenOnSsh = true;
 
     [ObservableProperty]
+    private bool _sftpFollowSshDirectory;
+
+    [ObservableProperty]
     private string _x11ServerPath = "";
 
     [ObservableProperty]
@@ -902,6 +905,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
         SftpBrowserEnabled = settings.SftpBrowserEnabled;
         SftpAutoOpenOnSsh = settings.SftpAutoOpenOnSsh;
+        SftpFollowSshDirectory = settings.SftpFollowSshDirectory;
         X11ServerPath = settings.X11ServerPath ?? "";
         X11AutoStart = settings.X11AutoStart;
         SysinternalsPath = settings.SysinternalsPath ?? "";
@@ -1095,6 +1099,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
             settings.SftpBrowserEnabled = SftpBrowserEnabled;
             settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
+            settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
             settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
             settings.X11AutoStart = X11AutoStart;
             settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;

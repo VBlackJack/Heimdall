@@ -101,6 +101,60 @@ public sealed class EmbeddedSessionManagerDisconnectTests
         Assert.Same(host, pane.HostControl);
     }
 
+    [Fact]
+    public void ResolveSftpFollowPane_ReturnsFollowEnabledSftpSibling()
+    {
+        object sshHost = new();
+        object sftpHost = new();
+        SessionPaneModel sshPane = CreatePane(sshHost);
+        sshPane.ConnectionType = "SSH";
+        SessionPaneModel sftpPane = CreatePane(sftpHost);
+        sftpPane.ConnectionType = "SFTP";
+        sftpPane.SftpFollowSshDirectory = true;
+        SplitContainerModel root = new()
+        {
+            First = sshPane,
+            Second = sftpPane,
+            Orientation = SplitOrientation.Vertical
+        };
+
+        SessionPaneModel? resolved = EmbeddedSessionManager.ResolveSftpFollowPane(
+            root,
+            hostControl => ReferenceEquals(hostControl, sftpHost));
+
+        Assert.Same(sftpPane, resolved);
+    }
+
+    [Fact]
+    public void ResolveSftpFollowPane_ReturnsNullWhenFollowIsOff()
+    {
+        object sftpHost = new();
+        SessionPaneModel sftpPane = CreatePane(sftpHost);
+        sftpPane.ConnectionType = "SFTP";
+        sftpPane.SftpFollowSshDirectory = false;
+
+        SessionPaneModel? resolved = EmbeddedSessionManager.ResolveSftpFollowPane(
+            sftpPane,
+            hostControl => ReferenceEquals(hostControl, sftpHost));
+
+        Assert.Null(resolved);
+    }
+
+    [Fact]
+    public void ResolveSftpFollowPane_ReturnsNullWhenNoSftpSiblingExists()
+    {
+        object sshHost = new();
+        SessionPaneModel sshPane = CreatePane(sshHost);
+        sshPane.ConnectionType = "SSH";
+        sshPane.SftpFollowSshDirectory = true;
+
+        SessionPaneModel? resolved = EmbeddedSessionManager.ResolveSftpFollowPane(
+            sshPane,
+            static _ => false);
+
+        Assert.Null(resolved);
+    }
+
     private static EmbeddedSessionManager CreateManager()
         => new EmbeddedSessionManager(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
 

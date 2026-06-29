@@ -444,9 +444,24 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// </summary>
     public Task NavigateToPath(string? path)
     {
+        return NavigateToPathCore(path, redactPathInLogs: false);
+    }
+
+    /// <summary>
+    /// Navigates to a remote path that originated from terminal output. The path
+    /// is still surfaced through the normal SFTP status path, but logs stay
+    /// redacted because terminal cwd values are untrusted remote input.
+    /// </summary>
+    internal Task NavigateToUntrustedPath(string? path)
+    {
+        return NavigateToPathCore(path, redactPathInLogs: true);
+    }
+
+    private Task NavigateToPathCore(string? path, bool redactPathInLogs)
+    {
         return string.IsNullOrWhiteSpace(path)
             ? Task.CompletedTask
-            : LoadDirectoryCoreAsync(path.Trim(), pushToHistory: true);
+            : LoadDirectoryCoreAsync(path.Trim(), pushToHistory: true, redactPathInLogs: redactPathInLogs);
     }
 
     /// <summary>
@@ -1749,7 +1764,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private async Task LoadDirectoryCoreAsync(
         string path,
         bool pushToHistory,
-        bool suppressErrorStatus = false)
+        bool suppressErrorStatus = false,
+        bool redactPathInLogs = false)
     {
         CancellationTokenSource? lifecycleCts = _lifecycleCts;
         if (_disposed || _browser is null || !_browser.IsConnected || IsLoading)
@@ -1778,8 +1794,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 }
                 catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
                 {
-                    Core.Logging.FileLogger.Info(
-                        $"EmbeddedSFTP listdir permission denied, falling back to sudo for {path}");
+                    Core.Logging.FileLogger.Info(redactPathInLogs
+                        ? "EmbeddedSFTP listdir permission denied, falling back to sudo."
+                        : $"EmbeddedSFTP listdir permission denied, falling back to sudo for {path}");
                     entries = await ListDirectoryViaSudoAsync(path, ct).ConfigureAwait(false);
                 }
             }
@@ -1811,7 +1828,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
             else
             {
-                Core.Logging.FileLogger.Warn($"EmbeddedSFTP LoadDirectory failed: {ex.Message}");
+                Core.Logging.FileLogger.Warn(redactPathInLogs
+                    ? $"EmbeddedSFTP LoadDirectory failed ({ex.GetType().Name})."
+                    : $"EmbeddedSFTP LoadDirectory failed: {ex.Message}");
                 await RunOnUiAsync(() =>
                     SetTransferError(ex));
             }

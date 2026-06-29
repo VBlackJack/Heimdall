@@ -273,6 +273,22 @@
                         </StackPanel>
                     </ToggleButton>
 
+                    <ToggleButton x:Name="BtnFollowSshDirectory"
+                                  Checked="OnFollowSshDirectoryToggled"
+                                  Unchecked="OnFollowSshDirectoryToggled"
+                                  ToolTip="{loc:Translate SftpFollowSshDirectoryTooltip}"
+                                  Style="{DynamicResource ToolbarToggleButtonStyle}"
+                                  FontSize="{StaticResource FontSizeCaption}"
+                                  IsEnabled="{Binding IsToolbarEnabled}"
+                                  AutomationProperties.Name="{loc:Translate SftpFollowSshDirectoryTooltip}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                                       VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBlock x:Name="BtnFollowSshDirectoryText" Text="{loc:Translate SftpFollowSshDirectoryLabel}" VerticalAlignment="Center"
+                                       FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </ToggleButton>
+
                     <Border x:Name="PrivilegeBookmarksSeparator"
                             Style="{StaticResource ToolbarVerticalSeparatorStyle}"
                             AutomationProperties.AutomationId="Toolbar.Sftp.PrivilegeBookmarksSeparator"/>

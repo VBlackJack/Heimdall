@@ -130,9 +130,21 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     {
         ArgumentNullException.ThrowIfNull(pane);
         _ownerPane = pane;
+        _ownerPane.SftpFollowSshDirectory = IsFollowSshDirectoryEnabled;
     }
 
     internal SessionPaneModel? OwningPane => _ownerPane;
+
+    public bool IsFollowSshDirectoryEnabled => BtnFollowSshDirectory.IsChecked == true;
+
+    public void SetFollowSshDirectoryEnabled(bool enabled)
+    {
+        BtnFollowSshDirectory.IsChecked = enabled;
+        if (_ownerPane is not null)
+        {
+            _ownerPane.SftpFollowSshDirectory = enabled;
+        }
+    }
 
     public EmbeddedSftpView()
     {
@@ -231,6 +243,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
         // Hide sudo toggle for FTP sessions (no SSH channel for sudo)
         BtnSudoMode.Visibility = sshParams is not null
+            ? Visibility.Visible : Visibility.Collapsed;
+        BtnFollowSshDirectory.Visibility = browser is SftpBrowser
             ? Visibility.Visible : Visibility.Collapsed;
 
         SessionTitleText.Text = displayName;
@@ -548,7 +562,16 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         PrivilegeBookmarksSeparator.Visibility = inlineActions;
         BtnBookmarkMenu.Visibility = inlineActions;
         BtnSudoModeText.Visibility = inlineActions;
+        BtnFollowSshDirectoryText.Visibility = inlineActions;
         BtnOverflowMenu.Visibility = overflow;
+    }
+
+    private void OnFollowSshDirectoryToggled(object sender, RoutedEventArgs e)
+    {
+        if (_ownerPane is not null)
+        {
+            _ownerPane.SftpFollowSshDirectory = IsFollowSshDirectoryEnabled;
+        }
     }
 
     private void OnToolbarMenuButtonClick(object sender, RoutedEventArgs e)
@@ -1321,6 +1344,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private Task NavigateRemoteAsync(string path)
     {
         return _viewModel.NavigateToPath(path);
+    }
+
+    public Task NavigateToPath(string path)
+    {
+        return _viewModel.NavigateToUntrustedPath(path);
     }
 
     private Task NavigateInitialAsync(string? initialRemotePath)

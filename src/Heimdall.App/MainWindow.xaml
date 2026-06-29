@@ -2363,6 +2363,7 @@
                                         </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsSftpBrowserEnabled" Content="{loc:Translate SettingsLabelSftpBrowserEnabled}" IsChecked="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"/>
                                         <CheckBox x:Name="Mw_SettingsAutoOpenSftp" Content="{loc:Translate SettingsLabelAutoOpenSftp}" IsChecked="{Binding Settings.SftpAutoOpenOnSsh}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                        <CheckBox x:Name="Mw_SettingsSftpFollowSshDirectory" Content="{loc:Translate SettingsLabelSftpFollowSshDirectory}" IsChecked="{Binding Settings.SftpFollowSshDirectory}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0" AutomationProperties.Name="{loc:Translate SettingsLabelSftpFollowSshDirectory}"/>
                                         <StackPanel Margin="0,12,0,0">
                                             <TextBlock x:Name="Mw_SettingsX11PathLabel" Text="{loc:Translate SettingsLabelX11ServerPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <DockPanel>

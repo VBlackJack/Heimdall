@@ -68,6 +68,13 @@ public partial class SessionPaneModel : ObservableObject, ISplitContent
     [ObservableProperty]
     private string? _sftpReconnectPathHint;
 
+    /// <summary>
+    /// Transient, per-pane toggle controlling whether this SFTP pane follows OSC 7
+    /// current-directory notifications emitted by a sibling SSH terminal.
+    /// </summary>
+    [ObservableProperty]
+    private bool _sftpFollowSshDirectory;
+
     [ObservableProperty]
     private string _title = "";
 

@@ -386,6 +386,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 displayName,
                 bundle.SshParams,
                 initialRemotePath,
+                settings,
                 bundle.SessionLoggingOverride);
         }
 
@@ -398,6 +399,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 displayName,
                 null,
                 initialRemotePath,
+                settings,
                 ftpBundle.SessionLoggingOverride);
         }
 
@@ -857,6 +859,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         string displayName,
         SshConnectionParams? sshParams,
         string? initialRemotePath = null,
+        AppSettings? settings = null,
         bool? sessionLoggingOverride = null)
     {
         var view = new EmbeddedSftpView
@@ -871,6 +874,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         view.InitializeSession(
             browser, tab, displayName, string.Empty,
             _localizer, _dialogService, _hostKeyStore, sshParams, initialRemotePath);
+        view.SetFollowSshDirectoryEnabled(
+            browser is SftpBrowser && settings?.SftpFollowSshDirectory == true);
 
         // Wire "Open in Terminal" to send a cd command to any SSH terminal
         // in the same tab's split tree.
@@ -899,6 +904,57 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 tab.ProfileLookupServerId,
                 tab.ConnectionType);
         view.CloseRequested += () => CloseRequestedCallback?.Invoke(tab);
+        view.CurrentDirectoryChanged += path => FollowSftpToCurrentDirectory(tab, path);
+    }
+
+    private static void FollowSftpToCurrentDirectory(SessionTabViewModel tab, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var pane = ResolveSftpFollowPane(
+            tab.RootContent,
+            static hostControl => hostControl is EmbeddedSftpView);
+        if (pane?.HostControl is not EmbeddedSftpView sftpView)
+        {
+            return;
+        }
+
+        _ = NavigateSftpToCurrentDirectoryAsync(sftpView, path);
+    }
+
+    internal static SessionPaneModel? ResolveSftpFollowPane(
+        ISplitContent? root,
+        Func<object?, bool> isSftpHost)
+    {
+        ArgumentNullException.ThrowIfNull(isSftpHost);
+
+        foreach (var pane in Heimdall.Core.Models.SplitTreeHelper.EnumerateLeaves(root))
+        {
+            if (pane.SftpFollowSshDirectory && isSftpHost(pane.HostControl))
+            {
+                return pane;
+            }
+        }
+
+        return null;
+    }
+
+    private static async Task NavigateSftpToCurrentDirectoryAsync(
+        EmbeddedSftpView sftpView,
+        string path)
+    {
+        try
+        {
+            await sftpView.NavigateToPath(path).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Debug(
+                $"EmbeddedSFTP follow-current-directory navigation failed ({ex.GetType().Name}).");
+        }
     }
 
     private void WireReconnectRequested(EmbeddedSftpView view, SessionTabViewModel tab)

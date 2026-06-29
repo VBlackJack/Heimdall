@@ -185,6 +185,31 @@
                 return bytesToBase64(new TextEncoder().encode(text));
             }
 
+            function tryParseOsc7Path(data) {
+                try {
+                    if (!data || data.indexOf('file://') !== 0) {
+                        return null;
+                    }
+
+                    var rest = data.substring('file://'.length);
+                    var pathStart = rest.indexOf('/');
+                    if (pathStart < 0) {
+                        return null;
+                    }
+
+                    var encodedPath = rest.substring(pathStart);
+                    if (!encodedPath) {
+                        return null;
+                    }
+
+                    var path = decodeURIComponent(encodedPath);
+                    return path || null;
+                }
+                catch (error) {
+                    return null;
+                }
+            }
+
             function fitTerminal() {
                 if (!fitAddon || !term) {
                     return;
@@ -334,6 +359,16 @@
                 term.onResize(function (size) {
                     postMessage('resize:' + size.cols + ',' + size.rows);
                 });
+
+                if (typeof term.registerOscHandler === 'function') {
+                    term.registerOscHandler(7, function (data) {
+                        var path = tryParseOsc7Path(data);
+                        if (path) {
+                            postMessage('cwd:' + stringToBase64(path));
+                        }
+                        return true;
+                    });
+                }
 
                 // ── Selection auto-copy (via C# host for clipboard access) ──
                 term.onSelectionChange(function () {
