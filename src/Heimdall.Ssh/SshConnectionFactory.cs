@@ -62,6 +62,32 @@ public static class SshConnectionFactory
             SshAgentRegistry.CreateDefault(connectionParams.SshAgentPreference));
     }
 
+    /// <summary>
+    /// Creates an <see cref="SshClient"/> that owns any private-key material
+    /// loaded while building its authentication methods.
+    /// </summary>
+    public static SshClient CreateSshClient(SshConnectionParams connectionParams)
+    {
+        ArgumentNullException.ThrowIfNull(connectionParams);
+
+        return CreateSshClient(
+            connectionParams,
+            SshAgentRegistry.CreateDefault(connectionParams.SshAgentPreference));
+    }
+
+    /// <summary>
+    /// Creates an <see cref="SftpClient"/> that owns any private-key material
+    /// loaded while building its authentication methods.
+    /// </summary>
+    public static SftpClient CreateSftpClient(SshConnectionParams connectionParams)
+    {
+        ArgumentNullException.ThrowIfNull(connectionParams);
+
+        return CreateSftpClient(
+            connectionParams,
+            SshAgentRegistry.CreateDefault(connectionParams.SshAgentPreference));
+    }
+
     internal static ConnectionInfo Create(
         SshConnectionParams connectionParams,
         SshAgentRegistry agentRegistry)
@@ -81,6 +107,71 @@ public static class SshConnectionFactory
         };
 
         return info;
+    }
+
+    internal static SshClient CreateSshClient(
+        SshConnectionParams connectionParams,
+        SshAgentRegistry agentRegistry)
+    {
+        ArgumentNullException.ThrowIfNull(connectionParams);
+        ArgumentNullException.ThrowIfNull(agentRegistry);
+
+        var ownedConnectionInfo = CreateOwned(connectionParams, agentRegistry);
+        try
+        {
+            return new OwnedSshClient(ownedConnectionInfo);
+        }
+        catch
+        {
+            ownedConnectionInfo.Dispose();
+            throw;
+        }
+    }
+
+    internal static SftpClient CreateSftpClient(
+        SshConnectionParams connectionParams,
+        SshAgentRegistry agentRegistry)
+    {
+        ArgumentNullException.ThrowIfNull(connectionParams);
+        ArgumentNullException.ThrowIfNull(agentRegistry);
+
+        var ownedConnectionInfo = CreateOwned(connectionParams, agentRegistry);
+        try
+        {
+            return new OwnedSftpClient(ownedConnectionInfo);
+        }
+        catch
+        {
+            ownedConnectionInfo.Dispose();
+            throw;
+        }
+    }
+
+    private static OwnedConnectionInfo CreateOwned(
+        SshConnectionParams connectionParams,
+        SshAgentRegistry agentRegistry)
+    {
+        var ownedResources = new List<IDisposable>();
+        try
+        {
+            var authMethods = BuildAuthMethods(connectionParams, agentRegistry, ownedResources);
+
+            var info = new ConnectionInfo(
+                connectionParams.Host,
+                connectionParams.Port,
+                connectionParams.Username,
+                [.. authMethods])
+            {
+                Timeout = connectionParams.ConnectTimeout
+            };
+
+            return new OwnedConnectionInfo(info, ownedResources);
+        }
+        catch
+        {
+            DisposeOwnedResources(ownedResources);
+            throw;
+        }
     }
 
     /// <summary>
@@ -431,14 +522,20 @@ public static class SshConnectionFactory
 
     private static List<AuthenticationMethod> BuildAuthMethods(
         SshConnectionParams connectionParams,
-        SshAgentRegistry agentRegistry)
+        SshAgentRegistry agentRegistry) =>
+        BuildAuthMethods(connectionParams, agentRegistry, ownedResources: null);
+
+    private static List<AuthenticationMethod> BuildAuthMethods(
+        SshConnectionParams connectionParams,
+        SshAgentRegistry agentRegistry,
+        ICollection<IDisposable>? ownedResources)
     {
         var methods = new List<AuthenticationMethod>();
 
         // Private key authentication (with optional passphrase)
         if (!string.IsNullOrWhiteSpace(connectionParams.KeyPath))
         {
-            AddPrivateKeyMethod(methods, connectionParams);
+            AddPrivateKeyMethod(methods, connectionParams, ownedResources);
         }
 
         // Password authentication.
@@ -498,24 +595,34 @@ public static class SshConnectionFactory
 
     private static void AddPrivateKeyMethod(
         ICollection<AuthenticationMethod> methods,
-        SshConnectionParams connectionParams)
+        SshConnectionParams connectionParams,
+        ICollection<IDisposable>? ownedResources)
     {
         var keyPath = connectionParams.KeyPath
             ?? throw new InvalidOperationException("KeyPath is required for private key authentication.");
 
+        PrivateKeyFile? keyFile = null;
         try
         {
             var keyPassphrase = ResolveKeyPassphrase(connectionParams);
-            var keyFile = string.IsNullOrEmpty(keyPassphrase)
+            keyFile = string.IsNullOrEmpty(keyPassphrase)
                 ? new PrivateKeyFile(keyPath)
                 : new PrivateKeyFile(keyPath, keyPassphrase);
 
             methods.Add(new PrivateKeyAuthenticationMethod(connectionParams.Username, keyFile));
+            ownedResources?.Add(keyFile);
+            keyFile = null;
         }
         catch (Exception ex) when (CanFallBackToPasswordAfterKeyLoadFailure(ex, connectionParams))
         {
+            keyFile?.Dispose();
             Core.Logging.FileLogger.Warn(
                 $"SSH key file could not be loaded for {connectionParams.Host}:{connectionParams.Port}; trying password fallback. {ex.GetType().Name}: {ex.Message}");
+        }
+        catch
+        {
+            keyFile?.Dispose();
+            throw;
         }
     }
 
@@ -596,5 +703,96 @@ public static class SshConnectionFactory
         }
 
         return null;
+    }
+
+    private static void DisposeOwnedResources(IEnumerable<IDisposable> resources)
+    {
+        foreach (var resource in resources)
+        {
+            try
+            {
+                resource.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Debug("SSH authentication resource cleanup suppressed", ex);
+            }
+        }
+    }
+
+    private sealed class OwnedConnectionInfo : IDisposable
+    {
+        private readonly IReadOnlyList<IDisposable> _ownedResources;
+        private int _disposed;
+
+        public OwnedConnectionInfo(ConnectionInfo connectionInfo, IReadOnlyList<IDisposable> ownedResources)
+        {
+            ConnectionInfo = connectionInfo ?? throw new ArgumentNullException(nameof(connectionInfo));
+            _ownedResources = ownedResources ?? throw new ArgumentNullException(nameof(ownedResources));
+        }
+
+        public ConnectionInfo ConnectionInfo { get; }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            DisposeOwnedResources(_ownedResources);
+        }
+    }
+
+    private sealed class OwnedSshClient : SshClient
+    {
+        private OwnedConnectionInfo? _ownedConnectionInfo;
+
+        public OwnedSshClient(OwnedConnectionInfo ownedConnectionInfo)
+            : base((ownedConnectionInfo ?? throw new ArgumentNullException(nameof(ownedConnectionInfo))).ConnectionInfo)
+        {
+            _ownedConnectionInfo = ownedConnectionInfo;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            try
+            {
+                base.Dispose(disposing);
+            }
+            finally
+            {
+                if (disposing)
+                {
+                    Interlocked.Exchange(ref _ownedConnectionInfo, null)?.Dispose();
+                }
+            }
+        }
+    }
+
+    private sealed class OwnedSftpClient : SftpClient
+    {
+        private OwnedConnectionInfo? _ownedConnectionInfo;
+
+        public OwnedSftpClient(OwnedConnectionInfo ownedConnectionInfo)
+            : base((ownedConnectionInfo ?? throw new ArgumentNullException(nameof(ownedConnectionInfo))).ConnectionInfo)
+        {
+            _ownedConnectionInfo = ownedConnectionInfo;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            try
+            {
+                base.Dispose(disposing);
+            }
+            finally
+            {
+                if (disposing)
+                {
+                    Interlocked.Exchange(ref _ownedConnectionInfo, null)?.Dispose();
+                }
+            }
+        }
     }
 }

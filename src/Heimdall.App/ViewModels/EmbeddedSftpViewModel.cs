@@ -1140,8 +1140,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 ct)
             .ConfigureAwait(false);
 
-        var connInfo = SshConnectionFactory.Create(_sshParams);
-        var ssh = new Renci.SshNet.SshClient(connInfo);
+        var ssh = SshConnectionFactory.CreateSshClient(_sshParams);
 
         SshConnectionFactory.AttachPinnedHostKeyVerification(
             ssh,

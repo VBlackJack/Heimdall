@@ -58,6 +58,24 @@ public sealed class SshConnectionFactoryTests
     private static IEnumerable<string> MethodTypeNames(IEnumerable<AuthenticationMethod> methods)
         => methods.Select(m => m.GetType().Name);
 
+    private static PrivateKeyFile GetSinglePrivateKeyFile(BaseClient client)
+    {
+        var method = Assert.Single(
+            client.ConnectionInfo.AuthenticationMethods.OfType<PrivateKeyAuthenticationMethod>());
+        var keyFile = Assert.Single(method.KeyFiles);
+        return Assert.IsType<PrivateKeyFile>(keyFile);
+    }
+
+    private static bool IsPrivateKeyFileDisposed(PrivateKeyFile keyFile)
+    {
+        var field = typeof(PrivateKeyFile).GetField(
+            "_isDisposed",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("PrivateKeyFile._isDisposed field not found.");
+
+        return Assert.IsType<bool>(field.GetValue(keyFile));
+    }
+
     [Fact]
     public void HostKeyVerificationEndpoint_WithoutLogicalIdentity_UsesTransportEndpoint()
     {
@@ -186,6 +204,68 @@ public sealed class SshConnectionFactoryTests
             Assert.Contains("PrivateKeyAuthenticationMethod", names);
             Assert.DoesNotContain("PasswordAuthenticationMethod", names);
             Assert.DoesNotContain("KeyboardInteractiveAuthenticationMethod", names);
+        }
+        finally
+        {
+            File.Delete(keyPath);
+        }
+    }
+
+    [Fact]
+    public void CreateSshClient_Dispose_DisposesPrivateKeyFile()
+    {
+        var keyPath = CreateTempRsaPrivateKeyFile();
+        var connParams = new SshConnectionParams
+        {
+            Host = "example.com",
+            Port = 22,
+            Username = "user",
+            KeyPath = keyPath
+        };
+
+        try
+        {
+            var client = SshConnectionFactory.CreateSshClient(
+                connParams,
+                new SshAgentRegistry(Array.Empty<ISshAgent>()));
+            var keyFile = GetSinglePrivateKeyFile(client);
+
+            Assert.False(IsPrivateKeyFileDisposed(keyFile));
+
+            client.Dispose();
+
+            Assert.True(IsPrivateKeyFileDisposed(keyFile));
+        }
+        finally
+        {
+            File.Delete(keyPath);
+        }
+    }
+
+    [Fact]
+    public void CreateSftpClient_Dispose_DisposesPrivateKeyFile()
+    {
+        var keyPath = CreateTempRsaPrivateKeyFile();
+        var connParams = new SshConnectionParams
+        {
+            Host = "example.com",
+            Port = 22,
+            Username = "user",
+            KeyPath = keyPath
+        };
+
+        try
+        {
+            var client = SshConnectionFactory.CreateSftpClient(
+                connParams,
+                new SshAgentRegistry(Array.Empty<ISshAgent>()));
+            var keyFile = GetSinglePrivateKeyFile(client);
+
+            Assert.False(IsPrivateKeyFileDisposed(keyFile));
+
+            client.Dispose();
+
+            Assert.True(IsPrivateKeyFileDisposed(keyFile));
         }
         finally
         {

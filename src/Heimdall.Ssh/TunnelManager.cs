@@ -163,11 +163,8 @@ public sealed partial class TunnelManager : IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            var connectionInfo = SshConnectionFactory.Create(gatewayParams);
-            context.FinalClient = new SshClient(connectionInfo)
-            {
-                KeepAliveInterval = TimeSpan.FromSeconds(keepAliveIntervalSeconds)
-            };
+            context.FinalClient = SshConnectionFactory.CreateSshClient(gatewayParams);
+            context.FinalClient.KeepAliveInterval = TimeSpan.FromSeconds(keepAliveIntervalSeconds);
 
             int reportedLocalPort = localPort;
             context.FinalClient.ErrorOccurred += (_, args) =>
@@ -295,7 +292,7 @@ public sealed partial class TunnelManager : IDisposable
                 .ConfigureAwait(false);
 
             // Connect to the first (root) gateway directly
-            var rootClient = new SshClient(SshConnectionFactory.Create(gatewayChain[0]));
+            var rootClient = SshConnectionFactory.CreateSshClient(gatewayChain[0]);
             context.IntermediateClients.Add(rootClient);
 
             await ConnectSshClientWithCancellationAsync(
@@ -343,7 +340,7 @@ public sealed partial class TunnelManager : IDisposable
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                var hopClient = new SshClient(SshConnectionFactory.Create(hopParams));
+                var hopClient = SshConnectionFactory.CreateSshClient(hopParams);
 
                 if (i < gatewayChain.Count - 1)
                 {
@@ -518,7 +515,7 @@ public sealed partial class TunnelManager : IDisposable
             return false;
         }
 
-        TunnelOpened?.Invoke(info);
+        RaiseTunnelOpened(info);
         return true;
     }
 
@@ -665,7 +662,7 @@ public sealed partial class TunnelManager : IDisposable
             error = ex.Message;
         }
 
-        TunnelClosed?.Invoke(localPort, error);
+        RaiseTunnelClosed(localPort, error);
     }
 
     /// <summary>
@@ -717,6 +714,44 @@ public sealed partial class TunnelManager : IDisposable
         int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
+    }
+
+    private void RaiseTunnelOpened(TunnelInfo info)
+    {
+        try
+        {
+            TunnelOpened?.Invoke(info);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Debug("TunnelManager.TunnelOpened subscriber failed", ex);
+        }
+    }
+
+    private void RaiseTunnelClosed(int localPort, string? error)
+    {
+        try
+        {
+            TunnelClosed?.Invoke(localPort, error);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Debug("TunnelManager.TunnelClosed subscriber failed", ex);
+        }
+    }
+
+    internal void RaiseForwardedPortFailed(TunnelForwardedPortFailure failure)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+
+        try
+        {
+            ForwardedPortFailed?.Invoke(failure);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Debug("TunnelManager.ForwardedPortFailed subscriber failed", ex);
+        }
     }
 
 }

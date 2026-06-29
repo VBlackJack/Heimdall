@@ -78,8 +78,7 @@ internal static class ToolGatewayConnector
                 preflight.Message ?? $"Authentication preflight failed for {gateway.Host}.");
         }
 
-        var connInfo = SshConnectionFactory.Create(connParams);
-        var client = new SshClient(connInfo);
+        var client = SshConnectionFactory.CreateSshClient(connParams);
         var (trustService, localizer) = ResolveHostKeyDependencies();
         var fingerprint = trustService.GetEffectiveEntry(gateway.Host, gateway.Port)?.Fingerprint
             ?? throw new InvalidOperationException(

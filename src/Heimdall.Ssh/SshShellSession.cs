@@ -121,8 +121,7 @@ public sealed class SshShellSession : IDisposable
                 cancellationToken)
             .ConfigureAwait(false);
 
-        var connectionInfo = SshConnectionFactory.Create(connectionParams);
-        _client = new SshClient(connectionInfo);
+        _client = SshConnectionFactory.CreateSshClient(connectionParams);
 
         SshConnectionFactory.AttachPinnedHostKeyVerification(
             _client,

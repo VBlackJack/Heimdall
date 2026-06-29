@@ -101,8 +101,7 @@ public sealed class SftpBrowser : IRemoteBrowser
                 ct)
             .ConfigureAwait(false);
 
-        var connectionInfo = SshConnectionFactory.Create(connectionParams);
-        var client = new SftpClient(connectionInfo);
+        var client = SshConnectionFactory.CreateSftpClient(connectionParams);
         if (connectionParams.KeepAliveIntervalSeconds is > 0)
         {
             client.KeepAliveInterval = TimeSpan.FromSeconds(connectionParams.KeepAliveIntervalSeconds.Value);
@@ -623,8 +622,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         SshClient? ssh = null;
         try
         {
-            var connectionInfo = SshConnectionFactory.Create(connectionParams);
-            ssh = new SshClient(connectionInfo);
+            ssh = SshConnectionFactory.CreateSshClient(connectionParams);
             SshConnectionFactory.AttachPinnedHostKeyVerification(ssh, connectionParams, pinnedVerifier);
 
             return await Task.Run(() =>

@@ -147,6 +147,145 @@ public sealed class RemoteFileEditorTaskTrackingTests
     }
 
     [Fact]
+    public async Task OnFileChangedAsync_FailedUpload_RearmsDebounceAndRetries()
+    {
+        var previousInterval = RemoteFileEditor.UploadDebounceInterval;
+        RemoteFileEditor.UploadDebounceInterval = TimeSpan.FromMilliseconds(50);
+
+        try
+        {
+            var attempts = 0;
+            var browser = new FakeRemoteBrowser((_, _, _) =>
+            {
+                if (Interlocked.Increment(ref attempts) == 1)
+                {
+                    return Task.FromException(new IOException("Transient upload failure."));
+                }
+
+                return Task.CompletedTask;
+            });
+            using var editor = CreateEditor(browser);
+            using var session = CreateSession();
+            var initialLastUploadTime = session.LastUploadTime;
+            DateTime? lastUploadTimeAfterFailure = null;
+            var uploadEvents = new List<(string RemotePath, bool Success)>();
+            editor.FileUploaded += (path, success) =>
+            {
+                uploadEvents.Add((path, success));
+                if (!success)
+                {
+                    lastUploadTimeAfterFailure = session.LastUploadTime;
+                }
+            };
+            session.DebounceTimer = new System.Threading.Timer(
+                _ => editor.TriggerOnFileChangedForTesting(session),
+                null,
+                Timeout.InfiniteTimeSpan,
+                Timeout.InfiniteTimeSpan);
+
+            editor.TriggerOnFileChangedForTesting(session);
+
+            await WaitUntilAsync(() => browser.UploadCallCount == 2 && uploadEvents.Count == 2);
+
+            Assert.Equal(2, attempts);
+            Assert.Equal(initialLastUploadTime, lastUploadTimeAfterFailure);
+            Assert.Equal(session.RemotePath, uploadEvents[0].RemotePath);
+            Assert.False(uploadEvents[0].Success);
+            Assert.Equal(session.RemotePath, uploadEvents[1].RemotePath);
+            Assert.True(uploadEvents[1].Success);
+            Assert.True(session.LastUploadTime > initialLastUploadTime);
+        }
+        finally
+        {
+            RemoteFileEditor.UploadDebounceInterval = previousInterval;
+        }
+    }
+
+    [Fact]
+    public async Task OnFileChangedAsync_SuccessfulUpload_AdvancesLastUploadTime()
+    {
+        var browser = new FakeRemoteBrowser();
+        using var editor = CreateEditor(browser);
+        using var session = CreateSession();
+        var initialLastUploadTime = session.LastUploadTime;
+
+        editor.TriggerOnFileChangedForTesting(session);
+        await WaitUntilAsync(() => session.CurrentUpload is not null);
+        await WaitForTaskAsync(session.CurrentUpload!);
+
+        Assert.Equal(1, browser.UploadCallCount);
+        Assert.True(session.LastUploadTime > initialLastUploadTime);
+    }
+
+    [Fact]
+    public async Task OnFileChangedAsync_Cancellation_DoesNotRetry()
+    {
+        var previousInterval = RemoteFileEditor.UploadDebounceInterval;
+        RemoteFileEditor.UploadDebounceInterval = TimeSpan.FromMilliseconds(50);
+
+        try
+        {
+            var browser = new FakeRemoteBrowser((_, _, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct));
+            using var editor = CreateEditor(browser);
+            using var session = CreateSession();
+            session.DebounceTimer = new System.Threading.Timer(
+                _ => editor.TriggerOnFileChangedForTesting(session),
+                null,
+                Timeout.InfiniteTimeSpan,
+                Timeout.InfiniteTimeSpan);
+
+            editor.TriggerOnFileChangedForTesting(session);
+            await WaitUntilAsync(() => browser.UploadCallCount == 1 && session.CurrentUpload is not null);
+
+            session.UploadCts.Cancel();
+            await WaitForTaskAsync(session.CurrentUpload!);
+            await Task.Delay(RemoteFileEditor.UploadDebounceInterval * 3);
+
+            Assert.Equal(1, browser.UploadCallCount);
+        }
+        finally
+        {
+            RemoteFileEditor.UploadDebounceInterval = previousInterval;
+        }
+    }
+
+    [Fact]
+    public async Task OnFileChangedAsync_HostKeyRejected_DoesNotRetry()
+    {
+        var previousInterval = RemoteFileEditor.UploadDebounceInterval;
+        RemoteFileEditor.UploadDebounceInterval = TimeSpan.FromMilliseconds(50);
+
+        try
+        {
+            var browser = new FakeRemoteBrowser((_, _, _) =>
+                throw new HostKeyRejectedException(
+                    "gw.example.com",
+                    22,
+                    "ssh-ed25519",
+                    "SHA256:BBB",
+                    "SHA256:AAA"));
+            using var editor = CreateEditor(browser);
+            using var session = CreateSession();
+            session.DebounceTimer = new System.Threading.Timer(
+                _ => editor.TriggerOnFileChangedForTesting(session),
+                null,
+                Timeout.InfiniteTimeSpan,
+                Timeout.InfiniteTimeSpan);
+
+            editor.TriggerOnFileChangedForTesting(session);
+            await WaitUntilAsync(() => session.CurrentUpload is not null);
+            await WaitForTaskAsync(session.CurrentUpload!);
+            await Task.Delay(RemoteFileEditor.UploadDebounceInterval * 3);
+
+            Assert.Equal(1, browser.UploadCallCount);
+        }
+        finally
+        {
+            RemoteFileEditor.UploadDebounceInterval = previousInterval;
+        }
+    }
+
+    [Fact]
     public async Task OnFileChangedAsync_NonSudoSave_DoesNotRaiseSudoSaveCompleted()
     {
         // A non-sudo save goes through the decorated browser (logged there); it must NOT raise the

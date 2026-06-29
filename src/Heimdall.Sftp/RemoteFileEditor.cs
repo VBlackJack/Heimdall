@@ -172,8 +172,7 @@ public sealed class RemoteFileEditor : IDisposable
                 .ConfigureAwait(false);
 
             // Download with sudo via SSH command
-            var connectionInfo = SshConnectionFactory.Create(sshParams);
-            using var sshClient = new SshClient(connectionInfo);
+            using var sshClient = SshConnectionFactory.CreateSshClient(sshParams);
 
             SshConnectionFactory.AttachPinnedHostKeyVerification(
                 sshClient,
@@ -433,7 +432,6 @@ public sealed class RemoteFileEditor : IDisposable
 
             enteredSemaphore = true;
             ct.ThrowIfCancellationRequested();
-            session.LastUploadTime = DateTime.UtcNow;
 
             if (session.IsSudo && session.SshParams is not null)
             {
@@ -460,6 +458,7 @@ public sealed class RemoteFileEditor : IDisposable
                     ct).ConfigureAwait(false);
             }
 
+            session.LastUploadTime = DateTime.UtcNow;
             success = true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -490,6 +489,7 @@ public sealed class RemoteFileEditor : IDisposable
             success = false;
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"RemoteFileEditor auto-upload failed for {session.RemotePath}: {ex.Message}");
+            ArmDebounceTimer(session);
         }
         finally
         {
@@ -571,9 +571,8 @@ public sealed class RemoteFileEditor : IDisposable
         string escapedPath = PathEscaper.EscapeForShell(session.RemotePath);
         string tempRemotePath = $"{RemoteTempPaths.Prefix}edit_{Guid.NewGuid():N}";
 
-        var connectionInfo = SshConnectionFactory.Create(session.SshParams);
-        using var sftpClient = new SftpClient(connectionInfo);
-        using var sshClient = new SshClient(connectionInfo);
+        using var sftpClient = SshConnectionFactory.CreateSftpClient(session.SshParams);
+        using var sshClient = SshConnectionFactory.CreateSshClient(session.SshParams);
 
         SshConnectionFactory.AttachPinnedHostKeyVerification(
             sftpClient,

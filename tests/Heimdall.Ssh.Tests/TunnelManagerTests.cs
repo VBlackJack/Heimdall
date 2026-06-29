@@ -633,6 +633,51 @@ public class TunnelManagerTests : IDisposable
         Assert.Contains(10002, closedPorts);
     }
 
+    [Fact]
+    public void TunnelOpened_SubscriberThrows_DoesNotEscapeAndKeepsTunnelRegistered()
+    {
+        _manager.TunnelOpened += _ => throw new InvalidOperationException("Test subscriber failure.");
+
+        Exception? exception = Record.Exception(() => RegisterFake(10001));
+
+        Assert.Null(exception);
+        Assert.True(_manager.HasTunnel(10001));
+    }
+
+    [Fact]
+    public void TunnelClosed_SubscriberThrows_DoesNotEscapeAndRemovesTunnel()
+    {
+        _manager.TunnelClosed += (_, _) => throw new InvalidOperationException("Test subscriber failure.");
+        RegisterFake(10001);
+
+        Exception? exception = Record.Exception(() => _manager.ForceCloseTunnel(10001));
+
+        Assert.Null(exception);
+        Assert.False(_manager.HasTunnel(10001));
+    }
+
+    [Fact]
+    public void ForwardedPortFailed_SubscriberThrows_DoesNotEscape()
+    {
+        var calls = 0;
+        _manager.ForwardedPortFailed += _ =>
+        {
+            calls++;
+            throw new InvalidOperationException("Test subscriber failure.");
+        };
+
+        Exception? exception = Record.Exception(() => _manager.RaiseForwardedPortFailed(
+            new TunnelForwardedPortFailure(
+                LocalPort: 10001,
+                RemoteHost: "target.internal",
+                RemotePort: 3389,
+                Message: "Synthetic forwarded port failure.",
+                OccurredAtUtc: DateTimeOffset.UtcNow)));
+
+        Assert.Null(exception);
+        Assert.Equal(1, calls);
+    }
+
     // ── Dispose ───────────────────────────────────────────────────────
 
     [Fact]

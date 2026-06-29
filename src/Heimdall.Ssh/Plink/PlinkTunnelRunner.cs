@@ -172,10 +172,16 @@ public sealed class PlinkTunnelRunner : IDisposable
         {
             try
             {
-                while (_process is { HasExited: false } && _process.StandardError is not null)
+                while (true)
                 {
+                    var proc = _process;
+                    if (proc is null || proc.HasExited || proc.StandardError is null)
+                    {
+                        break;
+                    }
+
                     drainToken.ThrowIfCancellationRequested();
-                    var line = await _process.StandardError.ReadLineAsync(drainToken).ConfigureAwait(false);
+                    var line = await proc.StandardError.ReadLineAsync(drainToken).ConfigureAwait(false);
                     if (line is null) break;
                     if (!string.IsNullOrWhiteSpace(line))
                     {

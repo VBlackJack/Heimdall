@@ -97,7 +97,7 @@ public sealed partial class TunnelManager
             Core.Logging.FileLogger.Error(
                 $"SSH forwarded port {reportedLocalPort} -> {remoteHost}:{remotePort} "
                 + $"exception: {args.Exception.Message}");
-            ForwardedPortFailed?.Invoke(new TunnelForwardedPortFailure(
+            RaiseForwardedPortFailed(new TunnelForwardedPortFailure(
                 reportedLocalPort,
                 remoteHost,
                 remotePort,
@@ -218,7 +218,7 @@ public sealed partial class TunnelManager
             return new TunnelResult(false, null, $"Local port {localPort} was claimed concurrently.", SshFailureCode.PortInUse);
         }
 
-        TunnelOpened?.Invoke(info);
+        RaiseTunnelOpened(info);
         return new TunnelResult(true, info, null, null);
     }
 
