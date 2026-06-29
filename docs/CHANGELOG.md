@@ -12,6 +12,101 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-06-29: Master password vault, Windows Hello unlock, macros and file-browser workflows
+
+Merged to `master` since v2026.062601; intended for the next release.
+
+### Master password vault (encryption at rest)
+
+- **Versioned crypto envelope.** New vault primitives: Argon2id key derivation and
+  AES-256-GCM with a versioned envelope, validated against known-answer tests
+  (`d128da0c`).
+- **DEK/KEK orchestration.** A data-encryption key is wrapped by a master-password
+  key-encryption key; `CredentialProtector` is now version-aware and backward
+  compatible with legacy DPAPI blobs (`257f4112`).
+- **Lifecycle and migration.** Enable, change, and disable the master password, with
+  a migration engine that re-wraps existing credentials (`7618d5ce`).
+- **Atomic config writes.** `ConfigManager` writes are now temp-then-rename atomic so
+  a crash mid-write cannot corrupt the vault (`17c0096e`).
+- **Startup unlock gate.** When a master password is set, the workspace is locked at
+  launch behind an unlock gate before any credential is usable (`6921282d`).
+- **Vault management UI.** Settings cards to enable / change / disable the master
+  password (`738a5f58`); the Command Library Git-token reader is now vault-aware
+  (`817ce185`).
+
+### Windows Hello vault unlock
+
+- **Unlock the vault with Windows Hello.** Optional convenience: a TPM-bound Hello
+  key (sign -> HKDF -> AES-GCM, AAD-bound, composed with DPAPI) wraps the DEK so the
+  vault can be unlocked by biometric/PIN instead of retyping the master password;
+  fail-closed with a master-password fallback (`dc4df107`). Enroll / remove cards in
+  Settings (gated on TPM presence) and a fingerprint unlock button on the gate and
+  lock overlay (`d0b8947e`). Confirmed to survive a machine reboot.
+
+### Workspace lock
+
+- **Lock the workspace.** Manual lock plus idle auto-lock (`AutoLockIdleMinutes`) with
+  a lock overlay; locked sessions survive and are masked rather than disconnected, with
+  an opt-in disconnect-on-lock (`f12421a8`).
+
+### Expect macros
+
+- **Wait-for-pattern playback.** Macros can wait for an expected output pattern before
+  sending the next step (expect-style), with a macro editor to author expect steps
+  (`16df054f`, `cb052a31`).
+
+### Per-profile session logging
+
+- **Tri-state per-profile override.** Session logging can be forced on, forced off, or
+  inherit the global setting per server profile, exposed as a combo in the server
+  dialog (`45a8016c`, `cf1fd484`).
+
+### File browser (SFTP / FTP)
+
+- **Copy primitive.** New no-overwrite `CopyAsync` on the remote browser: server-side
+  `cp` (host-key-pinned) with a roundtrip fallback for SFTP, recursive roundtrip for
+  FTP, journaled as a single Copy record (`b31f79ea`).
+- **Cut / Copy / Paste / Duplicate.** Per-pane clipboard, cross-directory move, and
+  non-destructive collision handling in the file-browser context menu (`9e5c827b`,
+  robustness fix `43975309`).
+- **Recursive folder upload + drop-into-folder.** Dropped folders upload recursively,
+  and a drop onto a folder row targets that folder (`ba373ed8`).
+- **Cross-pane copy/paste.** Paste between panes on the same server, then across
+  different servers (download-temp + upload), with cut semantics preserved
+  (`35acd9ca`, `18c537db`).
+- **Paste from Explorer.** A dedicated context-menu entry uploads files/folders from
+  the Windows clipboard (CF_HDROP) into the current remote directory (`bd149293`).
+- **Operations journal.** SFTP/FTP transfers (download, upload, mkdir, delete, rename,
+  copy) are journaled at the view/view-model boundary (`3ecac1a7`, `db79ab36`).
+
+### Fixed / internal
+
+- **Editor.** Guard against cyclic AvalonEdit rule-sets in the Dracula syntax palette
+  (`10358c12`).
+- **UI.** Context menus render uniformly text-only (`b8cbb0b1`).
+- **Dependencies.** Bump `System.Security.Cryptography.ProtectedData` 10.0.5 -> 10.0.9
+  (`12de9dfc`).
+- **Validation.** Blocking CI is green; the RequiresDesktop UIA pass remains
+  non-blocking.
+
+## 2026-06-26: v2026.062601 - MultiExec, global session logging, enriched context menus
+
+Released as v2026.062601.
+
+- **MultiExec / broadcast.** Send keystrokes to multiple sessions at once with scope
+  modes (current tab / all tabs / selected panes), per-tab and per-pane targeting, a
+  scope indicator, and a confirmation before a wide broadcast; fan-out routed through
+  the smart-paste guard.
+- **Global session logging.** A single global toggle: per-session text transcripts for
+  SSH / Telnet / Local Shell, and a connect/disconnect event log (reason + duration)
+  for RDP / VNC / Citrix; shared NDJSON event log, size rollover, restrictive ACLs.
+- **Enriched context menus.** Server-tree and session-tab context menus gained copy
+  address / copy SSH command / test reachability, close-others / close-to-right /
+  reveal-in-tree, rename / pin, open-in-split, and connect-as.
+- **Fixed.** Replay ConPTY bootstrap output to late subscribers so the Local Shell /
+  WinRM initial prompt is no longer dropped; apply inherited ConnectionType /
+  Environment and fix group-defaults precedence.
+
 ## 2026-06-24: KeePassXC key-file authentication
 
 Added key-file (`.keyx`/`.key`) authentication for the external credential
