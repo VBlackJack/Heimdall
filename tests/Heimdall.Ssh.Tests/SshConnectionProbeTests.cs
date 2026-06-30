@@ -22,12 +22,15 @@ namespace Heimdall.Ssh.Tests;
 
 public sealed class SshConnectionProbeTests
 {
+    private const int ClosedPortProbeTimeoutMs = 1000;
+    private const int LocalServerProbeTimeoutMs = 5000;
+
     [Fact]
     public async Task ProbeAsync_ClosedPort_ReturnsNetworkFailure()
     {
         var port = GetClosedLoopbackPort();
 
-        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, 1000);
+        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, ClosedPortProbeTimeoutMs);
 
         Assert.False(result.Success);
         Assert.True(
@@ -44,7 +47,7 @@ public sealed class SshConnectionProbeTests
     {
         var (port, serverTask) = StartSingleResponseServer("");
 
-        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, 1000);
+        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, LocalServerProbeTimeoutMs);
         await serverTask;
 
         Assert.False(result.Success);
@@ -59,7 +62,7 @@ public sealed class SshConnectionProbeTests
     {
         var (port, serverTask) = StartSingleResponseServer("HTTP/1.1 200 OK\r\n");
 
-        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, 1000);
+        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, LocalServerProbeTimeoutMs);
         await serverTask;
 
         Assert.False(result.Success);
@@ -75,7 +78,7 @@ public sealed class SshConnectionProbeTests
         const string banner = "Acc\u00e8s refus\u00e9";
         var (port, serverTask) = StartSingleResponseServer(banner + "\r\n");
 
-        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, 1000);
+        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, LocalServerProbeTimeoutMs);
         await serverTask;
 
         Assert.False(result.Success);
@@ -89,10 +92,12 @@ public sealed class SshConnectionProbeTests
     {
         var (port, serverTask) = StartSingleResponseServer("Authorized access only\r\nSSH-2.0-OpenSSH_9\r\n");
 
-        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, 1000);
+        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, LocalServerProbeTimeoutMs);
         await serverTask;
 
-        Assert.True(result.Success);
+        Assert.True(
+            result.Success,
+            $"Expected probe success, got {result.FailureCode} with banner '{result.Banner}' and message key '{result.MessageKey}'.");
         Assert.Equal("SSH-2.0-OpenSSH_9", result.Banner);
         Assert.Null(result.FailureCode);
         Assert.Null(result.MessageKey);
@@ -104,7 +109,7 @@ public sealed class SshConnectionProbeTests
     {
         var (port, serverTask) = StartSingleResponseServer("SSH-2.0-MockServer\r\n");
 
-        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, 1000);
+        var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, LocalServerProbeTimeoutMs);
         await serverTask;
 
         Assert.True(result.Success);
