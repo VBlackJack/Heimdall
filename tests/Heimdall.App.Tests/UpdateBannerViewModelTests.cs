@@ -474,6 +474,9 @@ public sealed class UpdateBannerViewModelTests
 
         public Task<List<ServerProfileDto>> LoadServersAsync() => throw new NotSupportedException();
 
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate) =>
+            throw new NotSupportedException();
+
         public Task SaveServersAsync(List<ServerProfileDto> servers) => throw new NotSupportedException();
     }
 }

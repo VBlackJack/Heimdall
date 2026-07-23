@@ -229,6 +229,39 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public async Task BulkMutation_StillSavesBeforeUpdatingVms_AndRestoresSelectionById()
+    {
+        var configManager = new FailingSaveConfigManager();
+        await using var fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            configManager: configManager);
+        await fixture.LoadServersAsync(
+            fixture.ExpandGroups("ops", "ops/source", "ops/target"),
+            CreateServer("alpha", "Alpha", "ops/source"),
+            CreateServer("beta", "Beta", "ops/source"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        bool observedPreSaveState = false;
+        configManager.BeforeSaveServers = () =>
+        {
+            observedPreSaveState = true;
+            Assert.Equal("ops/source", fixture.ServerById("alpha").Group);
+            Assert.Equal("ops/source", fixture.ServerById("beta").Group);
+            AssertSelection(fixture.ViewModel, "alpha", "beta");
+            Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
+        };
+
+        await fixture.ViewModel.MoveSelectedToGroupCommand.ExecuteAsync(
+            new BulkMoveToGroupRequest("ops/target"));
+
+        Assert.True(observedPreSaveState);
+        Assert.Equal("ops/target", fixture.ServerById("alpha").Group);
+        Assert.Equal("ops/target", fixture.ServerById("beta").Group);
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
+    }
+
+    [Fact]
     public async Task MoveSelectedToGroupAsync_MovesToolEntriesToo()
     {
         await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
@@ -1642,7 +1675,7 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
-    public async Task UpdateGatewayReferences_PreservesVmIdentityAndMultiSelection()
+    public async Task BulkMutation_PreservesVmIdentity_ViaUpdateFromDto()
     {
         await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
         AppSettings settings = fixture.ExpandGroups("ops");
@@ -2166,6 +2199,8 @@ public sealed class ServerListBulkActionTests
 
         public int SaveServersCallCount { get; private set; }
 
+        public Action? BeforeSaveServers { get; set; }
+
         public string ConfigPath => "mem://config";
 
         public string SettingsPath => "mem://settings.json";
@@ -2196,6 +2231,28 @@ public sealed class ServerListBulkActionTests
         }
 
         public Task<List<ServerProfileDto>> LoadServersAsync() => Task.FromResult(_servers.Select(CloneServer).ToList());
+
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+        {
+            List<ServerProfileDto> servers = _servers.Select(CloneServer).ToList();
+            string originalJson = System.Text.Json.JsonSerializer.Serialize(servers);
+            TResult result = mutate(servers);
+            string mutatedJson = System.Text.Json.JsonSerializer.Serialize(servers);
+            if (string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
+            {
+                return Task.FromResult(result);
+            }
+
+            BeforeSaveServers?.Invoke();
+            if (FailOnSaveServers)
+            {
+                throw new IOException("Simulated SaveServersAsync failure");
+            }
+
+            SaveServersCallCount++;
+            _servers = servers.Select(CloneServer).ToList();
+            return Task.FromResult(result);
+        }
 
         public Task SaveServersAsync(List<ServerProfileDto> servers)
         {
@@ -2250,6 +2307,27 @@ public sealed class ServerListBulkActionTests
 
         public Task<List<ServerProfileDto>> LoadServersAsync() =>
             Task.FromResult(_servers.Select(CloneUsernameServer).ToList());
+
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+        {
+            List<ServerProfileDto> servers = _servers.Select(CloneUsernameServer).ToList();
+            string originalJson = System.Text.Json.JsonSerializer.Serialize(servers);
+            TResult result = mutate(servers);
+            string mutatedJson = System.Text.Json.JsonSerializer.Serialize(servers);
+            if (string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
+            {
+                return Task.FromResult(result);
+            }
+
+            if (FailOnSaveServers)
+            {
+                throw new IOException("Simulated SaveServersAsync failure");
+            }
+
+            SaveServersCallCount++;
+            _servers = servers.Select(CloneUsernameServer).ToList();
+            return Task.FromResult(result);
+        }
 
         public Task SaveServersAsync(List<ServerProfileDto> servers)
         {

@@ -50,6 +50,8 @@ public sealed class ConfigManager : IConfigManager
     private readonly string _settingsDefaultPath;
     private readonly string _serversDefaultPath;
     private readonly string _logsPath;
+    // Process-local serialization only. TODO: add cross-process locking and revision/CAS
+    // before supporting multiple Heimdall instances that share one configuration directory.
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     /// <summary>
@@ -169,19 +171,17 @@ public sealed class ConfigManager : IConfigManager
     /// </summary>
     public async Task<AppSettings> LoadSettingsAsync()
     {
-        if (!File.Exists(_settingsPath))
+        await _writeLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            var defaults = new AppSettings();
-            CurrentSettings = defaults;
-            return defaults;
+            AppSettings settings = await LoadSettingsInternalAsync().ConfigureAwait(false);
+            CurrentSettings = settings;
+            return settings;
         }
-
-        var json = await File.ReadAllTextAsync(_settingsPath, Utf8NoBom)
-            .ConfigureAwait(false);
-        var settings = JsonSerializer.Deserialize<AppSettings>(json, ReadOptions) ?? new AppSettings();
-        NormalizeTrustedHostKeys(settings);
-        CurrentSettings = settings;
-        return settings;
+        finally
+        {
+            _writeLock.Release();
+        }
     }
 
     /// <summary>
@@ -197,13 +197,13 @@ public sealed class ConfigManager : IConfigManager
             NormalizeTrustedHostKeys(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
+            CurrentSettings = settings;
         }
         finally
         {
             _writeLock.Release();
         }
 
-        CurrentSettings = settings;
         SettingsChanged?.Invoke(settings);
     }
 
@@ -302,13 +302,13 @@ public sealed class ConfigManager : IConfigManager
             mutate(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
+            CurrentSettings = settings;
         }
         finally
         {
             _writeLock.Release();
         }
 
-        CurrentSettings = settings;
         SettingsChanged?.Invoke(settings);
     }
 
@@ -371,6 +371,43 @@ public sealed class ConfigManager : IConfigManager
     /// </summary>
     public async Task<List<ServerProfileDto>> LoadServersAsync()
     {
+        return await LoadServersInternalAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Atomically loads, mutates, and persists the server inventory under the process-local
+    /// write lock. The synchronous delegate must not call back into this manager.
+    /// </summary>
+    public async Task<TResult> MutateServersAsync<TResult>(
+        Func<List<ServerProfileDto>, TResult> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+
+        await _writeLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            List<ServerProfileDto> servers = await LoadServersInternalAsync().ConfigureAwait(false);
+            string originalJson = JsonSerializer.Serialize(servers, JsonOptions);
+            TResult result = mutate(servers);
+            string mutatedJson = JsonSerializer.Serialize(servers, JsonOptions);
+            if (!string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
+            {
+                await SaveServersInternalAsync(servers).ConfigureAwait(false);
+            }
+
+            return result;
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Loads the server inventory without acquiring the write lock.
+    /// </summary>
+    private async Task<List<ServerProfileDto>> LoadServersInternalAsync()
+    {
         if (!File.Exists(_serversPath))
         {
             return new List<ServerProfileDto>();
@@ -404,19 +441,27 @@ public sealed class ConfigManager : IConfigManager
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            foreach (var server in servers)
-            {
-                PostConnectMigration.PrepareForSave(server);
-                RdpResolutionProfileMigration.PrepareForSave(server);
-            }
-
-            var json = JsonSerializer.Serialize(servers, JsonOptions);
-            await WriteTextAsync(_serversPath, json).ConfigureAwait(false);
+            await SaveServersInternalAsync(servers).ConfigureAwait(false);
         }
         finally
         {
             _writeLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Persists the server inventory without acquiring the write lock.
+    /// </summary>
+    private async Task SaveServersInternalAsync(List<ServerProfileDto> servers)
+    {
+        foreach (var server in servers)
+        {
+            PostConnectMigration.PrepareForSave(server);
+            RdpResolutionProfileMigration.PrepareForSave(server);
+        }
+
+        var json = JsonSerializer.Serialize(servers, JsonOptions);
+        await WriteTextAsync(_serversPath, json).ConfigureAwait(false);
     }
 
     /// <summary>

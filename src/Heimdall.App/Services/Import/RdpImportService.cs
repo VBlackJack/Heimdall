@@ -148,85 +148,85 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         ArgumentNullException.ThrowIfNull(preview);
         ArgumentNullException.ThrowIfNull(selection);
 
-        var inventory = await _configManager.LoadServersAsync();
         var previewMap = preview.Entries.ToDictionary(entry => entry.SourceFilePath, StringComparer.OrdinalIgnoreCase);
-        var warnings = new List<string>();
-        var importedCount = 0;
-        var replacedCount = 0;
-        var renamedCount = 0;
-        var skippedCount = 0;
-        var passwordsIgnoredCount = 0;
-
-        foreach (var selectionEntry in selection.Entries)
+        return await _configManager.MutateServersAsync(inventory =>
         {
-            ct.ThrowIfCancellationRequested();
+            var warnings = new List<string>();
+            var importedCount = 0;
+            var replacedCount = 0;
+            var renamedCount = 0;
+            var skippedCount = 0;
+            var passwordsIgnoredCount = 0;
 
-            if (!selectionEntry.IsSelected ||
-                !previewMap.TryGetValue(selectionEntry.SourceFilePath, out var previewEntry))
+            foreach (RdpImportSelectionEntry selectionEntry in selection.Entries)
             {
-                continue;
-            }
+                ct.ThrowIfCancellationRequested();
 
-            if (previewEntry.HasParseError)
-            {
-                skippedCount++;
-                warnings.Add(previewEntry.ParseErrorMessage ?? previewEntry.SourceFilePath);
-                continue;
-            }
-
-            if (previewEntry.HasPasswordBlob)
-            {
-                passwordsIgnoredCount++;
-            }
-
-            var currentName = previewEntry.Candidate.DisplayName;
-            var existingIndex = inventory.FindIndex(server =>
-                string.Equals(server.DisplayName, currentName, StringComparison.OrdinalIgnoreCase));
-
-            if (existingIndex >= 0)
-            {
-                switch (selectionEntry.ConflictResolution)
+                if (!selectionEntry.IsSelected ||
+                    !previewMap.TryGetValue(selectionEntry.SourceFilePath, out RdpImportPreviewEntry? previewEntry))
                 {
-                    case RdpConflictResolution.Skip:
-                        skippedCount++;
-                        continue;
-
-                    case RdpConflictResolution.Replace:
-                        inventory[existingIndex] = ReplaceExisting(inventory[existingIndex], previewEntry.Candidate);
-                        replacedCount++;
-                        LogImport(previewEntry, "replaced");
-                        continue;
-
-                    case RdpConflictResolution.AutoRename:
-                        {
-                            var renamed = CloneCandidate(previewEntry.Candidate);
-                            renamed.DisplayName = BuildAutoRename(renamed.DisplayName, inventory);
-                            inventory.Add(renamed);
-                            importedCount++;
-                            renamedCount++;
-                            LogImport(previewEntry, $"renamed to '{renamed.DisplayName}'");
-                            continue;
-                        }
+                    continue;
                 }
+
+                if (previewEntry.HasParseError)
+                {
+                    skippedCount++;
+                    warnings.Add(previewEntry.ParseErrorMessage ?? previewEntry.SourceFilePath);
+                    continue;
+                }
+
+                if (previewEntry.HasPasswordBlob)
+                {
+                    passwordsIgnoredCount++;
+                }
+
+                var currentName = previewEntry.Candidate.DisplayName;
+                var existingIndex = inventory.FindIndex(server =>
+                    string.Equals(server.DisplayName, currentName, StringComparison.OrdinalIgnoreCase));
+
+                if (existingIndex >= 0)
+                {
+                    switch (selectionEntry.ConflictResolution)
+                    {
+                        case RdpConflictResolution.Skip:
+                            skippedCount++;
+                            continue;
+
+                        case RdpConflictResolution.Replace:
+                            inventory[existingIndex] = ReplaceExisting(inventory[existingIndex], previewEntry.Candidate);
+                            replacedCount++;
+                            LogImport(previewEntry, "replaced");
+                            continue;
+
+                        case RdpConflictResolution.AutoRename:
+                            {
+                                var renamed = CloneCandidate(previewEntry.Candidate);
+                                renamed.DisplayName = BuildAutoRename(renamed.DisplayName, inventory);
+                                inventory.Add(renamed);
+                                importedCount++;
+                                renamedCount++;
+                                LogImport(previewEntry, $"renamed to '{renamed.DisplayName}'");
+                                continue;
+                            }
+                    }
+                }
+
+                var candidate = CloneCandidate(previewEntry.Candidate);
+                inventory.Add(candidate);
+                importedCount++;
+                LogImport(previewEntry, "imported");
             }
 
-            var candidate = CloneCandidate(previewEntry.Candidate);
-            inventory.Add(candidate);
-            importedCount++;
-            LogImport(previewEntry, "imported");
-        }
-
-        await _configManager.SaveServersAsync(inventory);
-
-        return new RdpImportResult
-        {
-            ImportedCount = importedCount,
-            ReplacedCount = replacedCount,
-            RenamedCount = renamedCount,
-            SkippedCount = skippedCount,
-            PasswordsIgnoredCount = passwordsIgnoredCount,
-            Warnings = warnings
-        };
+            return new RdpImportResult
+            {
+                ImportedCount = importedCount,
+                ReplacedCount = replacedCount,
+                RenamedCount = renamedCount,
+                SkippedCount = skippedCount,
+                PasswordsIgnoredCount = passwordsIgnoredCount,
+                Warnings = warnings
+            };
+        });
     }
 
     private static ServerProfileDto CreateCandidate(string proposedName) =>

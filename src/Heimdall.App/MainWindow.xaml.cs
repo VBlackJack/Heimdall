@@ -695,9 +695,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 Group = string.IsNullOrWhiteSpace(group) ? null : group
             };
 
-            var servers = await vm.ConfigManager.LoadServersAsync();
-            servers.Add(dto);
-            await vm.ConfigManager.SaveServersAsync(servers);
+            List<Core.Configuration.ServerProfileDto> servers =
+                await vm.ConfigManager.MutateServersAsync(inventory =>
+                {
+                    inventory.Add(dto);
+                    return inventory;
+                });
 
             var settings = await vm.ConfigManager.LoadSettingsAsync();
             vm.ServerList.LoadServers(servers, settings);
@@ -2351,31 +2354,39 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
-        var servers = await vm.ConfigManager.LoadServersAsync();
-        var server = servers.FirstOrDefault(
-            s => string.Equals(s.Id, lookupId, StringComparison.Ordinal));
-        if (server is null)
+        var choice = rdpView.GetCurrentResolutionChoice();
+        bool updated = await vm.ConfigManager.MutateServersAsync(servers =>
+        {
+            Core.Configuration.ServerProfileDto? server = servers.FirstOrDefault(
+                candidate => string.Equals(candidate.Id, lookupId, StringComparison.Ordinal));
+            if (server is null)
+            {
+                return false;
+            }
+
+            if (choice.Kind == ResolutionChoiceKind.Fixed)
+            {
+                server.RdpResolutionMode = RdpResolutionMode.Fixed;
+                server.RdpFixedWidth = choice.Width;
+                server.RdpFixedHeight = choice.Height;
+            }
+            else
+            {
+                server.RdpResolutionMode = RdpResolutionMode.FitWindow;
+                server.RdpFixedWidth = 0;
+                server.RdpFixedHeight = 0;
+                server.RdpDynamicResolution = true;
+            }
+
+            return true;
+        });
+
+        if (!updated)
         {
             vm.StatusText = vm.Localize("RdpResolutionSaveDefaultUnavailable");
             return;
         }
 
-        var choice = rdpView.GetCurrentResolutionChoice();
-        if (choice.Kind == ResolutionChoiceKind.Fixed)
-        {
-            server.RdpResolutionMode = RdpResolutionMode.Fixed;
-            server.RdpFixedWidth = choice.Width;
-            server.RdpFixedHeight = choice.Height;
-        }
-        else
-        {
-            server.RdpResolutionMode = RdpResolutionMode.FitWindow;
-            server.RdpFixedWidth = 0;
-            server.RdpFixedHeight = 0;
-            server.RdpDynamicResolution = true;
-        }
-
-        await vm.ConfigManager.SaveServersAsync(servers);
         vm.StatusText = vm.Localize("RdpResolutionSaveDefaultDone");
     }
 

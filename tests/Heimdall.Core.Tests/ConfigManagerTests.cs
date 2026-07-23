@@ -457,6 +457,88 @@ public class ConfigManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task MutateServersAsync_HoldsLockAcrossLoadMutateWrite()
+    {
+        await _manager.SaveServersAsync([]);
+        using var firstMutationEntered = new ManualResetEventSlim();
+        using var releaseFirstMutation = new ManualResetEventSlim();
+        var secondMutationEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<bool> firstMutation = Task.Run(() => _manager.MutateServersAsync(servers =>
+        {
+            firstMutationEntered.Set();
+            Assert.True(releaseFirstMutation.Wait(TimeSpan.FromSeconds(5)));
+            servers.Add(new ServerProfileDto
+            {
+                Id = "first",
+                DisplayName = "First",
+                RemoteServer = "first.example.test"
+            });
+            return true;
+        }));
+
+        Assert.True(firstMutationEntered.Wait(TimeSpan.FromSeconds(5)));
+
+        Task<bool> secondMutation = _manager.MutateServersAsync(servers =>
+        {
+            secondMutationEntered.TrySetResult();
+            Assert.Contains(servers, server => server.Id == "first");
+            return true;
+        });
+
+        await Task.Delay(100);
+        Assert.False(secondMutationEntered.Task.IsCompleted);
+
+        releaseFirstMutation.Set();
+        await Task.WhenAll(firstMutation, secondMutation);
+        Assert.True(secondMutationEntered.Task.IsCompleted);
+    }
+
+    [Fact]
+    public async Task ConcurrentInventoryMutations_BothDeltasSurvive()
+    {
+        await _manager.SaveServersAsync([]);
+        using var firstMutationEntered = new ManualResetEventSlim();
+        using var releaseFirstMutation = new ManualResetEventSlim();
+
+        Task<string> firstMutation = Task.Run(() => _manager.MutateServersAsync(servers =>
+        {
+            firstMutationEntered.Set();
+            Assert.True(releaseFirstMutation.Wait(TimeSpan.FromSeconds(5)));
+            servers.Add(new ServerProfileDto
+            {
+                Id = "alpha",
+                DisplayName = "Alpha",
+                RemoteServer = "alpha.example.test"
+            });
+            return "alpha";
+        }));
+
+        Assert.True(firstMutationEntered.Wait(TimeSpan.FromSeconds(5)));
+
+        Task<string> secondMutation = _manager.MutateServersAsync(servers =>
+        {
+            servers.Add(new ServerProfileDto
+            {
+                Id = "beta",
+                DisplayName = "Beta",
+                RemoteServer = "beta.example.test"
+            });
+            return "beta";
+        });
+
+        releaseFirstMutation.Set();
+        await Task.WhenAll(firstMutation, secondMutation);
+
+        string[] persistedIds = (await _manager.LoadServersAsync())
+            .Select(server => server.Id)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(["alpha", "beta"], persistedIds);
+    }
+
+    [Fact]
     public async Task LoadServersAsync_DeserializesValidJson()
     {
         var configDir = Path.Combine(_tempDir, "config");
@@ -866,6 +948,38 @@ public class ConfigManagerTests : IDisposable
         Assert.False(
             bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF,
             "File should not contain UTF-8 BOM");
+    }
+
+    [Fact]
+    public async Task Settings_StaleLoad_DoesNotOverwriteNewerSave()
+    {
+        await _manager.SaveSettingsAsync(new AppSettings { DefaultTheme = "Old" });
+        await _manager.SaveServersAsync([]);
+        using var lockHolderEntered = new ManualResetEventSlim();
+        using var releaseLockHolder = new ManualResetEventSlim();
+        Task lockHolder = Task.Run(() => _manager.MutateServersAsync(servers =>
+        {
+            lockHolderEntered.Set();
+            Assert.True(releaseLockHolder.Wait(TimeSpan.FromSeconds(5)));
+            return servers.Count;
+        }));
+        Assert.True(lockHolderEntered.Wait(TimeSpan.FromSeconds(5)));
+
+        var newerSettings = new AppSettings { DefaultTheme = "New" };
+        Task newerSave = _manager.SaveSettingsAsync(newerSettings);
+        Task<AppSettings> potentiallyStaleLoad = _manager.LoadSettingsAsync();
+
+        await Task.Delay(100);
+        Assert.False(newerSave.IsCompleted);
+        Assert.False(potentiallyStaleLoad.IsCompleted);
+
+        releaseLockHolder.Set();
+
+        await Task.WhenAll(lockHolder, potentiallyStaleLoad, newerSave);
+
+        AppSettings persisted = await _manager.LoadSettingsAsync();
+        Assert.Equal("New", persisted.DefaultTheme);
+        Assert.Equal("New", _manager.CurrentSettings?.DefaultTheme);
     }
 
     // ── File ACL enforcement ───────────────────────────────────────────

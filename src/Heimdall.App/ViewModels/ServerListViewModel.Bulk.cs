@@ -376,7 +376,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var cloneIds = new List<string>(selectedServers.Count);
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (cloneIds.Count == 0)
         {
@@ -393,7 +393,7 @@ public partial class ServerListViewModel
 
         return cloneViewModels;
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -405,7 +405,7 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"DuplicateServersCoreAsync aborted because {ids.Count - dtoMap.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             var existingNames = _allServers
@@ -435,12 +435,12 @@ public partial class ServerListViewModel
 
             if (clones.Count == 0)
             {
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             serverDtos.AddRange(clones);
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
                 Array.Empty<(ServerItemViewModel OldVm, ServerProfileDto NewDto)>(),
                 clones,
@@ -448,7 +448,7 @@ public partial class ServerListViewModel
                 cloneIds[^1],
                 cloneIds[^1],
                 null,
-                null));
+                null);
         }
     }
 
@@ -488,7 +488,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var updatedCount = 0;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (updatedCount > 0)
         {
@@ -496,7 +496,7 @@ public partial class ServerListViewModel
                 $"EditPortServersCoreAsync updated port to {newPort} for {updatedCount} item(s) in a single transaction.");
         }
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -508,7 +508,7 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"EditPortServersCoreAsync aborted because {ids.Count - dtoMap.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             foreach (var server in dirtyServers)
@@ -518,7 +518,7 @@ public partial class ServerListViewModel
 
             updatedCount = dirtyServers.Count;
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
                 dirtyServers
                     .Select(server => (OldVm: server, NewDto: dtoMap[server.Id]))
@@ -528,7 +528,7 @@ public partial class ServerListViewModel
                 primarySelectionId,
                 null,
                 "StatusBulkPortUpdated",
-                [updatedCount]));
+                [updatedCount]);
         }
     }
 
@@ -569,7 +569,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var updatedCount = 0;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (updatedCount > 0)
         {
@@ -577,7 +577,7 @@ public partial class ServerListViewModel
                 $"EditUsernameServersCoreAsync updated username for {updatedCount} item(s) in a single transaction.");
         }
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -589,7 +589,7 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"EditUsernameServersCoreAsync aborted because {ids.Count - dtoMap.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             foreach (var server in dirtyServers)
@@ -599,7 +599,7 @@ public partial class ServerListViewModel
 
             updatedCount = dirtyServers.Count;
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
                 dirtyServers
                     .Select(server => (OldVm: server, NewDto: dtoMap[server.Id]))
@@ -609,7 +609,7 @@ public partial class ServerListViewModel
                 primarySelectionId,
                 null,
                 "StatusBulkUsernameUpdated",
-                [updatedCount]));
+                [updatedCount]);
         }
     }
 
@@ -642,7 +642,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var updatedCount = 0;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (updatedCount > 0)
         {
@@ -650,7 +650,7 @@ public partial class ServerListViewModel
                 $"EditPasswordServersCoreAsync updated password for {updatedCount} item(s) in a single transaction.");
         }
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -662,7 +662,7 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"EditPasswordServersCoreAsync aborted because {ids.Count - dtoMap.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             foreach (var server in selectedServers)
@@ -672,7 +672,7 @@ public partial class ServerListViewModel
 
             updatedCount = selectedServers.Count;
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
                 selectedServers
                     .Select(server => (OldVm: server, NewDto: dtoMap[server.Id]))
@@ -682,7 +682,7 @@ public partial class ServerListViewModel
                 primarySelectionId,
                 null,
                 "StatusBulkPasswordUpdated",
-                [updatedCount]));
+                [updatedCount]);
         }
     }
 
@@ -759,7 +759,7 @@ public partial class ServerListViewModel
         var updatedCount = 0;
         var unsupportedCount = 0;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (unsupportedCount > 0)
         {
@@ -776,7 +776,7 @@ public partial class ServerListViewModel
 
         return updatedCount;
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -788,7 +788,7 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"UpdateGatewayReferencesAsync aborted because {ids.Length - dtoMap.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             var updates = new List<(ServerItemViewModel OldVm, ServerProfileDto NewDto)>(ids.Length);
@@ -824,10 +824,10 @@ public partial class ServerListViewModel
             updatedCount = updates.Count;
             if (updatedCount == 0)
             {
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
                 updates,
                 Array.Empty<ServerProfileDto>(),
@@ -835,7 +835,7 @@ public partial class ServerListViewModel
                 primarySelectionId,
                 null,
                 null,
-                null));
+                null);
         }
     }
 
@@ -857,7 +857,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var deleted = false;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (deleted)
         {
@@ -867,7 +867,7 @@ public partial class ServerListViewModel
 
         return deleted;
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -879,13 +879,13 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"DeleteServersCoreAsync aborted because {ids.Count - dtoMatches.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             serverDtos.RemoveAll(dto => ids.Contains(dto.Id));
             deleted = true;
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 servers,
                 Array.Empty<(ServerItemViewModel OldVm, ServerProfileDto NewDto)>(),
                 Array.Empty<ServerProfileDto>(),
@@ -893,7 +893,7 @@ public partial class ServerListViewModel
                 null,
                 null,
                 null,
-                null));
+                null);
         }
     }
 
@@ -935,7 +935,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var movedCount = 0;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (movedCount > 0)
         {
@@ -945,7 +945,7 @@ public partial class ServerListViewModel
 
         return movedCount;
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -957,7 +957,7 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"MoveServersToProjectCoreAsync aborted because {ids.Count - dtoMap.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             foreach (var server in moveCandidates)
@@ -967,7 +967,7 @@ public partial class ServerListViewModel
 
             movedCount = moveCandidates.Count;
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
                 moveCandidates
                     .Select(server => (OldVm: server, NewDto: dtoMap[server.Id]))
@@ -977,7 +977,7 @@ public partial class ServerListViewModel
                 primarySelectionId,
                 null,
                 null,
-                null));
+                null);
         }
     }
 
@@ -1207,7 +1207,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var moved = false;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
+        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
         if (moved)
         {
@@ -1217,7 +1217,7 @@ public partial class ServerListViewModel
 
         return moved;
 
-        Task<BulkMutationPlan?> BuildPlanAsync(List<ServerProfileDto> serverDtos)
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> serverDtos)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -1229,7 +1229,7 @@ public partial class ServerListViewModel
             {
                 Core.Logging.FileLogger.Warn(
                     $"MoveServersToGroupCoreAsync aborted because {ids.Count - dtoMap.Count} selected DTO(s) were missing.");
-                return Task.FromResult<BulkMutationPlan?>(null);
+                return null;
             }
 
             foreach (var server in moveCandidates)
@@ -1239,7 +1239,7 @@ public partial class ServerListViewModel
 
             moved = true;
 
-            return Task.FromResult<BulkMutationPlan?>(new BulkMutationPlan(
+            return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
                 moveCandidates
                     .Select(server => (OldVm: server, NewDto: dtoMap[server.Id]))
@@ -1249,24 +1249,22 @@ public partial class ServerListViewModel
                 primarySelectionId,
                 null,
                 null,
-                null));
+                null);
         }
     }
 
     private async Task ExecutePersistedBulkMutationAsync(
-        Func<List<ServerProfileDto>, Task<BulkMutationPlan?>> buildPlanAsync,
+        Func<List<ServerProfileDto>, BulkMutationPlan?> buildPlan,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(buildPlanAsync);
+        ArgumentNullException.ThrowIfNull(buildPlan);
 
-        var dtos = await _configManager.LoadServersAsync();
-        var plan = await buildPlanAsync(dtos);
+        BulkMutationPlan? plan = await _configManager.MutateServersAsync(dtos =>
+            buildPlan(dtos));
         if (plan is null || plan.IsNoOp)
         {
             return;
         }
-
-        await _configManager.SaveServersAsync(dtos);
 
         var settings = await _configManager.LoadSettingsAsync();
         _currentSettings = settings;

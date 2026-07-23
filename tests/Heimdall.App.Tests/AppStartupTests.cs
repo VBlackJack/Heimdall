@@ -103,6 +103,9 @@ public sealed class AppStartupTests
 
         public Task<List<ServerProfileDto>> LoadServersAsync() => Task.FromResult(new List<ServerProfileDto>());
 
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate) =>
+            Task.FromResult(mutate([]));
+
         public Task SaveServersAsync(List<ServerProfileDto> servers) => Task.CompletedTask;
 
         public void ReleaseMerge()
@@ -140,6 +143,9 @@ public sealed class AppStartupTests
         public Task MergeSettingAsync(Action<AppSettings> mutate) => Task.CompletedTask;
 
         public Task<List<ServerProfileDto>> LoadServersAsync() => Task.FromResult(new List<ServerProfileDto>());
+
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate) =>
+            Task.FromResult(mutate([]));
 
         public Task SaveServersAsync(List<ServerProfileDto> servers) => Task.CompletedTask;
     }

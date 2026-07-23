@@ -88,6 +88,14 @@ internal sealed class InMemoryConfigManager : IConfigManager
 
     public Task<List<ServerProfileDto>> LoadServersAsync() => Task.FromResult(new List<ServerProfileDto>(_servers));
 
+    public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+    {
+        var servers = new List<ServerProfileDto>(_servers);
+        TResult result = mutate(servers);
+        _servers = servers;
+        return Task.FromResult(result);
+    }
+
     public Task SaveServersAsync(List<ServerProfileDto> servers)
     {
         _servers = new List<ServerProfileDto>(servers);

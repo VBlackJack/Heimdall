@@ -49,13 +49,15 @@ internal static class VaultMigrationEngine
     /// <summary>Forward-migrate the whole confidential set (legacy -> v2). Idempotent.</summary>
     public static async Task MigrateForwardAsync(IConfigManager configManager)
     {
-        var servers = await configManager.LoadServersAsync().ConfigureAwait(false);
-        foreach (var profile in servers)
+        await configManager.MutateServersAsync(servers =>
         {
-            ForwardProfile(profile);
-        }
+            foreach (ServerProfileDto profile in servers)
+            {
+                ForwardProfile(profile);
+            }
 
-        await configManager.SaveServersAsync(servers).ConfigureAwait(false);
+            return servers.Count;
+        }).ConfigureAwait(false);
 
         await configManager.MergeSettingAsync(settings =>
         {
@@ -69,13 +71,15 @@ internal static class VaultMigrationEngine
     /// <summary>Reverse-migrate the whole confidential set (v2 -> legacy). Idempotent.</summary>
     public static async Task MigrateReverseAsync(IConfigManager configManager)
     {
-        var servers = await configManager.LoadServersAsync().ConfigureAwait(false);
-        foreach (var profile in servers)
+        await configManager.MutateServersAsync(servers =>
         {
-            ReverseProfile(profile);
-        }
+            foreach (ServerProfileDto profile in servers)
+            {
+                ReverseProfile(profile);
+            }
 
-        await configManager.SaveServersAsync(servers).ConfigureAwait(false);
+            return servers.Count;
+        }).ConfigureAwait(false);
 
         await configManager.MergeSettingAsync(settings =>
         {

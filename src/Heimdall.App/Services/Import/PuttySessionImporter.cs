@@ -80,42 +80,38 @@ public sealed class PuttySessionImporter(
         ArgumentNullException.ThrowIfNull(selected);
 
         ct.ThrowIfCancellationRequested();
-        var inventory = await _configManager.LoadServersAsync().ConfigureAwait(false);
-        var existingNames = inventory
-            .Where(profile => !string.IsNullOrWhiteSpace(profile.DisplayName))
-            .Select(profile => profile.DisplayName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var importedCount = 0;
-        var skippedDuplicates = 0;
-        var skippedInvalid = 0;
-
-        foreach (var candidate in selected)
+        return await _configManager.MutateServersAsync(inventory =>
         {
-            ct.ThrowIfCancellationRequested();
+            var existingNames = inventory
+                .Where(profile => !string.IsNullOrWhiteSpace(profile.DisplayName))
+                .Select(profile => profile.DisplayName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var importedCount = 0;
+            var skippedDuplicates = 0;
+            var skippedInvalid = 0;
 
-            if (string.IsNullOrWhiteSpace(candidate.HostName))
+            foreach (PuttySessionCandidate candidate in selected)
             {
-                skippedInvalid++;
-                continue;
+                ct.ThrowIfCancellationRequested();
+
+                if (string.IsNullOrWhiteSpace(candidate.HostName))
+                {
+                    skippedInvalid++;
+                    continue;
+                }
+
+                if (!existingNames.Add(candidate.DisplayName))
+                {
+                    skippedDuplicates++;
+                    continue;
+                }
+
+                inventory.Add(MapCandidate(candidate));
+                importedCount++;
             }
 
-            if (!existingNames.Add(candidate.DisplayName))
-            {
-                skippedDuplicates++;
-                continue;
-            }
-
-            inventory.Add(MapCandidate(candidate));
-            importedCount++;
-        }
-
-        if (importedCount > 0)
-        {
-            await _configManager.SaveServersAsync(inventory).ConfigureAwait(false);
-        }
-
-        return new ImportOutcome(importedCount, skippedDuplicates, skippedInvalid);
+            return new ImportOutcome(importedCount, skippedDuplicates, skippedInvalid);
+        }).ConfigureAwait(false);
     }
 
     private static ServerProfileDto MapCandidate(PuttySessionCandidate candidate)

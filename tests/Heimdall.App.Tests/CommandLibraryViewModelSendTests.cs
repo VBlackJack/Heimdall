@@ -523,6 +523,9 @@ public sealed class CommandLibraryViewModelSendTests
         public Task<List<ServerProfileDto>> LoadServersAsync()
             => Task.FromResult(new List<ServerProfileDto>());
 
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+            => Task.FromResult(mutate([]));
+
         public Task SaveServersAsync(List<ServerProfileDto> servers)
             => Task.CompletedTask;
     }

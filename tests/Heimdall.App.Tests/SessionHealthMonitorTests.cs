@@ -331,6 +331,8 @@ public class SessionHealthMonitorTests
         public string ServersPath => string.Empty;
         public Task InitializeAsync() => Task.CompletedTask;
         public Task SaveSettingsAsync(AppSettings settings) => Task.CompletedTask;
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate) =>
+            Task.FromResult(mutate(_profiles.ToList()));
         public Task SaveServersAsync(List<ServerProfileDto> servers) => Task.CompletedTask;
         public Task<bool> MergeHostKeyAsync(string hostPortKey, string fingerprint) => Task.FromResult(false);
         public Task<int> MergeTrustedHostKeysAsync(IEnumerable<KeyValuePair<string, string>> entries) => Task.FromResult(0);

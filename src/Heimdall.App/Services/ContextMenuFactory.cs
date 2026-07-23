@@ -23,6 +23,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Heimdall.App.ViewModels;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Services;
 
@@ -574,7 +575,6 @@ public sealed class ContextMenuFactory
                 if (!string.IsNullOrWhiteSpace(newName) &&
                     !string.Equals(newName.Trim(), folder.Name, StringComparison.Ordinal))
                 {
-                    var servers = await vm.ConfigManager.LoadServersAsync();
                     string oldPath = folder.FullPath;
                     string parentPath = oldPath.Contains('/')
                         ? oldPath[..oldPath.LastIndexOf('/')]
@@ -582,17 +582,6 @@ public sealed class ContextMenuFactory
                     string newPath = string.IsNullOrEmpty(parentPath)
                         ? newName.Trim()
                         : $"{parentPath}/{newName.Trim()}";
-
-                    // Rename in server Group paths
-                    foreach (var dto in servers)
-                    {
-                        if (dto.Group is not null &&
-                            (dto.Group.Equals(oldPath, StringComparison.OrdinalIgnoreCase) ||
-                             dto.Group.StartsWith(oldPath + "/", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            dto.Group = newPath + dto.Group[oldPath.Length..];
-                        }
-                    }
 
                     // Rename in EmptyGroups
                     var settings = await vm.ConfigManager.LoadSettingsAsync();
@@ -606,8 +595,22 @@ public sealed class ContextMenuFactory
                         }
                     }
 
+                    List<ServerProfileDto> servers =
+                        await vm.ConfigManager.MutateServersAsync(inventory =>
+                        {
+                            foreach (ServerProfileDto dto in inventory)
+                            {
+                                if (dto.Group is not null &&
+                                    (dto.Group.Equals(oldPath, StringComparison.OrdinalIgnoreCase) ||
+                                     dto.Group.StartsWith(oldPath + "/", StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    dto.Group = newPath + dto.Group[oldPath.Length..];
+                                }
+                            }
+
+                            return inventory;
+                        });
                     await vm.ConfigManager.SaveSettingsAsync(settings);
-                    await vm.ConfigManager.SaveServersAsync(servers);
                     vm.ServerList.LoadServers(servers, settings);
                 }
             };
@@ -628,23 +631,26 @@ public sealed class ContextMenuFactory
 
                 if (!confirmed) return;
 
-                var servers = await vm.ConfigManager.LoadServersAsync();
-                foreach (var dto in servers)
-                {
-                    if (dto.Group is not null &&
-                        (dto.Group.Equals(folder.FullPath, StringComparison.OrdinalIgnoreCase) ||
-                         dto.Group.StartsWith(folder.FullPath + "/", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        dto.Group = null;
-                    }
-                }
-
                 var settings = await vm.ConfigManager.LoadSettingsAsync();
                 settings.EmptyGroups.RemoveAll(p =>
                     p.Equals(folder.FullPath, StringComparison.OrdinalIgnoreCase) ||
                     p.StartsWith(folder.FullPath + "/", StringComparison.OrdinalIgnoreCase));
+                List<ServerProfileDto> servers =
+                    await vm.ConfigManager.MutateServersAsync(inventory =>
+                    {
+                        foreach (ServerProfileDto dto in inventory)
+                        {
+                            if (dto.Group is not null &&
+                                (dto.Group.Equals(folder.FullPath, StringComparison.OrdinalIgnoreCase) ||
+                                 dto.Group.StartsWith(folder.FullPath + "/", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                dto.Group = null;
+                            }
+                        }
+
+                        return inventory;
+                    });
                 await vm.ConfigManager.SaveSettingsAsync(settings);
-                await vm.ConfigManager.SaveServersAsync(servers);
                 vm.ServerList.LoadServers(servers, settings);
             };
             menu.Items.Add(deleteItem);

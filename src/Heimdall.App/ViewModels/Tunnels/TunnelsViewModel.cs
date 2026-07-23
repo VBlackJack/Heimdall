@@ -267,21 +267,28 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         try
         {
-            var servers = await _configManager.LoadServersAsync().ConfigureAwait(true);
-            var profile = servers.FirstOrDefault(server =>
-                string.Equals(server.Id, activeTab.OriginalServerId, StringComparison.Ordinal));
+            bool updated = await _configManager.MutateServersAsync(servers =>
+            {
+                ServerProfileDto? profile = servers.FirstOrDefault(server =>
+                    string.Equals(server.Id, activeTab.OriginalServerId, StringComparison.Ordinal));
+                if (profile is null)
+                {
+                    return false;
+                }
 
-            if (profile is null)
+                profile.TunnelsPanelExpanded = expanded;
+                return true;
+            }).ConfigureAwait(true);
+
+            if (!updated)
             {
                 FileLogger.Warn(
                     $"[TunnelsViewModel] profile '{activeTab.OriginalServerId}' not found; using tab-local panel state only.");
                 return;
             }
 
-            profile.TunnelsPanelExpanded = expanded;
-            await _configManager.SaveServersAsync(servers).ConfigureAwait(true);
             FileLogger.Info(
-                $"[TunnelsViewModel] persisted tunnels panel expanded={expanded} for profile '{profile.Id}'.");
+                $"[TunnelsViewModel] persisted tunnels panel expanded={expanded} for profile '{activeTab.OriginalServerId}'.");
         }
         catch (Exception ex)
         {

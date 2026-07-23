@@ -327,95 +327,99 @@ public sealed class ProfileImportService(
         IReadOnlyList<SshGatewayDto> importedGateways,
         CancellationToken ct)
     {
-        var inventory = await _configManager.LoadServersAsync();
         var previewMap = preview.Entries.ToDictionary(entry => entry.SourceFilePath, StringComparer.OrdinalIgnoreCase);
-        List<ServerProfileDto> appliedServers = [];
-        var importedCount = 0;
-        var replacedCount = 0;
-        var renamedCount = 0;
-        var skippedCount = 0;
-
-        foreach (var selectionEntry in selection.Entries)
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        var mutationResult = await _configManager.MutateServersAsync(inventory =>
         {
-            ct.ThrowIfCancellationRequested();
+            List<ServerProfileDto> appliedServers = [];
+            var importedCount = 0;
+            var replacedCount = 0;
+            var renamedCount = 0;
+            var skippedCount = 0;
 
-            if (!selectionEntry.IsSelected ||
-                !previewMap.TryGetValue(selectionEntry.SourceFilePath, out var previewEntry))
+            foreach (RdpImportSelectionEntry selectionEntry in selection.Entries)
             {
-                continue;
-            }
+                ct.ThrowIfCancellationRequested();
 
-            if (previewEntry.HasParseError)
-            {
-                skippedCount++;
-                continue;
-            }
-
-            var candidate = CloneProfile(previewEntry.Candidate);
-            var existingIndex = FindExistingProfileIndex(inventory, candidate);
-            if (existingIndex >= 0)
-            {
-                switch (selectionEntry.ConflictResolution)
+                if (!selectionEntry.IsSelected ||
+                    !previewMap.TryGetValue(selectionEntry.SourceFilePath, out RdpImportPreviewEntry? previewEntry))
                 {
-                    case RdpConflictResolution.Skip:
-                        skippedCount++;
-                        continue;
-
-                    case RdpConflictResolution.Replace:
-                        candidate.Id = inventory[existingIndex].Id;
-                        inventory[existingIndex] = candidate;
-                        appliedServers.Add(candidate);
-                        replacedCount++;
-                        continue;
-
-                    case RdpConflictResolution.AutoRename:
-                        candidate.Id = BuildUniqueId(candidate.Id, inventory);
-                        candidate.DisplayName = BuildAutoRename(candidate.DisplayName, inventory);
-                        inventory.Add(candidate);
-                        appliedServers.Add(candidate);
-                        importedCount++;
-                        renamedCount++;
-                        continue;
+                    continue;
                 }
+
+                if (previewEntry.HasParseError)
+                {
+                    skippedCount++;
+                    continue;
+                }
+
+                var candidate = CloneProfile(previewEntry.Candidate);
+                var existingIndex = FindExistingProfileIndex(inventory, candidate);
+                if (existingIndex >= 0)
+                {
+                    switch (selectionEntry.ConflictResolution)
+                    {
+                        case RdpConflictResolution.Skip:
+                            skippedCount++;
+                            continue;
+
+                        case RdpConflictResolution.Replace:
+                            candidate.Id = inventory[existingIndex].Id;
+                            inventory[existingIndex] = candidate;
+                            appliedServers.Add(candidate);
+                            replacedCount++;
+                            continue;
+
+                        case RdpConflictResolution.AutoRename:
+                            candidate.Id = BuildUniqueId(candidate.Id, inventory);
+                            candidate.DisplayName = BuildAutoRename(candidate.DisplayName, inventory);
+                            inventory.Add(candidate);
+                            appliedServers.Add(candidate);
+                            importedCount++;
+                            renamedCount++;
+                            continue;
+                    }
+                }
+
+                candidate.Id = BuildUniqueId(candidate.Id, inventory);
+                inventory.Add(candidate);
+                appliedServers.Add(candidate);
+                importedCount++;
             }
 
-            candidate.Id = BuildUniqueId(candidate.Id, inventory);
-            inventory.Add(candidate);
-            appliedServers.Add(candidate);
-            importedCount++;
-        }
-
-        GatewayImportReconciliationResult gatewayReconciliation =
-            new([], new Dictionary<string, string>(), [], 0);
-        if (importedCount > 0 || replacedCount > 0)
-        {
-            AppSettings settings = await _configManager.LoadSettingsAsync();
-            gatewayReconciliation = GatewayImportReconciler.Reconcile(
-                settings.SshGateways,
-                importedGateways,
-                appliedServers);
-            ApplyGatewayIdMap(appliedServers, gatewayReconciliation.GatewayIdMap);
-
-            if (gatewayReconciliation.GatewaysToAdd.Count > 0)
+            GatewayImportReconciliationResult gatewayReconciliation =
+                new([], new Dictionary<string, string>(), [], 0);
+            if (importedCount > 0 || replacedCount > 0)
             {
+                gatewayReconciliation = GatewayImportReconciler.Reconcile(
+                    settings.SshGateways,
+                    importedGateways,
+                    appliedServers);
+                ApplyGatewayIdMap(appliedServers, gatewayReconciliation.GatewayIdMap);
                 settings.SshGateways.AddRange(gatewayReconciliation.GatewaysToAdd);
-                await _configManager.SaveSettingsAsync(settings);
             }
 
-            await _configManager.SaveServersAsync(inventory);
+            return (
+                Result: new ProfileImportResult
+                {
+                    HasChanges = importedCount > 0 || replacedCount > 0,
+                    ImportedCount = importedCount,
+                    ReplacedCount = replacedCount,
+                    RenamedCount = renamedCount,
+                    SkippedCount = skippedCount,
+                    GatewayCreatedCount = gatewayReconciliation.CreatedCount,
+                    GatewayMergedCount = gatewayReconciliation.MergedCount,
+                    GatewayOrphanCount = gatewayReconciliation.OrphanReferences.Count
+                },
+                SettingsChanged: gatewayReconciliation.GatewaysToAdd.Count > 0);
+        });
+
+        if (mutationResult.SettingsChanged)
+        {
+            await _configManager.SaveSettingsAsync(settings);
         }
 
-        return new ProfileImportResult
-        {
-            HasChanges = importedCount > 0 || replacedCount > 0,
-            ImportedCount = importedCount,
-            ReplacedCount = replacedCount,
-            RenamedCount = renamedCount,
-            SkippedCount = skippedCount,
-            GatewayCreatedCount = gatewayReconciliation.CreatedCount,
-            GatewayMergedCount = gatewayReconciliation.MergedCount,
-            GatewayOrphanCount = gatewayReconciliation.OrphanReferences.Count
-        };
+        return mutationResult.Result;
     }
 
     private static void ApplyGatewayIdMap(

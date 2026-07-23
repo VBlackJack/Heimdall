@@ -813,14 +813,23 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (!confirmed) return;
 
-        foreach (var server in servers)
+        var update = await _configManager.MutateServersAsync(currentServers =>
         {
-            server.SshMode = mode;
-        }
+            int updatedCount = 0;
+            foreach (ServerProfileDto server in currentServers)
+            {
+                if (!string.Equals(server.SshMode, mode, StringComparison.Ordinal))
+                {
+                    server.SshMode = mode;
+                    updatedCount++;
+                }
+            }
 
-        await _configManager.SaveServersAsync(servers);
+            return (UpdatedCount: updatedCount, TotalCount: currentServers.Count);
+        });
         ConfigurationChanged?.Invoke();
-        FileLogger.Info($"Applied SSH mode '{mode}' to {changeCount}/{servers.Count} servers.");
+        FileLogger.Info(
+            $"Applied SSH mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} servers.");
     }
 
     /// <summary>
@@ -849,14 +858,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (!confirmed) return;
 
-        foreach (var server in rdpServers)
+        var update = await _configManager.MutateServersAsync(currentServers =>
         {
-            server.RdpMode = mode;
-        }
+            List<ServerProfileDto> currentRdpServers = currentServers
+                .Where(server => string.Equals(
+                    server.ConnectionType,
+                    "RDP",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            int updatedCount = 0;
+            foreach (ServerProfileDto server in currentRdpServers)
+            {
+                if (!string.Equals(server.RdpMode, mode, StringComparison.Ordinal))
+                {
+                    server.RdpMode = mode;
+                    updatedCount++;
+                }
+            }
 
-        await _configManager.SaveServersAsync(servers);
+            return (UpdatedCount: updatedCount, TotalCount: currentRdpServers.Count);
+        });
         ConfigurationChanged?.Invoke();
-        FileLogger.Info($"Applied RDP mode '{mode}' to {changeCount}/{rdpServers.Count} RDP servers.");
+        FileLogger.Info(
+            $"Applied RDP mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} RDP servers.");
     }
 
     /// <summary>
@@ -1068,6 +1092,25 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }).ToList();
         List<SshGatewayDto> sshGateways = _pendingGateways.Select(CloneGateway).ToList();
         List<ProjectDto> projects = _pendingProjects.Select(CloneProject).ToList();
+        HashSet<string> deletedProjectIds = _deletedProjectIds.ToHashSet(StringComparer.Ordinal);
+
+        // Clear inventory references first. If the following settings commit is interrupted,
+        // the project still exists and can be reassigned; the inverse order leaves dangling IDs.
+        if (deletedProjectIds.Count > 0)
+        {
+            await _configManager.MutateServersAsync(servers =>
+            {
+                int changedCount = 0;
+                foreach (ServerProfileDto server in servers.Where(server =>
+                    server.ProjectId is not null && deletedProjectIds.Contains(server.ProjectId)))
+                {
+                    server.ProjectId = null;
+                    changedCount++;
+                }
+
+                return changedCount;
+            });
+        }
 
         await _configManager.MergeSettingAsync((AppSettings settings) =>
         {
@@ -1191,25 +1234,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.Projects = projects;
         });
 
-        // Unassign servers from deleted projects
-        if (_deletedProjectIds.Count > 0)
-        {
-            var servers = await _configManager.LoadServersAsync();
-            var changed = false;
-            foreach (var server in servers.Where(s =>
-                s.ProjectId is not null && _deletedProjectIds.Contains(s.ProjectId)))
-            {
-                server.ProjectId = null;
-                changed = true;
-            }
-
-            if (changed)
-            {
-                await _configManager.SaveServersAsync(servers);
-            }
-
-            _deletedProjectIds.Clear();
-        }
+        _deletedProjectIds.Clear();
 
         _originalTheme = DefaultTheme;
         _originalAccentTint = AccentTint;
@@ -1476,39 +1501,47 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 return;
             }
 
-            var existing = await _configManager.LoadServersAsync();
-
-            var newCount = 0;
-            var updatedCount = 0;
-
-            foreach (var server in imported)
+            var importResult = await _configManager.MutateServersAsync(existing =>
             {
-                if (string.IsNullOrEmpty(server.Id))
+                int newCount = 0;
+                int updatedCount = 0;
+                foreach (ServerProfileDto server in imported)
                 {
-                    server.Id = Guid.NewGuid().ToString();
+                    if (string.IsNullOrEmpty(server.Id))
+                    {
+                        server.Id = Guid.NewGuid().ToString();
+                    }
+
+                    int existingIndex = existing.FindIndex(
+                        candidate => string.Equals(
+                            candidate.Id,
+                            server.Id,
+                            StringComparison.OrdinalIgnoreCase));
+
+                    if (existingIndex >= 0)
+                    {
+                        existing[existingIndex] = server;
+                        updatedCount++;
+                    }
+                    else
+                    {
+                        existing.Add(server);
+                        newCount++;
+                    }
                 }
 
-                var existingIndex = existing.FindIndex(
-                    s => string.Equals(s.Id, server.Id, StringComparison.OrdinalIgnoreCase));
+                return (NewCount: newCount, UpdatedCount: updatedCount);
+            });
 
-                if (existingIndex >= 0)
-                {
-                    existing[existingIndex] = server;
-                    updatedCount++;
-                }
-                else
-                {
-                    existing.Add(server);
-                    newCount++;
-                }
-            }
+            int totalImported = importResult.NewCount + importResult.UpdatedCount;
+            FileLogger.Info(
+                $"Imported {totalImported} server(s) from {filePath} ({importResult.NewCount} new, {importResult.UpdatedCount} updated)");
 
-            await _configManager.SaveServersAsync(existing);
-
-            var totalImported = newCount + updatedCount;
-            FileLogger.Info($"Imported {totalImported} server(s) from {filePath} ({newCount} new, {updatedCount} updated)");
-
-            var statusMessage = _localizer.Format("StatusImportBreakdown", totalImported, newCount, updatedCount);
+            var statusMessage = _localizer.Format(
+                "StatusImportBreakdown",
+                totalImported,
+                importResult.NewCount,
+                importResult.UpdatedCount);
 
             if (importWarnings is { Count: > 0 })
             {
@@ -1633,16 +1666,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             if (!confirmed) return;
 
             var imported = CitrixCacheScanner.ToServerProfiles(scanResult.Resources);
-            var existing = await _configManager.LoadServersAsync();
-
-            var newCount = 0;
-            foreach (var server in imported)
+            int newCount = await _configManager.MutateServersAsync(existing =>
             {
-                existing.Add(server);
-                newCount++;
-            }
-
-            await _configManager.SaveServersAsync(existing);
+                existing.AddRange(imported);
+                return imported.Count;
+            });
 
             var statusMsg = _localizer.Format("CitrixScanSuccess", newCount);
             if (scanResult.Warnings.Count > 0)

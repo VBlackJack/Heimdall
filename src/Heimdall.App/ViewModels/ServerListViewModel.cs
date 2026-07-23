@@ -301,24 +301,25 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     {
         try
         {
-            List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
-            ServerProfileDto? stored = servers.FirstOrDefault(
-                server => string.Equals(server.Id, profile.Id, StringComparison.Ordinal));
-
-            if (stored is null)
+            await _configManager.MutateServersAsync(servers =>
             {
-                if (SessionIdCodec.TryGetInventoryId(profile.Id, out string inventoryId))
+                ServerProfileDto? stored = servers.FirstOrDefault(
+                    server => string.Equals(server.Id, profile.Id, StringComparison.Ordinal));
+
+                if (stored is null
+                    && SessionIdCodec.TryGetInventoryId(profile.Id, out string inventoryId))
                 {
                     stored = servers.FirstOrDefault(
                         server => string.Equals(server.Id, inventoryId, StringComparison.Ordinal));
                 }
-            }
 
-            if (stored is not null && !stored.ExecutionConfirmed)
-            {
-                stored.ExecutionConfirmed = true;
-                await _configManager.SaveServersAsync(servers);
-            }
+                if (stored is not null)
+                {
+                    stored.ExecutionConfirmed = true;
+                }
+
+                return stored is not null;
+            });
         }
         catch (Exception ex)
         {
@@ -1245,11 +1246,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             await _configManager.MergeSettingAsync(s => s.LastUsedGatewayId = savedGatewayId);
         }
 
-        var servers = await _configManager.LoadServersAsync();
         result.Server.Id = Guid.NewGuid().ToString();
         result.Server.Origin = ProfileOrigin.Manual;
-        servers.Add(result.Server);
-        await _configManager.SaveServersAsync(servers);
+        await _configManager.MutateServersAsync(servers =>
+        {
+            servers.Add(result.Server);
+            return result.Server;
+        });
 
         _allServers.Add(ServerItemViewModel.FromDto(
             result.Server,
@@ -1297,11 +1300,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             await _configManager.MergeSettingAsync(s => s.LastUsedGatewayId = savedGatewayId);
         }
 
-        var servers = await _configManager.LoadServersAsync();
         result.Server.Id = Guid.NewGuid().ToString();
         result.Server.Origin = ProfileOrigin.Manual;
-        servers.Add(result.Server);
-        await _configManager.SaveServersAsync(servers);
+        await _configManager.MutateServersAsync(servers =>
+        {
+            servers.Add(result.Server);
+            return result.Server;
+        });
 
         _allServers.Add(ServerItemViewModel.FromDto(
             result.Server,
@@ -1347,12 +1352,29 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                 _localizer["AddToolDialogHost"],
                 serverDto.RemoteServer ?? "");
 
-            serverDto.DisplayName = newName.Trim();
-            serverDto.RemoteServer = newHost?.Trim() ?? "";
-            await _configManager.SaveServersAsync(servers);
+            string updatedName = newName.Trim();
+            string updatedHost = newHost?.Trim() ?? "";
+            bool updated = await _configManager.MutateServersAsync(inventory =>
+            {
+                ServerProfileDto? persisted = inventory.FirstOrDefault(
+                    candidate => string.Equals(candidate.Id, serverDto.Id, StringComparison.Ordinal));
+                if (persisted is null)
+                {
+                    return false;
+                }
 
-            server.DisplayName = serverDto.DisplayName;
-            server.RemoteServer = serverDto.RemoteServer;
+                persisted.DisplayName = updatedName;
+                persisted.RemoteServer = updatedHost;
+                return true;
+            });
+
+            if (!updated)
+            {
+                return;
+            }
+
+            server.DisplayName = updatedName;
+            server.RemoteServer = updatedHost;
             return;
         }
 
@@ -1379,16 +1401,23 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             await _configManager.MergeSettingAsync(s => s.LastUsedGatewayId = savedGatewayId);
         }
 
-        var index = servers.FindIndex(
-            s => string.Equals(s.Id, serverDto.Id, StringComparison.Ordinal));
+        bool saved = await _configManager.MutateServersAsync(inventory =>
+        {
+            int index = inventory.FindIndex(
+                candidate => string.Equals(candidate.Id, serverDto.Id, StringComparison.Ordinal));
+            if (index < 0)
+            {
+                return false;
+            }
 
-        if (index < 0)
+            inventory[index] = result.Server;
+            return true;
+        });
+
+        if (!saved)
         {
             return;
         }
-
-        servers[index] = result.Server;
-        await _configManager.SaveServersAsync(servers);
 
         server.UpdateFromDto(
             result.Server,

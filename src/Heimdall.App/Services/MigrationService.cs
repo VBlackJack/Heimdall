@@ -125,7 +125,12 @@ public sealed class MigrationService
             }
         }
 
-        await _configManager.SaveServersAsync(servers);
+        await _configManager.MutateServersAsync(inventory =>
+        {
+            inventory.Clear();
+            inventory.AddRange(servers);
+            return servers.Count;
+        });
     }
 
     // -- Settings mapping --------------------------------------------------

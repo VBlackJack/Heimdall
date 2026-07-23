@@ -92,33 +92,34 @@ public sealed class NetworkScannerService(
 
             if (addServers)
             {
-                var existingServers = await _configManager.LoadServersAsync();
-
-                foreach (var result in results)
+                await _configManager.MutateServersAsync(existingServers =>
                 {
-                    var connectionType = result.OpenPorts.Contains(DefaultPorts.Rdp) ? "RDP"
-                        : result.OpenPorts.Contains(DefaultPorts.Ssh) ? "SSH"
-                        : result.OpenPorts.Contains(DefaultPorts.Vnc) ? "VNC"
-                        : "SSH";
-                    var port = connectionType switch
+                    foreach (var result in results)
                     {
-                        "RDP" => DefaultPorts.Rdp,
-                        "VNC" => DefaultPorts.Vnc,
-                        _ => DefaultPorts.Ssh
-                    };
+                        var connectionType = result.OpenPorts.Contains(DefaultPorts.Rdp) ? "RDP"
+                            : result.OpenPorts.Contains(DefaultPorts.Ssh) ? "SSH"
+                            : result.OpenPorts.Contains(DefaultPorts.Vnc) ? "VNC"
+                            : "SSH";
+                        var port = connectionType switch
+                        {
+                            "RDP" => DefaultPorts.Rdp,
+                            "VNC" => DefaultPorts.Vnc,
+                            _ => DefaultPorts.Ssh
+                        };
 
-                    existingServers.Add(new ServerProfileDto
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        DisplayName = result.Hostname ?? result.IpAddress,
-                        RemoteServer = result.IpAddress,
-                        RemotePort = port,
-                        ConnectionType = connectionType,
-                        Group = "Discovered"
-                    });
-                }
+                        existingServers.Add(new ServerProfileDto
+                        {
+                            Id = Guid.NewGuid().ToString(),
+                            DisplayName = result.Hostname ?? result.IpAddress,
+                            RemoteServer = result.IpAddress,
+                            RemotePort = port,
+                            ConnectionType = connectionType,
+                            Group = "Discovered"
+                        });
+                    }
 
-                await _configManager.SaveServersAsync(existingServers);
+                    return results.Count;
+                });
             }
 
             return new NetworkScanResult(

@@ -605,6 +605,47 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task ProjectDeletion_ClearsInventoryProjectIds_RecoverableIfInterrupted()
+    {
+        var config = new FakeConfigManager
+        {
+            Settings = new AppSettings
+            {
+                Projects =
+                [
+                    new ProjectDto
+                    {
+                        Id = "project-a",
+                        Name = "Project A"
+                    }
+                ]
+            },
+            Servers =
+            [
+                new ServerProfileDto
+                {
+                    Id = "alpha",
+                    DisplayName = "Alpha",
+                    RemoteServer = "alpha.example.test",
+                    ProjectId = "project-a"
+                }
+            ]
+        };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedProject = Assert.Single(viewModel.Projects);
+        await viewModel.DeleteProjectCommand.ExecuteAsync(null);
+        config.FailOnMergeSetting = true;
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            viewModel.SaveCommand.ExecuteAsync(null));
+
+        Assert.Null(Assert.Single(config.Servers).ProjectId);
+        Assert.Contains(config.Settings.Projects, project => project.Id == "project-a");
+    }
+
+    [Fact]
     public async Task ConfigurePin_SetResult_PersistsHashSaltAndResetsLockout()
     {
         DateTime lockoutUntilUtc = DateTime.UtcNow.AddMinutes(5);
@@ -1464,6 +1505,8 @@ public sealed class SettingsViewModelTests
 
         public int MergeSettingCallCount { get; private set; }
 
+        public bool FailOnMergeSetting { get; set; }
+
         public List<ServerProfileDto> Servers { get; set; } = [];
 
         public List<ServerProfileDto>? SavedServers { get; private set; }
@@ -1499,6 +1542,11 @@ public sealed class SettingsViewModelTests
         public Task MergeSettingAsync(Action<AppSettings> mutate)
         {
             MergeSettingCallCount++;
+            if (FailOnMergeSetting)
+            {
+                throw new IOException("Simulated MergeSettingAsync failure");
+            }
+
             AppSettings currentSettings = CloneSettings(Settings);
             mutate(currentSettings);
             Settings = currentSettings;
@@ -1509,6 +1557,15 @@ public sealed class SettingsViewModelTests
 
         public Task<List<ServerProfileDto>> LoadServersAsync()
             => Task.FromResult(Servers);
+
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+        {
+            List<ServerProfileDto> servers = Servers.ToList();
+            TResult result = mutate(servers);
+            SavedServers = servers;
+            Servers = servers;
+            return Task.FromResult(result);
+        }
 
         public Task SaveServersAsync(List<ServerProfileDto> servers)
         {

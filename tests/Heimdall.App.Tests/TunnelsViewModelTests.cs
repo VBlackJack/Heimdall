@@ -515,6 +515,23 @@ public sealed class TunnelsViewModelTests
             return Task.FromResult(CloneServers(Servers));
         }
 
+        public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+        {
+            LoadServersCallCount++;
+            List<ServerProfileDto> servers = CloneServers(Servers);
+            string originalJson = System.Text.Json.JsonSerializer.Serialize(servers);
+            TResult result = mutate(servers);
+            string mutatedJson = System.Text.Json.JsonSerializer.Serialize(servers);
+            if (string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
+            {
+                return Task.FromResult(result);
+            }
+
+            SaveServersCallCount++;
+            Servers = CloneServers(servers);
+            return Task.FromResult(result);
+        }
+
         public Task SaveServersAsync(List<ServerProfileDto> servers)
         {
             SaveServersCallCount++;

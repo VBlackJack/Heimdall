@@ -91,6 +91,12 @@ public interface IConfigManager
     Task<List<ServerProfileDto>> LoadServersAsync();
 
     /// <summary>
+    /// Atomically loads the server inventory, applies a synchronous mutation, persists it,
+    /// and returns a caller-defined result while holding the process-local write lock.
+    /// </summary>
+    Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate);
+
+    /// <summary>
     /// Serializes and saves the server inventory to servers.json (UTF-8 without BOM).
     /// </summary>
     Task SaveServersAsync(List<ServerProfileDto> servers);

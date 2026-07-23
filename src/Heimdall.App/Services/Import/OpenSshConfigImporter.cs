@@ -120,8 +120,8 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
             .Select(gateway => gateway.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var createdGateways = new List<SshGatewayDto>();
+        var plannedProfiles = new List<ServerProfileDto>();
 
-        var importedCount = 0;
         var skippedDuplicates = 0;
         var warningCount = 0;
 
@@ -155,8 +155,7 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
                 createdGateways.Add(gateway);
             }
 
-            inventory.Add(MapCandidate(candidate, gatewayPlan.LastGatewayId));
-            importedCount++;
+            plannedProfiles.Add(MapCandidate(candidate, gatewayPlan.LastGatewayId));
         }
 
         if (createdGateways.Count > 0)
@@ -164,12 +163,32 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
             await _configManager.SaveSettingsAsync(settings).ConfigureAwait(false);
         }
 
-        if (importedCount > 0)
+        return await _configManager.MutateServersAsync(currentInventory =>
         {
-            await _configManager.SaveServersAsync(inventory).ConfigureAwait(false);
-        }
+            var currentAliases = currentInventory
+                .Where(profile => !string.IsNullOrWhiteSpace(profile.DisplayName))
+                .Select(profile => profile.DisplayName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            int importedCount = 0;
+            int finalSkippedDuplicates = skippedDuplicates;
 
-        return new ImportOutcome(importedCount, skippedDuplicates, WarningCount: warningCount);
+            foreach (ServerProfileDto profile in plannedProfiles)
+            {
+                if (!currentAliases.Add(profile.DisplayName))
+                {
+                    finalSkippedDuplicates++;
+                    continue;
+                }
+
+                currentInventory.Add(profile);
+                importedCount++;
+            }
+
+            return new ImportOutcome(
+                importedCount,
+                finalSkippedDuplicates,
+                WarningCount: warningCount);
+        }).ConfigureAwait(false);
     }
 
     private static ServerProfileDto MapCandidate(OpenSshImportCandidate candidate, string? sshGatewayId)
