@@ -103,6 +103,42 @@ public sealed class GatewayOverviewBuilderTests
     }
 
     [Fact]
+    public void GatewayOverview_SurfacesGroupDefaultAndParentOrphans()
+    {
+        SshGatewayDto child = CreateGateway(
+            "gw-child",
+            "Child",
+            "child.example.test",
+            22,
+            "ops");
+        child.ParentGatewayId = "gw-missing-parent";
+        Dictionary<string, GroupDefaultsDto> groupDefaults = new()
+        {
+            ["Production/Linux"] = new GroupDefaultsDto
+            {
+                SshGatewayId = "gw-missing-default"
+            }
+        };
+
+        GatewayOverview overview = GatewayOverviewBuilder.Build([child], [], groupDefaults);
+
+        GatewayOverviewMissingReferenceGroup defaultOrphan = overview.MissingReferences.Single(
+            reference => reference.GatewayId == "gw-missing-default");
+        GatewayOverviewConfigurationReference defaultReference =
+            Assert.Single(defaultOrphan.ConfigurationReferences);
+        Assert.Equal(GatewayOverviewConfigurationReferenceKind.GroupDefault, defaultReference.Kind);
+        Assert.Equal("Production/Linux", defaultReference.Id);
+
+        GatewayOverviewMissingReferenceGroup parentOrphan = overview.MissingReferences.Single(
+            reference => reference.GatewayId == "gw-missing-parent");
+        GatewayOverviewConfigurationReference parentReference =
+            Assert.Single(parentOrphan.ConfigurationReferences);
+        Assert.Equal(GatewayOverviewConfigurationReferenceKind.ChildGatewayParent, parentReference.Kind);
+        Assert.Equal("gw-child", parentReference.Id);
+        Assert.Equal(2, overview.MissingReferenceCount);
+    }
+
+    [Fact]
     public void Build_IgnoresGatewayReferencesOnIneligibleProtocols()
     {
         SshGatewayDto gateway = CreateGateway("gw-1", "Bastion", "bastion.example.test", 22, "ops");

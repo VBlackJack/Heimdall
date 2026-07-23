@@ -27,7 +27,8 @@ public static class GatewayOverviewBuilder
 {
     public static GatewayOverview Build(
         IEnumerable<SshGatewayDto>? gateways,
-        IEnumerable<ServerProfileDto>? servers)
+        IEnumerable<ServerProfileDto>? servers,
+        IReadOnlyDictionary<string, GroupDefaultsDto>? groupDefaults = null)
     {
         List<SshGatewayDto> gatewayList = (gateways ?? [])
             .Where(gateway => !string.IsNullOrWhiteSpace(gateway.Id))
@@ -50,7 +51,8 @@ public static class GatewayOverviewBuilder
                 _ => new List<GatewayOverviewSession>(),
                 StringComparer.OrdinalIgnoreCase);
 
-        Dictionary<string, List<GatewayOverviewSession>> missingReferences = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, MissingReferenceAccumulator> missingReferences =
+            new(StringComparer.OrdinalIgnoreCase);
 
         foreach (ServerProfileDto server in servers ?? [])
         {
@@ -68,13 +70,38 @@ public static class GatewayOverviewBuilder
                 continue;
             }
 
-            if (!missingReferences.TryGetValue(gatewayId, out List<GatewayOverviewSession>? missingSessions))
+            GetMissingReference(missingReferences, gatewayId).Sessions.Add(session);
+        }
+
+        foreach ((string groupPath, GroupDefaultsDto defaults) in groupDefaults ??
+            new Dictionary<string, GroupDefaultsDto>())
+        {
+            string? gatewayId = defaults.SshGatewayId;
+            if (string.IsNullOrWhiteSpace(gatewayId) || gatewayMap.ContainsKey(gatewayId))
             {
-                missingSessions = [];
-                missingReferences[gatewayId] = missingSessions;
+                continue;
             }
 
-            missingSessions.Add(session);
+            GetMissingReference(missingReferences, gatewayId).ConfigurationReferences.Add(
+                new GatewayOverviewConfigurationReference(
+                    GatewayOverviewConfigurationReferenceKind.GroupDefault,
+                    groupPath,
+                    groupPath));
+        }
+
+        foreach (SshGatewayDto gateway in canonicalGateways)
+        {
+            string? parentGatewayId = gateway.ParentGatewayId;
+            if (string.IsNullOrWhiteSpace(parentGatewayId) || gatewayMap.ContainsKey(parentGatewayId))
+            {
+                continue;
+            }
+
+            GetMissingReference(missingReferences, parentGatewayId).ConfigurationReferences.Add(
+                new GatewayOverviewConfigurationReference(
+                    GatewayOverviewConfigurationReferenceKind.ChildGatewayParent,
+                    gateway.Id,
+                    FormatGatewayName(gateway)));
         }
 
         List<GatewayOverviewGatewayGroup> gatewayGroups = canonicalGateways
@@ -90,10 +117,27 @@ public static class GatewayOverviewBuilder
             .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .Select(pair => new GatewayOverviewMissingReferenceGroup(
                 pair.Key,
-                SortSessions(pair.Value)))
+                SortSessions(pair.Value.Sessions),
+                pair.Value.ConfigurationReferences
+                    .OrderBy(reference => reference.Kind)
+                    .ThenBy(reference => reference.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .ToList()))
             .ToList();
 
         return new GatewayOverview(gatewayGroups, missingGroups);
+    }
+
+    private static MissingReferenceAccumulator GetMissingReference(
+        IDictionary<string, MissingReferenceAccumulator> missingReferences,
+        string gatewayId)
+    {
+        if (!missingReferences.TryGetValue(gatewayId, out MissingReferenceAccumulator? missingReference))
+        {
+            missingReference = new MissingReferenceAccumulator();
+            missingReferences[gatewayId] = missingReference;
+        }
+
+        return missingReference;
     }
 
     private static IReadOnlyList<GatewayOverviewSession> SortSessions(IEnumerable<GatewayOverviewSession> sessions)
@@ -163,6 +207,13 @@ public static class GatewayOverviewBuilder
     }
 
     private sealed record IndexedGateway(SshGatewayDto Gateway, int Index);
+
+    private sealed class MissingReferenceAccumulator
+    {
+        public List<GatewayOverviewSession> Sessions { get; } = [];
+
+        public List<GatewayOverviewConfigurationReference> ConfigurationReferences { get; } = [];
+    }
 }
 
 public sealed record GatewayOverview(
@@ -173,7 +224,8 @@ public sealed record GatewayOverview(
 
     public int RoutedSessionCount => Gateways.Sum(gateway => gateway.Sessions.Count);
 
-    public int MissingReferenceCount => MissingReferences.Sum(reference => reference.Sessions.Count);
+    public int MissingReferenceCount => MissingReferences.Sum(reference =>
+        reference.Sessions.Count + reference.ConfigurationReferences.Count);
 }
 
 public sealed record GatewayOverviewGatewayGroup(
@@ -185,7 +237,19 @@ public sealed record GatewayOverviewGatewayGroup(
 
 public sealed record GatewayOverviewMissingReferenceGroup(
     string GatewayId,
-    IReadOnlyList<GatewayOverviewSession> Sessions);
+    IReadOnlyList<GatewayOverviewSession> Sessions,
+    IReadOnlyList<GatewayOverviewConfigurationReference> ConfigurationReferences);
+
+public enum GatewayOverviewConfigurationReferenceKind
+{
+    GroupDefault,
+    ChildGatewayParent
+}
+
+public sealed record GatewayOverviewConfigurationReference(
+    GatewayOverviewConfigurationReferenceKind Kind,
+    string Id,
+    string DisplayName);
 
 public sealed record GatewayOverviewSession(
     string Id,

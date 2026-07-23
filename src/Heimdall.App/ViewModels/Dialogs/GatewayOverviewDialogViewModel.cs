@@ -269,9 +269,15 @@ public sealed partial class GatewayOverviewMissingReferenceItemViewModel : Obser
         GatewayId = group.GatewayId;
         HeaderText = localizer.Format("GatewayOverviewMissingHeader", group.GatewayId);
         SessionCountText = localizer.Format("GatewayOverviewSessionCount", group.Sessions.Count);
+        ConfigurationReferenceCountText = localizer.Format(
+            "GatewayOverviewConfigurationReferenceCount",
+            group.ConfigurationReferences.Count);
         SessionIds = group.Sessions.Select(session => session.Id).ToArray();
         Sessions = new ObservableCollection<GatewayOverviewSessionItemViewModel>(
             group.Sessions.Select(session => new GatewayOverviewSessionItemViewModel(session)));
+        ConfigurationReferences = new ObservableCollection<GatewayOverviewConfigurationReferenceItemViewModel>(
+            group.ConfigurationReferences.Select(reference =>
+                new GatewayOverviewConfigurationReferenceItemViewModel(reference, localizer)));
         AvailableGateways = new ObservableCollection<GatewayOption>(availableGateways);
         IsActionEnabled = isActionEnabled;
         SelectedGatewayId = AvailableGateways.FirstOrDefault()?.Id ?? "";
@@ -283,11 +289,19 @@ public sealed partial class GatewayOverviewMissingReferenceItemViewModel : Obser
 
     public string SessionCountText { get; }
 
+    public string ConfigurationReferenceCountText { get; }
+
     public IReadOnlyList<string> SessionIds { get; }
 
     public ObservableCollection<GatewayOverviewSessionItemViewModel> Sessions { get; }
 
+    public ObservableCollection<GatewayOverviewConfigurationReferenceItemViewModel> ConfigurationReferences { get; }
+
     public ObservableCollection<GatewayOption> AvailableGateways { get; }
+
+    public bool HasSessions => Sessions.Count > 0;
+
+    public bool HasConfigurationReferences => ConfigurationReferences.Count > 0;
 
     public bool HasAvailableGateways => AvailableGateways.Count > 0;
 
@@ -333,6 +347,34 @@ public sealed partial class GatewayOverviewMissingReferenceItemViewModel : Obser
         ReassignCommand.NotifyCanExecuteChanged();
         ClearCommand.NotifyCanExecuteChanged();
     }
+}
+
+public sealed class GatewayOverviewConfigurationReferenceItemViewModel
+{
+    public GatewayOverviewConfigurationReferenceItemViewModel(
+        GatewayOverviewConfigurationReference reference,
+        LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        Id = reference.Id;
+        DisplayName = reference.DisplayName;
+        ReferenceType = reference.Kind switch
+        {
+            GatewayOverviewConfigurationReferenceKind.GroupDefault =>
+                localizer["GatewayOverviewGroupDefaultReferenceType"],
+            GatewayOverviewConfigurationReferenceKind.ChildGatewayParent =>
+                localizer["GatewayOverviewChildGatewayReferenceType"],
+            _ => ""
+        };
+    }
+
+    public string Id { get; }
+
+    public string DisplayName { get; }
+
+    public string ReferenceType { get; }
 }
 
 public sealed class GatewayOverviewSessionItemViewModel

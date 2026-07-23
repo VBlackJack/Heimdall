@@ -257,6 +257,159 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task DeleteGateway_ReferencedByGroupDefault_IncludedInImpact()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                SshGateways = [CreateGateway("Gateway-Root", "Root")],
+                GroupDefaults = new Dictionary<string, GroupDefaultsDto>
+                {
+                    ["Production"] = new GroupDefaultsDto { SshGatewayId = "gateway-root" }
+                }
+            }
+        };
+        var dialog = new FakeDialogService { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedGateway = Assert.Single(viewModel.Gateways);
+
+        await viewModel.DeleteGatewayCommand.ExecuteAsync(null);
+
+        string message = Assert.Single(dialog.ConfirmCalls).Message;
+        Assert.Contains("Servers: 0", message, StringComparison.Ordinal);
+        Assert.Contains("Folder defaults: 1", message, StringComparison.Ordinal);
+        Assert.Contains("Child gateways: 0", message, StringComparison.Ordinal);
+        Assert.Single(viewModel.Gateways);
+    }
+
+    [Fact]
+    public async Task DeleteGateway_ReferencedByChildGatewayParent_IncludedInImpact()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        SshGatewayDto root = CreateGateway("Gateway-Root", "Root");
+        SshGatewayDto child = CreateGateway("gateway-child", "Child");
+        child.ParentGatewayId = "gateway-root";
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings { SshGateways = [root, child] }
+        };
+        var dialog = new FakeDialogService { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedGateway = viewModel.Gateways.Single(gateway => gateway.Id == root.Id);
+
+        await viewModel.DeleteGatewayCommand.ExecuteAsync(null);
+
+        string message = Assert.Single(dialog.ConfirmCalls).Message;
+        Assert.Contains("Servers: 0", message, StringComparison.Ordinal);
+        Assert.Contains("Folder defaults: 0", message, StringComparison.Ordinal);
+        Assert.Contains("Child gateways: 1", message, StringComparison.Ordinal);
+        Assert.Equal(2, viewModel.Gateways.Count);
+    }
+
+    [Fact]
+    public async Task DeleteGateway_OnConfirm_ClearsServersFolderDefaultsAndChildParents()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        SshGatewayDto root = CreateGateway("Gateway-Root", "Root");
+        SshGatewayDto child = CreateGateway("gateway-child", "Child");
+        child.ParentGatewayId = "gateway-root";
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                SshGateways = [root, child],
+                GroupDefaults = new Dictionary<string, GroupDefaultsDto>
+                {
+                    ["Production"] = new GroupDefaultsDto { SshGatewayId = "GATEWAY-ROOT" }
+                }
+            },
+            Servers = [CreateServer("alpha", "Alpha", "gateway-ROOT")]
+        };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedGateway = viewModel.Gateways.Single(gateway => gateway.Id == root.Id);
+
+        await viewModel.DeleteGatewayCommand.ExecuteAsync(null);
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        string message = Assert.Single(dialog.ConfirmCalls).Message;
+        Assert.Contains("Servers: 1", message, StringComparison.Ordinal);
+        Assert.Contains("Folder defaults: 1", message, StringComparison.Ordinal);
+        Assert.Contains("Child gateways: 1", message, StringComparison.Ordinal);
+        Assert.Equal(["servers", "settings"], config.PersistenceCalls);
+        Assert.Null(Assert.Single(config.Servers).SshGatewayId);
+        Assert.Null(config.Settings.GroupDefaults["Production"].SshGatewayId);
+        SshGatewayDto savedChild = Assert.Single(config.Settings.SshGateways);
+        Assert.Equal(child.Id, savedChild.Id);
+        Assert.Null(savedChild.ParentGatewayId);
+    }
+
+    [Fact]
+    public async Task DeleteGateway_InterruptedBeforeSettingsWrite_LeavesRecoverableState()
+    {
+        SshGatewayDto root = CreateGateway("Gateway-Root", "Root");
+        SshGatewayDto child = CreateGateway("gateway-child", "Child");
+        child.ParentGatewayId = "gateway-root";
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                SshGateways = [root, child],
+                GroupDefaults = new Dictionary<string, GroupDefaultsDto>
+                {
+                    ["Production"] = new GroupDefaultsDto { SshGatewayId = "GATEWAY-ROOT" }
+                }
+            },
+            Servers = [CreateServer("alpha", "Alpha", "gateway-ROOT")]
+        };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedGateway = viewModel.Gateways.Single(gateway => gateway.Id == root.Id);
+        await viewModel.DeleteGatewayCommand.ExecuteAsync(null);
+        config.FailOnMergeSetting = true;
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Equal(["servers", "settings"], config.PersistenceCalls);
+        Assert.Null(Assert.Single(config.Servers).SshGatewayId);
+        Assert.Equal("GATEWAY-ROOT", config.Settings.GroupDefaults["Production"].SshGatewayId);
+        Assert.Contains(config.Settings.SshGateways, gateway => gateway.Id == root.Id);
+        Assert.Equal(
+            "gateway-root",
+            config.Settings.SshGateways.Single(gateway => gateway.Id == child.Id).ParentGatewayId);
+    }
+
+    [Fact]
+    public async Task DeleteGateway_Unreferenced_StillDeletesCleanly()
+    {
+        SshGatewayDto gateway = CreateGateway("gateway-unused", "Unused");
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings { SshGateways = [gateway] }
+        };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedGateway = Assert.Single(viewModel.Gateways);
+
+        await viewModel.DeleteGatewayCommand.ExecuteAsync(null);
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        Assert.Empty(config.Settings.SshGateways);
+        Assert.Empty(viewModel.Gateways);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
     public async Task SaveThenLoad_PreservesNewRdpRedirectionDefaults()
     {
         var config = new FakeConfigManager();
@@ -1611,6 +1764,8 @@ public sealed class SettingsViewModelTests
 
         public List<ServerProfileDto>? SavedServers { get; private set; }
 
+        public List<string> PersistenceCalls { get; } = [];
+
         public string ConfigPath => "config";
 
         public string SettingsPath => "settings.json";
@@ -1642,6 +1797,7 @@ public sealed class SettingsViewModelTests
         public async Task MergeSettingAsync(Action<AppSettings> mutate)
         {
             MergeSettingCallCount++;
+            PersistenceCalls.Add("settings");
             if (FailOnMergeSetting)
             {
                 throw new IOException("Simulated MergeSettingAsync failure");
@@ -1665,6 +1821,7 @@ public sealed class SettingsViewModelTests
 
         public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
         {
+            PersistenceCalls.Add("servers");
             List<ServerProfileDto> servers = Servers.ToList();
             TResult result = mutate(servers);
             SavedServers = servers;

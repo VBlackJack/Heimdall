@@ -253,18 +253,29 @@
                                         BorderThickness="1">
                                     <StackPanel>
                                         <DockPanel>
-                                            <TextBlock DockPanel.Dock="Right"
-                                                       Text="{Binding SessionCountText}"
-                                                       Foreground="{DynamicResource WarningTextBrush}"
-                                                       FontSize="{StaticResource FontSizeSmallCaption}"
-                                                       FontWeight="SemiBold"/>
+                                            <StackPanel DockPanel.Dock="Right"
+                                                        HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding SessionCountText}"
+                                                           Foreground="{DynamicResource WarningTextBrush}"
+                                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                                           FontWeight="SemiBold"
+                                                           TextAlignment="Right"
+                                                           Visibility="{Binding HasSessions, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                <TextBlock Text="{Binding ConfigurationReferenceCountText}"
+                                                           Foreground="{DynamicResource WarningTextBrush}"
+                                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                                           FontWeight="SemiBold"
+                                                           TextAlignment="Right"
+                                                           Visibility="{Binding HasConfigurationReferences, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </StackPanel>
                                             <TextBlock Text="{Binding HeaderText}"
                                                        Foreground="{DynamicResource WarningTextBrush}"
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis"/>
                                         </DockPanel>
 
-                                        <Grid Margin="0,10,0,0">
+                                        <Grid Margin="0,10,0,0"
+                                              Visibility="{Binding HasSessions, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -315,6 +326,30 @@
                                                                    FontSize="{StaticResource FontSizeCaption}"
                                                                    TextTrimming="CharacterEllipsis"
                                                                    Visibility="{Binding HasMetadata, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <ItemsControl ItemsSource="{Binding ConfigurationReferences}"
+                                                      Margin="0,10,0,0"
+                                                      Visibility="{Binding HasConfigurationReferences, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type vm:GatewayOverviewConfigurationReferenceItemViewModel}">
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="260"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding DisplayName}"
+                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding ReferenceType}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                                   TextTrimming="CharacterEllipsis"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>

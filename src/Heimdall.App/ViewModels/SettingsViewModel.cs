@@ -124,6 +124,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // Projects removed before Save — servers are unassigned on flush
     private readonly List<string> _deletedProjectIds = new();
 
+    // Gateways removed before Save — all reverse references are cleared on flush
+    private readonly HashSet<string> _deletedGatewayIds = new(StringComparer.OrdinalIgnoreCase);
+
     // --- General ---
 
     [ObservableProperty]
@@ -1050,6 +1053,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _pendingGateways = settings.SshGateways.Select(CloneGateway).ToList();
         _pendingProjects = settings.Projects.Select(CloneProject).ToList();
         _deletedProjectIds.Clear();
+        _deletedGatewayIds.Clear();
 
         TrustedHostKeys.Refresh();
         IsDirty = false;
@@ -1121,19 +1125,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         List<SshGatewayDto> sshGateways = _pendingGateways.Select(CloneGateway).ToList();
         List<ProjectDto> projects = _pendingProjects.Select(CloneProject).ToList();
         HashSet<string> deletedProjectIds = _deletedProjectIds.ToHashSet(StringComparer.Ordinal);
+        HashSet<string> deletedGatewayIds = new(_deletedGatewayIds, StringComparer.OrdinalIgnoreCase);
 
         // Clear inventory references first. If the following settings commit is interrupted,
-        // the project still exists and can be reassigned; the inverse order leaves dangling IDs.
-        if (deletedProjectIds.Count > 0)
+        // the project or gateway still exists and can be reassigned; the inverse order leaves
+        // dangling IDs.
+        if (deletedProjectIds.Count > 0 || deletedGatewayIds.Count > 0)
         {
             await _configManager.MutateServersAsync(servers =>
             {
                 int changedCount = 0;
-                foreach (ServerProfileDto server in servers.Where(server =>
-                    server.ProjectId is not null && deletedProjectIds.Contains(server.ProjectId)))
+                foreach (ServerProfileDto server in servers)
                 {
-                    server.ProjectId = null;
-                    changedCount++;
+                    if (server.ProjectId is not null && deletedProjectIds.Contains(server.ProjectId))
+                    {
+                        server.ProjectId = null;
+                        changedCount++;
+                    }
+
+                    if (server.SshGatewayId is not null && deletedGatewayIds.Contains(server.SshGatewayId))
+                    {
+                        server.SshGatewayId = null;
+                        changedCount++;
+                    }
                 }
 
                 return changedCount;
@@ -1142,6 +1156,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         await _configManager.MergeSettingAsync((AppSettings settings) =>
         {
+            if (deletedGatewayIds.Count > 0)
+            {
+                foreach (GroupDefaultsDto defaults in settings.GroupDefaults.Values)
+                {
+                    if (defaults.SshGatewayId is not null &&
+                        deletedGatewayIds.Contains(defaults.SshGatewayId))
+                    {
+                        defaults.SshGatewayId = null;
+                    }
+                }
+
+                foreach (SshGatewayDto gateway in sshGateways)
+                {
+                    if (gateway.ParentGatewayId is not null &&
+                        deletedGatewayIds.Contains(gateway.ParentGatewayId))
+                    {
+                        gateway.ParentGatewayId = null;
+                    }
+                }
+
+                sshGateways.RemoveAll(gateway => deletedGatewayIds.Contains(gateway.Id));
+            }
+
             // General
             settings.DefaultLocale = DefaultLocale;
             settings.DefaultTheme = DefaultTheme;
@@ -1263,6 +1300,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         });
 
         _deletedProjectIds.Clear();
+        _deletedGatewayIds.Clear();
 
         _originalTheme = DefaultTheme;
         _originalAccentTint = AccentTint;
@@ -1796,14 +1834,57 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private async Task DeleteGatewayAsync(CancellationToken cancellationToken)
     {
         var gateway = SelectedGateway!;
+        SshGatewayDto? gatewayDto = _pendingGateways.LastOrDefault(candidate =>
+            string.Equals(candidate.Id, gateway.Id, StringComparison.OrdinalIgnoreCase));
+        if (gatewayDto is null)
+        {
+            return;
+        }
+
+        AppSettings persistedSettings = await _configManager.LoadSettingsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+        List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+        GatewayReferenceImpact impact = GatewayReferenceAnalyzer.AnalyzeDeletion(
+            gatewayDto.Id,
+            _pendingGateways,
+            servers,
+            persistedSettings.GroupDefaults);
         var confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["ConfirmDeleteGatewayTitle"],
-            _localizer.Format("ConfirmDeleteGatewayDetailMessage", gateway.Name),
+            _localizer.Format(
+                "ConfirmDeleteGatewayImpactMessage",
+                gateway.Name,
+                impact.ServerCount,
+                impact.GroupDefaultCount,
+                impact.ChildGatewayCount),
             "danger");
 
         if (!confirmed) return;
 
-        _pendingGateways.RemoveAll(g => g.Id == gateway.Id);
+        foreach (SshGatewayDto child in _pendingGateways.Where(candidate =>
+            string.Equals(
+                candidate.ParentGatewayId,
+                impact.GatewayId,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            child.ParentGatewayId = null;
+        }
+
+        foreach (GatewayItemViewModel child in Gateways.Where(candidate =>
+            string.Equals(
+                candidate.ParentGatewayId,
+                impact.GatewayId,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            child.ParentGatewayId = null;
+        }
+
+        _pendingGateways.RemoveAll(candidate => string.Equals(
+            candidate.Id,
+            impact.GatewayId,
+            StringComparison.OrdinalIgnoreCase));
+        _deletedGatewayIds.Add(impact.GatewayId);
         Gateways.Remove(gateway);
         SelectedGateway = null;
         IsDirty = true;
@@ -1822,7 +1903,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             cancellationToken.ThrowIfCancellationRequested();
 
             IReadOnlyList<SshGatewayDto> persistedGateways = persistedSettings.SshGateways;
-            GatewayOverview overview = GatewayOverviewBuilder.Build(persistedGateways, servers);
+            GatewayOverview overview = GatewayOverviewBuilder.Build(
+                persistedGateways,
+                servers,
+                persistedSettings.GroupDefaults);
             string? warningMessage = HaveSameGatewayIds(persistedGateways, _pendingGateways)
                 ? null
                 : _localizer["GatewayOverviewUnsavedGatewayChangesWarning"];
@@ -1853,7 +1937,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             reloadCancellationToken.ThrowIfCancellationRequested();
             List<ServerProfileDto> refreshedServers = await _configManager.LoadServersAsync();
             reloadCancellationToken.ThrowIfCancellationRequested();
-            return GatewayOverviewBuilder.Build(refreshedSettings.SshGateways, refreshedServers);
+            return GatewayOverviewBuilder.Build(
+                refreshedSettings.SshGateways,
+                refreshedServers,
+                refreshedSettings.GroupDefaults);
         }
     }
 
