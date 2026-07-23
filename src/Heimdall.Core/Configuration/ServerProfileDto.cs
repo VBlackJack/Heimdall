@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Heimdall.Core.Models;
 
@@ -30,6 +31,10 @@ public sealed class ServerProfileDto
     private RdpResolutionMode _rdpResolutionMode = RdpResolutionMode.FitWindow;
     private int? _rdpFixedWidth;
     private int? _rdpFixedHeight;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> ExtensionData { get; set; } =
+        new(StringComparer.Ordinal);
 
     public string Id { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;

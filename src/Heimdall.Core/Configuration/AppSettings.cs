@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Models;
@@ -28,6 +29,14 @@ namespace Heimdall.Core.Configuration;
 /// </summary>
 public sealed class AppSettings
 {
+    public const int CurrentSchemaVersion = 1;
+
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> ExtensionData { get; set; } =
+        new(StringComparer.Ordinal);
+
     // Display
     public int DefaultResolutionWidth { get; set; } = 1920;
     public int DefaultResolutionHeight { get; set; } = 1080;

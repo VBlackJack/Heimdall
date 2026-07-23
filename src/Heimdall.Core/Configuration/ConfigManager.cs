@@ -54,6 +54,10 @@ public sealed class ConfigManager : IConfigManager
     // Process-local serialization only. TODO: add cross-process locking and revision/CAS
     // before supporting multiple Heimdall instances that share one configuration directory.
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly object _settingsPublicationLock = new();
+    private readonly Func<Task> _beforeSettingsLoadPublishAsync;
+    private long _nextSettingsRevision;
+    private PublishedSettingsSnapshot? _publishedSettings;
 
     /// <summary>
     /// Initializes a ConfigManager with the legacy co-located install and writable layout.
@@ -73,6 +77,14 @@ public sealed class ConfigManager : IConfigManager
     /// <param name="installPath">Application install root containing bundled defaults.</param>
     /// <param name="dataPath">User-writable application data root.</param>
     public ConfigManager(string installPath, string dataPath)
+        : this(installPath, dataPath, beforeSettingsLoadPublishAsync: null)
+    {
+    }
+
+    internal ConfigManager(
+        string installPath,
+        string dataPath,
+        Func<Task>? beforeSettingsLoadPublishAsync)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(installPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(dataPath);
@@ -88,6 +100,8 @@ public sealed class ConfigManager : IConfigManager
         _settingsDefaultPath = Path.Combine(bundledConfigPath, "settings.default.json");
         _serversDefaultPath = Path.Combine(bundledConfigPath, "servers.default.json");
         _logsPath = ApplicationDataPathResolver.GetLogsDirectory(dataPath);
+        _beforeSettingsLoadPublishAsync =
+            beforeSettingsLoadPublishAsync ?? (static () => Task.CompletedTask);
     }
 
     /// <summary>
@@ -117,7 +131,29 @@ public sealed class ConfigManager : IConfigManager
     /// load. Lets composition-root factories read the current configuration synchronously without
     /// re-reading the settings file or blocking on the async load path.
     /// </summary>
-    public AppSettings? CurrentSettings { get; private set; }
+    public AppSettings? CurrentSettings
+    {
+        get
+        {
+            lock (_settingsPublicationLock)
+            {
+                return _publishedSettings is null
+                    ? null
+                    : CloneSettings(_publishedSettings.Settings);
+            }
+        }
+    }
+
+    internal long CurrentSettingsRevision
+    {
+        get
+        {
+            lock (_settingsPublicationLock)
+            {
+                return _publishedSettings?.Revision ?? 0;
+            }
+        }
+    }
 
     /// <summary>
     /// Performs first-run initialization: creates directories,
@@ -269,17 +305,21 @@ public sealed class ConfigManager : IConfigManager
     /// </summary>
     public async Task<AppSettings> LoadSettingsAsync()
     {
+        long revision = ReserveSettingsRevision();
+        AppSettings settings;
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            AppSettings settings = await LoadSettingsInternalAsync().ConfigureAwait(false);
-            CurrentSettings = settings;
-            return settings;
+            settings = await LoadSettingsInternalAsync().ConfigureAwait(false);
         }
         finally
         {
             _writeLock.Release();
         }
+
+        await _beforeSettingsLoadPublishAsync().ConfigureAwait(false);
+        TryPublishSettingsSnapshot(revision, settings);
+        return settings;
     }
 
     /// <summary>
@@ -289,20 +329,27 @@ public sealed class ConfigManager : IConfigManager
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        AppSettings settingsToPublish;
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            NormalizeTrustedHostKeys(settings);
-            var json = JsonSerializer.Serialize(settings, JsonOptions);
+            AppSettings currentSettings = await LoadSettingsInternalAsync(
+                requireSupportedSchemaForWrite: true).ConfigureAwait(false);
+            AppSettings settingsToSave = CloneSettings(settings);
+            MergeExtensionData(currentSettings.ExtensionData, settingsToSave.ExtensionData);
+            settingsToSave.SchemaVersion = AppSettings.CurrentSchemaVersion;
+            NormalizeTrustedHostKeys(settingsToSave);
+            var json = JsonSerializer.Serialize(settingsToSave, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
-            CurrentSettings = settings;
+            TryPublishSettingsSnapshot(ReserveSettingsRevision(), settingsToSave);
+            settingsToPublish = CloneSettings(settingsToSave);
         }
         finally
         {
             _writeLock.Release();
         }
 
-        SettingsChanged?.Invoke(settings);
+        SettingsChanged?.Invoke(settingsToPublish);
     }
 
     /// <summary>
@@ -321,7 +368,8 @@ public sealed class ConfigManager : IConfigManager
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var settings = await LoadSettingsInternalAsync().ConfigureAwait(false);
+            var settings = await LoadSettingsInternalAsync(
+                requireSupportedSchemaForWrite: true).ConfigureAwait(false);
             if (settings.TrustedHostKeysV2.ContainsKey(hostPortKey))
             {
                 return false;
@@ -330,8 +378,10 @@ public sealed class ConfigManager : IConfigManager
             var entry = CreateUserConfirmedHostKeyEntry(fingerprint);
             settings.TrustedHostKeysV2[hostPortKey] = entry;
             settings.TrustedHostKeys.TryAdd(hostPortKey, fingerprint);
+            settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
+            TryPublishSettingsSnapshot(ReserveSettingsRevision(), settings);
             return true;
         }
         finally
@@ -351,7 +401,8 @@ public sealed class ConfigManager : IConfigManager
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var settings = await LoadSettingsInternalAsync().ConfigureAwait(false);
+            var settings = await LoadSettingsInternalAsync(
+                requireSupportedSchemaForWrite: true).ConfigureAwait(false);
             var added = 0;
             foreach (var entry in entries)
             {
@@ -372,8 +423,10 @@ public sealed class ConfigManager : IConfigManager
 
             if (added > 0)
             {
+                settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
                 var json = JsonSerializer.Serialize(settings, JsonOptions);
                 await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
+                TryPublishSettingsSnapshot(ReserveSettingsRevision(), settings);
             }
 
             return added;
@@ -396,11 +449,15 @@ public sealed class ConfigManager : IConfigManager
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            settings = await LoadSettingsInternalAsync().ConfigureAwait(false);
+            settings = await LoadSettingsInternalAsync(
+                requireSupportedSchemaForWrite: true).ConfigureAwait(false);
             mutate(settings);
+            settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+            NormalizeTrustedHostKeys(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
-            CurrentSettings = settings;
+            TryPublishSettingsSnapshot(ReserveSettingsRevision(), settings);
+            settings = CloneSettings(settings);
         }
         finally
         {
@@ -413,7 +470,8 @@ public sealed class ConfigManager : IConfigManager
     /// <summary>
     /// Internal settings load that does NOT acquire the write lock (caller must hold it).
     /// </summary>
-    private async Task<AppSettings> LoadSettingsInternalAsync()
+    private async Task<AppSettings> LoadSettingsInternalAsync(
+        bool requireSupportedSchemaForWrite = false)
     {
         if (!File.Exists(_settingsPath))
         {
@@ -422,8 +480,78 @@ public sealed class ConfigManager : IConfigManager
 
         var json = await File.ReadAllTextAsync(_settingsPath, Utf8NoBom).ConfigureAwait(false);
         var settings = JsonSerializer.Deserialize<AppSettings>(json, ReadOptions) ?? new AppSettings();
+        ValidateSchemaVersion(
+            "settings",
+            _settingsPath,
+            settings.SchemaVersion,
+            AppSettings.CurrentSchemaVersion,
+            requireSupportedSchemaForWrite);
         NormalizeTrustedHostKeys(settings);
         return settings;
+    }
+
+    private long ReserveSettingsRevision() => Interlocked.Increment(ref _nextSettingsRevision);
+
+    private bool TryPublishSettingsSnapshot(long revision, AppSettings settings)
+    {
+        AppSettings immutableSnapshot = CloneSettings(settings);
+        lock (_settingsPublicationLock)
+        {
+            if (_publishedSettings is not null && revision <= _publishedSettings.Revision)
+            {
+                return false;
+            }
+
+            _publishedSettings = new PublishedSettingsSnapshot(revision, immutableSnapshot);
+            return true;
+        }
+    }
+
+    private static AppSettings CloneSettings(AppSettings settings)
+    {
+        string json = JsonSerializer.Serialize(settings, JsonOptions);
+        return JsonSerializer.Deserialize<AppSettings>(json, ReadOptions)
+            ?? throw new JsonException("Failed to clone application settings.");
+    }
+
+    private static void MergeExtensionData(
+        IReadOnlyDictionary<string, JsonElement> source,
+        IDictionary<string, JsonElement> destination)
+    {
+        foreach ((string key, JsonElement value) in source)
+        {
+            if (!destination.ContainsKey(key))
+            {
+                destination[key] = value.Clone();
+            }
+        }
+    }
+
+    private static void ValidateSchemaVersion(
+        string documentName,
+        string documentPath,
+        int foundVersion,
+        int supportedVersion,
+        bool requireSupportedSchemaForWrite)
+    {
+        if (foundVersion <= supportedVersion)
+        {
+            return;
+        }
+
+        Logging.FileLogger.Warn(
+            $"{documentName} schema version {foundVersion} is newer than supported version " +
+            $"{supportedVersion}. The document is read-only and will not be overwritten: " +
+            documentPath);
+
+        if (requireSupportedSchemaForWrite)
+        {
+            throw new ConfigurationSchemaVersionException(
+                documentName,
+                documentPath,
+                foundVersion,
+                supportedVersion);
+        }
     }
 
     private static void NormalizeTrustedHostKeys(AppSettings settings)
@@ -469,7 +597,9 @@ public sealed class ConfigManager : IConfigManager
     /// </summary>
     public async Task<List<ServerProfileDto>> LoadServersAsync()
     {
-        return await LoadServersInternalAsync().ConfigureAwait(false);
+        ServerInventoryDocument document =
+            await LoadServerInventoryInternalAsync().ConfigureAwait(false);
+        return document.Servers;
     }
 
     /// <summary>
@@ -484,16 +614,21 @@ public sealed class ConfigManager : IConfigManager
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            List<ServerProfileDto> servers = await LoadServersInternalAsync().ConfigureAwait(false);
+            ServerInventoryDocument document = await LoadServerInventoryInternalAsync(
+                requireSupportedSchemaForWrite: true).ConfigureAwait(false);
+            List<ServerProfileDto> servers = document.Servers;
             Dictionary<string, CredentialReferenceSnapshot> credentialReferences =
                 CaptureCredentialReferences(servers);
+            Dictionary<string, IReadOnlyDictionary<string, JsonElement>> extensionData =
+                CaptureServerExtensionData(servers);
             string originalJson = JsonSerializer.Serialize(servers, JsonOptions);
             TResult result = mutate(servers);
             FreezeCredentialReferencesAcrossRenames(credentialReferences, servers);
+            PreserveServerExtensionData(extensionData, servers);
             string mutatedJson = JsonSerializer.Serialize(servers, JsonOptions);
             if (!string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
             {
-                await SaveServersInternalAsync(servers).ConfigureAwait(false);
+                await SaveServerInventoryInternalAsync(document).ConfigureAwait(false);
             }
 
             return result;
@@ -507,29 +642,51 @@ public sealed class ConfigManager : IConfigManager
     /// <summary>
     /// Loads the server inventory without acquiring the write lock.
     /// </summary>
-    private async Task<List<ServerProfileDto>> LoadServersInternalAsync()
+    private async Task<ServerInventoryDocument> LoadServerInventoryInternalAsync(
+        bool requireSupportedSchemaForWrite = false)
     {
         if (!File.Exists(_serversPath))
         {
-            return new List<ServerProfileDto>();
+            return new ServerInventoryDocument();
         }
 
         var json = await File.ReadAllTextAsync(_serversPath, Utf8NoBom)
             .ConfigureAwait(false);
-        var servers = JsonSerializer.Deserialize<List<ServerProfileDto>>(json, ReadOptions);
-
-        if (servers is null)
+        using JsonDocument parsed = JsonDocument.Parse(json);
+        ServerInventoryDocument document;
+        if (parsed.RootElement.ValueKind == JsonValueKind.Array)
         {
-            return new List<ServerProfileDto>();
+            document = new ServerInventoryDocument
+            {
+                Servers = JsonSerializer.Deserialize<List<ServerProfileDto>>(json, ReadOptions) ?? []
+            };
+        }
+        else if (parsed.RootElement.ValueKind == JsonValueKind.Object)
+        {
+            document = JsonSerializer.Deserialize<ServerInventoryDocument>(json, ReadOptions)
+                ?? new ServerInventoryDocument();
+            document.Servers ??= [];
+        }
+        else
+        {
+            throw new JsonException(
+                "servers.json must contain either a legacy array or a versioned object document.");
         }
 
-        foreach (var server in servers)
+        ValidateSchemaVersion(
+            "server inventory",
+            _serversPath,
+            document.SchemaVersion,
+            ServerInventoryDocument.CurrentSchemaVersion,
+            requireSupportedSchemaForWrite);
+
+        foreach (var server in document.Servers)
         {
             PostConnectMigration.Migrate(server);
             RdpResolutionProfileMigration.Migrate(server);
         }
 
-        return servers;
+        return document;
     }
 
     /// <summary>
@@ -542,11 +699,17 @@ public sealed class ConfigManager : IConfigManager
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            List<ServerProfileDto> currentServers = await LoadServersInternalAsync().ConfigureAwait(false);
+            ServerInventoryDocument currentDocument = await LoadServerInventoryInternalAsync(
+                requireSupportedSchemaForWrite: true).ConfigureAwait(false);
+            List<ServerProfileDto> currentServers = currentDocument.Servers;
             Dictionary<string, CredentialReferenceSnapshot> credentialReferences =
                 CaptureCredentialReferences(currentServers);
+            Dictionary<string, IReadOnlyDictionary<string, JsonElement>> extensionData =
+                CaptureServerExtensionData(currentServers);
             FreezeCredentialReferencesAcrossRenames(credentialReferences, servers);
-            await SaveServersInternalAsync(servers).ConfigureAwait(false);
+            PreserveServerExtensionData(extensionData, servers);
+            currentDocument.Servers = servers;
+            await SaveServerInventoryInternalAsync(currentDocument).ConfigureAwait(false);
         }
         finally
         {
@@ -557,15 +720,16 @@ public sealed class ConfigManager : IConfigManager
     /// <summary>
     /// Persists the server inventory without acquiring the write lock.
     /// </summary>
-    private async Task SaveServersInternalAsync(List<ServerProfileDto> servers)
+    private async Task SaveServerInventoryInternalAsync(ServerInventoryDocument document)
     {
-        foreach (var server in servers)
+        document.SchemaVersion = ServerInventoryDocument.CurrentSchemaVersion;
+        foreach (var server in document.Servers)
         {
             PostConnectMigration.PrepareForSave(server);
             RdpResolutionProfileMigration.PrepareForSave(server);
         }
 
-        var json = JsonSerializer.Serialize(servers, JsonOptions);
+        var json = JsonSerializer.Serialize(document, JsonOptions);
         await WriteTextAsync(_serversPath, json).ConfigureAwait(false);
     }
 
@@ -584,6 +748,41 @@ public sealed class ConfigManager : IConfigManager
         }
 
         return snapshots;
+    }
+
+    private static Dictionary<string, IReadOnlyDictionary<string, JsonElement>>
+        CaptureServerExtensionData(IEnumerable<ServerProfileDto> servers)
+    {
+        var snapshots =
+            new Dictionary<string, IReadOnlyDictionary<string, JsonElement>>(StringComparer.Ordinal);
+        foreach (ServerProfileDto server in servers)
+        {
+            if (string.IsNullOrEmpty(server.Id))
+            {
+                continue;
+            }
+
+            var extensionData = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            MergeExtensionData(server.ExtensionData, extensionData);
+            snapshots.TryAdd(server.Id, extensionData);
+        }
+
+        return snapshots;
+    }
+
+    private static void PreserveServerExtensionData(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonElement>> previousProfiles,
+        IEnumerable<ServerProfileDto> updatedProfiles)
+    {
+        foreach (ServerProfileDto updatedProfile in updatedProfiles)
+        {
+            if (previousProfiles.TryGetValue(
+                    updatedProfile.Id,
+                    out IReadOnlyDictionary<string, JsonElement>? extensionData))
+            {
+                MergeExtensionData(extensionData, updatedProfile.ExtensionData);
+            }
+        }
     }
 
     private static void FreezeCredentialReferencesAcrossRenames(
@@ -607,6 +806,10 @@ public sealed class ConfigManager : IConfigManager
     private readonly record struct CredentialReferenceSnapshot(
         string DisplayName,
         string? VaultEntryName);
+
+    private sealed record PublishedSettingsSnapshot(
+        long Revision,
+        AppSettings Settings);
 
     /// <summary>
     /// Writes text content to a file using UTF-8 without BOM encoding.
