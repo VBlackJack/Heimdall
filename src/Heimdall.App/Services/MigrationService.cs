@@ -52,8 +52,14 @@ public sealed class MigrationService
             return false;
         }
 
-        var settingsPath = Path.Combine(legacyPath, "config", "settings.json");
-        var serversPath = Path.Combine(legacyPath, "config", "servers.json");
+        var settingsPath = Path.Combine(
+            legacyPath,
+            AppConstants.BundledConfigDirectoryName,
+            "settings.json");
+        var serversPath = Path.Combine(
+            legacyPath,
+            AppConstants.BundledConfigDirectoryName,
+            "servers.json");
         return File.Exists(settingsPath) && File.Exists(serversPath);
     }
 
@@ -87,7 +93,10 @@ public sealed class MigrationService
     private async Task ImportSettingsAsync(
         string legacyPath, MigrationResult result, CancellationToken ct)
     {
-        var legacySettingsPath = Path.Combine(legacyPath, "config", "settings.json");
+        var legacySettingsPath = Path.Combine(
+            legacyPath,
+            AppConstants.BundledConfigDirectoryName,
+            "settings.json");
         var legacyJson = await File.ReadAllTextAsync(legacySettingsPath, ct);
         var legacySettings = JsonSerializer.Deserialize<JsonElement>(legacyJson);
 
@@ -100,7 +109,10 @@ public sealed class MigrationService
     private async Task ImportServersAsync(
         string legacyPath, MigrationResult result, CancellationToken ct)
     {
-        var legacyServersPath = Path.Combine(legacyPath, "config", "servers.json");
+        var legacyServersPath = Path.Combine(
+            legacyPath,
+            AppConstants.BundledConfigDirectoryName,
+            "servers.json");
         var legacyJson = await File.ReadAllTextAsync(legacyServersPath, ct);
         var legacyServers = JsonSerializer.Deserialize<List<JsonElement>>(legacyJson);
 

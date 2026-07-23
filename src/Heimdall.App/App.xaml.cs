@@ -56,6 +56,7 @@ public partial class App : System.Windows.Application
 {
     private ServiceProvider? _serviceProvider;
     private MainViewModel? _mainViewModel;
+    private string? _dataRoot;
     private string? _notesStoragePath;
 
     // Timeout for the single long-lived updater HttpClient (no magic number inline).
@@ -118,10 +119,8 @@ public partial class App : System.Windows.Application
             }
         };
 
-        // Initialize file logger
-        var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-        Heimdall.Core.Logging.FileLogger.Initialize(logDir);
-        Heimdall.Core.Logging.ConnectionHistory.Initialize(logDir);
+        _dataRoot = ApplicationDataPathResolver.Resolve();
+        InitializeLogging(_dataRoot);
         Heimdall.Core.Logging.FileLogger.Info("Heimdall starting");
         LogMsTscAxRegistration();
 
@@ -131,7 +130,7 @@ public partial class App : System.Windows.Application
         try
         {
             var services = new ServiceCollection();
-            ConfigureServices(services);
+            ConfigureServices(services, _dataRoot);
             _serviceProvider = services.BuildServiceProvider();
 
             // Initialize core services
@@ -140,7 +139,7 @@ public partial class App : System.Windows.Application
 
             var localization = _serviceProvider.GetRequiredService<LocalizationManager>();
             var settings = await configManager.LoadSettingsAsync();
-            _notesStoragePath = ResolveNotesStoragePath(settings, AppDomain.CurrentDomain.BaseDirectory);
+            _notesStoragePath = ResolveNotesStoragePath(settings, _dataRoot);
 
             await localization.LoadAsync(
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "locales"),
@@ -472,11 +471,12 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private void ConfigureServices(IServiceCollection services)
+    private void ConfigureServices(IServiceCollection services, string dataRoot)
     {
         // Core services
         services.AddSingleton<IConfigManager>(_ => new ConfigManager(
-            AppDomain.CurrentDomain.BaseDirectory));
+            AppDomain.CurrentDomain.BaseDirectory,
+            dataRoot));
         services.AddSingleton<ConfigManager>(sp =>
             (ConfigManager)sp.GetRequiredService<IConfigManager>());
         services.AddSingleton<LocalizationManager>();
@@ -545,12 +545,9 @@ public partial class App : System.Windows.Application
             LocalizationManager localizer = sp.GetRequiredService<LocalizationManager>();
             ILogger<SessionLogService> logger = sp.GetRequiredService<ILogger<SessionLogService>>();
 
-            // FileLogger writes to "<base>/logs"; root session logs under the same writable base so
-            // a relative SessionLogDirectory (default "logs/sessions") lands beside heimdall_*.log.
-            string fileLoggerLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-            string sessionLogBaseDirectory = Directory.GetParent(fileLoggerLogDirectory)?.FullName
-                ?? AppDomain.CurrentDomain.BaseDirectory;
-            string root = SessionLogPathResolver.Resolve(currentSettings, sessionLogBaseDirectory);
+            // A relative SessionLogDirectory (default "logs/sessions") is rooted beneath the
+            // same user-writable data root as the diagnostic logger.
+            string root = SessionLogPathResolver.Resolve(currentSettings, dataRoot);
 
             return new SessionLogService(
                 root,
@@ -570,10 +567,7 @@ public partial class App : System.Windows.Application
             ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
             AppSettings currentSettings = configManager.CurrentSettings ?? new AppSettings();
 
-            string fileLoggerLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-            string sessionLogBaseDirectory = Directory.GetParent(fileLoggerLogDirectory)?.FullName
-                ?? AppDomain.CurrentDomain.BaseDirectory;
-            string root = SessionLogPathResolver.Resolve(currentSettings, sessionLogBaseDirectory);
+            string root = SessionLogPathResolver.Resolve(currentSettings, dataRoot);
 
             return new SessionEventLog(
                 root,
@@ -593,10 +587,7 @@ public partial class App : System.Windows.Application
             ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
             AppSettings currentSettings = configManager.CurrentSettings ?? new AppSettings();
 
-            string fileLoggerLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-            string sessionLogBaseDirectory = Directory.GetParent(fileLoggerLogDirectory)?.FullName
-                ?? AppDomain.CurrentDomain.BaseDirectory;
-            string root = SessionLogPathResolver.Resolve(currentSettings, sessionLogBaseDirectory);
+            string root = SessionLogPathResolver.Resolve(currentSettings, dataRoot);
 
             return new SessionOperationLog(
                 root,
@@ -700,7 +691,35 @@ public partial class App : System.Windows.Application
                 : Path.Combine(basePath, settings.NotesDirectory);
         }
 
-        return Path.Combine(basePath, "config", "notes");
+        return Path.Combine(
+            basePath,
+            AppConstants.BundledConfigDirectoryName,
+            AppConstants.NotesDirectoryName);
+    }
+
+    internal static void InitializeLogging(string dataRoot)
+    {
+        string logDirectory = ApplicationDataPathResolver.GetLogsDirectory(dataRoot);
+
+        try
+        {
+            Heimdall.Core.Logging.FileLogger.Initialize(logDirectory);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"File logging is unavailable: {ex.Message}");
+        }
+
+        try
+        {
+            Heimdall.Core.Logging.ConnectionHistory.Initialize(logDirectory);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Connection history logging is unavailable: {ex.Message}");
+        }
     }
 
     internal static async Task PersistTrustedHostKeyAsync(
@@ -941,7 +960,8 @@ public partial class App : System.Windows.Application
     {
         // Update logging state
         Core.Logging.FileLogger.SetEnabled(newSettings.EnableLogging);
-        _notesStoragePath = ResolveNotesStoragePath(newSettings, AppDomain.CurrentDomain.BaseDirectory);
+        string dataRoot = _dataRoot ?? ApplicationDataPathResolver.Resolve();
+        _notesStoragePath = ResolveNotesStoragePath(newSettings, dataRoot);
 
         // Delegate theme swap to the centralized service on the UI thread.
         // Idempotent: HeimdallThemeService skips the swap when the theme is unchanged.
@@ -959,7 +979,9 @@ public partial class App : System.Windows.Application
     private string GetNotesStoragePath()
     {
         return _notesStoragePath
-            ?? ResolveNotesStoragePath(new AppSettings(), AppDomain.CurrentDomain.BaseDirectory);
+            ?? ResolveNotesStoragePath(
+                new AppSettings(),
+                _dataRoot ?? ApplicationDataPathResolver.Resolve());
     }
 
     private void ShowUnhandledException(Exception exception)

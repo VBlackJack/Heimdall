@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.Json;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.Core.Discovery;
 
@@ -41,7 +42,7 @@ public static class KnowledgeBaseManager
     private const int CurrentVersion = 1;
 
     internal static string GetKbPath() =>
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "network-kb.json");
+        Path.Combine(ApplicationDataPathResolver.Resolve(), "network-kb.json");
 
     /// <summary>
     /// Loads the knowledge base from disk. Returns an empty KB if the file

@@ -43,7 +43,8 @@ public sealed class ConfigManager : IConfigManager
 
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
-    private readonly string _basePath;
+    private readonly string _installPath;
+    private readonly string _dataPath;
     private readonly string _configPath;
     private readonly string _settingsPath;
     private readonly string _serversPath;
@@ -55,20 +56,38 @@ public sealed class ConfigManager : IConfigManager
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     /// <summary>
-    /// Initializes a new ConfigManager rooted at the given application base path.
+    /// Initializes a ConfigManager with the legacy co-located install and writable layout.
+    /// This overload is retained for compatibility with isolated consumers and tests.
     /// </summary>
-    /// <param name="basePath">Root directory of the application (where config/ lives).</param>
+    /// <param name="basePath">Root directory containing the bundled config directory.</param>
     public ConfigManager(string basePath)
+        : this(
+            basePath,
+            Path.Combine(basePath, AppConstants.BundledConfigDirectoryName))
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(basePath);
+    }
 
-        _basePath = basePath;
-        _configPath = Path.Combine(basePath, "config");
+    /// <summary>
+    /// Initializes a ConfigManager with separate read-only install and writable data roots.
+    /// </summary>
+    /// <param name="installPath">Application install root containing bundled defaults.</param>
+    /// <param name="dataPath">User-writable application data root.</param>
+    public ConfigManager(string installPath, string dataPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(installPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataPath);
+
+        _installPath = installPath;
+        _dataPath = dataPath;
+        _configPath = dataPath;
         _settingsPath = Path.Combine(_configPath, "settings.json");
         _serversPath = Path.Combine(_configPath, "servers.json");
-        _settingsDefaultPath = Path.Combine(_configPath, "settings.default.json");
-        _serversDefaultPath = Path.Combine(_configPath, "servers.default.json");
-        _logsPath = Path.Combine(basePath, "logs");
+
+        string bundledConfigPath =
+            Path.Combine(installPath, AppConstants.BundledConfigDirectoryName);
+        _settingsDefaultPath = Path.Combine(bundledConfigPath, "settings.default.json");
+        _serversDefaultPath = Path.Combine(bundledConfigPath, "servers.default.json");
+        _logsPath = ApplicationDataPathResolver.GetLogsDirectory(dataPath);
     }
 
     /// <summary>
@@ -134,6 +153,8 @@ public sealed class ConfigManager : IConfigManager
             }
         }
 
+        MigrateLegacyData();
+
         if (!File.Exists(_settingsPath))
         {
             if (File.Exists(_settingsDefaultPath))
@@ -164,6 +185,83 @@ public sealed class ConfigManager : IConfigManager
 
         ApplyFileAcl(_settingsPath);
         ApplyFileAcl(_serversPath);
+    }
+
+    private void MigrateLegacyData()
+    {
+        string legacyConfigPath =
+            Path.Combine(_installPath, AppConstants.BundledConfigDirectoryName);
+
+        string[] legacyRuntimeFiles =
+        [
+            "settings.json",
+            "servers.json",
+            "password-presets.json",
+            "network-kb.json",
+            "session-snapshot.json",
+            "split-layouts.json"
+        ];
+
+        foreach (string fileName in legacyRuntimeFiles)
+        {
+            CopyFileIfMissing(
+                Path.Combine(legacyConfigPath, fileName),
+                Path.Combine(_dataPath, fileName));
+        }
+
+        CopyDirectoryContentsWithoutOverwrite(
+            Path.Combine(legacyConfigPath, AppConstants.NetworkScansDirectoryName),
+            ApplicationDataPathResolver.GetNetworkScansDirectory(_dataPath));
+
+        CopyDirectoryContentsWithoutOverwrite(
+            Path.Combine(legacyConfigPath, AppConstants.NotesDirectoryName),
+            Path.Combine(
+                _dataPath,
+                AppConstants.BundledConfigDirectoryName,
+                AppConstants.NotesDirectoryName));
+
+        CopyDirectoryContentsWithoutOverwrite(
+            Path.Combine(_installPath, AppConstants.MacrosDirectoryName),
+            ApplicationDataPathResolver.GetMacrosDirectory(_dataPath));
+
+        CopyDirectoryContentsWithoutOverwrite(
+            Path.Combine(_installPath, AppConstants.LogsDirectoryName),
+            _logsPath);
+    }
+
+    private static void CopyFileIfMissing(string sourcePath, string destinationPath)
+    {
+        if (!File.Exists(sourcePath) || File.Exists(destinationPath))
+        {
+            return;
+        }
+
+        string? destinationDirectory = Path.GetDirectoryName(destinationPath);
+        if (!string.IsNullOrEmpty(destinationDirectory))
+        {
+            Directory.CreateDirectory(destinationDirectory);
+        }
+
+        File.Copy(sourcePath, destinationPath, overwrite: false);
+    }
+
+    private static void CopyDirectoryContentsWithoutOverwrite(
+        string sourceDirectory,
+        string destinationDirectory)
+    {
+        if (!Directory.Exists(sourceDirectory))
+        {
+            return;
+        }
+
+        foreach (string sourcePath in Directory.EnumerateFiles(
+                     sourceDirectory,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            string relativePath = Path.GetRelativePath(sourceDirectory, sourcePath);
+            CopyFileIfMissing(sourcePath, Path.Combine(destinationDirectory, relativePath));
+        }
     }
 
     /// <summary>

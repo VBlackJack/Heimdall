@@ -1356,7 +1356,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Load factory defaults from settings.default.json (preserves bundled external tools)
         // rather than new AppSettings() which has empty defaults for collections.
         var defaultsPath = System.IO.Path.Combine(
-            AppContext.BaseDirectory, "config", "settings.default.json");
+            AppContext.BaseDirectory,
+            AppConstants.BundledConfigDirectoryName,
+            "settings.default.json");
 
         if (System.IO.File.Exists(defaultsPath))
         {

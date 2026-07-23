@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.Json;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.Core.Discovery;
 
@@ -40,7 +41,8 @@ public static class ScanHistoryManager
     internal const int MaxRetainedSnapshots = 20;
 
     private static string GetScanDir() =>
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "network-scans");
+        ApplicationDataPathResolver.GetNetworkScansDirectory(
+            ApplicationDataPathResolver.Resolve());
 
     /// <summary>
     /// Persists a scan snapshot to the history directory as JSON.

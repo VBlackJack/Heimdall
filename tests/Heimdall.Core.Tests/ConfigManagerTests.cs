@@ -72,6 +72,16 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal(Path.Combine(_tempDir, "config", "servers.json"), _manager.ServersPath);
     }
 
+    [Fact]
+    public void DataRoot_ResolvesToLocalAppData_AppFolder()
+    {
+        string expected = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            AppConstants.ApplicationFolderName);
+
+        Assert.Equal(expected, ApplicationDataPathResolver.Resolve());
+    }
+
     // ── InitializeAsync ────────────────────────────────────────────────
 
     [Fact]
@@ -80,7 +90,140 @@ public class ConfigManagerTests : IDisposable
         await _manager.InitializeAsync();
 
         Assert.True(Directory.Exists(Path.Combine(_tempDir, "config")));
-        Assert.True(Directory.Exists(Path.Combine(_tempDir, "logs")));
+        Assert.True(Directory.Exists(
+            ApplicationDataPathResolver.GetLogsDirectory(_manager.ConfigPath)));
+    }
+
+    [Fact]
+    public async Task ConfigManager_WritesRuntimeFilesUnderDataRoot_NotInstallRoot()
+    {
+        string installRoot = Path.Combine(_tempDir, "install");
+        string dataRoot = Path.Combine(_tempDir, "data");
+        Directory.CreateDirectory(installRoot);
+        var manager = new ConfigManager(installRoot, dataRoot);
+
+        await manager.InitializeAsync();
+        await manager.SaveSettingsAsync(new AppSettings { DefaultLocale = "fr" });
+        await manager.SaveServersAsync([]);
+
+        Assert.Equal(dataRoot, manager.ConfigPath);
+        Assert.Equal(Path.Combine(dataRoot, "settings.json"), manager.SettingsPath);
+        Assert.Equal(Path.Combine(dataRoot, "servers.json"), manager.ServersPath);
+        Assert.True(File.Exists(manager.SettingsPath));
+        Assert.True(File.Exists(manager.ServersPath));
+        Assert.False(File.Exists(Path.Combine(installRoot, "config", "settings.json")));
+        Assert.False(File.Exists(Path.Combine(installRoot, "config", "servers.json")));
+    }
+
+    [Fact]
+    public async Task ConfigManager_ResolvesDefaultsFromInstallRoot()
+    {
+        string installRoot = Path.Combine(_tempDir, "install-default-resolution");
+        string dataRoot = Path.Combine(_tempDir, "data-default-resolution");
+        string bundledConfigPath = Path.Combine(installRoot, "config");
+        Directory.CreateDirectory(bundledConfigPath);
+        await File.WriteAllTextAsync(
+            Path.Combine(bundledConfigPath, "settings.default.json"),
+            """{"defaultLocale":"fr","defaultTheme":"Blade"}""",
+            new UTF8Encoding(false));
+
+        var manager = new ConfigManager(installRoot, dataRoot);
+        await manager.InitializeAsync();
+
+        AppSettings settings = await manager.LoadSettingsAsync();
+        Assert.Equal("fr", settings.DefaultLocale);
+        Assert.Equal("Blade", settings.DefaultTheme);
+    }
+
+    [Fact]
+    public async Task ConfigManager_Initialize_DoesNotCreateDirectoriesUnderInstallRoot()
+    {
+        string installRoot = Path.Combine(_tempDir, "missing-install-root");
+        string dataRoot = Path.Combine(_tempDir, "isolated-data-root");
+        var manager = new ConfigManager(installRoot, dataRoot);
+
+        await manager.InitializeAsync();
+
+        Assert.False(Directory.Exists(installRoot));
+        Assert.True(Directory.Exists(dataRoot));
+        Assert.True(Directory.Exists(
+            ApplicationDataPathResolver.GetLogsDirectory(dataRoot)));
+    }
+
+    [Fact]
+    public async Task ConfigManager_FirstRun_CopiesBundledDefaultsIntoDataRoot()
+    {
+        string installRoot = Path.Combine(_tempDir, "install-first-run");
+        string dataRoot = Path.Combine(_tempDir, "data-first-run");
+        string bundledConfigPath = Path.Combine(installRoot, "config");
+        Directory.CreateDirectory(bundledConfigPath);
+        const string SettingsJson = """{"defaultLocale":"fr"}""";
+        const string ServersJson = "[]";
+        await File.WriteAllTextAsync(
+            Path.Combine(bundledConfigPath, "settings.default.json"),
+            SettingsJson,
+            new UTF8Encoding(false));
+        await File.WriteAllTextAsync(
+            Path.Combine(bundledConfigPath, "servers.default.json"),
+            ServersJson,
+            new UTF8Encoding(false));
+
+        var manager = new ConfigManager(installRoot, dataRoot);
+        await manager.InitializeAsync();
+
+        Assert.Equal(SettingsJson, await File.ReadAllTextAsync(manager.SettingsPath));
+        Assert.Equal(ServersJson, await File.ReadAllTextAsync(manager.ServersPath));
+        Assert.False(File.Exists(Path.Combine(installRoot, "config", "settings.json")));
+        Assert.False(File.Exists(Path.Combine(installRoot, "config", "servers.json")));
+    }
+
+    [Fact]
+    public async Task Migration_MovesLegacyRuntimeFiles_Idempotent_DoesNotOverwriteNewer()
+    {
+        string installRoot = Path.Combine(_tempDir, "legacy-install");
+        string dataRoot = Path.Combine(_tempDir, "migrated-data");
+        string legacyConfigPath = Path.Combine(installRoot, "config");
+        Directory.CreateDirectory(legacyConfigPath);
+        const string LegacySettings = """{"defaultLocale":"fr"}""";
+        const string LegacyServers = """[{"id":"legacy","displayName":"Legacy"}]""";
+        await File.WriteAllTextAsync(
+            Path.Combine(legacyConfigPath, "settings.json"),
+            LegacySettings,
+            new UTF8Encoding(false));
+        await File.WriteAllTextAsync(
+            Path.Combine(legacyConfigPath, "servers.json"),
+            LegacyServers,
+            new UTF8Encoding(false));
+
+        var manager = new ConfigManager(installRoot, dataRoot);
+        await manager.InitializeAsync();
+
+        Assert.Equal(LegacySettings, await File.ReadAllTextAsync(manager.SettingsPath));
+        Assert.Equal(LegacyServers, await File.ReadAllTextAsync(manager.ServersPath));
+
+        const string NewerSettings = """{"defaultLocale":"en","defaultTheme":"Matrix"}""";
+        const string NewerServers = """[{"id":"newer","displayName":"Newer"}]""";
+        await File.WriteAllTextAsync(
+            manager.SettingsPath,
+            NewerSettings,
+            new UTF8Encoding(false));
+        await File.WriteAllTextAsync(
+            manager.ServersPath,
+            NewerServers,
+            new UTF8Encoding(false));
+        await File.WriteAllTextAsync(
+            Path.Combine(legacyConfigPath, "settings.json"),
+            """{"defaultLocale":"de"}""",
+            new UTF8Encoding(false));
+        await File.WriteAllTextAsync(
+            Path.Combine(legacyConfigPath, "servers.json"),
+            "[]",
+            new UTF8Encoding(false));
+
+        await manager.InitializeAsync();
+
+        Assert.Equal(NewerSettings, await File.ReadAllTextAsync(manager.SettingsPath));
+        Assert.Equal(NewerServers, await File.ReadAllTextAsync(manager.ServersPath));
     }
 
     [Fact]

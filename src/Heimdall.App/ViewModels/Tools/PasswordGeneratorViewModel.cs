@@ -21,6 +21,7 @@ using System.Text;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
@@ -1122,8 +1123,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     private static string GetPresetsFilePath()
     {
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
-        return Path.Combine(appDir, "config", "password-presets.json");
+        return Path.Combine(
+            ApplicationDataPathResolver.Resolve(),
+            "password-presets.json");
     }
 
     private List<PasswordPreset> LoadCustomPresets()

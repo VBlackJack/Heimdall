@@ -16,17 +16,19 @@
 
 using System.IO;
 using System.Text.Json;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services;
 
 /// <summary>
-/// Persists and loads terminal macros from the <c>macros/</c> directory under the application base.
+/// Persists and loads terminal macros beneath the user-writable application data root.
 /// </summary>
 public static class MacroService
 {
     private static readonly string MacroDirectory =
-        Path.Combine(AppContext.BaseDirectory, "macros");
+        ApplicationDataPathResolver.GetMacrosDirectory(
+            ApplicationDataPathResolver.Resolve());
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

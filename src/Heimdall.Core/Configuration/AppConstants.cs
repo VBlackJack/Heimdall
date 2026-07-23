@@ -21,6 +21,24 @@ namespace Heimdall.Core.Configuration;
 /// </summary>
 public static class AppConstants
 {
+    /// <summary>Application directory name under the current user's local application data.</summary>
+    public const string ApplicationFolderName = "Heimdall";
+
+    /// <summary>Install-directory subfolder containing bundled configuration templates.</summary>
+    public const string BundledConfigDirectoryName = "config";
+
+    /// <summary>Writable diagnostic and connection-history subfolder.</summary>
+    public const string LogsDirectoryName = "logs";
+
+    /// <summary>Writable terminal-macro subfolder.</summary>
+    public const string MacrosDirectoryName = "macros";
+
+    /// <summary>Writable network-scan history subfolder.</summary>
+    public const string NetworkScansDirectoryName = "network-scans";
+
+    /// <summary>Writable notes subfolder within the legacy relative config path.</summary>
+    public const string NotesDirectoryName = "notes";
+
     /// <summary>Maximum import file size for Command Library JSON imports.</summary>
     public const long MaxImportFileSizeBytes = 50 * 1024 * 1024;
 

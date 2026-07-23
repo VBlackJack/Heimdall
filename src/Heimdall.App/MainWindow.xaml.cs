@@ -501,7 +501,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
 
         var configPath = vm.ConfigManager.ConfigPath;
-        var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+        var logPath = ApplicationDataPathResolver.GetLogsDirectory(
+            ApplicationDataPathResolver.Resolve());
         AboutConfigPathText.Text = configPath;
         AboutConfigPathText.ToolTip = configPath;
         AboutLogPathText.Text = logPath;
@@ -518,7 +519,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void OnAboutOpenLogsClick(object sender, RoutedEventArgs e)
     {
-        var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+        var logPath = ApplicationDataPathResolver.GetLogsDirectory(
+            ApplicationDataPathResolver.Resolve());
         OpenFolderInExplorer(logPath);
     }
 

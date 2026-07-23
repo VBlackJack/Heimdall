@@ -19,6 +19,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Views.Tools;
 
@@ -192,7 +193,9 @@ public partial class HackerSimulatorView
 
     private static string? ResolveConfigOverridePath(string overrideFileName, string defaultFileName)
     {
-        string configPath = Path.Combine(AppContext.BaseDirectory, "config");
+        string configPath = Path.Combine(
+            AppContext.BaseDirectory,
+            AppConstants.BundledConfigDirectoryName);
         string overridePath = Path.Combine(configPath, overrideFileName);
         if (File.Exists(overridePath))
             return overridePath;
