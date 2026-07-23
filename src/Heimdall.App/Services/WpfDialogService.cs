@@ -165,6 +165,27 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task<ServerBulkEditGatewayResult?> ShowBulkEditGatewayAsync(
+        int count,
+        IReadOnlyList<GatewayOption> availableGateways,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var vm = new ServerBulkEditGatewayViewModel(_localizer, count, availableGateways);
+        var dialog = new ServerBulkEditGatewayDialog
+        {
+            DataContext = vm,
+            Owner = GetOwnerWindow()
+        };
+
+        ServerBulkEditGatewayResult? result = dialog.ShowDialog() == true
+            ? vm.ResolvedResult
+            : null;
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
     public async Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null)
     {
         var vm = editVm ?? new ServerDialogViewModel();

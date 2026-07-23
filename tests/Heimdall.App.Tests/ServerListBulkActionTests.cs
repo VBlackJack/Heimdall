@@ -1746,6 +1746,243 @@ public sealed class ServerListBulkActionTests
         Assert.Equal("gateway missing", alphaVm.GatewayBadgeText);
     }
 
+    [Fact]
+    public async Task BulkEditGateway_AppliesToEligibleSelectedServers_Only()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("GW-Target", "Bastion"));
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        ServerProfileDto rdp = CreateServer("rdp", "RDP", "ops");
+        rdp.ConnectionType = "RDP";
+        ServerProfileDto unselected = CreateServer("unselected", "Unselected", "ops");
+        await fixture.LoadServersAsync(settings, ssh, rdp, unselected);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.UseGateway,
+            "gw-target");
+        fixture.ViewModel.SelectSingle(fixture.ServerById("ssh"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("rdp"));
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        Assert.All(
+            storedServers.Where(server => server.Id is "ssh" or "rdp"),
+            server =>
+            {
+                Assert.Equal("GW-Target", server.SshGatewayId);
+                Assert.False(server.UseDirectConnection);
+            });
+        Assert.Null(Assert.Single(storedServers, server => server.Id == "unselected").SshGatewayId);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_IneligibleProtocols_SkippedAndReported_NotBadged()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-target", "Bastion"));
+        ServerProfileDto telnet = CreateServer("telnet", "Telnet", "ops");
+        telnet.ConnectionType = "TELNET";
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        await fixture.LoadServersAsync(settings, telnet, ssh);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.UseGateway,
+            "gw-target");
+        fixture.ViewModel.SelectSingle(fixture.ServerById("telnet"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("ssh"));
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        ServerProfileDto storedTelnet = Assert.Single(storedServers, server => server.Id == "telnet");
+        Assert.Null(storedTelnet.SshGatewayId);
+        Assert.False(storedTelnet.UseDirectConnection);
+        ServerItemViewModel telnetVm = fixture.ServerById("telnet");
+        Assert.False(telnetVm.IsGatewayBadgeVisible);
+        Assert.False(telnetVm.IsGatewayMissing);
+        Assert.Equal(
+            "Skipped 1 item(s): their protocols do not support SSH gateways.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_DirectChoice_ClearsGatewayAndSetsDirect_AllSelected()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        ssh.SshGatewayId = "gw-old";
+        ServerProfileDto telnet = CreateServer("telnet", "Telnet", "ops");
+        telnet.ConnectionType = "TELNET";
+        telnet.SshGatewayId = "gw-residual";
+        await fixture.LoadServersAsync(settings, ssh, telnet);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.DirectConnection,
+            GatewayId: null);
+        fixture.ViewModel.SelectSingle(fixture.ServerById("ssh"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("telnet"));
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        Assert.All(
+            storedServers,
+            server =>
+            {
+                Assert.Null(server.SshGatewayId);
+                Assert.True(server.UseDirectConnection);
+            });
+        Assert.Null(fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_InheritChoice_ClearsExplicitGateway_ResolvesGroupDefault()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-default", "Default"));
+        settings.SshGateways.Add(CreateGateway("gw-explicit", "Explicit"));
+        settings.GroupDefaults["ops"] = new GroupDefaultsDto { SshGatewayId = "gw-default" };
+        ServerProfileDto alpha = CreateServer("alpha", "Alpha", "ops");
+        alpha.SshGatewayId = "gw-explicit";
+        ServerProfileDto beta = CreateServer("beta", "Beta", "ops");
+        beta.ConnectionType = "TELNET";
+        beta.UseDirectConnection = true;
+        await fixture.LoadServersAsync(settings, alpha, beta);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.InheritFolderDefault,
+            GatewayId: null);
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        AppSettings storedSettings = await fixture.ConfigManager.LoadSettingsAsync();
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        Assert.All(
+            storedServers,
+            server =>
+            {
+                Assert.Null(server.SshGatewayId);
+                Assert.False(server.UseDirectConnection);
+            });
+        ServerProfileDto storedAlpha = Assert.Single(storedServers, server => server.Id == "alpha");
+        GroupDefaultsDto defaults = GroupDefaultsDto.Resolve(
+            storedAlpha.Group,
+            storedSettings.GroupDefaults);
+        defaults.ApplyTo(storedAlpha);
+        Assert.Equal("gw-default", storedAlpha.SshGatewayId);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_DeletedGatewayAfterDialogOpen_Aborts()
+    {
+        FailingSaveConfigManager configManager = new();
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            configManager: configManager);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-target", "Bastion"));
+        ServerProfileDto alpha = CreateServer("alpha", "Alpha", "ops");
+        alpha.SshGatewayId = "gw-original";
+        ServerProfileDto beta = CreateServer("beta", "Beta", "ops");
+        beta.SshGatewayId = "gw-original";
+        await fixture.LoadServersAsync(settings, alpha, beta);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.UseGateway,
+            "gw-target");
+        fixture.DialogService.OnBulkEditGatewayShown = async cancellationToken =>
+        {
+            AppSettings currentSettings = await configManager.LoadSettingsAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            currentSettings.SshGateways.RemoveAll(gateway =>
+                string.Equals(gateway.Id, "gw-target", StringComparison.OrdinalIgnoreCase));
+            await configManager.SaveSettingsAsync(currentSettings);
+        };
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        int saveCountBeforeCommand = configManager.SaveServersCallCount;
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Equal(saveCountBeforeCommand, configManager.SaveServersCallCount);
+        Assert.All(
+            await fixture.ConfigManager.LoadServersAsync(),
+            server => Assert.Equal("gw-original", server.SshGatewayId));
+        Assert.Equal(
+            "Skipped 2 item(s): SSH gateway \"gw-target\" no longer exists.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_PreservesVmIdentityAndSelection()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-target", "Bastion"));
+        await fixture.LoadServersAsync(
+            settings,
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        ServerItemViewModel alphaVm = fixture.ServerById("alpha");
+        ServerItemViewModel betaVm = fixture.ServerById("beta");
+        fixture.ViewModel.SelectSingle(alphaVm);
+        fixture.ViewModel.ToggleSelection(betaVm);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.UseGateway,
+            "gw-target");
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Same(alphaVm, fixture.ServerById("alpha"));
+        Assert.Same(betaVm, fixture.ServerById("beta"));
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        Assert.Same(betaVm, fixture.ViewModel.SelectedServer);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_DialogBindsCredentialFreeProjection_NotSshGatewayDto()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        SshGatewayDto gateway = CreateGateway("gw-target", "Bastion");
+        gateway.SshPasswordEncrypted = "encrypted-password";
+        gateway.SshKeyPassphraseEncrypted = "encrypted-passphrase";
+        settings.SshGateways.Add(gateway);
+        await fixture.LoadServersAsync(
+            settings,
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        fixture.DialogService.NextBulkEditGatewayResult = null;
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        GatewayOption option = Assert.Single(fixture.DialogService.LastBulkEditGatewayOptions);
+        Assert.Equal("gw-target", option.Id);
+        Assert.Equal("Bastion", option.Name);
+        Assert.DoesNotContain(
+            typeof(GatewayOption).GetProperties(),
+            property => property.Name.Contains("Password", StringComparison.OrdinalIgnoreCase)
+                        || property.Name.Contains("Credential", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(
+            typeof(GatewayOption),
+            typeof(ServerBulkEditGatewayViewModel)
+                .GetProperty(nameof(ServerBulkEditGatewayViewModel.AvailableGateways))!
+                .PropertyType
+                .GetGenericArguments()
+                .Single());
+    }
+
     private static ServerProfileDto CreateServer(
         string id,
         string displayName,
@@ -2041,6 +2278,16 @@ public sealed class ServerListBulkActionTests
 
         public string? NextBulkEditPasswordResult { get; set; }
 
+        public int BulkEditGatewayCallCount { get; private set; }
+
+        public int LastBulkEditGatewayCount { get; private set; }
+
+        public IReadOnlyList<GatewayOption> LastBulkEditGatewayOptions { get; private set; } = [];
+
+        public ServerBulkEditGatewayResult? NextBulkEditGatewayResult { get; set; }
+
+        public Func<CancellationToken, Task>? OnBulkEditGatewayShown { get; set; }
+
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
         {
             LastConfirmTitle = title;
@@ -2076,6 +2323,22 @@ public sealed class ServerListBulkActionTests
             LastBulkEditPasswordCount = count;
             BulkEditPasswordCallCount++;
             return Task.FromResult(NextBulkEditPasswordResult);
+        }
+
+        public async Task<ServerBulkEditGatewayResult?> ShowBulkEditGatewayAsync(
+            int count,
+            IReadOnlyList<GatewayOption> availableGateways,
+            CancellationToken cancellationToken)
+        {
+            LastBulkEditGatewayCount = count;
+            LastBulkEditGatewayOptions = availableGateways;
+            BulkEditGatewayCallCount++;
+            if (OnBulkEditGatewayShown is not null)
+            {
+                await OnBulkEditGatewayShown(cancellationToken);
+            }
+
+            return NextBulkEditGatewayResult;
         }
 
         public Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null) => Task.FromResult<ServerDialogResult?>(null);

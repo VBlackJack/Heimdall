@@ -41,6 +41,7 @@ public partial class ServerListViewModel
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         MoveSelectedToProjectCommand.NotifyCanExecuteChanged();
         MoveSelectedToGroupCommand.NotifyCanExecuteChanged();
+        BulkEditGatewayCommand.NotifyCanExecuteChanged();
     }
 
     public void SelectSingle(ServerItemViewModel? item)

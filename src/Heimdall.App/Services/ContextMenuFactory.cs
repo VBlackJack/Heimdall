@@ -862,6 +862,11 @@ public sealed class ContextMenuFactory
             bulkContext.Items));
 
         item.Items.Add(CreateMenuItem(
+            vm.Localize("TreeCtxBulkEditGateway"),
+            vm.ServerList.BulkEditGatewayCommand,
+            bulkContext.Items));
+
+        item.Items.Add(CreateMenuItem(
             string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
                 vm.Localize("TreeCtxBulkEditUsername"),

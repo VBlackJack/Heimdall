@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
@@ -292,6 +294,43 @@ public partial class ServerListViewModel
         await EditPasswordServersCoreAsync(selectedItems, result, cancellationToken);
     }
 
+    [RelayCommand(CanExecute = nameof(CanBulkEditGateway))]
+    private async Task BulkEditGatewayAsync(
+        IReadOnlyList<ServerItemViewModel>? selection,
+        CancellationToken cancellationToken)
+    {
+        var selectedItems = NormalizeSelection(selection ?? SelectedItems.ToList());
+        if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+        SshGatewayDto[] canonicalGateways = settings.SshGateways
+            .Where(gateway => !string.IsNullOrWhiteSpace(gateway.Id))
+            .GroupBy(gateway => gateway.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToArray();
+        GatewayOption[] gatewayOptions = BuildGatewayOptions(canonicalGateways)
+            .OrderBy(option => option.DisplayText, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        ServerBulkEditGatewayResult? result = await _dialogService.ShowBulkEditGatewayAsync(
+            selectedItems.Count,
+            gatewayOptions,
+            cancellationToken);
+        if (result is null)
+        {
+            return;
+        }
+
+        string[] selectedIds = selectedItems
+            .Select(server => server.Id)
+            .ToArray();
+        await UpdateGatewayAssignmentsAsync(selectedIds, result, cancellationToken);
+    }
+
     [RelayCommand]
     private async Task ConnectSelectedAsync(CancellationToken cancellationToken)
     {
@@ -340,6 +379,8 @@ public partial class ServerListViewModel
     private bool CanBulkEditUsername() => SelectionCount > 1;
 
     private bool CanBulkEditPassword() => SelectionCount > 1;
+
+    private bool CanBulkEditGateway() => SelectionCount > 1;
 
     public async Task ConnectServersBulkCoreAsync(
         IReadOnlyList<ServerItemViewModel> serversToConnect,
@@ -711,7 +752,22 @@ public partial class ServerListViewModel
         string? targetGatewayId,
         CancellationToken cancellationToken = default)
     {
+        var choice = string.IsNullOrWhiteSpace(targetGatewayId)
+            ? ServerBulkEditGatewayChoice.DirectConnection
+            : ServerBulkEditGatewayChoice.UseGateway;
+        return await UpdateGatewayAssignmentsAsync(
+            serverIds,
+            new ServerBulkEditGatewayResult(choice, targetGatewayId),
+            cancellationToken);
+    }
+
+    private async Task<int> UpdateGatewayAssignmentsAsync(
+        IReadOnlyCollection<string> serverIds,
+        ServerBulkEditGatewayResult request,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(serverIds);
+        ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
         string[] ids = serverIds
@@ -721,6 +777,11 @@ public partial class ServerListViewModel
         if (ids.Length == 0)
         {
             return 0;
+        }
+
+        if (!Enum.IsDefined(request.Choice))
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), request.Choice, "Unsupported gateway choice.");
         }
 
         var vmMap = _allServers
@@ -734,9 +795,18 @@ public partial class ServerListViewModel
         }
 
         string? canonicalTargetGatewayId = null;
-        if (!string.IsNullOrWhiteSpace(targetGatewayId))
+        if (request.Choice == ServerBulkEditGatewayChoice.UseGateway)
         {
+            string? targetGatewayId = request.GatewayId;
+            if (string.IsNullOrWhiteSpace(targetGatewayId))
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"UpdateGatewayReferencesAsync aborted {ids.Length} item(s) because the gateway choice contained no ID.");
+                return 0;
+            }
+
             AppSettings settings = await _configManager.LoadSettingsAsync();
+            cancellationToken.ThrowIfCancellationRequested();
             SshGatewayDto? targetGateway = settings.SshGateways.LastOrDefault(
                 gateway => !string.IsNullOrWhiteSpace(gateway.Id)
                            && string.Equals(gateway.Id, targetGatewayId, StringComparison.OrdinalIgnoreCase));
@@ -769,7 +839,13 @@ public partial class ServerListViewModel
 
         if (updatedCount > 0)
         {
-            string targetLabel = canonicalTargetGatewayId ?? "<direct>";
+            string targetLabel = request.Choice switch
+            {
+                ServerBulkEditGatewayChoice.UseGateway => canonicalTargetGatewayId!,
+                ServerBulkEditGatewayChoice.DirectConnection => "direct connection",
+                ServerBulkEditGatewayChoice.InheritFolderDefault => "folder default",
+                _ => throw new UnreachableException()
+            };
             Core.Logging.FileLogger.Info(
                 $"UpdateGatewayReferencesAsync updated gateway reference to '{targetLabel}' for {updatedCount} item(s) in a single transaction.");
         }
@@ -796,11 +872,17 @@ public partial class ServerListViewModel
             {
                 ServerProfileDto dto = dtoMap[id];
                 bool changed;
-                if (canonicalTargetGatewayId is null)
+                if (request.Choice == ServerBulkEditGatewayChoice.DirectConnection)
                 {
                     changed = dto.SshGatewayId is not null || !dto.UseDirectConnection;
                     dto.SshGatewayId = null;
                     dto.UseDirectConnection = true;
+                }
+                else if (request.Choice == ServerBulkEditGatewayChoice.InheritFolderDefault)
+                {
+                    changed = dto.SshGatewayId is not null || dto.UseDirectConnection;
+                    dto.SshGatewayId = null;
+                    dto.UseDirectConnection = false;
                 }
                 else if (!ProtocolCapabilities.SupportsSshGateway(dto.ConnectionType))
                 {
@@ -809,9 +891,11 @@ public partial class ServerListViewModel
                 }
                 else
                 {
-                    changed = !string.Equals(dto.SshGatewayId, canonicalTargetGatewayId, StringComparison.Ordinal)
+                    string targetGatewayId = canonicalTargetGatewayId
+                        ?? throw new InvalidOperationException("The canonical gateway ID was not resolved.");
+                    changed = !string.Equals(dto.SshGatewayId, targetGatewayId, StringComparison.Ordinal)
                               || dto.UseDirectConnection;
-                    dto.SshGatewayId = canonicalTargetGatewayId;
+                    dto.SshGatewayId = targetGatewayId;
                     dto.UseDirectConnection = false;
                 }
 

@@ -164,6 +164,39 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Fact]
+    public void ServerContextMenu_MultiSelectBulkEdit_ContainsSetGateway()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            ServerProfileDto ssh = harness.CreateServer("SSH");
+            ServerProfileDto rdp = harness.CreateServer("RDP");
+            harness.PersistServerAsync(ssh).GetAwaiter().GetResult();
+            harness.PersistServerAsync(rdp).GetAwaiter().GetResult();
+            ServerItemViewModel sshVm = Assert.Single(
+                harness.Main.ServerList.Servers,
+                item => string.Equals(item.Id, ssh.Id, StringComparison.Ordinal));
+            ServerItemViewModel rdpVm = Assert.Single(
+                harness.Main.ServerList.Servers,
+                item => string.Equals(item.Id, rdp.Id, StringComparison.Ordinal));
+            var bulkContext = new BulkSelectionContext([sshVm, rdpVm], rdpVm);
+            ContextMenuFactory factory = new ContextMenuFactory(new ExternalToolProviderService());
+
+            ContextMenu menu = factory.CreateTreeContextMenu(
+                bulkContext,
+                harness.Main,
+                new NullContextMenuCallbacks());
+
+            MenuItem bulkEdit = AssertMenuItem(menu, harness.Main.Localize("TreeCtxBulkEditMenu"));
+            MenuItem? setGateway = FindChildMenuItem(
+                bulkEdit,
+                harness.Main.Localize("TreeCtxBulkEditGateway"));
+            Assert.NotNull(setGateway);
+            Assert.Same(harness.Main.ServerList.BulkEditGatewayCommand, setGateway!.Command);
+        });
+    }
+
     private static MenuItem? FindChildMenuItem(MenuItem parent, string header)
     {
         foreach (object raw in parent.Items)

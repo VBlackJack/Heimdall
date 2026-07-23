@@ -16,6 +16,7 @@
 
 using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
+using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Import;
 using Heimdall.Core.Models;
@@ -223,6 +224,18 @@ public interface IDialogService
     /// the plaintext password, or <c>null</c> when the dialog is cancelled.
     /// </summary>
     Task<string?> ShowBulkEditPasswordAsync(int count, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Shows the bulk gateway edit dialog and returns one explicit routing choice,
+    /// or <c>null</c> when the dialog is cancelled.
+    /// </summary>
+    Task<ServerBulkEditGatewayResult?> ShowBulkEditGatewayAsync(
+        int count,
+        IReadOnlyList<GatewayOption> availableGateways,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult<ServerBulkEditGatewayResult?>(null);
+    }
 
     /// <summary>
     /// Shows a non-blocking error notification.
