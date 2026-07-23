@@ -638,9 +638,9 @@ public sealed class SettingsViewModelTests
         await viewModel.DeleteProjectCommand.ExecuteAsync(null);
         config.FailOnMergeSetting = true;
 
-        await Assert.ThrowsAsync<IOException>(() =>
-            viewModel.SaveCommand.ExecuteAsync(null));
+        bool saved = await viewModel.TrySaveAsync();
 
+        Assert.False(saved);
         Assert.Null(Assert.Single(config.Servers).ProjectId);
         Assert.Contains(config.Settings.Projects, project => project.Id == "project-a");
     }
@@ -801,6 +801,102 @@ public sealed class SettingsViewModelTests
         Assert.False(viewModel.HasSshTabErrors);
         Assert.Equal(1, viewModel.AdvancedTabErrorCount);
         Assert.True(viewModel.HasAdvancedTabErrors);
+    }
+
+    [Fact]
+    public async Task Closing_WithInvalidSettings_StaysOpenAndWarns_DoesNotDiscard()
+    {
+        var config = new FakeConfigManager();
+        var dialog = new FakeDialogService { SaveDiscardResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.SshAutoReconnectAttempts = 0;
+        var windowStatePersistCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            viewModel.IsDirty,
+            () => dialog.ShowSaveDiscardCancelAsync("Unsaved", "Save changes?"),
+            () => viewModel.TrySaveAsync(),
+            () =>
+            {
+                windowStatePersistCount++;
+                return Task.CompletedTask;
+            },
+            () => dialog.ShowWarning("Not saved", "Fix validation errors."));
+
+        Assert.False(canClose);
+        Assert.True(viewModel.IsDirty);
+        Assert.True(viewModel.HasValidationErrors);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.Equal(0, windowStatePersistCount);
+        Assert.Single(dialog.WarningCalls);
+    }
+
+    [Fact]
+    public async Task Closing_ValidSettings_AwaitsPersistBeforeClose()
+    {
+        var config = new FakeConfigManager();
+        var dialog = new FakeDialogService { SaveDiscardResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(new AppSettings());
+        viewModel.DefaultTheme = "Buffy";
+        var mergeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseMerge = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var windowStateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseWindowState = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        config.MergeSettingStarted = mergeStarted;
+        config.MergeSettingRelease = releaseMerge.Task;
+
+        Task<bool> closing = WindowClosingFlow.TryPrepareCloseAsync(
+            viewModel.IsDirty,
+            () => dialog.ShowSaveDiscardCancelAsync("Unsaved", "Save changes?"),
+            () => viewModel.TrySaveAsync(),
+            async () =>
+            {
+                windowStateStarted.SetResult();
+                await releaseWindowState.Task;
+            },
+            () => dialog.ShowWarning("Not saved", "Retry."));
+
+        await mergeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(closing.IsCompleted);
+        Assert.False(windowStateStarted.Task.IsCompleted);
+
+        releaseMerge.SetResult();
+        await windowStateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(closing.IsCompleted);
+        Assert.False(viewModel.IsDirty);
+
+        releaseWindowState.SetResult();
+        Assert.True(await closing);
+        Assert.Empty(dialog.WarningCalls);
+    }
+
+    [Fact]
+    public async Task Closing_SaveFailure_DoesNotClose()
+    {
+        var config = new FakeConfigManager { FailOnMergeSetting = true };
+        var dialog = new FakeDialogService { SaveDiscardResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(new AppSettings());
+        viewModel.DefaultTheme = "Buffy";
+        var windowStatePersistCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            viewModel.IsDirty,
+            () => dialog.ShowSaveDiscardCancelAsync("Unsaved", "Save changes?"),
+            () => viewModel.TrySaveAsync(),
+            () =>
+            {
+                windowStatePersistCount++;
+                return Task.CompletedTask;
+            },
+            () => dialog.ShowWarning("Not saved", "Retry."));
+
+        Assert.False(canClose);
+        Assert.True(viewModel.IsDirty);
+        Assert.Equal(1, config.MergeSettingCallCount);
+        Assert.Equal(0, windowStatePersistCount);
+        Assert.Single(dialog.WarningCalls);
     }
 
     [Fact]
@@ -1507,6 +1603,10 @@ public sealed class SettingsViewModelTests
 
         public bool FailOnMergeSetting { get; set; }
 
+        public TaskCompletionSource? MergeSettingStarted { get; set; }
+
+        public Task? MergeSettingRelease { get; set; }
+
         public List<ServerProfileDto> Servers { get; set; } = [];
 
         public List<ServerProfileDto>? SavedServers { get; private set; }
@@ -1539,7 +1639,7 @@ public sealed class SettingsViewModelTests
         public Task<int> MergeTrustedHostKeysAsync(IEnumerable<KeyValuePair<string, string>> entries)
             => Task.FromResult(0);
 
-        public Task MergeSettingAsync(Action<AppSettings> mutate)
+        public async Task MergeSettingAsync(Action<AppSettings> mutate)
         {
             MergeSettingCallCount++;
             if (FailOnMergeSetting)
@@ -1549,10 +1649,15 @@ public sealed class SettingsViewModelTests
 
             AppSettings currentSettings = CloneSettings(Settings);
             mutate(currentSettings);
+            MergeSettingStarted?.TrySetResult();
+            if (MergeSettingRelease is not null)
+            {
+                await MergeSettingRelease;
+            }
+
             Settings = currentSettings;
             SavedSettings = currentSettings;
             SettingsChanged?.Invoke(currentSettings);
-            return Task.CompletedTask;
         }
 
         public Task<List<ServerProfileDto>> LoadServersAsync()
@@ -1592,6 +1697,8 @@ public sealed class SettingsViewModelTests
     {
         public bool ConfirmResult { get; set; }
 
+        public bool? SaveDiscardResult { get; set; }
+
         public List<(string Title, string Message, string Severity)> ConfirmCalls { get; } = [];
 
         public List<(string Title, string Message)> ErrorCalls { get; } = [];
@@ -1613,7 +1720,7 @@ public sealed class SettingsViewModelTests
         }
 
         public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)
-            => Task.FromResult<bool?>(null);
+            => Task.FromResult(SaveDiscardResult);
 
         public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null)
             => Task.FromResult<string?>(null);

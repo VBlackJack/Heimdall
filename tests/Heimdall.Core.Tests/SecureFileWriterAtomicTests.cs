@@ -73,7 +73,7 @@ public sealed class SecureFileWriterAtomicTests : IDisposable
     }
 
     [Fact]
-    public async Task WriteAllTextAtomicAsync_OverwriteExisting_FullyReplacesAndStaysRestrictive()
+    public async Task SecureFileWriter_HappyPathNtfs_StillAtomicReplace()
     {
         var path = TempFile();
         await SecureFileWriter.WriteAllTextAtomicAsync(path, "first-content-that-is-quite-long");
@@ -128,6 +128,62 @@ public sealed class SecureFileWriterAtomicTests : IDisposable
 
         await SecureFileWriter.WriteAllTextAtomicAsync(path, "content");
 
+        Assert.Empty(StrayTemps());
+    }
+
+    [Fact]
+    public async Task SecureFileWriter_AclUnsupportedVolume_UsesTempThenAtomicRename_NotDirectWrite()
+    {
+        var path = TempFile();
+        await File.WriteAllTextAsync(path, "ORIGINAL");
+        var operations = new RecordingAtomicFileOperations
+        {
+            RestrictedWriteAsync = (_, _, _) =>
+                throw new SecureFileWriter.AclCreationNotSupportedException(
+                    new NotSupportedException("ACLs are unsupported."))
+        };
+
+        await SecureFileWriter.WriteAllTextAtomicAsync(
+            path,
+            "NEW-CONTENT",
+            operations);
+
+        Assert.Equal("NEW-CONTENT", await File.ReadAllTextAsync(path));
+        string plainTempPath = Assert.Single(operations.PlainWritePaths);
+        Assert.NotEqual(path, plainTempPath);
+        Assert.Equal(Path.GetDirectoryName(path), Path.GetDirectoryName(plainTempPath));
+        MoveCall move = Assert.Single(operations.MoveCalls);
+        Assert.Equal(plainTempPath, move.SourcePath);
+        Assert.Equal(path, move.DestinationPath);
+        Assert.True(move.Overwrite);
+        Assert.DoesNotContain(path, operations.RestrictedWritePaths);
+        Assert.DoesNotContain(path, operations.PlainWritePaths);
+        Assert.Empty(StrayTemps());
+    }
+
+    [Fact]
+    public async Task SecureFileWriter_TransientIoError_LeavesTargetIntact_AndPropagates()
+    {
+        var path = TempFile();
+        await File.WriteAllTextAsync(path, "ORIGINAL");
+        var operations = new RecordingAtomicFileOperations
+        {
+            RestrictedWriteAsync = async (tempPath, _, cancellationToken) =>
+            {
+                await File.WriteAllTextAsync(tempPath, "PARTIAL", cancellationToken);
+                throw new IOException("Simulated transient staging failure.");
+            }
+        };
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            SecureFileWriter.WriteAllTextAtomicAsync(
+                path,
+                "NEW-CONTENT",
+                operations));
+
+        Assert.Equal("ORIGINAL", await File.ReadAllTextAsync(path));
+        Assert.Empty(operations.PlainWritePaths);
+        Assert.Empty(operations.MoveCalls);
         Assert.Empty(StrayTemps());
     }
 
@@ -213,4 +269,57 @@ public sealed class SecureFileWriterAtomicTests : IDisposable
             }
         }
     }
+
+    private sealed class RecordingAtomicFileOperations : SecureFileWriter.IAtomicFileOperations
+    {
+        public Func<string, string, CancellationToken, Task>? RestrictedWriteAsync { get; init; }
+
+        public List<string> RestrictedWritePaths { get; } = [];
+
+        public List<string> PlainWritePaths { get; } = [];
+
+        public List<MoveCall> MoveCalls { get; } = [];
+
+        public async Task WriteWithRestrictedAclAsync(
+            string path,
+            string content,
+            CancellationToken cancellationToken)
+        {
+            RestrictedWritePaths.Add(path);
+            if (RestrictedWriteAsync is not null)
+            {
+                await RestrictedWriteAsync(path, content, cancellationToken);
+                return;
+            }
+
+            await File.WriteAllTextAsync(path, content, cancellationToken);
+        }
+
+        public async Task WriteWithoutAclAsync(
+            string path,
+            string content,
+            CancellationToken cancellationToken)
+        {
+            PlainWritePaths.Add(path);
+            await File.WriteAllTextAsync(path, content, cancellationToken);
+        }
+
+        public void ApplyRestrictedAcl(string path)
+        {
+        }
+
+        public void Move(string sourcePath, string destinationPath, bool overwrite)
+        {
+            MoveCalls.Add(new MoveCall(sourcePath, destinationPath, overwrite));
+            File.Move(sourcePath, destinationPath, overwrite);
+        }
+
+        public void Delete(string path)
+            => File.Delete(path);
+    }
+
+    private sealed record MoveCall(
+        string SourcePath,
+        string DestinationPath,
+        bool Overwrite);
 }

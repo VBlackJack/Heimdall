@@ -1057,13 +1057,23 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [RelayCommand]
     private async Task SaveAsync(CancellationToken cancellationToken)
+        => await TrySaveAsync(cancellationToken);
+
+    /// <summary>
+    /// Validates and persists the current settings.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> only after persistence completes and the view model
+    /// is no longer dirty; otherwise <see langword="false"/>.
+    /// </returns>
+    public async Task<bool> TrySaveAsync(CancellationToken cancellationToken = default)
     {
         ValidateAllProperties();
         RefreshValidationSummary();
 
         if (HasErrors)
         {
-            return;
+            return false;
         }
 
         // Validate external tools before persisting
@@ -1072,15 +1082,33 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         {
             ValidationSummary = extToolError;
             HasValidationErrors = true;
-            return;
+            return false;
         }
 
+        try
+        {
+            await PersistValidatedSettingsAsync(cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error("Settings save failed", ex);
+            return false;
+        }
+    }
+
+    private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
+    {
         SshAgentPreferenceEnum parsedSshAgentPreference = Enum.TryParse<SshAgentPreferenceEnum>(
-            SshAgentPreference,
-            ignoreCase: false,
-            out SshAgentPreferenceEnum sshAgentPreference)
-            ? sshAgentPreference
-            : SshAgentPreferenceEnum.AutoOpenSshFirst;
+                SshAgentPreference,
+                ignoreCase: false,
+                out SshAgentPreferenceEnum sshAgentPreference)
+                ? sshAgentPreference
+                : SshAgentPreferenceEnum.AutoOpenSshFirst;
         List<ExternalToolDefinition> externalTools = ExternalTools.Select(tool => new ExternalToolDefinition
         {
             Name = tool.Name.Trim(),
@@ -1245,7 +1273,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
 
         IsDirty = false;
-        ConfigurationChanged?.Invoke();
+        try
+        {
+            ConfigurationChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error("Settings change notification failed", ex);
+        }
     }
 
     [RelayCommand]

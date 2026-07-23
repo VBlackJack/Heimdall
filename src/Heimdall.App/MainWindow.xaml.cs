@@ -82,6 +82,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private object? _lastKeyEventSource;
     private readonly ToolsTabPopulationService _toolsTabPopulation;
     private bool _closeConfirmed;
+    private bool _closeInProgress;
     private bool _suppressSidebarLaunch;
     private bool _isRdpImportDragActive;
     private bool _suppressFileShareStartDialog;
@@ -3128,14 +3129,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
-    private void SaveWindowBounds(MainViewModel vm)
+    private Task SaveWindowBoundsAsync(MainViewModel vm)
     {
         // Save Normal-state bounds even when maximized
         var bounds = WindowState == WindowState.Maximized
             ? RestoreBounds
             : new System.Windows.Rect(Left, Top, Width, Height);
 
-        _ = vm.ConfigManager.MergeSettingAsync(s =>
+        return vm.ConfigManager.MergeSettingAsync(s =>
         {
             s.WindowWidth = bounds.Width;
             s.WindowHeight = bounds.Height;
@@ -3148,10 +3149,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// <inheritdoc />
     /// <remarks>
     /// <c>async void</c> is intentional and required: <see cref="Window.OnClosing"/>
-    /// is a synchronous override, but the unsaved-settings dialog must be awaited
-    /// without blocking the dispatcher (<c>.GetAwaiter().GetResult()</c> deadlocks
-    /// because the dialog posts back to the UI thread). The standard WPF pattern
-    /// is to cancel the close, await the dialog, then re-invoke <see cref="Window.Close"/>.
+    /// is a synchronous override, but the unsaved-settings decision and all config
+    /// writes must be awaited without blocking the dispatcher. The standard WPF
+    /// pattern is to cancel the close, await preparation, then re-invoke
+    /// <see cref="Window.Close"/>.
     /// The <see cref="_closeConfirmed"/> flag prevents infinite recursion on the
     /// second pass through this handler.
     /// </remarks>
@@ -3162,64 +3163,67 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         if (DataContext is not MainViewModel vm) return;
 
-        SaveWindowBounds(vm);
-
-        if (vm.Settings.IsDirty && !_closeConfirmed)
+        if (_closeConfirmed)
         {
-            // Cancel this close, show the dialog asynchronously, then re-close
-            // (or stay open) based on the user's choice.
-            e.Cancel = true;
-
-            var title = vm.Localize("SettingsUnsavedWarningTitle");
-            var message = vm.Localize("SettingsUnsavedWarning");
-            var result = await vm.DialogService.ShowSaveDiscardCancelAsync(title, message);
-
-            if (result is null)
+            // This window will close on the current pass. Arm the shutdown guard
+            // before WPF broadcasts Unloaded to the visual tree, so session panes
+            // skip reparenting teardown during application shutdown.
+            if (Application.Current is Heimdall.App.App app)
             {
-                // User cancelled — stay open.
-                return;
+                app.IsShuttingDown = true;
             }
 
-            if (result == true)
-            {
-                vm.Settings.SaveCommand.Execute(null);
-            }
-            // false = Discard — fall through and re-close.
-
-            _closeConfirmed = true;
-            try
-            {
-                if (IsLoaded)
-                {
-                    Close();
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                // Window is already closing — safe to ignore.
-            }
-            catch
-            {
-                // If the second Close() somehow gets cancelled, reset the flag so
-                // the user can try again instead of being stuck in a confirmed state.
-                _closeConfirmed = false;
-                throw;
-            }
+            return;
         }
 
-        // If this pass is cancelling the close (for example while the
-        // unsaved-settings dialog is shown), do not arm the shutdown guard.
-        if (e.Cancel)
+        // Every first close pass is cancelled so all persistence can complete
+        // before a guarded second Close() re-enters this handler.
+        e.Cancel = true;
+        if (_closeInProgress)
         {
             return;
         }
 
-        // This window will close on the current pass. Arm the shutdown guard
-        // before WPF broadcasts Unloaded to the visual tree, so session panes
-        // skip reparenting teardown during application shutdown.
-        if (Application.Current is Heimdall.App.App app)
+        _closeInProgress = true;
+        try
         {
-            app.IsShuttingDown = true;
+            string warningTitle = vm.Localize("SettingsCloseSaveFailedTitle");
+            string warningMessage = vm.Localize("SettingsCloseSaveFailedMessage");
+            bool prepared = await WindowClosingFlow.TryPrepareCloseAsync(
+                vm.Settings.IsDirty,
+                () => vm.DialogService.ShowSaveDiscardCancelAsync(
+                    vm.Localize("SettingsUnsavedWarningTitle"),
+                    vm.Localize("SettingsUnsavedWarning")),
+                () => vm.Settings.TrySaveAsync(),
+                () => SaveWindowBoundsAsync(vm),
+                () => vm.DialogService.ShowWarning(warningTitle, warningMessage));
+
+            if (!prepared)
+            {
+                return;
+            }
+
+            _closeConfirmed = true;
+            if (IsLoaded)
+            {
+                Close();
+            }
+            else
+            {
+                _closeConfirmed = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _closeConfirmed = false;
+            Core.Logging.FileLogger.Error("Guarded main window close failed", ex);
+            vm.DialogService.ShowWarning(
+                vm.Localize("SettingsCloseSaveFailedTitle"),
+                vm.Localize("SettingsCloseSaveFailedMessage"));
+        }
+        finally
+        {
+            _closeInProgress = false;
         }
     }
 

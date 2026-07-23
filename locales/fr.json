@@ -1493,6 +1493,8 @@
   "SettingsUnsavedIndicator": "*",
   "SettingsUnsavedWarning": "Vous avez des modifications non enregistr\u00e9es. Les appliquer avant de quitter ?",
   "SettingsUnsavedWarningTitle": "Modifications non enregistr\u00e9es",
+  "SettingsCloseSaveFailedTitle": "Param\u00e8tres non enregistr\u00e9s",
+  "SettingsCloseSaveFailedMessage": "Heimdall n'a pas pu enregistrer les param\u00e8tres. Corrigez les erreurs de validation ou r\u00e9essayez avant de fermer.",
   "SettingsUnsavedChanges": "Vous avez des modifications non enregistr\u00e9es",
   "ProjectColorBlue": "Bleu",
   "ProjectColorGreen": "Vert",

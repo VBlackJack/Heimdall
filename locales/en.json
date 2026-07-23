@@ -1493,6 +1493,8 @@
   "SettingsUnsavedIndicator": "*",
   "SettingsUnsavedWarning": "You have unsaved settings changes. Apply them before leaving?",
   "SettingsUnsavedWarningTitle": "Unsaved Changes",
+  "SettingsCloseSaveFailedTitle": "Settings Not Saved",
+  "SettingsCloseSaveFailedMessage": "Heimdall could not save the settings. Review validation errors or retry before closing.",
   "SettingsUnsavedChanges": "You have unsaved changes",
   "ProjectColorBlue": "Blue",
   "ProjectColorGreen": "Green",

@@ -119,19 +119,33 @@ public static class SecureFileWriter
     /// On ANY failure the temp is deleted and the ORIGINAL target is left untouched;
     /// the error is surfaced, never swallowed. If the volume does not support the
     /// secure ACL create (e.g. FAT/exFAT/odd network shares), the method falls back
-    /// once to a non-atomic write + best-effort post-write ACL, logging a single
-    /// Warning. Default Windows (NTFS) always takes the atomic path.
+    /// once to a same-directory temp write + best-effort ACL + atomic rename,
+    /// logging a single warning. Default Windows (NTFS) always takes the
+    /// restrictive-ACL staging path.
     /// </remarks>
     /// <param name="targetPath">The final file path.</param>
     /// <param name="content">The text content to write (UTF-8, no BOM).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public static async Task WriteAllTextAtomicAsync(
+    public static Task WriteAllTextAtomicAsync(
         string targetPath,
         string content,
         CancellationToken cancellationToken = default)
+        => WriteAllTextAtomicAsync(
+            targetPath,
+            content,
+            SystemAtomicFileOperations.Instance,
+            cancellationToken);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    internal static async Task WriteAllTextAtomicAsync(
+        string targetPath,
+        string content,
+        IAtomicFileOperations fileOperations,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(targetPath);
+        ArgumentNullException.ThrowIfNull(fileOperations);
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(targetPath));
         if (string.IsNullOrEmpty(directory))
@@ -148,22 +162,26 @@ public static class SecureFileWriter
         {
             // Stage the content into the temp file with the restrictive ACL applied
             // at create (TOCTOU-free), reusing the secure-create path.
-            await WriteAndProtectAsync(tempPath, content, cancellationToken).ConfigureAwait(false);
+            await fileOperations.WriteWithRestrictedAclAsync(tempPath, content, cancellationToken)
+                .ConfigureAwait(false);
         }
-        catch (Exception ex) when (
-            ex is IOException or UnauthorizedAccessException or NotSupportedException or PlatformNotSupportedException
-            && !cancellationToken.IsCancellationRequested)
+        catch (AclCreationNotSupportedException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            // The volume may not support the secure ACL create (non-NTFS). Fall back
-            // once to a non-atomic write; a genuine write error re-surfaces there.
-            TryDeleteTemp(tempPath);
-            FileLogger.Warn($"Atomic secure write unavailable; falling back to non-atomic write: {ex.Message}");
-            await WriteWithPostAclFallbackAsync(targetPath, content, cancellationToken).ConfigureAwait(false);
+            // Only the ACL-aware create is allowed to select this path. Generic I/O
+            // failures during staging must propagate so the live target stays intact.
+            TryDeleteTemp(tempPath, fileOperations);
+            FileLogger.Warn($"Restrictive ACL create unavailable; using atomic post-ACL fallback: {ex.Message}");
+            await WriteWithPostAclFallbackAsync(
+                tempPath,
+                targetPath,
+                content,
+                fileOperations,
+                cancellationToken).ConfigureAwait(false);
             return;
         }
         catch
         {
-            TryDeleteTemp(tempPath);
+            TryDeleteTemp(tempPath, fileOperations);
             throw;
         }
 
@@ -171,55 +189,161 @@ public static class SecureFileWriter
         {
             // Atomic same-volume replace. The temp's restrictive ACL travels with
             // the renamed file, so the final target is restricted.
-            File.Move(tempPath, targetPath, overwrite: true);
+            fileOperations.Move(tempPath, targetPath, overwrite: true);
         }
         catch
         {
-            TryDeleteTemp(tempPath);
+            TryDeleteTemp(tempPath, fileOperations);
             throw; // original target left untouched
         }
     }
 
     /// <summary>
-    /// Non-atomic fallback used only when the secure ACL create is unsupported on
-    /// the volume: write the bytes then best-effort apply the restrictive ACL.
+    /// Atomic fallback used only when the secure ACL create is unsupported on the
+    /// volume: write a same-directory temp, apply the ACL best-effort, then rename.
     /// </summary>
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private static async Task WriteWithPostAclFallbackAsync(
+        string tempPath,
         string targetPath,
         string content,
+        IAtomicFileOperations fileOperations,
         CancellationToken cancellationToken)
     {
-        var bytes = Utf8NoBom.GetBytes(content ?? string.Empty);
         try
         {
-            await File.WriteAllBytesAsync(targetPath, bytes, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            Array.Clear(bytes);
-        }
+            await fileOperations.WriteWithoutAclAsync(tempPath, content, cancellationToken)
+                .ConfigureAwait(false);
 
-        try
-        {
-            new FileInfo(targetPath).SetAccessControl(BuildRestrictedSecurity());
-        }
-        catch (Exception ex)
-        {
-            FileLogger.Warn($"Post-write ACL application skipped (non-NTFS or restricted): {ex.Message}");
-        }
-    }
+            try
+            {
+                fileOperations.ApplyRestrictedAcl(tempPath);
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Warn($"Post-write ACL application skipped (non-NTFS or restricted): {ex.Message}");
+            }
 
-    private static void TryDeleteTemp(string tempPath)
-    {
-        try
-        {
-            File.Delete(tempPath);
+            fileOperations.Move(tempPath, targetPath, overwrite: true);
         }
         catch
         {
-            // Best-effort cleanup; a stray temp is harmless and ACL-restricted.
+            TryDeleteTemp(tempPath, fileOperations);
+            throw;
         }
+    }
+
+    private static void TryDeleteTemp(string tempPath, IAtomicFileOperations fileOperations)
+    {
+        try
+        {
+            fileOperations.Delete(tempPath);
+        }
+        catch
+        {
+            // Best-effort cleanup; a stray temp contains only staged data.
+        }
+    }
+
+    internal interface IAtomicFileOperations
+    {
+        Task WriteWithRestrictedAclAsync(
+            string path,
+            string content,
+            CancellationToken cancellationToken);
+
+        Task WriteWithoutAclAsync(
+            string path,
+            string content,
+            CancellationToken cancellationToken);
+
+        void ApplyRestrictedAcl(string path);
+
+        void Move(string sourcePath, string destinationPath, bool overwrite);
+
+        void Delete(string path);
+    }
+
+    internal sealed class AclCreationNotSupportedException : Exception
+    {
+        internal AclCreationNotSupportedException(Exception innerException)
+            : base("The volume does not support restrictive ACL creation.", innerException)
+        {
+        }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private sealed class SystemAtomicFileOperations : IAtomicFileOperations
+    {
+        internal static SystemAtomicFileOperations Instance { get; } = new();
+
+        private SystemAtomicFileOperations()
+        {
+        }
+
+        public async Task WriteWithRestrictedAclAsync(
+            string path,
+            string content,
+            CancellationToken cancellationToken)
+        {
+            FileSecurity security = BuildRestrictedSecurity();
+            FileInfo fileInfo = new(path);
+            fileInfo.Delete();
+
+            FileStream stream;
+            try
+            {
+                stream = fileInfo.Create(
+                    FileMode.CreateNew,
+                    FileSystemRights.WriteData,
+                    FileShare.None,
+                    4096,
+                    FileOptions.Asynchronous,
+                    security);
+            }
+            catch (NotSupportedException ex)
+            {
+                throw new AclCreationNotSupportedException(ex);
+            }
+
+            await using (stream)
+            {
+                byte[] bytes = Utf8NoBom.GetBytes(content ?? string.Empty);
+                try
+                {
+                    await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    Array.Clear(bytes);
+                }
+            }
+        }
+
+        public async Task WriteWithoutAclAsync(
+            string path,
+            string content,
+            CancellationToken cancellationToken)
+        {
+            byte[] bytes = Utf8NoBom.GetBytes(content ?? string.Empty);
+            try
+            {
+                await File.WriteAllBytesAsync(path, bytes, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                Array.Clear(bytes);
+            }
+        }
+
+        public void ApplyRestrictedAcl(string path)
+            => new FileInfo(path).SetAccessControl(BuildRestrictedSecurity());
+
+        public void Move(string sourcePath, string destinationPath, bool overwrite)
+            => File.Move(sourcePath, destinationPath, overwrite);
+
+        public void Delete(string path)
+            => File.Delete(path);
     }
 
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
