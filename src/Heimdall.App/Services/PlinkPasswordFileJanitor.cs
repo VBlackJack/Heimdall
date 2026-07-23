@@ -15,19 +15,21 @@
  */
 
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Heimdall.Core.Logging;
+using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Services;
 
 internal sealed class PlinkPasswordFileJanitor
 {
-    internal const string PasswordFilePrefix = "heimdall_ssh_pw_";
-    internal const string PasswordFileSearchPattern = "heimdall_ssh_pw_*";
     internal const int DefaultMaxAgeMinutes = 60;
 
     private readonly Func<string> _tempDirectory;
     private readonly Func<string, IEnumerable<string>> _enumerateFiles;
     private readonly Func<string, DateTime> _getLastWriteTimeUtc;
+    private readonly Func<string, bool> _isOwnedByCurrentUser;
     private readonly Action<string> _delete;
     private readonly Func<DateTime> _utcNow;
     private readonly TimeSpan _maxAge;
@@ -36,6 +38,7 @@ internal sealed class PlinkPasswordFileJanitor
         Func<string>? tempDirectory = null,
         Func<string, IEnumerable<string>>? enumerateFiles = null,
         Func<string, DateTime>? getLastWriteTimeUtc = null,
+        Func<string, bool>? isOwnedByCurrentUser = null,
         Action<string>? delete = null,
         Func<DateTime>? utcNow = null,
         TimeSpan? maxAge = null)
@@ -43,6 +46,7 @@ internal sealed class PlinkPasswordFileJanitor
         _tempDirectory = tempDirectory ?? Path.GetTempPath;
         _enumerateFiles = enumerateFiles ?? DefaultEnumerate;
         _getLastWriteTimeUtc = getLastWriteTimeUtc ?? File.GetLastWriteTimeUtc;
+        _isOwnedByCurrentUser = isOwnedByCurrentUser ?? DefaultIsOwnedByCurrentUser;
         _delete = delete ?? File.Delete;
         _utcNow = utcNow ?? (() => DateTime.UtcNow);
         _maxAge = maxAge ?? TimeSpan.FromMinutes(DefaultMaxAgeMinutes);
@@ -81,6 +85,11 @@ internal sealed class PlinkPasswordFileJanitor
                         continue;
                     }
 
+                    if (!IsOwnedByCurrentUser(path))
+                    {
+                        continue;
+                    }
+
                     _delete(path);
                     removed++;
                 }
@@ -112,7 +121,53 @@ internal sealed class PlinkPasswordFileJanitor
     }
 
     private static IEnumerable<string> DefaultEnumerate(string directory)
-        => Directory.Exists(directory)
-            ? Directory.EnumerateFiles(directory, PasswordFileSearchPattern)
-            : Array.Empty<string>();
+    {
+        if (!Directory.Exists(directory))
+        {
+            return Array.Empty<string>();
+        }
+
+        return Directory.EnumerateFiles(directory, PlinkPasswordFileNaming.SearchPattern)
+            .Concat(Directory.EnumerateFiles(directory, PlinkPasswordFileNaming.LegacyTunnelSearchPattern));
+    }
+
+    private bool IsOwnedByCurrentUser(string path)
+    {
+        try
+        {
+            if (_isOwnedByCurrentUser(path))
+            {
+                return true;
+            }
+
+            FileLogger.Warn(
+                $"[PlinkPasswordFileJanitor] Skipped password file not owned by the current user: {Path.GetFileName(path)}");
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn(
+                $"[PlinkPasswordFileJanitor] Could not validate password-file ownership: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static bool DefaultIsOwnedByCurrentUser(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+        SecurityIdentifier? currentUser = identity.User;
+        if (currentUser is null)
+        {
+            return false;
+        }
+
+        FileSecurity security = new FileInfo(path).GetAccessControl(AccessControlSections.Owner);
+        IdentityReference? owner = security.GetOwner(typeof(SecurityIdentifier));
+        return currentUser.Equals(owner);
+    }
 }

@@ -16,6 +16,7 @@
 
 using System.IO;
 using Heimdall.App.Services;
+using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Tests;
 
@@ -25,9 +26,21 @@ public sealed class PlinkPasswordFileJanitorTests
         new DateTime(2026, 6, 4, 12, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public void Janitor_SweepsTunnelOrphan_WithUnifiedPrefix()
+    {
+        AssertDefaultSweepDeletes(PlinkPasswordFileNaming.Prefix);
+    }
+
+    [Fact]
+    public void Janitor_SweepsLegacyPrefix_Too()
+    {
+        AssertDefaultSweepDeletes(PlinkPasswordFileNaming.LegacyTunnelPrefix);
+    }
+
+    [Fact]
     public void SweepStale_DeletesPasswordFileOlderThanMaxAge()
     {
-        string stalePath = @"C:\Temp\heimdall_ssh_pw_stale";
+        string stalePath = GetTestPasswordFilePath("stale");
         Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
         {
             [stalePath] = FixedUtcNow.AddMinutes(-61)
@@ -47,7 +60,7 @@ public sealed class PlinkPasswordFileJanitorTests
     [Fact]
     public void SweepStale_KeepsPasswordFileNewerThanMaxAge()
     {
-        string freshPath = @"C:\Temp\heimdall_ssh_pw_fresh";
+        string freshPath = GetTestPasswordFilePath("fresh");
         Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
         {
             [freshPath] = FixedUtcNow.AddMinutes(-5)
@@ -67,9 +80,9 @@ public sealed class PlinkPasswordFileJanitorTests
     [Fact]
     public void SweepStale_ReturnsRemovedCount()
     {
-        string stalePath1 = @"C:\Temp\heimdall_ssh_pw_stale_1";
-        string stalePath2 = @"C:\Temp\heimdall_ssh_pw_stale_2";
-        string freshPath = @"C:\Temp\heimdall_ssh_pw_fresh";
+        string stalePath1 = GetTestPasswordFilePath("stale_1");
+        string stalePath2 = GetTestPasswordFilePath("stale_2");
+        string freshPath = GetTestPasswordFilePath("fresh");
         Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
         {
             [stalePath1] = FixedUtcNow.AddMinutes(-61),
@@ -111,8 +124,8 @@ public sealed class PlinkPasswordFileJanitorTests
     [Fact]
     public void SweepStale_WhenDeleteThrowsIOException_ContinuesWithOtherFiles()
     {
-        string failingPath = @"C:\Temp\heimdall_ssh_pw_locked";
-        string deletedPath = @"C:\Temp\heimdall_ssh_pw_deleted";
+        string failingPath = GetTestPasswordFilePath("locked");
+        string deletedPath = GetTestPasswordFilePath("deleted");
         Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
         {
             [failingPath] = FixedUtcNow.AddHours(-2),
@@ -155,6 +168,30 @@ public sealed class PlinkPasswordFileJanitorTests
         Assert.Empty(deleted);
     }
 
+    [Fact]
+    public void SweepStale_SkipsPasswordFileNotOwnedByCurrentUser()
+    {
+        string stalePath = GetTestPasswordFilePath("other_owner");
+        Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
+        {
+            [stalePath] = FixedUtcNow.AddHours(-2)
+        };
+        List<string> deleted = new List<string>();
+        PlinkPasswordFileJanitor janitor = new PlinkPasswordFileJanitor(
+            tempDirectory: () => @"C:\Temp",
+            enumerateFiles: _ => new string[] { stalePath },
+            getLastWriteTimeUtc: path => lastWriteTimes[path],
+            isOwnedByCurrentUser: _ => false,
+            delete: path => deleted.Add(path),
+            utcNow: () => FixedUtcNow,
+            maxAge: TimeSpan.FromHours(1));
+
+        int removed = janitor.SweepStale();
+
+        Assert.Equal(0, removed);
+        Assert.Empty(deleted);
+    }
+
     private static PlinkPasswordFileJanitor CreateJanitor(
         IEnumerable<string> candidates,
         IReadOnlyDictionary<string, DateTime> lastWriteTimes,
@@ -165,8 +202,43 @@ public sealed class PlinkPasswordFileJanitorTests
             tempDirectory: () => @"C:\Temp",
             enumerateFiles: _ => candidates,
             getLastWriteTimeUtc: path => lastWriteTimes[path],
+            isOwnedByCurrentUser: _ => true,
             delete: delete ?? (path => deleted.Add(path)),
             utcNow: () => FixedUtcNow,
             maxAge: TimeSpan.FromHours(1));
     }
+
+    private static void AssertDefaultSweepDeletes(string prefix)
+    {
+        string testDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall_plink_janitor_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(testDirectory);
+        string orphanPath = Path.Combine(testDirectory, $"{prefix}{Guid.NewGuid():N}");
+
+        try
+        {
+            File.WriteAllText(orphanPath, "secret");
+            File.SetLastWriteTimeUtc(orphanPath, FixedUtcNow.AddHours(-2));
+            var janitor = new PlinkPasswordFileJanitor(
+                tempDirectory: () => testDirectory,
+                utcNow: () => FixedUtcNow,
+                maxAge: TimeSpan.FromHours(1));
+
+            int removed = janitor.SweepStale();
+
+            Assert.Equal(1, removed);
+            Assert.False(File.Exists(orphanPath));
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
+    private static string GetTestPasswordFilePath(string suffix)
+        => $@"C:\Temp\{PlinkPasswordFileNaming.Prefix}{suffix}";
 }

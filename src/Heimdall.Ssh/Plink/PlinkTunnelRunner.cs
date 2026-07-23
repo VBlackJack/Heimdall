@@ -211,6 +211,9 @@ public sealed class PlinkTunnelRunner : IDisposable
                 return new PlinkTunnelResult(false, message, SshFailureCode.Unknown);
             }
 
+            // Plink consumes -pwfile during process startup. Once the local
+            // forwarding port is bound, the plaintext file is no longer needed.
+            CleanupPasswordFile();
             return new PlinkTunnelResult(true, null, null);
         }
         catch (OperationCanceledException)
@@ -373,7 +376,9 @@ public sealed class PlinkTunnelRunner : IDisposable
             // Create the file with restricted ACL atomically to eliminate
             // the TOCTOU window between creation and permission enforcement.
             CleanupPasswordFile();
-            _pwFilePath = Path.Combine(Path.GetTempPath(), $"heimdall_pw_{Guid.NewGuid():N}");
+            _pwFilePath = Path.Combine(
+                Path.GetTempPath(),
+                $"{PlinkPasswordFileNaming.Prefix}{Guid.NewGuid():N}");
 
             if (OperatingSystem.IsWindows())
             {
@@ -620,18 +625,24 @@ public sealed class PlinkTunnelRunner : IDisposable
     /// </summary>
     private void CleanupPasswordFile()
     {
-        if (_pwFilePath is not null)
+        string? passwordFilePath = _pwFilePath;
+        if (passwordFilePath is null)
         {
-            try
-            {
-                File.Delete(_pwFilePath);
-            }
-            catch (IOException ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Warn($"[PlinkTunnelRunner] CleanupPasswordFile: {ex.Message}");
-            }
+            return;
+        }
 
+        try
+        {
+            File.Delete(passwordFilePath);
             _pwFilePath = null;
+        }
+        catch (IOException ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[PlinkTunnelRunner] CleanupPasswordFile: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[PlinkTunnelRunner] CleanupPasswordFile: {ex.Message}");
         }
     }
 }

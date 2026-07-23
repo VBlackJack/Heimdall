@@ -25,6 +25,7 @@ using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
 using Heimdall.Ssh.Agents;
+using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Services.Handlers;
 
@@ -658,7 +659,7 @@ internal sealed class SshHandler : IProtocolHandler
 
         var passwordFilePath = Path.Combine(
             Path.GetTempPath(),
-            $"{PlinkPasswordFileJanitor.PasswordFilePrefix}{Guid.NewGuid():N}");
+            $"{PlinkPasswordFileNaming.Prefix}{Guid.NewGuid():N}");
         if (OperatingSystem.IsWindows())
         {
             SecureFileWriter.WriteAndProtect(passwordFilePath, password);
