@@ -25,7 +25,7 @@ namespace Heimdall.App.ViewModels;
 /// Represents a folder node in the TreeView. Folders can contain sub-folders
 /// and servers with unlimited nesting depth. Replaces the old Project + Group model.
 /// </summary>
-public partial class FolderViewModel : ObservableObject
+public partial class FolderViewModel : ObservableObject, IInlineRenameNode
 {
     [ObservableProperty]
     private string _name = "";
@@ -43,6 +43,12 @@ public partial class FolderViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _isExpanded;
+
+    [ObservableProperty]
+    private bool _isEditing;
+
+    [ObservableProperty]
+    private string _editName = "";
 
     /// <summary>
     /// Stable key for expand/collapse state persistence.
@@ -120,4 +126,25 @@ public partial class FolderViewModel : ObservableObject
     /// <summary>Total server count (direct + recursive). Cached; call InvalidateChildren() on structural changes.</summary>
     public int ServerCount =>
         _serverCountCache ??= Servers.Count + SubFolders.Sum(f => f.ServerCount);
+
+    /// <inheritdoc />
+    public void BeginInlineEdit()
+    {
+        EditName = Name;
+        IsEditing = true;
+    }
+
+    /// <inheritdoc />
+    public void CancelInlineEdit()
+    {
+        EditName = Name;
+        IsEditing = false;
+    }
+
+    /// <inheritdoc />
+    public void CompleteInlineEdit()
+    {
+        EditName = Name;
+        IsEditing = false;
+    }
 }

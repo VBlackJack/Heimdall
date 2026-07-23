@@ -90,6 +90,13 @@ public sealed class ContextMenuFactory
         }
         menu.Items.Add(CreateConnectAsMenu(vm, server));
         menu.Items.Add(CreateOpenInSplitMenu(vm, server));
+        var renameItem = new MenuItem
+        {
+            Header = vm.Localize("TreeCtxRename"),
+            InputGestureText = "F2"
+        };
+        renameItem.Click += (_, _) => callbacks.BeginInlineRename(server);
+        menu.Items.Add(renameItem);
         menu.Items.Add(CreateMenuItem(
             vm.Localize("TreeCtxEdit"),
             vm.ServerList.EditServerCommand,
@@ -564,70 +571,12 @@ public sealed class ContextMenuFactory
         // Rename folder
         if (!string.IsNullOrEmpty(folder.FullPath))
         {
-            var renameItem = new MenuItem { Header = vm.Localize("TreeCtxRenameGroup") };
-            renameItem.Click += async (_, _) =>
+            var renameItem = new MenuItem
             {
-                var newName = await vm.DialogService.ShowInputAsync(
-                    vm.Localize("RenameGroupDialogTitle"),
-                    vm.Localize("RenameGroupFieldNew"),
-                    folder.Name);
-
-                if (newName is null)
-                {
-                    return;
-                }
-
-                try
-                {
-                    FolderRenameResult result =
-                        await new FolderRenameService(vm.ConfigManager)
-                            .RenameAsync(folder.FullPath, newName);
-
-                    switch (result.Status)
-                    {
-                        case FolderRenameStatus.Renamed:
-                            vm.ServerList.LoadServers(
-                                result.Servers
-                                    ?? throw new InvalidOperationException(
-                                        "A successful folder rename must return the inventory."),
-                                result.Settings
-                                    ?? throw new InvalidOperationException(
-                                        "A successful folder rename must return the settings."));
-                            callbacks.SelectFolder(result.NewPath!);
-                            vm.StatusText = string.Format(
-                                vm.Localize("StatusGroupRenamed"),
-                                folder.FullPath,
-                                result.NewPath);
-                            break;
-
-                        case FolderRenameStatus.InvalidSegment:
-                            vm.DialogService.ShowWarning(
-                                vm.Localize("RenameGroupDialogTitle"),
-                                vm.Localize("RenameGroupErrorInvalidSegment"));
-                            break;
-
-                        case FolderRenameStatus.SiblingCollision:
-                            vm.DialogService.ShowWarning(
-                                vm.Localize("RenameGroupDialogTitle"),
-                                vm.Localize("RenameGroupErrorSiblingCollision"));
-                            break;
-
-                        case FolderRenameStatus.NoChange:
-                            break;
-
-                        default:
-                            throw new InvalidOperationException(
-                                $"Unexpected folder rename status: {result.Status}.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Core.Logging.FileLogger.Error("Folder rename failed", ex);
-                    vm.DialogService.ShowError(
-                        vm.Localize("RenameGroupDialogTitle"),
-                        vm.Localize("RenameGroupErrorPersistence"));
-                }
+                Header = vm.Localize("TreeCtxRename"),
+                InputGestureText = "F2"
             };
+            renameItem.Click += (_, _) => callbacks.BeginInlineRename(folder);
             menu.Items.Add(renameItem);
 
             // Delete folder (move servers to root)

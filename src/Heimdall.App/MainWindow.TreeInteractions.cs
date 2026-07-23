@@ -18,9 +18,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Heimdall.App;
 
@@ -37,6 +39,8 @@ namespace Heimdall.App;
 /// </summary>
 public partial class MainWindow
 {
+    private IInlineRenameNode? _inlineRenameNode;
+
     // ── Keyboard context menu (Apps / Shift+F10) ─────────────────────
 
     /// <summary>
@@ -152,6 +156,12 @@ public partial class MainWindow
     /// </summary>
     private void OnTreeViewDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (DataContext is not MainViewModel vm)
         {
             return;
@@ -179,6 +189,11 @@ public partial class MainWindow
 
     private void OnSessionTreeViewItemPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
         if (DataContext is not MainViewModel vm || sender is not TreeViewItem treeViewItem)
         {
             return;
@@ -273,6 +288,17 @@ public partial class MainWindow
 
     private async void OnSessionTreeViewPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F2
+            && Keyboard.Modifiers == ModifierKeys.None
+            && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            object? focusedNode =
+                FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext
+                ?? SessionTreeView.SelectedItem;
+            e.Handled = BeginSessionTreeInlineRename(focusedNode);
+            return;
+        }
+
         if (e.Key != Key.Delete
             || Keyboard.Modifiers != ModifierKeys.None
             || DataContext is not MainViewModel vm
@@ -286,10 +312,295 @@ public partial class MainWindow
         await vm.ServerList.DeleteSelectedCommand.ExecuteAsync(null);
     }
 
+    private async void OnInlineRenameEditorPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not WpfTextBox editor || editor.DataContext is not IInlineRenameNode node)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            SessionTreeInlineRename.CancelEdit(node, RestoreInlineRenameFocus);
+            return;
+        }
+
+        if (e.Key != Key.Enter || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await CommitInlineRenameAsync(node, editor);
+    }
+
+    private bool BeginSessionTreeInlineRename(object? node)
+    {
+        if (node is not IInlineRenameNode editableNode)
+        {
+            return false;
+        }
+
+        if (_inlineRenameNode is not null && !ReferenceEquals(_inlineRenameNode, editableNode))
+        {
+            _inlineRenameNode.CancelInlineEdit();
+        }
+
+        if (!SessionTreeInlineRename.TryBeginEdit(node))
+        {
+            return false;
+        }
+
+        _inlineRenameNode = editableNode;
+        RefocusInlineRenameEditor(editableNode);
+        return true;
+    }
+
+    private async Task CommitInlineRenameAsync(IInlineRenameNode node, WpfTextBox editor)
+    {
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        string requestedName = node.EditName.Trim();
+        if (requestedName.Length == 0)
+        {
+            SessionTreeInlineRename.CancelEdit(node, RestoreInlineRenameFocus);
+            return;
+        }
+
+        editor.IsEnabled = false;
+        try
+        {
+            switch (node)
+            {
+                case ServerItemViewModel server:
+                    await CommitServerInlineRenameAsync(vm, server);
+                    break;
+
+                case FolderViewModel folder:
+                    await CommitFolderInlineRenameAsync(vm, folder);
+                    break;
+            }
+        }
+        finally
+        {
+            editor.IsEnabled = true;
+        }
+    }
+
+    private async Task CommitServerInlineRenameAsync(
+        MainViewModel vm,
+        ServerItemViewModel server)
+    {
+        try
+        {
+            ServerRenameResult result =
+                await new ServerRenameService(vm.ConfigManager)
+                    .RenameAsync(server.Id, server.EditName);
+
+            switch (result.Status)
+            {
+                case ServerRenameStatus.Renamed:
+                    vm.ServerList.ApplyInlineServerRename(
+                        server,
+                        result.Server
+                            ?? throw new InvalidOperationException(
+                                "A successful server rename must return the persisted server."));
+                    SessionTreeInlineRename.CompleteEdit(server, RestoreInlineRenameFocus);
+                    break;
+
+                case ServerRenameStatus.NoChange:
+                    SessionTreeInlineRename.CompleteEdit(server, RestoreInlineRenameFocus);
+                    break;
+
+                case ServerRenameStatus.InvalidName:
+                    vm.DialogService.ShowWarning(
+                        vm.Localize("InlineRenameDialogTitle"),
+                        vm.Localize("InlineRenameServerInvalid"));
+                    RefocusInlineRenameEditor(server);
+                    break;
+
+                case ServerRenameStatus.NameTooLong:
+                    vm.DialogService.ShowWarning(
+                        vm.Localize("InlineRenameDialogTitle"),
+                        string.Format(
+                            vm.Localize("InlineRenameServerTooLong"),
+                            ServerRenameService.MaxDisplayNameLength));
+                    RefocusInlineRenameEditor(server);
+                    break;
+
+                case ServerRenameStatus.NotFound:
+                    vm.DialogService.ShowError(
+                        vm.Localize("InlineRenameDialogTitle"),
+                        vm.Localize("InlineRenameServerSaveFailed"));
+                    RefocusInlineRenameEditor(server);
+                    break;
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unexpected server rename status: {result.Status}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Server inline rename failed", ex);
+            vm.DialogService.ShowError(
+                vm.Localize("InlineRenameDialogTitle"),
+                vm.Localize("InlineRenameServerSaveFailed"));
+            RefocusInlineRenameEditor(server);
+        }
+    }
+
+    private async Task CommitFolderInlineRenameAsync(
+        MainViewModel vm,
+        FolderViewModel folder)
+    {
+        string oldPath = folder.FullPath;
+        try
+        {
+            FolderRenameResult result =
+                await new FolderRenameService(vm.ConfigManager)
+                    .RenameAsync(oldPath, folder.EditName);
+
+            switch (result.Status)
+            {
+                case FolderRenameStatus.Renamed:
+                    vm.ServerList.ApplyInlineFolderRename(folder, oldPath, result);
+                    SessionTreeInlineRename.CompleteEdit(folder, RestoreInlineRenameFocus);
+                    vm.StatusText = string.Format(
+                        vm.Localize("StatusGroupRenamed"),
+                        oldPath,
+                        result.NewPath);
+                    break;
+
+                case FolderRenameStatus.NoChange:
+                    SessionTreeInlineRename.CompleteEdit(folder, RestoreInlineRenameFocus);
+                    break;
+
+                case FolderRenameStatus.InvalidSegment:
+                    vm.DialogService.ShowWarning(
+                        vm.Localize("RenameGroupDialogTitle"),
+                        vm.Localize("RenameGroupErrorInvalidSegment"));
+                    RefocusInlineRenameEditor(folder);
+                    break;
+
+                case FolderRenameStatus.SiblingCollision:
+                    vm.DialogService.ShowWarning(
+                        vm.Localize("RenameGroupDialogTitle"),
+                        vm.Localize("RenameGroupErrorSiblingCollision"));
+                    RefocusInlineRenameEditor(folder);
+                    break;
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unexpected folder rename status: {result.Status}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Folder inline rename failed", ex);
+            vm.DialogService.ShowError(
+                vm.Localize("RenameGroupDialogTitle"),
+                vm.Localize("RenameGroupErrorPersistence"));
+            RefocusInlineRenameEditor(folder);
+        }
+    }
+
+    private void RefocusInlineRenameEditor(IInlineRenameNode node)
+    {
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                TreeViewItem? container =
+                    TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, node);
+                WpfTextBox? editor = container is null
+                    ? null
+                    : FindVisualDescendant<WpfTextBox>(
+                        container,
+                        candidate => ReferenceEquals(candidate.DataContext, node) && candidate.IsVisible);
+                if (editor is null)
+                {
+                    return;
+                }
+
+                editor.Focus();
+                editor.SelectAll();
+            }));
+    }
+
+    private void RestoreInlineRenameFocus(IInlineRenameNode node)
+    {
+        if (ReferenceEquals(_inlineRenameNode, node))
+        {
+            _inlineRenameNode = null;
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            new Action(() =>
+            {
+                TreeViewItem? container =
+                    TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, node);
+                if (container is null)
+                {
+                    return;
+                }
+
+                if (node is ServerItemViewModel)
+                {
+                    container.IsSelected = true;
+                }
+
+                container.BringIntoView();
+                container.Focus();
+            }));
+    }
+
+    internal static bool IsInlineRenameEditorSource(DependencyObject? source)
+        => FindAncestor<WpfTextBox>(source) is not null;
+
+    private static T? FindVisualDescendant<T>(
+        DependencyObject root,
+        Predicate<T> predicate)
+        where T : DependencyObject
+    {
+        int childCount = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int index = 0; index < childCount; index++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, index);
+            if (child is T candidate && predicate(candidate))
+            {
+                return candidate;
+            }
+
+            T? descendant = FindVisualDescendant(child, predicate);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
+    void IContextMenuCallbacks.BeginInlineRename(object node)
+        => BeginSessionTreeInlineRename(node);
+
     // ── TreeView drag-drop: move servers between groups/projects ─────
 
     private void OnTreeViewDragStart(object sender, MouseButtonEventArgs e)
     {
+        if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            _treeState.DragInProgress = false;
+            return;
+        }
+
         if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
         {
             _treeState.DragInProgress = false;
@@ -302,6 +613,12 @@ public partial class MainWindow
 
     private void OnTreeViewDragMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            _treeState.DragInProgress = false;
+            return;
+        }
+
         if (e.LeftButton != MouseButtonState.Pressed
             || _treeState.DragInProgress
             || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)

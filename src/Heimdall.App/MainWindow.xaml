@@ -5,6 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels"
+        xmlns:services="clr-namespace:Heimdall.App.Services"
         xmlns:views="clr-namespace:Heimdall.App.Views"
         xmlns:models="clr-namespace:Heimdall.Core.Models;assembly=Heimdall.Core"
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
@@ -539,11 +540,22 @@
                                                   Width="13" Height="13"
                                                   Stretch="Uniform"
                                                   VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Name}"
-                                                       FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis"/>
+                                            <Grid Grid.Column="1">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
+                                                <TextBox Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         MinWidth="80"
+                                                         Padding="2,0"
+                                                         VerticalContentAlignment="Center"
+                                                         AutomationProperties.Name="{loc:Translate InlineRenameEditorA11y}"
+                                                         PreviewKeyDown="OnInlineRenameEditorPreviewKeyDown"
+                                                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </Grid>
                                             <TextBlock Grid.Column="2"
                                                        Text="{Binding ServerCount}"
                                                        FontSize="{StaticResource FontSizeSmallCaption}"
@@ -603,10 +615,21 @@
                                                 </Ellipse.Fill>
                                             </Ellipse>
                                             <!-- Server name -->
-                                            <TextBlock Grid.Column="2"
-                                                       Text="{Binding DisplayName}" FontSize="{StaticResource FontSizeBody}"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       VerticalAlignment="Center"/>
+                                            <Grid Grid.Column="2">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontSize="{StaticResource FontSizeBody}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           VerticalAlignment="Center"
+                                                           Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
+                                                <TextBox Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         MinWidth="80"
+                                                         MaxLength="{x:Static services:ServerRenameService.MaxDisplayNameLength}"
+                                                         Padding="2,0"
+                                                         VerticalContentAlignment="Center"
+                                                         AutomationProperties.Name="{loc:Translate InlineRenameEditorA11y}"
+                                                         PreviewKeyDown="OnInlineRenameEditorPreviewKeyDown"
+                                                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </Grid>
                                             <StackPanel Grid.Column="3"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center">

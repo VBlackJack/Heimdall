@@ -53,6 +53,13 @@ public interface IContextMenuCallbacks
     void AddToolFromMenu(string? group);
 
     /// <summary>
+    /// Starts the shared inline rename editor for a server or folder node.
+    /// </summary>
+    void BeginInlineRename(object node)
+    {
+    }
+
+    /// <summary>
     /// Selects and reveals a folder after a tree-rebuilding operation.
     /// </summary>
     void SelectFolder(string fullPath)

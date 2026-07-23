@@ -28,13 +28,19 @@ namespace Heimdall.App.ViewModels;
 /// ViewModel representing a single server item in the server list.
 /// Maps from <see cref="ServerProfileDto"/> for UI binding.
 /// </summary>
-public partial class ServerItemViewModel : ObservableObject
+public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
 {
     [ObservableProperty]
     private string _id = "";
 
     [ObservableProperty]
     private string _displayName = "";
+
+    [ObservableProperty]
+    private bool _isEditing;
+
+    [ObservableProperty]
+    private string _editName = "";
 
     [ObservableProperty]
     private string _remoteServer = "";
@@ -258,6 +264,27 @@ public partial class ServerItemViewModel : ObservableObject
     partial void OnDisplayNameChanged(string value)
     {
         OnPropertyChanged(nameof(SidebarDisplayName));
+    }
+
+    /// <inheritdoc />
+    public void BeginInlineEdit()
+    {
+        EditName = DisplayName;
+        IsEditing = true;
+    }
+
+    /// <inheritdoc />
+    public void CancelInlineEdit()
+    {
+        EditName = DisplayName;
+        IsEditing = false;
+    }
+
+    /// <inheritdoc />
+    public void CompleteInlineEdit()
+    {
+        EditName = DisplayName;
+        IsEditing = false;
     }
 
     partial void OnRemoteServerChanged(string value)
