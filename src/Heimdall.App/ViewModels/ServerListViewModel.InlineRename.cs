@@ -42,7 +42,8 @@ public partial class ServerListViewModel
             gatewayMap,
             _localizer);
 
-        SelectSingle(server);
+        ResortStableTreeProjection();
+        ApplyFilter(server.Id);
     }
 
     /// <summary>
@@ -97,6 +98,8 @@ public partial class ServerListViewModel
         }
 
         RefreshLookupCollections(result.Settings);
+        ResortStableTreeProjection();
+        ApplyFilter();
     }
 
     private static void RewriteFolderSubtree(

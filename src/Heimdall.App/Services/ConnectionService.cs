@@ -44,6 +44,13 @@ public sealed class ConnectionService : IConnectionService
     /// <summary>Returns the latest cached settings snapshot, if any.</summary>
     public AppSettings? CurrentSettings => _currentSettings;
 
+    /// <summary>
+    /// Protocol identifiers exposed by the handlers registered in this process.
+    /// UI protocol filters consume this list so they cannot drift from the
+    /// connection router's real capabilities.
+    /// </summary>
+    public IReadOnlyList<string> RegisteredProtocols { get; }
+
     /// <summary>Relay wired by the shell to surface transient status messages.</summary>
     internal Action<string>? SetStatusText
     {
@@ -78,6 +85,9 @@ public sealed class ConnectionService : IConnectionService
         _localizer = localizer;
         _tunnelService = tunnelService;
         _handlers = handlers.ToDictionary(h => h.Protocol, StringComparer.OrdinalIgnoreCase);
+        RegisteredProtocols = _handlers.Keys
+            .OrderBy(protocol => protocol, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         if (_handlers.TryGetValue("SSH", out var handler) && handler is SshHandler sshHandler)
         {

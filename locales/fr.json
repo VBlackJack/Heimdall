@@ -4900,6 +4900,16 @@
   "AccessFullscreenExit": "Quitter le plein \u00e9cran",
 
   "SearchResultCount": "{0} sessions",
+  "FilterResultCount": "{0} / {1} sessions",
+  "FilterButton": "Filtres",
+  "FilterButtonAutomationName": "Ouvrir les filtres de sessions",
+  "FilterProtocols": "Protocoles",
+  "FilterProtocolsAutomationName": "Filtrer les sessions par protocole",
+  "FilterProtocolAutomationName": "Filtrer le protocole {0}",
+  "FilterFavorite": "Favoris",
+  "FilterFavoriteAutomationName": "Afficher uniquement les sessions favorites",
+  "FilterConnected": "Connect\u00e9es",
+  "FilterConnectedAutomationName": "Afficher uniquement les sessions connect\u00e9es",
 
   "AccessDetailConnect": "Se connecter \u00e0 la session s\u00e9lectionn\u00e9e",
   "AccessDetailOpen": "Ouvrir l'outil s\u00e9lectionn\u00e9",

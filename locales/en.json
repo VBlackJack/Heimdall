@@ -4901,6 +4901,16 @@
   "AccessFullscreenExit": "Exit fullscreen",
 
   "SearchResultCount": "{0} sessions",
+  "FilterResultCount": "{0} / {1} sessions",
+  "FilterButton": "Filters",
+  "FilterButtonAutomationName": "Open session filters",
+  "FilterProtocols": "Protocols",
+  "FilterProtocolsAutomationName": "Filter sessions by protocol",
+  "FilterProtocolAutomationName": "Filter protocol {0}",
+  "FilterFavorite": "Favorites",
+  "FilterFavoriteAutomationName": "Show favorite sessions only",
+  "FilterConnected": "Connected",
+  "FilterConnectedAutomationName": "Show connected sessions only",
 
   "AccessDetailConnect": "Connect to selected session",
   "AccessDetailOpen": "Open selected tool",

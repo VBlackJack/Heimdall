@@ -777,6 +777,16 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
+    private void OnFilterButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.ContextMenu is not null)
+        {
+            button.ContextMenu.PlacementTarget = button;
+            button.ContextMenu.Placement = PlacementMode.Bottom;
+            button.ContextMenu.IsOpen = true;
+        }
+    }
+
     private void OnSidebarOverflowClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.ContextMenu != null)
@@ -875,20 +885,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         var hasText = !string.IsNullOrEmpty(Mw_FilterBox.Text);
         Mw_FilterClearBtn.Visibility = hasText ? Visibility.Visible : Visibility.Collapsed;
-
-        if (DataContext is ViewModels.MainViewModel vm)
-        {
-            var count = vm.ServerList.FilteredCount;
-            if (hasText)
-            {
-                Mw_FilterResultCount.Text = string.Format(vm.Localize("SearchResultCount"), count);
-                Mw_FilterResultCount.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                Mw_FilterResultCount.Visibility = Visibility.Collapsed;
-            }
-        }
     }
 
     private void OnWindowPreviewDragOver(object sender, System.Windows.DragEventArgs e)

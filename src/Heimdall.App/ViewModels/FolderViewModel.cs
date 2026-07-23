@@ -27,6 +27,8 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public partial class FolderViewModel : ObservableObject, IInlineRenameNode
 {
+    private bool _suppressChildInvalidation;
+
     [ObservableProperty]
     private string _name = "";
 
@@ -91,7 +93,12 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode
     /// collection reference is replaced.
     /// </summary>
     private void OnCollectionInvalidated(object? sender, NotifyCollectionChangedEventArgs e)
-        => InvalidateChildren();
+    {
+        if (!_suppressChildInvalidation)
+        {
+            InvalidateChildren();
+        }
+    }
 
     private ArrayList? _childrenCache;
     private int? _serverCountCache;
@@ -116,16 +123,85 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode
         }
     }
 
+    /// <summary>
+    /// Applies visible membership changes as an ordered diff while retaining
+    /// this folder and its backing collection instances.
+    /// </summary>
+    public void SynchronizeVisibleChildren(
+        IReadOnlyList<FolderViewModel> folders,
+        IReadOnlyList<ServerItemViewModel> servers)
+    {
+        ArgumentNullException.ThrowIfNull(folders);
+        ArgumentNullException.ThrowIfNull(servers);
+
+        _suppressChildInvalidation = true;
+        try
+        {
+            SynchronizeCollection(SubFolders, folders);
+            SynchronizeCollection(Servers, servers);
+        }
+        finally
+        {
+            _suppressChildInvalidation = false;
+        }
+
+        // Always invalidate: a retained child folder may have changed its
+        // descendant count without changing this folder's direct membership.
+        InvalidateChildren();
+    }
+
     /// <summary>Invalidate the Children and ServerCount caches when sub-collections change.</summary>
     public void InvalidateChildren()
     {
         _childrenCache = null;
         _serverCountCache = null;
+        OnPropertyChanged(nameof(Children));
+        OnPropertyChanged(nameof(ServerCount));
     }
 
     /// <summary>Total server count (direct + recursive). Cached; call InvalidateChildren() on structural changes.</summary>
     public int ServerCount =>
         _serverCountCache ??= Servers.Count + SubFolders.Sum(f => f.ServerCount);
+
+    private static void SynchronizeCollection<T>(
+        ObservableCollection<T> collection,
+        IReadOnlyList<T> target)
+        where T : class
+    {
+        for (var targetIndex = 0; targetIndex < target.Count; targetIndex++)
+        {
+            T targetItem = target[targetIndex];
+            if (targetIndex < collection.Count
+                && ReferenceEquals(collection[targetIndex], targetItem))
+            {
+                continue;
+            }
+
+            var existingIndex = -1;
+            for (var index = targetIndex + 1; index < collection.Count; index++)
+            {
+                if (ReferenceEquals(collection[index], targetItem))
+                {
+                    existingIndex = index;
+                    break;
+                }
+            }
+
+            if (existingIndex >= 0)
+            {
+                collection.Move(existingIndex, targetIndex);
+            }
+            else
+            {
+                collection.Insert(targetIndex, targetItem);
+            }
+        }
+
+        while (collection.Count > target.Count)
+        {
+            collection.RemoveAt(collection.Count - 1);
+        }
+    }
 
     /// <inheritdoc />
     public void BeginInlineEdit()

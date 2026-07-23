@@ -1389,6 +1389,7 @@ public partial class ServerListViewModel
         RefreshLookupCollections(settings);
 
         var anchorId = plan.FocusId ?? _selectionAnchor?.Id;
+        RebuildStableTreeProjection();
         ApplyFilter(plan.FocusId);
 
         if (plan.FinalSelectionIds is not null)

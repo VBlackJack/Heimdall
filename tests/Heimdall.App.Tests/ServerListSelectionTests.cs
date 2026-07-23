@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
 using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -29,11 +30,12 @@ using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
+using Xunit.Abstractions;
 using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
 namespace Heimdall.App.Tests;
 
-public sealed class ServerListSelectionTests
+public sealed class ServerListSelectionTests(ITestOutputHelper output)
 {
     [Fact]
     public async Task SelectSingle_ReplacesExistingMultiSelection()
@@ -403,6 +405,337 @@ public sealed class ServerListSelectionTests
         RecentConnectionEntry recent = Assert.Single(fixture.RecentConnections.GetRecents(10));
         Assert.Equal("alpha.example.com", recent.Host);
         Assert.Equal("SSH", recent.Protocol);
+    }
+
+    [Fact]
+    public void FilterSpec_AllFacets_ComposeWithAndSemantics()
+    {
+        var server = ServerItemViewModel.FromDto(
+            new ServerProfileDto
+            {
+                Id = "alpha",
+                DisplayName = "Alpha Production",
+                RemoteServer = "alpha.example.com",
+                ConnectionType = "SSH",
+                SshUsername = "operator",
+                Tags = "critical",
+                IsFavorite = true,
+                ProjectId = "atlas",
+                Origin = ProfileOrigin.Manual
+            },
+            new ProjectDto { Id = "atlas", Name = "Atlas" },
+            ConnectionState.Connected.ToString());
+
+        Assert.True(ServerFilterSpec.Create(
+            "critical",
+            ["ssh"],
+            favoritesOnly: true,
+            connectedOnly: true,
+            "atlas").Matches(server));
+        Assert.False(ServerFilterSpec.Create(
+            "missing",
+            ["ssh"],
+            favoritesOnly: true,
+            connectedOnly: true,
+            "atlas").Matches(server));
+        Assert.False(ServerFilterSpec.Create(
+            "critical",
+            ["rdp"],
+            favoritesOnly: true,
+            connectedOnly: true,
+            "atlas").Matches(server));
+        Assert.False(ServerFilterSpec.Create(
+            "critical",
+            ["ssh"],
+            favoritesOnly: true,
+            connectedOnly: true,
+            "other").Matches(server));
+
+        server.IsFavorite = false;
+        Assert.False(ServerFilterSpec.Create(
+            "critical",
+            ["ssh"],
+            favoritesOnly: true,
+            connectedOnly: true,
+            "atlas").Matches(server));
+
+        server.IsFavorite = true;
+        server.ConnectionState = ConnectionState.Disconnected.ToString();
+        Assert.False(ServerFilterSpec.Create(
+            "critical",
+            ["ssh"],
+            favoritesOnly: true,
+            connectedOnly: true,
+            "atlas").Matches(server));
+    }
+
+    [Fact]
+    public void ConnectedFilter_ExcludesErrorInitializingAndDisconnecting()
+    {
+        var server = ServerItemViewModel.FromDto(CreateServer("alpha", "Alpha", "ops"));
+        ServerFilterSpec connectedOnly = ServerFilterSpec.Create(null, connectedOnly: true);
+
+        foreach (ConnectionState excluded in new[]
+                 {
+                     ConnectionState.Error,
+                     ConnectionState.Initializing,
+                     ConnectionState.Disconnecting
+                 })
+        {
+            server.ConnectionState = excluded.ToString();
+            Assert.False(connectedOnly.Matches(server));
+        }
+
+        foreach (ConnectionState included in ConnectionStateSets.Connected)
+        {
+            server.ConnectionState = included.ToString();
+            Assert.True(connectedOnly.Matches(server));
+        }
+    }
+
+    [Fact]
+    public async Task ConnectionStateCrossesBoundary_RefreshesConnectedMembershipOnce()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+        fixture.ViewModel.ConnectedFilterEnabled = true;
+        int stableBuildCount = fixture.ViewModel.StableTreeBuildCount;
+        int initialPassCount = fixture.ViewModel.FilterPassApplicationCount;
+
+        TransitionSshSessionToConnected(
+            fixture.StateMachine,
+            SessionIdCodec.Create("alpha"));
+
+        AssertVisibleServerIds(fixture.ViewModel, "alpha");
+        Assert.Equal(1, fixture.ViewModel.ConnectedMembershipRefreshCount);
+        Assert.Equal(initialPassCount + 1, fixture.ViewModel.FilterPassApplicationCount);
+        Assert.Equal(stableBuildCount, fixture.ViewModel.StableTreeBuildCount);
+    }
+
+    [Fact]
+    public async Task FilteredTree_HidesEmptyFolders_AndKeepsAncestorCounts()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        AppSettings settings = fixture.ExpandGroups(
+            "root",
+            "root/matching",
+            "root/hidden",
+            "root/empty");
+        settings.EmptyGroups.Add("root/empty");
+        ServerProfileDto matching = CreateServer(
+            "alpha",
+            "Alpha",
+            "root/matching");
+        matching.IsFavorite = true;
+        fixture.LoadServers(
+            settings,
+            matching,
+            CreateServer("beta", "Beta", "root/hidden"));
+
+        fixture.ViewModel.FavoriteFilterEnabled = true;
+
+        FolderViewModel root = Assert.Single(fixture.ViewModel.GroupedServers);
+        Assert.Equal("root", root.FullPath);
+        FolderViewModel matchingFolder = Assert.Single(root.SubFolders);
+        Assert.Equal("root/matching", matchingFolder.FullPath);
+        Assert.Equal(1, matchingFolder.ServerCount);
+        Assert.Equal(1, root.ServerCount);
+        Assert.DoesNotContain(root.SubFolders, folder => folder.FullPath == "root/hidden");
+        Assert.DoesNotContain(root.SubFolders, folder => folder.FullPath == "root/empty");
+        Assert.False(fixture.ViewModel.ShowNoGroupDropZone);
+    }
+
+    [Fact]
+    public async Task Search_WinRmUsername_Matches()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var winRm = new ServerProfileDto
+        {
+            Id = "winrm",
+            DisplayName = "Windows Host",
+            RemoteServer = "windows.example.com",
+            ConnectionType = "WINRM",
+            WinRmUsername = "codex24-user",
+            Group = "ops",
+            Origin = ProfileOrigin.Manual
+        };
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            winRm,
+            CreateServer("ssh", "SSH Host", "ops"));
+
+        fixture.ViewModel.SearchText = "codex24-user";
+
+        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "winrm");
+    }
+
+    [Theory]
+    [InlineData("SSH", "ssh-user")]
+    [InlineData("SFTP", "ssh-user")]
+    [InlineData("RDP", "rdp-user")]
+    [InlineData("WINRM", "winrm-user")]
+    [InlineData("FTP", "ftp-user")]
+    [InlineData("TELNET", "telnet-user")]
+    [InlineData("VNC", "")]
+    [InlineData("CITRIX", "")]
+    [InlineData("LOCAL", "")]
+    public void SearchUsernameProjection_UsesProtocolSpecificField(
+        string protocol,
+        string expectedUsername)
+    {
+        var dto = new ServerProfileDto
+        {
+            Id = protocol,
+            DisplayName = $"{protocol} Host",
+            ConnectionType = protocol,
+            RemoteServer = "host.example.com",
+            SshUsername = "ssh-user",
+            RdpUsername = "rdp-user",
+            WinRmUsername = "winrm-user",
+            FtpUsername = "ftp-user",
+            TelnetUsername = "telnet-user",
+            Origin = ProfileOrigin.Manual
+        };
+
+        ServerItemViewModel server = ServerItemViewModel.FromDto(dto);
+
+        Assert.Equal(expectedUsername, server.Username);
+        if (expectedUsername.Length > 0)
+        {
+            Assert.Contains(
+                ServerItemViewModel.NormalizeSearchTerm(expectedUsername),
+                server.NormalizedSearchText,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task SearchDebounce_LatestWins_ClearImmediate_DisposedPassIgnored()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha Node", "ops"),
+            CreateServer("beta", "Beta Node", "ops"),
+            CreateServer("gamma", "Gamma Node", "ops"));
+        int initialPassCount = fixture.ViewModel.FilterPassApplicationCount;
+
+        fixture.ViewModel.SearchText = "alpha";
+        await Task.Delay(50);
+        fixture.ViewModel.SearchText = "gamma";
+
+        Assert.Equal(initialPassCount, fixture.ViewModel.FilterPassApplicationCount);
+        Assert.True(fixture.ViewModel.IsFilterPending);
+        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "gamma");
+        Assert.Equal(initialPassCount + 1, fixture.ViewModel.FilterPassApplicationCount);
+
+        fixture.ViewModel.SearchText = "";
+
+        AssertVisibleServerIds(fixture.ViewModel, "alpha", "beta", "gamma");
+        Assert.False(fixture.ViewModel.IsFilterPending);
+        Assert.Equal(initialPassCount + 2, fixture.ViewModel.FilterPassApplicationCount);
+
+        fixture.ViewModel.SearchText = "beta";
+        int passCountBeforeDispose = fixture.ViewModel.FilterPassApplicationCount;
+        fixture.ViewModel.Dispose();
+        await Task.Delay(400);
+
+        Assert.Equal(passCountBeforeDispose, fixture.ViewModel.FilterPassApplicationCount);
+    }
+
+    [Fact]
+    public async Task ResultCount_ReflectsAppliedPass_NotPreviousTerm()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha Node", "ops"),
+            CreateServer("beta", "Beta Node", "ops"),
+            CreateServer("gamma", "Gamma Node", "ops"));
+
+        fixture.ViewModel.SearchText = "alpha";
+        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "alpha");
+        Assert.Equal("1 / 3 sessions", fixture.ViewModel.FilterResultCountText);
+        Assert.True(fixture.ViewModel.HasAppliedFilterResult);
+
+        fixture.ViewModel.SearchText = "does-not-exist";
+
+        Assert.True(fixture.ViewModel.IsFilterPending);
+        Assert.False(fixture.ViewModel.HasAppliedFilterResult);
+        await WaitForVisibleServerIdsAsync(fixture.ViewModel);
+        Assert.Equal("0 / 3 sessions", fixture.ViewModel.FilterResultCountText);
+        Assert.True(fixture.ViewModel.HasAppliedFilterResult);
+    }
+
+    [Fact]
+    public async Task Filter_ReusesStableNodes_DoesNotRebuildWholeGraph()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        ServerProfileDto alpha = CreateServer("alpha", "Alpha", "ops");
+        alpha.IsFavorite = true;
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            alpha,
+            CreateServer("beta", "Beta", "ops"));
+        FolderViewModel originalFolder = Assert.Single(fixture.ViewModel.GroupedServers);
+        ServerItemViewModel originalAlpha = fixture.ServerById("alpha");
+        int stableBuildCount = fixture.ViewModel.StableTreeBuildCount;
+        Assert.False(fixture.ViewModel.HasActiveFacetFilter);
+
+        fixture.ViewModel.FavoriteFilterEnabled = true;
+
+        Assert.True(fixture.ViewModel.HasActiveFacetFilter);
+        Assert.Same(originalFolder, Assert.Single(fixture.ViewModel.GroupedServers));
+        Assert.Same(originalAlpha, Assert.Single(fixture.ViewModel.Servers));
+        Assert.Equal(stableBuildCount, fixture.ViewModel.StableTreeBuildCount);
+
+        fixture.ViewModel.FavoriteFilterEnabled = false;
+
+        Assert.False(fixture.ViewModel.HasActiveFacetFilter);
+        Assert.Same(originalFolder, Assert.Single(fixture.ViewModel.GroupedServers));
+        Assert.Same(originalAlpha, fixture.ServerById("alpha"));
+        Assert.Equal(stableBuildCount, fixture.ViewModel.StableTreeBuildCount);
+    }
+
+    [Theory]
+    [InlineData(500)]
+    [InlineData(2000)]
+    [InlineData(5000)]
+    public async Task FilterPass_Benchmark_ReportsInventoryScale(int inventorySize)
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        ServerProfileDto[] servers = Enumerable.Range(0, inventorySize)
+            .Select(index =>
+            {
+                ServerProfileDto server = CreateServer(
+                    $"server-{index:D5}",
+                    $"Benchmark Server {index:D5}",
+                    $"benchmark/group-{index % 50:D2}",
+                    index);
+                server.IsFavorite = index % 10 == 0;
+                return server;
+            })
+            .ToArray();
+        fixture.LoadServers(
+            fixture.ExpandGroups("benchmark"),
+            servers);
+
+        var wallClock = Stopwatch.StartNew();
+        fixture.ViewModel.FavoriteFilterEnabled = true;
+        wallClock.Stop();
+
+        output.WriteLine(
+            "Inventory={0}; applied-pass={1:F3} ms; wall-clock={2:F3} ms; results={3}",
+            inventorySize,
+            fixture.ViewModel.LastFilterPassDuration.TotalMilliseconds,
+            wallClock.Elapsed.TotalMilliseconds,
+            fixture.ViewModel.FilteredCount);
+        Assert.Equal((inventorySize + 9) / 10, fixture.ViewModel.FilteredCount);
+        Assert.True(
+            wallClock.Elapsed < TimeSpan.FromSeconds(2),
+            $"Filtering {inventorySize} sessions took {wallClock.Elapsed.TotalMilliseconds:F3} ms.");
     }
 
     private static void TransitionSshSessionToConnected(ConnectionStateMachine stateMachine, string sessionId)

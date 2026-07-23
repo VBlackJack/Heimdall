@@ -357,6 +357,7 @@
                                             <ColumnDefinition Width="*" MinWidth="120"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
                                         <Grid Grid.Column="0">
@@ -379,12 +380,64 @@
                                         </Grid>
 
                                         <Button Grid.Column="1"
+                                                x:Name="FilterButton"
+                                                Click="OnFilterButtonClick"
+                                                Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                Padding="6,6" FontSize="{StaticResource FontSizeBody}"
+                                                Width="32" Height="32"
+                                                Margin="6,0,0,0"
+                                                ToolTip="{loc:Translate FilterButton}"
+                                                AutomationProperties.Name="{loc:Translate FilterButtonAutomationName}">
+                                            <Grid>
+                                                <TextBlock Text="&#xE71C;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="{StaticResource FontSizeBody}"/>
+                                                <Ellipse Width="6"
+                                                         Height="6"
+                                                         HorizontalAlignment="Right"
+                                                         VerticalAlignment="Top"
+                                                         Margin="0,-3,-3,0"
+                                                         Fill="{DynamicResource AccentBrush}"
+                                                         Visibility="{Binding ServerList.HasActiveFacetFilter, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </Grid>
+                                            <Button.ContextMenu>
+                                                <ContextMenu x:Name="FilterMenu"
+                                                             DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                    <MenuItem Header="{loc:Translate FilterProtocols}"
+                                                              AutomationProperties.Name="{loc:Translate FilterProtocolsAutomationName}"
+                                                              ItemsSource="{Binding ServerList.ProtocolFilters}">
+                                                        <MenuItem.ItemContainerStyle>
+                                                            <Style TargetType="{x:Type MenuItem}">
+                                                                <Setter Property="Header" Value="{Binding Protocol}"/>
+                                                                <Setter Property="IsCheckable" Value="True"/>
+                                                                <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                                                <Setter Property="StaysOpenOnClick" Value="True"/>
+                                                                <Setter Property="AutomationProperties.Name" Value="{Binding AccessibilityName}"/>
+                                                            </Style>
+                                                        </MenuItem.ItemContainerStyle>
+                                                    </MenuItem>
+                                                    <Separator/>
+                                                    <MenuItem Header="{loc:Translate FilterFavorite}"
+                                                              IsCheckable="True"
+                                                              IsChecked="{Binding ServerList.FavoriteFilterEnabled, Mode=TwoWay}"
+                                                              StaysOpenOnClick="True"
+                                                              AutomationProperties.Name="{loc:Translate FilterFavoriteAutomationName}"/>
+                                                    <MenuItem Header="{loc:Translate FilterConnected}"
+                                                              IsCheckable="True"
+                                                              IsChecked="{Binding ServerList.ConnectedFilterEnabled, Mode=TwoWay}"
+                                                              StaysOpenOnClick="True"
+                                                              AutomationProperties.Name="{loc:Translate FilterConnectedAutomationName}"/>
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
+                                        </Button>
+
+                                        <Button Grid.Column="2"
                                                 x:Name="AddButton"
                                                 Click="OnAddButtonClick"
                                                 Style="{DynamicResource ToolbarGhostButtonStyle}"
                                                 Padding="6,6" FontSize="{StaticResource FontSizeBody}"
                                                 Width="32" Height="32"
-                                                Margin="6,0,0,0"
+                                                Margin="2,0,0,0"
                                                 ToolTip="{loc:Translate TooltipAddMenu}"
                                                 AutomationProperties.Name="{loc:Translate TooltipAddMenu}">
                                             <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"/>
@@ -400,7 +453,7 @@
                                             </Button.ContextMenu>
                                         </Button>
 
-                                        <Button Grid.Column="2"
+                                        <Button Grid.Column="3"
                                                 x:Name="SidebarOverflowButton"
                                                 Click="OnSidebarOverflowClick"
                                                 Style="{DynamicResource ToolbarGhostButtonStyle}"
@@ -451,13 +504,16 @@
                                         </Button>
                                     </Grid>
 
-                                    <!-- Result count hint: collapses to 0 height when filter is inactive (code-behind toggles Visibility) -->
+                                    <!-- Count is hidden while a debounced pass is pending so it
+                                         never describes the previous applied filter. -->
                                     <TextBlock x:Name="Mw_FilterResultCount"
+                                               Text="{Binding ServerList.FilterResultCountText}"
                                                FontSize="{StaticResource FontSizeSmallCaption}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                Margin="2,4,0,0"
                                                TextTrimming="CharacterEllipsis"
-                                               Visibility="Collapsed"/>
+                                               Visibility="{Binding ServerList.HasAppliedFilterResult, Converter={StaticResource BoolToVisibilityConverter}}"
+                                               AutomationProperties.Name="{Binding ServerList.FilterResultCountText}"/>
                                 </StackPanel>
 
                                 <Border x:Name="SessionTreeNoGroupDropZone"
@@ -470,6 +526,7 @@
                                         DragOver="OnTreeViewDragOver"
                                         DragLeave="OnTreeViewDragLeave"
                                         Drop="OnTreeViewDrop"
+                                        Visibility="{Binding ServerList.ShowNoGroupDropZone, Converter={StaticResource BoolToVisibilityConverter}}"
                                         ToolTip="{loc:Translate TreeNodeNoGroup}"
                                         AutomationProperties.Name="{loc:Translate TreeNodeNoGroup}">
                                     <Border.Style>

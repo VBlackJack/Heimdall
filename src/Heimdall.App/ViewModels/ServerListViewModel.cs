@@ -72,8 +72,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     private int _searchFilterVersion;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
     private ObservableCollection<ServerItemViewModel> _servers = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    private int _filteredCount;
 
     [ObservableProperty]
     private ObservableCollection<FolderViewModel> _groupedServers = [];
@@ -100,12 +103,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     /// <summary>
     /// True when the server list contains no entries, used to show the empty state overlay.
     /// </summary>
-    public bool IsEmpty => Servers.Count == 0;
-
-    /// <summary>
-    /// Number of servers currently visible after filtering.
-    /// </summary>
-    public int FilteredCount => Servers.Count;
+    public bool IsEmpty => FilteredCount == 0;
 
     /// <summary>
     /// True when a server is selected in the TreeView, used to toggle the detail panel.
@@ -183,6 +181,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         _credentialProviderFactory = credentialProviderFactory ?? new CredentialProviderFactory();
         _windowsHelloService = windowsHelloService ?? new WindowsHelloService();
 
+        InitializeFilterOptions();
         InitializeSelectionModel();
         _connectionSm.StateChanged += OnConnectionStateChanged;
         if (_healthMonitor is not null)
@@ -230,7 +229,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        UnsubscribeFolderEvents(GroupedServers);
+        DetachStableTreeFolderEvents();
         _searchFilterTimer?.Dispose();
         _expandSaveTimer?.Dispose();
         _connectionSm.StateChanged -= OnConnectionStateChanged;
@@ -329,21 +328,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Recursively detaches <see cref="OnFolderExpandedChanged"/> from every folder
-    /// in the supplied tree. Called before rebuilding <see cref="GroupedServers"/>
-    /// and in <see cref="Dispose"/> to ensure handler subscriptions do not
-    /// accumulate across tree rebuilds.
-    /// </summary>
-    private void UnsubscribeFolderEvents(IEnumerable<FolderViewModel> folders)
-    {
-        foreach (var folder in folders)
-        {
-            folder.PropertyChanged -= OnFolderExpandedChanged;
-            UnsubscribeFolderEvents(folder.SubFolders);
-        }
-    }
-
-    /// <summary>
     /// Populates the server list from loaded DTOs and settings.
     /// </summary>
     public void LoadServers(List<ServerProfileDto> serverDtos, AppSettings settings)
@@ -374,6 +358,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
         RefreshLookupCollections(settings);
         IsSidebarVisible = !settings.SidebarCollapsed;
+        RebuildStableTreeProjection();
         ApplyFilter(selectedServerId);
     }
 
@@ -1262,6 +1247,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             _localizer));
 
         RefreshLookupCollections(settings);
+        RebuildStableTreeProjection();
         ApplyFilter(result.Server.Id);
         OnPropertyChanged(nameof(Servers));
         OnPropertyChanged(nameof(IsEmpty));
@@ -1316,6 +1302,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             _localizer));
 
         RefreshLookupCollections(settings);
+        RebuildStableTreeProjection();
         ApplyFilter(result.Server.Id);
         OnPropertyChanged(nameof(Servers));
         OnPropertyChanged(nameof(IsEmpty));
@@ -1375,6 +1362,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
             server.DisplayName = updatedName;
             server.RemoteServer = updatedHost;
+            ResortStableTreeProjection();
+            ApplyFilter(server.Id);
             return;
         }
 
@@ -1426,6 +1415,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             _localizer);
 
         RefreshLookupCollections(settings);
+        RebuildStableTreeProjection();
         ApplyFilter(server.Id);
     }
 
@@ -1681,216 +1671,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     private void ToggleSidebar()
     {
         IsSidebarVisible = !IsSidebarVisible;
-    }
-
-    partial void OnSearchTextChanged(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            CancelSearchFilterDebounce();
-            ApplyFilter();
-            return;
-        }
-
-        ScheduleSearchFilter();
-    }
-
-    partial void OnSelectedProjectChanged(string value)
-    {
-        CancelSearchFilterDebounce();
-        ApplyFilter();
-    }
-
-    private void ScheduleSearchFilter()
-    {
-        var version = System.Threading.Interlocked.Increment(ref _searchFilterVersion);
-        _searchFilterTimer?.Dispose();
-        _searchFilterTimer = new System.Threading.Timer(
-            _ => ApplySearchFilterFromTimer(version),
-            null,
-            SearchFilterDebounceDelay,
-            Timeout.InfiniteTimeSpan);
-    }
-
-    private void CancelSearchFilterDebounce()
-    {
-        System.Threading.Interlocked.Increment(ref _searchFilterVersion);
-        _searchFilterTimer?.Dispose();
-        _searchFilterTimer = null;
-    }
-
-    private void ApplySearchFilterFromTimer(int version)
-    {
-        _ = _uiDispatcher.InvokeAsync(() =>
-        {
-            if (_disposed || version != System.Threading.Volatile.Read(ref _searchFilterVersion))
-            {
-                return;
-            }
-
-            ApplyFilter();
-        });
-    }
-
-    private void ApplyFilter(string? preferredSelectedServerId = null)
-    {
-        var filtered = _allServers.AsEnumerable();
-
-        if (!string.IsNullOrWhiteSpace(SearchText))
-        {
-            var term = SearchText;
-            filtered = filtered.Where(s =>
-                s.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                s.RemoteServer.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                s.Group.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                s.Username.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                s.ConnectionType.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                s.Environment.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                s.Tags.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                s.ProjectName.Contains(term, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (!string.IsNullOrWhiteSpace(SelectedProject))
-        {
-            filtered = filtered.Where(s =>
-                string.Equals(s.ProjectName, SelectedProject, StringComparison.OrdinalIgnoreCase));
-        }
-
-        var filteredList = filtered
-            .OrderBy(s => s.SortOrder)
-            .ThenBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        Servers = new ObservableCollection<ServerItemViewModel>(filteredList);
-        RebuildGroupedView(filteredList);
-        SynchronizeSelection(preferredSelectedServerId);
-    }
-
-    /// <summary>
-    /// Rebuilds the hierarchical folder tree from server Group paths.
-    /// The Group field is the full folder path (e.g., "ADSEC/Gateway/Linux").
-    /// Servers without a Group appear at the tree root.
-    /// Empty folders from settings are included even without servers.
-    /// </summary>
-    private void RebuildGroupedView(List<ServerItemViewModel> filteredServers)
-    {
-        // Detach handlers from the previous tree before rebuilding so that
-        // replaced FolderViewModel instances do not retain subscriptions back
-        // to this ViewModel.
-        UnsubscribeFolderEvents(GroupedServers);
-
-        // Build the folder tree from server Group paths
-        var root = new FolderViewModel { Name = "__root__", FullPath = "" };
-
-        foreach (var server in filteredServers)
-        {
-            string folderPath = (server.Group?.Trim() ?? "").Replace('\\', '/');
-            if (string.IsNullOrEmpty(folderPath))
-            {
-                // Server at tree root (no folder)
-                root.Servers.Add(server);
-            }
-            else
-            {
-                var folder = EnsureFolderPath(root, folderPath);
-                folder.Servers.Add(server);
-            }
-        }
-
-        // Add empty folders from settings
-        if (_currentSettings?.EmptyGroups is not null)
-        {
-            foreach (var path in _currentSettings.EmptyGroups)
-            {
-                if (!string.IsNullOrWhiteSpace(path))
-                {
-                    EnsureFolderPath(root, path);
-                }
-            }
-        }
-
-        // Sort all levels: folders first (alphabetical), then servers (by SortOrder, then name)
-        SortFolderRecursive(root);
-
-        // The top-level children become GroupedServers
-        // Root servers go into a virtual "(root)" folder only if there are also named folders
-        var topFolders = root.SubFolders.ToList();
-        var rootServers = root.Servers.ToList();
-
-        if (rootServers.Count > 0)
-        {
-            var rootFolder = new FolderViewModel
-            {
-                Name = _localizer["TreeNodeNoGroup"],
-                FullPath = "",
-                IsExpanded = _expandedNodes.Contains("::nogroup"),
-                Servers = new ObservableCollection<ServerItemViewModel>(rootServers)
-            };
-            rootFolder.PropertyChanged += OnFolderExpandedChanged;
-            topFolders.Add(rootFolder);
-        }
-
-        GroupedServers = new ObservableCollection<FolderViewModel>(topFolders);
-    }
-
-    /// <summary>
-    /// Ensures a folder path exists in the tree, creating intermediate folders as needed.
-    /// "ADSEC/Gateway/Linux" creates ADSEC → Gateway → Linux.
-    /// </summary>
-    private FolderViewModel EnsureFolderPath(FolderViewModel root, string path)
-    {
-        var segments = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var current = root;
-        var pathSoFar = "";
-
-        foreach (var segment in segments)
-        {
-            pathSoFar = string.IsNullOrEmpty(pathSoFar) ? segment : $"{pathSoFar}/{segment}";
-
-            var existing = current.SubFolders.FirstOrDefault(
-                f => string.Equals(f.Name, segment, StringComparison.OrdinalIgnoreCase));
-
-            if (existing is not null)
-            {
-                current = existing;
-            }
-            else
-            {
-                var newFolder = new FolderViewModel
-                {
-                    Name = segment,
-                    FullPath = pathSoFar,
-                    IsExpanded = _expandedNodes.Contains(pathSoFar)
-                };
-                newFolder.PropertyChanged += OnFolderExpandedChanged;
-                current.SubFolders.Add(newFolder);
-                current = newFolder;
-            }
-        }
-
-        return current;
-    }
-
-    private static void SortFolderRecursive(FolderViewModel folder)
-    {
-        // Sort sub-folders alphabetically
-        var sortedFolders = folder.SubFolders
-            .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        folder.SubFolders = new ObservableCollection<FolderViewModel>(sortedFolders);
-
-        // Sort servers by SortOrder then name
-        var sortedServers = folder.Servers
-            .OrderBy(s => s.SortOrder)
-            .ThenBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        folder.Servers = new ObservableCollection<ServerItemViewModel>(sortedServers);
-
-        // Recurse
-        foreach (var sub in folder.SubFolders)
-        {
-            SortFolderRecursive(sub);
-        }
     }
 
     /// <summary>
@@ -2168,9 +1948,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             server.ConnectionState = aggregateState.ToString();
             bool isConnected = ConnectionStateSets.IsConnected(aggregateState);
 
-            // Rebuild filtered views only when connected-filter membership changes.
-            if (wasConnected != isConnected)
+            // Refresh the stable projection exactly once when this server
+            // crosses the connected-filter boundary. Other state changes only
+            // update the row's visual state.
+            if (ConnectedFilterEnabled && wasConnected != isConnected)
             {
+                ConnectedMembershipRefreshCount++;
                 ApplyFilter(server.Id);
             }
 

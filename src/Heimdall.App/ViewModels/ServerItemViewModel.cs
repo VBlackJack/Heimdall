@@ -127,6 +127,36 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
     /// </summary>
     private ServerProfileDto? _sourceDto;
 
+    private string _normalizedSearchText = "";
+    private bool _searchTextCacheInvalid = true;
+
+    /// <summary>
+    /// Cached normalized projection of every searchable server field. Property
+    /// callbacks invalidate it, and the next filter pass recomputes it once.
+    /// </summary>
+    public string NormalizedSearchText
+    {
+        get
+        {
+            if (_searchTextCacheInvalid)
+            {
+                _normalizedSearchText = NormalizeSearchTerm(string.Join(
+                    "\u001F",
+                    DisplayName,
+                    RemoteServer,
+                    Group,
+                    Username,
+                    ConnectionType,
+                    Environment,
+                    Tags,
+                    ProjectName));
+                _searchTextCacheInvalid = false;
+            }
+
+            return _normalizedSearchText;
+        }
+    }
+
     /// <summary>
     /// Returns the protocol-appropriate port for this server (SSH→SshPort, FTP→FtpPort, etc.)
     /// instead of the generic <see cref="RemotePort"/> which defaults to the RDP port.
@@ -259,11 +289,13 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
     partial void OnConnectionTypeChanged(string value)
     {
         OnPropertyChanged(nameof(ConnectionTypeBadge));
+        InvalidateSearchTextCache();
     }
 
     partial void OnDisplayNameChanged(string value)
     {
         OnPropertyChanged(nameof(SidebarDisplayName));
+        InvalidateSearchTextCache();
     }
 
     /// <inheritdoc />
@@ -288,7 +320,20 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
     }
 
     partial void OnRemoteServerChanged(string value)
-        => Endpoint = string.IsNullOrEmpty(value) ? "" : (RemotePort > 0 ? $"{value}:{RemotePort}" : value);
+    {
+        Endpoint = string.IsNullOrEmpty(value) ? "" : (RemotePort > 0 ? $"{value}:{RemotePort}" : value);
+        InvalidateSearchTextCache();
+    }
+
+    partial void OnGroupChanged(string value) => InvalidateSearchTextCache();
+
+    partial void OnEnvironmentChanged(string value) => InvalidateSearchTextCache();
+
+    partial void OnProjectNameChanged(string value) => InvalidateSearchTextCache();
+
+    partial void OnUsernameChanged(string value) => InvalidateSearchTextCache();
+
+    partial void OnTagsChanged(string value) => InvalidateSearchTextCache();
 
     partial void OnConnectionStateChanged(string value)
     {
@@ -323,13 +368,22 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         return port > 0 ? $"{host}:{port}" : host;
     }
 
+    internal static string NormalizeSearchTerm(string? value) =>
+        value?.Trim().ToUpperInvariant() ?? "";
+
+    private void InvalidateSearchTextCache() => _searchTextCacheInvalid = true;
+
     private static string GetUsername(ServerProfileDto dto)
     {
-        if (!string.IsNullOrWhiteSpace(dto.SshUsername)) return dto.SshUsername;
-        if (!string.IsNullOrWhiteSpace(dto.RdpUsername)) return dto.RdpUsername;
-        if (!string.IsNullOrWhiteSpace(dto.FtpUsername)) return dto.FtpUsername;
-        if (!string.IsNullOrWhiteSpace(dto.TelnetUsername)) return dto.TelnetUsername;
-        return "";
+        return dto.ConnectionType?.ToUpperInvariant() switch
+        {
+            "SSH" or "SFTP" => dto.SshUsername ?? "",
+            "RDP" => dto.RdpUsername ?? "",
+            "WINRM" => dto.WinRmUsername ?? "",
+            "FTP" => dto.FtpUsername ?? "",
+            "TELNET" => dto.TelnetUsername ?? "",
+            _ => ""
+        };
     }
 
     private void ApplyGatewayState(
