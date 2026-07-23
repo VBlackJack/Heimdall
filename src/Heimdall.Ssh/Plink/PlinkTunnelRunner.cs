@@ -148,16 +148,23 @@ public sealed class PlinkTunnelRunner : IDisposable
             return new PlinkTunnelResult(false, ex.Message, SshFailureCode.Unknown);
         }
 
+        Process? process = null;
         try
         {
-            Process process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-            _process = process;
-            process.Exited += (_, _) => LogProcessExit(process, localPort);
-            process.Start();
+            var newProcess = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+            process = newProcess;
+            newProcess.Exited += (_, _) => LogProcessExit(newProcess, localPort);
+            if (!newProcess.Start())
+            {
+                throw new InvalidOperationException("Process.Start returned without starting plink.");
+            }
+
+            _process = newProcess;
         }
         catch (Exception ex)
         {
-            // Ensure password file is cleaned up if process fails to start
+            process?.Dispose();
+            _process = null;
             CleanupPasswordFile();
             return new PlinkTunnelResult(false, $"Failed to start plink process: {ex.Message}", SshFailureCode.Unknown);
         }

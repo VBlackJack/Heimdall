@@ -246,6 +246,40 @@ public class PlinkTunnelRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task StartAsync_ProcessStartFails_ResetsStateAndAllowsRetry()
+    {
+        string invalidExecutablePath = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall-invalid-plink-{Guid.NewGuid():N}.exe");
+        await File.WriteAllTextAsync(invalidExecutablePath, "not a Windows executable");
+
+        try
+        {
+            PlinkTunnelResult firstResult = await _runner.StartAsync(
+                invalidExecutablePath,
+                "gw.test", 22, "user", null, null,
+                "remote", 22, 10022);
+
+            Assert.False(firstResult.Success);
+            Assert.False(_runner.IsRunning);
+            Assert.Null(_runner.ProcessId);
+
+            PlinkTunnelResult retryResult = await _runner.StartAsync(
+                invalidExecutablePath,
+                "gw.test", 22, "user", null, null,
+                "remote", 22, 10022);
+
+            Assert.False(retryResult.Success);
+            Assert.False(_runner.IsRunning);
+            Assert.Null(_runner.ProcessId);
+        }
+        finally
+        {
+            File.Delete(invalidExecutablePath);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_KeyPathWithKeyPassphrase_ReturnsFailureWithoutStartingProcess()
     {
         var result = await _runner.StartAsync(

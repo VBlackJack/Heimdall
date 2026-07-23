@@ -74,6 +74,20 @@ public class PageantClientTests
         Assert.Equal(value, result);
     }
 
+    [Fact]
+    public void ResponseLengthValidation_RejectsMappedSize_AndAcceptsValidMaximumMinusOne()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            PageantClient.GetValidatedTotalResponseLength(PageantClient.AgentMaxMessageLength));
+
+        uint validPayloadLength = (uint)(
+            PageantClient.AgentMaxMessageLength - sizeof(uint) - 1);
+        int totalResponseLength =
+            PageantClient.GetValidatedTotalResponseLength(validPayloadLength);
+
+        Assert.Equal(PageantClient.AgentMaxMessageLength - 1, totalResponseLength);
+    }
+
     // ── ExtractKeyTypeFromBlob ────────────────────────────────────────
 
     [Fact]

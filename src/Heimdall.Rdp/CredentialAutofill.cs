@@ -533,30 +533,33 @@ public static partial class CredentialAutofill
                 return false;
             }
 
-            var passwordElement = FindPasswordElement(root);
-            if (passwordElement is null)
-            {
-                FileLogger.Warn("CredentialAutofill UIA could not locate a password field.");
-                return false;
-            }
-
             var passwordText = new string(passwordBuffer);
-            if (!TrySetAutomationValue(passwordElement, passwordText))
-            {
-                FileLogger.Warn("CredentialAutofill UIA could not set the password field value.");
-                return false;
-            }
+            IReadOnlyList<PasswordFieldCandidate<AutomationElement>> passwordFields =
+                FindPasswordElements(root);
+            bool injected = TryAutofillConfirmedPasswordField(
+                passwordFields,
+                passwordText,
+                TrySetAutomationValue,
+                () =>
+                {
+                    var okButton = FindOkButtonElement(root);
+                    if (okButton is null)
+                    {
+                        FileLogger.Warn("CredentialAutofill UIA could not locate the confirmation button.");
+                        return false;
+                    }
 
-            var okButton = FindOkButtonElement(root);
-            if (okButton is null)
-            {
-                FileLogger.Warn("CredentialAutofill UIA could not locate the confirmation button.");
-                return false;
-            }
+                    if (!TryInvokeAutomationButton(okButton))
+                    {
+                        FileLogger.Warn("CredentialAutofill UIA could not invoke the confirmation button.");
+                        return false;
+                    }
 
-            if (!TryInvokeAutomationButton(okButton))
+                    return true;
+                });
+
+            if (!injected)
             {
-                FileLogger.Warn("CredentialAutofill UIA could not invoke the confirmation button.");
                 return false;
             }
 
@@ -592,52 +595,52 @@ public static partial class CredentialAutofill
             return false;
         }
 
-        IntPtr passwordEdit = IntPtr.Zero;
-        foreach (WindowInfo edit in editControls)
-        {
-            if (HasPasswordStyle(GetWindowStyle(edit.Handle)))
-            {
-                passwordEdit = edit.Handle;
-                break;
-            }
-        }
-
-        bool styleDetected = passwordEdit != IntPtr.Zero;
-        if (!styleDetected)
-        {
-            passwordEdit = editControls.Count >= 2 ? editControls[1].Handle : editControls[0].Handle;
-        }
-
-        FileLogger.Info($"CredentialAutofill Win32 password edit selected: styleDetected={styleDetected} handle=0x{passwordEdit.ToInt64():X}");
-
-        string passwordText = new(passwordBuffer);
-        SendMessageString(passwordEdit, WM_SETTEXT, IntPtr.Zero, passwordText);
-        FileLogger.Info($"CredentialAutofill Win32 password text sent to handle=0x{passwordEdit.ToInt64():X}");
-
-        var buttons = GetDescendantWindows(dialog.Handle)
-            .Where(w => string.Equals(w.ClassName, "Button", StringComparison.OrdinalIgnoreCase))
+        IReadOnlyList<PasswordFieldCandidate<WindowInfo>> passwordFields = editControls
+            .Select(edit => new PasswordFieldCandidate<WindowInfo>(
+                edit,
+                string.Empty,
+                IsEnabled: true,
+                IsPassword: HasPasswordStyle(GetWindowStyle(edit.Handle))))
             .ToList();
 
-        FileLogger.Info($"CredentialAutofill Win32 found {buttons.Count} descendant Button controls.");
+        return TryAutofillConfirmedPasswordField(
+            passwordFields,
+            new string(passwordBuffer),
+            (passwordEdit, passwordText) =>
+            {
+                SendMessageString(passwordEdit.Handle, WM_SETTEXT, IntPtr.Zero, passwordText);
+                FileLogger.Info(
+                    $"CredentialAutofill Win32 password text sent to handle=0x{passwordEdit.Handle.ToInt64():X}");
+                return true;
+            },
+            () =>
+            {
+                var buttons = GetDescendantWindows(dialog.Handle)
+                    .Where(w => string.Equals(w.ClassName, "Button", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
 
-        if (buttons.Count == 0)
-        {
-            return true;
-        }
+                FileLogger.Info($"CredentialAutofill Win32 found {buttons.Count} descendant Button controls.");
 
-        var targetButton = buttons.FirstOrDefault(w => OkButtonPattern.IsMatch(w.Title));
-        if (targetButton.Handle == IntPtr.Zero)
-        {
-            targetButton = buttons.Count >= 2 ? buttons[1] : buttons[0];
-        }
+                if (buttons.Count == 0)
+                {
+                    return true;
+                }
 
-        SendMessage(targetButton.Handle, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
-        FileLogger.Info(
-            $"CredentialAutofill Win32 clicked button handle=0x{targetButton.Handle.ToInt64():X} title='{targetButton.Title}'");
-        return true;
+                var targetButton = buttons.FirstOrDefault(w => OkButtonPattern.IsMatch(w.Title));
+                if (targetButton.Handle == IntPtr.Zero)
+                {
+                    targetButton = buttons.Count >= 2 ? buttons[1] : buttons[0];
+                }
+
+                SendMessage(targetButton.Handle, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+                FileLogger.Info(
+                    $"CredentialAutofill Win32 clicked button handle=0x{targetButton.Handle.ToInt64():X} title='{targetButton.Title}'");
+                return true;
+            });
     }
 
-    private static AutomationElement? FindPasswordElement(AutomationElement root)
+    private static IReadOnlyList<PasswordFieldCandidate<AutomationElement>> FindPasswordElements(
+        AutomationElement root)
     {
         var edits = root.FindAll(
             TreeScope.Descendants,
@@ -645,9 +648,7 @@ public static partial class CredentialAutofill
 
         FileLogger.Info($"CredentialAutofill UIA discovered {edits.Count} Edit elements.");
 
-        AutomationElement? namedPassword = null;
-        AutomationElement? passwordFlagMatch = null;
-        AutomationElement? firstEnabled = null;
+        var passwordFields = new List<PasswordFieldCandidate<AutomationElement>>(edits.Count);
 
         for (var index = 0; index < edits.Count; index++)
         {
@@ -659,28 +660,64 @@ public static partial class CredentialAutofill
             FileLogger.Debug(
                 $"CredentialAutofill UIA edit[{index}]: enabled={isEnabled} isPassword={isPassword}");
 
-            if (!isEnabled)
+            passwordFields.Add(new PasswordFieldCandidate<AutomationElement>(
+                element,
+                name,
+                isEnabled,
+                isPassword));
+        }
+
+        return passwordFields;
+    }
+
+    internal static bool TryAutofillConfirmedPasswordField<T>(
+        IReadOnlyList<PasswordFieldCandidate<T>> fields,
+        string password,
+        Func<T, string, bool> writePassword,
+        Func<bool> submit)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        ArgumentNullException.ThrowIfNull(password);
+        ArgumentNullException.ThrowIfNull(writePassword);
+        ArgumentNullException.ThrowIfNull(submit);
+
+        var passwordFlagIndex = -1;
+        var passwordNameIndex = -1;
+
+        for (var index = 0; index < fields.Count; index++)
+        {
+            PasswordFieldCandidate<T> field = fields[index];
+            if (!field.IsEnabled)
             {
                 continue;
             }
 
-            if (firstEnabled is null)
+            if (passwordFlagIndex < 0 && field.IsPassword)
             {
-                firstEnabled = element;
+                passwordFlagIndex = index;
             }
 
-            if (isPassword && passwordFlagMatch is null)
+            if (passwordNameIndex < 0 && PasswordFieldPattern.IsMatch(field.Name))
             {
-                passwordFlagMatch = element;
-            }
-
-            if (namedPassword is null && PasswordFieldPattern.IsMatch(name))
-            {
-                namedPassword = element;
+                passwordNameIndex = index;
             }
         }
 
-        return passwordFlagMatch ?? namedPassword ?? firstEnabled;
+        int selectedIndex = passwordFlagIndex >= 0 ? passwordFlagIndex : passwordNameIndex;
+        if (selectedIndex < 0)
+        {
+            FileLogger.Info(
+                "CredentialAutofill abandoned because no confirmed password field was found.");
+            return false;
+        }
+
+        if (!writePassword(fields[selectedIndex].Element, password))
+        {
+            FileLogger.Warn("CredentialAutofill could not set the confirmed password field value.");
+            return false;
+        }
+
+        return submit();
     }
 
     private static AutomationElement? FindOkButtonElement(AutomationElement root)
@@ -788,6 +825,12 @@ public static partial class CredentialAutofill
         string ClassName,
         int ProcessId,
         string ProcessName);
+
+    internal readonly record struct PasswordFieldCandidate<T>(
+        T Element,
+        string Name,
+        bool IsEnabled,
+        bool IsPassword);
 
     private sealed record CredentialBrokerMatchEvaluation(
         WindowInfo? Selected,

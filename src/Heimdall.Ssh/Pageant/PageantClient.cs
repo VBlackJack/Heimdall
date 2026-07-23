@@ -33,7 +33,7 @@ public sealed class PageantClient : IPageantClient
     private const byte SSH2_AGENTC_SIGN_REQUEST = 13;
     private const byte SSH2_AGENT_SIGN_RESPONSE = 14;
     private const int WM_COPYDATA = 0x004A;
-    private const int AgentMaxMessageLength = 262144;
+    internal const int AgentMaxMessageLength = 262144;
 
     /// <summary>
     /// Magic value required by Pageant in COPYDATASTRUCT.dwData.
@@ -234,17 +234,10 @@ public sealed class PageantClient : IPageantClient
             }
 
             // Read response length from shared memory (first 4 bytes, big-endian)
-            var lengthBytes = new byte[4];
-            Marshal.Copy(view, lengthBytes, 0, 4);
-            int responsePayloadLength = (int)ReadBigEndianUInt32(lengthBytes, 0);
-
-            if (responsePayloadLength <= 0 || responsePayloadLength > AgentMaxMessageLength)
-            {
-                throw new InvalidOperationException(
-                    $"Pageant returned invalid response length: {responsePayloadLength}");
-            }
-
-            int totalResponseLength = 4 + responsePayloadLength;
+            var lengthBytes = new byte[sizeof(uint)];
+            Marshal.Copy(view, lengthBytes, 0, lengthBytes.Length);
+            uint responsePayloadLength = ReadBigEndianUInt32(lengthBytes, 0);
+            int totalResponseLength = GetValidatedTotalResponseLength(responsePayloadLength);
             var response = new byte[totalResponseLength];
             Marshal.Copy(view, response, 0, totalResponseLength);
 
@@ -254,6 +247,18 @@ public sealed class PageantClient : IPageantClient
         {
             NativeMethods.UnmapViewOfFile(view);
         }
+    }
+
+    internal static int GetValidatedTotalResponseLength(uint responsePayloadLength)
+    {
+        uint maximumPayloadLength = AgentMaxMessageLength - sizeof(uint);
+        if (responsePayloadLength == 0 || responsePayloadLength > maximumPayloadLength)
+        {
+            throw new InvalidOperationException(
+                $"Pageant returned invalid response length: {responsePayloadLength}");
+        }
+
+        return sizeof(uint) + (int)responsePayloadLength;
     }
 
     /// <summary>

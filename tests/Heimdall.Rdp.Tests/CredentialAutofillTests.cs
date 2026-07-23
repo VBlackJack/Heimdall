@@ -96,6 +96,45 @@ public sealed class CredentialAutofillTests : IDisposable
     }
 
     [Fact]
+    public void TryAutofillConfirmedPasswordField_NoConfirmedField_FailsWithoutWritingOrSubmitting()
+    {
+        const string Secret = "must-not-be-written-or-logged";
+        var fields = new List<CredentialAutofill.PasswordFieldCandidate<string>>
+        {
+            new("username", "User name", IsEnabled: true, IsPassword: false),
+            new("disabled-password", "Password", IsEnabled: false, IsPassword: true)
+        };
+        var writeAttempts = 0;
+        var submitAttempts = 0;
+
+        bool result = CredentialAutofill.TryAutofillConfirmedPasswordField(
+            fields,
+            Secret,
+            (_, _) =>
+            {
+                writeAttempts++;
+                return true;
+            },
+            () =>
+            {
+                submitAttempts++;
+                return true;
+            });
+
+        Assert.False(result);
+        Assert.Equal(0, writeAttempts);
+        Assert.Equal(0, submitAttempts);
+
+        FileLogger.Flush();
+        string[] logLines = ReadLogLines();
+        Assert.Contains(logLines, line =>
+            line.Contains(
+                "CredentialAutofill abandoned because no confirmed password field was found.",
+                StringComparison.Ordinal));
+        Assert.DoesNotContain(logLines, line => line.Contains(Secret, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SelectCredentialDialogTarget_ReturnsNull_ForUnmatchedBrokerWindows()
     {
         var windows = new List<CredentialAutofill.WindowInfo>

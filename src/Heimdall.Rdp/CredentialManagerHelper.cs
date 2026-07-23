@@ -28,11 +28,11 @@ public static class CredentialManagerHelper
 {
     #region Constants
 
-    private const uint CredTypeGeneric = 1;
-    private const uint CredTypeDomainPassword = 2;
+    internal const uint CredTypeGeneric = 1;
+    internal const uint CredTypeDomainPassword = 2;
     private const uint CredPersistSession = 1;
     private const int CredMaxCredentialBlobSize = 512;
-    private const int ErrorNotFound = 1168;
+    internal const int ErrorNotFound = 1168;
 
     #endregion
 
@@ -90,6 +90,23 @@ public static class CredentialManagerHelper
     /// </summary>
     public static bool DeleteCredential(string targetName, out string? error)
     {
+        return DeleteCredential(
+            targetName,
+            (target, type) =>
+            {
+                bool deleted = CredDelete(target, type, 0);
+                return new CredentialDeleteResult(
+                    deleted,
+                    deleted ? 0 : Marshal.GetLastWin32Error());
+            },
+            out error);
+    }
+
+    internal static bool DeleteCredential(
+        string targetName,
+        Func<string, uint, CredentialDeleteResult> deleteCredential,
+        out string? error)
+    {
         error = null;
 
         if (string.IsNullOrWhiteSpace(targetName))
@@ -98,32 +115,34 @@ public static class CredentialManagerHelper
             return false;
         }
 
-        // Try deleting as DOMAIN_PASSWORD first (used for TERMSRV/ RDP targets)
-        bool deletedDomain = CredDelete(targetName, CredTypeDomainPassword, 0);
-        if (!deletedDomain)
+        ArgumentNullException.ThrowIfNull(deleteCredential);
+
+        var failures = new List<string>();
+        (uint Type, string Name)[] credentialTypes =
+        [
+            (CredTypeDomainPassword, "DOMAIN_PASSWORD"),
+            (CredTypeGeneric, "GENERIC")
+        ];
+
+        foreach ((uint type, string name) in credentialTypes)
         {
-            int win32Domain = Marshal.GetLastWin32Error();
-            if (win32Domain != ErrorNotFound)
+            CredentialDeleteResult result = deleteCredential(targetName, type);
+            if (!result.Success && result.ErrorCode != ErrorNotFound)
             {
-                error = $"WIN32_ERROR_{win32Domain}";
-                return false;
+                failures.Add($"{name}: WIN32_ERROR_{result.ErrorCode}");
             }
         }
 
-        // Also attempt GENERIC cleanup in case legacy credentials exist
-        bool deletedGeneric = CredDelete(targetName, CredTypeGeneric, 0);
-        if (!deletedGeneric)
+        if (failures.Count > 0)
         {
-            int win32Generic = Marshal.GetLastWin32Error();
-            if (win32Generic != ErrorNotFound && !deletedDomain)
-            {
-                error = $"WIN32_ERROR_{win32Generic}";
-                return false;
-            }
+            error = string.Join("; ", failures);
+            return false;
         }
 
         return true;
     }
+
+    internal readonly record struct CredentialDeleteResult(bool Success, int ErrorCode);
 
     /// <summary>
     /// Shared implementation for writing a Windows credential via CredWriteW.
