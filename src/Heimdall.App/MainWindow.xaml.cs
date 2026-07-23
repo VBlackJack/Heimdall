@@ -336,6 +336,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private static void RefreshVmDrivenLocalization(MainViewModel vm)
     {
+        vm.ServerList.RefreshLocalizedState();
         vm.ToolsTab.RefreshHeaderText();
         vm.ToolsTab.InvalidateSections();
     }

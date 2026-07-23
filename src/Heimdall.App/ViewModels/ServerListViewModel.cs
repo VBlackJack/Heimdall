@@ -379,6 +379,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         return targets;
     }
 
+    internal void RefreshLocalizedState()
+    {
+        foreach (ServerItemViewModel server in _allServers)
+        {
+            server.RefreshLocalizedState();
+        }
+    }
+
     public IReadOnlyList<GroupTarget> GetGroupTargets(string? projectId, bool includeNoGroup)
     {
         var normalizedProjectId = projectId ?? string.Empty;

@@ -119,13 +119,18 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
     /// <summary>Tooltip text for the sidebar health dot, recomputed on every <see cref="HealthState"/> change.</summary>
     public string HealthTooltipText => HealthReasonLocalizer.FormatTooltip(HealthState, _localizer);
 
-    partial void OnHealthStateChanged(HealthState value) => OnPropertyChanged(nameof(HealthTooltipText));
+    partial void OnHealthStateChanged(HealthState value)
+    {
+        OnPropertyChanged(nameof(HealthTooltipText));
+        OnPropertyChanged(nameof(AccessibleName));
+    }
 
     /// <summary>
     /// Retained DTO reference for accessing protocol-specific properties
     /// (e.g. SshPort, FtpPort, SshKeyPath) that are not exposed as ViewModel fields.
     /// </summary>
     private ServerProfileDto? _sourceDto;
+    private IReadOnlyDictionary<string, SshGatewayDto>? _gatewayMap;
 
     private string _normalizedSearchText = "";
     private bool _searchTextCacheInvalid = true;
@@ -182,10 +187,12 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
     public string ConnectionStateDisplayName =>
         ConnectionState switch
         {
+            { } state when string.Equals(state, "Connected", StringComparison.OrdinalIgnoreCase)
+                => T("SessionStatusConnected"),
             { } state when string.Equals(state, "LaunchedExternalClient", StringComparison.OrdinalIgnoreCase)
-                => L("StatusLaunchedExternalClient"),
+                => T("StatusLaunchedExternalClient"),
             { } state when string.Equals(state, "RemoteSessionHandedOff", StringComparison.OrdinalIgnoreCase)
-                => L("StatusRemoteSessionHandedOff"),
+                => T("StatusRemoteSessionHandedOff"),
             _ => ConnectionState
         };
 
@@ -193,13 +200,19 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         ConnectionState switch
         {
             { } state when string.Equals(state, "LaunchedExternalClient", StringComparison.OrdinalIgnoreCase)
-                => L("StatusLaunchedExternalClientTooltip"),
+                => T("StatusLaunchedExternalClientTooltip"),
             { } state when string.Equals(state, "RemoteSessionHandedOff", StringComparison.OrdinalIgnoreCase)
-                => L("StatusRemoteSessionHandedOffTooltip"),
+                => T("StatusRemoteSessionHandedOffTooltip"),
             _ => ConnectionStateDisplayName
         };
 
     public string SidebarDisplayName => SidebarDisplayNameFormatter.Format(DisplayName) ?? "";
+
+    public string AccessibleName => Format(
+        "SessionTreeServerAccessibleName",
+        DisplayName,
+        ConnectionType.ToUpperInvariant(),
+        IsActiveSession ? ConnectionStateDisplayName : HealthTooltipText);
 
     public string ConnectionTypeBadge => ConnectionType.ToUpperInvariant() switch
     {
@@ -229,6 +242,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         var viewModel = new ServerItemViewModel
         {
             _sourceDto = dto,
+            _gatewayMap = gatewayMap,
             _localizer = localizer,
             Id = dto.Id,
             DisplayName = dto.DisplayName,
@@ -248,9 +262,8 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
             IsFavorite = dto.IsFavorite,
             SortOrder = dto.SortOrder,
             MacAddress = dto.MacAddress ?? "",
-            AuthSummary = BuildAuthSummary(dto),
         };
-        viewModel.ApplyGatewayState(dto.SshGatewayId, gatewayMap);
+        viewModel.RefreshLocalizedState();
         return viewModel;
     }
 
@@ -264,6 +277,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         LocalizationManager? localizer = null)
     {
         _sourceDto = dto;
+        _gatewayMap = gatewayMap;
         _localizer = localizer ?? _localizer;
         DisplayName = dto.DisplayName;
         Origin = dto.Origin;
@@ -281,20 +295,20 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         IsFavorite = dto.IsFavorite;
         SortOrder = dto.SortOrder;
         MacAddress = dto.MacAddress ?? "";
-        ApplyGatewayState(dto.SshGatewayId, gatewayMap);
-        AuthSummary = BuildAuthSummary(dto);
-        OnPropertyChanged(nameof(OriginDisplayName));
+        RefreshLocalizedState();
     }
 
     partial void OnConnectionTypeChanged(string value)
     {
         OnPropertyChanged(nameof(ConnectionTypeBadge));
+        OnPropertyChanged(nameof(AccessibleName));
         InvalidateSearchTextCache();
     }
 
     partial void OnDisplayNameChanged(string value)
     {
         OnPropertyChanged(nameof(SidebarDisplayName));
+        OnPropertyChanged(nameof(AccessibleName));
         InvalidateSearchTextCache();
     }
 
@@ -340,9 +354,23 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         OnPropertyChanged(nameof(IsActiveSession));
         OnPropertyChanged(nameof(ConnectionStateDisplayName));
         OnPropertyChanged(nameof(ConnectionStateTooltip));
+        OnPropertyChanged(nameof(AccessibleName));
     }
 
-    private string L(string key) => _localizer?[key] ?? key;
+    internal void RefreshLocalizedState()
+    {
+        if (_sourceDto is not null)
+        {
+            AuthSummary = BuildAuthSummary(_sourceDto);
+            ApplyGatewayState(_sourceDto.SshGatewayId, _gatewayMap);
+        }
+
+        OnPropertyChanged(nameof(OriginDisplayName));
+        OnPropertyChanged(nameof(HealthTooltipText));
+        OnPropertyChanged(nameof(ConnectionStateDisplayName));
+        OnPropertyChanged(nameof(ConnectionStateTooltip));
+        OnPropertyChanged(nameof(AccessibleName));
+    }
 
     private static string FormatEndpoint(ServerProfileDto dto)
     {
@@ -442,10 +470,21 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         "SessionGatewayBadgeTooltipVia" => "Routes through SSH gateway {0}.",
         "SessionGatewayBadgeTooltipMissing" => "This session references missing SSH gateway id {0}.",
         "SessionGatewayMissingDetail" => "Missing gateway ({0})",
+        "SessionAuthSshKey" => "SSH key",
+        "SessionAuthPassword" => "Password",
+        "SessionAuthAgent" => "Agent",
+        "SessionAuthPrompt" => "Prompt",
+        "SessionAuthCurrentUser" => "Current user",
+        "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
+        "SessionStatusConnected" => "Connected",
+        "StatusLaunchedExternalClient" => "External client launched",
+        "StatusLaunchedExternalClientTooltip" => "The external client was launched.",
+        "StatusRemoteSessionHandedOff" => "Session started",
+        "StatusRemoteSessionHandedOffTooltip" => "The remote session was handed off to its client.",
         _ => key
     };
 
-    private static string BuildAuthSummary(ServerProfileDto dto)
+    private string BuildAuthSummary(ServerProfileDto dto)
     {
         var type = dto.ConnectionType?.ToUpperInvariant();
 
@@ -456,57 +495,59 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
                     var parts = new List<string>();
                     if (!string.IsNullOrWhiteSpace(dto.SshKeyPath))
                     {
-                        parts.Add("SSH Key");
+                        parts.Add(T("SessionAuthSshKey"));
                     }
 
                     if (!string.IsNullOrWhiteSpace(dto.SshPasswordEncrypted))
                     {
-                        parts.Add("Password");
+                        parts.Add(T("SessionAuthPassword"));
                     }
 
                     if (dto.SshAgentForwarding)
                     {
-                        parts.Add("Agent");
+                        parts.Add(T("SessionAuthAgent"));
                     }
 
-                    return parts.Count > 0 ? string.Join(" + ", parts) : "Password";
+                    return parts.Count > 0
+                        ? string.Join(" + ", parts)
+                        : T("SessionAuthPassword");
                 }
 
             case "RDP":
                 {
                     return !string.IsNullOrWhiteSpace(dto.RdpPasswordEncrypted)
-                        ? "Password"
-                        : "Prompt";
+                        ? T("SessionAuthPassword")
+                        : T("SessionAuthPrompt");
                 }
 
             case "WINRM":
                 {
                     return dto.WinRmIdentityMode == Core.Configuration.WinRmIdentityMode.CurrentUser
-                        ? "Current user"
+                        ? T("SessionAuthCurrentUser")
                         : !string.IsNullOrWhiteSpace(dto.WinRmPasswordEncrypted)
-                            ? "Password"
-                            : "Prompt";
+                            ? T("SessionAuthPassword")
+                            : T("SessionAuthPrompt");
                 }
 
             case "FTP":
                 {
                     return !string.IsNullOrWhiteSpace(dto.FtpPasswordEncrypted)
-                        ? "Password"
-                        : "Prompt";
+                        ? T("SessionAuthPassword")
+                        : T("SessionAuthPrompt");
                 }
 
             case "TELNET":
                 {
                     return !string.IsNullOrWhiteSpace(dto.TelnetPasswordEncrypted)
-                        ? "Password"
-                        : "Prompt";
+                        ? T("SessionAuthPassword")
+                        : T("SessionAuthPrompt");
                 }
 
             case "VNC":
                 {
                     return !string.IsNullOrWhiteSpace(dto.VncPassword)
-                        ? "Password"
-                        : "Prompt";
+                        ? T("SessionAuthPassword")
+                        : T("SessionAuthPrompt");
                 }
 
             default:

@@ -641,6 +641,7 @@
                                             BorderThickness="3,0,0,0"
                                             BorderBrush="Transparent"
                                             Background="Transparent"
+                                            AutomationProperties.Name="{Binding AccessibleName}"
                                             ToolTip="{Binding DisplayName}"
                                             ToolTipService.InitialShowDelay="150">
                                         <Grid>
