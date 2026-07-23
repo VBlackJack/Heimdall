@@ -51,6 +51,51 @@ public sealed class ServerDialogOriginPreservationTests
         Assert.Equal(ProfileOrigin.ImportPutty, dto.Origin);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Rename_WhenVaultEntryNameEmpty_FreezesOldDisplayNameAsCredentialTarget(
+        string? vaultEntryName)
+    {
+        ServerProfileDto storedProfile = CreateProfile("Prod SSH", vaultEntryName);
+        ServerProfileDto editedProfile = CreateProfile("Production SSH", vaultEntryName);
+        await using var fixture = await ServerListFixture.CreateAsync(editedProfile, storedProfile);
+        fixture.ViewModel.LoadServers(
+            await fixture.ConfigManager.LoadServersAsync(),
+            new AppSettings());
+
+        bool edited = await fixture.ViewModel.EditServerByIdAsync(
+            storedProfile.Id,
+            CancellationToken.None);
+
+        Assert.True(edited);
+        ServerProfileDto persisted = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal("Production SSH", persisted.DisplayName);
+        Assert.Equal("Prod SSH", persisted.VaultEntryName);
+    }
+
+    [Fact]
+    public async Task Rename_WhenVaultEntryNameSet_LeavesReferenceUntouched()
+    {
+        const string credentialReference = "Explicit Credential Reference";
+        ServerProfileDto storedProfile = CreateProfile("Prod SSH", credentialReference);
+        ServerProfileDto editedProfile = CreateProfile("Production SSH", credentialReference);
+        await using var fixture = await ServerListFixture.CreateAsync(editedProfile, storedProfile);
+        fixture.ViewModel.LoadServers(
+            await fixture.ConfigManager.LoadServersAsync(),
+            new AppSettings());
+
+        bool edited = await fixture.ViewModel.EditServerByIdAsync(
+            storedProfile.Id,
+            CancellationToken.None);
+
+        Assert.True(edited);
+        ServerProfileDto persisted = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal("Production SSH", persisted.DisplayName);
+        Assert.Equal(credentialReference, persisted.VaultEntryName);
+    }
+
     [Fact]
     public void ServerDialogViewModel_ToDto_MarksExecutionConfirmed()
     {
@@ -140,11 +185,17 @@ public sealed class ServerDialogOriginPreservationTests
 
         public FakeUiDispatcher Dispatcher { get; }
 
-        public static async Task<ServerListFixture> CreateAsync(ServerProfileDto dialogServer)
+        public static async Task<ServerListFixture> CreateAsync(
+            ServerProfileDto dialogServer,
+            params ServerProfileDto[] storedProfiles)
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "heimdall-b63-serverlist", Guid.NewGuid().ToString("N"));
             var configManager = new ConfigManager(rootPath);
             await configManager.InitializeAsync();
+            if (storedProfiles.Length > 0)
+            {
+                await configManager.SaveServersAsync([.. storedProfiles]);
+            }
 
             var localizer = new LocalizationManager();
             await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
@@ -190,6 +241,20 @@ public sealed class ServerDialogOriginPreservationTests
 
             return ValueTask.CompletedTask;
         }
+    }
+
+    private static ServerProfileDto CreateProfile(
+        string displayName,
+        string? vaultEntryName)
+    {
+        return new ServerProfileDto
+        {
+            Id = "server-1",
+            DisplayName = displayName,
+            RemoteServer = "prod.example.com",
+            ConnectionType = "SSH",
+            VaultEntryName = vaultEntryName
+        };
     }
 
     private sealed class NullTunnelService : ITunnelService

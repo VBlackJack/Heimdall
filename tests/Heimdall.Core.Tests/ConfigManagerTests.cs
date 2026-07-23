@@ -681,6 +681,82 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal(["alpha", "beta"], persistedIds);
     }
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("   ", true)]
+    [InlineData("Explicit Credential Reference", false)]
+    public async Task BulkRename_WhenProfilesChangedInOneMutation_PreservesCredentialTargets(
+        string? vaultEntryName,
+        bool freezesOldDisplayName)
+    {
+        await _manager.SaveServersAsync(
+        [
+            new ServerProfileDto
+            {
+                Id = "alpha",
+                DisplayName = "Alpha",
+                RemoteServer = "alpha.example.test",
+                VaultEntryName = vaultEntryName
+            },
+            new ServerProfileDto
+            {
+                Id = "beta",
+                DisplayName = "Beta",
+                RemoteServer = "beta.example.test",
+                VaultEntryName = vaultEntryName
+            }
+        ]);
+
+        await _manager.MutateServersAsync(servers =>
+        {
+            foreach (ServerProfileDto server in servers)
+            {
+                server.DisplayName += " Renamed";
+            }
+
+            return servers.Count;
+        });
+
+        List<ServerProfileDto> persisted = await _manager.LoadServersAsync();
+        Assert.Equal(
+            freezesOldDisplayName ? "Alpha" : vaultEntryName,
+            persisted.Single(server => server.Id == "alpha").VaultEntryName);
+        Assert.Equal(
+            freezesOldDisplayName ? "Beta" : vaultEntryName,
+            persisted.Single(server => server.Id == "beta").VaultEntryName);
+    }
+
+    [Theory]
+    [InlineData(null, "Original Display Name")]
+    [InlineData("Explicit Credential Reference", "Explicit Credential Reference")]
+    public async Task SaveServersAsync_ProgrammaticRename_PreservesCredentialTarget(
+        string? vaultEntryName,
+        string expectedCredentialTarget)
+    {
+        var original = new ServerProfileDto
+        {
+            Id = "server-1",
+            DisplayName = "Original Display Name",
+            RemoteServer = "server.example.test",
+            VaultEntryName = vaultEntryName
+        };
+        await _manager.SaveServersAsync([original]);
+
+        var renamed = new ServerProfileDto
+        {
+            Id = original.Id,
+            DisplayName = "Renamed Display Name",
+            RemoteServer = original.RemoteServer,
+            VaultEntryName = vaultEntryName
+        };
+        await _manager.SaveServersAsync([renamed]);
+
+        ServerProfileDto persisted = Assert.Single(await _manager.LoadServersAsync());
+        Assert.Equal("Renamed Display Name", persisted.DisplayName);
+        Assert.Equal(expectedCredentialTarget, persisted.VaultEntryName);
+    }
+
     [Fact]
     public async Task LoadServersAsync_DeserializesValidJson()
     {

@@ -143,15 +143,18 @@ public sealed class SessionTreeInlineRenameTests
         Assert.Equal("Original", Assert.Single(config.Servers).DisplayName);
     }
 
-    [Fact]
-    public async Task RenameServer_WhenVaultEntryNameMissing_PreservesCredentialLookupTarget()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Rename_WhenVaultEntryNameEmpty_FreezesOldDisplayNameAsCredentialTarget(
+        string? vaultEntryName)
     {
+        ServerProfileDto profile = CreateServer("server-1", "Credential Target");
+        profile.VaultEntryName = vaultEntryName;
         var config = new RecordingConfigManager
         {
-            Servers =
-            [
-                CreateServer("server-1", "Credential Target")
-            ]
+            Servers = [profile]
         };
 
         ServerRenameResult result =
@@ -162,6 +165,26 @@ public sealed class SessionTreeInlineRenameTests
         ServerProfileDto persisted = Assert.Single(config.Servers);
         Assert.Equal("Display Name", persisted.DisplayName);
         Assert.Equal("Credential Target", persisted.VaultEntryName);
+    }
+
+    [Fact]
+    public async Task Rename_WhenVaultEntryNameSet_LeavesReferenceUntouched()
+    {
+        ServerProfileDto profile = CreateServer("server-1", "Original Display Name");
+        profile.VaultEntryName = "Explicit Credential Reference";
+        var config = new RecordingConfigManager
+        {
+            Servers = [profile]
+        };
+
+        ServerRenameResult result =
+            await new ServerRenameService(config)
+                .RenameAsync("server-1", "Renamed Display Name");
+
+        Assert.Equal(ServerRenameStatus.Renamed, result.Status);
+        ServerProfileDto persisted = Assert.Single(config.Servers);
+        Assert.Equal("Renamed Display Name", persisted.DisplayName);
+        Assert.Equal("Explicit Credential Reference", persisted.VaultEntryName);
     }
 
     [Fact]

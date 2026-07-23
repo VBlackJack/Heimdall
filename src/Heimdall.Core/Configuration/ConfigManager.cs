@@ -485,8 +485,11 @@ public sealed class ConfigManager : IConfigManager
         try
         {
             List<ServerProfileDto> servers = await LoadServersInternalAsync().ConfigureAwait(false);
+            Dictionary<string, CredentialReferenceSnapshot> credentialReferences =
+                CaptureCredentialReferences(servers);
             string originalJson = JsonSerializer.Serialize(servers, JsonOptions);
             TResult result = mutate(servers);
+            FreezeCredentialReferencesAcrossRenames(credentialReferences, servers);
             string mutatedJson = JsonSerializer.Serialize(servers, JsonOptions);
             if (!string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
             {
@@ -539,6 +542,10 @@ public sealed class ConfigManager : IConfigManager
         await _writeLock.WaitAsync().ConfigureAwait(false);
         try
         {
+            List<ServerProfileDto> currentServers = await LoadServersInternalAsync().ConfigureAwait(false);
+            Dictionary<string, CredentialReferenceSnapshot> credentialReferences =
+                CaptureCredentialReferences(currentServers);
+            FreezeCredentialReferencesAcrossRenames(credentialReferences, servers);
             await SaveServersInternalAsync(servers).ConfigureAwait(false);
         }
         finally
@@ -561,6 +568,45 @@ public sealed class ConfigManager : IConfigManager
         var json = JsonSerializer.Serialize(servers, JsonOptions);
         await WriteTextAsync(_serversPath, json).ConfigureAwait(false);
     }
+
+    private static Dictionary<string, CredentialReferenceSnapshot> CaptureCredentialReferences(
+        IEnumerable<ServerProfileDto> servers)
+    {
+        var snapshots = new Dictionary<string, CredentialReferenceSnapshot>(StringComparer.Ordinal);
+        foreach (ServerProfileDto server in servers)
+        {
+            if (!string.IsNullOrEmpty(server.Id))
+            {
+                snapshots.TryAdd(
+                    server.Id,
+                    new CredentialReferenceSnapshot(server.DisplayName, server.VaultEntryName));
+            }
+        }
+
+        return snapshots;
+    }
+
+    private static void FreezeCredentialReferencesAcrossRenames(
+        IReadOnlyDictionary<string, CredentialReferenceSnapshot> previousProfiles,
+        IEnumerable<ServerProfileDto> updatedProfiles)
+    {
+        foreach (ServerProfileDto updatedProfile in updatedProfiles)
+        {
+            if (!previousProfiles.TryGetValue(updatedProfile.Id, out CredentialReferenceSnapshot previousProfile)
+                || string.Equals(previousProfile.DisplayName, updatedProfile.DisplayName, StringComparison.Ordinal)
+                || !string.IsNullOrWhiteSpace(previousProfile.VaultEntryName)
+                || !string.IsNullOrWhiteSpace(updatedProfile.VaultEntryName))
+            {
+                continue;
+            }
+
+            updatedProfile.VaultEntryName = previousProfile.DisplayName;
+        }
+    }
+
+    private readonly record struct CredentialReferenceSnapshot(
+        string DisplayName,
+        string? VaultEntryName);
 
     /// <summary>
     /// Writes text content to a file using UTF-8 without BOM encoding.

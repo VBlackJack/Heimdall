@@ -29,9 +29,25 @@ namespace Heimdall.App.Services;
 /// Launches configured and auto-detected external tools with consistent
 /// validation, placeholder resolution, and user-facing error reporting.
 /// </summary>
-public sealed class ExternalToolLaunchService(IDialogService dialogService)
+public sealed class ExternalToolLaunchService
 {
-    private readonly IDialogService _dialogService = dialogService;
+    private readonly IDialogService _dialogService;
+    private readonly Func<ProcessStartInfo, Process?> _launchProcess;
+
+    public ExternalToolLaunchService(IDialogService dialogService)
+        : this(dialogService, Process.Start)
+    {
+    }
+
+    internal ExternalToolLaunchService(
+        IDialogService dialogService,
+        Func<ProcessStartInfo, Process?> launchProcess)
+    {
+        ArgumentNullException.ThrowIfNull(dialogService);
+        ArgumentNullException.ThrowIfNull(launchProcess);
+        _dialogService = dialogService;
+        _launchProcess = launchProcess;
+    }
 
     /// <summary>
     /// Launches a user-configured external tool, resolving placeholders from
@@ -89,8 +105,8 @@ public sealed class ExternalToolLaunchService(IDialogService dialogService)
             tool.Name,
             processInfo,
             localize,
-            $"External tool launched: {tool.ExecutablePath} {arguments}",
-            $"External tool launch failed: {tool.Name}");
+            $"External tool launch succeeded: '{tool.Name}' ({tool.ExecutablePath}).",
+            $"External tool launch failed: '{tool.Name}' ({tool.ExecutablePath}).");
     }
 
     /// <summary>
@@ -132,8 +148,8 @@ public sealed class ExternalToolLaunchService(IDialogService dialogService)
             tool.Name,
             processInfo,
             localize,
-            $"Detected tool launched: {tool.ProviderName}/{tool.Name} -> {tool.ExecutablePath} {arguments}",
-            $"Detected tool launch failed: {tool.Name}");
+            $"Detected tool launch succeeded: '{tool.ProviderName}/{tool.Name}' ({tool.ExecutablePath}).",
+            $"Detected tool launch failed: '{tool.ProviderName}/{tool.Name}' ({tool.ExecutablePath}).");
     }
 
     private bool ValidateExecutable(string toolName, string executablePath, Func<string, string> localize)
@@ -164,7 +180,7 @@ public sealed class ExternalToolLaunchService(IDialogService dialogService)
     {
         try
         {
-            Process.Start(processInfo)?.Dispose();
+            _launchProcess(processInfo)?.Dispose();
             FileLogger.Info(successLogMessage);
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
@@ -173,7 +189,7 @@ public sealed class ExternalToolLaunchService(IDialogService dialogService)
         }
         catch (Exception ex)
         {
-            FileLogger.Error(failureLogMessage, ex);
+            FileLogger.Error($"{failureLogMessage} Error type: {ex.GetType().Name}.");
             _dialogService.ShowWarning(
                 localize("AppName"),
                 string.Format(
