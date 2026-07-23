@@ -568,50 +568,64 @@ public sealed class ContextMenuFactory
             renameItem.Click += async (_, _) =>
             {
                 var newName = await vm.DialogService.ShowInputAsync(
-                    vm.Localize("TreeCtxRenameGroup"),
-                    vm.Localize("ServerFieldGroup"),
+                    vm.Localize("RenameGroupDialogTitle"),
+                    vm.Localize("RenameGroupFieldNew"),
                     folder.Name);
 
-                if (!string.IsNullOrWhiteSpace(newName) &&
-                    !string.Equals(newName.Trim(), folder.Name, StringComparison.Ordinal))
+                if (newName is null)
                 {
-                    string oldPath = folder.FullPath;
-                    string parentPath = oldPath.Contains('/')
-                        ? oldPath[..oldPath.LastIndexOf('/')]
-                        : "";
-                    string newPath = string.IsNullOrEmpty(parentPath)
-                        ? newName.Trim()
-                        : $"{parentPath}/{newName.Trim()}";
+                    return;
+                }
 
-                    // Rename in EmptyGroups
-                    var settings = await vm.ConfigManager.LoadSettingsAsync();
-                    for (int i = 0; i < settings.EmptyGroups.Count; i++)
+                try
+                {
+                    FolderRenameResult result =
+                        await new FolderRenameService(vm.ConfigManager)
+                            .RenameAsync(folder.FullPath, newName);
+
+                    switch (result.Status)
                     {
-                        var eg = settings.EmptyGroups[i];
-                        if (eg.Equals(oldPath, StringComparison.OrdinalIgnoreCase) ||
-                            eg.StartsWith(oldPath + "/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            settings.EmptyGroups[i] = newPath + eg[oldPath.Length..];
-                        }
+                        case FolderRenameStatus.Renamed:
+                            vm.ServerList.LoadServers(
+                                result.Servers
+                                    ?? throw new InvalidOperationException(
+                                        "A successful folder rename must return the inventory."),
+                                result.Settings
+                                    ?? throw new InvalidOperationException(
+                                        "A successful folder rename must return the settings."));
+                            callbacks.SelectFolder(result.NewPath!);
+                            vm.StatusText = string.Format(
+                                vm.Localize("StatusGroupRenamed"),
+                                folder.FullPath,
+                                result.NewPath);
+                            break;
+
+                        case FolderRenameStatus.InvalidSegment:
+                            vm.DialogService.ShowWarning(
+                                vm.Localize("RenameGroupDialogTitle"),
+                                vm.Localize("RenameGroupErrorInvalidSegment"));
+                            break;
+
+                        case FolderRenameStatus.SiblingCollision:
+                            vm.DialogService.ShowWarning(
+                                vm.Localize("RenameGroupDialogTitle"),
+                                vm.Localize("RenameGroupErrorSiblingCollision"));
+                            break;
+
+                        case FolderRenameStatus.NoChange:
+                            break;
+
+                        default:
+                            throw new InvalidOperationException(
+                                $"Unexpected folder rename status: {result.Status}.");
                     }
-
-                    List<ServerProfileDto> servers =
-                        await vm.ConfigManager.MutateServersAsync(inventory =>
-                        {
-                            foreach (ServerProfileDto dto in inventory)
-                            {
-                                if (dto.Group is not null &&
-                                    (dto.Group.Equals(oldPath, StringComparison.OrdinalIgnoreCase) ||
-                                     dto.Group.StartsWith(oldPath + "/", StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    dto.Group = newPath + dto.Group[oldPath.Length..];
-                                }
-                            }
-
-                            return inventory;
-                        });
-                    await vm.ConfigManager.SaveSettingsAsync(settings);
-                    vm.ServerList.LoadServers(servers, settings);
+                }
+                catch (Exception ex)
+                {
+                    Core.Logging.FileLogger.Error("Folder rename failed", ex);
+                    vm.DialogService.ShowError(
+                        vm.Localize("RenameGroupDialogTitle"),
+                        vm.Localize("RenameGroupErrorPersistence"));
                 }
             };
             menu.Items.Add(renameItem);

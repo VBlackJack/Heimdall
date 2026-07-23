@@ -51,4 +51,11 @@ public interface IContextMenuCallbacks
     /// an empty area of the TreeView.
     /// </summary>
     void AddToolFromMenu(string? group);
+
+    /// <summary>
+    /// Selects and reveals a folder after a tree-rebuilding operation.
+    /// </summary>
+    void SelectFolder(string fullPath)
+    {
+    }
 }

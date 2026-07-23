@@ -2884,6 +2884,49 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         _ = ShowAddToolPickerAsync(vm, group);
     }
 
+    /// <inheritdoc />
+    void IContextMenuCallbacks.SelectFolder(string fullPath)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        FolderViewModel? folder = FindFolderByPath(vm.ServerList.GroupedServers, fullPath);
+        if (folder is null) return;
+
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() =>
+            {
+                TreeViewItem? container =
+                    TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, folder);
+                if (container is not null)
+                {
+                    container.IsSelected = true;
+                    container.BringIntoView();
+                }
+            }));
+    }
+
+    private static FolderViewModel? FindFolderByPath(
+        IEnumerable<FolderViewModel> folders,
+        string fullPath)
+    {
+        foreach (FolderViewModel folder in folders)
+        {
+            if (string.Equals(folder.FullPath, fullPath, StringComparison.Ordinal))
+            {
+                return folder;
+            }
+
+            FolderViewModel? nested = FindFolderByPath(folder.SubFolders, fullPath);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
     // ── ISessionTabContextCallbacks ───────────────────────────────────
     // OnResolutionChanged and ToggleFullscreen stay in MainWindow
     // (fullscreen touches named XAML elements via MainWindow.WindowUI.cs;
@@ -3132,18 +3175,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private Task SaveWindowBoundsAsync(MainViewModel vm)
     {
         // Save Normal-state bounds even when maximized
-        var bounds = WindowState == WindowState.Maximized
+        bool isMaximized = WindowState == WindowState.Maximized;
+        var bounds = isMaximized
             ? RestoreBounds
             : new System.Windows.Rect(Left, Top, Width, Height);
 
-        return vm.ConfigManager.MergeSettingAsync(s =>
-        {
-            s.WindowWidth = bounds.Width;
-            s.WindowHeight = bounds.Height;
-            s.WindowLeft = bounds.Left;
-            s.WindowTop = bounds.Top;
-            s.WindowMaximized = WindowState == WindowState.Maximized;
-        });
+        var snapshot = new WindowBoundsSnapshot(
+            bounds.Left,
+            bounds.Top,
+            bounds.Width,
+            bounds.Height,
+            isMaximized);
+        return WindowBoundsPersistence.PersistAsync(vm.ConfigManager, snapshot);
     }
 
     /// <inheritdoc />

@@ -52,15 +52,21 @@ internal static class WindowClosingFlow
                     return false;
                 }
             }
-
-            await persistWindowStateAsync();
-            return true;
         }
         catch (Exception ex)
         {
             FileLogger.Error("Main window close preparation failed", ex);
-            warnSaveFailed();
-            return false;
         }
+
+        try
+        {
+            await persistWindowStateAsync();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Window state persistence failed during close: {ex.Message}");
+        }
+
+        return true;
     }
 }
