@@ -1,14 +1,15 @@
 <!--
   Heimdall WiX MSI Installer
   WiX v4+ format. Produces an .msi for enterprise GPO/SCCM deployment.
-  Build: wix build -o Heimdall.msi Product.wxs -ext WixToolset.UI.wixext
+  Build: wix build -d AppVersion=<assembly version> -d SourceDir=<publish directory>
+         -o Heimdall.msi Product.wxs -ext WixToolset.UI.wixext
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
   <Package Name="Heimdall"
            Manufacturer="Julien Bombled"
-           Version="!(wix.AppVersion)"
+           Version="$(AppVersion)"
            UpgradeCode="B7A4D3E1-8F2C-4A91-9D5E-6C3B8A1F0E72"
            Scope="perMachine"
            InstallerVersion="500">
@@ -55,7 +56,7 @@
   <!-- Product files harvested via WiX Files element -->
   <Fragment>
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <Files Include="..\Dist\release\Heimdall_current\**">
+      <Files Include="$(SourceDir)\**">
         <Exclude Files="**\*.pdb" />
       </Files>
     </ComponentGroup>

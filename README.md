@@ -30,7 +30,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - **Zero-trust credential storage** --- DPAPI + HMAC-SHA256 integrity, an optional **master-password vault** (Argon2id key derivation, AES-256-GCM) with a startup unlock gate and idle workspace lock, PBKDF2 PIN protection, Windows ACL enforcement, and optional **Windows Hello** (biometric/PIN) to unlock the vault and as a gate before connect
 - **External vault integration** --- KeePassXC, KeePass2 (KPScript), Bitwarden CLI, 1Password CLI, `pass`, the native Windows Credential Manager, or any command-line password manager
 - **Pageant-native** --- Direct IPC with PuTTY Pageant via shared memory (no agent forwarding hacks)
-- **Portable** --- Self-contained build with no installer required
+- **Portable distribution** --- Self-contained build with no installer required; writable data is stored per user under `%LOCALAPPDATA%\Heimdall`
 
 ---
 
@@ -225,7 +225,10 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Deferred state machine cleanup**: reconnect releases old tunnel/state only after new connection succeeds or definitively fails
 - **Merge feedback**: status bar message when a busy tool blocks a merge operation
 - Command Palette renders as a WPF `Popup` (own HWND) above RDP/VNC ActiveX surfaces
-- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/group, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog)
+- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/group, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog), and **bulk edit SSH gateway** (credential-free, four explicit outcomes - preserve / force direct / inherit / specific - skipping protocols that do not support gateways)
+- **Inline rename**: F2 or Ctrl+E renames sessions and folders directly in the tree, without opening a dialog, and stays correct under virtualization
+- **Structured tree filters**: filter the session tree by protocol/type, favorite, and connected state, combined with the debounced text search through one versioned pass over stable nodes; a colored dot on the filter button signals an active filter
+- **Virtualized session tree**: recycling virtualization keeps the tree smooth at thousands of sessions and "Expand all" no longer freezes; long names are ellipsis-trimmed with a full-name tooltip, and search now expands folders that contain a match and highlights the matched text
 - Global session logging (opt-in): per-session text transcripts for SSH / Telnet / Local Shell and a connect/disconnect event log (reason + duration) for RDP / VNC / Citrix, restrictive ACLs and size rollover; **per-profile tri-state override** (force on / off / inherit) in the server dialog
 - Connection history log (JSONL with auto-rotation)
 - Screenshot capture to clipboard (Ctrl+Shift+S)
@@ -253,7 +256,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: 3-step guided introduction overlay with skip/next/get started
-- Bilingual interface: English and French (~5,749 i18n keys)
+- Bilingual interface: English and French (6,051 i18n keys per language, exact EN/FR parity)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips
 

@@ -12,6 +12,86 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-07-23: Cross-review hardening sprint + treeview UX (v2026.072300)
+
+A cross-reviewed hardening and UX campaign, verified
+finding-by-finding against the real code. Closes the last release-blocking defects
+and adds the requested tree-management features. Build clean (0 warnings), full suite
+green (8,184 tests).
+
+### Deployment
+
+- **Writable state under `%LOCALAPPDATA%`.** Config, logs, and other mutable state now
+  live under `%LOCALAPPDATA%\Heimdall` instead of next to the executable, so a
+  per-machine MSI install starts for a standard user. Bundled `*.default.json` still
+  resolve from the install directory, with an idempotent one-time migration of existing
+  data (`3239246c`, CODEX-004).
+
+### Session tree (UX)
+
+- **Inline rename.** F2 / Ctrl+E rename of sessions and folders directly in the tree,
+  virtualization-safe (`fdc3411b`).
+- **Recycling virtualization.** The session tree is virtualized; long names are
+  ellipsis-trimmed with a tooltip, and "Expand all" no longer freezes at thousands of
+  nodes (~48 realized containers on a 1,200-server inventory) (`4263c5eb`, CODEX-016).
+- **Structured filters.** Filter by protocol/type, favorite, and connected state,
+  combined with debounced text search through one versioned pass that reuses stable
+  nodes; the WinRM username is now included in search (`00711704`, CODEX-017/024).
+
+### Gateways
+
+- **Bulk gateway edit.** Credential-free bulk edit of the SSH gateway across servers with
+  four explicit outcomes (preserve / force direct / inherit / specific), skipping
+  ineligible protocols (`96c0d1a7`).
+- **Centralized eligibility.** `SupportsSshGateway` is defined once (RDP/SSH/SFTP/WinRM)
+  and enforced in the dialog, persistence, badge, and bulk path; no more false
+  "via gateway" badge on a cleartext protocol such as Telnet (`48dc9989`, CODEX-006).
+- **Deletion integrity.** Gateway deletion now analyzes inherited group-default and
+  parent-gateway references before acting (`620797fe`, CODEX-018).
+
+### Security hardening
+
+- **Honest connection state.** Connection-state feedback decodes the generated session id
+  and aggregates multi-session state per profile (`48dc9989`, CODEX-011/017).
+- **RDP autofill fail-closed.** Credential autofill only writes to a confirmed password
+  field, never a guessed one, and abandons injection otherwise (`4591956f`, RDP-02).
+- **RDP credential deletion, Pageant OOB read, and plink start-failure state** hardened:
+  each credential type is deleted independently, the Pageant shared-memory read is bounded
+  exactly, and a failed `Process.Start` leaves the runner in a clean retryable state
+  (`4591956f`, RDP-05 / SSH-01 / SSH-07).
+- **Plink password-file hygiene.** Orphan tunnel password files left by an interrupted
+  tunnel are now swept (unified prefix) (`24726bf4`, SSH-09 / CODEX-026).
+- **Credential identity across rename.** Renaming a profile no longer changes its external
+  credential lookup key; the old display name is frozen centrally in the persistence layer
+  when no explicit reference exists (`9bff9888`, CODEX-019).
+- **Tool-log hygiene.** External-tool arguments and exception messages are no longer logged
+  verbatim, so secrets passed as tool arguments do not reach the log (`9bff9888`, CODEX-027).
+
+### Reliability & data integrity
+
+- **Atomic inventory mutations.** `MutateServersAsync` holds the write lock across
+  load-mutate-write; concurrent operations can no longer erase each other
+  (`424a560e`, CODEX-002/020/029).
+- **Safe config writes + shutdown.** Fail-safe writer plus an awaited save-on-close, with a
+  cross-thread WPF close-regression hotfix so closing with valid settings never blocks
+  (`31c5da34`, `5e62ff2b`, CODEX-001/003).
+- **Atomic folder rename.** Folder rename migrates group defaults and expansion state in a
+  single recoverable mutation (`5e62ff2b`, CODEX-005).
+- **Schema resilience.** Persisted settings and inventory carry a schema version and
+  `[JsonExtensionData]`: unknown fields round-trip through load/save, and a document with a
+  newer schema version is never overwritten (`03b36c16`, CODEX-021).
+- **Monotonic settings snapshots.** Published settings carry a monotonic revision and are
+  deep-cloned, so `CurrentSettings` cannot regress behind a just-committed save
+  (`03b36c16`, CODEX-029).
+- **Deterministic NuGet restore.** Lock files regenerated and committed, and CI restores
+  with `--locked-mode` (`ac3f6e6f`, CODEX-022).
+
+### Accessibility & i18n
+
+- **Localized auth summary + accessible nodes.** The detail-panel authentication summary is
+  localized (EN/FR) and refreshes on locale change; tree nodes expose an accessible name
+  combining name, protocol, and connection state (`7e0627ee`, CODEX-023/031).
+
 ## 2026-06-29: SSH/SFTP companion, follow-directory, and reliability hardening
 
 Merged to `master`; intended for the next release. A focused robustness + interop

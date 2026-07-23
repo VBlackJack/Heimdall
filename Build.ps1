@@ -156,7 +156,8 @@ if ($Version) {
     $buildNumber = "{0}{1:D2}" -f $datePrefix, $sequence
 }
 
-$assemblyVer = "1.0.$($today.ToString('MMdd')).$sequence"
+$assemblyDate = $buildNumber.Substring(5, 4)
+$assemblyVer = "1.0.${assemblyDate}.$sequence"
 $totalSteps = if ($Mode -eq 'Release') { 6 } else { 5 }
 $step = 0
 
@@ -361,6 +362,50 @@ if ($Mode -eq 'Release') {
         Write-Host "      Install Inno Setup 6, or set `$env:HEIMDALL_ISCC_PATH if ISCC.exe is installed elsewhere." -ForegroundColor Yellow
         Write-Host "      Checked: $iscc" -ForegroundColor DarkYellow
     }
+
+    $wixProduct = Join-Path $ProjectRoot 'installer\Product.wxs'
+    $wixCommand = Get-Command wix -ErrorAction SilentlyContinue
+    $wix = if ([string]::IsNullOrWhiteSpace($env:HEIMDALL_WIX_PATH)) {
+        if ($null -eq $wixCommand) { $null } else { $wixCommand.Source }
+    } else {
+        $env:HEIMDALL_WIX_PATH
+    }
+    if (-not (Test-Path $wixProduct)) {
+        Write-Host "  [!] WiX product definition not found: $wixProduct" -ForegroundColor Red
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace($wix) -or -not (Test-Path $wix)) {
+        Write-Host "  [!] WiX CLI not found. Install WiX 6, or set `$env:HEIMDALL_WIX_PATH." -ForegroundColor Red
+        exit 1
+    }
+
+    $msiSource = $outputs |
+        Where-Object { $_.Name -eq 'Standard' } |
+        Select-Object -First 1
+    if ($null -eq $msiSource) {
+        $msiSource = $outputs | Select-Object -First 1
+    }
+
+    $msiPath = Join-Path $installerDir "Heimdall_${buildNumber}.msi"
+    Write-Host "  Building WiX MSI from $($msiSource.Name)..." -ForegroundColor DarkGray
+    Push-Location (Split-Path $wixProduct -Parent)
+    try {
+        & $wix build `
+            -arch x64 `
+            -d "AppVersion=$assemblyVer" `
+            -d "SourceDir=$($msiSource.Dir)" `
+            -o $msiPath `
+            -pdbtype none `
+            $wixProduct `
+            -ext WixToolset.UI.wixext
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "    [!] WiX MSI build failed" -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Host "    + Heimdall_${buildNumber}.msi (ProductVersion $assemblyVer)" -ForegroundColor DarkGray
 
     Write-Host "[$step/$totalSteps] Installers done" -ForegroundColor Green
 }
