@@ -18,7 +18,7 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore Heimdall.slnx
+        run: dotnet restore Heimdall.slnx --locked-mode
 
       - name: Build (Debug, for format workspace)
         run: dotnet build Heimdall.slnx --no-restore
