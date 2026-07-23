@@ -16,6 +16,8 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using Heimdall.App.ViewModels;
 
 namespace Heimdall.App.Services;
 
@@ -109,5 +111,187 @@ public sealed class TreeInteractionState
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Builds the root-to-node data path needed to materialize a virtualized
+    /// folder or server container.
+    /// </summary>
+    public static bool TryBuildItemPath(
+        IEnumerable<FolderViewModel> roots,
+        object target,
+        out IReadOnlyList<object> path)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        ArgumentNullException.ThrowIfNull(target);
+
+        var candidatePath = new List<object>();
+        foreach (FolderViewModel root in roots)
+        {
+            if (TryBuildItemPath(root, target, candidatePath))
+            {
+                path = candidatePath;
+                return true;
+            }
+        }
+
+        path = [];
+        return false;
+    }
+
+    /// <summary>
+    /// Materializes each direct child in a root-to-node item path. Ancestor
+    /// folders are expanded before their child panel is queried.
+    /// </summary>
+    public static TreeViewItem? RealizeTreeViewItemContainer(
+        ItemsControl root,
+        IReadOnlyList<object> itemPath)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(itemPath);
+
+        ItemsControl parent = root;
+        TreeViewItem? current = null;
+        foreach (object item in itemPath)
+        {
+            if (parent is TreeViewItem parentContainer)
+            {
+                parentContainer.IsExpanded = true;
+            }
+
+            current = RealizeDirectChildContainer(parent, item);
+            if (current is null)
+            {
+                return null;
+            }
+
+            parent = current;
+        }
+
+        return current;
+    }
+
+    /// <summary>
+    /// Returns how many direct item containers are currently realized by an
+    /// items control. Intended for virtualization diagnostics and tests.
+    /// </summary>
+    public static int CountRealizedDirectContainers(ItemsControl parent)
+    {
+        ArgumentNullException.ThrowIfNull(parent);
+
+        var count = 0;
+        for (var index = 0; index < parent.Items.Count; index++)
+        {
+            if (parent.ItemContainerGenerator.ContainerFromIndex(index) is not null)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Resolves the domain group represented by a drag target. Pointer hit
+    /// testing supplies a realized folder when the cursor is over a folder;
+    /// the explicit no-group zone and empty tree area opt into the root target.
+    /// </summary>
+    public static bool TryResolveGroupDropTarget(
+        FolderViewModel? folder,
+        bool acceptsRootTarget,
+        out string? targetGroup)
+    {
+        if (folder is not null)
+        {
+            targetGroup = folder.FullPath;
+            return true;
+        }
+
+        targetGroup = null;
+        return acceptsRootTarget;
+    }
+
+    private static TreeViewItem? RealizeDirectChildContainer(
+        ItemsControl parent,
+        object item)
+    {
+        parent.ApplyTemplate();
+        parent.UpdateLayout();
+
+        if (parent.ItemContainerGenerator.ContainerFromItem(item) is TreeViewItem existing)
+        {
+            return existing;
+        }
+
+        int index = parent.Items.IndexOf(item);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        VirtualizingTreePanel? itemsHost = FindItemsHost(parent, parent);
+        if (itemsHost is null)
+        {
+            return null;
+        }
+
+        itemsHost.RealizeIndex(index);
+        parent.UpdateLayout();
+        return parent.ItemContainerGenerator.ContainerFromIndex(index) as TreeViewItem;
+    }
+
+    private static VirtualizingTreePanel? FindItemsHost(
+        DependencyObject current,
+        ItemsControl owner)
+    {
+        if (current is VirtualizingTreePanel panel
+            && panel.TemplatedParent is ItemsPresenter presenter
+            && ReferenceEquals(presenter.TemplatedParent, owner))
+        {
+            return panel;
+        }
+
+        int childCount = VisualTreeHelper.GetChildrenCount(current);
+        for (var index = 0; index < childCount; index++)
+        {
+            VirtualizingTreePanel? result =
+                FindItemsHost(VisualTreeHelper.GetChild(current, index), owner);
+            if (result is not null)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryBuildItemPath(
+        FolderViewModel folder,
+        object target,
+        List<object> path)
+    {
+        path.Add(folder);
+        if (ReferenceEquals(folder, target))
+        {
+            return true;
+        }
+
+        foreach (FolderViewModel child in folder.SubFolders)
+        {
+            if (TryBuildItemPath(child, target, path))
+            {
+                return true;
+            }
+        }
+
+        if (target is ServerItemViewModel server
+            && folder.Servers.Any(candidate => ReferenceEquals(candidate, server)))
+        {
+            path.Add(server);
+            return true;
+        }
+
+        path.RemoveAt(path.Count - 1);
+        return false;
     }
 }

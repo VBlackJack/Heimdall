@@ -2897,7 +2897,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             new Action(() =>
             {
                 TreeViewItem? container =
-                    TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, folder);
+                    GetOrRealizeSessionTreeItem(folder);
                 if (container is not null)
                 {
                     container.IsSelected = true;
@@ -3011,7 +3011,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             System.Windows.Threading.DispatcherPriority.Background,
             new Action(() =>
             {
-                var container = TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, server);
+                var container = GetOrRealizeSessionTreeItem(server);
                 if (container is not null)
                 {
                     container.IsSelected = true;

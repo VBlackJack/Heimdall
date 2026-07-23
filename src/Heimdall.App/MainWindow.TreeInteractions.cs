@@ -61,7 +61,7 @@ public partial class MainWindow
         var placementTarget = target is BulkSelectionContext bulkContext
             ? (object?)bulkContext.Primary ?? vm.ServerList.SelectedServer
             : target;
-        var container = TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, placementTarget);
+        var container = GetOrRealizeSessionTreeItem(placementTarget);
         if (container is not null)
         {
             menu.PlacementTarget = container;
@@ -516,7 +516,7 @@ public partial class MainWindow
             new Action(() =>
             {
                 TreeViewItem? container =
-                    TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, node);
+                    GetOrRealizeSessionTreeItem(node);
                 WpfTextBox? editor = container is null
                     ? null
                     : FindVisualDescendant<WpfTextBox>(
@@ -544,7 +544,7 @@ public partial class MainWindow
             new Action(() =>
             {
                 TreeViewItem? container =
-                    TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, node);
+                    GetOrRealizeSessionTreeItem(node);
                 if (container is null)
                 {
                     return;
@@ -562,6 +562,26 @@ public partial class MainWindow
 
     internal static bool IsInlineRenameEditorSource(DependencyObject? source)
         => FindAncestor<WpfTextBox>(source) is not null;
+
+    private TreeViewItem? GetOrRealizeSessionTreeItem(object? item)
+    {
+        TreeViewItem? realized =
+            TreeInteractionState.FindTreeViewItemContainer(SessionTreeView, item);
+        if (realized is not null
+            || item is null
+            || DataContext is not MainViewModel vm
+            || !TreeInteractionState.TryBuildItemPath(
+                vm.ServerList.GroupedServers,
+                item,
+                out IReadOnlyList<object> itemPath))
+        {
+            return realized;
+        }
+
+        return TreeInteractionState.RealizeTreeViewItemContainer(
+            SessionTreeView,
+            itemPath);
+    }
 
     private static T? FindVisualDescendant<T>(
         DependencyObject root,
@@ -799,21 +819,27 @@ public partial class MainWindow
         targetDisplayName = vm.Localize("TreeNodeNoGroup");
 
         var target = FindAncestorFolderTreeViewItem(e.OriginalSource as DependencyObject);
-        if (target?.DataContext is FolderViewModel folder)
+        FolderViewModel? folder = target?.DataContext as FolderViewModel;
+        bool acceptsRootTarget =
+            ReferenceEquals(sender, SessionTreeNoGroupDropZone)
+            || (ReferenceEquals(sender, SessionTreeView)
+                && FindAncestor<TreeViewItem>(
+                    e.OriginalSource as DependencyObject) is null);
+        if (!TreeInteractionState.TryResolveGroupDropTarget(
+                folder,
+                acceptsRootTarget,
+                out targetGroup))
+        {
+            return false;
+        }
+
+        if (folder is not null)
         {
             targetContainer = target;
-            targetGroup = folder.FullPath;
             targetDisplayName = folder.Name;
-            return true;
         }
 
-        if (ReferenceEquals(sender, SessionTreeNoGroupDropZone))
-        {
-            return true;
-        }
-
-        return ReferenceEquals(sender, SessionTreeView)
-            && FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) is null;
+        return true;
     }
 
     private static bool IsAllowedTreeGroupDrop(
