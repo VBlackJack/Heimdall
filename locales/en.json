@@ -1460,6 +1460,8 @@
   "BulkEditPasswordValidationControl": "Password cannot contain control characters.",
   "BulkEditPasswordValidationMismatch": "Passwords do not match.",
   "StatusBulkPasswordUpdated": "Password updated on {0} server(s).",
+  "StatusBulkGatewayMissingTarget": "Skipped {0} item(s): SSH gateway \"{1}\" no longer exists.",
+  "StatusBulkGatewayUnsupportedSkipped": "Skipped {0} item(s): their protocols do not support SSH gateways.",
   "TreeCtxEditProject": "Edit project",
   "TreeCtxDeleteProject": "Delete project",
   "TreeCtxMoveSelected": "Move to... ({0})",

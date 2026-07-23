@@ -21,6 +21,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -301,6 +302,117 @@ public sealed class ServerListSelectionTests
         Assert.Equal("Embedded", stored.RdpMode);
     }
 
+    [Fact]
+    public async Task SavedProfile_OnConnectedTransition_TreeShowsConnected()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+        string sessionId = SessionIdCodec.Create("alpha");
+
+        TransitionSshSessionToConnected(fixture.StateMachine, sessionId);
+
+        var server = fixture.ServerById("alpha");
+        Assert.Equal(ConnectionState.Connected.ToString(), server.ConnectionState);
+        Assert.True(server.IsActiveSession);
+    }
+
+    [Fact]
+    public void ConnectedSet_ExcludesErrorInitializingAndDisconnecting()
+    {
+        ConnectionState[] expected =
+        [
+            ConnectionState.Connected,
+            ConnectionState.LaunchedExternalClient,
+            ConnectionState.RemoteSessionHandedOff
+        ];
+
+        Assert.Equal(
+            expected.OrderBy(state => state),
+            ConnectionStateSets.Connected.OrderBy(state => state));
+        Assert.DoesNotContain(ConnectionState.Error, ConnectionStateSets.Connected.AsEnumerable());
+        Assert.DoesNotContain(ConnectionState.Initializing, ConnectionStateSets.Connected.AsEnumerable());
+        Assert.DoesNotContain(ConnectionState.Disconnecting, ConnectionStateSets.Connected.AsEnumerable());
+    }
+
+    [Fact]
+    public void IsActiveSession_MatchesConnectedSet()
+    {
+        var server = new ServerItemViewModel();
+
+        foreach (ConnectionState state in Enum.GetValues<ConnectionState>())
+        {
+            server.ConnectionState = state.ToString();
+
+            Assert.Equal(ConnectionStateSets.IsConnected(state), server.IsActiveSession);
+        }
+    }
+
+    [Fact]
+    public async Task MultipleSessionsSameProfile_OneDisconnects_ProfileStaysConnected()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+        string firstSessionId = SessionIdCodec.Create("alpha");
+        string secondSessionId = SessionIdCodec.Create("alpha");
+        TransitionSshSessionToConnected(fixture.StateMachine, firstSessionId);
+        TransitionSshSessionToConnected(fixture.StateMachine, secondSessionId);
+
+        fixture.StateMachine.Reset(firstSessionId);
+
+        var server = fixture.ServerById("alpha");
+        Assert.True(server.IsActiveSession);
+        Assert.True(ConnectionStateSets.IsConnected(server.ConnectionState));
+    }
+
+    [Fact]
+    public async Task LastSessionTeardown_ProfileBecomesDisconnected_AndAggregationEntryRemoved()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+        string firstSessionId = SessionIdCodec.Create("alpha");
+        string secondSessionId = SessionIdCodec.Create("alpha");
+        TransitionSshSessionToConnected(fixture.StateMachine, firstSessionId);
+        TransitionSshSessionToConnected(fixture.StateMachine, secondSessionId);
+
+        fixture.StateMachine.Reset(firstSessionId);
+        fixture.StateMachine.Reset(secondSessionId);
+
+        var server = fixture.ServerById("alpha");
+        Assert.Equal(ConnectionState.Disconnected.ToString(), server.ConnectionState);
+        Assert.False(server.IsActiveSession);
+        Assert.Equal(0, fixture.ViewModel.ActiveSessionAggregationEntryCount);
+    }
+
+    [Fact]
+    public async Task RecentConnections_RecordedOnConnectOfSavedProfile()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+        string sessionId = SessionIdCodec.Create("alpha");
+
+        TransitionSshSessionToConnected(fixture.StateMachine, sessionId);
+
+        RecentConnectionEntry recent = Assert.Single(fixture.RecentConnections.GetRecents(10));
+        Assert.Equal("alpha.example.com", recent.Host);
+        Assert.Equal("SSH", recent.Protocol);
+    }
+
+    private static void TransitionSshSessionToConnected(ConnectionStateMachine stateMachine, string sessionId)
+    {
+        Assert.True(stateMachine.TryTransition(sessionId, ConnectionState.Initializing));
+        Assert.True(stateMachine.TryTransition(sessionId, ConnectionState.ValidatingConfig));
+        Assert.True(stateMachine.TryTransition(sessionId, ConnectionState.LaunchingSsh));
+        Assert.True(stateMachine.TryTransition(sessionId, ConnectionState.Connected));
+    }
+
     private static ServerProfileDto CreateServer(string id, string displayName, string group, int sortOrder = 0) =>
         new()
         {
@@ -377,16 +489,24 @@ public sealed class ServerListSelectionTests
         private ServerListSelectionFixture(
             string rootPath,
             ConfigManager configManager,
-            ServerListViewModel viewModel)
+            ServerListViewModel viewModel,
+            ConnectionStateMachine stateMachine,
+            RecentConnectionTracker recentConnections)
         {
             _rootPath = rootPath;
             ConfigManager = configManager;
             ViewModel = viewModel;
+            StateMachine = stateMachine;
+            RecentConnections = recentConnections;
         }
 
         public ConfigManager ConfigManager { get; }
 
         public ServerListViewModel ViewModel { get; }
+
+        public ConnectionStateMachine StateMachine { get; }
+
+        public RecentConnectionTracker RecentConnections { get; }
 
         public static async Task<ServerListSelectionFixture> CreateAsync(
             IEnumerable<IProtocolHandler>? protocolHandlers = null)
@@ -408,6 +528,7 @@ public sealed class ServerListSelectionTests
             var puttyImporter = new PuttySessionImporter(new FakePuttySessionRegistrySource([]), configManager);
             var knownHostsImporter = new KnownHostsImporter(configManager, new HostKeyStore());
             var uiDispatcher = new FakeUiDispatcher();
+            var recentConnections = new RecentConnectionTracker();
 
             var viewModel = new ServerListViewModel(
                 configManager,
@@ -418,9 +539,15 @@ public sealed class ServerListSelectionTests
                 dialogService,
                 new NullRdpImportService(),
                 puttyImporter,
-                knownHostsImporter);
+                knownHostsImporter,
+                recentConnections);
 
-            return new ServerListSelectionFixture(rootPath, configManager, viewModel);
+            return new ServerListSelectionFixture(
+                rootPath,
+                configManager,
+                viewModel,
+                stateMachine,
+                recentConnections);
         }
 
         public AppSettings ExpandGroups(params string[] groups)

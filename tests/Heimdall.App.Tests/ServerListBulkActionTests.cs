@@ -1572,6 +1572,102 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public async Task UpdateGatewayReferences_TelnetOrIneligible_IsSkippedAndReported()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-target", "Bastion"));
+        ServerProfileDto telnet = CreateServer("telnet", "Telnet", "ops");
+        telnet.ConnectionType = "TELNET";
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        await fixture.LoadServersAsync(settings, telnet, ssh);
+
+        int updatedCount = await fixture.ViewModel.UpdateGatewayReferencesAsync(
+            ["telnet", "ssh"],
+            "gw-target");
+
+        Assert.Equal(1, updatedCount);
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        ServerProfileDto storedTelnet = Assert.Single(storedServers, server => server.Id == "telnet");
+        ServerProfileDto storedSsh = Assert.Single(storedServers, server => server.Id == "ssh");
+        Assert.Null(storedTelnet.SshGatewayId);
+        Assert.Equal("gw-target", storedSsh.SshGatewayId);
+        Assert.Equal(
+            "Skipped 1 item(s): their protocols do not support SSH gateways.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task UpdateGatewayReferences_MissingGatewayId_DoesNotSave()
+    {
+        FailingSaveConfigManager configManager = new();
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            configManager: configManager);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        ServerProfileDto alpha = CreateServer("alpha", "Alpha", "ops");
+        alpha.SshGatewayId = "gw-original";
+        await fixture.LoadServersAsync(settings, alpha);
+        int saveCountBeforeUpdate = configManager.SaveServersCallCount;
+
+        int updatedCount = await fixture.ViewModel.UpdateGatewayReferencesAsync(
+            ["alpha"],
+            "gw-removed");
+
+        Assert.Equal(0, updatedCount);
+        Assert.Equal(saveCountBeforeUpdate, configManager.SaveServersCallCount);
+        ServerProfileDto storedServer = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal("gw-original", storedServer.SshGatewayId);
+        Assert.Equal(
+            "Skipped 1 item(s): SSH gateway \"gw-removed\" no longer exists.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task UpdateGatewayReferences_CaseInsensitiveId_UsesCanonicalStoredId()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("GW-Target", "Bastion"));
+        await fixture.LoadServersAsync(settings, CreateServer("alpha", "Alpha", "ops"));
+
+        int updatedCount = await fixture.ViewModel.UpdateGatewayReferencesAsync(
+            ["alpha"],
+            "gw-target");
+
+        Assert.Equal(1, updatedCount);
+        ServerProfileDto storedServer = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal("GW-Target", storedServer.SshGatewayId);
+        Assert.Equal("via Bastion", fixture.ServerById("alpha").GatewayBadgeText);
+    }
+
+    [Fact]
+    public async Task UpdateGatewayReferences_PreservesVmIdentityAndMultiSelection()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-target", "Bastion"));
+        await fixture.LoadServersAsync(
+            settings,
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        ServerItemViewModel alphaVm = fixture.ServerById("alpha");
+        ServerItemViewModel betaVm = fixture.ServerById("beta");
+        fixture.ViewModel.SelectSingle(alphaVm);
+        fixture.ViewModel.ToggleSelection(betaVm);
+
+        int updatedCount = await fixture.ViewModel.UpdateGatewayReferencesAsync(
+            ["alpha", "beta"],
+            "gw-target");
+
+        Assert.Equal(2, updatedCount);
+        Assert.Same(alphaVm, fixture.ServerById("alpha"));
+        Assert.Same(betaVm, fixture.ServerById("beta"));
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        Assert.Same(betaVm, fixture.ViewModel.SelectedServer);
+    }
+
+    [Fact]
     public async Task UpdateGatewayReferencesAsync_ClearSetsDirectStateAndRefreshesBadges()
     {
         await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
@@ -2068,6 +2164,8 @@ public sealed class ServerListBulkActionTests
 
         public bool FailOnSaveServers { get; set; }
 
+        public int SaveServersCallCount { get; private set; }
+
         public string ConfigPath => "mem://config";
 
         public string SettingsPath => "mem://settings.json";
@@ -2106,6 +2204,7 @@ public sealed class ServerListBulkActionTests
                 throw new IOException("Simulated SaveServersAsync failure");
             }
 
+            SaveServersCallCount++;
             _servers = servers.Select(CloneServer).ToList();
             return Task.CompletedTask;
         }

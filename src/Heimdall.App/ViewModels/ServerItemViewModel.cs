@@ -18,7 +18,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using Heimdall.Core.SessionHealth;
+using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.ViewModels;
 
@@ -139,9 +141,7 @@ public partial class ServerItemViewModel : ObservableObject
     /// </summary>
     public string SshKeyPath => _sourceDto?.SshKeyPath ?? "";
 
-    public bool IsActiveSession =>
-        !string.IsNullOrEmpty(ConnectionState)
-        && !string.Equals(ConnectionState, "Disconnected", StringComparison.OrdinalIgnoreCase);
+    public bool IsActiveSession => ConnectionStateSets.IsConnected(ConnectionState);
 
     public string ConnectionStateDisplayName =>
         ConnectionState switch
@@ -309,7 +309,9 @@ public partial class ServerItemViewModel : ObservableObject
         string? gatewayId,
         IReadOnlyDictionary<string, SshGatewayDto>? gatewayMap)
     {
-        if (string.IsNullOrWhiteSpace(gatewayId) || gatewayMap is null)
+        if (!ProtocolCapabilities.SupportsSshGateway(ConnectionType)
+            || string.IsNullOrWhiteSpace(gatewayId)
+            || gatewayMap is null)
         {
             GatewayName = "";
             IsGatewayBadgeVisible = false;

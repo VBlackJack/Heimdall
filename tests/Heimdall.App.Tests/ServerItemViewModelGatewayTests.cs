@@ -71,6 +71,25 @@ public sealed class ServerItemViewModelGatewayTests
     }
 
     [Fact]
+    public void TelnetProfileWithGatewayId_ShowsNoBadge()
+    {
+        ServerProfileDto dto = CreateServer("gw-1");
+        dto.ConnectionType = "TELNET";
+        Dictionary<string, SshGatewayDto> gatewayMap = new(StringComparer.Ordinal)
+        {
+            ["gw-1"] = new SshGatewayDto { Id = "gw-1", Name = "Bastion" }
+        };
+
+        ServerItemViewModel vm = ServerItemViewModel.FromDto(dto, gatewayMap: gatewayMap);
+
+        Assert.False(vm.IsGatewayBadgeVisible);
+        Assert.False(vm.IsGatewayMissing);
+        Assert.Equal("", vm.GatewayName);
+        Assert.Equal("", vm.GatewayBadgeText);
+        Assert.Equal("", vm.GatewayDetailText);
+    }
+
+    [Fact]
     public void FromDto_WithMissingGateway_ShowsWarningBadge()
     {
         ServerProfileDto dto = CreateServer("gw-missing");

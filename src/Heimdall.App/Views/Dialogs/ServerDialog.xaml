@@ -167,21 +167,12 @@
                 </Style.Triggers>
             </Style>
 
-            <!-- Gateway/routing sections: hidden for Local shell, Citrix, VNC, FTP -->
+            <!-- Gateway/routing sections: visible only for protocols backed by the SSH tunnel service -->
             <Style x:Key="NetworkSectionStyle" TargetType="FrameworkElement">
-                <Setter Property="Visibility" Value="Visible"/>
+                <Setter Property="Visibility" Value="Collapsed"/>
                 <Style.Triggers>
-                    <DataTrigger Binding="{Binding ConnectionType}" Value="Local">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding ConnectionType}" Value="Citrix">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding ConnectionType}" Value="VNC">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding ConnectionType}" Value="FTP">
-                        <Setter Property="Visibility" Value="Collapsed"/>
+                    <DataTrigger Binding="{Binding SupportsGateway}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -2134,7 +2125,7 @@
                         </TabItem.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="{StaticResource SpacingSm}">
-                                <!-- Gateway section (hidden for Local, Citrix, VNC, FTP) -->
+                                <!-- Gateway section (visible only for tunneling protocols) -->
                                 <StackPanel Style="{StaticResource NetworkSectionStyle}" Margin="0,14,0,0">
                                     <TextBlock x:Name="DlgSrv_GatewayRoutingTitle" Style="{StaticResource DialogSectionTitleStyle}"/>
                                     <TextBlock x:Name="DlgSrv_GatewayRoutingDesc"

@@ -1245,11 +1245,14 @@ public partial class ServerDialogViewModel : ObservableValidator
         !string.Equals(ConnectionType, "Local", StringComparison.OrdinalIgnoreCase)
         && !string.Equals(ConnectionType, "Citrix", StringComparison.OrdinalIgnoreCase);
 
+    public bool SupportsGateway => ProtocolCapabilities.SupportsSshGateway(ConnectionType);
+
     public bool UsesGateway =>
-        !DirectConnection
+        SupportsGateway
+        && !DirectConnection
         && !string.IsNullOrWhiteSpace(SelectedGatewayId);
 
-    public bool CanSelectGateway => !DirectConnection;
+    public bool CanSelectGateway => SupportsGateway && !DirectConnection;
 
     public string GatewayComboHelpText => CanSelectGateway
         ? ""
@@ -1725,6 +1728,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         string? sshKeyPath = string.IsNullOrWhiteSpace(SshKeyPath) ? null : SshKeyPath;
         int snappedRdpFixedWidth = RdpDisplayHelper.SnapToMultipleOf(RdpFixedWidth, 4);
+        bool supportsGateway = ProtocolCapabilities.SupportsSshGateway(ConnectionType);
 
         return new ServerProfileDto
         {
@@ -1833,10 +1837,10 @@ public partial class ServerDialogViewModel : ObservableValidator
             RdpPerformanceFlags = ComposePerformanceFlags(),
             RdpDisableUdp = RdpDisableUdp,
             RdpGateway = string.IsNullOrWhiteSpace(RdpGateway) ? null : RdpGateway,
-            SshGatewayId = DirectConnection || string.IsNullOrWhiteSpace(SelectedGatewayId)
+            SshGatewayId = !supportsGateway || DirectConnection || string.IsNullOrWhiteSpace(SelectedGatewayId)
                 ? null
                 : SelectedGatewayId,
-            UseDirectConnection = DirectConnection,
+            UseDirectConnection = supportsGateway && DirectConnection,
             ProjectId = string.IsNullOrWhiteSpace(SelectedProjectId) ? null : SelectedProjectId,
             Tags = string.IsNullOrWhiteSpace(Tags) ? null : Tags,
             Environment = Environment == "None" ? null : Environment,
@@ -2219,6 +2223,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(WinRmUseSslHelpText));
         OnPropertyChanged(nameof(IsLocalConnection));
         OnPropertyChanged(nameof(IsSshFamilyConnection));
+        OnPropertyChanged(nameof(SupportsGateway));
         OnPropertyChanged(nameof(UsesGateway));
         OnPropertyChanged(nameof(CanSelectGateway));
         OnPropertyChanged(nameof(GatewayComboHelpText));

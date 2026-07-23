@@ -17,6 +17,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.ViewModels;
 
@@ -732,20 +733,43 @@ public partial class ServerListViewModel
             return 0;
         }
 
-        string? normalizedTargetGatewayId = string.IsNullOrWhiteSpace(targetGatewayId)
-            ? null
-            : targetGatewayId;
+        string? canonicalTargetGatewayId = null;
+        if (!string.IsNullOrWhiteSpace(targetGatewayId))
+        {
+            AppSettings settings = await _configManager.LoadSettingsAsync();
+            SshGatewayDto? targetGateway = settings.SshGateways.LastOrDefault(
+                gateway => !string.IsNullOrWhiteSpace(gateway.Id)
+                           && string.Equals(gateway.Id, targetGatewayId, StringComparison.OrdinalIgnoreCase));
+            if (targetGateway is null)
+            {
+                StatusMessageRequested?.Invoke(
+                    _localizer.Format("StatusBulkGatewayMissingTarget", ids.Length, targetGatewayId));
+                Core.Logging.FileLogger.Warn(
+                    $"UpdateGatewayReferencesAsync skipped {ids.Length} item(s) because gateway '{targetGatewayId}' no longer exists.");
+                return 0;
+            }
+
+            canonicalTargetGatewayId = targetGateway.Id;
+        }
+
         string[] finalSelectionIds = SelectedItems
             .Select(server => server.Id)
             .ToArray();
         string? primarySelectionId = SelectedServer?.Id;
         var updatedCount = 0;
+        var unsupportedCount = 0;
 
         await ExecutePersistedBulkMutationAsync(BuildPlanAsync, cancellationToken);
 
+        if (unsupportedCount > 0)
+        {
+            StatusMessageRequested?.Invoke(
+                _localizer.Format("StatusBulkGatewayUnsupportedSkipped", unsupportedCount));
+        }
+
         if (updatedCount > 0)
         {
-            string targetLabel = normalizedTargetGatewayId ?? "<direct>";
+            string targetLabel = canonicalTargetGatewayId ?? "<direct>";
             Core.Logging.FileLogger.Info(
                 $"UpdateGatewayReferencesAsync updated gateway reference to '{targetLabel}' for {updatedCount} item(s) in a single transaction.");
         }
@@ -772,17 +796,22 @@ public partial class ServerListViewModel
             {
                 ServerProfileDto dto = dtoMap[id];
                 bool changed;
-                if (normalizedTargetGatewayId is null)
+                if (canonicalTargetGatewayId is null)
                 {
                     changed = dto.SshGatewayId is not null || !dto.UseDirectConnection;
                     dto.SshGatewayId = null;
                     dto.UseDirectConnection = true;
                 }
+                else if (!ProtocolCapabilities.SupportsSshGateway(dto.ConnectionType))
+                {
+                    unsupportedCount++;
+                    continue;
+                }
                 else
                 {
-                    changed = !string.Equals(dto.SshGatewayId, normalizedTargetGatewayId, StringComparison.Ordinal)
+                    changed = !string.Equals(dto.SshGatewayId, canonicalTargetGatewayId, StringComparison.Ordinal)
                               || dto.UseDirectConnection;
-                    dto.SshGatewayId = normalizedTargetGatewayId;
+                    dto.SshGatewayId = canonicalTargetGatewayId;
                     dto.UseDirectConnection = false;
                 }
 

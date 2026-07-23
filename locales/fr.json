@@ -1460,6 +1460,8 @@
   "BulkEditPasswordValidationControl": "Le mot de passe ne peut pas contenir de caract\u00e8res de contr\u00f4le.",
   "BulkEditPasswordValidationMismatch": "Les mots de passe ne correspondent pas.",
   "StatusBulkPasswordUpdated": "Mot de passe modifi\u00e9 sur {0} serveur(s).",
+  "StatusBulkGatewayMissingTarget": "{0} \u00e9l\u00e9ment(s) ignor\u00e9(s) : la passerelle SSH \u00ab {1} \u00bb n'existe plus.",
+  "StatusBulkGatewayUnsupportedSkipped": "{0} \u00e9l\u00e9ment(s) ignor\u00e9(s) : leur protocole ne prend pas en charge les passerelles SSH.",
   "TreeCtxEditProject": "Modifier le projet",
   "TreeCtxDeleteProject": "Supprimer le projet",
   "TreeCtxMoveSelected": "D\u00e9placer vers... ({0})",

@@ -63,6 +63,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
     private List<ServerItemViewModel> _allServers = [];
     private List<ProjectTarget> _projectTargets = [];
+    private readonly Dictionary<string, Dictionary<string, ConnectionState>> _sessionStatesByInventoryId =
+        new(StringComparer.Ordinal);
     private AppSettings? _currentSettings;
     private readonly HashSet<string> _expandedNodes = new(StringComparer.OrdinalIgnoreCase);
     private System.Threading.Timer? _searchFilterTimer;
@@ -210,6 +212,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     }
 
     private readonly IRecentConnectionTracker _recentConnections;
+
+    internal int ActiveSessionAggregationEntryCount => _sessionStatesByInventoryId.Count;
 
     private readonly ICredentialProviderFactory _credentialProviderFactory;
 
@@ -2088,32 +2092,119 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
     private void OnConnectionStateChanged(
         string serverId,
-        Heimdall.Core.Models.ConnectionState previousState,
-        Heimdall.Core.Models.ConnectionState newState,
+        ConnectionState previousState,
+        ConnectionState newState,
         string? error)
     {
         // State machine events may fire from background threads; marshal to UI thread.
         // Always queued; direct fast-path would re-enter selection / binding updates.
         _ = _uiDispatcher.InvokeAsync(() =>
         {
-            var server = _allServers.FirstOrDefault(s =>
-                string.Equals(s.Id, serverId, StringComparison.Ordinal));
+            var server = _allServers.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, serverId, StringComparison.Ordinal));
+            string inventoryId = serverId;
 
-            if (server is not null)
+            // A raw inventory ID takes precedence because a valid profile ID may
+            // itself end with an underscore and eight hexadecimal characters.
+            if (server is null)
             {
-                server.ConnectionState = newState.ToString();
-
-                // Record successful reach: feeds RDP-DISC-04 (palette protocol bias)
-                // and RDP-DISC-05 (Recents). LaunchedExternalClient counts because
-                // it indicates a user-initiated session attempt completed dispatch.
-                if (newState == Heimdall.Core.Models.ConnectionState.Connected
-                    || newState == Heimdall.Core.Models.ConnectionState.LaunchedExternalClient
-                    || newState == Heimdall.Core.Models.ConnectionState.RemoteSessionHandedOff)
+                var trackedProfile = _sessionStatesByInventoryId.FirstOrDefault(entry =>
+                    entry.Value.ContainsKey(serverId));
+                if (trackedProfile.Value is not null)
                 {
-                    _recentConnections.Record(server.RemoteServer, server.ConnectionType);
+                    inventoryId = trackedProfile.Key;
                 }
+                else if (SessionIdCodec.TryGetInventoryId(
+                             serverId,
+                             out string decodedInventoryId))
+                {
+                    inventoryId = decodedInventoryId;
+                }
+
+                server = _allServers.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Id, inventoryId, StringComparison.Ordinal));
+            }
+
+            ConnectionState aggregateState = UpdateProfileSessionState(
+                inventoryId,
+                serverId,
+                newState);
+
+            if (server is null)
+            {
+                return;
+            }
+
+            bool wasConnected = ConnectionStateSets.IsConnected(server.ConnectionState);
+            server.ConnectionState = aggregateState.ToString();
+            bool isConnected = ConnectionStateSets.IsConnected(aggregateState);
+
+            // Rebuild filtered views only when connected-filter membership changes.
+            if (wasConnected != isConnected)
+            {
+                ApplyFilter(server.Id);
+            }
+
+            // Record successful reach: feeds RDP-DISC-04 (palette protocol bias)
+            // and RDP-DISC-05 (Recents). External launch and remote handoff count
+            // because the user-initiated session reached its successful boundary.
+            if (ConnectionStateSets.IsConnected(newState))
+            {
+                _recentConnections.Record(server.RemoteServer, server.ConnectionType);
             }
         });
+    }
+
+    private ConnectionState UpdateProfileSessionState(
+        string inventoryId,
+        string sessionId,
+        ConnectionState newState)
+    {
+        bool isTeardown =
+            newState is ConnectionState.Disconnected or ConnectionState.Error;
+
+        if (!_sessionStatesByInventoryId.TryGetValue(
+                inventoryId,
+                out Dictionary<string, ConnectionState>? sessionStates))
+        {
+            if (isTeardown)
+            {
+                return newState;
+            }
+
+            sessionStates = new Dictionary<string, ConnectionState>(StringComparer.Ordinal);
+            _sessionStatesByInventoryId.Add(inventoryId, sessionStates);
+        }
+
+        if (isTeardown)
+        {
+            sessionStates.Remove(sessionId);
+        }
+        else
+        {
+            sessionStates[sessionId] = newState;
+        }
+
+        if (sessionStates.Count == 0)
+        {
+            _sessionStatesByInventoryId.Remove(inventoryId);
+            return newState;
+        }
+
+        foreach (ConnectionState sessionState in sessionStates.Values)
+        {
+            if (ConnectionStateSets.IsConnected(sessionState))
+            {
+                return sessionState;
+            }
+        }
+
+        if (sessionStates.TryGetValue(sessionId, out ConnectionState currentSessionState))
+        {
+            return currentSessionState;
+        }
+
+        return sessionStates.Values.First();
     }
 }
 

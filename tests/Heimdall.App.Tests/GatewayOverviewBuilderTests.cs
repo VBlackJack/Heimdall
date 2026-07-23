@@ -102,6 +102,23 @@ public sealed class GatewayOverviewBuilderTests
         Assert.Equal(2, overview.MissingReferenceCount);
     }
 
+    [Fact]
+    public void Build_IgnoresGatewayReferencesOnIneligibleProtocols()
+    {
+        SshGatewayDto gateway = CreateGateway("gw-1", "Bastion", "bastion.example.test", 22, "ops");
+        ServerProfileDto telnet = CreateServer("server-1", "Telnet", "gw-1", sortOrder: 1);
+        telnet.ConnectionType = "TELNET";
+        ServerProfileDto ftp = CreateServer("server-2", "FTP", "gw-missing", sortOrder: 2);
+        ftp.ConnectionType = "FTP";
+
+        GatewayOverview overview = GatewayOverviewBuilder.Build([gateway], [telnet, ftp]);
+
+        Assert.Empty(Assert.Single(overview.Gateways).Sessions);
+        Assert.Empty(overview.MissingReferences);
+        Assert.Equal(0, overview.RoutedSessionCount);
+        Assert.Equal(0, overview.MissingReferenceCount);
+    }
+
     private static SshGatewayDto CreateGateway(
         string id,
         string name,

@@ -15,6 +15,7 @@
  */
 
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services;
 
@@ -54,7 +55,8 @@ public static class GatewayOverviewBuilder
         foreach (ServerProfileDto server in servers ?? [])
         {
             string? gatewayId = server.SshGatewayId;
-            if (string.IsNullOrWhiteSpace(gatewayId))
+            if (!ProtocolCapabilities.SupportsSshGateway(server.ConnectionType)
+                || string.IsNullOrWhiteSpace(gatewayId))
             {
                 continue;
             }
