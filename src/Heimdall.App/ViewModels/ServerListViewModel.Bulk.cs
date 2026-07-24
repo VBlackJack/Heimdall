@@ -1386,6 +1386,7 @@ public partial class ServerListViewModel
             _allServers.Add(newVm);
         }
 
+        RebuildHealthServerIndex();
         RefreshLookupCollections(settings);
 
         var anchorId = plan.FocusId ?? _selectionAnchor?.Id;

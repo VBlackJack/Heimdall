@@ -35,7 +35,7 @@ using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
 namespace Heimdall.App.Tests;
 
-public sealed class ServerListSelectionTests(ITestOutputHelper output)
+public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 {
     [Fact]
     public async Task SelectSingle_ReplacesExistingMultiSelection()
@@ -824,13 +824,15 @@ public sealed class ServerListSelectionTests(ITestOutputHelper output)
             ConfigManager configManager,
             ServerListViewModel viewModel,
             ConnectionStateMachine stateMachine,
-            RecentConnectionTracker recentConnections)
+            RecentConnectionTracker recentConnections,
+            SessionHealthMonitor? healthMonitor)
         {
             _rootPath = rootPath;
             ConfigManager = configManager;
             ViewModel = viewModel;
             StateMachine = stateMachine;
             RecentConnections = recentConnections;
+            HealthMonitor = healthMonitor;
         }
 
         public ConfigManager ConfigManager { get; }
@@ -841,8 +843,11 @@ public sealed class ServerListSelectionTests(ITestOutputHelper output)
 
         public RecentConnectionTracker RecentConnections { get; }
 
+        public SessionHealthMonitor? HealthMonitor { get; }
+
         public static async Task<ServerListSelectionFixture> CreateAsync(
-            IEnumerable<IProtocolHandler>? protocolHandlers = null)
+            IEnumerable<IProtocolHandler>? protocolHandlers = null,
+            bool withHealthMonitor = false)
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "heimdall-b65-selection", Guid.NewGuid().ToString("N"));
             var configManager = new ConfigManager(rootPath);
@@ -862,6 +867,9 @@ public sealed class ServerListSelectionTests(ITestOutputHelper output)
             var knownHostsImporter = new KnownHostsImporter(configManager, new HostKeyStore());
             var uiDispatcher = new FakeUiDispatcher();
             var recentConnections = new RecentConnectionTracker();
+            SessionHealthMonitor? healthMonitor = withHealthMonitor
+                ? new SessionHealthMonitor(configManager, new FixtureHealthProbe())
+                : null;
 
             var viewModel = new ServerListViewModel(
                 configManager,
@@ -873,14 +881,16 @@ public sealed class ServerListSelectionTests(ITestOutputHelper output)
                 new NullRdpImportService(),
                 puttyImporter,
                 knownHostsImporter,
-                recentConnections);
+                recentConnections,
+                healthMonitor: healthMonitor);
 
             return new ServerListSelectionFixture(
                 rootPath,
                 configManager,
                 viewModel,
                 stateMachine,
-                recentConnections);
+                recentConnections,
+                healthMonitor);
         }
 
         public AppSettings ExpandGroups(params string[] groups)
@@ -919,6 +929,7 @@ public sealed class ServerListSelectionTests(ITestOutputHelper output)
         public ValueTask DisposeAsync()
         {
             ViewModel.Dispose();
+            HealthMonitor?.Dispose();
 
             try
             {

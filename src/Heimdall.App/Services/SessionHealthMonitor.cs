@@ -23,7 +23,7 @@ namespace Heimdall.App.Services;
 
 /// <summary>
 /// Background reachability monitor. Loads the server inventory from
-/// <see cref="IConfigManager"/> on every tick, runs a throttled batch of
+/// <see cref="IConfigManager"/> on every cycle, runs a throttled batch of
 /// <see cref="IHealthProbe"/> calls, and exposes the result both as a queryable
 /// dictionary and as a per-server <see cref="StatusChanged"/> event the UI can
 /// subscribe to.
@@ -39,14 +39,19 @@ public sealed class SessionHealthMonitor : IDisposable
     private readonly IConfigManager _configManager;
     private readonly IHealthProbe _probe;
     private readonly ConcurrentDictionary<string, HealthState> _states = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _stateGenerations = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, object> _stateGates = new(StringComparer.Ordinal);
     private readonly object _lifecycleGate = new();
 
-    private System.Threading.Timer? _timer;
+    private PeriodicTimer? _periodicTimer;
+    private Task? _schedulerTask;
     private CancellationTokenSource? _cycleCts;
     private AppSettings? _currentSettings;
+    private long _nextGeneration;
+    private long _lifecycleVersion;
     private bool _disposed;
 
-    public event Action<string, HealthState>? StatusChanged;
+    public event Action<HealthStateChange>? StatusChanged;
 
     public SessionHealthMonitor(IConfigManager configManager, IHealthProbe probe)
     {
@@ -62,17 +67,19 @@ public sealed class SessionHealthMonitor : IDisposable
     public HealthState GetState(string serverId)
         => _states.TryGetValue(serverId, out var state) ? state : HealthState.Initial;
 
+    internal long LifecycleVersion => Volatile.Read(ref _lifecycleVersion);
+
     /// <summary>
     /// Boots the monitor with the given settings snapshot. Safe to call repeatedly;
-    /// each call cancels the in-flight cycle and re-arms the timer with the new
-    /// interval. When <see cref="AppSettings.SessionHealthMonitorEnabled"/> is
-    /// false, the timer stays stopped and existing state is cleared.
+    /// each call cancels the in-flight cycle and re-arms the sequential scheduler
+    /// with the new interval. When <see cref="AppSettings.SessionHealthMonitorEnabled"/>
+    /// is false, the scheduler stays stopped and existing state is cleared.
     /// </summary>
     public void Start(AppSettings settings) => Start(settings, armTimer: true);
 
     /// <summary>
     /// Internal seam used by unit tests to set up the throttle and settings without
-    /// arming the background Timer (which would race with manual
+    /// arming the background scheduler (which would race with manual
     /// <see cref="RunCycleAsync"/> calls).
     /// </summary>
     internal void Start(AppSettings settings, bool armTimer)
@@ -83,6 +90,7 @@ public sealed class SessionHealthMonitor : IDisposable
 
             _currentSettings = settings;
             StopUnsafe();
+            long lifecycleVersion = Interlocked.Increment(ref _lifecycleVersion);
 
             if (!settings.SessionHealthMonitorEnabled)
             {
@@ -95,7 +103,15 @@ public sealed class SessionHealthMonitor : IDisposable
             _cycleCts = new CancellationTokenSource();
             if (armTimer)
             {
-                _timer = new System.Threading.Timer(OnTimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(intervalSeconds));
+                _periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
+                PeriodicTimer timer = _periodicTimer;
+                CancellationToken token = _cycleCts.Token;
+                _schedulerTask = Task.Run(
+                    () => RunSequentialLoopAsync(
+                        ct => timer.WaitForNextTickAsync(ct).AsTask(),
+                        lifecycleVersion,
+                        token),
+                    CancellationToken.None);
             }
         }
     }
@@ -111,8 +127,9 @@ public sealed class SessionHealthMonitor : IDisposable
 
     private void StopUnsafe()
     {
-        _timer?.Dispose();
-        _timer = null;
+        _periodicTimer?.Dispose();
+        _periodicTimer = null;
+        _schedulerTask = null;
 
         // Cancel the in-flight cycle, but defer disposing the source: a running
         // cycle still holds this token and must observe cancellation (not an
@@ -143,34 +160,22 @@ public sealed class SessionHealthMonitor : IDisposable
 
     private void OnSettingsChanged(AppSettings settings) => Start(settings);
 
-    private async void OnTimerTick(object? _)
-    {
-        var cts = _cycleCts;
-        if (cts is null || cts.IsCancellationRequested) return;
-
-        try
-        {
-            await RunCycleAsync(cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Cycle cancelled by Stop()/Dispose()/settings change — expected.
-        }
-        catch (Exception ex)
-        {
-            FileLogger.Warn($"SessionHealthMonitor cycle failed: {ex.Message}");
-        }
-    }
-
     /// <summary>
     /// Executes a single probe cycle. Exposed as internal so unit tests can drive
     /// the scheduler deterministically without relying on the Timer.
     /// </summary>
     internal async Task RunCycleAsync(CancellationToken ct)
     {
+        long lifecycleVersion = Volatile.Read(ref _lifecycleVersion);
+        await RunCycleAsync(lifecycleVersion, ct).ConfigureAwait(false);
+    }
+
+    private async Task RunCycleAsync(long lifecycleVersion, CancellationToken ct)
+    {
         var settings = _currentSettings;
         if (settings is null) return;
 
+        long generation = Interlocked.Increment(ref _nextGeneration);
         var maxConcurrent = Math.Max(1, settings.SessionHealthMaxConcurrent);
         var profiles = await _configManager.LoadServersAsync().ConfigureAwait(false);
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
@@ -184,7 +189,13 @@ public sealed class SessionHealthMonitor : IDisposable
         {
             if (string.IsNullOrEmpty(dto.Id)) continue;
             seenIds.Add(dto.Id);
-            tasks.Add(ProbeOneAsync(dto, settings.SessionHealthProbeTimeoutMs, throttle, ct));
+            tasks.Add(ProbeOneAsync(
+                dto,
+                settings.SessionHealthProbeTimeoutMs,
+                throttle,
+                generation,
+                lifecycleVersion,
+                ct));
         }
 
         await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -194,32 +205,107 @@ public sealed class SessionHealthMonitor : IDisposable
         {
             if (!seenIds.Contains(key))
             {
-                _states.TryRemove(key, out _);
+                PruneState(key, generation, lifecycleVersion);
             }
         }
     }
 
-    private async Task ProbeOneAsync(ServerProfileDto dto, int timeoutMs, SemaphoreSlim throttle, CancellationToken ct)
+    internal async Task RunSequentialLoopAsync(
+        Func<CancellationToken, Task<bool>> waitForNextTickAsync,
+        CancellationToken ct)
+    {
+        long lifecycleVersion = Volatile.Read(ref _lifecycleVersion);
+        await RunSequentialLoopAsync(
+            waitForNextTickAsync,
+            lifecycleVersion,
+            ct).ConfigureAwait(false);
+    }
+
+    private async Task RunSequentialLoopAsync(
+        Func<CancellationToken, Task<bool>> waitForNextTickAsync,
+        long lifecycleVersion,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(waitForNextTickAsync);
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await RunCycleAsync(lifecycleVersion, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Warn($"SessionHealthMonitor cycle failed: {ex.Message}");
+            }
+
+            if (ct.IsCancellationRequested)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!await waitForNextTickAsync(ct).ConfigureAwait(false))
+                {
+                    return;
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Warn($"SessionHealthMonitor scheduler failed: {ex.Message}");
+                return;
+            }
+        }
+    }
+
+    private async Task ProbeOneAsync(
+        ServerProfileDto dto,
+        int timeoutMs,
+        SemaphoreSlim throttle,
+        long generation,
+        long lifecycleVersion,
+        CancellationToken ct)
     {
         // Gateway-fronted servers and protocols without a probe port short-circuit
         // before they queue against the throttle, leaving slots free for probes
         // that will actually hit the network.
         if (!string.IsNullOrEmpty(dto.SshGatewayId))
         {
-            PublishState(dto.Id, new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, "behind-gateway"));
+            PublishState(
+                dto.Id,
+                new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, "behind-gateway"),
+                generation,
+                lifecycleVersion);
             return;
         }
 
         var port = ResolveProbePort(dto);
         if (!port.HasValue || port.Value <= 0)
         {
-            PublishState(dto.Id, new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, "no-port"));
+            PublishState(
+                dto.Id,
+                new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, "no-port"),
+                generation,
+                lifecycleVersion);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(dto.RemoteServer))
         {
-            PublishState(dto.Id, new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, "no-host"));
+            PublishState(
+                dto.Id,
+                new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, "no-host"),
+                generation,
+                lifecycleVersion);
             return;
         }
 
@@ -228,9 +314,13 @@ public sealed class SessionHealthMonitor : IDisposable
         {
             if (ct.IsCancellationRequested) return;
 
-            PublishState(dto.Id, new HealthState(HealthStatus.Probing, DateTime.UtcNow, null, null));
+            PublishState(
+                dto.Id,
+                new HealthState(HealthStatus.Probing, DateTime.UtcNow, null, null),
+                generation,
+                lifecycleVersion);
             var result = await _probe.ProbeAsync(dto.RemoteServer, port.Value, timeoutMs, ct).ConfigureAwait(false);
-            PublishState(dto.Id, result);
+            PublishState(dto.Id, result, generation, lifecycleVersion);
         }
         finally
         {
@@ -256,9 +346,86 @@ public sealed class SessionHealthMonitor : IDisposable
         };
     }
 
-    private void PublishState(string serverId, HealthState state)
+    internal bool PublishState(string serverId, HealthState state, long generation)
     {
-        _states[serverId] = state;
-        StatusChanged?.Invoke(serverId, state);
+        return PublishState(
+            serverId,
+            state,
+            generation,
+            Volatile.Read(ref _lifecycleVersion));
+    }
+
+    internal bool PublishState(
+        string serverId,
+        HealthState state,
+        long generation,
+        long lifecycleVersion)
+    {
+        if (lifecycleVersion != Volatile.Read(ref _lifecycleVersion))
+        {
+            return false;
+        }
+
+        object stateGate = _stateGates.GetOrAdd(serverId, static _ => new object());
+        lock (stateGate)
+        {
+            if (lifecycleVersion != Volatile.Read(ref _lifecycleVersion))
+            {
+                return false;
+            }
+
+            if (_stateGenerations.TryGetValue(serverId, out long currentGeneration)
+                && generation < currentGeneration)
+            {
+                return false;
+            }
+
+            _stateGenerations[serverId] = generation;
+            _states[serverId] = state;
+        }
+
+        if (lifecycleVersion != Volatile.Read(ref _lifecycleVersion))
+        {
+            return false;
+        }
+
+        StatusChanged?.Invoke(new HealthStateChange(serverId, state, generation));
+        return true;
+    }
+
+    private void PruneState(
+        string serverId,
+        long generation,
+        long lifecycleVersion)
+    {
+        if (lifecycleVersion != Volatile.Read(ref _lifecycleVersion))
+        {
+            return;
+        }
+
+        object stateGate = _stateGates.GetOrAdd(serverId, static _ => new object());
+        lock (stateGate)
+        {
+            if (lifecycleVersion != Volatile.Read(ref _lifecycleVersion))
+            {
+                return;
+            }
+
+            if (_stateGenerations.TryGetValue(serverId, out long currentGeneration)
+                && currentGeneration > generation)
+            {
+                return;
+            }
+
+            _stateGenerations[serverId] = generation;
+            // Keep the generation as a tombstone after removing the visible state.
+            // A lingering older cycle must not be able to recreate a removed server.
+            _states.TryRemove(serverId, out _);
+        }
     }
 }
+
+public readonly record struct HealthStateChange(
+    string ServerId,
+    HealthState State,
+    long Generation);

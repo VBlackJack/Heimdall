@@ -62,6 +62,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     private bool _disposed;
 
     private List<ServerItemViewModel> _allServers = [];
+    private readonly Dictionary<string, ServerItemViewModel> _healthServerById =
+        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, long> _lastHealthGenerationByServerId =
+        new(StringComparer.Ordinal);
     private List<ProjectTarget> _projectTargets = [];
     private readonly Dictionary<string, Dictionary<string, SessionStateRevision>> _sessionStatesByInventoryId =
         new(StringComparer.Ordinal);
@@ -198,18 +202,51 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     /// Routes a health probe verdict back to the corresponding
     /// <see cref="ServerItemViewModel"/>. Always marshals to the UI thread
     /// because <see cref="SessionHealthMonitor.StatusChanged"/> fires from a
-    /// background timer thread.
+    /// background scheduler thread.
     /// </summary>
-    private void OnServerHealthChanged(string serverId, HealthState state)
+    private void OnServerHealthChanged(HealthStateChange change)
     {
-        _uiDispatcher.InvokeAsync(() =>
+        _ = _uiDispatcher.InvokeAsync(() =>
         {
-            var vm = _allServers.FirstOrDefault(s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
-            if (vm is not null)
-            {
-                vm.HealthState = state;
-            }
+            ApplyServerHealthChange(change);
         });
+    }
+
+    internal int HealthServerIndexCount => _healthServerById.Count;
+
+    internal bool ApplyServerHealthChange(HealthStateChange change)
+    {
+        if (_lastHealthGenerationByServerId.TryGetValue(
+                change.ServerId,
+                out long lastGeneration)
+            && change.Generation < lastGeneration)
+        {
+            return false;
+        }
+
+        _lastHealthGenerationByServerId[change.ServerId] = change.Generation;
+        if (!_healthServerById.TryGetValue(change.ServerId, out ServerItemViewModel? vm))
+        {
+            return false;
+        }
+
+        vm.HealthState = change.State;
+        return true;
+    }
+
+    private void RebuildHealthServerIndex()
+    {
+        _healthServerById.Clear();
+        foreach (ServerItemViewModel server in _allServers)
+        {
+            if (!string.IsNullOrEmpty(server.Id))
+            {
+                _healthServerById[server.Id] = server;
+            }
+        }
+
+        // Generation entries deliberately outlive an index entry so a health
+        // event queued before removal cannot regress a later VM with the same ID.
     }
 
     private readonly IRecentConnectionTracker _recentConnections;
@@ -357,6 +394,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                 gatewayMap,
                 _localizer))
             .ToList();
+        RebuildHealthServerIndex();
 
         RefreshLookupCollections(settings);
         IsSidebarVisible = !settings.SidebarCollapsed;
@@ -1263,6 +1301,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             _connectionSm.GetState(result.Server.Id).ToString(),
             BuildGatewayMap(settings),
             _localizer));
+        RebuildHealthServerIndex();
 
         RefreshLookupCollections(settings);
         RebuildStableTreeProjection();
@@ -1318,6 +1357,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             _connectionSm.GetState(result.Server.Id).ToString(),
             BuildGatewayMap(settings),
             _localizer));
+        RebuildHealthServerIndex();
 
         RefreshLookupCollections(settings);
         RebuildStableTreeProjection();
