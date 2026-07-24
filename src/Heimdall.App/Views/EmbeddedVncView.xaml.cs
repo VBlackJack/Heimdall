@@ -31,11 +31,8 @@ namespace Heimdall.App.Views;
 /// </summary>
 public partial class EmbeddedVncView : UserControl, IDisposable
 {
-    /// <summary>
-    /// Virtual host name for mapping local VNC assets into WebView2.
-    /// Provides a stable HTTPS origin instead of file:// for security.
-    /// </summary>
-    private const string VncVirtualHost = "heimdall-vnc.local";
+    private static readonly WebViewDocumentPolicy VncDocumentPolicy =
+        new("https://heimdall-vnc.local/vnc.html");
 
     private VncSessionResult? _session;
     private SessionTabViewModel? _sessionTab;
@@ -171,7 +168,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
             // origin for WebMessage source validation).
             var assetsPath = Path.Combine(AppContext.BaseDirectory, "Assets");
             core.SetVirtualHostNameToFolderMapping(
-                VncVirtualHost, assetsPath,
+                VncDocumentPolicy.TrustedDocument.Host, assetsPath,
                 CoreWebView2HostResourceAccessKind.Allow);
 
             // Block all navigation away from the VNC virtual host
@@ -181,7 +178,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
             var htmlPath = Path.Combine(AppContext.BaseDirectory, "Assets", "vnc.html");
             if (File.Exists(htmlPath))
             {
-                core.Navigate($"https://{VncVirtualHost}/vnc.html");
+                core.Navigate(VncDocumentPolicy.TrustedDocument.AbsoluteUri);
             }
             else
             {
@@ -205,15 +202,11 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
-        // Validate message source — only accept messages from our virtual VNC host
-        var source = e.Source;
-        if (!string.IsNullOrEmpty(source)
-            && !source.StartsWith($"https://{VncVirtualHost}", StringComparison.OrdinalIgnoreCase)
-            && !source.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
-            && !source.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        var activeDocument = VncWebView.CoreWebView2?.Source;
+        if (!ShouldAcceptWebMessage(e.Source, activeDocument))
         {
             Core.Logging.FileLogger.Warn(
-                $"EmbeddedVNC rejected WebMessage from unexpected source: {source}");
+                "EmbeddedVNC rejected a WebMessage from an untrusted document.");
             return;
         }
 
@@ -366,15 +359,14 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
     private void OnWebViewNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs navArgs)
     {
-        if (navArgs.Uri is not null
-            && !navArgs.Uri.StartsWith($"https://{VncVirtualHost}", StringComparison.OrdinalIgnoreCase)
-            && !navArgs.Uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
-            && !navArgs.Uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        if (VncDocumentPolicy.IsTrustedDocument(navArgs.Uri))
         {
-            navArgs.Cancel = true;
-            Core.Logging.FileLogger.Warn(
-                $"EmbeddedVNC blocked navigation to: {navArgs.Uri}");
+            _webViewReady = false;
+            return;
         }
+
+        navArgs.Cancel = true;
+        Core.Logging.FileLogger.Warn("EmbeddedVNC blocked navigation to an untrusted document.");
     }
 
     private void SendConnectCommand()
@@ -397,10 +389,16 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
     private void PostWebMessage(string message)
     {
-        if (VncWebView.CoreWebView2 is not null)
+        if (VncWebView.CoreWebView2 is { } core
+            && VncDocumentPolicy.CanExchangeMessages(_webViewReady, core.Source))
         {
-            VncWebView.CoreWebView2.PostWebMessageAsString(message);
+            core.PostWebMessageAsString(message);
         }
+    }
+
+    internal static bool ShouldAcceptWebMessage(string? source, string? activeDocument)
+    {
+        return VncDocumentPolicy.ShouldAcceptMessage(source, activeDocument);
     }
 
     private void ShowFallback(string message)
@@ -563,6 +561,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         EmitDisconnect("teardown");
 
         _disposed = true;
+        _webViewReady = false;
 
         if (VncWebView.CoreWebView2 is not null)
         {

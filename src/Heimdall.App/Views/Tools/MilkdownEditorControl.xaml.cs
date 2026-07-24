@@ -20,6 +20,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using Heimdall.App.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.Core;
 
 namespace Heimdall.App.Views.Tools;
@@ -31,9 +32,13 @@ namespace Heimdall.App.Views.Tools;
 /// </summary>
 public partial class MilkdownEditorControl : UserControl, IDisposable
 {
+    private static readonly WebViewDocumentPolicy EditorDocumentPolicy =
+        new("https://appassets.local/index.html");
+
     private static readonly string EditorHtmlPath = Path.Combine(
         AppContext.BaseDirectory, "Assets", "milkdown", "index.html");
 
+    private readonly IBrowserLauncher _browserLauncher;
     private bool _initialized;
     private bool _editorReady;
     private bool _disposed;
@@ -60,7 +65,14 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
     public static bool IsAvailable => File.Exists(EditorHtmlPath);
 
     public MilkdownEditorControl()
+        : this(ResolveBrowserLauncher())
     {
+    }
+
+    internal MilkdownEditorControl(IBrowserLauncher browserLauncher)
+    {
+        _browserLauncher = browserLauncher
+            ?? throw new ArgumentNullException(nameof(browserLauncher));
         InitializeComponent();
     }
 
@@ -114,17 +126,21 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
             // Block external navigation
             core.NavigationStarting -= OnNavigationStarting;
             core.NavigationStarting += OnNavigationStarting;
+            core.NewWindowRequested -= OnNewWindowRequested;
+            core.NewWindowRequested += OnNewWindowRequested;
             core.WebMessageReceived -= OnWebMessageReceived;
             core.WebMessageReceived += OnWebMessageReceived;
 
             // Map the milkdown assets folder as a virtual host
             var assetsFolder = Path.GetDirectoryName(EditorHtmlPath)!;
             core.SetVirtualHostNameToFolderMapping(
-                "appassets.local", assetsFolder, CoreWebView2HostResourceAccessKind.Allow);
+                EditorDocumentPolicy.TrustedDocument.Host,
+                assetsFolder,
+                CoreWebView2HostResourceAccessKind.Allow);
 
             Core.Logging.FileLogger.Info(
                 $"Milkdown virtual host mapped to '{assetsFolder}'");
-            core.Navigate("https://appassets.local/index.html");
+            core.Navigate(EditorDocumentPolicy.TrustedDocument.AbsoluteUri);
             Core.Logging.FileLogger.Info("Milkdown navigation started");
         }
         catch (Exception ex)
@@ -137,7 +153,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
     public void SetContent(string markdown)
     {
-        if (!_editorReady)
+        if (!CanPostMessages())
         {
             _pendingContent = markdown;
             return;
@@ -148,7 +164,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
     public void SetTheme(string theme)
     {
-        if (_editorReady)
+        if (CanPostMessages())
         {
             PostMessage("set-theme", theme);
         }
@@ -156,7 +172,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
     public void SetReadOnly(bool readOnly)
     {
-        if (!_editorReady)
+        if (!CanPostMessages())
         {
             _pendingReadOnly = readOnly;
             return;
@@ -168,7 +184,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
     public void FocusEditor()
     {
-        if (_editorReady)
+        if (CanPostMessages())
         {
             PostMessage("focus");
         }
@@ -176,7 +192,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
     public void InsertText(string text)
     {
-        if (_editorReady)
+        if (CanPostMessages())
         {
             PostMessage("insert", text);
         }
@@ -184,7 +200,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
     public void SetContextMenuLabels(Dictionary<string, string> labels)
     {
-        if (_editorReady)
+        if (CanPostMessages())
         {
             PostMessage("set-menu-labels", labels);
         }
@@ -192,7 +208,9 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
     private void PostMessage(string type, object? payload = null)
     {
-        if (_disposed || EditorWebView.CoreWebView2 is null)
+        if (_disposed
+            || !CanPostMessages()
+            || EditorWebView.CoreWebView2 is not { } core)
         {
             return;
         }
@@ -201,22 +219,49 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
             ? JsonSerializer.Serialize(new { type, payload })
             : JsonSerializer.Serialize(new { type });
 
-        EditorWebView.CoreWebView2.PostWebMessageAsJson(msg);
+        core.PostWebMessageAsJson(msg);
     }
 
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
     {
-        if (args.Uri is not null
-            && !args.Uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
-            && !args.Uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-            && !args.Uri.Contains("appassets.local", StringComparison.OrdinalIgnoreCase))
+        var decision = EditorDocumentPolicy.GetNavigationDecision(
+            args.Uri,
+            args.IsUserInitiated);
+
+        if (decision == WebViewNavigationDecision.Allow)
         {
-            args.Cancel = true;
+            _editorReady = false;
+            return;
+        }
+
+        args.Cancel = true;
+
+        if (decision == WebViewNavigationDecision.CancelAndOpenExternally)
+        {
+            _ = TryOpenExternalLink(args.Uri, _browserLauncher);
+        }
+    }
+
+    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
+    {
+        args.Handled = true;
+
+        if (args.IsUserInitiated)
+        {
+            _ = TryOpenExternalLink(args.Uri, _browserLauncher);
         }
     }
 
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
+        var activeDocument = EditorWebView.CoreWebView2?.Source;
+        if (!EditorDocumentPolicy.ShouldAcceptMessage(e.Source, activeDocument))
+        {
+            Core.Logging.FileLogger.Debug(
+                "Milkdown ignored a WebMessage from an untrusted document.");
+            return;
+        }
+
         try
         {
             using var doc = JsonDocument.Parse(e.WebMessageAsJson);
@@ -271,7 +316,10 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
                         var noteRef = linkPayload.GetString();
                         if (!string.IsNullOrWhiteSpace(noteRef))
                         {
-                            LinkClicked?.Invoke(noteRef);
+                            if (!TryOpenExternalLink(noteRef, _browserLauncher))
+                            {
+                                LinkClicked?.Invoke(noteRef);
+                            }
                         }
                     }
                     break;
@@ -281,6 +329,46 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
         {
             Core.Logging.FileLogger.Warn($"Milkdown message parse error: {ex.Message}");
         }
+    }
+
+    internal static string TrustedEditorOrigin => EditorDocumentPolicy.TrustedOrigin;
+
+    internal static string TrustedEditorDocument =>
+        EditorDocumentPolicy.TrustedDocument.AbsoluteUri;
+
+    internal static WebViewNavigationDecision GetNavigationDecision(
+        string? target,
+        bool isUserInitiated)
+    {
+        return EditorDocumentPolicy.GetNavigationDecision(target, isUserInitiated);
+    }
+
+    internal static bool ShouldAcceptWebMessage(string? source, string? activeDocument)
+    {
+        return EditorDocumentPolicy.ShouldAcceptMessage(source, activeDocument);
+    }
+
+    internal static bool TryOpenExternalLink(
+        string? target,
+        IBrowserLauncher browserLauncher)
+    {
+        return EditorDocumentPolicy.TryOpenExternalHttpLink(target, browserLauncher);
+    }
+
+    private bool CanPostMessages()
+    {
+        return !_disposed
+            && EditorDocumentPolicy.CanExchangeMessages(
+                _editorReady,
+                EditorWebView.CoreWebView2?.Source);
+    }
+
+    private static IBrowserLauncher ResolveBrowserLauncher()
+    {
+        return (Application.Current as App)?
+            .Services?
+            .GetService<IBrowserLauncher>()
+            ?? new BrowserLauncher();
     }
 
     private Task WaitUntilLoadedAsync()
@@ -304,10 +392,12 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
         }
 
         _disposed = true;
+        _editorReady = false;
 
         if (EditorWebView.CoreWebView2 is { } core)
         {
             core.NavigationStarting -= OnNavigationStarting;
+            core.NewWindowRequested -= OnNewWindowRequested;
             core.WebMessageReceived -= OnWebMessageReceived;
         }
 
