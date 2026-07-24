@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.Views;
+using Heimdall.Sftp;
 
 namespace Heimdall.App.Tests;
 
@@ -36,5 +37,161 @@ public sealed class EmbeddedSftpViewTaskObservationTests
         string warning = Assert.Single(warnings);
         Assert.Contains("test prologue", warning, StringComparison.Ordinal);
         Assert.Contains(fault.Message, warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DisposeBrowserAsync_ReturnsPromptlyAndRunsTeardownOffCallingThread()
+    {
+        using var releaseDisconnect = new ManualResetEventSlim();
+        var browser = new BlockingRemoteBrowser(releaseDisconnect);
+        int callingThreadId = Environment.CurrentManagedThreadId;
+
+        Task teardown = EmbeddedSftpView.DisposeBrowserAsync(browser);
+
+        await browser.DisconnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.NotEqual(callingThreadId, browser.DisconnectThreadId);
+        Assert.False(teardown.IsCompleted);
+
+        releaseDisconnect.Set();
+        await teardown.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.True(browser.DisposeCalled);
+    }
+
+    [Fact]
+    public async Task DisposeBrowserAsync_WhenDisconnectFails_DisposesAndFaultIsObserved()
+    {
+        List<string> warnings = [];
+        var browser = new BlockingRemoteBrowser(
+            releaseDisconnect: null,
+            disconnectException: new InvalidOperationException("disconnect failed"));
+
+        Task observer = EmbeddedSftpView.ObserveFaultedTask(
+            EmbeddedSftpView.DisposeBrowserAsync(browser),
+            "browser teardown",
+            warnings.Add);
+
+        await observer.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.True(browser.DisposeCalled);
+        string warning = Assert.Single(warnings);
+        Assert.Contains("browser teardown", warning, StringComparison.Ordinal);
+        Assert.Contains("disconnect failed", warning, StringComparison.Ordinal);
+    }
+
+    private sealed class BlockingRemoteBrowser(
+        ManualResetEventSlim? releaseDisconnect,
+        Exception? disconnectException = null) : IRemoteBrowser
+    {
+        public event Action<string>? DirectoryChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<SftpTransferProgress>? TransferProgress
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<string?>? Disconnected
+        {
+            add { }
+            remove { }
+        }
+
+        public TaskCompletionSource DisconnectStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DisconnectThreadId { get; private set; }
+
+        public bool DisposeCalled { get; private set; }
+
+        public string CurrentDirectory => "/";
+
+        public bool IsConnected => true;
+
+        public void Disconnect()
+        {
+            DisconnectThreadId = Environment.CurrentManagedThreadId;
+            DisconnectStarted.TrySetResult();
+            releaseDisconnect?.Wait();
+
+            if (disconnectException is not null)
+            {
+                throw disconnectException;
+            }
+        }
+
+        public void Dispose()
+        {
+            DisposeCalled = true;
+        }
+
+        public Task<IReadOnlyList<SftpFileInfo>> ListDirectoryAsync(
+            string? path = null,
+            CancellationToken ct = default)
+        {
+            return Task.FromResult<IReadOnlyList<SftpFileInfo>>([]);
+        }
+
+        public Task<string> GetCurrentDirectoryAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult("/");
+        }
+
+        public Task ChangeDirectoryAsync(string path, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DownloadFileAsync(
+            string remotePath,
+            string localPath,
+            CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task UploadFileAsync(
+            string localPath,
+            string remotePath,
+            CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task CreateDirectoryAsync(string path, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(string path, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ChmodAsync(string path, short mode, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task RenameAsync(
+            string oldPath,
+            string newPath,
+            CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task CopyAsync(
+            string sourcePath,
+            string destinationPath,
+            bool recursive,
+            CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

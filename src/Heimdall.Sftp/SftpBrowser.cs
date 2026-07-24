@@ -32,9 +32,12 @@ namespace Heimdall.Sftp;
 /// </remarks>
 public sealed class SftpBrowser : IRemoteBrowser
 {
+    private static readonly TimeSpan DefaultDisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
+
     private SftpClient? _client;
-    private bool _disposed;
+    private int _disposeState;
     private readonly SemaphoreSlim _clientLock = new(1, 1);
+    private readonly TimeSpan _disconnectLockTimeout;
 
     // Connection context retained so a short-lived SSH exec channel can be opened later for a
     // server-side copy, pinned to the SAME host key resolved at connect time (fail-closed: no
@@ -45,6 +48,21 @@ public sealed class SftpBrowser : IRemoteBrowser
     // Generous bound on a server-side cp; a server-local copy is fast, but a large tree may take a
     // while. On timeout the copy falls back to the roundtrip path rather than failing.
     private static readonly TimeSpan ServerSideCopyCommandTimeout = TimeSpan.FromMinutes(10);
+
+    public SftpBrowser()
+        : this(DefaultDisconnectLockTimeout)
+    {
+    }
+
+    internal SftpBrowser(TimeSpan disconnectLockTimeout)
+    {
+        if (disconnectLockTimeout < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(disconnectLockTimeout));
+        }
+
+        _disconnectLockTimeout = disconnectLockTimeout;
+    }
 
     /// <summary>Raised when the current working directory changes.</summary>
     public event Action<string>? DirectoryChanged;
@@ -67,7 +85,7 @@ public sealed class SftpBrowser : IRemoteBrowser
     public string CurrentDirectory { get; private set; } = "/";
 
     /// <summary>Whether the SFTP client is connected to the remote host.</summary>
-    public bool IsConnected => _client?.IsConnected ?? false;
+    public bool IsConnected => Volatile.Read(ref _client)?.IsConnected ?? false;
 
     /// <summary>
     /// Connects to the remote host using the supplied SSH connection parameters.
@@ -84,12 +102,12 @@ public sealed class SftpBrowser : IRemoteBrowser
         IHostKeyVerifier hostKeyVerifier,
         CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
         ArgumentNullException.ThrowIfNull(connectionParams);
         ArgumentNullException.ThrowIfNull(hostKeyStore);
         ArgumentNullException.ThrowIfNull(hostKeyVerifier);
 
-        if (_client?.IsConnected == true)
+        if (Volatile.Read(ref _client)?.IsConnected == true)
         {
             throw new InvalidOperationException("SFTP browser is already connected.");
         }
@@ -107,7 +125,7 @@ public sealed class SftpBrowser : IRemoteBrowser
             client.KeepAliveInterval = TimeSpan.FromSeconds(connectionParams.KeepAliveIntervalSeconds.Value);
         }
 
-        _client = client;
+        Volatile.Write(ref _client, client);
 
         SshConnectionFactory.AttachPinnedHostKeyVerification(
             client,
@@ -130,11 +148,13 @@ public sealed class SftpBrowser : IRemoteBrowser
         }
         catch
         {
-            client.ErrorOccurred -= OnErrorOccurred;
-            client.Dispose();
-            _client = null;
-            _connectionParams = null;
-            _pinnedHostKeyVerifier = null;
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _client, null, client), client))
+            {
+                client.ErrorOccurred -= OnErrorOccurred;
+                client.Dispose();
+                DropConnectionContext();
+            }
+
             throw;
         }
 
@@ -758,22 +778,23 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <summary>Disconnects from the remote host and releases the SFTP client.</summary>
     public void Disconnect()
     {
-        var disconnected = false;
-        _clientLock.Wait();
+        bool lockTaken = _clientLock.Wait(_disconnectLockTimeout);
+        bool disconnected = false;
         try
         {
-            if (_client is null)
+            SftpClient? client = DetachClient();
+            if (client is null)
             {
                 return;
             }
 
-            _client.ErrorOccurred -= OnErrorOccurred;
+            client.ErrorOccurred -= OnErrorOccurred;
 
-            if (_client.IsConnected)
+            if (lockTaken && client.IsConnected)
             {
                 try
                 {
-                    _client.Disconnect();
+                    client.Disconnect();
                 }
                 catch (Exception ex)
                 {
@@ -781,17 +802,25 @@ public sealed class SftpBrowser : IRemoteBrowser
                 }
             }
 
-            _client.Dispose();
-            _client = null;
+            try
+            {
+                client.Dispose();
+            }
+            catch (Exception ex)
+            {
+                string teardownKind = lockTaken ? "dispose" : "forced dispose";
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"[SftpBrowser] {teardownKind} during disconnect suppressed: {ex.Message}");
+            }
 
-            // Drop the retained server-side-copy context so a torn-down session cannot open an exec channel.
-            _connectionParams = null;
-            _pinnedHostKeyVerifier = null;
             disconnected = true;
         }
         finally
         {
-            _clientLock.Release();
+            if (lockTaken)
+            {
+                _clientLock.Release();
+            }
         }
 
         if (disconnected)
@@ -803,14 +832,12 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
         Disconnect();
-        _clientLock.Dispose();
     }
 
     // ------------------------------------------------------------------
@@ -819,14 +846,28 @@ public sealed class SftpBrowser : IRemoteBrowser
 
     private SftpClient GetConnectedClient()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
 
-        if (_client is null || !_client.IsConnected)
+        SftpClient? client = Volatile.Read(ref _client);
+        if (client is null || !client.IsConnected)
         {
             throw new InvalidOperationException("SFTP browser is not connected.");
         }
 
-        return _client;
+        return client;
+    }
+
+    private SftpClient? DetachClient()
+    {
+        SftpClient? client = Interlocked.Exchange(ref _client, null);
+        DropConnectionContext();
+        return client;
+    }
+
+    private void DropConnectionContext()
+    {
+        Interlocked.Exchange(ref _connectionParams, null);
+        Interlocked.Exchange(ref _pinnedHostKeyVerifier, null);
     }
 
     private void OnErrorOccurred(object? sender, Renci.SshNet.Common.ExceptionEventArgs e)

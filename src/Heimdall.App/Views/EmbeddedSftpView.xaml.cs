@@ -322,26 +322,20 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
         if (_browser is not null)
         {
-            _browser.DirectoryChanged -= OnDirectoryChanged;
-            _browser.TransferProgress -= OnTransferProgress;
-            _browser.Disconnected -= OnBrowserDisconnected;
-            if (_browser is SftpBrowser sftpBrowser)
+            IRemoteBrowser browser = _browser;
+            _browser = null;
+
+            browser.DirectoryChanged -= OnDirectoryChanged;
+            browser.TransferProgress -= OnTransferProgress;
+            browser.Disconnected -= OnBrowserDisconnected;
+            if (browser is SftpBrowser sftpBrowser)
             {
                 sftpBrowser.SecurityEventOccurred -= OnBrowserSecurityEvent;
             }
 
-            try { _browser.Disconnect(); }
-            catch (ObjectDisposedException) { /* Expected when disposing already-closed connection */ }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn(
-                    $"EmbeddedSFTP Disconnect during dispose failed: {ex.Message}");
-            }
-
-            try { _browser.Dispose(); }
-            catch (ObjectDisposedException) { /* Expected when disposing already-closed browser */ }
-
-            _browser = null;
+            _ = ObserveFaultedTask(
+                DisposeBrowserAsync(browser),
+                "browser teardown");
         }
 
         // The decorator wraps the raw browser and owns no resources of its own (its Dispose is a no-op);
@@ -1426,6 +1420,34 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+    }
+
+    internal static Task DisposeBrowserAsync(IRemoteBrowser browser)
+    {
+        ArgumentNullException.ThrowIfNull(browser);
+
+        return Task.Run(() =>
+        {
+            try
+            {
+                browser.Disconnect();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Expected when the connection has already been closed.
+            }
+            finally
+            {
+                try
+                {
+                    browser.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Expected when the browser has already been disposed.
+                }
+            }
+        });
     }
 
     private Task RefreshRemoteAsync()
