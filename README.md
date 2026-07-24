@@ -256,9 +256,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: 3-step guided introduction overlay with skip/next/get started
-- Bilingual interface: English and French (6,051 i18n keys per language, exact EN/FR parity)
+- Bilingual interface: English and French (6,055 i18n keys per language, exact EN/FR parity)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
-- WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips
+- WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
 ### Security
 - DPAPI encryption + HMAC-SHA256 integrity via unified `CredentialProtector`
@@ -273,9 +273,12 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - HTTP/TFTP directory traversal prevention with sibling-prefix check
 - WebSocket Origin validation on VNC proxy (CSWSH prevention)
 - Atomic file creation with restrictive ACL for sensitive temp files (TOCTOU-safe)
+- Privileged (sudo) SFTP edit/upload stream their content over the privileged channel into a root-owned temp directory created beside the target and commit with an atomic, symlink-refusing rename - no attacker-writable `/tmp` staging, and the privileged read path holds a no-follow descriptor
+- Citrix launch tokens are decrypted only at the launch boundary and are never written to any log or exception; a locked vault fails closed rather than launching
 - Path traversal prevention on local file browser rename/new folder operations
 - ConfigManager concurrency-safe writes via SemaphoreSlim
 - WebView2 Content Security Policy (CSP) and navigation blocking
+- Embedded WebView documents (Milkdown notes editor, VNC view) enforce an exact scheme/host/port/path origin for accepted `postMessage` traffic and navigation - a substring-style trust match is not used, so a foreign document cannot post into or navigate the host
 - Pageant IPC hardened with self-only DACL on the shared file mapping, cryptographic random suffix in the mapping name (64 bits of entropy), trusted Pageant process whitelist before any agent traffic, and empty-agent preflight check
 - Constant-time host-key fingerprint comparison via `CryptographicOperations.FixedTimeEquals`
 - `known_hosts` import bounded by per-line (64 KB) and per-file (50 MB) caps with streaming `StreamReader`; malformed input degrades to diagnostics rather than UI exceptions
@@ -305,6 +308,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Startup update check against the latest GitHub release (spaced out, configurable in Settings) with a non-blocking banner offering **View release**, **Later**, and **Skip this version**
 - **Updates** section in Settings with a manual **Check now** button and the current installed version
 - Every release publishes a `SHA256SUMS.txt` asset so installer integrity can be verified before running
+- The downloaded installer is staged under a restrictive-ACL directory and held under a deny-write handle from verification through launch; its SHA-256 (plus Authenticode when the installer is signed) is re-checked immediately before the elevated launch, so a swap between verification and execution is refused
 
 ---
 

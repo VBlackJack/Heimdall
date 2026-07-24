@@ -12,6 +12,74 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-07-24: Security, lifecycle, and accessibility hardening (v2026.072401)
+
+A cross-reviewed hardening pass over the remote-protocol, updater, and session
+lifecycle surfaces, verified finding-by-finding against the real code, plus two
+robustness fixes and a tree-accessibility completion. Build clean (0 warnings),
+full suite green (8,271 tests).
+
+### Security
+
+- **Embedded WebView documents enforce exact-origin trust.** Messages and navigation
+  from the Milkdown notes editor and the embedded VNC view are validated against an
+  exact scheme/host/port/path origin instead of a substring check, so a foreign
+  document can no longer post messages into or navigate the host (`dc3e3870`, CODEX-007).
+- **Privileged SFTP writes no longer stage in attacker-writable `/tmp`.** Sudo edit and
+  upload stream their content over the privileged channel into a root-owned temp
+  directory created beside the target and commit with an atomic, symlink-refusing
+  `mv -fT`; the sudo read path holds a no-follow descriptor. A same-account process can
+  no longer swap the staged bytes or redirect the write through a symlink (`fc247df1`,
+  CODEX-008).
+- **The in-app updater re-validates at the execution boundary.** The verified installer
+  is staged under a restrictive-ACL directory in `%LOCALAPPDATA%`, held under a
+  deny-write handle from verification through launch, and its SHA-256 (plus Authenticode
+  when the installer is signed) is re-checked immediately before the elevated
+  `Start-Process`; the relauncher script is itself integrity-checked. A swap between
+  verification and the elevated run is refused rather than executed (`3e3b9239`,
+  CODEX-009).
+- **Citrix launch arguments are decrypted only at the launch boundary and never logged.**
+  The pre-authenticated SelfService launch token is decrypted just before use, validated,
+  and passed to the launcher without being written to any log or exception; a locked
+  vault fails closed (`6ba7392a`, CODEX-010).
+
+### Robustness (lifecycle)
+
+- **Connection lifecycle teardown is bounded and ordered.** Ephemeral per-session state
+  entries are removed at terminal teardown (no more unbounded growth across connects),
+  and connection-state notifications carry a monotonic per-session revision so a stale
+  update can never overwrite a newer one (`c4f683d0`, CODEX-012).
+- **Tunnel manager disposal is a real barrier.** A tunnel whose open is still in flight
+  when the manager is disposed is now rejected and disposed under the registry lock
+  instead of registering into a torn-down manager, closing a leaked-connection window; a
+  lifetime token aborts in-flight opens (`ca5e83c0`, CODEX-013).
+- **Closing an SFTP tab never blocks the UI.** Tab teardown is bounded and runs off the
+  dispatcher; a stuck, non-cancellable directory listing is aborted by disposing the
+  underlying client rather than waited on, and the credential context is dropped on both
+  the graceful and abort paths (`c7b48342`, CODEX-014).
+- **Session health checks no longer overlap.** Reachability cycles run sequentially via a
+  `PeriodicTimer`, each stamped with a monotonic generation so an older probe cannot
+  overwrite a newer verdict, and verdicts route to their row in O(1) (`6e65d873`,
+  CODEX-015).
+- **Tree expand-state persistence is thread-safe.** The debounced save snapshots the
+  expanded-node set on the UI thread and writes it through an atomic settings merge,
+  instead of enumerating a mutable set on a background thread (`c88085a0`, CODEX-028).
+
+### Accessibility
+
+- **Filter result count is a live region.** Screen readers announce the filtered session
+  count when it changes, deferred until the count is actually visible and de-duplicated so
+  an unchanged value is never re-announced. A keyboard-focused folder is now a reliable
+  target for the Shift+F10 / Apps context menu, with a localized automation name and help
+  distinct from a server (`eb87590c`, CODEX-031).
+
+### Internal
+
+- **Deterministic search-debounce test.** The search-filter debounce uses an injected
+  `TimeProvider` (default `TimeProvider.System`, so runtime behavior is unchanged), letting
+  its test advance a virtual clock instead of sleeping on the wall clock (`65227300`,
+  CODEX-032).
+
 ## 2026-07-24: Session tree gateway badge fix (v2026.072400)
 
 Targeted hotfix for v2026.072300.
