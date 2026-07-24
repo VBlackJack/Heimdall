@@ -298,7 +298,7 @@ public partial class ServerListViewModel
 
     private StableFolderNode CreateNoGroupNode()
     {
-        var viewModel = new FolderViewModel
+        var viewModel = new FolderViewModel(_localizer)
         {
             Name = _localizer["TreeNodeNoGroup"],
             FullPath = "",
@@ -327,7 +327,7 @@ public partial class ServerListViewModel
                 continue;
             }
 
-            var viewModel = new FolderViewModel
+            var viewModel = new FolderViewModel(_localizer)
             {
                 Name = segment,
                 FullPath = currentPath,

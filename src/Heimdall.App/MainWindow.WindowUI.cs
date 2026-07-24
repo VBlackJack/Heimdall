@@ -176,7 +176,18 @@ public partial class MainWindow
 
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        var action = FullscreenShortcutRouter.Resolve(e.Key, Keyboard.Modifiers, _uiState.IsFullscreen);
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        if ((e.Key == Key.Apps
+                || (e.Key == Key.F10 && modifiers == ModifierKeys.Shift))
+            && SessionTreeView.IsKeyboardFocusWithin
+            && DataContext is MainViewModel contextMenuViewModel)
+        {
+            e.Handled = true;
+            OpenTreeViewKeyboardContextMenu(contextMenuViewModel);
+            return;
+        }
+
+        var action = FullscreenShortcutRouter.Resolve(e.Key, modifiers, _uiState.IsFullscreen);
         if (action == FullscreenShortcutAction.None)
         {
             return;

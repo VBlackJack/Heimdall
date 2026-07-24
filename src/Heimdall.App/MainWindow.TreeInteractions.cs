@@ -45,7 +45,7 @@ public partial class MainWindow
 
     /// <summary>
     /// Opens the TreeView context menu via keyboard (Shift+F10 or Apps key).
-    /// Positions the menu at the selected TreeViewItem rather than at the mouse cursor.
+    /// Positions the menu at the focused TreeViewItem rather than at the mouse cursor.
     /// </summary>
     private void OpenTreeViewKeyboardContextMenu(MainViewModel vm)
     {
@@ -54,14 +54,26 @@ public partial class MainWindow
             return;
         }
 
-        var target = vm.ServerList.CreateBulkSelectionContext() ?? SessionTreeView.SelectedItem;
+        TreeViewItem? focusedContainer = TreeInteractionState.FindFocusedTreeViewItem(
+            SessionTreeView,
+            Keyboard.FocusedElement as DependencyObject);
+        object? focusedTarget = focusedContainer?.DataContext;
+
+        // A focused folder must win because folders are deliberately not selected.
+        // Preserve the existing bulk action menu when focus remains on a selected server.
+        object? target = TreeInteractionState.ResolveKeyboardContextTarget(
+            focusedTarget,
+            vm.ServerList.CreateBulkSelectionContext(),
+            SessionTreeView.SelectedItem);
         var menu = _contextMenuFactory.CreateTreeContextMenu(target, vm, this);
 
         // Try to position the menu at the selected item's location
         var placementTarget = target is BulkSelectionContext bulkContext
             ? (object?)bulkContext.Primary ?? vm.ServerList.SelectedServer
             : target;
-        var container = GetOrRealizeSessionTreeItem(placementTarget);
+        var container = ReferenceEquals(placementTarget, focusedTarget)
+            ? focusedContainer
+            : GetOrRealizeSessionTreeItem(placementTarget);
         if (container is not null)
         {
             menu.PlacementTarget = container;
@@ -288,8 +300,9 @@ public partial class MainWindow
 
     private async void OnSessionTreeViewPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        ModifierKeys modifiers = Keyboard.Modifiers;
         if (e.Key == Key.F2
-            && Keyboard.Modifiers == ModifierKeys.None
+            && modifiers == ModifierKeys.None
             && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
         {
             object? focusedNode =
@@ -300,7 +313,7 @@ public partial class MainWindow
         }
 
         if (e.Key != Key.Delete
-            || Keyboard.Modifiers != ModifierKeys.None
+            || modifiers != ModifierKeys.None
             || DataContext is not MainViewModel vm
             || vm.ServerList.SelectionCount <= 1
             || !vm.ServerList.DeleteSelectedCommand.CanExecute(null))

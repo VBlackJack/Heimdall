@@ -114,6 +114,44 @@ public sealed class TreeInteractionState
     }
 
     /// <summary>
+    /// Finds the nearest focused item container that belongs to the supplied tree.
+    /// Folder focus is intentionally independent from server selection.
+    /// </summary>
+    public static TreeViewItem? FindFocusedTreeViewItem(
+        TreeView tree,
+        DependencyObject? focusedElement)
+    {
+        ArgumentNullException.ThrowIfNull(tree);
+
+        DependencyObject? current = focusedElement;
+        while (current is not null && !ReferenceEquals(current, tree))
+        {
+            if (current is TreeViewItem item && BelongsToTree(item, tree))
+            {
+                return item;
+            }
+
+            current = current is Visual
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Resolves a keyboard context-menu target without turning folder focus into
+    /// server selection. Existing server multi-selection retains precedence.
+    /// </summary>
+    public static object? ResolveKeyboardContextTarget(
+        object? focusedTarget,
+        object? bulkSelectionTarget,
+        object? selectedTarget) =>
+        focusedTarget is FolderViewModel
+            ? focusedTarget
+            : bulkSelectionTarget ?? focusedTarget ?? selectedTarget;
+
+    /// <summary>
     /// Builds the root-to-node data path needed to materialize a virtualized
     /// folder or server container.
     /// </summary>
@@ -238,6 +276,17 @@ public sealed class TreeInteractionState
         itemsHost.RealizeIndex(index);
         parent.UpdateLayout();
         return parent.ItemContainerGenerator.ContainerFromIndex(index) as TreeViewItem;
+    }
+
+    private static bool BelongsToTree(TreeViewItem item, TreeView tree)
+    {
+        ItemsControl? owner = ItemsControl.ItemsControlFromItemContainer(item);
+        while (owner is TreeViewItem ownerItem)
+        {
+            owner = ItemsControl.ItemsControlFromItemContainer(ownerItem);
+        }
+
+        return ReferenceEquals(owner, tree);
     }
 
     private static VirtualizingTreePanel? FindItemsHost(

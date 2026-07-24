@@ -18,6 +18,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.App.ViewModels;
 
@@ -27,7 +28,13 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public partial class FolderViewModel : ObservableObject, IInlineRenameNode
 {
+    private readonly LocalizationManager? _localizer;
     private bool _suppressChildInvalidation;
+
+    public FolderViewModel(LocalizationManager? localizer = null)
+    {
+        _localizer = localizer;
+    }
 
     [ObservableProperty]
     private string _name = "";
@@ -58,6 +65,12 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode
     /// </summary>
     public string ExpansionKey =>
         string.IsNullOrEmpty(FullPath) ? "::nogroup" : FullPath;
+
+    /// <summary>Localized UI Automation name that distinguishes a folder from a server.</summary>
+    public string AccessibleName => Format("SessionTreeFolderAccessibleName", Name);
+
+    /// <summary>Localized keyboard guidance exposed to UI Automation clients.</summary>
+    public string AccessibleHelpText => Translate("SessionTreeFolderAccessibleHelp");
 
     [ObservableProperty]
     private ObservableCollection<FolderViewModel> _subFolders = [];
@@ -163,6 +176,14 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode
     public int ServerCount =>
         _serverCountCache ??= Servers.Count + SubFolders.Sum(f => f.ServerCount);
 
+    partial void OnNameChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
+
+    internal void RefreshLocalizedState()
+    {
+        OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(AccessibleHelpText));
+    }
+
     private static void SynchronizeCollection<T>(
         ObservableCollection<T> collection,
         IReadOnlyList<T> target)
@@ -223,4 +244,28 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode
         EditName = Name;
         IsEditing = false;
     }
+
+    private string Translate(string key) =>
+        _localizer?.HasKey(key) == true ? _localizer[key] : Fallback(key);
+
+    private string Format(string key, params object[] args)
+    {
+        if (_localizer?.HasKey(key) == true)
+        {
+            return _localizer.Format(key, args);
+        }
+
+        return string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            Fallback(key),
+            args);
+    }
+
+    private static string Fallback(string key) => key switch
+    {
+        "SessionTreeFolderAccessibleName" => "{0}, folder",
+        "SessionTreeFolderAccessibleHelp" =>
+            "Folder. Use Left and Right Arrow to collapse or expand. Press Shift+F10 for actions.",
+        _ => key
+    };
 }

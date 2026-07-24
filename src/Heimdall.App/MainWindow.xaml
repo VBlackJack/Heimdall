@@ -507,13 +507,15 @@
                                     <!-- Count is hidden while a debounced pass is pending so it
                                          never describes the previous applied filter. -->
                                     <TextBlock x:Name="Mw_FilterResultCount"
-                                               Text="{Binding ServerList.FilterResultCountText}"
+                                               Text="{Binding ServerList.FilterResultCountText, NotifyOnTargetUpdated=True}"
                                                FontSize="{StaticResource FontSizeSmallCaption}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                Margin="2,4,0,0"
                                                TextTrimming="CharacterEllipsis"
                                                Visibility="{Binding ServerList.HasAppliedFilterResult, Converter={StaticResource BoolToVisibilityConverter}}"
-                                               AutomationProperties.Name="{Binding ServerList.FilterResultCountText}"/>
+                                               AutomationProperties.Name="{Binding ServerList.FilterResultCountText}"
+                                               AutomationProperties.LiveSetting="Polite"
+                                               behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                                 </StackPanel>
 
                                 <Border x:Name="SessionTreeNoGroupDropZone"
@@ -766,6 +768,8 @@
                                 <Style TargetType="TreeViewItem"
                                        BasedOn="{StaticResource ThemedTreeViewItemStyle}">
                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                    <Setter Property="Focusable" Value="True"/>
+                                    <Setter Property="behaviors:FolderTreeItemAccessibilityBehavior.IsEnabled" Value="True"/>
                                     <Setter Property="Padding" Value="1,1"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                     <Setter Property="HorizontalAlignment" Value="Left"/>

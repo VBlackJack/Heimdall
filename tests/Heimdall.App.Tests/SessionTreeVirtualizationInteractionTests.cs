@@ -105,4 +105,47 @@ public sealed class SessionTreeVirtualizationInteractionTests
         Assert.Null(rootGroup);
         Assert.False(emptyRejected);
     }
+
+    [Fact]
+    public void KeyboardContextTarget_FocusedFolderWinsWithoutChangingServerSelection()
+    {
+        var folder = new FolderViewModel
+        {
+            Name = "Production",
+            FullPath = "Production"
+        };
+        ServerItemViewModel selectedServer = ServerItemViewModel.FromDto(new ServerProfileDto
+        {
+            Id = "selected",
+            DisplayName = "Selected",
+            RemoteServer = "selected.example.test"
+        });
+        var bulkSelection = new object();
+
+        object? target = TreeInteractionState.ResolveKeyboardContextTarget(
+            folder,
+            bulkSelection,
+            selectedServer);
+
+        Assert.Same(folder, target);
+    }
+
+    [Fact]
+    public void KeyboardContextTarget_FocusedServerPreservesBulkSelectionMenu()
+    {
+        ServerItemViewModel focusedServer = ServerItemViewModel.FromDto(new ServerProfileDto
+        {
+            Id = "focused",
+            DisplayName = "Focused",
+            RemoteServer = "focused.example.test"
+        });
+        var bulkSelection = new object();
+
+        object? target = TreeInteractionState.ResolveKeyboardContextTarget(
+            focusedServer,
+            bulkSelection,
+            selectedTarget: null);
+
+        Assert.Same(bulkSelection, target);
+    }
 }

@@ -2101,6 +2101,8 @@
   "SessionAuthPrompt": "Prompt",
   "SessionAuthCurrentUser": "Current user",
   "SessionTreeServerAccessibleName": "{0}, protocol {1}, state {2}",
+  "SessionTreeFolderAccessibleName": "{0}, folder",
+  "SessionTreeFolderAccessibleHelp": "Folder. Use Left and Right Arrow to collapse or expand. Press Shift+F10 for actions.",
   "DetailLabelAuth": "Auth:",
   "DetailLabelTags": "Tags:",
   "DetailLabelFavorite": "Favorite:",

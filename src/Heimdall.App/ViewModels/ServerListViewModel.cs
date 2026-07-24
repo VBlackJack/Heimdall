@@ -429,6 +429,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         {
             server.RefreshLocalizedState();
         }
+
+        foreach (StableFolderNode folder in EnumerateStableFolders(_stableTreeRoot))
+        {
+            folder.ViewModel!.RefreshLocalizedState();
+        }
     }
 
     public IReadOnlyList<GroupTarget> GetGroupTargets(string? projectId, bool includeNoGroup)

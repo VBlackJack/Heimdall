@@ -2101,6 +2101,8 @@
   "SessionAuthPrompt": "Saisie requise",
   "SessionAuthCurrentUser": "Utilisateur actuel",
   "SessionTreeServerAccessibleName": "{0}, protocole {1}, \u00e9tat {2}",
+  "SessionTreeFolderAccessibleName": "{0}, dossier",
+  "SessionTreeFolderAccessibleHelp": "Dossier. Utilisez les fl\u00e8ches gauche et droite pour r\u00e9duire ou d\u00e9velopper. Appuyez sur Maj+F10 pour les actions.",
   "DetailLabelAuth": "Auth :",
   "DetailLabelTags": "Tags :",
   "DetailLabelFavorite": "Favori :",
