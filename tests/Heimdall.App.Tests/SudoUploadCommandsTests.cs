@@ -15,50 +15,39 @@
  */
 
 using Heimdall.App.ViewModels;
+using Heimdall.Sftp;
 
 namespace Heimdall.App.Tests;
 
 public sealed class SudoUploadCommandsTests
 {
     [Fact]
-    public void Build_ProducesTwoSeparateCommands_NoLogicalAnd()
+    public void Build_ProducesStreamedAtomicWriteWithoutUnprivilegedStaging()
     {
-        (string write, string cleanup) = SudoUploadCommands.Build(
-            "/tmp/.heimdall_upload_xyz",
-            "/etc/hosts");
+        string write = SudoUploadCommands.Build("/etc/hosts");
 
-        Assert.DoesNotContain("&&", write);
-        Assert.DoesNotContain(";", write);
-        Assert.DoesNotContain("&&", cleanup);
-        Assert.Equal("cp -- '/tmp/.heimdall_upload_xyz' '/etc/hosts'", write);
-        Assert.Equal("rm -f '/tmp/.heimdall_upload_xyz'", cleanup);
+        Assert.Contains("cat > payload", write, StringComparison.Ordinal);
+        Assert.Contains("mktemp -d --", write, StringComparison.Ordinal);
+        Assert.Contains("mv -fT -- payload", write, StringComparison.Ordinal);
+        Assert.Contains("[ -L", write, StringComparison.Ordinal);
+        Assert.DoesNotContain(RemoteTempPaths.Prefix, write, StringComparison.Ordinal);
+        Assert.DoesNotContain("sudo tee", write, StringComparison.Ordinal);
+        Assert.DoesNotContain("cp --", write, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Build_EscapesPathsContainingSingleQuotes()
+    public void Build_EscapesTargetContainingSingleQuotes()
     {
-        (string write, string cleanup) = SudoUploadCommands.Build(
-            "/tmp/o'reilly",
-            "/var/log/oh's.log");
+        string write = SudoUploadCommands.Build("/var/log/oh's.log");
 
-        Assert.Contains(@"'/tmp/o'\''reilly'", write);
-        Assert.Contains(@"'/var/log/oh'\''s.log'", write);
-        Assert.Contains(@"'/tmp/o'\''reilly'", cleanup);
-    }
-
-    [Fact]
-    public void Build_ThrowsForNullOrWhitespaceTempPath()
-    {
-        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build(null!, "/etc/hosts"));
-        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build(string.Empty, "/etc/hosts"));
-        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build(" ", "/etc/hosts"));
+        Assert.EndsWith(@"sh '/var/log/oh'\''s.log'", write, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Build_ThrowsForNullOrWhitespaceTargetPath()
     {
-        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build("/tmp/x", null!));
-        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build("/tmp/x", string.Empty));
-        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build("/tmp/x", " "));
+        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build(null!));
+        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build(string.Empty));
+        Assert.ThrowsAny<ArgumentException>(() => SudoUploadCommands.Build(" "));
     }
 }

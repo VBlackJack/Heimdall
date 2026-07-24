@@ -226,7 +226,6 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             hostKeyStore,
             _hostKeyVerifier,
             sshParams,
-            rawBrowser: browser,
             operationLog: SessionOperationLog,
             sessionLoggingEnabledProvider: SessionLoggingEnabledProvider,
             operationProtocol: operationProtocol,

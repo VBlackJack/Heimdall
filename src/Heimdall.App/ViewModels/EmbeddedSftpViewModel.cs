@@ -62,16 +62,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private const string SudoStderrIncorrectPasswordAttempt = "incorrect password attempt";
     private const string SudoStderrSorryTryAgain = "sorry, try again";
     private const string SudoStderrNoPasswordProvided = "no password was provided";
-    private const short SudoUploadTempPermissions = 0x180;
     private static readonly TimeSpan ErrorHighlightDuration = TimeSpan.FromSeconds(5);
 
     private readonly Stack<string> _navigationHistory = new();
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IRemoteClipboardService _remoteClipboard;
     private IRemoteBrowser? _browser;
-    // The RAW (undecorated) browser, used only for sudo-upload temp staging and temp cleanup so the
-    // logging decorator does not record misleading temp-path operations.
-    private IRemoteBrowser? _rawBrowser;
     // Emits operation records for the SFTP sudo fallbacks (which bypass the decorated browser).
     private SessionOperationEmitter _sudoEmitter = SessionOperationEmitter.Disabled;
     private SshConnectionParams? _sshParams;
@@ -272,7 +268,6 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
         SshConnectionParams? sshParams = null,
-        IRemoteBrowser? rawBrowser = null,
         ISessionOperationLog? operationLog = null,
         Func<bool>? sessionLoggingEnabledProvider = null,
         string? operationProtocol = null,
@@ -288,9 +283,6 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         bool firstInitialization = _browser is null;
         _browser = browser;
-        // Fall back to the decorated browser when no raw browser is supplied (e.g. legacy callers); the
-        // sudo temp-staging paths only avoid the decorator when the view wires the raw browser.
-        _rawBrowser = rawBrowser ?? browser;
         _sudoEmitter = operationLog is not null
             && !string.IsNullOrWhiteSpace(operationProtocol)
             && !string.IsNullOrWhiteSpace(operationHost)
@@ -1318,8 +1310,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Uploads a file via SFTP to a temp path, then moves it to the target
-    /// location using <c>sudo cp</c> over SSH.
+    /// Streams a file over SSH to a root-owned same-directory temp file, then
+    /// atomically replaces the privileged target without following symlinks.
     /// </summary>
     internal async Task UploadViaSudoAsync(string localPath, string remotePath, CancellationToken ct)
     {
@@ -1328,81 +1320,72 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             throw new InvalidOperationException("Browser not available for sudo upload.");
         }
 
-        // Prefer the RAW browser for temp staging so the logging decorator does NOT record a
-        // misleading temp-path upload; fall back to the (possibly decorated) browser when no raw
-        // browser was wired.
-        IRemoteBrowser rawBrowser = _rawBrowser ?? _browser;
-
-        string tempRemote = $"{RemoteTempPaths.Prefix}upload_{Guid.NewGuid():N}";
-        (string write, string cleanup) = SudoUploadCommands.Build(tempRemote, remotePath);
-        bool sudoCleanupAttempted = false;
-
-        // Stage the upload to a temp path via the RAW browser; the real privileged write to the user's
-        // target is logged below.
-        await rawBrowser.UploadFileAsync(localPath, tempRemote, ct).ConfigureAwait(false);
+        using Renci.SshNet.SshClient ssh = await CreateSudoSshClientAsync(ct).ConfigureAwait(false);
         try
         {
-            // chmod is not one of the five logged operations; the decorator forwards it without logging.
-            await _browser.ChmodAsync(tempRemote, SudoUploadTempPermissions, ct).ConfigureAwait(false);
+            // Log the privileged write against the user's true target path.
+            await _sudoEmitter.RunUploadAsync(
+                localPath,
+                remotePath,
+                async () =>
+                {
+                    await using var content = new FileStream(
+                        localPath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read,
+                        bufferSize: 81920,
+                        FileOptions.Asynchronous | FileOptions.SequentialScan);
+                    string writeBody = SudoUploadCommands.Build(remotePath);
+                    PrivilegedCommandResult result = await PrivilegedFileTransfer.ExecuteAtomicWriteAsync(
+                            ssh,
+                            writeBody,
+                            content,
+                            _sshParams?.Password,
+                            ct)
+                        .ConfigureAwait(false);
 
-            using Renci.SshNet.SshClient ssh = await CreateSudoSshClientAsync(ct).ConfigureAwait(false);
-            try
-            {
-                // Log the privileged copy against the user's TRUE target path, not the temp path.
-                await _sudoEmitter.RunUploadAsync(
-                    localPath,
-                    remotePath,
-                    async () =>
-                    {
-                        try
-                        {
-                            using Renci.SshNet.SshCommand cmd = await ExecuteSudoBodyAsync(ssh, write, ct)
-                                .ConfigureAwait(false);
-
-                            EnsureSudoSucceeded(cmd, "cp");
-                        }
-                        finally
-                        {
-                            sudoCleanupAttempted = true;
-                            await TryRemoveSudoTempAsync(ssh, cleanup, tempRemote).ConfigureAwait(false);
-                        }
-                    },
-                    () => new FileInfo(localPath).Length,
-                    privileged: true).ConfigureAwait(false);
-            }
-            finally
-            {
-                SafeDisconnect(ssh);
-            }
+                    EnsureSudoSucceeded(
+                        result.ExitStatus,
+                        result.Error,
+                        "atomic write");
+                },
+                () => new FileInfo(localPath).Length,
+                privileged: true).ConfigureAwait(false);
         }
         finally
         {
-            if (!sudoCleanupAttempted)
-            {
-                await TryRemoveUploadedSudoTempViaBrowserAsync(tempRemote).ConfigureAwait(false);
-            }
+            SafeDisconnect(ssh);
         }
     }
 
     private static void EnsureSudoSucceeded(Renci.SshNet.SshCommand cmd, string operationLabel)
     {
         ArgumentNullException.ThrowIfNull(cmd);
+        EnsureSudoSucceeded(cmd.ExitStatus ?? -1, cmd.Error, operationLabel);
+    }
+
+    private static void EnsureSudoSucceeded(
+        int exitStatus,
+        string? stderr,
+        string operationLabel)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(operationLabel);
 
-        if (cmd.ExitStatus == 0)
+        if (exitStatus == 0)
         {
             return;
         }
 
-        string stderr = cmd.Error ?? string.Empty;
-        SudoFailureKind failureKind = ClassifySudoStderr(stderr);
+        string error = stderr ?? string.Empty;
+        SudoFailureKind failureKind = ClassifySudoStderr(error);
         if (failureKind is SudoFailureKind.PasswordUnavailable or SudoFailureKind.PasswordRejected)
         {
-            throw new SudoAuthenticationException(failureKind, stderr);
+            throw new SudoAuthenticationException(failureKind, error);
         }
 
         throw new InvalidOperationException(
-            $"sudo {operationLabel} failed (exit {cmd.ExitStatus}): {stderr}");
+            $"sudo {operationLabel} failed (exit {exitStatus}): {error}");
     }
 
     private static void SafeDisconnect(Renci.SshNet.SshClient ssh)
@@ -1415,45 +1398,6 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"EmbeddedSftpViewModel: sudo SSH disconnect failed: {ex.Message}");
-        }
-    }
-
-    private async Task TryRemoveSudoTempAsync(
-        Renci.SshNet.SshClient ssh,
-        string cleanupBody,
-        string tempPathForLog)
-    {
-        try
-        {
-            using Renci.SshNet.SshCommand rmCmd = await ExecuteSudoBodyAsync(ssh, cleanupBody)
-                .ConfigureAwait(false);
-
-            if (rmCmd.ExitStatus != 0)
-            {
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    $"EmbeddedSftpViewModel: failed to remove sudo upload temp file '{tempPathForLog}' "
-                    + $"(exit {rmCmd.ExitStatus}): {rmCmd.Error}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"EmbeddedSftpViewModel: exception while removing sudo upload temp file '{tempPathForLog}': {ex.Message}");
-        }
-    }
-
-    private async Task TryRemoveUploadedSudoTempViaBrowserAsync(string tempRemote)
-    {
-        try
-        {
-            // Use the RAW browser so the decorator does not record a temp-path delete; fall back to the
-            // (possibly decorated) browser when no raw browser was wired.
-            await (_rawBrowser ?? _browser)!.DeleteAsync(tempRemote, CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"EmbeddedSftpViewModel: failed to remove uploaded sudo temp file '{tempRemote}': {ex.Message}");
         }
     }
 
@@ -1813,7 +1757,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     internal static string BuildSudoBase64DownloadBody(string remotePath)
     {
-        return $"base64 -- {PathEscaper.EscapeForShell(remotePath)}";
+        return PrivilegedFileCommands.BuildNoFollowBase64ReadBody(remotePath);
     }
 
     internal static byte[] DecodeSudoBase64(string commandOutput)
@@ -2143,22 +2087,13 @@ internal enum SudoFailureKind
 internal static class SudoUploadCommands
 {
     /// <summary>
-    /// Builds the privileged write body and its independent cleanup body.
+    /// Builds the privileged streamed atomic-write body.
     /// </summary>
-    /// <param name="tempRemotePath">Temporary remote file path uploaded via SFTP.</param>
-    /// <param name="targetRemotePath">Privileged target path to write via sudo cp.</param>
-    /// <returns>The write body and cleanup body.</returns>
-    internal static (string Write, string Cleanup) Build(
-        string tempRemotePath,
-        string targetRemotePath)
+    /// <param name="targetRemotePath">Privileged target path to replace atomically.</param>
+    /// <returns>The privileged shell body.</returns>
+    internal static string Build(string targetRemotePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetRemotePath);
-
-        string escapedTemp = PathEscaper.EscapeForShell(tempRemotePath);
-        string escapedTarget = PathEscaper.EscapeForShell(targetRemotePath);
-        return (
-            Write: $"cp -- {escapedTemp} {escapedTarget}",
-            Cleanup: $"rm -f {escapedTemp}");
+        return PrivilegedFileCommands.BuildAtomicWriteBody(targetRemotePath);
     }
 }

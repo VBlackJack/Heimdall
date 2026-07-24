@@ -626,7 +626,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public async Task UploadViaSudoAsync_SetsPrivateTempPermissionsAndDeletesTempWhenSshSetupFails()
+    public async Task UploadViaSudoAsync_DoesNotStageThroughBrowserWhenSshSetupFails()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
@@ -639,17 +639,9 @@ public sealed class EmbeddedSftpViewModelTests
                 "/etc/app.conf",
                 CancellationToken.None));
 
-        Assert.Equal(1, browser.UploadCallCount);
-        Assert.Equal(1, browser.ChmodCallCount);
-        Assert.Equal((short)0x180, browser.LastChmodMode);
-        string chmodPath = browser.LastChmodPath ?? throw new InvalidOperationException("Chmod path was not captured.");
-        string uploadedPath = browser.LastUploadedRemotePath ?? throw new InvalidOperationException("Upload path was not captured.");
-        string deletedPath = browser.LastDeletedPath ?? throw new InvalidOperationException("Delete path was not captured.");
-        Assert.StartsWith($"{RemoteTempPaths.Prefix}upload_", chmodPath, StringComparison.Ordinal);
-        Assert.Equal(uploadedPath, chmodPath);
-        Assert.Equal(1, browser.DeleteCallCount);
-        Assert.Equal(chmodPath, deletedPath);
-        Assert.False(browser.LastDeleteCancellationToken.CanBeCanceled);
+        Assert.Equal(0, browser.UploadCallCount);
+        Assert.Equal(0, browser.ChmodCallCount);
+        Assert.Equal(0, browser.DeleteCallCount);
     }
 
     [Theory]

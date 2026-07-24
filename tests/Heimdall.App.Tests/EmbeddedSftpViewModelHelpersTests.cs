@@ -181,16 +181,13 @@ public sealed class EmbeddedSftpViewModelHelpersTests
     }
 
     [Fact]
-    public void SudoUploadCommandsBuild_EscapesPathsAndBuildsWriteAndCleanupCommands()
+    public void SudoUploadCommandsBuild_EscapesTargetAndBuildsAtomicWrite()
     {
-        (string write, string cleanup) = SudoUploadCommands.Build(
-            "/tmp/o'reilly",
-            "/var/log/oh's.log");
+        string write = SudoUploadCommands.Build("/var/log/oh's.log");
 
-        Assert.Equal(
-            @"cp -- '/tmp/o'\''reilly' '/var/log/oh'\''s.log'",
-            write);
-        Assert.Equal(@"rm -f '/tmp/o'\''reilly'", cleanup);
+        Assert.Contains("cat > payload", write, StringComparison.Ordinal);
+        Assert.Contains("mv -fT -- payload", write, StringComparison.Ordinal);
+        Assert.EndsWith(@"sh '/var/log/oh'\''s.log'", write, StringComparison.Ordinal);
     }
 
     [Fact]

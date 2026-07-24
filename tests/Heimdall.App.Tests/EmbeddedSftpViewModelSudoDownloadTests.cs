@@ -46,8 +46,12 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
     {
         string command = EmbeddedSftpViewModel.BuildSudoBase64DownloadBody("/etc/ssh/it's config");
 
-        Assert.StartsWith("base64 -- ", command, StringComparison.Ordinal);
-        Assert.Equal(@"base64 -- '/etc/ssh/it'\''s config'", command);
+        Assert.StartsWith("sh -c ", command, StringComparison.Ordinal);
+        Assert.Contains("ln -P", command, StringComparison.Ordinal);
+        Assert.Contains("exec 3< source", command, StringComparison.Ordinal);
+        Assert.Contains("base64 <&3", command, StringComparison.Ordinal);
+        Assert.EndsWith(@"sh '/etc/ssh/it'\''s config'", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("base64 -- '/etc/ssh", command, StringComparison.Ordinal);
     }
 
     [Theory]

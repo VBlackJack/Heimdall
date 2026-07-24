@@ -40,7 +40,6 @@ public sealed class RemoteFileEditor : IDisposable
     /// to change at runtime.
     /// </remarks>
     public static TimeSpan UploadDebounceInterval { get; set; } = TimeSpan.FromSeconds(2);
-    private const short OwnerReadWritePermissions = 600;
     internal const long MaxSudoEditFileBytes = 16L * 1024 * 1024;
     private static readonly TimeSpan UploadDrainTimeout = TimeSpan.FromSeconds(2);
 
@@ -143,7 +142,8 @@ public sealed class RemoteFileEditor : IDisposable
 
     /// <summary>
     /// Opens a privileged (sudo) remote file for editing. The file is downloaded
-    /// via <c>sudo base64</c> over SSH and uploaded back via <c>sudo tee</c>.
+    /// through a symlink-refusing held descriptor and streamed back through a
+    /// root-owned same-directory temp file followed by an atomic rename.
     /// </summary>
     /// <param name="remotePath">Full remote path to the privileged file.</param>
     /// <param name="sshParams">SSH connection parameters for the sudo SSH session.</param>
@@ -189,25 +189,31 @@ public sealed class RemoteFileEditor : IDisposable
 
             try
             {
-                long remoteSize = await GetSudoFileSizeAsync(
-                    sshClient,
+                string readBody = PrivilegedFileCommands.BuildNoFollowBase64ReadBody(
                     remotePath,
-                    ct).ConfigureAwait(false);
-                EnsureSudoEditFileSizeWithinLimit(remotePath, remoteSize);
+                    MaxSudoEditFileBytes);
+                PrivilegedCommandResult downloadResult = await PrivilegedFileTransfer.ExecuteCommandAsync(
+                        sshClient,
+                        readBody,
+                        sshParams.Password,
+                        ct)
+                    .ConfigureAwait(false);
 
-                using var downloadCmd = await Task.Run(() =>
-                    sshClient.RunCommand(BuildSudoDownloadCommand(remotePath)),
-                    ct).ConfigureAwait(false);
+                if (downloadResult.ExitStatus == PrivilegedFileCommands.FileTooLargeExitStatus
+                    && TryParseSudoFileSize(downloadResult.Result, out long remoteSize))
+                {
+                    EnsureSudoEditFileSizeWithinLimit(remotePath, remoteSize);
+                }
 
-                if (downloadCmd.ExitStatus != 0)
+                if (downloadResult.ExitStatus != 0)
                 {
                     throw new InvalidOperationException(
-                        $"sudo base64 failed (exit {downloadCmd.ExitStatus}): {downloadCmd.Error}");
+                        $"sudo base64 failed (exit {downloadResult.ExitStatus}): {downloadResult.Error}");
                 }
 
                 await WriteBase64DecodedFileAsync(
                     localPath,
-                    downloadCmd.Result,
+                    downloadResult.Result,
                     ct).ConfigureAwait(false);
             }
             finally
@@ -532,18 +538,6 @@ public sealed class RemoteFileEditor : IDisposable
         }
     }
 
-    internal static string BuildSudoDownloadCommand(string remotePath)
-    {
-        string escapedPath = PathEscaper.EscapeForShell(remotePath);
-        return $"sudo base64 -- {escapedPath}";
-    }
-
-    internal static string BuildSudoFileSizeCommand(string remotePath)
-    {
-        string escapedPath = PathEscaper.EscapeForShell(remotePath);
-        return $"sudo stat -c %s -- {escapedPath}";
-    }
-
     internal static bool TryParseSudoFileSize(string? output, out long fileSize)
     {
         fileSize = 0;
@@ -570,30 +564,6 @@ public sealed class RemoteFileEditor : IDisposable
                 fileSizeBytes,
                 MaxSudoEditFileBytes);
         }
-    }
-
-    private static async Task<long> GetSudoFileSizeAsync(
-        SshClient sshClient,
-        string remotePath,
-        CancellationToken ct)
-    {
-        using var sizeCmd = await Task.Run(
-                () => sshClient.RunCommand(BuildSudoFileSizeCommand(remotePath)),
-                ct)
-            .ConfigureAwait(false);
-
-        if (sizeCmd.ExitStatus != 0)
-        {
-            throw new InvalidOperationException(
-                $"sudo stat failed (exit {sizeCmd.ExitStatus}): {sizeCmd.Error}");
-        }
-
-        if (!TryParseSudoFileSize(sizeCmd.Result, out long fileSize))
-        {
-            throw new InvalidOperationException("sudo stat returned an invalid file size.");
-        }
-
-        return fileSize;
     }
 
     internal static async Task WriteBase64DecodedFileAsync(
@@ -634,16 +604,8 @@ public sealed class RemoteFileEditor : IDisposable
                 "Sudo edit session must have a cached pinned verifier; was the session created via EditFileSudoAsync?");
         }
 
-        string escapedPath = PathEscaper.EscapeForShell(session.RemotePath);
-        string tempRemotePath = $"{RemoteTempPaths.Prefix}edit_{Guid.NewGuid():N}";
-
-        using var sftpClient = SshConnectionFactory.CreateSftpClient(session.SshParams);
         using var sshClient = SshConnectionFactory.CreateSshClient(session.SshParams);
 
-        SshConnectionFactory.AttachPinnedHostKeyVerification(
-            sftpClient,
-            session.SshParams,
-            session.Verifier);
         SshConnectionFactory.AttachPinnedHostKeyVerification(
             sshClient,
             session.SshParams,
@@ -652,55 +614,36 @@ public sealed class RemoteFileEditor : IDisposable
         await Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
-            sftpClient.Connect();
-            ct.ThrowIfCancellationRequested();
             sshClient.Connect();
         }, ct).ConfigureAwait(false);
 
         try
         {
-            // Upload to temp location via SFTP (unprivileged)
-            await Task.Run(() =>
-            {
-                ct.ThrowIfCancellationRequested();
-                using var fileStream = File.OpenRead(session.LocalPath);
-                sftpClient.UploadFile(fileStream, tempRemotePath);
-                ct.ThrowIfCancellationRequested();
-                sftpClient.ChangePermissions(tempRemotePath, OwnerReadWritePermissions);
-                ct.ThrowIfCancellationRequested();
-            }, ct).ConfigureAwait(false);
+            await using var fileStream = new FileStream(
+                session.LocalPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 81920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            string writeBody = PrivilegedFileCommands.BuildAtomicWriteBody(session.RemotePath);
+            PrivilegedCommandResult result = await PrivilegedFileTransfer.ExecuteAtomicWriteAsync(
+                    sshClient,
+                    writeBody,
+                    fileStream,
+                    session.SshParams.Password,
+                    ct)
+                .ConfigureAwait(false);
 
-            // Move to final location with sudo
-            string escapedTemp = PathEscaper.EscapeForShell(tempRemotePath);
-            await Task.Run(() =>
+            ct.ThrowIfCancellationRequested();
+            if (result.ExitStatus != 0)
             {
-                ct.ThrowIfCancellationRequested();
-                using var result = sshClient.RunCommand(
-                    $"cat {escapedTemp} | sudo tee -- {escapedPath} > /dev/null");
-                ct.ThrowIfCancellationRequested();
-
-                if (result.ExitStatus != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"sudo tee failed (exit {result.ExitStatus}): {result.Error}");
-                }
-            }, ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"sudo atomic write failed (exit {result.ExitStatus}): {result.Error}");
+            }
         }
         finally
         {
-            // Always clean up temp file, even if tee failed
-            try
-            {
-                string escapedTemp2 = PathEscaper.EscapeForShell(tempRemotePath);
-                using var rmCmd = sshClient.RunCommand($"sudo rm -f {escapedTemp2}");
-            }
-            catch (Exception ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    $"RemoteFileEditor failed to clean up temp file {tempRemotePath}: {ex.Message}");
-            }
-
-            sftpClient.Disconnect();
             sshClient.Disconnect();
         }
     }

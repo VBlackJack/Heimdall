@@ -22,19 +22,25 @@ namespace Heimdall.App.Tests;
 public sealed class RemoteFileEditorSudoDownloadTests
 {
     [Fact]
-    public void BuildSudoDownloadCommand_EscapesRemotePath()
+    public void BuildNoFollowBase64ReadBody_EscapesRemotePathAndUsesHeldDescriptor()
     {
-        var command = RemoteFileEditor.BuildSudoDownloadCommand("/etc/ssh/it's config; rm -rf /");
+        string command = PrivilegedFileCommands.BuildNoFollowBase64ReadBody(
+            "/etc/ssh/it's config; rm -rf /",
+            RemoteFileEditor.MaxSudoEditFileBytes);
 
-        Assert.Equal(@"sudo base64 -- '/etc/ssh/it'\''s config; rm -rf /'", command);
-    }
-
-    [Fact]
-    public void BuildSudoFileSizeCommand_EscapesRemotePath()
-    {
-        var command = RemoteFileEditor.BuildSudoFileSizeCommand("/etc/ssh/it's config; rm -rf /");
-
-        Assert.Equal(@"sudo stat -c %s -- '/etc/ssh/it'\''s config; rm -rf /'", command);
+        Assert.EndsWith(
+            @"sh '/etc/ssh/it'\''s config; rm -rf /'",
+            command,
+            StringComparison.Ordinal);
+        Assert.Contains("ln -P", command, StringComparison.Ordinal);
+        Assert.Contains("exec 3< source", command, StringComparison.Ordinal);
+        Assert.Contains("stat -Lc %s /proc/self/fd/3", command, StringComparison.Ordinal);
+        Assert.Contains(
+            $"-gt {RemoteFileEditor.MaxSudoEditFileBytes}",
+            command,
+            StringComparison.Ordinal);
+        Assert.Contains("base64 <&3", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("base64 -- '/etc/ssh", command, StringComparison.Ordinal);
     }
 
     [Theory]
