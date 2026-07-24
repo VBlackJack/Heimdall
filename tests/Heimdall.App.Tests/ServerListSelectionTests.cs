@@ -821,7 +821,7 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         private ServerListSelectionFixture(
             string rootPath,
-            ConfigManager configManager,
+            IConfigManager configManager,
             ServerListViewModel viewModel,
             ConnectionStateMachine stateMachine,
             RecentConnectionTracker recentConnections,
@@ -835,7 +835,7 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
             HealthMonitor = healthMonitor;
         }
 
-        public ConfigManager ConfigManager { get; }
+        public IConfigManager ConfigManager { get; }
 
         public ServerListViewModel ViewModel { get; }
 
@@ -847,32 +847,33 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         public static async Task<ServerListSelectionFixture> CreateAsync(
             IEnumerable<IProtocolHandler>? protocolHandlers = null,
-            bool withHealthMonitor = false)
+            bool withHealthMonitor = false,
+            IConfigManager? configManager = null)
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "heimdall-b65-selection", Guid.NewGuid().ToString("N"));
-            var configManager = new ConfigManager(rootPath);
-            await configManager.InitializeAsync();
+            IConfigManager actualConfigManager = configManager ?? new ConfigManager(rootPath);
+            await actualConfigManager.InitializeAsync();
 
             var localizer = new LocalizationManager();
             await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
 
             var stateMachine = new ConnectionStateMachine();
             var connectionService = new ConnectionService(
-                configManager,
+                actualConfigManager,
                 localizer,
                 new NullTunnelService(),
                 protocolHandlers ?? Array.Empty<IProtocolHandler>());
             var dialogService = new DialogServiceStub();
-            var puttyImporter = new PuttySessionImporter(new FakePuttySessionRegistrySource([]), configManager);
-            var knownHostsImporter = new KnownHostsImporter(configManager, new HostKeyStore());
+            var puttyImporter = new PuttySessionImporter(new FakePuttySessionRegistrySource([]), actualConfigManager);
+            var knownHostsImporter = new KnownHostsImporter(actualConfigManager, new HostKeyStore());
             var uiDispatcher = new FakeUiDispatcher();
             var recentConnections = new RecentConnectionTracker();
             SessionHealthMonitor? healthMonitor = withHealthMonitor
-                ? new SessionHealthMonitor(configManager, new FixtureHealthProbe())
+                ? new SessionHealthMonitor(actualConfigManager, new FixtureHealthProbe())
                 : null;
 
             var viewModel = new ServerListViewModel(
-                configManager,
+                actualConfigManager,
                 localizer,
                 uiDispatcher,
                 stateMachine,
@@ -886,7 +887,7 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
             return new ServerListSelectionFixture(
                 rootPath,
-                configManager,
+                actualConfigManager,
                 viewModel,
                 stateMachine,
                 recentConnections,
@@ -921,10 +922,11 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         public void CollapseGroup(string path)
         {
-            var folder = FindFolder(ViewModel.GroupedServers, path);
-            Assert.NotNull(folder);
-            folder!.IsExpanded = false;
+            FolderByPath(path).IsExpanded = false;
         }
+
+        public FolderViewModel FolderByPath(string path) =>
+            Assert.IsType<FolderViewModel>(FindFolder(ViewModel.GroupedServers, path));
 
         public ValueTask DisposeAsync()
         {

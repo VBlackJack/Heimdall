@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
@@ -1761,21 +1762,22 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     /// </summary>
     private void ScheduleExpandStateSave()
     {
+        ImmutableArray<string> expandedNodes = [.. _expandedNodes];
         _expandSaveTimer?.Dispose();
         _expandSaveTimer = new System.Threading.Timer(
-            _ => SaveExpandStateAsync(),
+            _ => SaveExpandStateAsync(expandedNodes),
             null,
             TimeSpan.FromMilliseconds(500),
             Timeout.InfiniteTimeSpan);
     }
 
-    private void SaveExpandStateAsync()
+    private void SaveExpandStateAsync(ImmutableArray<string> expandedNodes)
     {
         _ = Task.Run(async () =>
         {
             try
             {
-                await SaveExpandStateCoreAsync().ConfigureAwait(false);
+                await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -1784,13 +1786,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         });
     }
 
-    private async Task SaveExpandStateCoreAsync()
+    private async Task SaveExpandStateCoreAsync(ImmutableArray<string> expandedNodes)
     {
         try
         {
-            var settings = await _configManager.LoadSettingsAsync();
-            settings.TreeExpandedNodes = _expandedNodes.ToList();
-            await _configManager.SaveSettingsAsync(settings);
+            await _configManager.MergeSettingAsync(
+                settings => settings.TreeExpandedNodes = [.. expandedNodes]).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
