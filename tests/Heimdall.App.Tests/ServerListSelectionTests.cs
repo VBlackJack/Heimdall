@@ -30,6 +30,7 @@ using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
+using Microsoft.Extensions.Time.Testing;
 using Xunit.Abstractions;
 using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
@@ -149,7 +150,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     [Fact]
     public async Task SearchFilter_PurgesInvisibleSelectionsAndKeepsVisiblePrimary()
     {
-        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var timeProvider = new FakeTimeProvider();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
         fixture.LoadServers(
             fixture.ExpandGroups("ops"),
             CreateServer("alpha", "Alpha Node", "ops"),
@@ -160,8 +162,9 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
 
         fixture.ViewModel.SearchText = "Beta";
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "beta");
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
 
+        AssertVisibleServerIds(fixture.ViewModel, "beta");
         AssertSelection(fixture.ViewModel, "beta");
         Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
     }
@@ -169,7 +172,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     [Fact]
     public async Task SearchFilter_ClearsSelectionWhenNothingRemainsVisible()
     {
-        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var timeProvider = new FakeTimeProvider();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
         fixture.LoadServers(
             fixture.ExpandGroups("ops"),
             CreateServer("alpha", "Alpha Node", "ops"));
@@ -177,8 +181,9 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
 
         fixture.ViewModel.SearchText = "does-not-exist";
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel);
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
 
+        AssertVisibleServerIds(fixture.ViewModel);
         Assert.Empty(fixture.ViewModel.SelectedItems);
         Assert.Null(fixture.ViewModel.SelectedServer);
         Assert.False(fixture.ViewModel.HasSelection);
@@ -187,7 +192,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     [Fact]
     public async Task SearchFilter_DebouncesNonEmptyTextAndAppliesLatestTerm()
     {
-        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var timeProvider = new FakeTimeProvider();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
         fixture.LoadServers(
             fixture.ExpandGroups("ops"),
             CreateServer("alpha", "Alpha Node", "ops"),
@@ -197,24 +203,28 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         fixture.ViewModel.SearchText = "Alpha";
         fixture.ViewModel.SearchText = "Gamma";
 
-        await Task.Delay(150);
-
         Assert.Equal(3, fixture.ViewModel.Servers.Count);
+        Assert.True(fixture.ViewModel.IsFilterPending);
 
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "gamma");
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+
+        AssertVisibleServerIds(fixture.ViewModel, "gamma");
+        Assert.False(fixture.ViewModel.IsFilterPending);
     }
 
     [Fact]
     public async Task SearchFilter_ClearingTextAppliesImmediately()
     {
-        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var timeProvider = new FakeTimeProvider();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
         fixture.LoadServers(
             fixture.ExpandGroups("ops"),
             CreateServer("alpha", "Alpha Node", "ops"),
             CreateServer("beta", "Beta Node", "ops"));
 
         fixture.ViewModel.SearchText = "Beta";
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "beta");
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+        AssertVisibleServerIds(fixture.ViewModel, "beta");
 
         fixture.ViewModel.SearchText = "";
 
@@ -550,7 +560,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     [Fact]
     public async Task Search_WinRmUsername_Matches()
     {
-        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var timeProvider = new FakeTimeProvider();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
         var winRm = new ServerProfileDto
         {
             Id = "winrm",
@@ -567,8 +578,9 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
             CreateServer("ssh", "SSH Host", "ops"));
 
         fixture.ViewModel.SearchText = "codex24-user";
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
 
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "winrm");
+        AssertVisibleServerIds(fixture.ViewModel, "winrm");
     }
 
     [Theory]
@@ -614,7 +626,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     [Fact]
     public async Task SearchDebounce_LatestWins_ClearImmediate_DisposedPassIgnored()
     {
-        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var timeProvider = new FakeTimeProvider();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
         fixture.LoadServers(
             fixture.ExpandGroups("ops"),
             CreateServer("alpha", "Alpha Node", "ops"),
@@ -623,12 +636,12 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         int initialPassCount = fixture.ViewModel.FilterPassApplicationCount;
 
         fixture.ViewModel.SearchText = "alpha";
-        await Task.Delay(50);
         fixture.ViewModel.SearchText = "gamma";
 
         Assert.Equal(initialPassCount, fixture.ViewModel.FilterPassApplicationCount);
         Assert.True(fixture.ViewModel.IsFilterPending);
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "gamma");
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+        AssertVisibleServerIds(fixture.ViewModel, "gamma");
         Assert.Equal(initialPassCount + 1, fixture.ViewModel.FilterPassApplicationCount);
 
         fixture.ViewModel.SearchText = "";
@@ -640,7 +653,7 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         fixture.ViewModel.SearchText = "beta";
         int passCountBeforeDispose = fixture.ViewModel.FilterPassApplicationCount;
         fixture.ViewModel.Dispose();
-        await Task.Delay(400);
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
 
         Assert.Equal(passCountBeforeDispose, fixture.ViewModel.FilterPassApplicationCount);
     }
@@ -648,7 +661,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     [Fact]
     public async Task ResultCount_ReflectsAppliedPass_NotPreviousTerm()
     {
-        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        var timeProvider = new FakeTimeProvider();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
         fixture.LoadServers(
             fixture.ExpandGroups("ops"),
             CreateServer("alpha", "Alpha Node", "ops"),
@@ -656,7 +670,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
             CreateServer("gamma", "Gamma Node", "ops"));
 
         fixture.ViewModel.SearchText = "alpha";
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel, "alpha");
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+        AssertVisibleServerIds(fixture.ViewModel, "alpha");
         Assert.Equal("1 / 3 sessions", fixture.ViewModel.FilterResultCountText);
         Assert.True(fixture.ViewModel.HasAppliedFilterResult);
 
@@ -664,7 +679,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         Assert.True(fixture.ViewModel.IsFilterPending);
         Assert.False(fixture.ViewModel.HasAppliedFilterResult);
-        await WaitForVisibleServerIdsAsync(fixture.ViewModel);
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+        AssertVisibleServerIds(fixture.ViewModel);
         Assert.Equal("0 / 3 sessions", fixture.ViewModel.FilterResultCountText);
         Assert.True(fixture.ViewModel.HasAppliedFilterResult);
     }
@@ -791,22 +807,6 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         }
     }
 
-    private static async Task WaitForVisibleServerIdsAsync(ServerListViewModel viewModel, params string[] expectedIds)
-    {
-        var sortedExpected = SortIds(expectedIds);
-        for (var attempt = 0; attempt < 40; attempt++)
-        {
-            if (SortIds(viewModel.Servers.Select(server => server.Id)).SequenceEqual(sortedExpected))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        AssertVisibleServerIds(viewModel, expectedIds);
-    }
-
     private static void AssertVisibleServerIds(ServerListViewModel viewModel, params string[] expectedIds)
     {
         Assert.Equal(SortIds(expectedIds), SortIds(viewModel.Servers.Select(server => server.Id)));
@@ -848,7 +848,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         public static async Task<ServerListSelectionFixture> CreateAsync(
             IEnumerable<IProtocolHandler>? protocolHandlers = null,
             bool withHealthMonitor = false,
-            IConfigManager? configManager = null)
+            IConfigManager? configManager = null,
+            TimeProvider? timeProvider = null)
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "heimdall-b65-selection", Guid.NewGuid().ToString("N"));
             IConfigManager actualConfigManager = configManager ?? new ConfigManager(rootPath);
@@ -883,7 +884,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
                 puttyImporter,
                 knownHostsImporter,
                 recentConnections,
-                healthMonitor: healthMonitor);
+                healthMonitor: healthMonitor,
+                timeProvider: timeProvider);
 
             return new ServerListSelectionFixture(
                 rootPath,

@@ -108,7 +108,7 @@ public partial class ServerListViewModel
     {
         int version = System.Threading.Interlocked.Increment(ref _searchFilterVersion);
         _searchFilterTimer?.Dispose();
-        _searchFilterTimer = new System.Threading.Timer(
+        _searchFilterTimer = _timeProvider.CreateTimer(
             _ => ApplySearchFilterFromTimer(version),
             null,
             SearchFilterDebounceDelay,

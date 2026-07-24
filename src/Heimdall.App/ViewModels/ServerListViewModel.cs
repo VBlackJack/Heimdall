@@ -44,7 +44,7 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public partial class ServerListViewModel : ObservableObject, IDisposable
 {
-    private static readonly TimeSpan SearchFilterDebounceDelay = TimeSpan.FromMilliseconds(300);
+    internal static readonly TimeSpan SearchFilterDebounceDelay = TimeSpan.FromMilliseconds(300);
 
     /// <summary>Default SSH port; omitted from a generated <c>ssh</c> command line.</summary>
     private const int DefaultSshPort = 22;
@@ -52,6 +52,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     private readonly IConfigManager _configManager;
     private readonly LocalizationManager _localizer;
     private readonly IUiDispatcher _uiDispatcher;
+    private readonly TimeProvider _timeProvider;
     private readonly ConnectionStateMachine _connectionSm;
     private readonly ConnectionService _connectionService;
     private readonly IProfileImportService _profileImportService;
@@ -74,7 +75,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         new(StringComparer.Ordinal);
     private AppSettings? _currentSettings;
     private readonly HashSet<string> _expandedNodes = new(StringComparer.OrdinalIgnoreCase);
-    private System.Threading.Timer? _searchFilterTimer;
+    private ITimer? _searchFilterTimer;
     private System.Threading.Timer? _expandSaveTimer;
     private int _searchFilterVersion;
 
@@ -171,11 +172,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         IProfileImportService? profileImportService = null,
         SessionHealthMonitor? healthMonitor = null,
         ICredentialProviderFactory? credentialProviderFactory = null,
-        IWindowsHelloService? windowsHelloService = null)
+        IWindowsHelloService? windowsHelloService = null,
+        TimeProvider? timeProvider = null)
     {
         _configManager = configManager;
         _localizer = localizer;
         _uiDispatcher = uiDispatcher;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _connectionSm = connectionSm;
         _connectionService = connectionService;
         _dialogService = dialogService;
