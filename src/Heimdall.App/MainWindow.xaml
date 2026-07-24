@@ -574,7 +574,7 @@
                                   PreviewMouseRightButtonDown="OnTreeViewPreviewMouseRightButtonDown"
                                   PreviewKeyDown="OnSessionTreeViewPreviewKeyDown"
                                   ContextMenuOpening="OnTreeViewContextMenuOpening"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                   ScrollViewer.CanContentScroll="True"
                                   VirtualizingPanel.IsVirtualizing="True"
                                   VirtualizingPanel.VirtualizationMode="Recycling">
@@ -685,7 +685,6 @@
                                                            FontSize="{StaticResource FontSizeBody}"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                                            VerticalAlignment="Center"
-                                                           TextTrimming="CharacterEllipsis"
                                                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
                                                 <TextBox Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                          MinWidth="80"
@@ -769,7 +768,7 @@
                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                     <Setter Property="Padding" Value="1,1"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                    <Setter Property="HorizontalAlignment" Value="Left"/>
                                     <Setter Property="ItemsPanel">
                                         <Setter.Value>
                                             <ItemsPanelTemplate>
@@ -815,11 +814,11 @@
                                                         <Border x:Name="IndentGuide"
                                                                 Width="1"
                                                                 HorizontalAlignment="Left"
-                                                                Margin="6,0,0,0"
+                                                                Margin="1,0,0,0"
                                                                 Background="{DynamicResource TreeViewIndentGuideBrush}"
                                                                 Visibility="Collapsed"/>
                                                         <ItemsPresenter x:Name="ItemsHost"
-                                                                        Margin="12,1,0,0"/>
+                                                                        Margin="2,1,0,0"/>
                                                     </Grid>
                                                 </Grid>
                                                 <ControlTemplate.Triggers>
