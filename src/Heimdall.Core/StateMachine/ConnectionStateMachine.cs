@@ -20,12 +20,14 @@ namespace Heimdall.Core.StateMachine;
 
 /// <summary>
 /// Manages connection state transitions for multiple server connections.
-/// Thread-safe: all state mutations are protected by a lock per connection entry.
+/// Thread-safe: all tracked state and notification queue mutations share one lock.
 /// </summary>
 public sealed class ConnectionStateMachine
 {
     private readonly Dictionary<string, ConnectionStateData> _connections = new();
+    private readonly Queue<PendingStateChange> _pendingStateChanges = new();
     private readonly object _lock = new();
+    private bool _isPublishingStateChanges;
 
     private static readonly Dictionary<ConnectionState, HashSet<ConnectionState>> ValidTransitions = new()
     {
@@ -75,9 +77,9 @@ public sealed class ConnectionStateMachine
 
     /// <summary>
     /// Raised after a successful state transition.
-    /// Parameters: serverId, previousState, newState, optional error message.
+    /// Notifications are published in mutation order and never while the state lock is held.
     /// </summary>
-    public event Action<string, ConnectionState, ConnectionState, string?>? StateChanged;
+    public event Action<ConnectionStateChange>? StateChanged;
 
     /// <summary>
     /// Gets the current state for a server, returning Disconnected if unknown.
@@ -114,6 +116,7 @@ public sealed class ConnectionStateMachine
     public bool TryTransition(string serverId, ConnectionState newState)
     {
         ConnectionState previousState;
+        long revision;
 
         lock (_lock)
         {
@@ -127,6 +130,7 @@ public sealed class ConnectionStateMachine
             data.PreviousState = previousState;
             data.CurrentState = newState;
             data.LastTransitionUtc = DateTime.UtcNow;
+            revision = ++data.Revision;
 
             if (newState == ConnectionState.Initializing)
             {
@@ -146,9 +150,12 @@ public sealed class ConnectionStateMachine
                 data.TunnelProcessId = null;
                 data.ConnectedAtUtc = null;
             }
+
+            EnqueueStateChange(
+                new ConnectionStateChange(serverId, previousState, newState, null, revision));
         }
 
-        StateChanged?.Invoke(serverId, previousState, newState, null);
+        PublishPendingStateChanges();
         return true;
     }
 
@@ -160,6 +167,7 @@ public sealed class ConnectionStateMachine
     public bool SetError(string serverId, string errorMessage)
     {
         ConnectionState previousState;
+        long revision;
 
         lock (_lock)
         {
@@ -174,9 +182,17 @@ public sealed class ConnectionStateMachine
             data.CurrentState = ConnectionState.Error;
             data.ErrorMessage = errorMessage;
             data.LastTransitionUtc = DateTime.UtcNow;
+            revision = ++data.Revision;
+            EnqueueStateChange(
+                new ConnectionStateChange(
+                    serverId,
+                    previousState,
+                    ConnectionState.Error,
+                    errorMessage,
+                    revision));
         }
 
-        StateChanged?.Invoke(serverId, previousState, ConnectionState.Error, errorMessage);
+        PublishPendingStateChanges();
         return true;
     }
 
@@ -199,11 +215,6 @@ public sealed class ConnectionStateMachine
     /// </summary>
     public void Reset(string serverId)
     {
-        // Capture events to emit in order, then fire them sequentially
-        // outside the lock to avoid re-entrancy, but using a per-server
-        // guarantee via the captured state.
-        (ConnectionState from, ConnectionState to)[] transitions;
-
         lock (_lock)
         {
             if (!_connections.TryGetValue(serverId, out ConnectionStateData? data))
@@ -216,36 +227,37 @@ public sealed class ConnectionStateMachine
                 return;
             }
 
-            List<(ConnectionState from, ConnectionState to)> pending = new List<(ConnectionState from, ConnectionState to)>();
+            QueueResetTransitions(serverId, data);
+        }
 
-            // From Error, go directly to Disconnected (Error cannot transition to Disconnecting)
-            if (data.CurrentState != ConnectionState.Error
-                && IsValidTransition(data.CurrentState, ConnectionState.Disconnecting))
+        PublishPendingStateChanges();
+    }
+
+    /// <summary>
+    /// Transitions a connection to Disconnected, publishes the terminal notifications,
+    /// and then removes the same lifecycle entry from tracking.
+    /// </summary>
+    public void Teardown(string serverId)
+    {
+        lock (_lock)
+        {
+            if (!_connections.TryGetValue(serverId, out ConnectionStateData? data))
             {
-                pending.Add((data.CurrentState, ConnectionState.Disconnecting));
-                data.PreviousState = data.CurrentState;
-                data.CurrentState = ConnectionState.Disconnecting;
-                data.LastTransitionUtc = DateTime.UtcNow;
+                return;
             }
 
-            pending.Add((data.CurrentState, ConnectionState.Disconnected));
-            data.PreviousState = data.CurrentState;
-            data.CurrentState = ConnectionState.Disconnected;
-            data.ErrorMessage = null;
-            data.TunnelLocalPort = null;
-            data.TunnelProcessId = null;
-            data.ConnectedAtUtc = null;
-            data.LastTransitionUtc = DateTime.UtcNow;
+            if (data.CurrentState != ConnectionState.Disconnected)
+            {
+                QueueResetTransitions(serverId, data);
+            }
 
-            transitions = pending.ToArray();
+            _pendingStateChanges.Enqueue(PendingStateChange.RemoveAfterPublish(
+                serverId,
+                data,
+                data.Revision));
         }
 
-        // Emit events in order; state is already final so concurrent
-        // reconnects will see Disconnected and create a new entry.
-        foreach ((ConnectionState from, ConnectionState to) transition in transitions)
-        {
-            StateChanged?.Invoke(serverId, transition.from, transition.to, null);
-        }
+        PublishPendingStateChanges();
     }
 
     /// <summary>
@@ -314,6 +326,143 @@ public sealed class ConnectionStateMachine
 
         return data;
     }
+
+    private void QueueResetTransitions(string serverId, ConnectionStateData data)
+    {
+        // Error cannot transition through Disconnecting.
+        if (data.CurrentState != ConnectionState.Error
+            && IsValidTransition(data.CurrentState, ConnectionState.Disconnecting))
+        {
+            ConnectionState previousState = data.CurrentState;
+            data.PreviousState = previousState;
+            data.CurrentState = ConnectionState.Disconnecting;
+            data.LastTransitionUtc = DateTime.UtcNow;
+            long revision = ++data.Revision;
+            EnqueueStateChange(
+                new ConnectionStateChange(
+                    serverId,
+                    previousState,
+                    ConnectionState.Disconnecting,
+                    null,
+                    revision));
+        }
+
+        ConnectionState finalPreviousState = data.CurrentState;
+        data.PreviousState = finalPreviousState;
+        data.CurrentState = ConnectionState.Disconnected;
+        data.ErrorMessage = null;
+        data.TunnelLocalPort = null;
+        data.TunnelProcessId = null;
+        data.ConnectedAtUtc = null;
+        data.LastTransitionUtc = DateTime.UtcNow;
+        long finalRevision = ++data.Revision;
+        EnqueueStateChange(
+            new ConnectionStateChange(
+                serverId,
+                finalPreviousState,
+                ConnectionState.Disconnected,
+                null,
+                finalRevision));
+    }
+
+    private void EnqueueStateChange(ConnectionStateChange change)
+    {
+        _pendingStateChanges.Enqueue(PendingStateChange.Publish(change));
+    }
+
+    private void PublishPendingStateChanges()
+    {
+        lock (_lock)
+        {
+            if (_isPublishingStateChanges || _pendingStateChanges.Count == 0)
+            {
+                return;
+            }
+
+            _isPublishingStateChanges = true;
+        }
+
+        Exception? firstDispatchException = null;
+        try
+        {
+            while (true)
+            {
+                PendingStateChange pending;
+                lock (_lock)
+                {
+                    if (_pendingStateChanges.Count == 0)
+                    {
+                        _isPublishingStateChanges = false;
+                        break;
+                    }
+
+                    pending = _pendingStateChanges.Dequeue();
+                }
+
+                try
+                {
+                    if (pending.Change is not null)
+                    {
+                        StateChanged?.Invoke(pending.Change);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    firstDispatchException ??= ex;
+                }
+                finally
+                {
+                    if (pending.EntryToRemove is not null)
+                    {
+                        lock (_lock)
+                        {
+                            if (_connections.TryGetValue(
+                                    pending.ServerId,
+                                    out ConnectionStateData? current)
+                                && ReferenceEquals(current, pending.EntryToRemove)
+                                && current.Revision == pending.ExpectedRevision
+                                && current.CurrentState == ConnectionState.Disconnected)
+                            {
+                                _connections.Remove(pending.ServerId);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (firstDispatchException is not null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo
+                    .Capture(firstDispatchException)
+                    .Throw();
+            }
+        }
+        catch
+        {
+            lock (_lock)
+            {
+                _isPublishingStateChanges = false;
+            }
+
+            throw;
+        }
+    }
+
+    private sealed record PendingStateChange(
+        ConnectionStateChange? Change,
+        string ServerId,
+        ConnectionStateData? EntryToRemove,
+        long ExpectedRevision)
+    {
+        public static PendingStateChange Publish(ConnectionStateChange change)
+            => new(change, change.ServerId, null, 0);
+
+        public static PendingStateChange RemoveAfterPublish(
+            string serverId,
+            ConnectionStateData entry,
+            long expectedRevision)
+            => new(null, serverId, entry, expectedRevision);
+    }
 }
 
 /// <summary>
@@ -328,6 +477,7 @@ public sealed class ConnectionStateData
     public int? TunnelProcessId { get; set; }
     public DateTime? ConnectedAtUtc { get; set; }
     public DateTime LastTransitionUtc { get; set; } = DateTime.UtcNow;
+    public long Revision { get; set; }
 
     /// <summary>
     /// Creates a shallow copy of this state data for safe external consumption.
@@ -341,8 +491,24 @@ public sealed class ConnectionStateData
         TunnelProcessId = TunnelProcessId,
         ConnectedAtUtc = ConnectedAtUtc,
         LastTransitionUtc = LastTransitionUtc,
+        Revision = Revision,
     };
 }
+
+/// <summary>
+/// Immutable notification for an applied connection-state transition.
+/// </summary>
+/// <param name="ServerId">Connection lifecycle identifier.</param>
+/// <param name="PreviousState">State before the transition.</param>
+/// <param name="NewState">State after the transition.</param>
+/// <param name="ErrorMessage">Optional error associated with the transition.</param>
+/// <param name="Revision">Monotonic revision within this connection lifecycle.</param>
+public sealed record ConnectionStateChange(
+    string ServerId,
+    ConnectionState PreviousState,
+    ConnectionState NewState,
+    string? ErrorMessage,
+    long Revision);
 
 /// <summary>
 /// Immutable metadata describing a connection state's UI and behavioral properties.

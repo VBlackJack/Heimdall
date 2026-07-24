@@ -72,6 +72,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             FakeUiDispatcher dispatcher,
             FakeDialogService dialogService,
             FakeEmbeddedSessionManager embeddedSessionManager,
+            ConnectionStateMachine stateMachine,
             IReadOnlyDictionary<string, ControlledProtocolHandler> handlers)
         {
             _rootPath = rootPath;
@@ -79,6 +80,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             Dispatcher = dispatcher;
             DialogService = dialogService;
             EmbeddedSessionManager = embeddedSessionManager;
+            StateMachine = stateMachine;
             Handlers = handlers;
         }
 
@@ -89,6 +91,8 @@ public sealed partial class SessionCoordinatorPreMountTests
         public FakeDialogService DialogService { get; }
 
         public FakeEmbeddedSessionManager EmbeddedSessionManager { get; }
+
+        public ConnectionStateMachine StateMachine { get; }
 
         private IReadOnlyDictionary<string, ControlledProtocolHandler> Handlers { get; }
 
@@ -184,7 +188,14 @@ public sealed partial class SessionCoordinatorPreMountTests
                 null!,
                 new ServiceCollection().BuildServiceProvider());
 
-            return new TestHarness(rootPath, main, dispatcher, dialogService, embeddedSessionManager, handlers);
+            return new TestHarness(
+                rootPath,
+                main,
+                dispatcher,
+                dialogService,
+                embeddedSessionManager,
+                connectionStateMachine,
+                handlers);
         }
 
         public ControlledProtocolHandler GetHandler(string protocol) => Handlers[protocol];

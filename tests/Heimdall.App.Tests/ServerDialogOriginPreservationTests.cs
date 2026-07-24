@@ -21,6 +21,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -157,6 +158,51 @@ public sealed class ServerDialogOriginPreservationTests
         Assert.True(transitioned);
         Assert.Equal(1, fixture.Dispatcher.InvokeAsyncCalls);
         Assert.Equal(ConnectionState.Initializing.ToString(), Assert.Single(fixture.ViewModel.Servers).ConnectionState);
+    }
+
+    [Fact]
+    public async Task ServerListViewModel_StaleOrDuplicateRevisionCannotOverwriteNewerAggregateState()
+    {
+        await using var fixture = await ServerListFixture.CreateAsync(new ServerProfileDto
+        {
+            DisplayName = "Imported via dialog",
+            RemoteServer = "manual.example.com",
+            ConnectionType = "SSH",
+            Origin = ProfileOrigin.ImportPutty
+        });
+        fixture.ViewModel.LoadServers(
+            [
+                new ServerProfileDto
+                {
+                    Id = "alpha",
+                    DisplayName = "Alpha",
+                    RemoteServer = "alpha.example.com",
+                    ConnectionType = "SSH"
+                }
+            ],
+            new AppSettings());
+        List<Action> queuedUpdates = [];
+        fixture.Dispatcher.InvokeAsyncActionHandler = queuedUpdates.Add;
+        string firstSessionId = SessionIdCodec.Create("alpha");
+        string secondSessionId = SessionIdCodec.Create("alpha");
+
+        Assert.True(fixture.StateMachine.TryTransition(firstSessionId, ConnectionState.Initializing));
+        Assert.True(fixture.StateMachine.TryTransition(firstSessionId, ConnectionState.ValidatingConfig));
+        Assert.True(fixture.StateMachine.TryTransition(firstSessionId, ConnectionState.LaunchingSsh));
+        Assert.True(fixture.StateMachine.TryTransition(firstSessionId, ConnectionState.Connected));
+        Assert.True(fixture.StateMachine.TryTransition(secondSessionId, ConnectionState.Initializing));
+        Assert.True(fixture.StateMachine.TryTransition(firstSessionId, ConnectionState.Disconnected));
+        Assert.Equal(6, queuedUpdates.Count);
+
+        queuedUpdates[5]();
+        queuedUpdates[4]();
+        queuedUpdates[5]();
+        queuedUpdates[3]();
+
+        Assert.Equal(
+            ConnectionState.Initializing.ToString(),
+            Assert.Single(fixture.ViewModel.Servers).ConnectionState);
+        Assert.Equal(1, fixture.ViewModel.ActiveSessionAggregationEntryCount);
     }
 
     private sealed class ServerListFixture : IAsyncDisposable

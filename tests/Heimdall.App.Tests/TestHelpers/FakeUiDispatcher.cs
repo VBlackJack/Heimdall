@@ -32,6 +32,8 @@ internal sealed class FakeUiDispatcher(bool checkAccess = true) : IUiDispatcher
 
     public Func<Func<Task>, Task>? InvokeAsyncFuncHandler { get; set; }
 
+    public Action<Action>? InvokeAsyncActionHandler { get; set; }
+
     public void Invoke(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -50,7 +52,15 @@ internal sealed class FakeUiDispatcher(bool checkAccess = true) : IUiDispatcher
     {
         ArgumentNullException.ThrowIfNull(action);
         InvokeAsyncCalls++;
-        ExecuteOnUiThread(action);
+        if (InvokeAsyncActionHandler is not null)
+        {
+            InvokeAsyncActionHandler(action);
+        }
+        else
+        {
+            ExecuteOnUiThread(action);
+        }
+
         return Task.CompletedTask;
     }
 

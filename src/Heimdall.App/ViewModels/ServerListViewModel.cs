@@ -63,7 +63,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
     private List<ServerItemViewModel> _allServers = [];
     private List<ProjectTarget> _projectTargets = [];
-    private readonly Dictionary<string, Dictionary<string, ConnectionState>> _sessionStatesByInventoryId =
+    private readonly Dictionary<string, Dictionary<string, SessionStateRevision>> _sessionStatesByInventoryId =
+        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TerminalSessionRevision> _lastTerminalSessionRevisionByInventoryId =
         new(StringComparer.Ordinal);
     private AppSettings? _currentSettings;
     private readonly HashSet<string> _expandedNodes = new(StringComparer.OrdinalIgnoreCase);
@@ -751,28 +753,31 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
             Core.Logging.FileLogger.Info($"ConnectAsync: {server.DisplayName} type={serverDto.ConnectionType} gateway={serverDto.SshGatewayId} sessionId={sessionId}");
 
-            // Use sessionId for state machine keying — allows duplicate connections
-            // to the same server without sharing state or tunnels
             var originalId = serverDto.Id;
-            serverDto.Id = sessionId;
-            _connectionSm.TryTransition(sessionId, Core.Models.ConnectionState.Initializing);
 
             // Tool entries bypass the connection pipeline entirely
             if (serverDto.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
             {
-                var toolId = serverDto.ConnectionType["TOOL:".Length..];
-                var context = new Core.Models.ToolContext(
-                    TargetHost: serverDto.RemoteServer,
-                    TargetPort: serverDto.RemotePort > 0 ? serverDto.RemotePort : null,
-                    Argument: serverDto.RemoteServer,
-                    DisplayName: serverDto.DisplayName,
-                    Username: serverDto.SshUsername ?? serverDto.RdpUsername,
-                    ConnectionType: serverDto.ConnectionType,
-                    ProjectName: server.ProjectName);
-                ToolSessionRequested?.Invoke(toolId, server.DisplayName, context);
                 serverDto.Id = originalId;
-                _connectionSm.Reset(sessionId);
-                return true;
+                _connectionSm.TryTransition(sessionId, Core.Models.ConnectionState.Initializing);
+                try
+                {
+                    var toolId = serverDto.ConnectionType["TOOL:".Length..];
+                    var context = new Core.Models.ToolContext(
+                        TargetHost: serverDto.RemoteServer,
+                        TargetPort: serverDto.RemotePort > 0 ? serverDto.RemotePort : null,
+                        Argument: serverDto.RemoteServer,
+                        DisplayName: serverDto.DisplayName,
+                        Username: serverDto.SshUsername ?? serverDto.RdpUsername,
+                        ConnectionType: serverDto.ConnectionType,
+                        ProjectName: server.ProjectName);
+                    ToolSessionRequested?.Invoke(toolId, server.DisplayName, context);
+                    return true;
+                }
+                finally
+                {
+                    _connectionSm.Teardown(sessionId);
+                }
             }
 
             var outcome = await RunConnectionPipelineAsync(
@@ -837,12 +842,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         }
 
         serverDto.Id = sessionId;
-        _connectionSm.TryTransition(sessionId, Core.Models.ConnectionState.Initializing);
         var sessionStartFired = false;
         CancellationTokenSource? sessionStartCts = null;
+        var lifecycleHandedOff = false;
 
         try
         {
+            _connectionSm.TryTransition(sessionId, Core.Models.ConnectionState.Initializing);
             ConnectionResult result;
 
             switch (serverDto.ConnectionType?.ToUpperInvariant())
@@ -916,6 +922,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                     serverDto.ConnectionType,
                     result.Session,
                     rdpModeOverride);
+                lifecycleHandedOff = result.Session is not null;
                 return new BulkConnectOutcome(BulkConnectOutcomeStatus.Success, null);
             }
 
@@ -937,7 +944,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                 SessionStartFailed?.Invoke(sessionId);
             }
 
-            _connectionSm.Reset(sessionId);
             return new BulkConnectOutcome(BulkConnectOutcomeStatus.Cancelled, null);
         }
         catch (Exception ex)
@@ -961,6 +967,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         {
             sessionStartCts?.Dispose();
             serverDto.Id = originalId;
+            if (!lifecycleHandedOff)
+            {
+                _connectionSm.Teardown(sessionId);
+            }
         }
     }
 
@@ -1907,16 +1917,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         return string.IsNullOrWhiteSpace(groupName) ? noGroupLabel : groupName;
     }
 
-    private void OnConnectionStateChanged(
-        string serverId,
-        ConnectionState previousState,
-        ConnectionState newState,
-        string? error)
+    private void OnConnectionStateChanged(ConnectionStateChange change)
     {
         // State machine events may fire from background threads; marshal to UI thread.
         // Always queued; direct fast-path would re-enter selection / binding updates.
         _ = _uiDispatcher.InvokeAsync(() =>
         {
+            string serverId = change.ServerId;
             var server = _allServers.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, serverId, StringComparison.Ordinal));
             string inventoryId = serverId;
@@ -1942,10 +1949,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                     string.Equals(candidate.Id, inventoryId, StringComparison.Ordinal));
             }
 
-            ConnectionState aggregateState = UpdateProfileSessionState(
+            StateAggregationResult aggregation = UpdateProfileSessionState(
                 inventoryId,
                 serverId,
-                newState);
+                change.NewState,
+                change.Revision);
+
+            if (!aggregation.Applied)
+            {
+                return;
+            }
 
             if (server is null)
             {
@@ -1953,8 +1966,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             }
 
             bool wasConnected = ConnectionStateSets.IsConnected(server.ConnectionState);
-            server.ConnectionState = aggregateState.ToString();
-            bool isConnected = ConnectionStateSets.IsConnected(aggregateState);
+            server.ConnectionState = aggregation.AggregateState.ToString();
+            bool isConnected = ConnectionStateSets.IsConnected(aggregation.AggregateState);
 
             // Refresh the stable projection exactly once when this server
             // crosses the connected-filter boundary. Other state changes only
@@ -1968,63 +1981,96 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             // Record successful reach: feeds RDP-DISC-04 (palette protocol bias)
             // and RDP-DISC-05 (Recents). External launch and remote handoff count
             // because the user-initiated session reached its successful boundary.
-            if (ConnectionStateSets.IsConnected(newState))
+            if (ConnectionStateSets.IsConnected(change.NewState))
             {
                 _recentConnections.Record(server.RemoteServer, server.ConnectionType);
             }
         });
     }
 
-    private ConnectionState UpdateProfileSessionState(
+    private StateAggregationResult UpdateProfileSessionState(
         string inventoryId,
         string sessionId,
-        ConnectionState newState)
+        ConnectionState newState,
+        long revision)
     {
         bool isTeardown =
             newState is ConnectionState.Disconnected or ConnectionState.Error;
 
-        if (!_sessionStatesByInventoryId.TryGetValue(
-                inventoryId,
-                out Dictionary<string, ConnectionState>? sessionStates))
-        {
-            if (isTeardown)
-            {
-                return newState;
-            }
+        _sessionStatesByInventoryId.TryGetValue(
+            inventoryId,
+            out Dictionary<string, SessionStateRevision>? sessionStates);
 
-            sessionStates = new Dictionary<string, ConnectionState>(StringComparer.Ordinal);
-            _sessionStatesByInventoryId.Add(inventoryId, sessionStates);
+        if (sessionStates is not null
+            && sessionStates.TryGetValue(sessionId, out SessionStateRevision current)
+            && revision <= current.Revision)
+        {
+            return StateAggregationResult.Stale;
+        }
+
+        if (_lastTerminalSessionRevisionByInventoryId.TryGetValue(
+                inventoryId,
+                out TerminalSessionRevision lastTerminalRevision)
+            && string.Equals(lastTerminalRevision.SessionId, sessionId, StringComparison.Ordinal)
+            && revision <= lastTerminalRevision.Revision)
+        {
+            return StateAggregationResult.Stale;
         }
 
         if (isTeardown)
         {
-            sessionStates.Remove(sessionId);
+            sessionStates?.Remove(sessionId);
+            _lastTerminalSessionRevisionByInventoryId[inventoryId] =
+                new TerminalSessionRevision(sessionId, revision);
         }
         else
         {
-            sessionStates[sessionId] = newState;
-        }
-
-        if (sessionStates.Count == 0)
-        {
-            _sessionStatesByInventoryId.Remove(inventoryId);
-            return newState;
-        }
-
-        foreach (ConnectionState sessionState in sessionStates.Values)
-        {
-            if (ConnectionStateSets.IsConnected(sessionState))
+            if (sessionStates is null)
             {
-                return sessionState;
+                sessionStates = new Dictionary<string, SessionStateRevision>(StringComparer.Ordinal);
+                _sessionStatesByInventoryId.Add(inventoryId, sessionStates);
+            }
+
+            sessionStates[sessionId] = new SessionStateRevision(newState, revision);
+            if (_lastTerminalSessionRevisionByInventoryId.TryGetValue(
+                    inventoryId,
+                    out TerminalSessionRevision terminalRevision)
+                && string.Equals(terminalRevision.SessionId, sessionId, StringComparison.Ordinal))
+            {
+                _lastTerminalSessionRevisionByInventoryId.Remove(inventoryId);
             }
         }
 
-        if (sessionStates.TryGetValue(sessionId, out ConnectionState currentSessionState))
+        if (sessionStates is null || sessionStates.Count == 0)
         {
-            return currentSessionState;
+            _sessionStatesByInventoryId.Remove(inventoryId);
+            return new StateAggregationResult(true, newState);
         }
 
-        return sessionStates.Values.First();
+        foreach (SessionStateRevision sessionState in sessionStates.Values)
+        {
+            if (ConnectionStateSets.IsConnected(sessionState.State))
+            {
+                return new StateAggregationResult(true, sessionState.State);
+            }
+        }
+
+        if (sessionStates.TryGetValue(sessionId, out SessionStateRevision currentSessionState))
+        {
+            return new StateAggregationResult(true, currentSessionState.State);
+        }
+
+        return new StateAggregationResult(true, sessionStates.Values.First().State);
+    }
+
+    private readonly record struct SessionStateRevision(ConnectionState State, long Revision);
+
+    private readonly record struct TerminalSessionRevision(string SessionId, long Revision);
+
+    private readonly record struct StateAggregationResult(bool Applied, ConnectionState AggregateState)
+    {
+        public static StateAggregationResult Stale { get; } =
+            new(false, ConnectionState.Disconnected);
     }
 }
 

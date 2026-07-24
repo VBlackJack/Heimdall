@@ -473,7 +473,7 @@ public sealed class SplitService : ISplitService
     // ── Close pane ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Closes a specific pane in the split tree. Releases tunnel, resets state machine,
+    /// Closes a specific pane in the split tree. Releases tunnel, tears down state tracking,
     /// disconnects/disposes the host, detaches it, and promotes the sibling.
     /// </summary>
     public void ClosePane(
@@ -509,7 +509,7 @@ public sealed class SplitService : ISplitService
             var stateData = _connectionSm.GetStateData(pane.ServerId);
             if (stateData?.TunnelLocalPort is int localPort)
                 _tunnelManager.ReleaseReference(localPort);
-            _connectionSm.Reset(pane.ServerId);
+            _connectionSm.Teardown(pane.ServerId);
         }
 
         DisconnectPaneHost(pane, reason);
@@ -812,7 +812,7 @@ public sealed class SplitService : ISplitService
     // ── Cleanup ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Releases tunnel reference and resets state machine for a pane that was
+    /// Releases tunnel reference and tears down state tracking for a pane that was
     /// orphaned by tab close or detach while still connecting.
     /// </summary>
     public void CleanupOrphanedPane(string serverId)
@@ -822,7 +822,7 @@ public sealed class SplitService : ISplitService
         var stateData = _connectionSm.GetStateData(serverId);
         if (stateData?.TunnelLocalPort is int port)
             _tunnelManager.ReleaseReference(port);
-        _connectionSm.Reset(serverId);
+        _connectionSm.Teardown(serverId);
 
         Core.Logging.FileLogger.Info(
             $"Cleaned up orphaned pane resources for server '{serverId}'.");
@@ -831,7 +831,7 @@ public sealed class SplitService : ISplitService
     // ── Close all panes (tab teardown) ─────────────────────────────
 
     /// <summary>
-    /// Tears down all panes in the session tree: releases tunnels, resets state machines,
+    /// Tears down all panes in the session tree: releases tunnels, removes state tracking,
     /// records disconnect history, and disposes host controls. Returns false if a busy
     /// tool pane blocked the close.
     /// </summary>
@@ -867,7 +867,7 @@ public sealed class SplitService : ISplitService
                 if (stateData?.TunnelLocalPort is int localPort)
                     _tunnelManager.ReleaseReference(localPort);
 
-                _connectionSm.Reset(pane.ServerId);
+                _connectionSm.Teardown(pane.ServerId);
             }
 
             DisconnectPaneHost(pane, reason);
@@ -1090,7 +1090,7 @@ public sealed class SplitService : ISplitService
     }
 
     /// <summary>
-    /// Releases tunnel reference and resets state machine for a previous connection.
+    /// Releases tunnel reference and tears down state tracking for a previous connection.
     /// Used by <see cref="ReconnectPaneAsync"/> to defer cleanup until after
     /// the new connection succeeds (or definitively fails).
     /// </summary>
@@ -1101,7 +1101,7 @@ public sealed class SplitService : ISplitService
         var stateData = _connectionSm.GetStateData(oldServerId);
         if (stateData?.TunnelLocalPort is int port)
             _tunnelManager.ReleaseReference(port);
-        _connectionSm.Reset(oldServerId);
+        _connectionSm.Teardown(oldServerId);
     }
 
     private void TryReleaseOldConnectionState(string oldServerId, string context)

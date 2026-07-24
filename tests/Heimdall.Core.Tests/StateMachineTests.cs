@@ -145,11 +145,11 @@ public class ConnectionStateMachineTests
         ConnectionState? receivedPrevious = null;
         ConnectionState? receivedNew = null;
 
-        _sm.StateChanged += (id, prev, next, err) =>
+        _sm.StateChanged += change =>
         {
-            receivedServerId = id;
-            receivedPrevious = prev;
-            receivedNew = next;
+            receivedServerId = change.ServerId;
+            receivedPrevious = change.PreviousState;
+            receivedNew = change.NewState;
         };
 
         _sm.TryTransition("server-1", ConnectionState.Initializing);
@@ -165,7 +165,7 @@ public class ConnectionStateMachineTests
         _sm.TryTransition("server-1", ConnectionState.Initializing);
 
         string? receivedError = null;
-        _sm.StateChanged += (id, prev, next, err) => { receivedError = err; };
+        _sm.StateChanged += change => { receivedError = change.ErrorMessage; };
 
         _sm.SetError("server-1", "auth failed");
 
@@ -176,11 +176,158 @@ public class ConnectionStateMachineTests
     public void StateChanged_DoesNotFire_OnInvalidTransition()
     {
         bool fired = false;
-        _sm.StateChanged += (_, _, _, _) => { fired = true; };
+        _sm.StateChanged += _ => { fired = true; };
 
         _sm.TryTransition("server-1", ConnectionState.Connected);
 
         Assert.False(fired);
+    }
+
+    [Fact]
+    public void StateChanged_RevisionsIncreaseForEveryAppliedTransition()
+    {
+        List<long> revisions = [];
+        _sm.StateChanged += change => revisions.Add(change.Revision);
+
+        Assert.True(_sm.TryTransition("server-1", ConnectionState.Initializing));
+        Assert.True(_sm.TryTransition("server-1", ConnectionState.ValidatingConfig));
+        Assert.True(_sm.SetError("server-1", "validation failed"));
+        _sm.Reset("server-1");
+
+        Assert.Equal([1L, 2L, 3L, 4L], revisions);
+        Assert.Equal(4, Assert.IsType<ConnectionStateData>(_sm.GetStateData("server-1")).Revision);
+    }
+
+    [Fact]
+    public void Teardown_PublishesOrderedDisconnectThenRemovesEntry()
+    {
+        List<ConnectionStateChange> teardownChanges = [];
+        bool entryPresentDuringFinalNotification = false;
+        bool captureTeardown = false;
+        _sm.StateChanged += change =>
+        {
+            if (!captureTeardown)
+            {
+                return;
+            }
+
+            teardownChanges.Add(change);
+            if (change.NewState == ConnectionState.Disconnected)
+            {
+                entryPresentDuringFinalNotification = _sm.GetStateData(change.ServerId) is not null;
+            }
+        };
+        TransitionSshToConnected(_sm, "server-1");
+        captureTeardown = true;
+
+        _sm.Teardown("server-1");
+
+        Assert.Collection(
+            teardownChanges,
+            change =>
+            {
+                Assert.Equal(ConnectionState.Connected, change.PreviousState);
+                Assert.Equal(ConnectionState.Disconnecting, change.NewState);
+                Assert.Equal(5, change.Revision);
+            },
+            change =>
+            {
+                Assert.Equal(ConnectionState.Disconnecting, change.PreviousState);
+                Assert.Equal(ConnectionState.Disconnected, change.NewState);
+                Assert.Equal(6, change.Revision);
+            });
+        Assert.True(entryPresentDuringFinalNotification);
+        Assert.Null(_sm.GetStateData("server-1"));
+        Assert.Empty(_sm.GetActiveConnections());
+    }
+
+    [Fact]
+    public void Teardown_RepeatedDistinctSessionCyclesKeepTrackingBounded()
+    {
+        const int CycleCount = 500;
+
+        for (int index = 0; index < CycleCount; index++)
+        {
+            string sessionId = $"inventory_{index:x8}";
+            Assert.True(_sm.TryTransition(sessionId, ConnectionState.Initializing));
+
+            _sm.Teardown(sessionId);
+
+            Assert.Null(_sm.GetStateData(sessionId));
+        }
+
+        Assert.Empty(_sm.GetActiveConnections());
+        Assert.Empty(_sm.GetServersByState(ConnectionState.Disconnected));
+    }
+
+    [Fact]
+    public void Teardown_RemovesEntryEvenWhenSubscriberThrows()
+    {
+        Assert.True(_sm.TryTransition("server-1", ConnectionState.Initializing));
+        _sm.StateChanged += change =>
+        {
+            if (change.NewState == ConnectionState.Disconnected)
+            {
+                throw new InvalidOperationException("subscriber failed");
+            }
+        };
+
+        Assert.Throws<InvalidOperationException>(() => _sm.Teardown("server-1"));
+
+        Assert.Null(_sm.GetStateData("server-1"));
+    }
+
+    [Fact]
+    public async Task ConcurrentTransitions_PublishOutsideLockInRevisionOrderAndTeardownCleanly()
+    {
+        const string SessionId = "shared-session";
+        System.Collections.Concurrent.ConcurrentQueue<long> revisions = new();
+        int probeStarted = 0;
+        bool crossThreadReadCompleted = false;
+        _sm.StateChanged += change =>
+        {
+            revisions.Enqueue(change.Revision);
+            if (Interlocked.CompareExchange(ref probeStarted, 1, 0) == 0)
+            {
+                Task readTask = Task.Run(() => _sm.GetStateData(change.ServerId));
+                crossThreadReadCompleted = readTask.Wait(TimeSpan.FromSeconds(2));
+            }
+        };
+
+        Task[] workers = Enumerable.Range(0, 8)
+            .Select(worker => Task.Run(() =>
+            {
+                for (int iteration = 0; iteration < 100; iteration++)
+                {
+                    switch ((worker + iteration) % 4)
+                    {
+                        case 0:
+                            _sm.TryTransition(SessionId, ConnectionState.Initializing);
+                            break;
+                        case 1:
+                            _sm.TryTransition(SessionId, ConnectionState.ValidatingConfig);
+                            break;
+                        case 2:
+                            _sm.SetError(SessionId, "concurrent failure");
+                            break;
+                        default:
+                            _sm.Reset(SessionId);
+                            break;
+                    }
+                }
+            }))
+            .ToArray();
+
+        await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+        _sm.Teardown(SessionId);
+
+        long[] publishedRevisions = revisions.ToArray();
+        Assert.True(crossThreadReadCompleted);
+        Assert.NotEmpty(publishedRevisions);
+        Assert.True(publishedRevisions.Zip(
+            publishedRevisions.Skip(1),
+            (previous, next) => previous < next).All(inOrder => inOrder));
+        Assert.Null(_sm.GetStateData(SessionId));
     }
 
     [Fact]
@@ -913,6 +1060,14 @@ public class ConnectionStateMachineTests
         ConnectionStateMachine sm = ArrangeAtLaunchingLocal(serverId);
         Assert.True(sm.TryTransition(serverId, ConnectionState.RemoteSessionHandedOff));
         return sm;
+    }
+
+    private static void TransitionSshToConnected(ConnectionStateMachine sm, string serverId)
+    {
+        Assert.True(sm.TryTransition(serverId, ConnectionState.Initializing));
+        Assert.True(sm.TryTransition(serverId, ConnectionState.ValidatingConfig));
+        Assert.True(sm.TryTransition(serverId, ConnectionState.LaunchingSsh));
+        Assert.True(sm.TryTransition(serverId, ConnectionState.Connected));
     }
 }
 

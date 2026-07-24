@@ -71,6 +71,22 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
+    public async Task RunConnectionPipelineAsync_PreflightFailureDoesNotCreateStateEntry()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        server.UseDirectConnection = false;
+        server.SshGatewayId = "missing-gateway";
+
+        BulkConnectOutcome outcome = await harness.RunPipelineAsync(
+            server,
+            "session-preflight-failed").WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.PreflightFailed, outcome.Status);
+        Assert.Null(harness.StateMachine.GetStateData("session-preflight-failed"));
+    }
+
+    [Fact]
     public async Task RunConnectionPipelineAsync_RdpForcedExternalCreatesLightweightTabWithSuffix()
     {
         using TestHarness harness = TestHarness.Create();
@@ -88,6 +104,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal(RdpModeOverride.ForceExternal, tab.RdpModeOverride);
         Assert.Equal("Demo RDP (forced external)", tab.DisplayTitle);
         Assert.Equal("External client launched", tab.Status);
+        Assert.Null(harness.StateMachine.GetStateData("session-rdp-forced-external"));
     }
 
     [Fact]
@@ -103,6 +120,23 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal(BulkConnectOutcomeStatus.ConnectionFailed, outcome.Status);
         Assert.Empty(harness.Main.Connection.ActiveSessions);
         Assert.Equal(1, harness.EmbeddedSessionManager.CreateConnectingSshHostControlCalls);
+        Assert.Null(harness.StateMachine.GetStateData("session-ssh-failed"));
+    }
+
+    [Fact]
+    public async Task RunConnectionPipelineAsync_ExceptionRemovesStateEntry()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler sshHandler = harness.GetHandler("SSH");
+        ServerProfileDto server = harness.CreateServer("SSH");
+        sshHandler.Result.SetException(new InvalidOperationException("connect failed"));
+
+        BulkConnectOutcome outcome = await harness.RunPipelineAsync(
+            server,
+            "session-ssh-exception").WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.ConnectionFailed, outcome.Status);
+        Assert.Null(harness.StateMachine.GetStateData("session-ssh-exception"));
     }
 
     [Fact]
@@ -120,6 +154,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal(1, harness.EmbeddedSessionManager.CreateConnectingSshHostControlCalls);
         Assert.Equal(1, harness.EmbeddedSessionManager.AttachSshSessionCalls);
         Assert.Equal(0, harness.EmbeddedSessionManager.CreateHostControlCalls);
+        Assert.NotNull(harness.StateMachine.GetStateData("session-ssh-ready"));
     }
 
     [Fact]
@@ -140,6 +175,7 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         Assert.Equal(BulkConnectOutcomeStatus.Cancelled, outcome.Status);
         Assert.Empty(harness.Main.Connection.ActiveSessions);
+        Assert.Null(harness.StateMachine.GetStateData("session-ssh-cancel"));
     }
 
     [Fact]

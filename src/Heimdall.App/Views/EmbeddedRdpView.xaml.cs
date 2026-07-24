@@ -136,6 +136,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private bool _allowResolutionUpdates;
     private bool _sleepPreventionActive;
     private bool _comDrivenStatusActive;
+    private long _lastConnectionStateRevision;
     private bool _escapeHookRegistered;
     private bool _isFullscreen;
     private bool _disconnectConfirmInFlight;
@@ -2689,28 +2690,26 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         UpdateRedirectionIndicators();
     }
 
-    private void OnConnectionStateChanged(
-        string serverId,
-        ConnectionState previousState,
-        ConnectionState newState,
-        string? errorMessage)
+    private void OnConnectionStateChanged(ConnectionStateChange change)
     {
-        _ = previousState;
-        _ = errorMessage;
-
         if (_server is null
-            || !ShouldHandleStateChange(serverId, _server.Id, _comDrivenStatusActive, _disposed))
+            || !ShouldHandleStateChange(
+                change.ServerId,
+                _server.Id,
+                _comDrivenStatusActive,
+                _disposed)
+            || !TryAcceptConnectionStateRevision(change.Revision))
         {
             return;
         }
 
         if (Dispatcher.CheckAccess())
         {
-            ApplyConnectionStateStatus(newState);
+            ApplyConnectionStateStatus(change.NewState);
         }
         else
         {
-            Dispatcher.Invoke(() => ApplyConnectionStateStatus(newState));
+            Dispatcher.Invoke(() => ApplyConnectionStateStatus(change.NewState));
         }
     }
 
@@ -2728,13 +2727,35 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        var state = _connectionStateMachine.GetState(_server.Id);
-        if (state is ConnectionState.Disconnected)
+        ConnectionStateData? stateData = _connectionStateMachine.GetStateData(_server.Id);
+        if (stateData is null
+            || stateData.CurrentState is ConnectionState.Disconnected
+            || !TryAcceptConnectionStateRevision(stateData.Revision))
         {
             return;
         }
 
-        ApplyConnectionStateStatus(state);
+        ApplyConnectionStateStatus(stateData.CurrentState);
+    }
+
+    private bool TryAcceptConnectionStateRevision(long revision)
+    {
+        while (true)
+        {
+            long currentRevision = Volatile.Read(ref _lastConnectionStateRevision);
+            if (revision <= currentRevision)
+            {
+                return false;
+            }
+
+            if (Interlocked.CompareExchange(
+                    ref _lastConnectionStateRevision,
+                    revision,
+                    currentRevision) == currentRevision)
+            {
+                return true;
+            }
+        }
     }
 
     private void ApplyConnectionStateStatus(ConnectionState state)
