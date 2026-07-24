@@ -20,6 +20,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.Services.Handlers;
@@ -31,13 +32,50 @@ internal sealed class CitrixHandler : IProtocolHandler
 {
     private readonly ConnectionStateMachine _connectionSm;
     private readonly LocalizationManager _localizer;
+    private readonly Func<ProcessStartInfo, Process?> _startProcess;
+    private readonly Func<string, string?> _unprotectSecret;
+    private readonly Func<string?> _resolveSelfServicePath;
+    private readonly Action<string> _logInfo;
+    private readonly Action<string> _logWarning;
 
     public CitrixHandler(
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer)
+        : this(
+            connectionSm,
+            localizer,
+            static startInfo => Process.Start(startInfo),
+            CredentialProtector.Unprotect,
+            ResolveSelfServicePath,
+            Core.Logging.FileLogger.Info,
+            Core.Logging.FileLogger.Warn)
     {
+    }
+
+    internal CitrixHandler(
+        ConnectionStateMachine connectionSm,
+        LocalizationManager localizer,
+        Func<ProcessStartInfo, Process?> startProcess,
+        Func<string, string?> unprotectSecret,
+        Func<string?> resolveSelfServicePath,
+        Action<string> logInfo,
+        Action<string> logWarning)
+    {
+        ArgumentNullException.ThrowIfNull(connectionSm);
+        ArgumentNullException.ThrowIfNull(localizer);
+        ArgumentNullException.ThrowIfNull(startProcess);
+        ArgumentNullException.ThrowIfNull(unprotectSecret);
+        ArgumentNullException.ThrowIfNull(resolveSelfServicePath);
+        ArgumentNullException.ThrowIfNull(logInfo);
+        ArgumentNullException.ThrowIfNull(logWarning);
+
         _connectionSm = connectionSm;
         _localizer = localizer;
+        _startProcess = startProcess;
+        _unprotectSecret = unprotectSecret;
+        _resolveSelfServicePath = resolveSelfServicePath;
+        _logInfo = logInfo;
+        _logWarning = logWarning;
     }
 
     public string Protocol => "CITRIX";
@@ -53,7 +91,7 @@ internal sealed class CitrixHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(server);
 
-        Core.Logging.FileLogger.Info(
+        _logInfo(
             $"ConnectCitrixAsync: {server.DisplayName} hasLaunchCmd={!string.IsNullOrWhiteSpace(server.CitrixLaunchCommandLine)} storeFront={server.CitrixStoreFrontUrl ?? "none"} icaFile={server.CitrixIcaFilePath ?? "none"}");
 
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
@@ -67,7 +105,18 @@ internal sealed class CitrixHandler : IProtocolHandler
         {
             if (!string.IsNullOrWhiteSpace(server.CitrixLaunchCommandLine))
             {
-                if (server.CitrixLaunchCommandLine.AsSpan().IndexOfAny(
+                mode = CitrixLaunchMode.SelfServiceCache;
+                string launchArguments = ResolveLaunchArguments(server.CitrixLaunchCommandLine);
+                if (string.IsNullOrWhiteSpace(launchArguments))
+                {
+                    _logWarning(
+                        "Citrix launch blocked: mode=SelfServiceCache launchTokenUnavailable=true");
+                    string msg = _localizer["CitrixLaunchVaultLocked"];
+                    _connectionSm.SetError(server.Id, msg);
+                    return Task.FromResult(new ConnectionResult(false, msg, null));
+                }
+
+                if (launchArguments.AsSpan().IndexOfAny(
                     ['|', '&', ';', '`', '$', '\n', '\r']) >= 0)
                 {
                     var msg = _localizer["CitrixLaunchCommandRejected"];
@@ -75,8 +124,7 @@ internal sealed class CitrixHandler : IProtocolHandler
                     return Task.FromResult(new ConnectionResult(false, msg, null));
                 }
 
-                mode = CitrixLaunchMode.SelfServiceCache;
-                var selfServicePath = ResolveSelfServicePath();
+                var selfServicePath = _resolveSelfServicePath();
                 if (selfServicePath is null)
                 {
                     var msg = _localizer["CitrixWorkspaceNotFound"];
@@ -84,33 +132,43 @@ internal sealed class CitrixHandler : IProtocolHandler
                     return Task.FromResult(new ConnectionResult(false, msg, null));
                 }
 
-                Core.Logging.FileLogger.Info(
-                    $"Citrix launch (SelfService cache): {selfServicePath} {server.CitrixLaunchCommandLine}");
+                _logInfo(
+                    $"Citrix launch: mode=SelfServiceCache launcher={selfServicePath} hasLaunchCmd=true");
 
                 /*
-                 * CitrixLaunchCommandLine is treated as an opaque launch blob produced by
-                 * CitrixCacheScanner. ImportedProfileSanitizer.Sanitize is the live gate
-                 * that strips this field from externally imported profiles before they are
-                 * persisted into configuration. Manual servers.json edits still bypass that
-                 * gate; wiring SchemaValidator into the ConfigManager load path with an
-                 * explicit failure policy is tracked as follow-up backlog work.
+                 * CitrixLaunchCommandLine is stored as an encrypted opaque blob produced
+                 * from CitrixCacheScanner data and is decrypted only in this launch branch.
+                 * ImportedProfileSanitizer.Sanitize is the live gate that strips this field
+                 * from externally imported profiles before they are persisted into
+                 * configuration. Manual servers.json edits still bypass that gate; wiring
+                 * SchemaValidator into the ConfigManager load path with an explicit failure
+                 * policy is tracked as follow-up backlog work.
                  *
                  * Keep the launch path narrow here and avoid introducing a second ad-hoc
                  * string sanitizer with rules that could drift from the import boundary.
                  */
-                process = Process.Start(new ProcessStartInfo
+                var startInfo = new ProcessStartInfo
                 {
                     FileName = selfServicePath,
-                    Arguments = server.CitrixLaunchCommandLine,
+                    Arguments = launchArguments,
                     UseShellExecute = false,
                     CreateNoWindow = true
-                });
+                };
+                try
+                {
+                    process = _startProcess(startInfo);
+                }
+                finally
+                {
+                    startInfo.Arguments = string.Empty;
+                    launchArguments = string.Empty;
+                }
             }
             else if (!string.IsNullOrWhiteSpace(server.CitrixIcaFilePath) &&
                      File.Exists(server.CitrixIcaFilePath))
             {
                 mode = CitrixLaunchMode.IcaFile;
-                process = Process.Start(new ProcessStartInfo
+                process = _startProcess(new ProcessStartInfo
                 {
                     FileName = server.CitrixIcaFilePath,
                     UseShellExecute = true
@@ -143,10 +201,10 @@ internal sealed class CitrixHandler : IProtocolHandler
                     validatedStoreFrontUrl,
                     server.CitrixUseSso);
 
-                Core.Logging.FileLogger.Info(
+                _logInfo(
                     $"Citrix launch (StoreFront): launcher={launcher} app={server.CitrixAppName} store={validatedStoreFrontUrl} sso={server.CitrixUseSso}");
 
-                process = Process.Start(startInfo);
+                process = _startProcess(startInfo);
             }
             else
             {
@@ -166,13 +224,33 @@ internal sealed class CitrixHandler : IProtocolHandler
                     mode,
                     server.SessionLoggingOverride)));
         }
-        catch (Exception ex)
+        catch (VaultLockedException)
         {
             process?.Dispose();
-            var userMsg = _localizer.Format("ErrorCitrixLaunchFailed", ex.Message);
+            _logWarning("Citrix launch blocked: mode=SelfServiceCache vaultLocked=true");
+            string userMsg = _localizer["CitrixLaunchVaultLocked"];
             _connectionSm.SetError(server.Id, userMsg);
             return Task.FromResult(new ConnectionResult(false, userMsg, null));
         }
+        catch (Exception ex)
+        {
+            process?.Dispose();
+            _logWarning(
+                $"Citrix launch failed: mode={mode} error={ex.GetType().Name}");
+            var userMsg = _localizer["CitrixLaunchFailed"];
+            _connectionSm.SetError(server.Id, userMsg);
+            return Task.FromResult(new ConnectionResult(false, userMsg, null));
+        }
+    }
+
+    private string ResolveLaunchArguments(string storedLaunchCommandLine)
+    {
+        if (!VaultSecretBlob.IsSecretBlob(storedLaunchCommandLine))
+        {
+            return storedLaunchCommandLine;
+        }
+
+        return _unprotectSecret(storedLaunchCommandLine) ?? string.Empty;
     }
 
     /// <summary>

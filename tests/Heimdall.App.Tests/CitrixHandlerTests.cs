@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
+using System.Text;
 using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.Tests;
@@ -123,5 +126,201 @@ public sealed class CitrixHandlerTests
         Assert.False(result.Success);
         Assert.Equal("CitrixLaunchCommandRejected", result.ErrorMessage);
         Assert.Null(result.Session);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SecretBlob_DecryptsBeforeValidationAndLaunch()
+    {
+        const string plaintext = "-qlaunch app=Calculator";
+        string secretBlob = CreateSecretBlob(plaintext);
+        string? decryptInput = null;
+        string? launchedArguments = null;
+        ProcessStartInfo? retainedStartInfo = null;
+        var handler = CreateHandler(
+            startInfo =>
+            {
+                retainedStartInfo = startInfo;
+                launchedArguments = startInfo.Arguments;
+                return null;
+            },
+            stored =>
+            {
+                decryptInput = stored;
+                return plaintext;
+            });
+        var server = CreateCacheServer(secretBlob);
+
+        var result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(secretBlob, decryptInput);
+        Assert.Equal(plaintext, launchedArguments);
+        Assert.NotEqual(secretBlob, launchedArguments);
+        Assert.NotNull(retainedStartInfo);
+        Assert.Equal(string.Empty, retainedStartInfo!.Arguments);
+        Assert.False(retainedStartInfo.UseShellExecute);
+        Assert.True(retainedStartInfo.CreateNoWindow);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SecretBlob_ValidatesDecryptedPlaintext()
+    {
+        string secretBlob = CreateSecretBlob("-qlaunch app=Calculator");
+        var launchCallCount = 0;
+        var handler = CreateHandler(
+            _ =>
+            {
+                launchCallCount++;
+                return null;
+            },
+            _ => "-qlaunch app=Calculator | rejected");
+        var server = CreateCacheServer(secretBlob);
+
+        var result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixLaunchCommandRejected", result.ErrorMessage);
+        Assert.Equal(0, launchCallCount);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_LegacyPlaintext_LaunchesWithoutDecrypting()
+    {
+        const string plaintext = "-qlaunch app=LegacyCalculator";
+        var decryptCallCount = 0;
+        string? launchedArguments = null;
+        var handler = CreateHandler(
+            startInfo =>
+            {
+                launchedArguments = startInfo.Arguments;
+                return null;
+            },
+            _ =>
+            {
+                decryptCallCount++;
+                return "unexpected";
+            });
+        var server = CreateCacheServer(plaintext);
+
+        var result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, decryptCallCount);
+        Assert.Equal(plaintext, launchedArguments);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_VaultLocked_ReturnsRedactedErrorWithoutLaunching()
+    {
+        string secretBlob = CreateSecretBlob("-qlaunch app=Calculator");
+        var launchCallCount = 0;
+        var logs = new List<string>();
+        var stateMachine = new ConnectionStateMachine();
+        var handler = CreateHandler(
+            _ =>
+            {
+                launchCallCount++;
+                return null;
+            },
+            _ => throw new VaultLockedException(),
+            stateMachine,
+            logs.Add,
+            logs.Add);
+        var server = CreateCacheServer(secretBlob);
+
+        var result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixLaunchVaultLocked", result.ErrorMessage);
+        Assert.Equal(0, launchCallCount);
+        Assert.Equal("CitrixLaunchVaultLocked", stateMachine.GetStateData(server.Id)?.ErrorMessage);
+        Assert.All(logs, log => Assert.DoesNotContain(secretBlob, log, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SecretDecryptionReturnsNull_ReturnsLockedErrorWithoutLaunching()
+    {
+        string secretBlob = CreateSecretBlob("-qlaunch app=Calculator");
+        var launchCallCount = 0;
+        var logs = new List<string>();
+        var handler = CreateHandler(
+            _ =>
+            {
+                launchCallCount++;
+                return null;
+            },
+            _ => null,
+            logInfo: logs.Add,
+            logWarning: logs.Add);
+        var server = CreateCacheServer(secretBlob);
+
+        var result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixLaunchVaultLocked", result.ErrorMessage);
+        Assert.Equal(0, launchCallCount);
+        Assert.All(logs, log => Assert.DoesNotContain(secretBlob, log, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_LaunchFailure_RedactsExceptionAndResult()
+    {
+        const string plaintext = "-qlaunch app=SensitiveCalculator";
+        string secretBlob = CreateSecretBlob(plaintext);
+        var logs = new List<string>();
+        var stateMachine = new ConnectionStateMachine();
+        var handler = CreateHandler(
+            _ => throw new InvalidOperationException(
+                $"Failed with stored={secretBlob} plaintext={plaintext}"),
+            _ => plaintext,
+            stateMachine,
+            logs.Add,
+            logs.Add);
+        var server = CreateCacheServer(secretBlob);
+
+        var result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixLaunchFailed", result.ErrorMessage);
+        Assert.Equal("CitrixLaunchFailed", stateMachine.GetStateData(server.Id)?.ErrorMessage);
+        Assert.Contains(
+            logs,
+            log => log.Contains(
+                "error=InvalidOperationException",
+                StringComparison.Ordinal));
+        Assert.All(logs, log =>
+        {
+            Assert.DoesNotContain(secretBlob, log, StringComparison.Ordinal);
+            Assert.DoesNotContain(plaintext, log, StringComparison.Ordinal);
+        });
+    }
+
+    private static CitrixHandler CreateHandler(
+        Func<ProcessStartInfo, Process?> startProcess,
+        Func<string, string?> unprotectSecret,
+        ConnectionStateMachine? stateMachine = null,
+        Action<string>? logInfo = null,
+        Action<string>? logWarning = null) =>
+        new(
+            stateMachine ?? new ConnectionStateMachine(),
+            new LocalizationManager(),
+            startProcess,
+            unprotectSecret,
+            static () => "SelfService.exe",
+            logInfo ?? (static _ => { }),
+            logWarning ?? (static _ => { }));
+
+    private static ServerProfileDto CreateCacheServer(string launchCommandLine) =>
+        new()
+        {
+            Id = "srv-citrix-cache",
+            DisplayName = "Citrix cache test",
+            CitrixLaunchCommandLine = launchCommandLine
+        };
+
+    private static string CreateSecretBlob(string plaintext)
+    {
+        byte[] key = Enumerable.Range(1, 32).Select(static value => (byte)value).ToArray();
+        return VaultSecretBlob.Seal(key, Encoding.UTF8.GetBytes(plaintext));
     }
 }
