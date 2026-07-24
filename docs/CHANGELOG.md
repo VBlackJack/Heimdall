@@ -12,6 +12,18 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-07-24: Session tree gateway badge fix (v2026.072400)
+
+Targeted hotfix for v2026.072300.
+
+### Fixed
+
+- **Gateway badge no longer overlaps the server name.** In the session tree, a server
+  with an SSH gateway had its name column starved (measured as little as ~19px at depth)
+  because the row was constrained to the viewport. The horizontal scrollbar is restored
+  (`Auto`), name trimming is removed so full names show, recycling virtualization stays
+  active, and per-level indentation is tightened.
+
 ## 2026-07-23: Cross-review hardening sprint + treeview UX (v2026.072300)
 
 A cross-reviewed hardening and UX campaign, verified
