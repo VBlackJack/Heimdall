@@ -36,6 +36,9 @@ public static class AppConstants
     /// <summary>Writable network-scan history subfolder.</summary>
     public const string NetworkScansDirectoryName = "network-scans";
 
+    /// <summary>Restrictive staging root for verified application updates.</summary>
+    public const string UpdatesDirectoryName = "updates";
+
     /// <summary>Writable notes subfolder within the legacy relative config path.</summary>
     public const string NotesDirectoryName = "notes";
 

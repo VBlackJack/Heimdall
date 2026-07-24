@@ -463,7 +463,7 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
             CancellationToken cancellationToken)
             => Task.FromResult(new UpdateCheckResult(UpdateCheckStatus.UpToDate, null));
 
-        public Task<string> DownloadVerifiedAsync(
+        public Task<IVerifiedUpdatePackage> DownloadVerifiedAsync(
             UpdateInfo update,
             IProgress<double>? progress,
             CancellationToken cancellationToken)

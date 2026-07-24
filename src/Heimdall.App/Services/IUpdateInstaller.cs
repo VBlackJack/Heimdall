@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Updates;
+
 namespace Heimdall.App.Services;
 
 /// <summary>
@@ -28,5 +30,5 @@ public interface IUpdateInstaller
     /// (e.g. the current executable path is unknown). The caller shuts the app down only
     /// when this returns true.
     /// </summary>
-    bool BeginInstall(string verifiedInstallerPath);
+    bool BeginInstall(IVerifiedUpdatePackage package);
 }

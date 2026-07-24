@@ -28,8 +28,8 @@ internal interface IUpdateInstallerHost
     /// <summary>Identifier of the current process.</summary>
     int ProcessId { get; }
 
-    /// <summary>Creates a unique temporary path for the relauncher script (.ps1).</summary>
-    string CreateScriptPath();
+    /// <summary>Creates a unique relauncher script path inside the restrictive staging directory.</summary>
+    string CreateScriptPath(string stagingDirectory);
 
     /// <summary>Creates a unique temporary path for the relauncher transcript (.log).</summary>
     string CreateLogPath();
@@ -40,8 +40,11 @@ internal interface IUpdateInstallerHost
     /// <summary>Probes whether the directory is writable (elevation probe).</summary>
     bool IsDirectoryWritable(string directory);
 
-    /// <summary>Writes the given content to a file, replacing any existing content.</summary>
-    void WriteAllText(string path, string content);
+    /// <summary>Writes text with a restrictive ACL applied atomically at file creation.</summary>
+    void WriteProtectedText(string path, string content);
+
+    /// <summary>Checks a file against an expected SHA-256 digest.</summary>
+    bool VerifySha256(string path, string expectedSha256);
 
     /// <summary>Starts a detached, hidden process; returns true when it started.</summary>
     bool StartDetached(string fileName, string arguments);

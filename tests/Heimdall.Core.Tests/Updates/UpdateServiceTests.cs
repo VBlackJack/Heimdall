@@ -15,6 +15,7 @@
  */
 
 using System.Text;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Updates;
 
 namespace Heimdall.Core.Tests;
@@ -194,7 +195,7 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async Task DownloadVerifiedAsync_MatchingHash_ReturnsVerifiedTempPath()
+    public async Task DownloadVerifiedAsync_MatchingHash_ReturnsHeldVerifiedPackage()
     {
         var payload = Encoding.ASCII.GetBytes("verified-installer-payload");
         var hash = Sha256Verifier.ComputeHex(new MemoryStream(payload));
@@ -203,19 +204,40 @@ public sealed class UpdateServiceTests
         var update = UpdateWithSha(hash, payload.Length);
         var progress = new RecordingProgress();
 
-        var path = await service.DownloadVerifiedAsync(update, progress, CancellationToken.None);
+        IVerifiedUpdatePackage package = await service.DownloadVerifiedAsync(
+            update,
+            progress,
+            CancellationToken.None);
+        string stagingDirectory = package.StagingDirectory;
 
-        try
+        using (package)
         {
-            Assert.True(File.Exists(path));
-            Assert.Equal(payload, await File.ReadAllBytesAsync(path));
+            Assert.True(File.Exists(package.InstallerPath));
+            Assert.Equal(payload, await File.ReadAllBytesAsync(package.InstallerPath));
+            Assert.Equal(hash, package.ExpectedSha256);
+            Assert.Equal(
+                Path.GetFullPath(stagingDirectory),
+                Path.GetFullPath(Path.GetDirectoryName(package.InstallerPath)!));
             Assert.NotEmpty(progress.Reports);
             Assert.Equal(1.0, progress.Reports[^1]);
+
+            Assert.Throws<IOException>(
+                () => File.WriteAllText(package.InstallerPath, "attacker"));
+            Assert.Throws<IOException>(
+                () => File.Move(
+                    package.InstallerPath,
+                    Path.Combine(stagingDirectory, "swapped.exe")));
+            Assert.Throws<IOException>(() =>
+            {
+                using FileStream _ = new(
+                    package.InstallerPath,
+                    FileMode.Truncate,
+                    FileAccess.Write,
+                    FileShare.ReadWrite);
+            });
         }
-        finally
-        {
-            File.Delete(path);
-        }
+
+        Assert.False(Directory.Exists(stagingDirectory));
     }
 
     [Fact]
@@ -227,20 +249,16 @@ public sealed class UpdateServiceTests
         var service = CreateService(client, BuildVariant.Standard);
         var update = UpdateWithSha(hash, payload.Length);
 
-        var path = await service.DownloadVerifiedAsync(update, null, CancellationToken.None);
+        using IVerifiedUpdatePackage package = await service.DownloadVerifiedAsync(
+            update,
+            null,
+            CancellationToken.None);
 
-        try
-        {
-            Assert.Equal(".exe", Path.GetExtension(path));
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        Assert.Equal(".exe", Path.GetExtension(package.InstallerPath));
     }
 
     [Fact]
-    public async Task DownloadVerifiedAsync_HashMismatch_ThrowsAndDeletesTemp()
+    public async Task DownloadVerifiedAsync_HashMismatch_ThrowsAndDeletesStagingDirectory()
     {
         var payload = Encoding.ASCII.GetBytes("payload");
         var wrongHash = new string('0', 64);
@@ -250,15 +268,15 @@ public sealed class UpdateServiceTests
         const string tag = "v2026.061597";
         var update = UpdateWithSha(wrongHash, payload.Length, tag);
 
-        var before = TempSnapshot(tag);
+        var before = StagingSnapshot(tag);
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
 
-        Assert.Empty(TempSnapshot(tag).Except(before));
+        Assert.Empty(StagingSnapshot(tag).Except(before));
     }
 
     [Fact]
-    public async Task DownloadVerifiedAsync_NullSha256_ThrowsAndDeletesTemp()
+    public async Task DownloadVerifiedAsync_NullSha256_ThrowsAndDeletesStagingDirectory()
     {
         var payload = Encoding.ASCII.GetBytes("payload");
         var client = new StubReleaseClient { StreamFactory = () => new MemoryStream(payload) };
@@ -267,11 +285,30 @@ public sealed class UpdateServiceTests
         const string tag = "v2026.061598";
         var update = UpdateWithSha(null, payload.Length, tag);
 
-        var before = TempSnapshot(tag);
+        var before = StagingSnapshot(tag);
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
 
-        Assert.Empty(TempSnapshot(tag).Except(before));
+        Assert.Empty(StagingSnapshot(tag).Except(before));
+    }
+
+    [Fact]
+    public async Task DownloadVerifiedAsync_CancelledDownload_DeletesStagingDirectory()
+    {
+        var payload = Encoding.ASCII.GetBytes("payload");
+        var hash = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        var client = new StubReleaseClient { StreamFactory = () => new MemoryStream(payload) };
+        var service = CreateService(client, BuildVariant.Standard);
+        const string tag = "v2026.061599";
+        var update = UpdateWithSha(hash, payload.Length, tag);
+        var before = StagingSnapshot(tag);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.DownloadVerifiedAsync(update, null, cancellation.Token));
+
+        Assert.Empty(StagingSnapshot(tag).Except(before));
     }
 
     private static UpdateService CreateService(StubReleaseClient client, BuildVariant variant)
@@ -317,10 +354,18 @@ public sealed class UpdateServiceTests
         return new UpdateInfo(version, versionTag, "https://example.test", "notes", asset, sha256);
     }
 
-    private static HashSet<string> TempSnapshot(string versionTag)
+    private static HashSet<string> StagingSnapshot(string versionTag)
     {
         var version = HeimdallVersion.Parse(versionTag);
-        return new(Directory.EnumerateFiles(Path.GetTempPath(), $"Heimdall_{version}_*"), StringComparer.OrdinalIgnoreCase);
+        string updatesRoot = ApplicationDataPathResolver.GetUpdatesDirectory(
+            ApplicationDataPathResolver.Resolve());
+        return Directory.Exists(updatesRoot)
+            ? new(
+                Directory.EnumerateDirectories(
+                    updatesRoot,
+                    $"Heimdall_{version}_*"),
+                StringComparer.OrdinalIgnoreCase)
+            : [];
     }
 
     private sealed class StubReleaseClient : IGitHubReleaseClient

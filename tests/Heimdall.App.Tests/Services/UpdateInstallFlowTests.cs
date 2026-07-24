@@ -23,6 +23,8 @@ namespace Heimdall.App.Tests;
 
 public sealed class UpdateInstallFlowTests
 {
+    private static readonly string InstallerSha256 = new('a', 64);
+
     private static UpdateInfo SampleUpdate() =>
         new(
             HeimdallVersion.Parse("2026.061502"),
@@ -48,20 +50,25 @@ public sealed class UpdateInstallFlowTests
         installer.LastInstallerPath.Should().Be(updateService.DownloadResultPath);
         lifecycle.RequestShutdownCallCount.Should().Be(1);
         updateService.LastProgress.Should().BeSameAs(progress);
+        updateService.Package.TransferCallCount.Should().Be(1);
+        updateService.Package.DisposeCallCount.Should().Be(1);
     }
 
     [Fact]
     public async Task RunAsync_BeginInstallFalse_ReturnsInstallLaunchFailedWithoutShutdown()
     {
+        var updateService = new FakeUpdateService();
         var installer = new FakeUpdateInstaller { BeginInstallResult = false };
         var lifecycle = new FakeApplicationLifecycle();
-        var flow = new UpdateInstallFlow(new FakeUpdateService(), installer, lifecycle);
+        var flow = new UpdateInstallFlow(updateService, installer, lifecycle);
 
         var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
 
         outcome.Should().Be(UpdateInstallOutcome.InstallLaunchFailed);
         installer.BeginInstallCallCount.Should().Be(1);
         lifecycle.RequestShutdownCallCount.Should().Be(0);
+        updateService.Package.TransferCallCount.Should().Be(0);
+        updateService.Package.DisposeCallCount.Should().Be(1);
     }
 
     [Fact]
@@ -117,10 +124,18 @@ public sealed class UpdateInstallFlowTests
 
         public IProgress<double>? LastProgress { get; private set; }
 
+        public FakeVerifiedUpdatePackage Package { get; } = new(
+            @"C:\Temp\HeimdallSetup.exe",
+            InstallerSha256,
+            @"C:\Temp\update-stage");
+
         public Task<UpdateCheckResult> CheckForUpdatesAsync(HeimdallVersion current, string owner, string repo, CancellationToken cancellationToken)
             => Task.FromResult(new UpdateCheckResult(UpdateCheckStatus.UpToDate, null));
 
-        public Task<string> DownloadVerifiedAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+        public Task<IVerifiedUpdatePackage> DownloadVerifiedAsync(
+            UpdateInfo update,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
         {
             LastProgress = progress;
             if (DownloadException is not null)
@@ -128,7 +143,7 @@ public sealed class UpdateInstallFlowTests
                 throw DownloadException;
             }
 
-            return Task.FromResult(DownloadResultPath);
+            return Task.FromResult<IVerifiedUpdatePackage>(Package);
         }
     }
 
@@ -140,12 +155,32 @@ public sealed class UpdateInstallFlowTests
 
         public string? LastInstallerPath { get; private set; }
 
-        public bool BeginInstall(string verifiedInstallerPath)
+        public bool BeginInstall(IVerifiedUpdatePackage package)
         {
             BeginInstallCallCount++;
-            LastInstallerPath = verifiedInstallerPath;
+            LastInstallerPath = package.InstallerPath;
             return BeginInstallResult;
         }
+    }
+
+    private sealed class FakeVerifiedUpdatePackage(
+        string installerPath,
+        string expectedSha256,
+        string stagingDirectory) : IVerifiedUpdatePackage
+    {
+        public string InstallerPath { get; } = installerPath;
+
+        public string ExpectedSha256 { get; } = expectedSha256;
+
+        public string StagingDirectory { get; } = stagingDirectory;
+
+        public int TransferCallCount { get; private set; }
+
+        public int DisposeCallCount { get; private set; }
+
+        public void TransferCleanupToRelauncher() => TransferCallCount++;
+
+        public void Dispose() => DisposeCallCount++;
     }
 
     private sealed class FakeApplicationLifecycle : IApplicationLifecycle

@@ -69,6 +69,48 @@ public static class SecureFileWriter
     }
 
     /// <summary>
+    /// Creates a new file with a restrictive ACL applied atomically and returns
+    /// an exclusive write stream. The path must not already exist.
+    /// </summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static FileStream CreateWriteAndProtect(
+        string filePath,
+        int bufferSize = 81920,
+        FileOptions options = FileOptions.Asynchronous | FileOptions.SequentialScan)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bufferSize);
+
+        FileSecurity security = BuildRestrictedSecurity();
+        FileInfo fileInfo = new(filePath);
+        return fileInfo.Create(
+            FileMode.CreateNew,
+            FileSystemRights.Write,
+            FileShare.None,
+            bufferSize,
+            options,
+            security);
+    }
+
+    /// <summary>
+    /// Creates a new directory whose ACL grants access only to the current user,
+    /// Administrators, and SYSTEM. Inheritance is disabled at creation time.
+    /// </summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static void CreateRestrictedDirectory(string directoryPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);
+
+        var directory = new DirectoryInfo(directoryPath);
+        if (directory.Exists)
+        {
+            throw new IOException($"The restricted directory already exists: {directoryPath}");
+        }
+
+        directory.Create(BuildRestrictedDirectorySecurity());
+    }
+
+    /// <summary>
     /// Async variant of <see cref="WriteAndProtect"/>. Same TOCTOU-free guarantee:
     /// the restrictive ACL is applied atomically when the file is created, before
     /// any data is written, so an observer never sees the file with a permissive
@@ -365,6 +407,40 @@ public static class SecureFileWriter
         security.AddAccessRule(new FileSystemAccessRule(
             new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
             FileSystemRights.FullControl,
+            AccessControlType.Allow));
+        return security;
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static DirectorySecurity BuildRestrictedDirectorySecurity()
+    {
+        SecurityIdentifier currentUser = WindowsIdentity.GetCurrent().User
+            ?? throw new InvalidOperationException("Cannot determine current user SID.");
+
+        DirectorySecurity security = new DirectorySecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+
+        const InheritanceFlags inheritance =
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        const PropagationFlags propagation = PropagationFlags.None;
+
+        security.AddAccessRule(new FileSystemAccessRule(
+            currentUser,
+            FileSystemRights.FullControl,
+            inheritance,
+            propagation,
+            AccessControlType.Allow));
+        security.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+            FileSystemRights.FullControl,
+            inheritance,
+            propagation,
+            AccessControlType.Allow));
+        security.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            FileSystemRights.FullControl,
+            inheritance,
+            propagation,
             AccessControlType.Allow));
         return security;
     }

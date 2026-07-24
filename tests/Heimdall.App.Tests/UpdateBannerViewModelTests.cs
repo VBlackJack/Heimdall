@@ -338,7 +338,10 @@ public sealed class UpdateBannerViewModelTests
             return Task.FromResult(Result);
         }
 
-        public Task<string> DownloadVerifiedAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+        public Task<IVerifiedUpdatePackage> DownloadVerifiedAsync(
+            UpdateInfo update,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
             => throw new NotSupportedException();
     }
 

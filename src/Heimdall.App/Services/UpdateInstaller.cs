@@ -16,6 +16,7 @@
 
 using System.ComponentModel;
 using System.IO;
+using System.Text;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Updates;
 
@@ -37,11 +38,15 @@ internal sealed class UpdateInstaller : IUpdateInstaller
         _host = host;
     }
 
-    public bool BeginInstall(string verifiedInstallerPath)
+    public bool BeginInstall(IVerifiedUpdatePackage package)
     {
-        if (string.IsNullOrWhiteSpace(verifiedInstallerPath))
+        ArgumentNullException.ThrowIfNull(package);
+
+        if (string.IsNullOrWhiteSpace(package.InstallerPath)
+            || string.IsNullOrWhiteSpace(package.StagingDirectory)
+            || !IsSha256Hex(package.ExpectedSha256))
         {
-            FileLogger.Warn("Update install aborted: verified installer path is empty.");
+            FileLogger.Warn("Update install aborted: the verified package metadata is invalid.");
             return false;
         }
 
@@ -52,27 +57,38 @@ internal sealed class UpdateInstaller : IUpdateInstaller
             return false;
         }
 
-        var scriptPath = _host.CreateScriptPath();
+        string scriptPath = _host.CreateScriptPath(package.StagingDirectory);
         var logPath = _host.CreateLogPath();
 
         var installDir = Path.GetDirectoryName(exe);
         var requiresElevation = installDir is not null && !_host.IsDirectoryWritable(installDir);
 
         var spec = new UpdateRelaunchSpec(
-            InstallerPath: verifiedInstallerPath,
+            InstallerPath: package.InstallerPath,
+            ExpectedInstallerSha256: package.ExpectedSha256,
             TargetExecutablePath: exe,
             ProcessId: _host.ProcessId,
             ScriptPath: scriptPath,
+            StagingDirectory: package.StagingDirectory,
             RequiresElevation: requiresElevation,
             LogPath: logPath);
 
         bool launched;
         try
         {
-            _host.WriteAllText(scriptPath, UpdateRelaunchScript.Build(spec));
+            string script = UpdateRelaunchScript.Build(spec);
+            string expectedScriptSha256 = ComputeTextSha256(script);
+            _host.WriteProtectedText(scriptPath, script);
+            if (!_host.VerifySha256(scriptPath, expectedScriptSha256))
+            {
+                FileLogger.Warn("Update install aborted: relauncher script integrity check failed.");
+                return false;
+            }
 
             var psHost = _host.ResolvePowerShellExecutable();
-            var args = UpdateRelaunchScript.BuildPowerShellArguments(scriptPath);
+            var args = UpdateRelaunchScript.BuildPowerShellArguments(
+                scriptPath,
+                expectedScriptSha256);
             launched = _host.StartDetached(psHost, args);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
@@ -84,4 +100,14 @@ internal sealed class UpdateInstaller : IUpdateInstaller
         FileLogger.Info($"Update relauncher launched={launched} elevation={requiresElevation}");
         return launched;
     }
+
+    private static string ComputeTextSha256(string content)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(content);
+        using var stream = new MemoryStream(bytes, writable: false);
+        return Sha256Verifier.ComputeHex(stream);
+    }
+
+    private static bool IsSha256Hex(string value) =>
+        value.Length == 64 && value.All(Uri.IsHexDigit);
 }

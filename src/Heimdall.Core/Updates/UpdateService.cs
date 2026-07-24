@@ -15,7 +15,9 @@
  */
 
 using System.Globalization;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Security;
 
 namespace Heimdall.Core.Updates;
 
@@ -88,7 +90,7 @@ public sealed class UpdateService : IUpdateService
         return new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, info);
     }
 
-    public async Task<string> DownloadVerifiedAsync(
+    public async Task<IVerifiedUpdatePackage> DownloadVerifiedAsync(
         UpdateInfo update,
         IProgress<double>? progress,
         CancellationToken cancellationToken)
@@ -103,13 +105,26 @@ public sealed class UpdateService : IUpdateService
             extension = DefaultInstallerExtension;
         }
 
-        var tempPath = Path.Combine(Path.GetTempPath(), $"Heimdall_{update.Version}_{Guid.NewGuid():N}{extension}");
+        string updatesRoot = ApplicationDataPathResolver.GetUpdatesDirectory(
+            ApplicationDataPathResolver.Resolve());
+        Directory.CreateDirectory(updatesRoot);
+
+        string stagingDirectory = Path.Combine(
+            updatesRoot,
+            $"Heimdall_{update.Version}_{Guid.NewGuid():N}");
+        CreateStagingDirectory(stagingDirectory);
+        string installerPath = Path.Combine(
+            stagingDirectory,
+            $"Heimdall_{update.Version}_Setup{extension}");
+
         try
         {
             await using (var source = await _client.OpenAssetStreamAsync(update.Asset.DownloadUrl, cancellationToken).ConfigureAwait(false))
-            await using (var destination = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            await using (var destination = CreateInstallerWriteStream(installerPath))
             {
                 await CopyWithProgressAsync(source, destination, update.Asset.SizeBytes, progress, cancellationToken).ConfigureAwait(false);
+                await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+                destination.Flush(flushToDisk: true);
             }
 
             if (update.Sha256 is null)
@@ -117,16 +132,43 @@ public sealed class UpdateService : IUpdateService
                 throw new InvalidOperationException("Refusing to use an update with no published SHA-256 checksum.");
             }
 
-            if (!Sha256Verifier.Verify(tempPath, update.Sha256))
+            var integrityLease = new FileStream(
+                installerPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                DownloadBufferSize,
+                FileOptions.SequentialScan);
+            string actualSha256;
+            try
             {
+                actualSha256 = Sha256Verifier.ComputeHex(integrityLease);
+                integrityLease.Position = 0;
+            }
+            catch
+            {
+                integrityLease.Dispose();
+                throw;
+            }
+
+            if (!string.Equals(
+                    actualSha256,
+                    update.Sha256.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                integrityLease.Dispose();
                 throw new InvalidOperationException("The downloaded update failed SHA-256 verification.");
             }
 
-            return tempPath;
+            return new VerifiedUpdatePackage(
+                installerPath,
+                update.Sha256.Trim().ToLowerInvariant(),
+                stagingDirectory,
+                integrityLease);
         }
         catch
         {
-            TryDelete(tempPath);
+            TryDeleteStagingDirectory(stagingDirectory);
             throw;
         }
     }
@@ -219,22 +261,51 @@ public sealed class UpdateService : IUpdateService
         progress?.Report(1.0);
     }
 
-    private static void TryDelete(string path)
+    private static void CreateStagingDirectory(string stagingDirectory)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            SecureFileWriter.CreateRestrictedDirectory(stagingDirectory);
+            return;
+        }
+
+        Directory.CreateDirectory(
+            stagingDirectory,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
+
+    private static FileStream CreateInstallerWriteStream(string installerPath)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return SecureFileWriter.CreateWriteAndProtect(installerPath);
+        }
+
+        return new FileStream(
+            installerPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            DownloadBufferSize,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+    }
+
+    private static void TryDeleteStagingDirectory(string stagingDirectory)
     {
         try
         {
-            if (File.Exists(path))
+            if (Directory.Exists(stagingDirectory))
             {
-                File.Delete(path);
+                Directory.Delete(stagingDirectory, recursive: true);
             }
         }
         catch (IOException)
         {
-            // Best-effort cleanup of the temporary download.
+            // Best-effort cleanup of the restrictive staging directory.
         }
         catch (UnauthorizedAccessException)
         {
-            // Best-effort cleanup of the temporary download.
+            // Best-effort cleanup of the restrictive staging directory.
         }
     }
 }

@@ -17,6 +17,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Security;
+using Heimdall.Core.Security;
+using Heimdall.Core.Updates;
 
 namespace Heimdall.App.Services;
 
@@ -38,8 +40,13 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
 
     public int ProcessId => Environment.ProcessId;
 
-    public string CreateScriptPath() =>
-        Path.Combine(Path.GetTempPath(), $"{ScriptPrefix}{Guid.NewGuid():N}{ScriptExtension}");
+    public string CreateScriptPath(string stagingDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stagingDirectory);
+        return Path.Combine(
+            stagingDirectory,
+            $"{ScriptPrefix}{Guid.NewGuid():N}{ScriptExtension}");
+    }
 
     public string CreateLogPath() =>
         Path.Combine(Path.GetTempPath(), $"{ScriptPrefix}{Guid.NewGuid():N}{LogExtension}");
@@ -95,7 +102,11 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
         }
     }
 
-    public void WriteAllText(string path, string content) => File.WriteAllText(path, content);
+    public void WriteProtectedText(string path, string content) =>
+        SecureFileWriter.WriteAndProtect(path, content);
+
+    public bool VerifySha256(string path, string expectedSha256) =>
+        Sha256Verifier.Verify(path, expectedSha256);
 
     public bool StartDetached(string fileName, string arguments)
     {

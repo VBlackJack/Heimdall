@@ -58,4 +58,11 @@ public static class ApplicationDataPathResolver
         ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
         return Path.Combine(dataRoot, AppConstants.NetworkScansDirectoryName);
     }
+
+    /// <summary>Resolves the restrictive staging root for application updates.</summary>
+    public static string GetUpdatesDirectory(string dataRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
+        return Path.Combine(dataRoot, AppConstants.UpdatesDirectoryName);
+    }
 }

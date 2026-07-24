@@ -52,10 +52,12 @@ internal sealed class UpdateInstallFlow : IUpdateInstallFlow
 
         try
         {
-            var path = await _updateService.DownloadVerifiedAsync(update, progress, cancellationToken);
-            var launched = _updateInstaller.BeginInstall(path);
+            using IVerifiedUpdatePackage package = await _updateService
+                .DownloadVerifiedAsync(update, progress, cancellationToken);
+            bool launched = _updateInstaller.BeginInstall(package);
             if (launched)
             {
+                package.TransferCleanupToRelauncher();
                 _lifecycle.RequestShutdown();
                 return UpdateInstallOutcome.Started;
             }

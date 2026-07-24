@@ -183,6 +183,36 @@ public class SecureFileWriterTests : IDisposable
             bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF);
     }
 
+    [Fact]
+    public void CreateWriteAndProtect_CreatesExclusiveRestrictedFile()
+    {
+        string path = TempFile("installer.exe");
+
+        using (FileStream stream = SecureFileWriter.CreateWriteAndProtect(path))
+        {
+            stream.Write("verified"u8);
+            Assert.Throws<IOException>(() => File.WriteAllText(path, "attacker"));
+        }
+
+        Assert.Equal("verified", File.ReadAllText(path));
+        AssertRestrictiveAcl(path);
+    }
+
+    [Fact]
+    public void CreateRestrictedDirectory_DisablesInheritanceAndRestrictsIdentities()
+    {
+        string path = Path.Combine(_tempDir, "update-stage");
+
+        SecureFileWriter.CreateRestrictedDirectory(path);
+
+        DirectorySecurity acl = new DirectoryInfo(path).GetAccessControl();
+        Assert.True(acl.AreAccessRulesProtected);
+        AssertOnlyExpectedIdentities(acl.GetAccessRules(
+            includeExplicit: true,
+            includeInherited: false,
+            targetType: typeof(SecurityIdentifier)));
+    }
+
     private static void AssertRestrictiveAcl(string path)
     {
         FileInfo fileInfo = new(path);
@@ -190,6 +220,16 @@ public class SecureFileWriterTests : IDisposable
 
         Assert.True(acl.AreAccessRulesProtected);
 
+        AuthorizationRuleCollection rules = acl.GetAccessRules(
+            includeExplicit: true,
+            includeInherited: false,
+            targetType: typeof(SecurityIdentifier));
+
+        AssertOnlyExpectedIdentities(rules);
+    }
+
+    private static void AssertOnlyExpectedIdentities(AuthorizationRuleCollection rules)
+    {
         HashSet<string> expectedIdentities = new(StringComparer.OrdinalIgnoreCase);
         SecurityIdentifier? currentUser = WindowsIdentity.GetCurrent().User;
         if (currentUser is not null)
@@ -201,11 +241,6 @@ public class SecureFileWriterTests : IDisposable
         SecurityIdentifier system = new(WellKnownSidType.LocalSystemSid, null);
         expectedIdentities.Add(administrators.Value);
         expectedIdentities.Add(system.Value);
-
-        AuthorizationRuleCollection rules = acl.GetAccessRules(
-            includeExplicit: true,
-            includeInherited: false,
-            targetType: typeof(SecurityIdentifier));
 
         Assert.True(rules.Count > 0);
         foreach (FileSystemAccessRule rule in rules)

@@ -1617,7 +1617,10 @@ public sealed class SettingsViewModelTests
         public Task<UpdateCheckResult> CheckForUpdatesAsync(HeimdallVersion current, string owner, string repo, CancellationToken cancellationToken)
             => Task.FromResult(Result);
 
-        public Task<string> DownloadVerifiedAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+        public Task<IVerifiedUpdatePackage> DownloadVerifiedAsync(
+            UpdateInfo update,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
         {
             DownloadCallCount++;
             if (DownloadException is not null)
@@ -1625,7 +1628,7 @@ public sealed class SettingsViewModelTests
                 throw DownloadException;
             }
 
-            return Task.FromResult(DownloadResultPath);
+            throw new NotSupportedException();
         }
     }
 

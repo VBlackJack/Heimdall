@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
+using System.Text;
 using Heimdall.Core.Updates;
 
 namespace Heimdall.Core.Tests;
 
 public sealed class UpdateRelaunchScriptTests
 {
+    private static readonly string InstallerSha256 = new('a', 64);
+    private static readonly string ScriptSha256 = new('b', 64);
+
     private static UpdateRelaunchSpec SampleSpec(
         bool requiresElevation = false,
         string? logPath = null,
@@ -28,9 +32,11 @@ public sealed class UpdateRelaunchScriptTests
         string scriptPath = @"C:\Temp\heimdall_relaunch.ps1") =>
         new(
             InstallerPath: installerPath,
+            ExpectedInstallerSha256: InstallerSha256,
             TargetExecutablePath: targetExecutablePath,
             ProcessId: 4242,
             ScriptPath: scriptPath,
+            StagingDirectory: @"C:\Temp\update-stage",
             RequiresElevation: requiresElevation,
             LogPath: logPath);
 
@@ -55,16 +61,33 @@ public sealed class UpdateRelaunchScriptTests
     }
 
     [Fact]
-    public void BuildPowerShellArguments_ContainsHostFlagsAndQuotedScriptPath()
+    public void BuildPowerShellArguments_ContainsHostFlagsAndVerifiedBootstrap()
     {
         const string scriptPath = @"C:\Temp\heimdall_relaunch.ps1";
-        var args = UpdateRelaunchScript.BuildPowerShellArguments(scriptPath);
+        var args = UpdateRelaunchScript.BuildPowerShellArguments(
+            scriptPath,
+            ScriptSha256);
 
         Assert.Contains("-NoProfile", args);
         Assert.Contains("-NonInteractive", args);
         Assert.Contains("-ExecutionPolicy Bypass", args);
         Assert.Contains("-WindowStyle Hidden", args);
-        Assert.Contains($"-File \"{scriptPath}\"", args);
+        Assert.Contains("-EncodedCommand ", args);
+
+        string encoded = args[(args.IndexOf("-EncodedCommand ", StringComparison.Ordinal)
+            + "-EncodedCommand ".Length)..];
+        string bootstrap = Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+        Assert.Contains(
+            "Join-Path $PSHOME 'Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1'",
+            bootstrap);
+        Assert.Contains("Import-Module -Name $securityModulePath -ErrorAction Stop", bootstrap);
+        Assert.Contains($"$scriptPath = '{scriptPath}'", bootstrap);
+        Assert.Contains($"$expectedScriptSha256 = '{ScriptSha256}'", bootstrap);
+        Assert.Contains("[System.IO.FileShare]::Read", bootstrap);
+        Assert.Contains("$scriptStream.CopyTo($memory)", bootstrap);
+        Assert.Contains("$sha256.ComputeHash($scriptBytes)", bootstrap);
+        Assert.Contains("Invoke-Expression $scriptText", bootstrap);
+        Assert.DoesNotContain("-File", bootstrap);
     }
 
     [Fact]
@@ -78,6 +101,7 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Contains($"'{spec.InstallerPath}'", script);
         Assert.Contains($"'{spec.TargetExecutablePath}'", script);
         Assert.Contains($"'{spec.ScriptPath}'", script);
+        Assert.Contains($"'{spec.ExpectedInstallerSha256}'", script);
         Assert.Contains($"-ArgumentList '{UpdateRelaunchScript.DefaultInstallerArguments}'", script);
     }
 
@@ -89,6 +113,12 @@ public sealed class UpdateRelaunchScriptTests
 
         Assert.Contains(
             $"Remove-Item -LiteralPath '{spec.ScriptPath}' -Force -ErrorAction SilentlyContinue",
+            script);
+        Assert.Contains(
+            $"Remove-Item -LiteralPath '{spec.InstallerPath}' -Force -ErrorAction SilentlyContinue",
+            script);
+        Assert.Contains(
+            $"Remove-Item -LiteralPath '{spec.StagingDirectory}' -Force -ErrorAction SilentlyContinue",
             script);
     }
 
@@ -146,5 +176,52 @@ public sealed class UpdateRelaunchScriptTests
         var script = UpdateRelaunchScript.Build(spec);
 
         Assert.Contains(@"'C:\Temp\o''brien\setup.exe'", script);
+    }
+
+    [Fact]
+    public void Build_VerifiesAuthenticodeThenHeldInstallerBeforeStartProcess()
+    {
+        var script = UpdateRelaunchScript.Build(SampleSpec());
+
+        int openIndex = script.IndexOf("[System.IO.File]::Open", StringComparison.Ordinal);
+        int hashIndex = script.IndexOf("$sha256.ComputeHash($installerStream)", StringComparison.Ordinal);
+        int comparisonIndex = script.IndexOf(
+            "Installer SHA-256 verification failed at the execution boundary.",
+            StringComparison.Ordinal);
+        int signatureIndex = script.IndexOf("Get-AuthenticodeSignature", StringComparison.Ordinal);
+        int installerStartIndex = script.IndexOf(
+            "Start-Process -FilePath $installerPath",
+            StringComparison.Ordinal);
+        int disposeIndex = script.IndexOf("$installerStream.Dispose()", StringComparison.Ordinal);
+
+        Assert.True(openIndex >= 0);
+        Assert.True(openIndex > signatureIndex);
+        Assert.True(hashIndex > openIndex);
+        Assert.True(comparisonIndex > hashIndex);
+        Assert.True(installerStartIndex > comparisonIndex);
+        Assert.True(disposeIndex > installerStartIndex);
+        Assert.Contains("[System.IO.FileShare]::Read", script);
+        Assert.Contains("$signature.Status -ne 'Valid'", script);
+        Assert.Contains("$signature.Status -ne 'NotSigned'", script);
+    }
+
+    [Fact]
+    public void Build_InvalidInstallerHash_Throws()
+    {
+        UpdateRelaunchSpec spec = SampleSpec() with
+        {
+            ExpectedInstallerSha256 = "not-a-hash",
+        };
+
+        Assert.Throws<ArgumentException>(() => UpdateRelaunchScript.Build(spec));
+    }
+
+    [Fact]
+    public void BuildPowerShellArguments_InvalidScriptHash_Throws()
+    {
+        Assert.Throws<ArgumentException>(
+            () => UpdateRelaunchScript.BuildPowerShellArguments(
+                @"C:\Temp\relaunch.ps1",
+                "not-a-hash"));
     }
 }

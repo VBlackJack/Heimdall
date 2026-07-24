@@ -34,11 +34,12 @@ public interface IUpdateService
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Downloads the update's installer to a temporary file and verifies its
-    /// SHA-256. Refuses (throws) when no published checksum is available or the
-    /// digest does not match. Returns the verified temp file path.
+    /// Downloads the update's installer to a restrictive staging directory and
+    /// verifies its SHA-256. Refuses (throws) when no published checksum is
+    /// available or the digest does not match. Returns a lease that keeps the
+    /// verified installer deny-write locked until the relauncher has started.
     /// </summary>
-    Task<string> DownloadVerifiedAsync(
+    Task<IVerifiedUpdatePackage> DownloadVerifiedAsync(
         UpdateInfo update,
         IProgress<double>? progress,
         CancellationToken cancellationToken);
