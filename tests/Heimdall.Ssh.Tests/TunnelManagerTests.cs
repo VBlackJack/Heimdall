@@ -150,14 +150,15 @@ public class TunnelManagerTests : IDisposable
 
     private static SshConnectionParams MakeSshParams(
         string host = "127.0.0.1",
-        int port = 22) =>
+        int port = 22,
+        TimeSpan? connectTimeout = null) =>
         new()
         {
             Host = host,
             Port = port,
             Username = "testuser",
             Password = "secret",
-            ConnectTimeout = TimeSpan.FromMilliseconds(100)
+            ConnectTimeout = connectTimeout ?? TimeSpan.FromMilliseconds(100)
         };
 
     private static HostKeyStore TestHostKeyStore() => new();
@@ -238,6 +239,23 @@ public class TunnelManagerTests : IDisposable
 
         Assert.Throws<ObjectDisposedException>(() =>
             _manager.TryRegisterExternalTunnel(MakeInfo(10001), new FakeHandle(), () => true));
+    }
+
+    [Fact]
+    public void TryRegisterExternalTunnelCore_AfterDispose_RejectsAndDisposesHandle()
+    {
+        string alias = _manager.AllocateLoopbackAlias();
+        var handle = new FakeHandle();
+        _manager.Dispose();
+
+        bool registered = _manager.TryRegisterExternalTunnelCore(
+            MakeInfo(10001, localBindHost: alias),
+            handle,
+            () => true);
+
+        Assert.False(registered);
+        Assert.Equal(1, handle.DisposeCount);
+        Assert.Equal((0, 0, 0, 0), _manager.GetRegistryCounts());
     }
 
     // ── GetActiveTunnels ──────────────────────────────────────────────
@@ -718,10 +736,13 @@ public class TunnelManagerTests : IDisposable
     [Fact]
     public void Dispose_CalledTwice_DoesNotThrow()
     {
-        RegisterFake(10001);
+        var handle = new FakeHandle();
+        RegisterFake(10001, handle: handle);
 
         _manager.Dispose();
         _manager.Dispose();
+
+        Assert.Equal(1, handle.DisposeCount);
     }
 
     [Fact]
@@ -737,6 +758,174 @@ public class TunnelManagerTests : IDisposable
 
         Assert.Contains(10001, closedPorts);
         Assert.Contains(10002, closedPorts);
+    }
+
+    [Fact]
+    public void RegisterTunnelSession_AfterDispose_RejectsAndDisposesSession()
+    {
+        string alias = _manager.AllocateLoopbackAlias();
+        var client = new RecordingSshClient();
+        var port = new RecordingForwardedPortLocal();
+        TunnelInfo info = MakeInfo(10001, localBindHost: alias);
+        var session = new TunnelSession(client, port, info);
+        _manager.Dispose();
+
+        TunnelResult result = _manager.RegisterTunnelSession(session, info.LocalPort, info);
+
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
+        Assert.Equal(1, client.DisposeCount);
+        Assert.Equal(1, port.DisposeCount);
+        Assert.Equal((0, 0, 0, 0), _manager.GetRegistryCounts());
+    }
+
+    [Fact]
+    public async Task Dispose_DoesNotHoldRegistryLockWhileDisposing()
+    {
+        var blockingHandle = new BlockingHandle();
+        RegisterFake(10001, handle: blockingHandle);
+
+        Task disposeTask = Task.Run(_manager.Dispose);
+        Assert.True(blockingHandle.WaitForDisposeStarted(TimeSpan.FromSeconds(2)));
+
+        Task<(int Active, int External, int References, int Reservations)> countsTask =
+            Task.Run(_manager.GetRegistryCounts);
+        Task completed = await Task.WhenAny(countsTask, Task.Delay(TimeSpan.FromSeconds(2)));
+        try
+        {
+            Assert.Same(countsTask, completed);
+            Assert.Equal((0, 0, 0, 0), await countsTask);
+        }
+        finally
+        {
+            blockingHandle.AllowDispose();
+            await disposeTask;
+        }
+    }
+
+    [Fact]
+    public async Task Dispose_RacingActiveAndExternalRegistrations_DisposesEverySessionExactlyOnce()
+    {
+        const int registrationCount = 32;
+        var start = new ManualResetEventSlim(false);
+        var handles = Enumerable.Range(0, registrationCount)
+            .Select(_ => new FakeHandle())
+            .ToArray();
+        var externalRegistrations = handles
+            .Select((handle, index) =>
+            {
+                string alias = _manager.AllocateLoopbackAlias();
+                return Task.Run(() =>
+                {
+                    start.Wait();
+                    return _manager.TryRegisterExternalTunnelCore(
+                        MakeInfo(20000 + (index % 16), localBindHost: alias),
+                        handle,
+                        () => true);
+                });
+            })
+            .ToArray();
+        var clients = Enumerable.Range(0, registrationCount)
+            .Select(_ => new RecordingSshClient())
+            .ToArray();
+        var ports = Enumerable.Range(0, registrationCount)
+            .Select(_ => new RecordingForwardedPortLocal())
+            .ToArray();
+        var activeRegistrations = clients
+            .Select((client, index) =>
+            {
+                string alias = _manager.AllocateLoopbackAlias();
+                TunnelInfo info = MakeInfo(20000 + (index % 16), localBindHost: alias);
+                var session = new TunnelSession(client, ports[index], info);
+                return Task.Run(() =>
+                {
+                    start.Wait();
+                    return _manager.RegisterTunnelSession(session, info.LocalPort, info);
+                });
+            })
+            .ToArray();
+        Task disposeTask = Task.Run(() =>
+        {
+            start.Wait();
+            _manager.Dispose();
+        });
+
+        start.Set();
+        Task allTasks = Task.WhenAll(
+            externalRegistrations
+                .Cast<Task>()
+                .Concat(activeRegistrations)
+                .Append(disposeTask));
+        Task completed = await Task.WhenAny(allTasks, Task.Delay(TimeSpan.FromSeconds(5)));
+
+        Assert.Same(allTasks, completed);
+        await allTasks;
+        Assert.Equal((0, 0, 0, 0), _manager.GetRegistryCounts());
+        Assert.All(handles, handle => Assert.Equal(1, handle.DisposeCount));
+        Assert.All(clients, client => Assert.Equal(1, client.DisposeCount));
+        Assert.All(ports, port => Assert.Equal(1, port.DisposeCount));
+    }
+
+    [Fact]
+    public async Task OpenTunnelAsync_DisposeDuringConnect_CancelsManagerLifetime()
+    {
+        var connectStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new RecordingSshClient();
+
+        static Task<PinnedFingerprintVerifier> ResolvePinnedVerifier(
+            SshConnectionParams connectionParams,
+            string verificationHost,
+            int verificationPort,
+            HostKeyStore hostKeyStore,
+            IHostKeyVerifier verifier,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                new PinnedFingerprintVerifier(verificationHost, verificationPort, "SHA256:test"));
+        }
+
+        SshClient CreateSshClient(SshConnectionParams connectionParams) => client;
+
+        async Task ConnectSshClient(
+            SshClient sshClient,
+            string verificationHost,
+            int verificationPort,
+            PinnedFingerprintVerifier pinnedVerifier,
+            CancellationToken cancellationToken,
+            string cancelLogMessage)
+        {
+            connectStarted.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        using var manager = new TunnelManager(
+            ResolvePinnedVerifier,
+            CreateSshClient,
+            ConnectSshClient);
+        Task<TunnelResult> openTask = manager.OpenTunnelAsync(
+            MakeSshParams(connectTimeout: TimeSpan.FromSeconds(30)),
+            "target.internal",
+            3389,
+            10001,
+            TestHostKeyStore(),
+            TestHostKeyVerifier());
+
+        await connectStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        manager.Dispose();
+        TunnelResult result = await openTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
+        Assert.Equal(1, client.DisposeCount);
+        Assert.Equal((0, 0, 0, 0), manager.GetRegistryCounts());
+    }
+
+    [Fact]
+    public void AllocateLoopbackAlias_AfterDispose_ThrowsObjectDisposed()
+    {
+        _manager.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(_manager.AllocateLoopbackAlias);
     }
 
     // ── AllocatePort ──────────────────────────────────────────────────

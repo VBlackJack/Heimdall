@@ -192,16 +192,22 @@ public sealed partial class TunnelManager
         };
     }
 
-    private TunnelResult RegisterTunnelSession(
+    internal TunnelResult RegisterTunnelSession(
         TunnelSession session,
         int localPort,
         TunnelInfo info)
     {
         bool registered = false;
+        bool rejectedBecauseDisposed = false;
 
         lock (_registryLock)
         {
-            if (!IsPortTracked(localPort) && _activeTunnels.TryAdd(localPort, session))
+            if (_disposed)
+            {
+                rejectedBecauseDisposed = true;
+                ReleaseLoopbackAliasReservationIfUnboundUnderLock(info.LocalBindHost);
+            }
+            else if (!IsPortTracked(localPort) && _activeTunnels.TryAdd(localPort, session))
             {
                 AddReferenceUnderLock(localPort);
                 registered = true;
@@ -215,6 +221,15 @@ public sealed partial class TunnelManager
         if (!registered)
         {
             session.Dispose();
+            if (rejectedBecauseDisposed)
+            {
+                return new TunnelResult(
+                    false,
+                    null,
+                    "Tunnel manager was disposed before registration.",
+                    SshFailureCode.Cancelled);
+            }
+
             return new TunnelResult(false, null, $"Local port {localPort} was claimed concurrently.", SshFailureCode.PortInUse);
         }
 

@@ -29,12 +29,53 @@ namespace Heimdall.Ssh;
 /// </summary>
 public sealed partial class TunnelManager : IDisposable
 {
+    internal delegate Task<PinnedFingerprintVerifier> ResolvePinnedVerifier(
+        SshConnectionParams connectionParams,
+        string verificationHost,
+        int verificationPort,
+        HostKeyStore hostKeyStore,
+        IHostKeyVerifier verifier,
+        CancellationToken cancellationToken);
+
+    internal delegate Task ConnectSshClient(
+        SshClient client,
+        string verificationHost,
+        int verificationPort,
+        PinnedFingerprintVerifier pinnedVerifier,
+        CancellationToken cancellationToken,
+        string cancelLogMessage);
+
     private readonly ConcurrentDictionary<int, TunnelSession> _activeTunnels = new();
     private readonly ConcurrentDictionary<int, ExternalTunnelSession> _externalTunnels = new();
     private readonly ConcurrentDictionary<int, int> _refCounts = new();
     private readonly HashSet<string> _reservedLoopbackAliases = new(StringComparer.Ordinal);
     private readonly object _registryLock = new();
-    private bool _disposed;
+    private readonly CancellationTokenSource _lifetimeCts = new();
+    private readonly ResolvePinnedVerifier _resolvePinnedVerifier;
+    private readonly Func<SshConnectionParams, SshClient> _createSshClient;
+    private readonly ConnectSshClient _connectSshClient;
+    private volatile bool _disposed;
+
+    public TunnelManager()
+        : this(
+            ResolvePinnedVerifierAsync,
+            SshConnectionFactory.CreateSshClient,
+            ConnectSshClientWithCancellationAsync)
+    {
+    }
+
+    internal TunnelManager(
+        ResolvePinnedVerifier resolvePinnedVerifier,
+        Func<SshConnectionParams, SshClient> createSshClient,
+        ConnectSshClient connectSshClient)
+    {
+        _resolvePinnedVerifier = resolvePinnedVerifier
+            ?? throw new ArgumentNullException(nameof(resolvePinnedVerifier));
+        _createSshClient = createSshClient
+            ?? throw new ArgumentNullException(nameof(createSshClient));
+        _connectSshClient = connectSshClient
+            ?? throw new ArgumentNullException(nameof(connectSshClient));
+    }
 
     /// <summary>Raised when a tunnel is successfully opened.</summary>
     public event Action<TunnelInfo>? TunnelOpened;
@@ -143,6 +184,10 @@ public sealed partial class TunnelManager : IDisposable
         ArgumentNullException.ThrowIfNull(hostKeyStore);
         ArgumentNullException.ThrowIfNull(verifier);
         localBindHost = LoopbackBinding.NormalizeHost(localBindHost);
+        using var openCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _lifetimeCts.Token);
+        CancellationToken openToken = openCts.Token;
 
         if (localPort > 0 && IsPortTracked(localPort))
         {
@@ -154,32 +199,32 @@ public sealed partial class TunnelManager : IDisposable
 
         try
         {
-            var pinnedVerifier = await ResolvePinnedVerifierAsync(
+            var pinnedVerifier = await _resolvePinnedVerifier(
                     gatewayParams,
                     gatewayParams.Host,
                     gatewayParams.Port,
                     hostKeyStore,
                     verifier,
-                    cancellationToken)
+                    openToken)
                 .ConfigureAwait(false);
 
-            context.FinalClient = SshConnectionFactory.CreateSshClient(gatewayParams);
+            context.FinalClient = _createSshClient(gatewayParams);
             context.FinalClient.KeepAliveInterval = TimeSpan.FromSeconds(keepAliveIntervalSeconds);
 
             int reportedLocalPort = localPort;
             context.FinalClient.ErrorOccurred += (_, args) =>
                 Core.Logging.FileLogger.Error($"SSH tunnel error on port {reportedLocalPort}: {args.Exception.Message}");
 
-            await ConnectSshClientWithCancellationAsync(
+            await _connectSshClient(
                     context.FinalClient,
                     gatewayParams.Host,
                     gatewayParams.Port,
                     pinnedVerifier,
-                    cancellationToken,
+                    openToken,
                     "Client disconnect on cancel suppressed")
                 .ConfigureAwait(false);
 
-            cancellationToken.ThrowIfCancellationRequested();
+            openToken.ThrowIfCancellationRequested();
 
             int boundLocalPort = WireFinalForwardedPorts(
                 context,
@@ -266,6 +311,11 @@ public sealed partial class TunnelManager : IDisposable
                 .ConfigureAwait(false);
         }
 
+        using var openCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _lifetimeCts.Token);
+        CancellationToken openToken = openCts.Token;
+
         if (localPort > 0 && IsPortTracked(localPort))
         {
             ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
@@ -282,25 +332,25 @@ public sealed partial class TunnelManager : IDisposable
             // ...
             // Final: forward through last intermediate to remoteHost:remotePort
 
-            var rootPinnedVerifier = await ResolvePinnedVerifierAsync(
+            var rootPinnedVerifier = await _resolvePinnedVerifier(
                     gatewayChain[0],
                     gatewayChain[0].Host,
                     gatewayChain[0].Port,
                     hostKeyStore,
                     verifier,
-                    cancellationToken)
+                    openToken)
                 .ConfigureAwait(false);
 
             // Connect to the first (root) gateway directly
-            var rootClient = SshConnectionFactory.CreateSshClient(gatewayChain[0]);
+            var rootClient = _createSshClient(gatewayChain[0]);
             context.IntermediateClients.Add(rootClient);
 
-            await ConnectSshClientWithCancellationAsync(
+            await _connectSshClient(
                     rootClient,
                     gatewayChain[0].Host,
                     gatewayChain[0].Port,
                     rootPinnedVerifier,
-                    cancellationToken,
+                    openToken,
                     "Root client disconnect on cancel suppressed")
                 .ConfigureAwait(false);
 
@@ -309,7 +359,7 @@ public sealed partial class TunnelManager : IDisposable
             // Set up intermediate hops
             for (int i = 1; i < gatewayChain.Count; i++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                openToken.ThrowIfCancellationRequested();
 
                 var nextGateway = gatewayChain[i];
                 // Forward through current client to the next gateway's SSH port.
@@ -331,16 +381,16 @@ public sealed partial class TunnelManager : IDisposable
                 // Connect to the next gateway through the forwarded port
                 var hopParams = CreateLoopbackHopParams(nextGateway, intermediateLocalPort);
 
-                var hopPinnedVerifier = await ResolvePinnedVerifierAsync(
+                var hopPinnedVerifier = await _resolvePinnedVerifier(
                         hopParams,
                         nextGateway.Host,
                         nextGateway.Port,
                         hostKeyStore,
                         verifier,
-                        cancellationToken)
+                        openToken)
                     .ConfigureAwait(false);
 
-                var hopClient = SshConnectionFactory.CreateSshClient(hopParams);
+                var hopClient = _createSshClient(hopParams);
 
                 if (i < gatewayChain.Count - 1)
                 {
@@ -353,17 +403,17 @@ public sealed partial class TunnelManager : IDisposable
                     context.FinalClient = hopClient;
                 }
 
-                await ConnectSshClientWithCancellationAsync(
+                await _connectSshClient(
                         hopClient,
                         nextGateway.Host,
                         nextGateway.Port,
                         hopPinnedVerifier,
-                        cancellationToken,
+                        openToken,
                         "Hop client disconnect on cancel suppressed")
                     .ConfigureAwait(false);
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
+            openToken.ThrowIfCancellationRequested();
 
             int boundLocalPort = WireFinalForwardedPorts(
                 context,
@@ -496,21 +546,34 @@ public sealed partial class TunnelManager : IDisposable
         ArgumentNullException.ThrowIfNull(isAlive);
         info = info with { LocalBindHost = LoopbackBinding.NormalizeHost(info.LocalBindHost) };
 
+        return TryRegisterExternalTunnelCore(info, tunnelHandle, isAlive);
+    }
+
+    internal bool TryRegisterExternalTunnelCore(
+        TunnelInfo info,
+        IDisposable tunnelHandle,
+        Func<bool> isAlive)
+    {
         var session = new ExternalTunnelSession(info, tunnelHandle, isAlive);
         bool registered = false;
 
         lock (_registryLock)
         {
-            if (!IsPortTracked(info.LocalPort) && _externalTunnels.TryAdd(info.LocalPort, session))
+            if (!_disposed
+                && !IsPortTracked(info.LocalPort)
+                && _externalTunnels.TryAdd(info.LocalPort, session))
             {
                 AddReferenceUnderLock(info.LocalPort);
                 registered = true;
+            }
+            else
+            {
+                ReleaseLoopbackAliasReservationIfUnboundUnderLock(info.LocalBindHost);
             }
         }
 
         if (!registered)
         {
-            ReleaseLoopbackAliasReservationIfUnbound(info.LocalBindHost);
             session.Dispose();
             return false;
         }
@@ -526,8 +589,12 @@ public sealed partial class TunnelManager : IDisposable
     /// </summary>
     public string AllocateLoopbackAlias()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         lock (_registryLock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             for (int octet = LoopbackBinding.FirstAliasOctet; octet <= LoopbackBinding.LastAliasOctet; octet++)
             {
                 string candidate = LoopbackBinding.FormatAlias(octet);
@@ -568,8 +635,39 @@ public sealed partial class TunnelManager : IDisposable
             return;
         }
 
-        _disposed = true;
-        CloseAllTunnels();
+        try
+        {
+            _lifetimeCts.Cancel();
+        }
+        catch (AggregateException ex)
+        {
+            Core.Logging.FileLogger.Debug("TunnelManager lifetime cancellation callback failed", ex);
+        }
+
+        List<(int LocalPort, IDisposable Session)> sessions;
+        lock (_registryLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            sessions = _activeTunnels
+                .Select(pair => (pair.Key, (IDisposable)pair.Value))
+                .Concat(_externalTunnels.Select(pair => (pair.Key, (IDisposable)pair.Value)))
+                .ToList();
+
+            _activeTunnels.Clear();
+            _externalTunnels.Clear();
+            _refCounts.Clear();
+            _reservedLoopbackAliases.Clear();
+        }
+
+        foreach (var (localPort, session) in sessions)
+        {
+            DisposeAndNotifyClosed(localPort, session);
+        }
     }
 
     private bool IsPortTracked(int localPort)
@@ -663,6 +761,18 @@ public sealed partial class TunnelManager : IDisposable
         }
 
         RaiseTunnelClosed(localPort, error);
+    }
+
+    internal (int Active, int External, int References, int Reservations) GetRegistryCounts()
+    {
+        lock (_registryLock)
+        {
+            return (
+                _activeTunnels.Count,
+                _externalTunnels.Count,
+                _refCounts.Count,
+                _reservedLoopbackAliases.Count);
+        }
     }
 
     /// <summary>
