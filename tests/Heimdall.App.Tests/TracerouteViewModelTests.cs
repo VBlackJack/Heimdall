@@ -28,9 +28,12 @@ public class TracerouteViewModelTests
     /// an event: a signal the fake traceroute handler raises once it is entered or
     /// blocked. The value only has to be generous enough that a saturated thread
     /// pool cannot exhaust it before that handler runs at all, and it is paid only
-    /// on failure.
+    /// on failure. Raised from 30 seconds after Stop_CancelsInFlight exhausted that
+    /// value on run 30157869234 attempt 2, where the continuation that observes the
+    /// cancellation was still queued on the bounded concurrency context xUnit posts
+    /// test continuations to.
     /// </summary>
-    private static readonly TimeSpan SignalBackstop = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan SignalBackstop = TimeSpan.FromSeconds(60);
 
     [Fact]
     public void ValidateInputs_DelegatesToEngine()
@@ -190,7 +193,13 @@ public class TracerouteViewModelTests
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                    // Scheduling only: resume the cancellation-observing continuation
+                    // on the thread pool instead of the bounded concurrency context
+                    // xUnit posts to, which removes one of the two queue hops in the
+                    // signal path. It reduces exposure to a saturated queue, it does
+                    // not replace SignalBackstop. Safe because nothing below this
+                    // await touches thread-affine state.
+                    await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -204,10 +213,9 @@ public class TracerouteViewModelTests
 
         var vm = new TracerouteViewModel(service);
         var runTask = vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
-        await Task.Delay(50);
         vm.Stop();
         await blocker.Task.WaitAsync(SignalBackstop);
-        await runTask;
+        await runTask.WaitAsync(SignalBackstop);
 
         Assert.False(vm.IsTracing);
     }
