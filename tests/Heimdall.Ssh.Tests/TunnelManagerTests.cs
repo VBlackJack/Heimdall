@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Runtime.ExceptionServices;
 using Heimdall.Core.Ssh;
 using Renci.SshNet;
 using Renci.SshNet.Common;
@@ -22,6 +23,15 @@ namespace Heimdall.Ssh.Tests;
 
 public class TunnelManagerTests : IDisposable
 {
+    /// <summary>
+    /// Bound for a registry probe to complete while a teardown is in flight.
+    /// Exceeding it means the registry lock is held across the teardown.
+    /// </summary>
+    private static readonly TimeSpan RegistryProbeTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>Bound for a released teardown thread to finish.</summary>
+    private static readonly TimeSpan TeardownJoinTimeout = TimeSpan.FromSeconds(10);
+
     private readonly TunnelManager _manager = new();
 
     public void Dispose()
@@ -46,6 +56,52 @@ public class TunnelManagerTests : IDisposable
         {
             LocalBindHost = localBindHost
         };
+    }
+
+    /// <summary>
+    /// Runs work on a dedicated thread instead of the thread pool.
+    /// <para>
+    /// The lock-contention tests prove that one registry operation is not
+    /// blocked by another that is mid-teardown. Queueing either side on the
+    /// thread pool would make them additionally depend on how fast the pool
+    /// schedules them: on a two-core runner the pool starts with two workers
+    /// and injects more only slowly, so a queued probe can miss its deadline
+    /// while holding no lock at all, which reads as a lock-contention failure
+    /// that never happened. A dedicated thread starts regardless of pool
+    /// saturation, so a missed deadline means what the assertion claims.
+    /// </para>
+    /// Exceptions are captured and rethrown on the test thread; an unhandled
+    /// exception on a plain thread would tear down the whole test process.
+    /// </summary>
+    private sealed class OffPoolRun
+    {
+        private readonly Thread _thread;
+        private ExceptionDispatchInfo? _failure;
+
+        public OffPoolRun(Action work, string name)
+        {
+            _thread = new Thread(() =>
+            {
+                try
+                {
+                    work();
+                }
+                catch (Exception ex)
+                {
+                    _failure = ExceptionDispatchInfo.Capture(ex);
+                }
+            })
+            {
+                IsBackground = true,
+                Name = name
+            };
+        }
+
+        public void Start() => _thread.Start();
+
+        public bool Join(TimeSpan timeout) => _thread.Join(timeout);
+
+        public void ThrowIfFailed() => _failure?.Throw();
     }
 
     private sealed class FakeHandle : IDisposable
@@ -481,62 +537,78 @@ public class TunnelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task ForceCloseTunnel_DoesNotHoldRegistryLockWhileDisposing()
+    public void ForceCloseTunnel_DoesNotHoldRegistryLockWhileDisposing()
     {
         var blockingHandle = new BlockingHandle();
         RegisterFake(10001, handle: blockingHandle);
 
-        Task closeTask = Task.Run(() => _manager.ForceCloseTunnel(10001));
-        Assert.True(blockingHandle.WaitForDisposeStarted(TimeSpan.FromSeconds(2)));
+        var close = new OffPoolRun(() => _manager.ForceCloseTunnel(10001), "tunnel-force-close");
+        close.Start();
+        Assert.True(blockingHandle.WaitForDisposeStarted(RegistryProbeTimeout));
 
-        Task<bool> registerTask = Task.Run(
-            () => _manager.TryRegisterExternalTunnel(MakeInfo(10002), new FakeHandle(), () => true));
+        bool registered = false;
+        var register = new OffPoolRun(
+            () => registered = _manager.TryRegisterExternalTunnel(MakeInfo(10002), new FakeHandle(), () => true),
+            "tunnel-register-probe");
+        register.Start();
 
-        Task completed = await Task.WhenAny(registerTask, Task.Delay(TimeSpan.FromSeconds(2)));
         try
         {
-            Assert.Same(registerTask, completed);
-            Assert.True(await registerTask);
+            Assert.True(
+                register.Join(RegistryProbeTimeout),
+                "Registration did not complete while a tunnel dispose was in flight, "
+                + "so the registry lock is held across dispose.");
+            register.ThrowIfFailed();
+            Assert.True(registered);
             Assert.True(_manager.HasTunnel(10002));
         }
         finally
         {
             blockingHandle.AllowDispose();
-            await closeTask;
+            Assert.True(close.Join(TeardownJoinTimeout));
+            close.ThrowIfFailed();
         }
     }
 
     [Fact]
-    public async Task ForceCloseTunnel_DoesNotHoldRegistryLockWhileRaisingTunnelClosed()
+    public void ForceCloseTunnel_DoesNotHoldRegistryLockWhileRaisingTunnelClosed()
     {
         using var eventStarted = new ManualResetEventSlim(false);
         using var allowEvent = new ManualResetEventSlim(false);
         void Handler(int port, string? error)
         {
             eventStarted.Set();
-            Assert.True(allowEvent.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(allowEvent.Wait(TeardownJoinTimeout));
         }
 
         _manager.TunnelClosed += Handler;
         RegisterFake(10001);
 
-        Task closeTask = Task.Run(() => _manager.ForceCloseTunnel(10001));
-        Assert.True(eventStarted.Wait(TimeSpan.FromSeconds(2)));
+        var close = new OffPoolRun(() => _manager.ForceCloseTunnel(10001), "tunnel-force-close");
+        close.Start();
+        Assert.True(eventStarted.Wait(RegistryProbeTimeout));
 
-        Task<bool> registerTask = Task.Run(
-            () => _manager.TryRegisterExternalTunnel(MakeInfo(10002), new FakeHandle(), () => true));
+        bool registered = false;
+        var register = new OffPoolRun(
+            () => registered = _manager.TryRegisterExternalTunnel(MakeInfo(10002), new FakeHandle(), () => true),
+            "tunnel-register-probe");
+        register.Start();
 
-        Task completed = await Task.WhenAny(registerTask, Task.Delay(TimeSpan.FromSeconds(2)));
         try
         {
-            Assert.Same(registerTask, completed);
-            Assert.True(await registerTask);
+            Assert.True(
+                register.Join(RegistryProbeTimeout),
+                "Registration did not complete while TunnelClosed was being raised, "
+                + "so the registry lock is held across event dispatch.");
+            register.ThrowIfFailed();
+            Assert.True(registered);
             Assert.True(_manager.HasTunnel(10002));
         }
         finally
         {
             allowEvent.Set();
-            await closeTask;
+            Assert.True(close.Join(TeardownJoinTimeout));
+            close.ThrowIfFailed();
             _manager.TunnelClosed -= Handler;
         }
     }
@@ -780,26 +852,33 @@ public class TunnelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task Dispose_DoesNotHoldRegistryLockWhileDisposing()
+    public void Dispose_DoesNotHoldRegistryLockWhileDisposing()
     {
         var blockingHandle = new BlockingHandle();
         RegisterFake(10001, handle: blockingHandle);
 
-        Task disposeTask = Task.Run(_manager.Dispose);
-        Assert.True(blockingHandle.WaitForDisposeStarted(TimeSpan.FromSeconds(2)));
+        var dispose = new OffPoolRun(_manager.Dispose, "tunnel-manager-dispose");
+        dispose.Start();
+        Assert.True(blockingHandle.WaitForDisposeStarted(RegistryProbeTimeout));
 
-        Task<(int Active, int External, int References, int Reservations)> countsTask =
-            Task.Run(_manager.GetRegistryCounts);
-        Task completed = await Task.WhenAny(countsTask, Task.Delay(TimeSpan.FromSeconds(2)));
+        (int Active, int External, int References, int Reservations) counts = default;
+        var probe = new OffPoolRun(() => counts = _manager.GetRegistryCounts(), "registry-counts-probe");
+        probe.Start();
+
         try
         {
-            Assert.Same(countsTask, completed);
-            Assert.Equal((0, 0, 0, 0), await countsTask);
+            Assert.True(
+                probe.Join(RegistryProbeTimeout),
+                "Reading registry counts did not complete while a tunnel dispose was in flight, "
+                + "so the registry lock is held across dispose.");
+            probe.ThrowIfFailed();
+            Assert.Equal((0, 0, 0, 0), counts);
         }
         finally
         {
             blockingHandle.AllowDispose();
-            await disposeTask;
+            Assert.True(dispose.Join(TeardownJoinTimeout));
+            dispose.ThrowIfFailed();
         }
     }
 
