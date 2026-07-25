@@ -12,6 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check committed line endings
+        shell: bash
+        run: |
+          violations="$(git ls-files --eol | grep -E '^i/(crlf|mixed)' || true)"
+          if [ -n "$violations" ]; then
+            echo "Committed blobs must be stored with LF (see .gitattributes):"
+            echo "$violations"
+            echo
+            echo "These blobs were committed with CRLF, bypassing the clean filter."
+            echo "Do not fix this by replaying the offending commit: a pure"
+            echo "line-ending renormalization cannot be rebased, and the branch stays"
+            echo "permanently dirty. Regenerate it instead - rebase --onto the target"
+            echo "branch, stop after the offending commit, then run"
+            echo "git add --renormalize on the offending paths and commit that."
+            exit 1
+          fi
+          echo "All tracked blobs are stored with LF."
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
