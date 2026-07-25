@@ -220,8 +220,16 @@ public sealed class PlinkPasswordFileJanitorTests
         {
             File.WriteAllText(orphanPath, "secret");
             File.SetLastWriteTimeUtc(orphanPath, FixedUtcNow.AddHours(-2));
+            // Ownership is stubbed so this test stays about enumeration, prefix
+            // matching and deletion. The production ownership check compares the
+            // file owner SID against the current user SID, and an elevated host
+            // creates temp files owned by BUILTIN\Administrators, which would make
+            // the sweep skip the orphan for reasons unrelated to what is asserted
+            // here. SweepStale_SkipsPasswordFileNotOwnedByCurrentUser covers the
+            // skip path.
             var janitor = new PlinkPasswordFileJanitor(
                 tempDirectory: () => testDirectory,
+                isOwnedByCurrentUser: _ => true,
                 utcNow: () => FixedUtcNow,
                 maxAge: TimeSpan.FromHours(1));
 
