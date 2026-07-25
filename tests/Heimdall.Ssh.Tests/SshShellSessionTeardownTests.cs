@@ -16,12 +16,32 @@
 
 using System.Diagnostics;
 using System.Reflection;
+using Microsoft.Extensions.Time.Testing;
 using Renci.SshNet;
 
 namespace Heimdall.Ssh.Tests;
 
 public sealed class SshShellSessionTeardownTests
 {
+    /// <summary>Upper bound for a background teardown to report completion.</summary>
+    private static readonly TimeSpan TeardownTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Longest the caller may block while the read loop is stuck. Well below
+    /// the session's own two-second final wait, which is what the test proves
+    /// the caller does not pay for.
+    /// </summary>
+    private static readonly TimeSpan MaxCallerBlockingTime = TimeSpan.FromSeconds(1.5);
+
+    /// <summary>
+    /// Amount the controllable clock jumps per pump iteration. Comfortably past
+    /// the session's final wait so a single applied step releases it.
+    /// </summary>
+    private static readonly TimeSpan ClockStep = TimeSpan.FromSeconds(5);
+
+    /// <summary>Gap between two clock pump iterations.</summary>
+    private static readonly TimeSpan ClockPumpInterval = TimeSpan.FromMilliseconds(10);
+
     [Fact]
     public void Dispose_OnUnconnectedSession_DoesNotThrow()
     {
@@ -92,22 +112,32 @@ public sealed class SshShellSessionTeardownTests
     }
 
     [Fact]
-    public void Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait()
+    public async Task Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait()
     {
-        var session = CreateSessionWithReadLoop(Task.Delay(Timeout.InfiniteTimeSpan));
+        var timeProvider = new FakeTimeProvider();
+        var session = CreateSessionWithReadLoop(Task.Delay(Timeout.InfiniteTimeSpan), timeProvider);
         var disconnectCount = 0;
-        session.Disconnected += _ => Interlocked.Increment(ref disconnectCount);
+        var notified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Disconnected += _ =>
+        {
+            Interlocked.Increment(ref disconnectCount);
+            notified.TrySetResult();
+        };
 
         var stopwatch = Stopwatch.StartNew();
         session.Disconnect();
         stopwatch.Stop();
 
         Assert.True(
-            stopwatch.Elapsed < TimeSpan.FromSeconds(1.5),
+            stopwatch.Elapsed < MaxCallerBlockingTime,
             $"Disconnect took {stopwatch.ElapsedMilliseconds} ms with a stuck read loop.");
+
+        await PumpClockUntilCompletedAsync(timeProvider, notified.Task, TeardownTimeout);
+
         Assert.True(
-            SpinWait.SpinUntil(() => Volatile.Read(ref disconnectCount) == 1, TimeSpan.FromSeconds(5)),
+            notified.Task.IsCompleted,
             "Background teardown did not complete clean disconnect notification.");
+        Assert.Equal(1, Volatile.Read(ref disconnectCount));
     }
 
     [Fact]
@@ -143,9 +173,32 @@ public sealed class SshShellSessionTeardownTests
         Assert.Throws<ObjectDisposedException>(() => session.Write("x"));
     }
 
-    private static SshShellSession CreateSessionWithReadLoop(Task readLoopTask)
+    /// <summary>
+    /// Advances the controllable clock until <paramref name="completion"/> finishes.
+    /// The session registers its final-wait timer from a thread-pool thread, so a
+    /// single advance could land before that registration and leave the delay
+    /// pending for ever. Repeating the advance makes the wait independent of when
+    /// the pool happens to schedule the background teardown; the wall-clock bound
+    /// is only a failure backstop, never the synchronisation point.
+    /// </summary>
+    private static async Task PumpClockUntilCompletedAsync(
+        FakeTimeProvider timeProvider,
+        Task completion,
+        TimeSpan timeout)
     {
-        var session = new SshShellSession();
+        var stopwatch = Stopwatch.StartNew();
+        while (!completion.IsCompleted && stopwatch.Elapsed < timeout)
+        {
+            timeProvider.Advance(ClockStep);
+            await Task.WhenAny(completion, Task.Delay(ClockPumpInterval)).ConfigureAwait(false);
+        }
+    }
+
+    private static SshShellSession CreateSessionWithReadLoop(
+        Task readLoopTask,
+        TimeProvider? timeProvider = null)
+    {
+        var session = new SshShellSession(timeProvider);
         SetPrivateField(session, "_client", new SshClient("127.0.0.1", "user", "password"));
         SetPrivateField(session, "_readCts", new CancellationTokenSource());
         SetPrivateField(session, "_readLoopTask", readLoopTask);

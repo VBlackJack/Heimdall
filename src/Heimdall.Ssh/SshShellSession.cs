@@ -41,6 +41,7 @@ public sealed class SshShellSession : IDisposable
     /// </summary>
     private static readonly TimeSpan StopReadLoopFinal = TimeSpan.FromSeconds(2);
 
+    private readonly TimeProvider _timeProvider;
     private SshClient? _client;
     private ShellStream? _stream;
     private CancellationTokenSource? _readCts;
@@ -49,6 +50,20 @@ public sealed class SshShellSession : IDisposable
     private int _disconnectNotified;
     private bool _teardownStarted;
     private bool _disposed;
+
+    /// <summary>
+    /// Creates a shell session.
+    /// </summary>
+    /// <param name="timeProvider">
+    /// Clock backing the background teardown wait. Defaults to
+    /// <see cref="TimeProvider.System"/>, so runtime behaviour is unchanged;
+    /// tests substitute a controllable clock to drive teardown without
+    /// depending on wall-clock time.
+    /// </param>
+    public SshShellSession(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     /// <summary>Raised when data is received from the remote shell.</summary>
     public event Action<byte[]>? DataReceived;
@@ -391,7 +406,7 @@ public sealed class SshShellSession : IDisposable
         {
             try
             {
-                Task timeout = Task.Delay(StopReadLoopFinal);
+                Task timeout = Task.Delay(StopReadLoopFinal, _timeProvider);
                 Task completed = await Task.WhenAny(pending, timeout).ConfigureAwait(false);
                 if (completed == pending)
                 {
