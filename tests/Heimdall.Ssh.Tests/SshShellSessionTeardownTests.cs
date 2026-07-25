@@ -23,8 +23,14 @@ namespace Heimdall.Ssh.Tests;
 
 public sealed class SshShellSessionTeardownTests
 {
-    /// <summary>Upper bound for a background teardown to report completion.</summary>
-    private static readonly TimeSpan TeardownTimeout = TimeSpan.FromSeconds(5);
+    /// <summary>
+    /// Failure backstop for a background teardown to report completion. The
+    /// controllable clock, not this bound, is what releases the session's final
+    /// wait, so the value only has to be generous enough that a heavily loaded
+    /// runner cannot exhaust it before the thread pool schedules the teardown
+    /// at all. Its cost is paid only when the test genuinely fails.
+    /// </summary>
+    private static readonly TimeSpan TeardownTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Longest the caller may block while the read loop is stuck. Well below
