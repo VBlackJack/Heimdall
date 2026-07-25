@@ -62,21 +62,54 @@ Four distinct root causes share the same symptom (`TaskCanceledException`,
 
 ## Currently tagged `CIUnstable`
 
-| Test class | File |
-|---|---|
-| `OpenSshPipeAgentTests` (3 of 4 tests) | `tests/Heimdall.Ssh.Tests/OpenSshPipeAgentTests.cs` |
-| `HmacGeneratorSmokeTests` (whole class) | `tests/Heimdall.App.UiTests/Pilots/HmacGeneratorSmokeTests.cs` |
-| `TextDiffSmokeTests` (whole class) | `tests/Heimdall.App.UiTests/Pilots/TextDiffSmokeTests.cs` |
-| `HashGeneratorSmokeTests` (whole class) | `tests/Heimdall.App.UiTests/Pilots/HashGeneratorSmokeTests.cs` |
-| `DnsLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/DnsLookupViewModelTests.cs` |
-| `WhoisLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/WhoisLookupViewModelTests.cs` |
-| `ConPtySessionTests.StartAsync_LaunchesShell_DeliversInitialTerminalOutput` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` |
-| `TcpPingViewModelTests.StartCommand_MixedResults_PreservesFailedLineAndSummary` | `tests/Heimdall.App.Tests/TcpPingViewModelTests.cs` |
+There are 11 `[Trait("Category", "CIUnstable")]` sites in the solution: 8 on
+individual test methods and 3 on whole classes. Every site is listed below.
+
+| Test | File | Categories |
+|---|---|---|
+| `OpenSshPipeAgentTests.GetIdentities_ReadsResponseFromNamedPipe` | `tests/Heimdall.Ssh.Tests/OpenSshPipeAgentTests.cs` | `CIUnstable` |
+| `OpenSshPipeAgentTests.GetIdentities_WhenPipeClosesAfterConnect_ReturnsEmpty` | `tests/Heimdall.Ssh.Tests/OpenSshPipeAgentTests.cs` | `CIUnstable` |
+| `OpenSshPipeAgentTests.AgentKeySign_SendsFlagsAndReturnsSignature` | `tests/Heimdall.Ssh.Tests/OpenSshPipeAgentTests.cs` | `CIUnstable` |
+| `ConPtySessionTests.StartAsync_LaunchesShell_DeliversInitialTerminalOutput` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
+| `ConPtySessionTests.DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
+| `DnsLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/DnsLookupViewModelTests.cs` | `CIUnstable` |
+| `WhoisLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/WhoisLookupViewModelTests.cs` | `CIUnstable` |
+| `TcpPingViewModelTests.StartCommand_MixedResults_PreservesFailedLineAndSummary` | `tests/Heimdall.App.Tests/TcpPingViewModelTests.cs` | `CIUnstable` |
+| `HmacGeneratorSmokeTests` (class tag, 6 tests) | `tests/Heimdall.App.UiTests/Pilots/HmacGeneratorSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
+| `TextDiffSmokeTests` (class tag, 7 tests) | `tests/Heimdall.App.UiTests/Pilots/TextDiffSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
+| `HashGeneratorSmokeTests` (class tag, 5 tests) | `tests/Heimdall.App.UiTests/Pilots/HashGeneratorSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
+
+The three smoke classes carry `CIUnstable` at class level while each of their
+test methods additionally carries `RequiresDesktop`, so they are excluded by
+either half of the blocking filter. The other `Pilots/*SmokeTests` classes carry
+only `RequiresDesktop` and are not part of this inventory.
 
 `OpenSshPipeAgentTests.IsAvailable_NoServer_ReturnsFalse` is intentionally
 NOT tagged: it is a negative-path test that asserts a 25 ms
 availability probe fires when no server is listening, and that path is
 not affected by the runner latency.
+
+## Flakiness fixed by rewriting instead of tagging
+
+Not every runner-only failure earns a tag. Two SSH tests failed the blocking
+lane through thread-pool starvation on the two-core runner and were repaired
+rather than excluded:
+
+- `SshShellSessionTeardownTests.Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait`
+  waited on `SpinWait.SpinUntil`, a busy-spin that occupied the pool worker
+  running the test while the notification it waited for was produced by a
+  pool-queued continuation. It now awaits a `TaskCompletionSource`, and
+  `SshShellSession` takes an optional `TimeProvider` so the test drives the
+  final teardown wait from a `FakeTimeProvider` instead of wall-clock time.
+- The three `TunnelManagerTests` lock-contention tests raced a `Task.Run` probe
+  against a two-second `Task.Delay`. Winning that race required both that no
+  lock was held and that the pool scheduled the probe promptly, so a saturated
+  pool produced failures that read as lock contention. Both sides now run on
+  dedicated threads and the proof is a `Thread.Join` with a timeout.
+
+Prefer this route when the cause is the test's own scheduling assumptions
+rather than genuine environment latency: a tag hides the test, a rewrite keeps
+the coverage in the blocking lane.
 
 ## Running locally
 
