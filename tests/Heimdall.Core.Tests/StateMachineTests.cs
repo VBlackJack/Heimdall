@@ -26,15 +26,24 @@ public class ConnectionStateMachineTests
     /// and this only has to be generous enough that a loaded machine cannot exhaust it
     /// before eight threads have each run a hundred transitions. It is ONE budget for
     /// all eight joins together, not one per join, and it is paid only on failure.
+    /// It MUST stay strictly greater than <see cref="CrossThreadReadBackstop"/>: the
+    /// probe wait runs inside the worker that publishes, so a stalled probe blocks that
+    /// worker for the whole of its bound. Were this budget the smaller of the two, a
+    /// probe stall would always surface here and the probe assertion would be dead.
     /// </summary>
-    private static readonly TimeSpan WorkerCompletionBackstop = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan WorkerCompletionBackstop = TimeSpan.FromSeconds(60);
 
     /// <summary>
     /// Failure bound, not a synchronisation point. The wait it bounds completes on an
-    /// event: the probe task finishing its read of the state from another thread. It is
-    /// paid only on failure.
+    /// event: the probe thread finishing its read of the state from another thread. It
+    /// is paid only on failure. The former 2 s value was observed exhausted on run
+    /// 30163798337, when the probe was still a thread-pool work item and could not
+    /// obtain a worker while the rest of the suite saturated the pool. Now that the
+    /// probe runs on a dedicated thread the wait depends on OS scheduling alone, so a
+    /// value orders of magnitude above the sub-millisecond unstarved cost is a pure
+    /// failure bound rather than a bet on the pool.
     /// </summary>
-    private static readonly TimeSpan CrossThreadReadBackstop = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan CrossThreadReadBackstop = TimeSpan.FromSeconds(30);
 
     private readonly ConnectionStateMachine _sm = new();
 
@@ -305,8 +314,17 @@ public class ConnectionStateMachineTests
             revisions.Enqueue(change.Revision);
             if (Interlocked.CompareExchange(ref probeStarted, 1, 0) == 0)
             {
-                Task readTask = Task.Run(() => _sm.GetStateData(change.ServerId));
-                crossThreadReadCompleted = readTask.Wait(CrossThreadReadBackstop);
+                // A dedicated thread, not a pool work item. The assertion needs the read
+                // to happen off the publishing thread, which a thread satisfies; asking
+                // the pool for a worker made this wait depend on the rest of the suite
+                // releasing one. The CompareExchange guard means this runs once.
+                Thread probe = new(() => _sm.GetStateData(change.ServerId))
+                {
+                    IsBackground = true,
+                    Name = "state-machine-read-probe",
+                };
+                probe.Start();
+                crossThreadReadCompleted = probe.Join(CrossThreadReadBackstop);
             }
         };
 
