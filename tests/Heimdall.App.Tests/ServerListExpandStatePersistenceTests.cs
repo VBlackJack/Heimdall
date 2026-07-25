@@ -21,6 +21,15 @@ namespace Heimdall.App.Tests;
 
 public sealed partial class ServerListSelectionTests
 {
+    /// <summary>
+    /// Failure backstop for an expand-state persistence signal to arrive. The waits
+    /// it bounds are already event-driven, so this value is not a synchronisation
+    /// point: it only has to be generous enough that a saturated thread pool cannot
+    /// exhaust it before the background merge is scheduled at all. Its cost is paid
+    /// only when the test genuinely fails.
+    /// </summary>
+    private static readonly TimeSpan ExpandStatePersistBackstop = TimeSpan.FromSeconds(30);
+
     [Fact]
     public async Task ExpandStatePersist_InFlightMutationUsesCapturedSnapshots()
     {
@@ -32,7 +41,7 @@ public sealed partial class ServerListSelectionTests
             CreateServer("beta", "Beta", "beta"));
 
         fixture.FolderByPath("alpha").IsExpanded = true;
-        await configManager.FirstMergeStarted.WaitAsync(TimeSpan.FromSeconds(2));
+        await configManager.FirstMergeStarted.WaitAsync(ExpandStatePersistBackstop);
 
         fixture.FolderByPath("alpha").IsExpanded = false;
         fixture.FolderByPath("beta").IsExpanded = true;
@@ -201,7 +210,7 @@ public sealed partial class ServerListSelectionTests
         {
             if (expectedCount == 1)
             {
-                await _firstMergeStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+                await _firstMergeStarted.Task.WaitAsync(ExpandStatePersistBackstop);
                 while (_persistedSnapshots.IsEmpty)
                 {
                     await Task.Delay(10);
@@ -211,7 +220,7 @@ public sealed partial class ServerListSelectionTests
             }
 
             Assert.Equal(2, expectedCount);
-            await _secondMergeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            await _secondMergeCompleted.Task.WaitAsync(ExpandStatePersistBackstop);
         }
     }
 }
