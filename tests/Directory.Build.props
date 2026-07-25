@@ -1,0 +1,30 @@
+<Project>
+
+  <!--
+    A nested Directory.Build.props REPLACES the one above it rather than merging with
+    it, so the root file must be imported explicitly or the test projects would
+    silently lose TreatWarningsAsErrors, EnforceCodeStyleInBuild and
+    RestorePackagesWithLockFile.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!--
+      Test assemblies only. Several tests block a thread pool worker while waiting for
+      work that itself needs a worker; the pool starts at ProcessorCount and injects
+      further workers slowly, so that queued work waits on injection instead of on the
+      thing the test means to observe.
+
+      The floor must exceed the largest number of workers a single test can block,
+      multiplied by the collections that may run concurrently. The largest known
+      blocker holds eight workers plus a probe. A minimum is not a maximum, so this
+      cannot oversubscribe the machine, and threads reserve stack rather than commit
+      it, so the cost of an unused floor is negligible.
+
+      This does not affect xUnit's own concurrency context, which is separately bounded
+      at ProcessorCount and receives every await continuation. That is a distinct queue.
+    -->
+    <ThreadPoolMinThreads>64</ThreadPoolMinThreads>
+  </PropertyGroup>
+
+</Project>
