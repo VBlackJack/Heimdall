@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## 2026-07-24: Security, lifecycle, and accessibility hardening (v2026.072401)
+## 2026-07-25: Security, lifecycle, and accessibility hardening (v2026.072501)
 
 A cross-reviewed hardening pass over the remote-protocol, updater, and session
 lifecycle surfaces, verified finding-by-finding against the real code, plus two
@@ -79,6 +79,14 @@ full suite green (8,271 tests).
   `TimeProvider` (default `TimeProvider.System`, so runtime behavior is unchanged), letting
   its test advance a virtual clock instead of sleeping on the wall clock (`65227300`,
   CODEX-032).
+- **Flaky CI tests fixed.** The SSH shell teardown notification and the tunnel
+  registry-lock probes no longer depend on thread-pool scheduling, and the plink
+  password-file janitor sweep no longer depends on host elevation. `SshShellSession`
+  takes an optional `TimeProvider` (default `TimeProvider.System`, so runtime behavior
+  is unchanged) so its teardown wait is driven by a virtual clock (`7c7dd677`,
+  `740d0090`, `766fcbd7`, `2b42a4ba`).
+- **CIUnstable inventory refreshed.** `docs/CI_FLAKY_TESTS.md` lists all 11 trait sites
+  individually with their effective categories (`37072f03`).
 
 ## 2026-07-24: Session tree gateway badge fix (v2026.072400)
 
