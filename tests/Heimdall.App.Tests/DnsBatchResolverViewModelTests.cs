@@ -310,7 +310,14 @@ public sealed class DnsBatchResolverViewModelTests
         return manager;
     }
 
-    private static async Task WaitUntilAsync(Func<bool> predicate, int timeoutMs = 2000)
+    /// <summary>
+    /// Failure bound for a polled condition. The poll returns as soon as the
+    /// predicate holds, so this is not a synchronisation point: it only has to
+    /// outlast a saturated thread pool scheduling the work being observed.
+    /// </summary>
+    private const int PollBackstopMs = 30000;
+
+    private static async Task WaitUntilAsync(Func<bool> predicate, int timeoutMs = PollBackstopMs)
     {
         var timeoutAt = Environment.TickCount64 + timeoutMs;
         while (!predicate())

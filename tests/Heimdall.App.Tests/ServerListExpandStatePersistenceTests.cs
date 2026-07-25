@@ -211,8 +211,16 @@ public sealed partial class ServerListSelectionTests
             if (expectedCount == 1)
             {
                 await _firstMergeStarted.Task.WaitAsync(ExpandStatePersistBackstop);
+
+                // Bounded so an absent snapshot fails the test instead of hanging
+                // it. An unbounded poll here would stall the whole CI job rather
+                // than reporting one failure.
+                long deadline = Environment.TickCount64 + (long)ExpandStatePersistBackstop.TotalMilliseconds;
                 while (_persistedSnapshots.IsEmpty)
                 {
+                    Assert.True(
+                        Environment.TickCount64 < deadline,
+                        "No expand-state snapshot was persisted before the backstop elapsed.");
                     await Task.Delay(10);
                 }
 
