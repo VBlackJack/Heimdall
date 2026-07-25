@@ -32,6 +32,14 @@ public class TunnelManagerTests : IDisposable
     /// <summary>Bound for a released teardown thread to finish.</summary>
     private static readonly TimeSpan TeardownJoinTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// Failure bound for a batch of pool-queued registrations and a dispose to all
+    /// complete. Failure bound, not a synchronisation point: the wait ends on the
+    /// batch completing, and the value only has to outlast a saturated pool
+    /// draining the work items.
+    /// </summary>
+    private static readonly TimeSpan ConcurrentCompletionBackstop = TimeSpan.FromSeconds(30);
+
     private readonly TunnelManager _manager = new();
 
     public void Dispose()
@@ -935,10 +943,12 @@ public class TunnelManagerTests : IDisposable
                 .Cast<Task>()
                 .Concat(activeRegistrations)
                 .Append(disposeTask));
-        Task completed = await Task.WhenAny(allTasks, Task.Delay(TimeSpan.FromSeconds(5)));
-
-        Assert.Same(allTasks, completed);
-        await allTasks;
+        // Await the real completion rather than racing it against a timer. The
+        // registrations and the dispose are all queued on the thread pool, so a
+        // timer race measures how fast the pool drains 33 work items, not whether
+        // they complete correctly. This is the same defect the ForceCloseTunnel
+        // probes had.
+        await allTasks.WaitAsync(ConcurrentCompletionBackstop);
         Assert.Equal((0, 0, 0, 0), _manager.GetRegistryCounts());
         Assert.All(handles, handle => Assert.Equal(1, handle.DisposeCount));
         Assert.All(clients, client => Assert.Equal(1, client.DisposeCount));

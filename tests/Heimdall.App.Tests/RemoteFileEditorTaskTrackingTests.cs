@@ -422,10 +422,10 @@ public sealed class RemoteFileEditorTaskTrackingTests
 
     private static async Task WaitForTaskAsync(Task task, int timeoutMs = TestTimeoutMs)
     {
-        var timeout = Task.Delay(timeoutMs);
-        var completed = await Task.WhenAny(task, timeout);
-        Assert.Same(task, completed);
-        await task;
+        // Await the task directly rather than racing it against a timer: a race
+        // conflates "did not complete" with "was not scheduled", and reports the
+        // latter as the former.
+        await task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs));
     }
 
     private sealed class FakeRemoteBrowser : IRemoteBrowser
