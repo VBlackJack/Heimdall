@@ -21,6 +21,21 @@ namespace Heimdall.Core.Tests;
 
 public class ConnectionStateMachineTests
 {
+    /// <summary>
+    /// Failure bound, not a synchronisation point. The workers complete on their own,
+    /// and this only has to be generous enough that a loaded machine cannot exhaust it
+    /// before eight threads have each run a hundred transitions. It is ONE budget for
+    /// all eight joins together, not one per join, and it is paid only on failure.
+    /// </summary>
+    private static readonly TimeSpan WorkerCompletionBackstop = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Failure bound, not a synchronisation point. The wait it bounds completes on an
+    /// event: the probe task finishing its read of the state from another thread. It is
+    /// paid only on failure.
+    /// </summary>
+    private static readonly TimeSpan CrossThreadReadBackstop = TimeSpan.FromSeconds(2);
+
     private readonly ConnectionStateMachine _sm = new();
 
     [Fact]
@@ -278,10 +293,11 @@ public class ConnectionStateMachineTests
     }
 
     [Fact]
-    public async Task ConcurrentTransitions_PublishOutsideLockInRevisionOrderAndTeardownCleanly()
+    public void ConcurrentTransitions_PublishOutsideLockInRevisionOrderAndTeardownCleanly()
     {
         const string SessionId = "shared-session";
         System.Collections.Concurrent.ConcurrentQueue<long> revisions = new();
+        System.Collections.Concurrent.ConcurrentQueue<Exception> workerFailures = new();
         int probeStarted = 0;
         bool crossThreadReadCompleted = false;
         _sm.StateChanged += change =>
@@ -290,39 +306,89 @@ public class ConnectionStateMachineTests
             if (Interlocked.CompareExchange(ref probeStarted, 1, 0) == 0)
             {
                 Task readTask = Task.Run(() => _sm.GetStateData(change.ServerId));
-                crossThreadReadCompleted = readTask.Wait(TimeSpan.FromSeconds(2));
+                crossThreadReadCompleted = readTask.Wait(CrossThreadReadBackstop);
             }
         };
 
-        Task[] workers = Enumerable.Range(0, 8)
-            .Select(worker => Task.Run(() =>
+        // Dedicated threads, not pool tasks. The state machine invokes StateChanged
+        // synchronously on the caller's stack, so the handler's bounded wait above runs
+        // on whichever thread drives a transition. On pool tasks that meant blocking a
+        // pool worker while waiting for a pool work item, with eight more workers held
+        // by this test.
+        Thread[] workers = Enumerable.Range(0, 8)
+            .Select(worker => new Thread(() =>
             {
-                for (int iteration = 0; iteration < 100; iteration++)
+                try
                 {
-                    switch ((worker + iteration) % 4)
+                    for (int iteration = 0; iteration < 100; iteration++)
                     {
-                        case 0:
-                            _sm.TryTransition(SessionId, ConnectionState.Initializing);
-                            break;
-                        case 1:
-                            _sm.TryTransition(SessionId, ConnectionState.ValidatingConfig);
-                            break;
-                        case 2:
-                            _sm.SetError(SessionId, "concurrent failure");
-                            break;
-                        default:
-                            _sm.Reset(SessionId);
-                            break;
+                        switch ((worker + iteration) % 4)
+                        {
+                            case 0:
+                                _sm.TryTransition(SessionId, ConnectionState.Initializing);
+                                break;
+                            case 1:
+                                _sm.TryTransition(SessionId, ConnectionState.ValidatingConfig);
+                                break;
+                            case 2:
+                                _sm.SetError(SessionId, "concurrent failure");
+                                break;
+                            default:
+                                _sm.Reset(SessionId);
+                                break;
+                        }
                     }
                 }
-            }))
+                catch (Exception ex)
+                {
+                    // A thread surfaces nothing on its own: uncaught this would tear the
+                    // process down, swallowed it would lose the failure. Collect and
+                    // rethrow after the join to keep what Task.WhenAll reported.
+                    workerFailures.Enqueue(ex);
+                }
+            })
+            {
+                IsBackground = true,
+                Name = $"state-machine-worker-{worker}",
+            })
             .ToArray();
 
-        await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+        foreach (Thread thread in workers)
+        {
+            thread.Start();
+        }
+
+        // One budget for all eight joins. Joining each thread against the full backstop
+        // would allow eight times the intended bound.
+        System.Diagnostics.Stopwatch joinClock = System.Diagnostics.Stopwatch.StartNew();
+        foreach (Thread thread in workers)
+        {
+            TimeSpan remaining = WorkerCompletionBackstop - joinClock.Elapsed;
+            if (remaining <= TimeSpan.Zero || !thread.Join(remaining))
+            {
+                throw new TimeoutException(
+                    $"Concurrent transition workers did not all finish within "
+                    + $"{WorkerCompletionBackstop.TotalSeconds:0.##}s; {thread.Name} is "
+                    + $"still running.");
+            }
+        }
+
+        if (!workerFailures.IsEmpty)
+        {
+            throw new AggregateException(
+                "One or more concurrent transition workers failed.",
+                workerFailures);
+        }
+
         _sm.Teardown(SessionId);
 
         long[] publishedRevisions = revisions.ToArray();
-        Assert.True(crossThreadReadCompleted);
+        Assert.True(
+            crossThreadReadCompleted,
+            $"The cross-thread state read did not complete within "
+            + $"{CrossThreadReadBackstop.TotalSeconds:0.##}s, so the probe stalled "
+            + $"instead of proving the publication is observable off the publishing "
+            + $"thread.");
         Assert.NotEmpty(publishedRevisions);
         Assert.True(publishedRevisions.Zip(
             publishedRevisions.Skip(1),
