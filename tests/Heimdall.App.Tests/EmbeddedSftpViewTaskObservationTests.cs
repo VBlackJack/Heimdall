@@ -21,6 +21,14 @@ namespace Heimdall.App.Tests;
 
 public sealed class EmbeddedSftpViewTaskObservationTests
 {
+    /// <summary>
+    /// Failure bound, not a synchronisation point. The waits it bounds complete on
+    /// an event: a disconnect-started signal or a teardown task finishing. The value
+    /// only has to be generous enough that a saturated thread pool cannot exhaust it
+    /// before that work is scheduled at all, and it is paid only on failure.
+    /// </summary>
+    private static readonly TimeSpan SignalBackstop = TimeSpan.FromSeconds(30);
+
     [Fact]
     public async Task ObserveFaultedTask_LogsFaultWithoutThrowing()
     {
@@ -48,12 +56,12 @@ public sealed class EmbeddedSftpViewTaskObservationTests
 
         Task teardown = EmbeddedSftpView.DisposeBrowserAsync(browser);
 
-        await browser.DisconnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await browser.DisconnectStarted.Task.WaitAsync(SignalBackstop);
         Assert.NotEqual(callingThreadId, browser.DisconnectThreadId);
         Assert.False(teardown.IsCompleted);
 
         releaseDisconnect.Set();
-        await teardown.WaitAsync(TimeSpan.FromSeconds(1));
+        await teardown.WaitAsync(SignalBackstop);
 
         Assert.True(browser.DisposeCalled);
     }
@@ -71,7 +79,7 @@ public sealed class EmbeddedSftpViewTaskObservationTests
             "browser teardown",
             warnings.Add);
 
-        await observer.WaitAsync(TimeSpan.FromSeconds(1));
+        await observer.WaitAsync(SignalBackstop);
 
         Assert.True(browser.DisposeCalled);
         string warning = Assert.Single(warnings);

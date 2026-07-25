@@ -21,6 +21,14 @@ namespace Heimdall.Ssh.Tests;
 
 public sealed class ServerHealthMonitorTests
 {
+    /// <summary>
+    /// Failure bound, not a synchronisation point. The waits it bounds complete on
+    /// an event: a runner-started signal or a StopAsync completion. The value only
+    /// has to be generous enough that a saturated thread pool cannot exhaust it
+    /// before that work is scheduled at all, and it is paid only on failure.
+    /// </summary>
+    private static readonly TimeSpan SignalBackstop = TimeSpan.FromSeconds(30);
+
     [Fact]
     public void ParseCpuUsage_ParsesTopIdleOutput()
     {
@@ -111,16 +119,16 @@ public sealed class ServerHealthMonitorTests
         using var monitor = new ServerHealthMonitor(_ => runner);
 
         await monitor.StartAsync(client);
-        await runner.Started.WaitAsync(TimeSpan.FromSeconds(2));
-        await monitor.StopAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        await runner.Started.WaitAsync(SignalBackstop);
+        await monitor.StopAsync().WaitAsync(SignalBackstop);
 
         // Second Start must succeed; the lock-protected snapshot in StopAsync
         // guarantees _cts/_pollTask were cleared before StopAsync returned.
         var runner2 = new BlockingHealthCommandRunner();
         using var monitor2 = new ServerHealthMonitor(_ => runner2);
         await monitor2.StartAsync(client);
-        await runner2.Started.WaitAsync(TimeSpan.FromSeconds(2));
-        await monitor2.StopAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        await runner2.Started.WaitAsync(SignalBackstop);
+        await monitor2.StopAsync().WaitAsync(SignalBackstop);
     }
 
     [Fact]
@@ -133,10 +141,10 @@ public sealed class ServerHealthMonitorTests
         using var monitor = new ServerHealthMonitor(_ => runner);
 
         await monitor.StartAsync(client);
-        await runner.Started.WaitAsync(TimeSpan.FromSeconds(2));
+        await runner.Started.WaitAsync(SignalBackstop);
 
-        await monitor.StopAsync().WaitAsync(TimeSpan.FromSeconds(2));
-        await monitor.StopAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        await monitor.StopAsync().WaitAsync(SignalBackstop);
+        await monitor.StopAsync().WaitAsync(SignalBackstop);
     }
 
     [Fact]
@@ -150,11 +158,11 @@ public sealed class ServerHealthMonitorTests
         try
         {
             await monitor.StartAsync(client, cancellationSource.Token);
-            await runner.Started.WaitAsync(TimeSpan.FromSeconds(2));
+            await runner.Started.WaitAsync(SignalBackstop);
 
             cancellationSource.Cancel();
 
-            await monitor.StopAsync().WaitAsync(TimeSpan.FromSeconds(2));
+            await monitor.StopAsync().WaitAsync(SignalBackstop);
 
             Assert.True(runner.CallCount > 0);
             Assert.True(runner.CancellationCount > 0);

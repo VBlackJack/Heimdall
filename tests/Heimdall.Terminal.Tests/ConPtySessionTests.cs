@@ -28,6 +28,15 @@ namespace Heimdall.Terminal.Tests;
 /// </summary>
 public sealed class ConPtySessionTests
 {
+    /// <summary>
+    /// Failure bound, not a synchronisation point. The wait it bounds completes on
+    /// an event: the ProcessExited replay to a late subscriber, where the process has
+    /// already exited. The value only has to be generous enough that a saturated
+    /// thread pool cannot exhaust it before the replay is delivered, and it is paid
+    /// only on failure.
+    /// </summary>
+    private static readonly TimeSpan ReplaySignalBackstop = TimeSpan.FromSeconds(30);
+
     [Fact]
     [Trait("Category", "CIUnstable")]
     public async Task StartAsync_LaunchesShell_DeliversInitialTerminalOutput()
@@ -198,7 +207,7 @@ public sealed class ConPtySessionTests
 
             TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
             session.ProcessExited += exitCode => exited.TrySetResult(exitCode);
-            int exitCode = await exited.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            int exitCode = await exited.Task.WaitAsync(ReplaySignalBackstop);
 
             Assert.Equal(23, exitCode);
         }

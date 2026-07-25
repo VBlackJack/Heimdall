@@ -23,6 +23,15 @@ namespace Heimdall.App.Tests;
 
 public class TracerouteViewModelTests
 {
+    /// <summary>
+    /// Failure bound, not a synchronisation point. The waits it bounds complete on
+    /// an event: a signal the fake traceroute handler raises once it is entered or
+    /// blocked. The value only has to be generous enough that a saturated thread
+    /// pool cannot exhaust it before that handler runs at all, and it is paid only
+    /// on failure.
+    /// </summary>
+    private static readonly TimeSpan SignalBackstop = TimeSpan.FromSeconds(30);
+
     [Fact]
     public void ValidateInputs_DelegatesToEngine()
     {
@@ -197,7 +206,7 @@ public class TracerouteViewModelTests
         var runTask = vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
         await Task.Delay(50);
         vm.Stop();
-        await blocker.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await blocker.Task.WaitAsync(SignalBackstop);
         await runTask;
 
         Assert.False(vm.IsTracing);
@@ -233,7 +242,7 @@ public class TracerouteViewModelTests
 
         var vm = new TracerouteViewModel(service);
         var runTask = vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await entered.Task.WaitAsync(SignalBackstop);
 
         Assert.True(vm.IsTracing);
 
@@ -261,7 +270,7 @@ public class TracerouteViewModelTests
 
         var vm = new TracerouteViewModel(service);
         var first = vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await entered.Task.WaitAsync(SignalBackstop);
         await vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
         release.TrySetResult();
         await first;

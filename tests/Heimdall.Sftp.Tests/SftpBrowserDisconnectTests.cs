@@ -24,6 +24,17 @@ namespace Heimdall.Sftp.Tests;
 
 public sealed class SftpBrowserDisconnectTests
 {
+    /// <summary>
+    /// Failure bound, not a synchronisation point. The waits it bounds complete on
+    /// an event: an unwind signal raised from the client's Disposing handler, or the
+    /// client lock being released by the code under test. The value only has to be
+    /// generous enough that a saturated thread pool cannot exhaust it before that
+    /// work is scheduled at all, and it is paid only on failure. Distinct from the
+    /// one-second assertion on Disconnect's own elapsed time, which is a semantic
+    /// bound on the behaviour under test and must stay tight.
+    /// </summary>
+    private static readonly TimeSpan SignalBackstop = TimeSpan.FromSeconds(30);
+
     [Fact]
     public void Disconnect_WhenClientLockIsAvailable_DisposesGracefullyOnce()
     {
@@ -64,7 +75,7 @@ public sealed class SftpBrowserDisconnectTests
         browser.Disconnect();
         stopwatch.Stop();
 
-        await operationUnwound.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await operationUnwound.Task.WaitAsync(SignalBackstop);
 
         Assert.True(
             stopwatch.Elapsed < TimeSpan.FromSeconds(1),
@@ -73,7 +84,7 @@ public sealed class SftpBrowserDisconnectTests
         Assert.Equal(1, disconnectedCount);
         AssertConnectionContextDropped(browser);
 
-        Assert.True(await clientLock.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.True(await clientLock.WaitAsync(SignalBackstop));
         clientLock.Release();
 
         browser.Disconnect();
@@ -93,7 +104,7 @@ public sealed class SftpBrowserDisconnectTests
         browser.Dispose();
 
         clientLock.Release();
-        Assert.True(await clientLock.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.True(await clientLock.WaitAsync(SignalBackstop));
         clientLock.Release();
 
         browser.Dispose();
