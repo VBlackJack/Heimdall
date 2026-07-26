@@ -18,6 +18,8 @@
                                                     one pinned version.
       6. Every violation carries a remedy        -> the message has to say what to
                                                     type instead.
+      7. A leading byte-order mark               -> must be reported. No keyboard
+                                                    types one, so the rule covers it.
 
     Exits non-zero if any expectation fails.
 
@@ -158,6 +160,31 @@ try {
     Assert-True ($unlisted.Count -eq 1 -and -not [string]::IsNullOrWhiteSpace($unlisted[0].Remedy)) 'an unlisted character still gets the generic remedy'
 } finally {
     Remove-Item -LiteralPath $remedyPath -Force
+}
+
+# ----------------------------------------------------------------------------
+# Case 7: a leading byte-order mark must be reported, not swallowed. The bytes are
+# written RAW on purpose: WriteAllText with a no-BOM encoding cannot produce this
+# file, so it would test nothing. A reader that leaves BOM detection enabled eats
+# the mark before the scan begins and calls the file clean.
+# ----------------------------------------------------------------------------
+$bomPath = [System.IO.Path]::GetTempFileName()
+[System.IO.File]::WriteAllBytes(
+    $bomPath,
+    ([byte[]]@(0xEF, 0xBB, 0xBF) + [System.Text.Encoding]::UTF8.GetBytes('Clean ASCII line.')))
+try {
+    $v = @(Get-NotesTypographyViolations -Path $bomPath)
+    Assert-True ($v.Count -eq 1) "leading BOM flagged ($($v.Count) violations, expected 1)"
+    # When the guard regresses, this case yields zero violations. Extract through the
+    # pipeline and short-circuit before indexing so the failure prints as FAIL lines:
+    # under Set-StrictMode -Version Latest, $v.CodePoint on an empty array throws
+    # PropertyNotFoundStrict and would abort the run before the later cases report.
+    $bomCodePoints = @($v | ForEach-Object { $_.CodePoint })
+    Assert-True ($bomCodePoints -contains 'U+FEFF') 'BOM reported at code point U+FEFF'
+    $bomAt = if ($v.Count -ge 1) { "$($v[0].Line):$($v[0].Column)" } else { 'no violation' }
+    Assert-True ($v.Count -eq 1 -and $v[0].Line -eq 1 -and $v[0].Column -eq 1) "BOM located at line 1 column 1 (got $bomAt)"
+} finally {
+    Remove-Item -LiteralPath $bomPath -Force
 }
 
 Write-Host ''

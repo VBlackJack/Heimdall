@@ -11,8 +11,8 @@
     letters carried by the direct keys and by the three dead keys, and the handful of
     symbols on the layout. Everything else is rejected, including characters no
     deny-list would have thought to enumerate: word-processor "smart" punctuation,
-    non-standard spaces, non-breaking hyphens, arrows, mathematical look-alikes and
-    emoji.
+    non-standard spaces, non-breaking hyphens, arrows, mathematical look-alikes,
+    byte-order marks and emoji.
 
     Rationale (decision 2026-07-26). The previous implementation froze ten known
     offenders in a deny-list and silently accepted every other non-typeable
@@ -101,7 +101,7 @@ $script:NoteCharRemedies = @{
     0x202F = @{ Name = 'NARROW NO-BREAK SPACE';             Remedy = 'use a normal space' }
     0x2009 = @{ Name = 'THIN SPACE';                        Remedy = 'use a normal space' }
     0x00AD = @{ Name = 'SOFT HYPHEN';                       Remedy = 'delete it, it is invisible' }
-    0xFEFF = @{ Name = 'ZERO WIDTH NO-BREAK SPACE (BOM)';   Remedy = 'delete it, save the file as UTF-8 without BOM' }
+    0xFEFF = @{ Name = 'ZERO WIDTH NO-BREAK SPACE (BOM)';   Remedy = 'at line 1 column 1 it is a byte-order mark: save the file as UTF-8 without BOM; anywhere else, delete it' }
     0x200B = @{ Name = 'ZERO WIDTH SPACE';                  Remedy = 'delete it, it is invisible' }
     0x2192 = @{ Name = 'RIGHTWARDS ARROW';                  Remedy = 'write ->' }
     0x2264 = @{ Name = 'LESS-THAN OR EQUAL TO';             Remedy = 'write <=' }
@@ -134,8 +134,23 @@ function Get-NotesTypographyViolations {
     Set-StrictMode -Version Latest
 
     $violations = @()
-    $lines = [System.IO.File]::ReadAllLines($Path, [System.Text.UTF8Encoding]::new($false))
-    for ($i = 0; $i -lt $lines.Length; $i++) {
+
+    # Read with byte-order-mark detection DISABLED (the third StreamReader argument).
+    # A BOM is not typeable on any keyboard, so it is a violation like any other and
+    # the guard has to see it. Left enabled - as File.ReadAllLines does, with no way
+    # to opt out - the reader consumes a leading BOM before the scan starts and the
+    # file is declared clean. Note that the $false passed to UTF8Encoding governs BOM
+    # EMISSION when writing and has no bearing on detection when reading; relying on
+    # it to suppress detection is the mistake this call is written to avoid.
+    $lines = New-Object 'System.Collections.Generic.List[string]'
+    $reader = New-Object System.IO.StreamReader($Path, [System.Text.UTF8Encoding]::new($false), $false)
+    try {
+        while ($null -ne ($readLine = $reader.ReadLine())) { $null = $lines.Add($readLine) }
+    } finally {
+        $reader.Dispose()
+    }
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i]
         $c = 0
         while ($c -lt $line.Length) {
