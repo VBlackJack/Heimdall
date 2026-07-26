@@ -51,7 +51,7 @@ jobs:
       - name: Check dry-run leaves the tree clean
         shell: pwsh
         run: |
-          ./scripts/Test-DryRunTreeGuard.ps1
+          ./scripts/Test-DryRunProjectFileGuard.ps1
           # The script runs in a child scope, so its `exit 1` does not end this block.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
