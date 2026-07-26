@@ -30,6 +30,15 @@ jobs:
           fi
           echo "All tracked blobs are stored with LF."
 
+      # Placed with the other cheap fail-fast gates, before the SDK is even set
+      # up: the typography guard is pure PowerShell over docs/release-notes, so it
+      # needs no .NET and no build. Running it here reports a bad character in
+      # seconds instead of behind the 25-minute test job. Blocking on purpose - the
+      # script exits 1 on the first violation.
+      - name: Check release-notes typography
+        shell: pwsh
+        run: ./scripts/Test-NotesTypographyGuard.ps1
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
