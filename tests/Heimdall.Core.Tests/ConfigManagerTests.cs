@@ -611,7 +611,10 @@ public class ConfigManagerTests : IDisposable
         Task<bool> firstMutation = Task.Run(() => _manager.MutateServersAsync(servers =>
         {
             firstMutationEntered.Set();
-            Assert.True(releaseFirstMutation.Wait(TimeSpan.FromSeconds(5)));
+            if (!releaseFirstMutation.Wait(TimeSpan.FromSeconds(5)))
+            {
+                throw new TimeoutException("the test never released the held mutation");
+            }
             servers.Add(new ServerProfileDto
             {
                 Id = "first",
@@ -621,7 +624,10 @@ public class ConfigManagerTests : IDisposable
             return true;
         }));
 
-        Assert.True(firstMutationEntered.Wait(TimeSpan.FromSeconds(5)));
+        if (!firstMutationEntered.Wait(TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException("the mutation callback never entered the lock");
+        }
 
         Task<bool> secondMutation = _manager.MutateServersAsync(servers =>
         {
@@ -648,7 +654,10 @@ public class ConfigManagerTests : IDisposable
         Task<string> firstMutation = Task.Run(() => _manager.MutateServersAsync(servers =>
         {
             firstMutationEntered.Set();
-            Assert.True(releaseFirstMutation.Wait(TimeSpan.FromSeconds(5)));
+            if (!releaseFirstMutation.Wait(TimeSpan.FromSeconds(5)))
+            {
+                throw new TimeoutException("the test never released the held mutation");
+            }
             servers.Add(new ServerProfileDto
             {
                 Id = "alpha",
@@ -658,7 +667,10 @@ public class ConfigManagerTests : IDisposable
             return "alpha";
         }));
 
-        Assert.True(firstMutationEntered.Wait(TimeSpan.FromSeconds(5)));
+        if (!firstMutationEntered.Wait(TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException("the mutation callback never entered the lock");
+        }
 
         Task<string> secondMutation = _manager.MutateServersAsync(servers =>
         {
@@ -1179,10 +1191,16 @@ public class ConfigManagerTests : IDisposable
         Task lockHolder = Task.Run(() => _manager.MutateServersAsync(servers =>
         {
             lockHolderEntered.Set();
-            Assert.True(releaseLockHolder.Wait(TimeSpan.FromSeconds(5)));
+            if (!releaseLockHolder.Wait(TimeSpan.FromSeconds(5)))
+            {
+                throw new TimeoutException("the test never released the held mutation");
+            }
             return servers.Count;
         }));
-        Assert.True(lockHolderEntered.Wait(TimeSpan.FromSeconds(5)));
+        if (!lockHolderEntered.Wait(TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException("the mutation callback never entered the lock");
+        }
 
         var newerSettings = new AppSettings { DefaultTheme = "New" };
         Task newerSave = _manager.SaveSettingsAsync(newerSettings);
