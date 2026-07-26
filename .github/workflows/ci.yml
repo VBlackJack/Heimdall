@@ -37,7 +37,12 @@ jobs:
       # script exits 1 on the first violation.
       - name: Check release-notes typography
         shell: pwsh
-        run: ./scripts/Test-NotesTypographyGuard.ps1
+        run: |
+          ./scripts/Test-NotesTypographyGuard.ps1
+          # The script runs in a child scope, so its `exit 1` does not end this block.
+          # GitHub's pwsh wrapper appends an exit-code propagation line, but relying on
+          # that leaves the gate depending on runner behaviour invisible in this file.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
