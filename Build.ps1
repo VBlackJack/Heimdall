@@ -502,6 +502,14 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         $conventionNotes = Join-Path $ProjectRoot "docs\release-notes\v${buildNumber}.md"
         if (Test-Path -LiteralPath $conventionNotes) {
             $customNotesPath = $conventionNotes
+        } else {
+            # Deliberately a warning, not an error: shipping with auto-generated
+            # notes only is a legitimate choice. But it used to happen in total
+            # silence, so forgetting to write the notes was indistinguishable from
+            # deciding not to. Name the exact path so the operator can abort on
+            # purpose rather than discover it after the release is out.
+            Write-Host "[$label] WARNING: no hand-written release notes at $conventionNotes." -ForegroundColor Yellow
+            Write-Host "    Publishing with auto-generated notes only. Create that file, or pass -ReleaseNotesFile, if that is not what you want." -ForegroundColor Yellow
         }
     }
     if ($customNotesPath) {
