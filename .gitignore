@@ -60,3 +60,6 @@ TestResults/
 
 # Codex build artefacts
 .codex-build/
+
+# Local-only artefacts (AI briefs, audits, session reports); never committed
+local/
