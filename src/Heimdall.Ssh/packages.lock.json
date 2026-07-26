@@ -62,6 +62,7 @@
           "System.Security.Cryptography.ProtectedData": "[10.0.10, )"
         }
       }
-    }
+    },
+    "net10.0/win-x64": {}
   }
 }
