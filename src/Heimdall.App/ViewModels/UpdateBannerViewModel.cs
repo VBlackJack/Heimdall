@@ -136,6 +136,8 @@ public partial class UpdateBannerViewModel : ObservableObject
         _candidateVersion = version;
         _releaseUrl = result.Update.ReleaseUrl;
         _availableUpdate = result.Update;
+        // Plain field: no generated notification, so bound controls must be told explicitly.
+        DownloadAndInstallCommand.NotifyCanExecuteChanged();
         BannerVersionText = version.ToString();
         IsBannerVisible = true;
     }
