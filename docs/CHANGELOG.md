@@ -12,6 +12,64 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-07-26: Build, CI, and test-suite hardening (v2026.072601)
+
+A maintenance release. No new features and no user-visible fixes: the work sits in the
+build chain, the CI gates, and the reliability of the test suite. Two dependency bumps
+and one supply-chain tightening are the only changes that reach a shipped binary.
+
+### Dependencies
+
+- **The native components shipped with the app are now covered by the lock files.**
+  Declaring `RuntimeIdentifiers` for `win-x64` makes every restore, RID or not, produce
+  the same lock, which pins `SourceGear.sqlite3`, `LibGit2Sharp.NativeBinaries` and
+  `System.Management` by content hash. They previously escaped the lock entirely.
+  Committing the RID sections alone would not have worked: a plain restore strips them
+  again, so the tree would have churned on every build/publish alternation
+  (`218349a2`, BL-0042).
+- `SQLitePCLRaw.bundle_e_sqlite3` 3.0.3 to 3.0.4 (`c6a45bff`).
+- `System.Security.Cryptography.ProtectedData` 10.0.9 to 10.0.10 (`2907c324`, `529e0836`).
+- `actions/checkout` 6 to 7 (`7b2d3701`).
+
+### Build
+
+- **`Build.ps1 -DryRun` no longer writes the application project file.** The version is
+  injected as an MSBuild property on the dry-run path instead of being written to disk,
+  so a simulated publish leaves the tracked tree untouched and no longer advances the
+  next build number (`4d3d4cbd`). Proven by a guard that re-demonstrates red
+  (`e00460fa`), wired into CI (`a875fbb3`), then renamed and narrowed so its name and
+  success message state exactly what it does and does not cover (`565981bc`, `7dd17c25`).
+- A `-Publish` run with no conventional `v<version>.md` notes file now warns and names
+  the path it looked for, instead of being silently a no-op (`c87e4b24`).
+
+### CI gates
+
+- Committed CRLF blobs now fail the build, anchored on the `i/` column of
+  `git ls-files --eol` (`f9b191c9`).
+- The release-notes typography guard is keyed on the AZERTY layout as an allow-list
+  rather than a block-list, which also catches non-breaking hyphens, arrows and emoji
+  (`f12f3551`). A leading byte-order mark is now reported instead of swallowed
+  (`c3b0617f`), and the guard's own assertions stay legible when a case yields nothing
+  (`5c1df45f`).
+- Both gates run on every build (`7f33cbc7`), with the typography step propagating its
+  exit code explicitly rather than relying on runner behaviour (`19c4b44f`).
+
+### Test suite
+
+- Bounded waits in the configuration manager tests now name which side stalled, instead
+  of reporting an identical assertion failure for both (`d78b4234`). The entry-wait
+  message was then narrowed to what it can establish: it cannot tell a callback blocked
+  on the lock from a work item that was never scheduled (`04fdccb6`, BL-0033).
+- Thread-pool starvation no longer masquerades as a functional failure. The pool floor
+  is raised for the test assemblies (`914801c6`), concurrent probes are driven off the
+  pool (`d70dcd14`, `a4ed52a3`), and the traceroute stop signal stays diagnosable under
+  starvation (`1a46cc35`).
+- Polled waits are bounded so they fail instead of hanging (`258743b5`), one test awaits
+  completion instead of racing a timer (`18f35ce4`), and tight backstops were widened
+  (`b5290ff2`, `ab416af9`).
+- Line endings were renormalized after a Dependabot rewrite (`d22b4669`), and the
+  local-only artefacts directory is ignored (`6cc6acda`).
+
 ## 2026-07-25: Security, lifecycle, and accessibility hardening (v2026.072501)
 
 A cross-reviewed hardening pass over the remote-protocol, updater, and session
