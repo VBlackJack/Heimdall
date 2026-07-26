@@ -40,6 +40,11 @@ namespace Heimdall.App.UiTests.ViewModels;
 /// Button bound to Update.DownloadAndInstallCommand, exactly as MainWindow.xaml binds it.
 /// Polling ICommand.CanExecute directly cannot see this, because a Button only refreshes
 /// its enabled state when the command raises CanExecuteChanged.
+///
+/// Deliberately not tagged RequiresDesktop, unlike most of this project: that category runs
+/// only in the informational CI lane, where a regression could never fail a build. This test
+/// shows no window and injects no input - it needs the shared STA host, nothing more - so it
+/// belongs in the blocking lane. Do not add the trait for consistency with its neighbours.
 /// </summary>
 [Collection(DesktopUiCollection.Name)]
 public sealed class UpdateBannerDownloadButtonTests
@@ -48,7 +53,6 @@ public sealed class UpdateBannerDownloadButtonTests
     private const string Newer = "2026.061502";
 
     [StaFact]
-    [Trait("Category", "RequiresDesktop")]
     public void BoundButton_IsEnabled_AfterStartupCheckFindsUpdate()
     {
         WpfTestHost.Invoke(() =>
