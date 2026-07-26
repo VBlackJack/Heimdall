@@ -66,8 +66,12 @@ try {
     $v = @(Get-NotesTypographyViolations -Path $badPath)
     Assert-True ($v.Count -ge 7) "smart punctuation flagged ($($v.Count) violations, expected >= 7)"
     $kinds = ($v | ForEach-Object { $_.CodePoint } | Sort-Object -Unique) -join ','
-    Assert-True ($v.CodePoint -contains 'U+2014') "em-dash detected (kinds: $kinds)"
-    Assert-True ($v.CodePoint -contains 'U+202F') 'narrow no-break space detected'
+    # Extract through the pipeline, never as $v.CodePoint: under Set-StrictMode
+    # -Version Latest, member access on an empty array throws PropertyNotFoundStrict
+    # and aborts the run just when a regression makes the FAIL lines worth reading.
+    $codePoints = @($v | ForEach-Object { $_.CodePoint })
+    Assert-True ($codePoints -contains 'U+2014') "em-dash detected (kinds: $kinds)"
+    Assert-True ($codePoints -contains 'U+202F') 'narrow no-break space detected'
 } finally {
     Remove-Item -LiteralPath $badPath -Force
 }
@@ -96,8 +100,9 @@ $guillemetsPath = New-TempNotes ("Le bouton " + [char]0x00AB + " Tester " + [cha
 try {
     $v = @(Get-NotesTypographyViolations -Path $guillemetsPath)
     Assert-True ($v.Count -eq 2) "French guillemets flagged ($($v.Count) violations, expected 2)"
-    Assert-True ($v.CodePoint -contains 'U+00AB') 'opening guillemet U+00AB detected'
-    Assert-True ($v.CodePoint -contains 'U+00BB') 'closing guillemet U+00BB detected'
+    $codePoints = @($v | ForEach-Object { $_.CodePoint })
+    Assert-True ($codePoints -contains 'U+00AB') 'opening guillemet U+00AB detected'
+    Assert-True ($codePoints -contains 'U+00BB') 'closing guillemet U+00BB detected'
 } finally {
     Remove-Item -LiteralPath $guillemetsPath -Force
 }
@@ -112,10 +117,11 @@ $exoticPath = New-TempNotes ("Non-breaking hyphen " + [char]0x2011 + " and arrow
 try {
     $v = @(Get-NotesTypographyViolations -Path $exoticPath)
     Assert-True ($v.Count -eq 4) "unanticipated characters flagged ($($v.Count) violations, expected 4)"
-    Assert-True ($v.CodePoint -contains 'U+2011') 'non-breaking hyphen detected'
-    Assert-True ($v.CodePoint -contains 'U+2192') 'rightwards arrow detected'
-    Assert-True ($v.CodePoint -contains 'U+0153') 'oe ligature detected'
-    Assert-True ($v.CodePoint -contains 'U+1F680') 'emoji reported once at its real code point'
+    $codePoints = @($v | ForEach-Object { $_.CodePoint })
+    Assert-True ($codePoints -contains 'U+2011') 'non-breaking hyphen detected'
+    Assert-True ($codePoints -contains 'U+2192') 'rightwards arrow detected'
+    Assert-True ($codePoints -contains 'U+0153') 'oe ligature detected'
+    Assert-True ($codePoints -contains 'U+1F680') 'emoji reported once at its real code point'
     $rocket = @($v | Where-Object { $_.CodePoint -eq 'U+1F680' })
     Assert-True ($rocket.Count -eq 1) "emoji reported exactly once ($($rocket.Count) records)"
 } finally {
