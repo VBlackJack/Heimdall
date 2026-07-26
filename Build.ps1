@@ -71,6 +71,8 @@ $ProjectRoot = $PSScriptRoot
 
 # Release-notes typography guard (allow-list of AZERTY-typeable characters).
 . (Join-Path $ProjectRoot 'scripts\NotesTypographyGuard.ps1')
+# Version stamping, and the rule that a dry run never writes the project file.
+. (Join-Path $ProjectRoot 'scripts\BuildVersioning.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
 $SolutionFile = Get-ChildItem -Path $ProjectRoot -Filter '*.slnx' | Select-Object -First 1
 $distDir = Join-Path $ProjectRoot "Dist\$($Mode.ToLower())"
@@ -170,17 +172,24 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ── Step 1: Update version in csproj ───────────────────────────────────────
+#
+# The real publish path writes the project file: that write is what the release
+# commit carries. A dry run must not touch it, so it receives the same two
+# versions as MSBuild global properties instead, splatted into the build and
+# publish invocations below. See scripts/BuildVersioning.ps1 for why, and for
+# the measurement that chose this over writing the file and restoring it.
 
 $step++
-$csprojContent = Get-Content $AppProject -Raw
-$csprojContent = $csprojContent -replace '<Version>[^<]+</Version>', "<Version>${assemblyVer}</Version>"
-if ($csprojContent -match '<InformationalVersion>') {
-    $csprojContent = $csprojContent -replace '<InformationalVersion>[^<]+</InformationalVersion>', "<InformationalVersion>${buildNumber}</InformationalVersion>"
+$versionArgs = @(Get-VersionOverrideArgs -AssemblyVersion $assemblyVer -InformationalVersion $buildNumber -DryRun:$DryRun)
+$versionWritten = Update-AppProjectVersion -Path $AppProject `
+    -AssemblyVersion $assemblyVer `
+    -InformationalVersion $buildNumber `
+    -DryRun:$DryRun
+if ($versionWritten) {
+    Write-Host "[$step/$totalSteps] Version set to $buildNumber (assembly: $assemblyVer)" -ForegroundColor Green
 } else {
-    $csprojContent = $csprojContent -replace '</Version>', "</Version>`n    <InformationalVersion>${buildNumber}</InformationalVersion>"
+    Write-Host "[$step/$totalSteps] Version $buildNumber (assembly: $assemblyVer) passed to MSBuild; $(Split-Path $AppProject -Leaf) left untouched (dry run)" -ForegroundColor Magenta
 }
-[System.IO.File]::WriteAllText($AppProject, $csprojContent, [System.Text.UTF8Encoding]::new($false))
-Write-Host "[$step/$totalSteps] Version set to $buildNumber (assembly: $assemblyVer)" -ForegroundColor Green
 
 # ── Step 2: Run tests ─────────────────────────────────────────────────────
 
@@ -204,7 +213,7 @@ if (-not $SkipTests) {
 
 $step++
 Write-Host "[$step/$totalSteps] Building $Mode..." -ForegroundColor Yellow
-dotnet build $AppProject -c $Mode --nologo --verbosity quiet
+dotnet build $AppProject -c $Mode --nologo --verbosity quiet @versionArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build FAILED." -ForegroundColor Red
     exit 1
@@ -262,7 +271,7 @@ function Publish-Variant {
     if (Test-Path $variantDir) { Remove-Item $variantDir -Recurse -Force }
 
     Write-Host "  Publishing $VariantName to $variantFolder..." -ForegroundColor Yellow
-    dotnet publish $AppProject -c $Mode -o $variantDir --nologo --verbosity quiet --self-contained true -r win-x64 -p:PublishSingleFile=false
+    dotnet publish $AppProject -c $Mode -o $variantDir --nologo --verbosity quiet --self-contained true -r win-x64 -p:PublishSingleFile=false @versionArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Publish FAILED." -ForegroundColor Red
         exit 1
@@ -474,15 +483,27 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         $hash = (Get-FileHash -Path $a -Algorithm SHA256).Hash.ToLowerInvariant()
         '{0}  {1}' -f $hash, (Split-Path $a -Leaf)
     })
-    $checksumFile = Join-Path $installerDir 'SHA256SUMS.txt'
-    if ($isDry) {
-        Write-Host "[$label] Would create $(Split-Path $checksumFile -Leaf) ($($checksumLines.Count) entries) and add it to the release assets." -ForegroundColor Magenta
+    # A dry run generates the same two files a real publish does - the checksum
+    # list and the release notes - but into a temp directory instead of
+    # Dist\installers, so the simulation leaves the build output untouched.
+    # Redirected rather than suppressed on purpose: both paths appear in the
+    # simulated `gh release create` printed below, so suppressing either would
+    # leave that command naming a file that does not exist, and the operator
+    # could no longer inspect what would actually be published.
+    $generatedDir = if ($isDry) {
+        $dryRunDir = Join-Path ([System.IO.Path]::GetTempPath()) "heimdall-dryrun-v${buildNumber}"
+        if (-not (Test-Path $dryRunDir)) { New-Item -ItemType Directory -Path $dryRunDir -Force | Out-Null }
+        $dryRunDir
     } else {
-        # LF line endings with a single trailing newline, matching the standard
-        # sha256sum format consumed by `sha256sum -c`.
-        [System.IO.File]::WriteAllText($checksumFile, (($checksumLines -join "`n") + "`n"))
-        Write-Host "[$label] Wrote $(Split-Path $checksumFile -Leaf) ($($checksumLines.Count) entries)." -ForegroundColor DarkGray
+        $installerDir
     }
+
+    $checksumFile = Join-Path $generatedDir 'SHA256SUMS.txt'
+    # LF line endings with a single trailing newline, matching the standard
+    # sha256sum format consumed by `sha256sum -c`.
+    [System.IO.File]::WriteAllText($checksumFile, (($checksumLines -join "`n") + "`n"))
+    $checksumLabel = if ($isDry) { $checksumFile } else { Split-Path $checksumFile -Leaf }
+    Write-Host "[$label] Wrote $checksumLabel ($($checksumLines.Count) entries)." -ForegroundColor DarkGray
 
     # Build release notes
     $notes = "## Heimdall v${buildNumber}`n`n"
@@ -559,9 +580,10 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     $notes += "$fence`n"
     $artifacts += $checksumFile
 
-    $notesFile = Join-Path $installerDir "RELEASE_NOTES_v${buildNumber}.md"
+    $notesFile = Join-Path $generatedDir "RELEASE_NOTES_v${buildNumber}.md"
     [System.IO.File]::WriteAllText($notesFile, $notes, [System.Text.UTF8Encoding]::new($false))
-    Write-Output "[$label] Wrote $(Split-Path $notesFile -Leaf)."
+    $notesLabel = if ($isDry) { $notesFile } else { Split-Path $notesFile -Leaf }
+    Write-Output "[$label] Wrote $notesLabel."
 
     $createArgs = @('release', 'create', "v$buildNumber") + $artifacts + @('--title', "v$buildNumber", '--notes-file', $notesFile)
 

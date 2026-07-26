@@ -44,6 +44,19 @@ jobs:
           # that leaves the gate depending on runner behaviour invisible in this file.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Same reasoning as the gate above: pure PowerShell over Build.ps1 and the
+      # application project, no .NET and no build needed. Proves that
+      # Build.ps1 -DryRun cannot rewrite the tracked application project file.
+      # Scoped to that one file on purpose: a dry run does still rewrite the
+      # tracked packages.lock.json files through the publish RID restore, which
+      # is a separate known issue, so a green here is not a clean working tree.
+      - name: Check dry-run does not rewrite the app project file
+        shell: pwsh
+        run: |
+          ./scripts/Test-DryRunProjectFileGuard.ps1
+          # The script runs in a child scope, so its `exit 1` does not end this block.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
