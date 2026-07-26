@@ -44,6 +44,17 @@ jobs:
           # that leaves the gate depending on runner behaviour invisible in this file.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Same reasoning as the gate above: pure PowerShell over Build.ps1 and the
+      # application project, no .NET and no build needed. Proves that
+      # Build.ps1 -DryRun cannot modify the tracked project file, which is what
+      # keeps a mode documented as making no git changes honest.
+      - name: Check dry-run leaves the tree clean
+        shell: pwsh
+        run: |
+          ./scripts/Test-DryRunTreeGuard.ps1
+          # The script runs in a child scope, so its `exit 1` does not end this block.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
