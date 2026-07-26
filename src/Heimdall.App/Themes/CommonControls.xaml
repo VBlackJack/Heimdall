@@ -296,6 +296,16 @@
         </Setter>
     </Style>
 
+    <!-- Quiet button. Third visual weight, below Primary and Secondary: it carries the
+         ghost chrome (transparent at rest, no border) but the text metrics of a regular
+         button, so a row mixing the three weights keeps a single button height. Use it
+         for actions that must stay reachable without competing with the main action. -->
+    <Style x:Key="QuietButtonStyle" TargetType="{x:Type Button}"
+           BasedOn="{StaticResource ToolbarGhostButtonStyle}">
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="MinWidth" Value="0"/>
+    </Style>
+
     <!-- Toolbar visual separator. Used to group toolbar buttons by family
          (e.g., session control / interaction / display) without adding chrome. -->
     <Style x:Key="ToolbarVerticalSeparatorStyle" TargetType="Border">
