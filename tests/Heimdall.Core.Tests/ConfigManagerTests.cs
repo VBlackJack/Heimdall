@@ -626,7 +626,7 @@ public class ConfigManagerTests : IDisposable
 
         if (!firstMutationEntered.Wait(TimeSpan.FromSeconds(5)))
         {
-            throw new TimeoutException("the mutation callback never entered the lock");
+            throw new TimeoutException("the mutation callback never signalled entry");
         }
 
         Task<bool> secondMutation = _manager.MutateServersAsync(servers =>
@@ -669,7 +669,7 @@ public class ConfigManagerTests : IDisposable
 
         if (!firstMutationEntered.Wait(TimeSpan.FromSeconds(5)))
         {
-            throw new TimeoutException("the mutation callback never entered the lock");
+            throw new TimeoutException("the mutation callback never signalled entry");
         }
 
         Task<string> secondMutation = _manager.MutateServersAsync(servers =>
@@ -1199,7 +1199,7 @@ public class ConfigManagerTests : IDisposable
         }));
         if (!lockHolderEntered.Wait(TimeSpan.FromSeconds(5)))
         {
-            throw new TimeoutException("the mutation callback never entered the lock");
+            throw new TimeoutException("the mutation callback never signalled entry");
         }
 
         var newerSettings = new AppSettings { DefaultTheme = "New" };
