@@ -25,8 +25,9 @@
 
 .PARAMETER AllowNonAsciiNotes
     Override the typography guard. By default the publish step refuses to publish when
-    the hand-written notes contain banned "smart" punctuation (em-dash, curly quotes,
-    ellipsis, no-break/thin spaces); pass this switch to publish anyway.
+    the hand-written notes contain a character the French AZERTY keyboard cannot type
+    (smart punctuation, French guillemets, non-standard spaces, arrows, emoji); pass
+    this switch to publish anyway.
 
 .EXAMPLE
     .\Build.ps1                              # Debug build
@@ -68,7 +69,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = $PSScriptRoot
 
-# Release-notes typography guard (banned "smart" punctuation detection).
+# Release-notes typography guard (allow-list of AZERTY-typeable characters).
 . (Join-Path $ProjectRoot 'scripts\NotesTypographyGuard.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
 $SolutionFile = Get-ChildItem -Path $ProjectRoot -Filter '*.slnx' | Select-Object -First 1
@@ -504,21 +505,21 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         }
     }
     if ($customNotesPath) {
-        # Typography guard: refuse to publish notes containing banned "smart"
-        # punctuation (em-dash, curly quotes, ellipsis, no-break/thin spaces).
-        # French accents and the French guillemets are allowed. Fail-closed unless
-        # -AllowNonAsciiNotes is set.
+        # Typography guard: refuse to publish notes containing any character the
+        # French AZERTY keyboard cannot produce. French accents are allowed; the
+        # French guillemets U+00AB / U+00BB are NOT (decision 2026-07-26: they are
+        # absent from the layout). Fail-closed unless -AllowNonAsciiNotes is set.
         $noteViolations = @(Get-NotesTypographyViolations -Path $customNotesPath)
         if ($noteViolations.Count -gt 0) {
             if ($AllowNonAsciiNotes) {
                 Write-Host "[$label] WARNING: release notes contain $($noteViolations.Count) banned character(s); publishing anyway (-AllowNonAsciiNotes)." -ForegroundColor Yellow
                 foreach ($v in $noteViolations) {
-                    Write-Host ("    {0}:{1}:{2}  '{3}' {4} ({5})" -f (Split-Path $v.File -Leaf), $v.Line, $v.Column, $v.Char, $v.CodePoint, $v.Name) -ForegroundColor DarkYellow
+                    Write-Host ("    {0}:{1}:{2}  '{3}' {4} ({5}) - {6}" -f (Split-Path $v.File -Leaf), $v.Line, $v.Column, $v.Char, $v.CodePoint, $v.Name, $v.Remedy) -ForegroundColor DarkYellow
                 }
             } else {
-                Write-Host "[!] Release notes contain banned typography. Use ASCII equivalents (e.g. '-' instead of an em-dash, a normal space instead of a no-break space)." -ForegroundColor Red
+                Write-Host "[!] Release notes contain characters that cannot be typed on the French AZERTY keyboard." -ForegroundColor Red
                 foreach ($v in $noteViolations) {
-                    Write-Host ("    {0}:{1}:{2}  '{3}' {4} ({5})" -f $v.File, $v.Line, $v.Column, $v.Char, $v.CodePoint, $v.Name) -ForegroundColor Red
+                    Write-Host ("    {0}:{1}:{2}  '{3}' {4} ({5}) - {6}" -f $v.File, $v.Line, $v.Column, $v.Char, $v.CodePoint, $v.Name, $v.Remedy) -ForegroundColor Red
                 }
                 Write-Host "    Fix the notes file, or pass -AllowNonAsciiNotes to override. Refusing to publish." -ForegroundColor Red
                 exit 1
