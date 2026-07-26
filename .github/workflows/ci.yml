@@ -46,9 +46,11 @@ jobs:
 
       # Same reasoning as the gate above: pure PowerShell over Build.ps1 and the
       # application project, no .NET and no build needed. Proves that
-      # Build.ps1 -DryRun cannot modify the tracked project file, which is what
-      # keeps a mode documented as making no git changes honest.
-      - name: Check dry-run leaves the tree clean
+      # Build.ps1 -DryRun cannot rewrite the tracked application project file.
+      # Scoped to that one file on purpose: a dry run does still rewrite the
+      # tracked packages.lock.json files through the publish RID restore, which
+      # is a separate known issue, so a green here is not a clean working tree.
+      - name: Check dry-run does not rewrite the app project file
         shell: pwsh
         run: |
           ./scripts/Test-DryRunProjectFileGuard.ps1

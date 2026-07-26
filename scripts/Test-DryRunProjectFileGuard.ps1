@@ -1,19 +1,30 @@
 <#
 .SYNOPSIS
-    Tests that a dry run leaves the tracked working tree clean
+    Tests that a dry run does not rewrite the application project file
     (scripts/BuildVersioning.ps1).
 
 .DESCRIPTION
     Build.ps1 -DryRun is documented as making no git changes. It used to rewrite
-    the tracked src/Heimdall.App/Heimdall.App.csproj anyway, which dirtied the
-    working tree and, because the auto-increment reads <InformationalVersion>
-    back out of that same file, made two consecutive dry runs produce two
-    different build numbers.
+    the tracked src/Heimdall.App/Heimdall.App.csproj anyway, and because the
+    auto-increment reads <InformationalVersion> back out of that same file, two
+    consecutive dry runs produced two different build numbers.
+
+    SCOPE. This suite covers exactly one file: the application project. It is
+    NOT a whole-tree cleanliness check, and its silence is not evidence that a
+    dry run leaves the working tree clean. It does not.
+
+    Measured on 2026-07-26 with a full Build.ps1 -Mode Release -DryRun: the RID
+    restore inside dotnet publish -r win-x64, combined with
+    RestorePackagesWithLockFile in Directory.Build.props, rewrites nine tracked
+    packages.lock.json files under src/. That mutation predates this guard,
+    happens identically on the real publish path, is tracked separately, and is
+    deliberately out of scope here. Do not read a green run as its absence.
 
     The suite proves both directions, because a guard that only ever passes
     proves nothing:
 
-      1. A dry run leaves the project file byte-identical    -> the tree stays clean.
+      1. A dry run leaves the project file byte-identical    -> the file is not
+                                                                rewritten.
       2. A dry run reports that it skipped the write         -> the skip is real,
                                                                 not an accident of
                                                                 writing identical
@@ -45,7 +56,7 @@
     Copyright 2026 Julien Bombled
     Licensed under the Apache License, Version 2.0
 
-    Run on Windows with:  powershell -NoProfile -File scripts\Test-DryRunTreeGuard.ps1
+    Run on Windows with:  powershell -NoProfile -File scripts\Test-DryRunProjectFileGuard.ps1
 #>
 
 Set-StrictMode -Version Latest
@@ -82,7 +93,7 @@ function New-SandboxProject {
         exercises the element shapes actually shipped. Every case works on its
         own copy; the tracked file is never opened for writing.
     #>
-    $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ("heimdall-treeguard-" + [System.Guid]::NewGuid().ToString('N'))
+    $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ("heimdall-projectfileguard-" + [System.Guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $sandbox -Force
     $copy = Join-Path $sandbox 'Heimdall.App.csproj'
     Copy-Item -LiteralPath $script:appProject -Destination $copy -Force
@@ -226,7 +237,13 @@ if (Test-Path -LiteralPath $buildScript) {
 
 Write-Host ''
 if ($failures -gt 0) {
-    Write-Host "$failures test(s) FAILED." -ForegroundColor Red
+    Write-Host "$failures dry-run project-file guard test(s) FAILED." -ForegroundColor Red
+    Write-Host 'Build.ps1 -DryRun can now rewrite src/Heimdall.App/Heimdall.App.csproj.' -ForegroundColor Red
     exit 1
 }
-Write-Host 'All dry-run tree-guard tests passed.' -ForegroundColor Green
+# Deliberately states the scope on the happy path too. The green line is what a
+# reader sees most often, so it is where the limit has to be visible: the tracked
+# packages.lock.json files are rewritten by the publish RID restore and this
+# suite does not look at them.
+Write-Host 'Build.ps1 -DryRun does not rewrite the application project file.' -ForegroundColor Green
+Write-Host 'Scope: that file only. Not a whole-tree cleanliness check.' -ForegroundColor DarkGray

@@ -22,7 +22,15 @@
     MSBuild global properties instead (-p:Version, -p:InformationalVersion).
     Global properties outrank the project file, so the versions still reach the
     compiled assembly attributes and the dry run validates what the real run
-    would ship, with no window during which the working tree is dirty.
+    would ship, with no window during which this file is modified.
+
+    That is a statement about this file, not about the working tree. A full
+    Build.ps1 -Mode Release -DryRun on 2026-07-26 confirmed the project file is
+    never written, and also showed the run rewriting nine tracked
+    packages.lock.json files: dotnet publish restores for the win-x64 RID and
+    RestorePackagesWithLockFile in Directory.Build.props makes that restore
+    write the lock files back. That mutation is older than this module, occurs
+    on the real publish path too, and is tracked separately.
 
     Measured 2026-07-26, with the project declaring 1.0.0725.1 / 2026.072501:
     building with -p:Version=1.0.9999.42 -p:InformationalVersion=9999.999942
