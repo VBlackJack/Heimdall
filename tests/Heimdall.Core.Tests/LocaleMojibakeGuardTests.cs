@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace Heimdall.Core.Tests;
@@ -58,9 +59,16 @@ public sealed class LocaleMojibakeGuardTests
         "â€˜", // â€˜  – mojibake for '
         "â€œ", // â€œ  – mojibake for "
         "â†’", // â†'  – mojibake for →
-        "â†‘", // â†'  – mojibake for ←
+        "â†‘", // â†'  – mojibake for ↑
         "�",        // U+FFFD replacement character (lost-encoding marker)
     };
+
+    /// <summary>
+    /// Scalars intentionally supported by the current English and French locale
+    /// corpus. The blacklist above remains necessary for corrupt sequences made
+    /// entirely from scalars in this set.
+    /// </summary>
+    private static readonly HashSet<int> AllowedScalars = CreateAllowedScalars();
 
     [Theory]
     [InlineData(EnLocaleFileName)]
@@ -101,6 +109,20 @@ public sealed class LocaleMojibakeGuardTests
                     break;
                 }
             }
+
+            int scalarPosition = 0;
+            foreach (Rune rune in value.EnumerateRunes())
+            {
+                if (!AllowedScalars.Contains(rune.Value))
+                {
+                    violations.Add(
+                        $"  {fileName}::{property.Name} contains disallowed scalar "
+                        + $"U+{rune.Value:X4} at position {scalarPosition}");
+                    break;
+                }
+
+                scalarPosition++;
+            }
         }
 
         Assert.True(
@@ -108,6 +130,24 @@ public sealed class LocaleMojibakeGuardTests
             $"Found {violations.Count} mojibake violation(s) in {fileName}:"
             + Environment.NewLine
             + string.Join(Environment.NewLine, violations));
+    }
+
+    private static HashSet<int> CreateAllowedScalars()
+    {
+        HashSet<int> allowed = new()
+        {
+            0x0009, 0x000A,
+            0x00A0, 0x00AB, 0x00B7, 0x00BB, 0x00C0, 0x00C9, 0x00CA, 0x00D7,
+            0x00E0, 0x00E2, 0x00E7, 0x00E8, 0x00E9, 0x00EA, 0x00EB, 0x00EE,
+            0x00F4, 0x00F9, 0x00FB, 0x0153, 0x2013, 0x2014, 0x2019, 0x201D,
+            0x2022, 0x2026, 0x20AC, 0x2190, 0x2191, 0x2192, 0x2193, 0x2605,
+            0x2606, 0x2713, 0x2717, 0x1F512, 0x1F680,
+        };
+
+        for (int scalar = 0x0020; scalar <= 0x007E; scalar++)
+            allowed.Add(scalar);
+
+        return allowed;
     }
 
     private static string FindRepoRoot()

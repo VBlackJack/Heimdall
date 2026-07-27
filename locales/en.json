@@ -774,7 +774,7 @@
   "TreeCtxMoveUp": "Move up",
   "TreeCtxMoveDown": "Move down",
   "ProjectFieldIcon": "Icon (emoji):",
-  "ProjectFieldIconHint": "Optional emoji to display instead of color dot (e.g. ðŸš€, ðŸ”’)",
+  "ProjectFieldIconHint": "Optional emoji to display instead of color dot (e.g. 🚀, 🔒)",
   "TreeCtxClearRecent": "Clear history",
   "TreeSearchPlaceholder": "Filter tree...",
   "TooltipTreeSearch": "Filter the session tree (Ctrl+F)",
