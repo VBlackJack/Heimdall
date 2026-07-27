@@ -175,6 +175,8 @@ public partial class HashGeneratorView : UserControl, IToolView
 
     private void BeginFileHash(string filePath)
     {
+        if (!_vm.HashFileCommand.CanExecute(filePath)) { return; }
+
         _debounceTimer?.Stop();
         _suppressInputTextChanged = true;
         TxtInput.Text = string.Empty;

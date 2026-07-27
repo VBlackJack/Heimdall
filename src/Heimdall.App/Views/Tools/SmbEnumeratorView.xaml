@@ -78,6 +78,7 @@
                     <Button x:Name="BtnEnumerate" DockPanel.Dock="Right"
                             TabIndex="1"
                             Content="" Click="OnEnumerateClick"
+                            IsEnabled="{Binding CanToggleEnumeration}"
                             Style="{DynamicResource PrimaryButtonStyle}"
                             Padding="{StaticResource PaddingButtonPrimary}" Margin="{StaticResource MarginInlineControl}"
                             VerticalAlignment="Center"/>

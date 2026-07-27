@@ -73,6 +73,11 @@ public sealed partial class SmbEnumeratorViewModel : ObservableObject, IDisposab
     public bool HasProtocolSection => Result?.DialectRaw is not null;
 
     /// <summary>
+    /// Gets whether enumeration can be started or the active enumeration can be cancelled.
+    /// </summary>
+    public bool CanToggleEnumeration => IsBusy || !string.IsNullOrWhiteSpace(HostInput);
+
+    /// <summary>
     /// Gets the last localized report.
     /// </summary>
     public string LastReport => Result?.Report ?? string.Empty;
@@ -202,12 +207,14 @@ public sealed partial class SmbEnumeratorViewModel : ObservableObject, IDisposab
     partial void OnHostInputChanged(string value)
     {
         EnumerateCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanToggleEnumeration));
     }
 
     partial void OnIsBusyChanged(bool value)
     {
         EnumerateCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanToggleEnumeration));
     }
 
     partial void OnResultChanged(SmbEnumerationResult? value)
