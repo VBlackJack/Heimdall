@@ -159,7 +159,7 @@
                          embedded surface owns focus, unlike a hotkey a terminal may eat. -->
                     <Button x:Name="LockWorkspaceButton"
                             Command="{Binding LockWorkspaceCommand}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="6"
                             Width="32" Height="32"
                             Margin="0,0,4,0"
@@ -176,7 +176,7 @@
                     <!-- Share Folder toggle -->
                     <Button x:Name="ShareFolderButton"
                             Click="OnShareFolderClick"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="6"
                             Width="32" Height="32"
                             Margin="0,0,4,0"
@@ -210,7 +210,7 @@
                     <!-- Quick Connect shortcut button -->
                     <Button x:Name="QuickConnectButton"
                             Click="OnQuickConnectButtonClick"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="6"
                             Width="32" Height="32"
                             Margin="0,0,8,0"
@@ -372,7 +372,7 @@
                                                     HorizontalAlignment="Right" VerticalAlignment="Center"
                                                     Margin="0,0,4,0"
                                                     Padding="4"
-                                                    Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                    Style="{DynamicResource GhostButtonStyle}"
                                                     MinHeight="0"
                                                     Click="OnFilterClearClick"
                                                     Visibility="Collapsed"
@@ -382,7 +382,7 @@
                                         <Button Grid.Column="1"
                                                 x:Name="FilterButton"
                                                 Click="OnFilterButtonClick"
-                                                Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                Style="{DynamicResource GhostButtonStyle}"
                                                 Padding="6,6" FontSize="{StaticResource FontSizeBody}"
                                                 Width="32" Height="32"
                                                 Margin="6,0,0,0"
@@ -434,7 +434,7 @@
                                         <Button Grid.Column="2"
                                                 x:Name="AddButton"
                                                 Click="OnAddButtonClick"
-                                                Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                Style="{DynamicResource GhostButtonStyle}"
                                                 Padding="6,6" FontSize="{StaticResource FontSizeBody}"
                                                 Width="32" Height="32"
                                                 Margin="2,0,0,0"
@@ -456,7 +456,7 @@
                                         <Button Grid.Column="3"
                                                 x:Name="SidebarOverflowButton"
                                                 Click="OnSidebarOverflowClick"
-                                                Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                Style="{DynamicResource GhostButtonStyle}"
                                                 Padding="6,6" FontSize="{StaticResource FontSizeBody}"
                                                 Width="32" Height="32"
                                                 Margin="2,0,0,0"
@@ -1697,7 +1697,7 @@
                                             FontFamily="Segoe MDL2 Assets"
                                             FontSize="{StaticResource FontSizeCaption}"
                                             Command="{Binding Tunnels.TogglePanelCommand}"
-                                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                            Style="{DynamicResource GhostButtonStyle}"
                                             Padding="6,2" Margin="4,0,0,0"
                                             ToolTip="{loc:Translate TooltipCollapseTunnelPanel}"
                                             AutomationProperties.Name="{loc:Translate A11yCollapseTunnelPanel}"/>
@@ -1798,7 +1798,7 @@
                                                             FontSize="{StaticResource FontSizeCaption}"
                                                             Command="{Binding DataContext.Tunnels.CloseCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                             CommandParameter="{Binding}"
-                                                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                            Style="{DynamicResource GhostButtonStyle}"
                                                             Padding="2" Margin="0"
                                                             ToolTip="{Binding Tag, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                             VerticalAlignment="Center"
@@ -1854,7 +1854,7 @@
                 <!-- Manage gateways link -->
                 <Button x:Name="Mw_TunnelsManageGatewaysLink" DockPanel.Dock="Bottom"
                         Content="{loc:Translate TunnelsManageGatewaysLink}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         FontSize="{StaticResource FontSizeCaption}"
                         Foreground="{DynamicResource AccentBrush}"
                         HorizontalAlignment="Center"
@@ -2066,7 +2066,7 @@
                                     FontSize="{StaticResource FontSizeSmallCaption}"
                                     HorizontalAlignment="Right" VerticalAlignment="Center"
                                     Margin="0,0,4,0" Padding="4"
-                                    Style="{DynamicResource ToolbarGhostButtonStyle}" MinHeight="0"
+                                    Style="{DynamicResource GhostButtonStyle}" MinHeight="0"
                                     Click="OnSettingsSearchClearClick"
                                     Visibility="Collapsed"
                                     AutomationProperties.Name="{loc:Translate A11yClearSearchFilter}"/>
@@ -2927,7 +2927,7 @@
                                                                     Content="{loc:Translate SettingsRdpResolutionPresetRemove}"
                                                                     Command="{Binding DataContext.Settings.RemoveRdpResolutionPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                     CommandParameter="{Binding}"
-                                                                    Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                                    Style="{DynamicResource GhostButtonStyle}"
                                                                     FontSize="{StaticResource FontSizeCaption}"
                                                                     Padding="6,3"
                                                                     AutomationProperties.Name="{loc:Translate SettingsRdpResolutionPresetRemove}"/>
@@ -2944,14 +2944,14 @@
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <Button Content="{loc:Translate SettingsRdpResolutionPresetAdd}"
                                                     Command="{Binding Settings.AddRdpResolutionPresetCommand}"
-                                                    Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                    Style="{DynamicResource GhostButtonStyle}"
                                                     FontSize="{StaticResource FontSizeCaption}"
                                                     Foreground="{DynamicResource TextTertiaryBrush}"
                                                     Padding="0,4"
                                                     AutomationProperties.Name="{loc:Translate SettingsRdpResolutionPresetAdd}"/>
                                             <Button Content="{loc:Translate SettingsRdpResolutionPresetsReset}"
                                                     Command="{Binding Settings.ResetRdpResolutionPresetsCommand}"
-                                                    Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                    Style="{DynamicResource GhostButtonStyle}"
                                                     FontSize="{StaticResource FontSizeCaption}"
                                                     Foreground="{DynamicResource TextTertiaryBrush}"
                                                     Padding="0,4"
@@ -2969,7 +2969,7 @@
                                         Grid.Row="1"
                                         Content="{loc:Translate SettingsResetRdpDefaults}"
                                         Command="{Binding Settings.ResetRdpDefaultsCommand}"
-                                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                        Style="{DynamicResource GhostButtonStyle}"
                                         FontSize="{StaticResource FontSizeCaption}"
                                         Foreground="{DynamicResource TextTertiaryBrush}"
                                         HorizontalAlignment="Left"
@@ -3399,7 +3399,7 @@
                                             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Settings.CmdLibGitSyncBranch, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
                                             <TextBlock x:Name="Mw_SettingsCmdLibSyncLblToken" Grid.Row="2" Grid.Column="0" Text="{loc:Translate SettingsCmdLibSyncToken}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
                                             <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,8">
-                                                <Button x:Name="Mw_SettingsCmdLibSyncTokenClear" DockPanel.Dock="Right" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" Click="OnCmdLibSyncTokenClear" Style="{DynamicResource ToolbarGhostButtonStyle}" FontSize="12" Width="24" Height="24" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="{loc:Translate SettingsCmdLibSyncTokenClear}" AutomationProperties.Name="{loc:Translate SettingsCmdLibSyncTokenClear}"/>
+                                                <Button x:Name="Mw_SettingsCmdLibSyncTokenClear" DockPanel.Dock="Right" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" Click="OnCmdLibSyncTokenClear" Style="{DynamicResource GhostButtonStyle}" FontSize="12" Width="24" Height="24" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="{loc:Translate SettingsCmdLibSyncTokenClear}" AutomationProperties.Name="{loc:Translate SettingsCmdLibSyncTokenClear}"/>
                                                 <TextBlock x:Name="Mw_SettingsCmdLibSyncTokenStatus" DockPanel.Dock="Right" VerticalAlignment="Center" FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource SuccessTextBrush}" Margin="8,0,0,0"/>
                                                 <PasswordBox x:Name="Mw_SettingsCmdLibSyncToken" FontSize="{StaticResource FontSizeBody}" PasswordChanged="OnCmdLibSyncTokenChanged"/>
                                             </DockPanel>
@@ -3819,7 +3819,7 @@
                                     Margin="8,0,0,0"
                                     Padding="4,2"
                                     VerticalAlignment="Center"
-                                    Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                    Style="{DynamicResource GhostButtonStyle}"
                                     ToolTip="{loc:Translate CtxMenuCopy}"
                                     AutomationProperties.Name="{loc:Translate CtxMenuCopy}">
                                 <TextBlock Text="&#xE8C8;"
@@ -3853,7 +3853,7 @@
                     <Button x:Name="Mw_StatusTunnelToggle" Command="{Binding Tunnels.TogglePanelCommand}"
                             Padding="4,2" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,8,0"
                             VerticalAlignment="Center"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             ToolTip="{loc:Translate TunnelPanelToggle}"
                             AutomationProperties.Name="{loc:Translate A11yToggleTunnelPanel}">
                         <Button.Content>
@@ -3881,7 +3881,7 @@
                             </StackPanel>
                         </Button.Content>
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource ToolbarGhostButtonStyle}">
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Session.IsBroadcastMode}" Value="True">
                                         <Setter Property="Background" Value="{DynamicResource BroadcastActiveBrush}"/>
@@ -3896,7 +3896,7 @@
                             ToolTip="{loc:Translate BroadcastScopeTooltip}"
                             Padding="4,2" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,8,0"
                             VerticalAlignment="Center"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             AutomationProperties.Name="{loc:Translate A11yBroadcastScope}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal">
@@ -4416,7 +4416,7 @@
                                                             FontFamily="Segoe MDL2 Assets"
                                                             Command="{Binding DataContext.CommandPalette.SendSnippetExampleCommand, ElementName=MainWindowRoot}"
                                                             CommandParameter="{Binding}"
-                                                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                            Style="{DynamicResource GhostButtonStyle}"
                                                             ToolTip="{loc:Translate PaletteSnippetBtnSendExample}"
                                                             AutomationProperties.Name="{loc:Translate PaletteSnippetBtnSendExample}"
                                                             FontSize="11" Width="22" Height="22"
@@ -4426,7 +4426,7 @@
                                                             FontFamily="Segoe MDL2 Assets"
                                                             Command="{Binding DataContext.CommandPalette.CopySnippetExampleCommand, ElementName=MainWindowRoot}"
                                                             CommandParameter="{Binding}"
-                                                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                            Style="{DynamicResource GhostButtonStyle}"
                                                             ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                             AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                             FontSize="11" Width="22" Height="22"
@@ -4556,7 +4556,7 @@
                         <Button Content="{Binding SkipLabel}"
                                 Command="{Binding SkipCommand}"
                                 AutomationProperties.Name="{Binding SkipLabel}"
-                                Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                Style="{DynamicResource GhostButtonStyle}"
                                 Padding="12,6" FontSize="{StaticResource FontSizeBody}"
                                 DockPanel.Dock="Left"
                                 Foreground="{DynamicResource TextSecondaryBrush}"/>

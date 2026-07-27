@@ -166,7 +166,7 @@
                                         Command="{Binding DataContext.RemoveWindowsParameterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
                                         ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
-                                        Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                        Style="{DynamicResource GhostButtonStyle}"/>
                                 </Grid>
                                 <Grid Margin="0,2,0,0">
                                     <Grid.ColumnDefinitions>
@@ -274,7 +274,7 @@
                                         Command="{Binding DataContext.RemoveLinuxParameterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
                                         ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
-                                        Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                        Style="{DynamicResource GhostButtonStyle}"/>
                                 </Grid>
                                 <Grid Margin="0,2,0,0">
                                     <Grid.ColumnDefinitions>
@@ -377,7 +377,7 @@
                                             Command="{Binding DataContext.RemoveExampleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
                                             ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
-                                            Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                            Style="{DynamicResource GhostButtonStyle}"/>
                                 </Grid>
                                 <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource WatermarkTextBoxStyle}"
@@ -432,7 +432,7 @@
                                         Command="{Binding DataContext.RemoveLinkCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
                                         ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
-                                        Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                        Style="{DynamicResource GhostButtonStyle}"/>
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

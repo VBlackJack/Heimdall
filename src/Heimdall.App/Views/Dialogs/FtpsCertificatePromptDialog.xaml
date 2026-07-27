@@ -195,7 +195,7 @@
                             Grid.Column="1"
                             Content="{loc:Translate FtpsCertificateCopyFingerprintButton}"
                             Command="{Binding CopyFingerprintCommand}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="6,2"
                             MinHeight="0"
                             FontSize="{StaticResource FontSizeCaption}"

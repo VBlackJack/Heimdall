@@ -75,7 +75,7 @@
                         ToolTip="{loc:Translate TooltipSplitSession}"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding RequestSplitCommand}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                         AutomationProperties.Name="{loc:Translate A11ySplitSession}"/>
 
@@ -181,7 +181,7 @@
                             ToolTip="{loc:Translate TooltipNavigateBack}"
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding NavigateBackCommand}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="8,2" FontSize="{StaticResource FontSizeBody}"
                             IsEnabled="{Binding CanNavigateBack}"
                             AutomationProperties.Name="{loc:Translate A11yNavigateBack}"/>
@@ -190,7 +190,7 @@
                             ToolTip="{loc:Translate TooltipNavigateUp}"
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding NavigateUpCommand}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yNavigateUp}"/>
@@ -199,7 +199,7 @@
                             ToolTip="{loc:Translate TooltipNavigateHome}"
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding NavigateHomeCommand}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yNavigateHome}"/>
@@ -208,7 +208,7 @@
                             ToolTip="{loc:Translate TooltipRefreshDirectory}"
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding RefreshCommand}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yRefreshDirectory}"/>
@@ -298,7 +298,7 @@
                             Content="&#xE734;"
                             ToolTip="{loc:Translate SftpBtnBookmark}"
                             FontFamily="Segoe MDL2 Assets"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="8,2" FontSize="{StaticResource FontSizeBody}"
                             Click="OnToolbarMenuButtonClick"
                             IsEnabled="{Binding IsToolbarEnabled}"
@@ -325,7 +325,7 @@
                             Content="&#xE712;"
                             ToolTip="{loc:Translate SftpBtnMoreActions}"
                             FontFamily="Segoe MDL2 Assets"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             Visibility="Collapsed"
                             Click="OnToolbarMenuButtonClick"
@@ -372,7 +372,7 @@
                         ToolTip="{loc:Translate SftpBtnGoPath}"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding GoToPathCommand}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="8,2" FontSize="{StaticResource FontSizeBody}"
                         Margin="4,0,0,0"
                         IsEnabled="{Binding IsToolbarEnabled}"
@@ -610,7 +610,7 @@
                         ToolTip="{loc:Translate TooltipCancelTransfer}"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding CancelTransferCommand}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}"
                         Margin="8,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yCancelTransfer}"/>

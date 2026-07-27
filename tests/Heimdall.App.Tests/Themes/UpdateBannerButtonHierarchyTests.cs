@@ -67,8 +67,8 @@ public sealed class UpdateBannerButtonHierarchyTests
 
         string? basedOnKey = ExtractResourceKey((string?)quietStyle!.Attribute("BasedOn"));
         Assert.True(
-            string.Equals(basedOnKey, "ToolbarGhostButtonStyle", StringComparison.Ordinal),
-            $"Style 'QuietButtonStyle' must derive from 'ToolbarGhostButtonStyle' so the ghost "
+            string.Equals(basedOnKey, "GhostButtonStyle", StringComparison.Ordinal),
+            $"Style 'QuietButtonStyle' must derive from 'GhostButtonStyle' so the ghost "
             + $"template and its disabled-state opacity are inherited, but BasedOn references "
             + $"'{basedOnKey ?? "<none>"}'.");
     }

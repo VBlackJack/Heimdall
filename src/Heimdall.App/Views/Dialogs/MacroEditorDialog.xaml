@@ -140,7 +140,7 @@
                                             CommandParameter="{Binding}"
                                             AutomationProperties.Name="{loc:Translate MacroEditorMoveUp}"
                                             ToolTip="{loc:Translate MacroEditorMoveUp}"
-                                            Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                            Style="{DynamicResource GhostButtonStyle}"/>
                                     <Button Content="&#xE74B;"
                                             FontFamily="Segoe MDL2 Assets"
                                             Width="30"
@@ -150,7 +150,7 @@
                                             CommandParameter="{Binding}"
                                             AutomationProperties.Name="{loc:Translate MacroEditorMoveDown}"
                                             ToolTip="{loc:Translate MacroEditorMoveDown}"
-                                            Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                            Style="{DynamicResource GhostButtonStyle}"/>
                                     <Button Content="&#xE711;"
                                             FontFamily="Segoe MDL2 Assets"
                                             Width="30"
@@ -159,7 +159,7 @@
                                             CommandParameter="{Binding}"
                                             AutomationProperties.Name="{loc:Translate MacroEditorDeleteEntry}"
                                             ToolTip="{loc:Translate MacroEditorDeleteEntry}"
-                                            Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                                            Style="{DynamicResource GhostButtonStyle}"/>
                                 </StackPanel>
 
                                 <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,12,0,0">

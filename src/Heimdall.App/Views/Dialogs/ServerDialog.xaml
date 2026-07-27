@@ -492,7 +492,7 @@
                             AutomationProperties.HelpText="{loc:Translate ServerDialogProtocolChipChangeTooltip}"
                             TabIndex="0">
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource ToolbarGhostButtonStyle}">
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
                                 <Setter Property="Padding" Value="10,4"/>
                                 <Setter Property="MinHeight" Value="0"/>
                                 <Setter Property="Cursor" Value="Hand"/>
@@ -771,7 +771,7 @@
                                                     Margin="6,0,0,0"
                                                     Content="{loc:Translate ServerDialogRdpTestCancel}"
                                                     Command="{Binding CancelRdpTestCommand}"
-                                                    Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                                    Style="{DynamicResource GhostButtonStyle}"
                                                     Visibility="{Binding IsTestingRdpConnection, Converter={StaticResource BoolToVisibilityConverter}}"
                                                     AutomationProperties.Name="{loc:Translate ServerDialogRdpTestCancel}"/>
                                         </DockPanel>
@@ -1454,7 +1454,7 @@
                                                                                            VerticalAlignment="Center"/>
                                                                                 <Button Content="{loc:Translate ServerDialogRefreshMonitors}"
                                                                                         Command="{Binding RefreshMonitorsCommand}"
-                                                                                        Style="{StaticResource ToolbarGhostButtonStyle}"
+                                                                                        Style="{StaticResource GhostButtonStyle}"
                                                                                         FontSize="{StaticResource FontSizeCaption}"
                                                                                         Padding="8,2"
                                                                                         MinHeight="0"

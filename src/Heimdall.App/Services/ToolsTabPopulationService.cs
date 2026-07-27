@@ -552,7 +552,7 @@ public sealed class ToolsTabPopulationService
             Content = isFav ? "\uE735" : "\uE734",
             FontFamily = new FontFamily("Segoe MDL2 Assets"),
             FontSize = 12,
-            Style = (Style)Application.Current.FindResource("ToolbarGhostButtonStyle"),
+            Style = (Style)Application.Current.FindResource("GhostButtonStyle"),
             Padding = new Thickness(2),
             Opacity = isFav ? 1.0 : 0.4,
             VerticalAlignment = VerticalAlignment.Top,

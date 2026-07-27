@@ -109,7 +109,7 @@
                         Click="OnFullscreenButtonClick"
                         ToolTip="{loc:Translate TooltipFullscreenToggle}"
                         AutomationProperties.Name="{loc:Translate A11yFullscreenToggle}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2"
                         FontSize="{StaticResource FontSizeBody}"
                         Margin="4,0"/>
@@ -121,7 +121,7 @@
                         Click="OnSendKeysButtonClick"
                         ToolTip="{loc:Translate TooltipSendKeysMenu}"
                         AutomationProperties.Name="{loc:Translate A11ySendKeysMenu}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2"
                         FontSize="{StaticResource FontSizeBody}"
                         Margin="4,0">
@@ -172,7 +172,7 @@
                         Click="OnSplitClick"
                         ToolTip="{loc:Translate TooltipSplitSession}"
                         AutomationProperties.Name="{loc:Translate A11ySplitSession}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
                 <Border Style="{StaticResource ToolbarVerticalSeparatorStyle}"
                         AutomationProperties.AutomationId="Toolbar.SeparatorB-C"
@@ -182,7 +182,7 @@
                         TabIndex="4"
                         Content="&#xE740;"
                         FontFamily="Segoe MDL2 Assets"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         AutomationProperties.Name="{loc:Translate A11yChangeResolution}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                         Click="OnResolutionButtonClick">
@@ -256,7 +256,7 @@
                             Click="OnAutofillRetryClick"
                             ToolTip="{loc:Translate RdpAutofillRetryTooltip}"
                             AutomationProperties.Name="{loc:Translate RdpAutofillRetryAction}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Margin="6,0,0,0"
                             Padding="8,2"
                             FontSize="{StaticResource FontSizeCaption}"
@@ -267,7 +267,7 @@
                             Click="OnAutofillDismissClick"
                             ToolTip="{loc:Translate RdpAutofillDismissTooltip}"
                             AutomationProperties.Name="{loc:Translate RdpAutofillDismissAction}"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Margin="2,0,0,0"
                             Padding="6,2"
                             FontSize="{StaticResource FontSizeCaption}"
@@ -356,7 +356,7 @@
                             Margin="8,0,0,0"
                             Padding="4,1"
                             VerticalAlignment="Center"
-                            Style="{DynamicResource ToolbarGhostButtonStyle}"
+                            Style="{DynamicResource GhostButtonStyle}"
                             Cursor="Hand">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE945;"
@@ -438,7 +438,7 @@
                                     Padding="4,0"
                                     FontSize="{StaticResource FontSizeCaption}"
                                     Foreground="{DynamicResource TextSecondaryBrush}"
-                                    Style="{DynamicResource ToolbarGhostButtonStyle}"
+                                    Style="{DynamicResource GhostButtonStyle}"
                                     Click="OnRedirExpandBadgeClick"
                                     Cursor="Hand"
                                     ToolTip="{loc:Translate RdpRedirectionExpandBadgeTooltip}"

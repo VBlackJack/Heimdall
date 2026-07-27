@@ -40,26 +40,26 @@
                 <Button Content="&#xE72B;" FontFamily="Segoe MDL2 Assets"
                         x:Name="BtnBack" Click="OnBackClick"
                         ToolTip="{loc:Translate TooltipNavigateBack}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}"
                         IsEnabled="{Binding CanGoBack}"
                         AutomationProperties.Name="{loc:Translate A11yNavigateBack}"/>
                 <Button x:Name="BtnUp" Content="&#xE74A;" FontFamily="Segoe MDL2 Assets"
                         Click="OnUpClick"
                         ToolTip="{loc:Translate TooltipNavigateUp}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yNavigateUp}"/>
                 <Button x:Name="BtnHome" Content="&#xE80F;" FontFamily="Segoe MDL2 Assets"
                         Click="OnHomeClick"
                         ToolTip="{loc:Translate TooltipNavigateHome}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yNavigateHome}"/>
                 <Button x:Name="BtnRefresh" Content="&#xE72C;" FontFamily="Segoe MDL2 Assets"
                         Click="OnRefreshClick"
                         ToolTip="{loc:Translate TooltipRefreshDirectory}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yRefreshDirectory}"/>
             </StackPanel>

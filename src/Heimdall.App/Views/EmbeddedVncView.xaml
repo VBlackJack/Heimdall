@@ -44,7 +44,7 @@
                         Content="&#xE8A9;"
                         FontFamily="Segoe MDL2 Assets"
                         Click="OnSplitClick"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

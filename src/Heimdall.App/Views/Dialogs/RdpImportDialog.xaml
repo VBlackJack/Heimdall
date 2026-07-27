@@ -74,19 +74,19 @@
                         Command="{Binding ApplyAllSkipCommand}"
                         AutomationProperties.LabeledBy="{Binding ElementName=ApplyToAllLabel}"
                         AutomationProperties.HelpText="{loc:Translate A11yRdpImportApplyAllSkipHelp}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Margin="0,0,6,0"/>
                 <Button Content="{Binding ApplyAllReplaceText}"
                         Command="{Binding ApplyAllReplaceCommand}"
                         AutomationProperties.LabeledBy="{Binding ElementName=ApplyToAllLabel}"
                         AutomationProperties.HelpText="{loc:Translate A11yRdpImportApplyAllReplaceHelp}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Margin="0,0,6,0"/>
                 <Button Content="{Binding ApplyAllAutoRenameText}"
                         Command="{Binding ApplyAllAutoRenameCommand}"
                         AutomationProperties.LabeledBy="{Binding ElementName=ApplyToAllLabel}"
                         AutomationProperties.HelpText="{loc:Translate A11yRdpImportApplyAllAutoRenameHelp}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"/>
+                        Style="{DynamicResource GhostButtonStyle}"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal">

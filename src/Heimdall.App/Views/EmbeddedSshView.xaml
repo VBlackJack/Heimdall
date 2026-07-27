@@ -53,7 +53,7 @@
                         Click="OnHealthToggleClick"
                         ToolTip="{loc:Translate TooltipToggleHealthMonitoring}"
                         AutomationProperties.Name="{loc:Translate A11yToggleHealthMonitoring}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
                 <Button x:Name="SplitButton"
@@ -63,7 +63,7 @@
                         Click="OnSplitClick"
                         ToolTip="{loc:Translate TooltipSplitSession}"
                         AutomationProperties.Name="{loc:Translate A11ySplitSession}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
                 <Button x:Name="ElevateButton"
@@ -73,7 +73,7 @@
                         Click="OnElevateClick"
                         ToolTip="{loc:Translate TooltipElevateToRoot}"
                         AutomationProperties.Name="{loc:Translate A11yElevateToRoot}"
-                        Style="{DynamicResource ToolbarGhostButtonStyle}"
+                        Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                         Visibility="Collapsed"/>
 

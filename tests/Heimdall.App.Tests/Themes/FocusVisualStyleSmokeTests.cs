@@ -35,7 +35,7 @@ public sealed class FocusVisualStyleSmokeTests
         {
             "PrimaryButtonStyle",
             "SecondaryButtonStyle",
-            "ToolbarGhostButtonStyle",
+            "GhostButtonStyle",
             "ComboBoxToggleButtonStyle"
         })
         {
