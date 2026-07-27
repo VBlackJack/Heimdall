@@ -47,17 +47,26 @@ public sealed class EmbeddedSftpViewTaskObservationTests
         Assert.Contains(fault.Message, warning, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The contract is that the caller is not held for the duration of the teardown:
+    /// DisposeBrowserAsync hands back a task while the disconnect is still running, and
+    /// the browser is disposed once it finishes.
+    ///
+    /// This deliberately does not assert which thread the teardown runs on. Thread
+    /// identity is not a witness for that: the work is queued rather than started, the
+    /// caller returns its own thread to the pool as soon as it awaits, and the pool is
+    /// then free to run the queued work on that very thread. The assertion held only as
+    /// long as the pool never made that choice, which it eventually did.
+    /// </summary>
     [Fact]
-    public async Task DisposeBrowserAsync_ReturnsPromptlyAndRunsTeardownOffCallingThread()
+    public async Task DisposeBrowserAsync_ReturnsBeforeTeardownCompletesAndDisposes()
     {
         using var releaseDisconnect = new ManualResetEventSlim();
         var browser = new BlockingRemoteBrowser(releaseDisconnect);
-        int callingThreadId = Environment.CurrentManagedThreadId;
 
         Task teardown = EmbeddedSftpView.DisposeBrowserAsync(browser);
 
         await browser.DisconnectStarted.Task.WaitAsync(SignalBackstop);
-        Assert.NotEqual(callingThreadId, browser.DisconnectThreadId);
         Assert.False(teardown.IsCompleted);
 
         releaseDisconnect.Set();
@@ -112,8 +121,6 @@ public sealed class EmbeddedSftpViewTaskObservationTests
         public TaskCompletionSource DisconnectStarted { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public int DisconnectThreadId { get; private set; }
-
         public bool DisposeCalled { get; private set; }
 
         public string CurrentDirectory => "/";
@@ -122,7 +129,6 @@ public sealed class EmbeddedSftpViewTaskObservationTests
 
         public void Disconnect()
         {
-            DisconnectThreadId = Environment.CurrentManagedThreadId;
             DisconnectStarted.TrySetResult();
             releaseDisconnect?.Wait();
 
