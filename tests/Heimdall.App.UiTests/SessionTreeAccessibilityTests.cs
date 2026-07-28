@@ -22,6 +22,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using FlaUI.UIA3;
 using Heimdall.App.Behaviors;
 using Heimdall.App.Services;
@@ -66,6 +67,7 @@ public sealed class SessionTreeAccessibilityTests
             window = Show(count);
             windowHandle = new WindowInteropHelper(window).Handle;
         });
+        WpfTestHost.Invoke(DrainDispatcher);
 
         var announcements = new ConcurrentQueue<string>();
         using var automation = new UIA3Automation();
@@ -83,7 +85,7 @@ public sealed class SessionTreeAccessibilityTests
         {
             WpfTestHost.Invoke(() => count!.Visibility = Visibility.Collapsed);
             WpfTestHost.Invoke(() => source!.Value = "2 / 3 sessions");
-            Thread.Sleep(50);
+            WpfTestHost.Invoke(DrainDispatcher);
             Assert.Empty(announcements);
 
             WpfTestHost.Invoke(() => count!.Visibility = Visibility.Visible);
@@ -193,6 +195,15 @@ public sealed class SessionTreeAccessibilityTests
         window.Show();
         content.UpdateLayout();
         return window;
+    }
+
+    private static void DrainDispatcher()
+    {
+        var frame = new DispatcherFrame();
+        _ = Dispatcher.CurrentDispatcher.BeginInvoke(
+            DispatcherPriority.ContextIdle,
+            () => frame.Continue = false);
+        Dispatcher.PushFrame(frame);
     }
 
     private static void WaitForAutomationEvent(ConcurrentQueue<string> announcements)
