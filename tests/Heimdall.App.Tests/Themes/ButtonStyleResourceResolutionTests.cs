@@ -151,17 +151,8 @@ public sealed partial class ButtonStyleResourceResolutionTests
 
     private static IEnumerable<string> EnumerateSourceFiles(string root, string pattern)
     {
-        return Directory
-            .EnumerateFiles(root, pattern, SearchOption.AllDirectories)
-            .Where(path =>
-            {
-                string relativePath = Path.GetRelativePath(root, path);
-                string firstSegment = relativePath.Split(
-                    [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
-                    2)[0];
-                return !string.Equals(firstSegment, "bin", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(firstSegment, "obj", StringComparison.OrdinalIgnoreCase);
-            })
+        return SourceFileEnumeration
+            .EnumerateFiles(root, pattern)
             .Order(StringComparer.Ordinal);
     }
 

@@ -92,8 +92,7 @@ public class XamlLocalizationKeyCoverageTests
     {
         var srcPath = Path.Combine(repoRoot, "src");
         var references = new List<XamlLocalizationReference>();
-        var xamlFiles = Directory.EnumerateFiles(srcPath, "*.xaml", SearchOption.AllDirectories)
-            .Where(path => !HasBuildOutputDirectorySegment(path))
+        var xamlFiles = SourceFileEnumeration.EnumerateFiles(srcPath, "*.xaml")
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
 
         foreach (var filePath in xamlFiles)
@@ -114,14 +113,6 @@ public class XamlLocalizationKeyCoverageTests
         }
 
         return references;
-    }
-
-    private static bool HasBuildOutputDirectorySegment(string path)
-    {
-        var segments = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return segments.Any(segment =>
-            string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string NormalizeRelativePath(string path) =>

@@ -131,15 +131,8 @@ public sealed class HardcodedColorGuardTests
     {
         foreach (string pattern in new[] { "*.cs", "*.xaml" })
         {
-            foreach (string file in Directory.EnumerateFiles(appDir, pattern, SearchOption.AllDirectories))
+            foreach (string file in SourceFileEnumeration.EnumerateFiles(appDir, pattern))
             {
-                // Generated/build output never ships UI code reviewed here.
-                if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-                    || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-                {
-                    continue;
-                }
-
                 yield return file;
             }
         }
