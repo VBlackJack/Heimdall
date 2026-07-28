@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Reflection;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Tools;
 
 namespace Heimdall.App.Tests;
@@ -30,17 +31,15 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     private const string AmbiguousChars = "0Oo1lI|";
     private const string ShellDangerousChars = "$^&*'\"\\|`(){}[]<>!~;";
     private const string LayoutUnsafeChars = "aqwzmAQWZM";
-    private static readonly string PresetsFilePath =
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "password-presets.json");
-
-    public PasswordGeneratorViewModelTests()
-    {
-        DeletePresetFile();
-    }
+    private readonly string _presetsDirectoryPath =
+        Path.Combine(Path.GetTempPath(), nameof(PasswordGeneratorViewModelTests), Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
-        DeletePresetFile();
+        if (Directory.Exists(_presetsDirectoryPath))
+        {
+            Directory.Delete(_presetsDirectoryPath, recursive: true);
+        }
     }
 
     [Fact]
@@ -394,9 +393,9 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.DoesNotContain(sut.GetCustomPresetsForCurrentMode(), preset => preset.Name == "delete-me");
     }
 
-    private static PasswordGeneratorViewModel CreateInitializedVm()
+    private PasswordGeneratorViewModel CreateInitializedVm()
     {
-        var sut = new PasswordGeneratorViewModel();
+        var sut = new PasswordGeneratorViewModel(new PasswordPresetStorage(_presetsDirectoryPath));
         sut.Initialize(context: null, localizer: null);
         return sut;
     }
@@ -419,11 +418,4 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             .Invoke(sut, args);
     }
 
-    private static void DeletePresetFile()
-    {
-        if (File.Exists(PresetsFilePath))
-        {
-            File.Delete(PresetsFilePath);
-        }
-    }
 }

@@ -18,9 +18,9 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
@@ -215,9 +215,21 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private bool _isInitialized;
     private bool _isSuspended;
     private Func<string, string, Task<bool>>? _confirmAsync;
+    private readonly IPasswordPresetStorage _presetStorage;
     private List<PasswordPreset>? _cachedPresets;
     private string[] _englishWords = [];
     private string[] _frenchWords = [];
+
+    public PasswordGeneratorViewModel()
+        : this(new PasswordPresetStorage())
+    {
+    }
+
+    internal PasswordGeneratorViewModel(IPasswordPresetStorage presetStorage)
+    {
+        ArgumentNullException.ThrowIfNull(presetStorage);
+        _presetStorage = presetStorage;
+    }
 
     [ObservableProperty] private int _selectedModeIndex;
 
@@ -1121,13 +1133,6 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     private string L(string key) => _localizer?[key] ?? key;
 
-    private static string GetPresetsFilePath()
-    {
-        return Path.Combine(
-            ApplicationDataPathResolver.Resolve(),
-            "password-presets.json");
-    }
-
     private List<PasswordPreset> LoadCustomPresets()
     {
         if (_cachedPresets is not null)
@@ -1135,43 +1140,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             return _cachedPresets;
         }
 
-        try
-        {
-            var path = GetPresetsFilePath();
-            if (!File.Exists(path))
-            {
-                return _cachedPresets = [];
-            }
-
-            var json = File.ReadAllText(path, Encoding.UTF8);
-            return _cachedPresets = JsonSerializer.Deserialize<List<PasswordPreset>>(json) ?? [];
-        }
-        catch
-        {
-            return _cachedPresets = [];
-        }
+        return _cachedPresets = _presetStorage.Load();
     }
 
     private void SaveCustomPresets(List<PasswordPreset> presets)
     {
         _cachedPresets = null;
-        try
-        {
-            var path = GetPresetsFilePath();
-            var dir = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            var json = JsonSerializer.Serialize(presets, options);
-            File.WriteAllText(path, json, Encoding.UTF8);
-        }
-        catch (Exception ex)
-        {
-            FileLogger.Warn($"[PasswordGenerator] Failed to save custom presets: {ex.Message}");
-        }
+        _presetStorage.Save(presets);
     }
 
     private void LoadWordLists()
