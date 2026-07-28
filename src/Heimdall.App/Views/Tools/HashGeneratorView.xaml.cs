@@ -154,7 +154,12 @@ public partial class HashGeneratorView : UserControl, IToolView
 
     private void OnDragOver(object sender, System.Windows.DragEventArgs e)
     {
-        e.Effects = e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) ? System.Windows.DragDropEffects.Copy : System.Windows.DragDropEffects.None;
+        e.Effects = e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) &&
+            e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] files &&
+            files.Length > 0 &&
+            _vm.HashFileCommand.CanExecute(files[0])
+                ? System.Windows.DragDropEffects.Copy
+                : System.Windows.DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -163,12 +168,16 @@ public partial class HashGeneratorView : UserControl, IToolView
         DropZoneBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("BorderBrush");
         if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) &&
             e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] files &&
-            files.Length > 0) { BeginFileHash(files[0]); }
+            files.Length > 0 &&
+            _vm.HashFileCommand.CanExecute(files[0])) { BeginFileHash(files[0]); }
     }
 
     private void OnDragEnter(object sender, System.Windows.DragEventArgs e)
     {
-        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)) { DropZoneBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("AccentBrush"); }
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) &&
+            e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] files &&
+            files.Length > 0 &&
+            _vm.HashFileCommand.CanExecute(files[0])) { DropZoneBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("AccentBrush"); }
     }
 
     private void OnDragLeave(object sender, System.Windows.DragEventArgs e) => DropZoneBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("BorderBrush");
