@@ -496,6 +496,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<HostKeyStore>();
         services.AddSingleton<IHostKeyTrustService, HostKeyTrustService>();
         services.AddSingleton<KnownHostsStartupSync>();
+        services.AddSingleton<TrustPromptCoordinator>();
         services.AddSingleton<IHostKeyVerifier, DialogHostKeyVerifier>();
         services.AddSingleton<FtpsCertificateStore>();
         services.AddSingleton<IFtpsCertificateVerifier, DialogFtpsCertificateVerifier>();

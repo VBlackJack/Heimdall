@@ -26,9 +26,12 @@ namespace Heimdall.App.Services;
 /// <summary>
 /// WPF host key verifier that marshals onto the UI dispatcher and shows a modal dialog.
 /// </summary>
-internal sealed class DialogHostKeyVerifier(LocalizationManager localizer) : IHostKeyVerifier
+internal sealed class DialogHostKeyVerifier(
+    LocalizationManager localizer,
+    TrustPromptCoordinator coordinator) : IHostKeyVerifier
 {
     private readonly LocalizationManager _localizer = localizer;
+    private readonly TrustPromptCoordinator _coordinator = coordinator;
 
     public async Task<HostKeyDecision> VerifyAsync(
         string host,
@@ -51,24 +54,80 @@ internal sealed class DialogHostKeyVerifier(LocalizationManager localizer) : IHo
             return HostKeyDecision.Reject;
         }
 
+        if (app.Dispatcher.CheckAccess())
+        {
+            // The queue needs the dispatcher to display prompts. Bypass it on the UI
+            // thread to avoid deadlocking a caller that waits synchronously. This
+            // request is not coalesced, but the UI thread serializes its own dialogs.
+            return ShowDialog(
+                app,
+                host,
+                port,
+                algorithm,
+                presentedFingerprint,
+                storedFingerprint,
+                ct);
+        }
+
         try
         {
-            return await app.Dispatcher.InvokeAsync(
-                () => ShowDialog(
+            var key = TrustPromptKey.Create(
+                TrustPromptKind.SshHostKey,
+                host,
+                port,
+                presentedFingerprint);
+            return await _coordinator.RequestAsync(
+                key,
+                displayCt => ShowDialogOnDispatcherAsync(
                     app,
                     host,
                     port,
                     algorithm,
                     presentedFingerprint,
                     storedFingerprint,
-                    ct),
-                System.Windows.Threading.DispatcherPriority.Normal,
+                    displayCt),
+                HostKeyDecision.Reject,
                 ct);
         }
         catch (TaskCanceledException)
         {
             return HostKeyDecision.Reject;
         }
+    }
+
+    private Task<HostKeyDecision> ShowDialogOnDispatcherAsync(
+        Application app,
+        string host,
+        int port,
+        string algorithm,
+        string presentedFingerprint,
+        string? storedFingerprint,
+        CancellationToken ct)
+    {
+        if (app.Dispatcher.CheckAccess())
+        {
+            return Task.FromResult(
+                ShowDialog(
+                    app,
+                    host,
+                    port,
+                    algorithm,
+                    presentedFingerprint,
+                    storedFingerprint,
+                    ct));
+        }
+
+        return app.Dispatcher.InvokeAsync(
+            () => ShowDialog(
+                app,
+                host,
+                port,
+                algorithm,
+                presentedFingerprint,
+                storedFingerprint,
+                ct),
+            System.Windows.Threading.DispatcherPriority.Normal,
+            ct).Task;
     }
 
     private HostKeyDecision ShowDialog(

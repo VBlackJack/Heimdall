@@ -16,73 +16,75 @@
 
 using System.IO;
 using Heimdall.App.Services;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
-using Heimdall.Core.Ssh;
 
 namespace Heimdall.App.Tests;
 
-public sealed class DialogHostKeyVerifierTests
+public sealed class DialogFtpsCertificateVerifierTests
 {
     [Fact]
-    public async Task VerifyAsync_WithoutApplicationCurrent_ReturnsReject_AndLogsWarning()
+    public async Task VerifyAsync_WithoutApplicationCurrent_ReturnsRejectAndLogsWarning()
     {
         Assert.Null(System.Windows.Application.Current);
 
-        var localizer = await CreateLocalizerAsync("en");
-        var logDirectory = Path.Combine(
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        string logDirectory = Path.Combine(
             Path.GetTempPath(),
-            "heimdall-dialog-hostkey-tests",
+            "heimdall-dialog-ftps-tests",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(logDirectory);
         FileLogger.Initialize(logDirectory, flushIntervalMs: 10);
-
-        var verifier = new DialogHostKeyVerifier(
+        var verifier = new DialogFtpsCertificateVerifier(
             localizer,
             new TrustPromptCoordinator());
 
-        var decision = await verifier.VerifyAsync(
-            "headless.example.com",
-            22,
-            "ssh-ed25519",
-            "SHA256:presented",
-            null);
+        FtpsCertificateDecision decision = await verifier.VerifyAsync(CreatePrompt());
 
         FileLogger.Flush();
-        var logFile = Assert.Single(Directory.GetFiles(logDirectory, "heimdall_*.log"));
-        var logContent = await File.ReadAllTextAsync(logFile);
+        string logFile = Assert.Single(Directory.GetFiles(logDirectory, "heimdall_*.log"));
+        string logContent = await File.ReadAllTextAsync(logFile);
 
-        Assert.Equal(HostKeyDecision.Reject, decision);
-        Assert.Contains("DialogHostKeyVerifier invoked without Application.Current", logContent);
-        Assert.Contains("headless.example.com:22", logContent);
+        Assert.Equal(FtpsCertificateDecision.Reject, decision);
+        Assert.Contains(
+            "DialogFtpsCertificateVerifier invoked without Application.Current",
+            logContent);
     }
 
     [Fact]
     public async Task VerifyAsync_WithCancelledToken_ReturnsReject()
     {
-        var localizer = await CreateLocalizerAsync("en");
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-
-        var verifier = new DialogHostKeyVerifier(
+        var verifier = new DialogFtpsCertificateVerifier(
             localizer,
             new TrustPromptCoordinator());
 
-        var decision = await verifier.VerifyAsync(
-            "cancelled.example.com",
-            22,
-            "ssh-ed25519",
-            "SHA256:presented",
-            null,
+        FtpsCertificateDecision decision = await verifier.VerifyAsync(
+            CreatePrompt(),
             cts.Token);
 
-        Assert.Equal(HostKeyDecision.Reject, decision);
+        Assert.Equal(FtpsCertificateDecision.Reject, decision);
     }
+
+    private static FtpsCertificatePrompt CreatePrompt()
+        => new(
+            "ftps.example.com",
+            21,
+            "SHA256:presented",
+            null,
+            "CN=ftps.example.com",
+            "CN=Test CA",
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(30),
+            "self-signed");
 
     private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
     {
         var manager = new LocalizationManager();
-        var localesPath = Path.GetFullPath(
+        string localesPath = Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "locales"));
         await manager.LoadAsync(localesPath, locale);
         return manager;

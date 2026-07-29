@@ -23,9 +23,12 @@ using Heimdall.Core.Logging;
 
 namespace Heimdall.App.Services;
 
-internal sealed class DialogFtpsCertificateVerifier(LocalizationManager localizer) : IFtpsCertificateVerifier
+internal sealed class DialogFtpsCertificateVerifier(
+    LocalizationManager localizer,
+    TrustPromptCoordinator coordinator) : IFtpsCertificateVerifier
 {
     private readonly LocalizationManager _localizer = localizer;
+    private readonly TrustPromptCoordinator _coordinator = coordinator;
 
     public async Task<FtpsCertificateDecision> VerifyAsync(
         FtpsCertificatePrompt prompt,
@@ -48,20 +51,45 @@ internal sealed class DialogFtpsCertificateVerifier(LocalizationManager localize
 
         if (app.Dispatcher.CheckAccess())
         {
+            // The queue needs the dispatcher to display prompts. Bypass it on the UI
+            // thread to avoid deadlocking a caller that waits synchronously. This
+            // request is not coalesced, but the UI thread serializes its own dialogs.
             return ShowDialog(app, prompt, ct);
         }
 
         try
         {
-            return await app.Dispatcher.InvokeAsync(
-                () => ShowDialog(app, prompt, ct),
-                System.Windows.Threading.DispatcherPriority.Normal,
+            var key = TrustPromptKey.Create(
+                TrustPromptKind.FtpsCertificate,
+                prompt.Host,
+                prompt.Port,
+                prompt.PresentedFingerprint);
+            return await _coordinator.RequestAsync(
+                key,
+                displayCt => ShowDialogOnDispatcherAsync(app, prompt, displayCt),
+                FtpsCertificateDecision.Reject,
                 ct);
         }
         catch (TaskCanceledException)
         {
             return FtpsCertificateDecision.Reject;
         }
+    }
+
+    private Task<FtpsCertificateDecision> ShowDialogOnDispatcherAsync(
+        Application app,
+        FtpsCertificatePrompt prompt,
+        CancellationToken ct)
+    {
+        if (app.Dispatcher.CheckAccess())
+        {
+            return Task.FromResult(ShowDialog(app, prompt, ct));
+        }
+
+        return app.Dispatcher.InvokeAsync(
+            () => ShowDialog(app, prompt, ct),
+            System.Windows.Threading.DispatcherPriority.Normal,
+            ct).Task;
     }
 
     private FtpsCertificateDecision ShowDialog(
