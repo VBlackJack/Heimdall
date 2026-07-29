@@ -1748,7 +1748,7 @@ public partial class ServerDialogViewModel : ObservableValidator
                 ? ExistingWinRmPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(WinRmPassword),
             WinRmUseSsl = WinRmUseSsl,
-            WinRmSkipCertificateCheck = WinRmSkipCertificateCheck,
+            WinRmSkipCertificateCheck = WinRmUseSsl && WinRmSkipCertificateCheck,
             WinRmIdentityMode = WinRmIdentityMode,
             SshUsername = string.IsNullOrWhiteSpace(SshUsername) ? null : SshUsername,
             SshPort = SshPort,
@@ -1893,7 +1893,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.WinRmUsername = dto.WinRmUsername ?? "";
         vm.ExistingWinRmPasswordEncrypted = dto.WinRmPasswordEncrypted;
         vm.WinRmUseSsl = dto.WinRmUseSsl;
-        vm.WinRmSkipCertificateCheck = dto.WinRmSkipCertificateCheck;
+        vm.WinRmSkipCertificateCheck = dto.WinRmUseSsl && dto.WinRmSkipCertificateCheck;
         vm.WinRmIdentityMode = dto.WinRmIdentityMode;
         vm.SshUsername = dto.SshUsername ?? "";
         vm.SshPort = dto.SshPort;

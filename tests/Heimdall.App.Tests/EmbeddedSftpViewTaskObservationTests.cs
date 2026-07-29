@@ -29,6 +29,18 @@ public sealed class EmbeddedSftpViewTaskObservationTests
     /// </summary>
     private static readonly TimeSpan SignalBackstop = TimeSpan.FromSeconds(30);
 
+    [Theory]
+    [InlineData(true, "WarnFtpsDataChannelIdentityBadge")]
+    [InlineData(false, "WarnFtpCleartextBadge")]
+    public void GetFtpSecurityNoticeLocalizationKey_ReturnsProtocolAppropriateNotice(
+        bool isTlsEnabled,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            EmbeddedSftpView.GetFtpSecurityNoticeLocalizationKey(isTlsEnabled));
+    }
+
     [Fact]
     public async Task ObserveFaultedTask_LogsFaultWithoutThrowing()
     {

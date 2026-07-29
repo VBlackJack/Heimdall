@@ -33,6 +33,28 @@ namespace Heimdall.Sftp;
 public sealed class FtpBrowser : IRemoteBrowser
 {
     private const int DefaultTimeoutMilliseconds = 30_000;
+    private const X509ChainStatusFlags NonOverridableChainErrors =
+        X509ChainStatusFlags.NotTimeValid
+        | X509ChainStatusFlags.NotTimeNested
+        | X509ChainStatusFlags.Revoked
+        | X509ChainStatusFlags.NotSignatureValid
+        | X509ChainStatusFlags.NotValidForUsage
+        | X509ChainStatusFlags.Cyclic
+        | X509ChainStatusFlags.InvalidExtension
+        | X509ChainStatusFlags.InvalidPolicyConstraints
+        | X509ChainStatusFlags.InvalidBasicConstraints
+        | X509ChainStatusFlags.InvalidNameConstraints
+        | X509ChainStatusFlags.HasNotSupportedNameConstraint
+        | X509ChainStatusFlags.HasNotDefinedNameConstraint
+        | X509ChainStatusFlags.HasNotPermittedNameConstraint
+        | X509ChainStatusFlags.HasExcludedNameConstraint
+        | X509ChainStatusFlags.CtlNotTimeValid
+        | X509ChainStatusFlags.CtlNotSignatureValid
+        | X509ChainStatusFlags.CtlNotValidForUsage
+        | X509ChainStatusFlags.HasWeakSignature
+        | X509ChainStatusFlags.NoIssuanceChainPolicy
+        | X509ChainStatusFlags.ExplicitDistrust
+        | X509ChainStatusFlags.HasNotSupportedCriticalExtension;
 
     private readonly SemaphoreSlim _opLock = new SemaphoreSlim(1, 1);
     private readonly FtpsCertificateStore _certificateStore;
@@ -623,6 +645,14 @@ public sealed class FtpBrowser : IRemoteBrowser
         if (sessionEntry is not null
             && FtpsCertificateStore.ConstantTimeEquals(sessionEntry.Fingerprint, fingerprint))
         {
+            EnsurePinnedCertificateRemainsValid(
+                host,
+                port,
+                certificate2,
+                chain,
+                policyErrors,
+                validationErrors,
+                fingerprint);
             return true;
         }
 
@@ -651,6 +681,14 @@ public sealed class FtpBrowser : IRemoteBrowser
                     "FTPS certificate fingerprint mismatch.");
             }
 
+            EnsurePinnedCertificateRemainsValid(
+                host,
+                port,
+                certificate2,
+                chain,
+                policyErrors,
+                validationErrors,
+                fingerprint);
             _certificateStore.RefreshLastSeen(host, port);
             return true;
         }
@@ -703,6 +741,41 @@ public sealed class FtpBrowser : IRemoteBrowser
             null,
             isMismatch: false,
             "FTPS certificate was rejected.");
+    }
+
+    private static void EnsurePinnedCertificateRemainsValid(
+        string host,
+        int port,
+        X509Certificate2 certificate,
+        X509Chain? chain,
+        SslPolicyErrors policyErrors,
+        string validationErrors,
+        string fingerprint)
+    {
+        if (policyErrors == SslPolicyErrors.None)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        bool outsideValidityPeriod =
+            now < certificate.NotBefore.ToUniversalTime()
+            || now > certificate.NotAfter.ToUniversalTime();
+        bool hasNonOverridableChainError = chain?.ChainStatus.Any(
+            static status => (status.Status & NonOverridableChainErrors) != 0) == true;
+
+        if (!outsideValidityPeriod && !hasNonOverridableChainError)
+        {
+            return;
+        }
+
+        throw new FtpsCertificateRejectedException(
+            host,
+            port,
+            fingerprint,
+            fingerprint,
+            isMismatch: false,
+            $"FTPS pinned certificate failed non-overridable validity checks: {validationErrors}");
     }
 
     internal static SftpFileInfo MapFtpItemToFileInfo(FtpListItem item, string parentPath)

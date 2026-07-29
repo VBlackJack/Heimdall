@@ -42,6 +42,8 @@ public static class ImportedProfileSanitizer
 
             profile.CitrixLaunchCommandLine = null;
             profile.ExecutionConfirmed = false;
+            profile.WinRmSkipCertificateCheck =
+                profile.WinRmUseSsl && profile.WinRmSkipCertificateCheck;
         }
     }
 }

@@ -133,6 +133,36 @@ public sealed class ServerDialogWinRmTests
     }
 
     [Fact]
+    public void FromDto_WinRmWithoutSsl_ClearsLatentCertificateSkip()
+    {
+        ServerDialogViewModel vm = ServerDialogViewModel.FromDto(new ServerProfileDto
+        {
+            ConnectionType = "WINRM",
+            WinRmUseSsl = false,
+            WinRmSkipCertificateCheck = true
+        });
+
+        Assert.False(vm.WinRmUseSsl);
+        Assert.False(vm.WinRmSkipCertificateCheck);
+    }
+
+    [Fact]
+    public void ToDto_WinRmWithoutSsl_DoesNotPersistLatentCertificateSkip()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel
+        {
+            ConnectionType = "WINRM",
+            WinRmUseSsl = false,
+            WinRmSkipCertificateCheck = true
+        };
+
+        ServerProfileDto dto = vm.ToDto();
+
+        Assert.False(dto.WinRmUseSsl);
+        Assert.False(dto.WinRmSkipCertificateCheck);
+    }
+
+    [Fact]
     public async Task WinRmDisplayText_UsesFriendlyProtocolAndSessionNames()
     {
         ServerDialogViewModel vm = new ServerDialogViewModel

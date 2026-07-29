@@ -188,7 +188,7 @@ the process-wide `UnobservedTaskException` pipeline. Sudo edit sessions
 cache the `PinnedFingerprintVerifier` built at open time instead of resolving
 host-key trust again on every save.
 
-### FTP cleartext warning
+### FTP and FTPS transport notices
 
 FTP is implemented on top of FluentFTP `AsyncFtpClient`. `FtpHandler`
 validates the target host and port before connect. If a user connects with
@@ -196,7 +196,28 @@ credentials and TLS is disabled, `ConnectionResult.Warning` carries a
 localized non-blocking cleartext warning to the status surface; it does not
 block anonymous or explicit FTPS sessions. Explicit FTPS enables TLS for the
 control channel and FluentFTP `DataConnectionEncryption`, so file transfers
-use a protected data channel.
+use an encrypted data channel.
+
+The FTPS control-channel certificate is validated and pinned by Heimdall.
+The data channel has a third-party limitation in FluentFTP 54.2.0:
+`FtpDataStream` installs an unconditional certificate-acceptance handler, so
+Heimdall cannot verify that channel's identity. This behavior is also present
+in the current upstream source. No `FtpConfig` option exposes data-channel
+certificate validation, and supplying a second callback through
+`ConfigureAuthentication` is rejected by .NET because `SslStream` has already
+been constructed with FluentFTP's callback.
+
+The exact user-facing guarantee is:
+
+*FTPS ne peut etre considere comme liant l'identite du canal de donnees a
+celle du canal de controle que si le serveur exige la reprise de session TLS
+et qu'un transfert reel reussit sous cette politique. Sans cette exigence
+serveur, la garantie est indisponible.*
+
+.NET allows session resumption but exposes no API for Heimdall to require it
+or observe whether it occurred. Active FTPS sessions therefore display a
+persistent, non-blocking notice that the data channel identity is not
+verified.
 
 ### SSH agent identity enumeration
 

@@ -42,21 +42,19 @@ public sealed class IHostKeyVerifierIntegrationTests
         store.Trust(Host, Port, trustedFingerprint);
 
         var verifier = new FixedDecisionVerifier(HostKeyDecision.Reject);
-        var trustedEvents = 0;
-        store.HostKeyEvent += (_, _, trusted) =>
-        {
-            if (trusted)
-            {
-                trustedEvents++;
-            }
-        };
+        var trustedEvents = new List<(string Host, string Fingerprint, bool Trusted)>();
+        store.HostKeyEvent += (host, fingerprint, trusted) =>
+            trustedEvents.Add((host, fingerprint, trusted));
 
         var pinned = await ResolvePresentationAsync(store, verifier, FirstKey);
 
         Assert.True(pinned.Matches(Host, Port, trustedFingerprint));
         Assert.Equal(trustedFingerprint, store.GetFingerprint(Host, Port));
         Assert.Equal(0, verifier.CallCount);
-        Assert.Equal(0, trustedEvents);
+        var trustedEvent = Assert.Single(trustedEvents);
+        Assert.Equal($"{Host}:{Port}", trustedEvent.Host);
+        Assert.Equal(trustedFingerprint, trustedEvent.Fingerprint);
+        Assert.True(trustedEvent.Trusted);
     }
 
     [Fact]

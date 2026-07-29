@@ -132,7 +132,9 @@ public sealed class FtpsCertificateStore
             return;
         }
 
-        _trustedCertificates[key] = existing with { LastSeen = DateTimeOffset.UtcNow };
+        var updated = existing with { LastSeen = DateTimeOffset.UtcNow };
+        _trustedCertificates[key] = updated;
+        CertificateTrusted?.Invoke(key, updated);
     }
 
     public bool Remove(string host, int port)

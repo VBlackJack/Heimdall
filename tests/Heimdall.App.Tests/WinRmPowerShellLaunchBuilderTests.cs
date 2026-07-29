@@ -140,7 +140,7 @@ public sealed class WinRmPowerShellLaunchBuilderTests
             credentialExpression: null);
 
         Assert.Contains(
-            "-SessionOption (New-PSSessionOption -SkipCACheck -SkipCNCheck)",
+            "-SessionOption (New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck)",
             command,
             StringComparison.Ordinal);
     }
@@ -158,6 +158,7 @@ public sealed class WinRmPowerShellLaunchBuilderTests
         Assert.DoesNotContain("-SessionOption", command, StringComparison.Ordinal);
         Assert.DoesNotContain("SkipCACheck", command, StringComparison.Ordinal);
         Assert.DoesNotContain("SkipCNCheck", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("SkipRevocationCheck", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -176,6 +177,7 @@ public sealed class WinRmPowerShellLaunchBuilderTests
         Assert.DoesNotContain("-SessionOption", command, StringComparison.Ordinal);
         Assert.DoesNotContain("SkipCACheck", command, StringComparison.Ordinal);
         Assert.DoesNotContain("SkipCNCheck", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("SkipRevocationCheck", command, StringComparison.Ordinal);
     }
 
     [Fact]

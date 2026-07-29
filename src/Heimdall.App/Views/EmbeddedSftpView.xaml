@@ -79,7 +79,7 @@
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                         AutomationProperties.Name="{loc:Translate A11ySplitSession}"/>
 
-                <Border x:Name="CleartextWarningBadge"
+                <Border x:Name="SecurityNoticeBadge"
                         DockPanel.Dock="Right"
                         BorderBrush="{DynamicResource WarningBrush}"
                         BorderThickness="1"
@@ -87,9 +87,9 @@
                         Padding="6,1"
                         Margin="4,0"
                         VerticalAlignment="Center"
-                        ToolTip="{Binding CleartextWarningText}"
-                        Visibility="{Binding IsCleartextWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"
-                        AutomationProperties.Name="{Binding CleartextWarningText}">
+                        ToolTip="{Binding SecurityNoticeText}"
+                        Visibility="{Binding IsSecurityNoticeVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                        AutomationProperties.Name="{Binding SecurityNoticeText}">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE7BA;"
                                    FontFamily="Segoe MDL2 Assets"
@@ -97,7 +97,7 @@
                                    Foreground="{DynamicResource WarningTextBrush}"
                                    VerticalAlignment="Center"
                                    Margin="0,0,4,0"/>
-                        <TextBlock Text="{Binding CleartextWarningText}"
+                        <TextBlock Text="{Binding SecurityNoticeText}"
                                    FontSize="{StaticResource FontSizeSmallCaption}"
                                    Foreground="{DynamicResource WarningTextBrush}"
                                    VerticalAlignment="Center"

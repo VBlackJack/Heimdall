@@ -256,13 +256,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         {
             sftpBrowser.SecurityEventOccurred += OnBrowserSecurityEvent;
         }
-        else if (_browser is FtpBrowser ftpBrowser && !ftpBrowser.IsTlsEnabled)
+        else if (_browser is FtpBrowser ftpBrowser)
         {
-            string cleartextWarning = localizer["WarnFtpCleartextBadge"];
-            _viewModel.ShowCleartextWarning(cleartextWarning);
+            string securityNotice = localizer[
+                GetFtpSecurityNoticeLocalizationKey(ftpBrowser.IsTlsEnabled)];
+            _viewModel.ShowSecurityNotice(securityNotice);
             System.Windows.Automation.AutomationProperties.SetName(
-                CleartextWarningBadge,
-                cleartextWarning);
+                SecurityNoticeBadge,
+                securityNotice);
         }
 
         UpdateStatus(_localizer["SftpStatusConnected"]);
@@ -1421,6 +1422,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
     }
+
+    internal static string GetFtpSecurityNoticeLocalizationKey(bool isTlsEnabled)
+        => isTlsEnabled
+            ? "WarnFtpsDataChannelIdentityBadge"
+            : "WarnFtpCleartextBadge";
 
     internal static Task DisposeBrowserAsync(IRemoteBrowser browser)
     {

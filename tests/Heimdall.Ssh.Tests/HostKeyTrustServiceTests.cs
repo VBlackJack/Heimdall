@@ -56,6 +56,31 @@ public class HostKeyTrustServiceTests
     }
 
     [Fact]
+    public void Verify_MatchingFingerprint_EmitsPersistableStoreMutation()
+    {
+        var originalLastSeen = DateTimeOffset.UtcNow.AddDays(-1);
+        _store.TrustEntry(
+            Host,
+            Port,
+            new HostKeyEntry(
+                "SHA256:abc123",
+                DateTimeOffset.UtcNow.AddDays(-2),
+                originalLastSeen,
+                "unknown",
+                HostKeySource.UserConfirmed));
+        (string Key, string Fingerprint, bool Trusted)? mutation = null;
+        _store.HostKeyEvent += (key, fingerprint, trusted) =>
+            mutation = (key, fingerprint, trusted);
+
+        _service.Verify(Host, Port, "SHA256:abc123", "ssh-ed25519");
+
+        Assert.NotNull(mutation);
+        Assert.Equal($"{Host}:{Port}", mutation.Value.Key);
+        Assert.Equal("SHA256:abc123", mutation.Value.Fingerprint);
+        Assert.True(mutation.Value.Trusted);
+    }
+
+    [Fact]
     public void Verify_FirstUse_DoesNotStoreEntry()
     {
         var result = _service.Verify(Host, Port, "SHA256:abc123", "ssh-ed25519");

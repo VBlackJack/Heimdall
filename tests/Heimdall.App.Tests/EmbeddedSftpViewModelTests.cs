@@ -210,38 +210,38 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public void CleartextWarning_DefaultsHidden()
+    public void SecurityNotice_DefaultsHidden()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
 
-        Assert.False(viewModel.IsCleartextWarningVisible);
-        Assert.Equal(string.Empty, viewModel.CleartextWarningText);
+        Assert.False(viewModel.IsSecurityNoticeVisible);
+        Assert.Equal(string.Empty, viewModel.SecurityNoticeText);
     }
 
     [Fact]
-    public void ShowCleartextWarning_SetsTextAndVisibility()
+    public void ShowSecurityNotice_SetsTextAndVisibility()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
 
-        viewModel.ShowCleartextWarning("Credentials sent in clear text (no TLS)");
+        viewModel.ShowSecurityNotice("FTPS data-channel identity is not verified");
 
-        Assert.True(viewModel.IsCleartextWarningVisible);
-        Assert.Equal("Credentials sent in clear text (no TLS)", viewModel.CleartextWarningText);
+        Assert.True(viewModel.IsSecurityNoticeVisible);
+        Assert.Equal("FTPS data-channel identity is not verified", viewModel.SecurityNoticeText);
     }
 
     [Fact]
-    public void CleartextWarning_RemainsVisibleWhenStatusChanges()
+    public void SecurityNotice_RemainsVisibleWhenStatusChanges()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
 
-        viewModel.ShowCleartextWarning("Credentials sent in clear text (no TLS)");
+        viewModel.ShowSecurityNotice("FTPS data-channel identity is not verified");
         viewModel.UpdateStatus("Ready");
 
-        Assert.True(viewModel.IsCleartextWarningVisible);
-        Assert.Equal("Credentials sent in clear text (no TLS)", viewModel.CleartextWarningText);
+        Assert.True(viewModel.IsSecurityNoticeVisible);
+        Assert.Equal("FTPS data-channel identity is not verified", viewModel.SecurityNoticeText);
         Assert.Equal("Ready", viewModel.StatusText);
     }
 

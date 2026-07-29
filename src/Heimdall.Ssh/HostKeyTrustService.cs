@@ -133,7 +133,7 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
                 LastSeen = DateTimeOffset.UtcNow,
                 Algorithm = NormalizeAlgorithm(algorithm, existing.Algorithm)
             },
-            raiseEvent: false);
+            raiseEvent: true);
 
         return new HostKeyVerifyResult(
             Trusted: true,

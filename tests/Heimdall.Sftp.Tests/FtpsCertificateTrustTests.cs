@@ -167,6 +167,90 @@ public sealed class FtpsCertificateTrustTests
         Assert.Equal(0, verifier.CallCount);
     }
 
+    [Fact]
+    public void ValidateServerCertificate_ExpiredSessionPin_IsRejected()
+    {
+        using var certificate = CreateExpiredCertificate("CN=session-expired.example.com");
+        using var chain = BuildChain(certificate);
+        var store = new FtpsCertificateStore();
+        var verifier = new RecordingVerifier(FtpsCertificateDecision.Accept);
+        var browser = new FtpBrowser(store, verifier);
+        store.TrustForSession(
+            "session-expired.example.com",
+            21,
+            CreateEntry(certificate, FtpsCertificateSource.UserConfirmed));
+
+        var ex = Assert.Throws<FtpsCertificateRejectedException>(() =>
+            browser.ValidateServerCertificate(
+                "session-expired.example.com",
+                21,
+                certificate,
+                chain,
+                SslPolicyErrors.RemoteCertificateChainErrors,
+                "certificate expired"));
+
+        Assert.False(ex.IsMismatch);
+        Assert.Equal(CertificateFingerprint.ComputeSha256(certificate), ex.PresentedFingerprint);
+        Assert.Equal(0, verifier.CallCount);
+    }
+
+    [Fact]
+    public void ValidateServerCertificate_ExpiredPersistentPin_IsRejectedWithoutRefreshingLastSeen()
+    {
+        using var certificate = CreateExpiredCertificate("CN=persistent-expired.example.com");
+        using var chain = BuildChain(certificate);
+        var store = new FtpsCertificateStore();
+        var verifier = new RecordingVerifier(FtpsCertificateDecision.Accept);
+        var browser = new FtpBrowser(store, verifier);
+        FtpsCertificateEntry original = CreateEntry(
+            certificate,
+            FtpsCertificateSource.UserConfirmed) with
+        {
+            LastSeen = DateTimeOffset.UtcNow.AddDays(-7)
+        };
+        store.Trust("persistent-expired.example.com", 990, original);
+
+        var ex = Assert.Throws<FtpsCertificateRejectedException>(() =>
+            browser.ValidateServerCertificate(
+                "persistent-expired.example.com",
+                990,
+                certificate,
+                chain,
+                SslPolicyErrors.RemoteCertificateChainErrors,
+                "certificate expired"));
+
+        Assert.False(ex.IsMismatch);
+        Assert.Equal(original.LastSeen, store.GetEntry("persistent-expired.example.com", 990)!.LastSeen);
+        Assert.Equal(0, verifier.CallCount);
+    }
+
+    [Fact]
+    public void RefreshLastSeen_EmitsUpdatedEntryForPersistence()
+    {
+        using var certificate = CreateCertificate("CN=refresh.example.com");
+        var store = new FtpsCertificateStore();
+        FtpsCertificateEntry original = CreateEntry(
+            certificate,
+            FtpsCertificateSource.UserConfirmed) with
+        {
+            LastSeen = DateTimeOffset.UtcNow.AddDays(-7)
+        };
+        store.LoadEntriesFromConfig(
+        [
+            new KeyValuePair<string, FtpsCertificateEntry>(
+                FtpsCertificateStore.MakeKey("refresh.example.com", 21),
+                original)
+        ]);
+        (string Key, FtpsCertificateEntry Entry)? updated = null;
+        store.CertificateTrusted += (key, entry) => updated = (key, entry);
+
+        store.RefreshLastSeen("refresh.example.com", 21);
+
+        Assert.NotNull(updated);
+        Assert.Equal("refresh.example.com:21", updated.Value.Key);
+        Assert.True(updated.Value.Entry.LastSeen > original.LastSeen);
+    }
+
     [Theory]
     [InlineData("ftp.example.com", 21, "ftp.example.com:21")]
     [InlineData("2001:db8::1", 990, "[2001:db8::1]:990")]
@@ -188,6 +272,45 @@ public sealed class FtpsCertificateTrustTests
             DateTimeOffset.UtcNow.AddDays(-1),
             DateTimeOffset.UtcNow.AddDays(30));
         return X509CertificateLoader.LoadCertificate(certificate.Export(X509ContentType.Cert));
+    }
+
+    private static X509Certificate2 CreateExpiredCertificate(string subjectName)
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(
+            subjectName,
+            key,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+
+        using var certificate = request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddDays(-30),
+            DateTimeOffset.UtcNow.AddDays(-1));
+        return X509CertificateLoader.LoadCertificate(certificate.Export(X509ContentType.Cert));
+    }
+
+    private static X509Chain BuildChain(X509Certificate2 certificate)
+    {
+        var chain = new X509Chain();
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        _ = chain.Build(certificate);
+        return chain;
+    }
+
+    private static FtpsCertificateEntry CreateEntry(
+        X509Certificate2 certificate,
+        FtpsCertificateSource source)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new FtpsCertificateEntry(
+            CertificateFingerprint.ComputeSha256(certificate),
+            now,
+            now,
+            certificate.Subject,
+            certificate.Issuer,
+            certificate.NotBefore,
+            certificate.NotAfter,
+            source);
     }
 
     private sealed class RecordingVerifier(FtpsCertificateDecision decision) : IFtpsCertificateVerifier

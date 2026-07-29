@@ -129,7 +129,7 @@ internal sealed class WinRmPowerShellLaunchBuilder
         if (server.WinRmUseSsl && server.WinRmSkipCertificateCheck)
         {
             parts.Add("-SessionOption");
-            parts.Add("(New-PSSessionOption -SkipCACheck -SkipCNCheck)");
+            parts.Add("(New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck)");
         }
 
         if (!string.IsNullOrWhiteSpace(credentialExpression))

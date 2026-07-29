@@ -138,13 +138,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     [ObservableProperty]
     private bool _isErrorHighlighted;
 
-    /// <summary>True when the active session transmits credentials without TLS (plain FTP).</summary>
+    /// <summary>Whether the active session has a persistent security notice.</summary>
     [ObservableProperty]
-    private bool _isCleartextWarningVisible;
+    private bool _isSecurityNoticeVisible;
 
-    /// <summary>Localized cleartext-warning text shown in the persistent security badge.</summary>
+    /// <summary>Localized text shown in the persistent security notice badge.</summary>
     [ObservableProperty]
-    private string _cleartextWarningText = string.Empty;
+    private string _securityNoticeText = string.Empty;
 
     /// <summary>Whether a file transfer is currently running.</summary>
     [ObservableProperty]
@@ -708,12 +708,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Shows the persistent security warning for a plain FTP browser session.
+    /// Shows a persistent security notice for the active browser session.
     /// </summary>
-    public void ShowCleartextWarning(string message)
+    public void ShowSecurityNotice(string message)
     {
-        CleartextWarningText = message;
-        IsCleartextWarningVisible = true;
+        SecurityNoticeText = message;
+        IsSecurityNoticeVisible = true;
     }
 
     /// <summary>

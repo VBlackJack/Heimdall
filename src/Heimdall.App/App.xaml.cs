@@ -211,6 +211,10 @@ public partial class App : System.Windows.Application
             {
                 _ = PersistTrustedHostKeyEntryAsync(configManager, key, entry);
             };
+            hostKeyTrustService.EntryRemoved += key =>
+            {
+                _ = PersistRemovedHostKeyAsync(configManager, key);
+            };
 
             hostKeyStore.HostKeyEvent += (key, fingerprint, trusted) =>
             {
@@ -219,7 +223,14 @@ public partial class App : System.Windows.Application
                     return;
                 }
 
-                _ = PersistTrustedHostKeyAsync(configManager, key, fingerprint);
+                if (hostKeyStore.GetAllEntries().TryGetValue(key, out var entry))
+                {
+                    _ = PersistTrustedHostKeyEntryAsync(configManager, key, entry);
+                }
+                else
+                {
+                    _ = PersistTrustedHostKeyAsync(configManager, key, fingerprint);
+                }
             };
 
             var ftpsCertificateStore = _serviceProvider.GetRequiredService<FtpsCertificateStore>();
@@ -756,6 +767,25 @@ public partial class App : System.Windows.Application
         {
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"Failed to persist host key metadata for {key}: {ex.Message}");
+        }
+    }
+
+    internal static async Task PersistRemovedHostKeyAsync(
+        IConfigManager configManager,
+        string key)
+    {
+        try
+        {
+            await configManager.MergeSettingAsync(settings =>
+            {
+                settings.TrustedHostKeys.Remove(key);
+                settings.TrustedHostKeysV2.Remove(key);
+            });
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"Failed to persist host key removal for {key}: {ex.Message}");
         }
     }
 

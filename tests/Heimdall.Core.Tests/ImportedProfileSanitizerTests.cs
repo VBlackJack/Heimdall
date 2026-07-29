@@ -71,6 +71,31 @@ public sealed class ImportedProfileSanitizerTests
     }
 
     [Fact]
+    public void Sanitize_WinRmWithoutSsl_ClearsLatentCertificateSkip()
+    {
+        var profiles = new List<ServerProfileDto>
+        {
+            new()
+            {
+                ConnectionType = "WINRM",
+                WinRmUseSsl = false,
+                WinRmSkipCertificateCheck = true
+            },
+            new()
+            {
+                ConnectionType = "WINRM",
+                WinRmUseSsl = true,
+                WinRmSkipCertificateCheck = true
+            }
+        };
+
+        ImportedProfileSanitizer.Sanitize(profiles);
+
+        Assert.False(profiles[0].WinRmSkipCertificateCheck);
+        Assert.True(profiles[1].WinRmSkipCertificateCheck);
+    }
+
+    [Fact]
     public void Sanitize_ListContainingNullEntries_DoesNotThrow()
     {
         var profiles = new List<ServerProfileDto>

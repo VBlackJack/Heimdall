@@ -16,7 +16,11 @@
 
 using System.Diagnostics;
 using System.IO;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Ssh;
+using Heimdall.Sftp;
+using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
 
@@ -66,6 +70,153 @@ public sealed class AppStartupTests
         var configManager = new ThrowingConfigManager();
 
         await App.PersistTrustedHostKeyAsync(configManager, "server:22", "sha256");
+    }
+
+    [Fact]
+    public async Task PersistRemovedHostKeyAsync_ReloadDoesNotRestoreLegacyOrMetadataEntry()
+    {
+        string rootPath = CreateTemporaryRoot();
+        try
+        {
+            const string key = "removed.example.com:22";
+            var entry = CreateHostKeyEntry(DateTimeOffset.UtcNow.AddDays(-1));
+            var configManager = new ConfigManager(rootPath);
+            await configManager.InitializeAsync();
+            await configManager.MergeSettingAsync(settings =>
+            {
+                settings.TrustedHostKeys[key] = entry.Fingerprint;
+                settings.TrustedHostKeysV2[key] = entry;
+            });
+
+            await App.PersistRemovedHostKeyAsync(configManager, key);
+
+            AppSettings reloaded = await ReloadSettingsAsync(rootPath);
+            Assert.DoesNotContain(key, reloaded.TrustedHostKeys);
+            Assert.DoesNotContain(key, reloaded.TrustedHostKeysV2);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task HostKeyVerificationMutation_ReloadPreservesUpdatedLastSeen()
+    {
+        string rootPath = CreateTemporaryRoot();
+        try
+        {
+            const string host = "ssh-refresh.example.com";
+            const int port = 22;
+            string key = $"{host}:{port}";
+            DateTimeOffset originalLastSeen = DateTimeOffset.UtcNow.AddDays(-7);
+            var original = CreateHostKeyEntry(originalLastSeen);
+            var configManager = new ConfigManager(rootPath);
+            await configManager.InitializeAsync();
+            await App.PersistTrustedHostKeyEntryAsync(configManager, key, original);
+
+            var store = new HostKeyStore();
+            store.LoadEntriesFromConfig([(host, port, original)]);
+            Task persistence = Task.CompletedTask;
+            store.HostKeyEvent += (changedKey, _, trusted) =>
+            {
+                if (trusted && store.GetAllEntries().TryGetValue(changedKey, out var updated))
+                {
+                    persistence = App.PersistTrustedHostKeyEntryAsync(
+                        configManager,
+                        changedKey,
+                        updated);
+                }
+            };
+            var service = new HostKeyTrustService(store);
+
+            HostKeyVerifyResult result =
+                service.Verify(host, port, original.Fingerprint, "ssh-ed25519");
+            await persistence;
+
+            AppSettings reloaded = await ReloadSettingsAsync(rootPath);
+            Assert.True(result.Trusted);
+            Assert.True(reloaded.TrustedHostKeysV2[key].LastSeen > originalLastSeen);
+            Assert.Equal("ssh-ed25519", reloaded.TrustedHostKeysV2[key].Algorithm);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task FtpsLastSeenMutation_ReloadPreservesUpdatedEntry()
+    {
+        string rootPath = CreateTemporaryRoot();
+        try
+        {
+            const string host = "ftps-refresh.example.com";
+            const int port = 990;
+            string key = FtpsCertificateStore.MakeKey(host, port);
+            DateTimeOffset originalLastSeen = DateTimeOffset.UtcNow.AddDays(-7);
+            var original = new FtpsCertificateEntry(
+                "SHA256:ftps",
+                DateTimeOffset.UtcNow.AddDays(-30),
+                originalLastSeen,
+                "CN=ftps-refresh.example.com",
+                "CN=Test CA",
+                DateTimeOffset.UtcNow.AddDays(-30),
+                DateTimeOffset.UtcNow.AddDays(30),
+                FtpsCertificateSource.UserConfirmed);
+            var configManager = new ConfigManager(rootPath);
+            await configManager.InitializeAsync();
+            await App.PersistTrustedFtpsCertificateEntryAsync(configManager, key, original);
+
+            var store = new FtpsCertificateStore();
+            store.LoadEntriesFromConfig(
+            [
+                new KeyValuePair<string, FtpsCertificateEntry>(key, original)
+            ]);
+            Task persistence = Task.CompletedTask;
+            store.CertificateTrusted += (changedKey, updated) =>
+            {
+                persistence = App.PersistTrustedFtpsCertificateEntryAsync(
+                    configManager,
+                    changedKey,
+                    updated);
+            };
+
+            store.RefreshLastSeen(host, port);
+            await persistence;
+
+            AppSettings reloaded = await ReloadSettingsAsync(rootPath);
+            Assert.True(reloaded.TrustedFtpsCertificates[key].LastSeen > originalLastSeen);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    private static HostKeyEntry CreateHostKeyEntry(DateTimeOffset lastSeen)
+        => new(
+            "SHA256:host-key",
+            DateTimeOffset.UtcNow.AddDays(-30),
+            lastSeen,
+            "ssh-rsa",
+            HostKeySource.UserConfirmed);
+
+    private static string CreateTemporaryRoot()
+    {
+        string rootPath = Path.Combine(
+            Path.GetTempPath(),
+            "Heimdall-AppStartupTests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootPath);
+        return rootPath;
+    }
+
+    private static async Task<AppSettings> ReloadSettingsAsync(string rootPath)
+    {
+        var reloadedManager = new ConfigManager(rootPath);
+        await reloadedManager.InitializeAsync();
+        return await reloadedManager.LoadSettingsAsync();
     }
 
     private sealed class DelayedMergeConfigManager : IConfigManager

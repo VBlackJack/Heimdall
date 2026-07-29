@@ -285,7 +285,7 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 **Solution**: `IRemoteBrowser` defines the common surface (`Connect`, `ListDirectory`, `Upload`, `Download`, `Disconnect`, events). `SftpBrowser` (SSH.NET) and `FtpBrowser` (FluentFTP `AsyncFtpClient`) both implement this interface. `EmbeddedSftpView` binds to `IRemoteBrowser` without knowing the underlying protocol. `RemoteFileEditor` works with both via the same interface.
 
-`FtpHandler` validates host and port before connect. When `FtpUseSsl` is false and credentials are present, it returns a successful `ConnectionResult` with `Warning = WarnFtpCleartext`; the UI shows this as non-blocking status text. `FtpBrowser` uses FluentFTP for async FTP/FTPS operations, delegates directory listing parsing to FluentFTP, and enables protected data connections for explicit FTPS.
+`FtpHandler` validates host and port before connect. When `FtpUseSsl` is false and credentials are present, it returns a successful `ConnectionResult` with `Warning = WarnFtpCleartext`; the UI shows this as non-blocking status text. `FtpBrowser` uses FluentFTP for async FTP/FTPS operations, delegates directory listing parsing to FluentFTP, and enables encrypted data connections for explicit FTPS. Heimdall validates and pins the FTPS control-channel certificate. FluentFTP's `FtpDataStream` accepts the data-channel certificate independently, outside Heimdall's callback, so the application cannot assert the identity of that channel; an active FTPS session displays this limitation as a persistent notice.
 
 **Dual edit modes**: Right-click a file to choose between:
 - **Edit (integrated)**: Opens AvalonEdit inside the app with syntax highlighting. Save triggers upload.
