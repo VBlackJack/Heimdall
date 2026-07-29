@@ -116,6 +116,22 @@ public partial class ServerListViewModel
             .Count(item => !IsToolEntry(item) && !_connectingServerIds.Contains(item.Id));
     }
 
+    public int GetBulkUsernameTargetCount(IReadOnlyList<ServerItemViewModel> selectedItems)
+    {
+        ArgumentNullException.ThrowIfNull(selectedItems);
+
+        return NormalizeSelection(selectedItems)
+            .Count(item => SupportsBulkUsername(item.ConnectionType));
+    }
+
+    public int GetBulkPasswordTargetCount(IReadOnlyList<ServerItemViewModel> selectedItems)
+    {
+        ArgumentNullException.ThrowIfNull(selectedItems);
+
+        return NormalizeSelection(selectedItems)
+            .Count(item => SupportsBulkPassword(item.ConnectionType));
+    }
+
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
     private async Task DeleteSelectedAsync(CancellationToken cancellationToken)
     {
@@ -251,7 +267,17 @@ public partial class ServerListViewModel
             return;
         }
 
-        var distinctUsernames = selectedItems
+        var eligibleItems = selectedItems
+            .Where(server => SupportsBulkUsername(server.ConnectionType))
+            .ToList();
+        if (eligibleItems.Count == 0)
+        {
+            Core.Logging.FileLogger.Info(
+                $"BulkEditUsernameAsync skipped {selectedItems.Count} ineligible item(s).");
+            return;
+        }
+
+        var distinctUsernames = eligibleItems
             .Select(server => server.Username ?? string.Empty)
             .Distinct(StringComparer.Ordinal)
             .Take(2)
@@ -259,7 +285,7 @@ public partial class ServerListViewModel
         var initialUsername = distinctUsernames.Count == 1 ? distinctUsernames[0] : null;
 
         var result = await _dialogService.ShowBulkEditUsernameAsync(
-            selectedItems.Count,
+            eligibleItems.Count,
             initialUsername,
             cancellationToken);
 
@@ -282,8 +308,16 @@ public partial class ServerListViewModel
             return;
         }
 
+        var eligibleCount = selectedItems.Count(server => SupportsBulkPassword(server.ConnectionType));
+        if (eligibleCount == 0)
+        {
+            Core.Logging.FileLogger.Info(
+                $"BulkEditPasswordAsync skipped {selectedItems.Count} ineligible item(s).");
+            return;
+        }
+
         var result = await _dialogService.ShowBulkEditPasswordAsync(
-            selectedItems.Count,
+            eligibleCount,
             cancellationToken);
 
         if (result is null)
@@ -588,7 +622,17 @@ public partial class ServerListViewModel
             return;
         }
 
-        var dirtyServers = selectedServers
+        var eligibleServers = selectedServers
+            .Where(server => SupportsBulkUsername(server.ConnectionType))
+            .ToList();
+        var skippedCount = selectedServers.Count - eligibleServers.Count;
+        if (skippedCount > 0)
+        {
+            Core.Logging.FileLogger.Info(
+                $"EditUsernameServersCoreAsync skipped {skippedCount} ineligible item(s).");
+        }
+
+        var dirtyServers = eligibleServers
             .Where(server => !string.Equals(server.Username, newUsername, StringComparison.Ordinal))
             .ToList();
 
@@ -633,16 +677,20 @@ public partial class ServerListViewModel
                 return null;
             }
 
+            var updatedServers = new List<ServerItemViewModel>(dirtyServers.Count);
             foreach (var server in dirtyServers)
             {
-                SetEditableUsername(dtoMap[server.Id], newUsername);
+                if (TrySetEditableUsername(dtoMap[server.Id], newUsername))
+                {
+                    updatedServers.Add(server);
+                }
             }
 
-            updatedCount = dirtyServers.Count;
+            updatedCount = updatedServers.Count;
 
             return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
-                dirtyServers
+                updatedServers
                     .Select(server => (OldVm: server, NewDto: dtoMap[server.Id]))
                     .ToArray(),
                 Array.Empty<ServerProfileDto>(),
@@ -669,6 +717,21 @@ public partial class ServerListViewModel
             return;
         }
 
+        var eligibleServers = selectedServers
+            .Where(server => SupportsBulkPassword(server.ConnectionType))
+            .ToList();
+        var skippedCount = selectedServers.Count - eligibleServers.Count;
+        if (skippedCount > 0)
+        {
+            Core.Logging.FileLogger.Info(
+                $"EditPasswordServersCoreAsync skipped {skippedCount} ineligible item(s).");
+        }
+
+        if (eligibleServers.Count == 0)
+        {
+            return;
+        }
+
         var encryptedPassword = Core.Security.CredentialProtector.Protect(newPlaintextPassword);
 
         var selectedIds = selectedServers
@@ -678,7 +741,7 @@ public partial class ServerListViewModel
             && selectedServers.Any(server => string.Equals(server.Id, SelectedServer.Id, StringComparison.Ordinal))
                 ? SelectedServer.Id
                 : selectedServers[^1].Id;
-        var ids = selectedServers
+        var ids = eligibleServers
             .Select(server => server.Id)
             .ToHashSet(StringComparer.Ordinal);
         var updatedCount = 0;
@@ -706,16 +769,20 @@ public partial class ServerListViewModel
                 return null;
             }
 
-            foreach (var server in selectedServers)
+            var updatedServers = new List<ServerItemViewModel>(eligibleServers.Count);
+            foreach (var server in eligibleServers)
             {
-                SetEditablePassword(dtoMap[server.Id], encryptedPassword);
+                if (TrySetEditablePassword(dtoMap[server.Id], encryptedPassword))
+                {
+                    updatedServers.Add(server);
+                }
             }
 
-            updatedCount = selectedServers.Count;
+            updatedCount = updatedServers.Count;
 
             return new BulkMutationPlan(
                 Array.Empty<ServerItemViewModel>(),
-                selectedServers
+                updatedServers
                     .Select(server => (OldVm: server, NewDto: dtoMap[server.Id]))
                     .ToArray(),
                 Array.Empty<ServerProfileDto>(),
@@ -1494,7 +1561,7 @@ public partial class ServerListViewModel
         }
     }
 
-    private static void SetEditableUsername(ServerProfileDto dto, string username)
+    internal static bool TrySetEditableUsername(ServerProfileDto dto, string username)
     {
         ArgumentNullException.ThrowIfNull(dto);
         ArgumentException.ThrowIfNullOrEmpty(username);
@@ -1504,28 +1571,33 @@ public partial class ServerListViewModel
             case "SSH":
             case "SFTP":
                 dto.SshUsername = username;
-                break;
+                return true;
 
             case "FTP":
                 dto.FtpUsername = username;
-                break;
+                return true;
 
             case "WINRM":
                 dto.WinRmUsername = username;
                 dto.WinRmIdentityMode = Core.Configuration.WinRmIdentityMode.Credential;
-                break;
+                return true;
 
             case "TELNET":
                 dto.TelnetUsername = username;
-                break;
+                return true;
+
+            // Citrix shares the RDP credential fields; see GetCredentialTarget.
+            case "RDP":
+            case "CITRIX":
+                dto.RdpUsername = username;
+                return true;
 
             default:
-                dto.RdpUsername = username;
-                break;
+                return false;
         }
     }
 
-    private static void SetEditablePassword(ServerProfileDto dto, string encryptedPassword)
+    internal static bool TrySetEditablePassword(ServerProfileDto dto, string encryptedPassword)
     {
         ArgumentNullException.ThrowIfNull(dto);
         ArgumentException.ThrowIfNullOrEmpty(encryptedPassword);
@@ -1535,29 +1607,46 @@ public partial class ServerListViewModel
             case "SSH":
             case "SFTP":
                 dto.SshPasswordEncrypted = encryptedPassword;
-                break;
+                return true;
 
             case "FTP":
                 dto.FtpPasswordEncrypted = encryptedPassword;
-                break;
+                return true;
 
             case "WINRM":
                 dto.WinRmPasswordEncrypted = encryptedPassword;
                 dto.WinRmIdentityMode = Core.Configuration.WinRmIdentityMode.Credential;
-                break;
+                return true;
 
             case "TELNET":
                 dto.TelnetPasswordEncrypted = encryptedPassword;
-                break;
+                return true;
 
             case "VNC":
                 dto.VncPassword = encryptedPassword;
-                break;
+                return true;
+
+            // Citrix shares the RDP credential fields; see GetCredentialTarget.
+            case "RDP":
+            case "CITRIX":
+                dto.RdpPasswordEncrypted = encryptedPassword;
+                return true;
 
             default:
-                dto.RdpPasswordEncrypted = encryptedPassword;
-                break;
+                return false;
         }
+    }
+
+    private static bool SupportsBulkUsername(string? connectionType)
+    {
+        return connectionType?.ToUpperInvariant() is
+            "RDP" or "CITRIX" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET";
+    }
+
+    private static bool SupportsBulkPassword(string? connectionType)
+    {
+        return connectionType?.ToUpperInvariant() is
+            "RDP" or "CITRIX" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET" or "VNC";
     }
 
     private static string? NormalizeProjectForPersistence(string? projectId)

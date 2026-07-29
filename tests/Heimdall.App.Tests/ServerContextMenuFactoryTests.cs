@@ -197,6 +197,112 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Fact]
+    public void ServerContextMenu_MultiSelectBulkCredentials_UsesPerActionEligibleCounts()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            ServerProfileDto[] servers =
+            [
+                harness.CreateServer("RDP"),
+                harness.CreateServer("VNC"),
+                harness.CreateServer("TOOL:PING"),
+                harness.CreateServer("LOCAL"),
+                harness.CreateServer("UNKNOWN"),
+                harness.CreateServer("TELNET"),
+                harness.CreateServer("CITRIX")
+            ];
+            foreach (ServerProfileDto server in servers)
+            {
+                harness.PersistServerAsync(server).GetAwaiter().GetResult();
+            }
+
+            ServerItemViewModel[] items = servers
+                .Select(server => Assert.Single(
+                    harness.Main.ServerList.Servers,
+                    item => string.Equals(item.Id, server.Id, StringComparison.Ordinal)))
+                .ToArray();
+            harness.Main.ServerList.SelectSingle(items[0]);
+            foreach (ServerItemViewModel item in items.Skip(1))
+            {
+                harness.Main.ServerList.ToggleSelection(item);
+            }
+
+            var bulkContext = new BulkSelectionContext(items, items[^1]);
+            ContextMenuFactory factory = new ContextMenuFactory(new ExternalToolProviderService());
+
+            ContextMenu menu = factory.CreateTreeContextMenu(
+                bulkContext,
+                harness.Main,
+                new NullContextMenuCallbacks());
+
+            MenuItem bulkEdit = AssertMenuItem(menu, harness.Main.Localize("TreeCtxBulkEditMenu"));
+            string usernameHeader = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                harness.Main.Localize("TreeCtxBulkEditUsername"),
+                3);
+            string passwordHeader = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                harness.Main.Localize("TreeCtxBulkEditPassword"),
+                4);
+            MenuItem? username = FindChildMenuItem(bulkEdit, usernameHeader);
+            MenuItem? password = FindChildMenuItem(bulkEdit, passwordHeader);
+
+            Assert.NotNull(username);
+            Assert.NotNull(password);
+            Assert.True(username!.IsEnabled);
+            Assert.True(password!.IsEnabled);
+            Assert.Same(harness.Main.ServerList.BulkEditUsernameCommand, username.Command);
+            Assert.Same(harness.Main.ServerList.BulkEditPasswordCommand, password.Command);
+        });
+    }
+
+    [Fact]
+    public void ServerContextMenu_MultiSelectBulkCredentials_DisablesActionsWithNoEligibleTargets()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            ServerProfileDto tool = harness.CreateServer("TOOL:PING");
+            ServerProfileDto local = harness.CreateServer("LOCAL");
+            harness.PersistServerAsync(tool).GetAwaiter().GetResult();
+            harness.PersistServerAsync(local).GetAwaiter().GetResult();
+            ServerItemViewModel toolVm = Assert.Single(
+                harness.Main.ServerList.Servers,
+                item => string.Equals(item.Id, tool.Id, StringComparison.Ordinal));
+            ServerItemViewModel localVm = Assert.Single(
+                harness.Main.ServerList.Servers,
+                item => string.Equals(item.Id, local.Id, StringComparison.Ordinal));
+            harness.Main.ServerList.SelectSingle(toolVm);
+            harness.Main.ServerList.ToggleSelection(localVm);
+            var bulkContext = new BulkSelectionContext([toolVm, localVm], localVm);
+            ContextMenuFactory factory = new ContextMenuFactory(new ExternalToolProviderService());
+
+            ContextMenu menu = factory.CreateTreeContextMenu(
+                bulkContext,
+                harness.Main,
+                new NullContextMenuCallbacks());
+
+            MenuItem bulkEdit = AssertMenuItem(menu, harness.Main.Localize("TreeCtxBulkEditMenu"));
+            string usernameHeader = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                harness.Main.Localize("TreeCtxBulkEditUsername"),
+                0);
+            string passwordHeader = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                harness.Main.Localize("TreeCtxBulkEditPassword"),
+                0);
+            MenuItem? username = FindChildMenuItem(bulkEdit, usernameHeader);
+            MenuItem? password = FindChildMenuItem(bulkEdit, passwordHeader);
+
+            Assert.NotNull(username);
+            Assert.NotNull(password);
+            Assert.False(username!.IsEnabled);
+            Assert.False(password!.IsEnabled);
+        });
+    }
+
     private static MenuItem? FindChildMenuItem(MenuItem parent, string header)
     {
         foreach (object raw in parent.Items)

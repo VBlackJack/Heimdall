@@ -1190,6 +1190,46 @@ public sealed class ServerListBulkActionTests
         Assert.True(prefilledVm.IsApplyEnabled);
     }
 
+    [Theory]
+    [InlineData("TOOL:PING")]
+    [InlineData("TOOL:EXT:SYSINTERNALS:PSEXEC")]
+    [InlineData("LOCAL")]
+    [InlineData("UNKNOWN")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void BulkCredentialBoundary_UnsupportedType_DoesNotMutateRdpFields(string? connectionType)
+    {
+        ServerProfileDto server = CreatePasswordServer("alpha", "Alpha", "ops", connectionType);
+        server.RdpUsername = "rdp-user-before";
+        server.RdpPasswordEncrypted = "rdp-password-before";
+
+        bool usernameAccepted = ServerListViewModel.TrySetEditableUsername(server, "new-user");
+        bool passwordAccepted = ServerListViewModel.TrySetEditablePassword(server, "new-password");
+
+        Assert.False(usernameAccepted);
+        Assert.False(passwordAccepted);
+        Assert.Equal("rdp-user-before", server.RdpUsername);
+        Assert.Equal("rdp-password-before", server.RdpPasswordEncrypted);
+    }
+
+    [Fact]
+    public void BulkCredentialBoundary_VncAcceptsOnlyPassword_AndPreservesRdpFields()
+    {
+        ServerProfileDto server = CreatePasswordServer("alpha", "Alpha", "ops", "VNC");
+        server.RdpUsername = "rdp-user-before";
+        server.RdpPasswordEncrypted = "rdp-password-before";
+        server.VncPassword = "vnc-password-before";
+
+        bool usernameAccepted = ServerListViewModel.TrySetEditableUsername(server, "new-user");
+        bool passwordAccepted = ServerListViewModel.TrySetEditablePassword(server, "vnc-password-after");
+
+        Assert.False(usernameAccepted);
+        Assert.True(passwordAccepted);
+        Assert.Equal("rdp-user-before", server.RdpUsername);
+        Assert.Equal("rdp-password-before", server.RdpPasswordEncrypted);
+        Assert.Equal("vnc-password-after", server.VncPassword);
+    }
+
     [Fact]
     public async Task ServerBulkEditUsername_BasicBulkUpdate_AllUsernamesUpdated()
     {
@@ -1340,8 +1380,10 @@ public sealed class ServerListBulkActionTests
     [InlineData("SSH", "alpha")]
     [InlineData("SFTP", "alpha")]
     [InlineData("FTP", "alpha")]
+    [InlineData("WINRM", "alpha")]
     [InlineData("TELNET", "alpha")]
     [InlineData("RDP", "alpha")]
+    [InlineData("CITRIX", "alpha")]
     public async Task ServerBulkEditUsername_DispatchesByConnectionType_OnlyExpectedUsernameFieldChanges(
         string connectionType,
         string newUsername)
@@ -1359,6 +1401,10 @@ public sealed class ServerListBulkActionTests
                 break;
             case "FTP":
                 server.FtpUsername = "old";
+                break;
+            case "WINRM":
+                server.WinRmUsername = "old";
+                server.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
                 break;
             case "TELNET":
                 server.TelnetUsername = "old";
@@ -1393,6 +1439,14 @@ public sealed class ServerListBulkActionTests
                 Assert.Equal(newUsername, stored.FtpUsername);
                 Assert.True(string.IsNullOrEmpty(stored.SshUsername));
                 Assert.True(string.IsNullOrEmpty(stored.RdpUsername));
+                Assert.True(string.IsNullOrEmpty(stored.TelnetUsername));
+                break;
+            case "WINRM":
+                Assert.Equal(newUsername, stored.WinRmUsername);
+                Assert.Equal(WinRmIdentityMode.Credential, stored.WinRmIdentityMode);
+                Assert.True(string.IsNullOrEmpty(stored.SshUsername));
+                Assert.True(string.IsNullOrEmpty(stored.RdpUsername));
+                Assert.True(string.IsNullOrEmpty(stored.FtpUsername));
                 Assert.True(string.IsNullOrEmpty(stored.TelnetUsername));
                 break;
             case "TELNET":
@@ -1454,8 +1508,7 @@ public sealed class ServerListBulkActionTests
     [InlineData("WINRM", nameof(ServerProfileDto.WinRmPasswordEncrypted))]
     [InlineData("TELNET", nameof(ServerProfileDto.TelnetPasswordEncrypted))]
     [InlineData("VNC", nameof(ServerProfileDto.VncPassword))]
-    [InlineData("FOO", nameof(ServerProfileDto.RdpPasswordEncrypted))]
-    [InlineData(null, nameof(ServerProfileDto.RdpPasswordEncrypted))]
+    [InlineData("CITRIX", nameof(ServerProfileDto.RdpPasswordEncrypted))]
     public async Task BulkEditPasswordAsync_RoutesPasswordByConnectionTypeAndPreservesSelection(
         string? connectionType,
         string expectedPasswordField)
@@ -1495,6 +1548,67 @@ public sealed class ServerListBulkActionTests
                 Assert.Equal(WinRmIdentityMode.Credential, storedServer.WinRmIdentityMode);
             }
         }
+    }
+
+    [Fact]
+    public async Task BulkCredentialEdit_HeterogeneousSelection_MutatesOnlyEligibleAndReportsActualCounts()
+    {
+        const string NewPassword = "new-secret";
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        ServerProfileDto rdp = CreatePasswordServer("rdp", "RDP", "ops", "RDP");
+        rdp.RdpUsername = "rdp-user-before";
+        rdp.RdpPasswordEncrypted = "rdp-password-before";
+        ServerProfileDto vnc = CreatePasswordServer("vnc", "VNC", "ops", "VNC");
+        vnc.RdpUsername = "vnc-rdp-user-before";
+        vnc.RdpPasswordEncrypted = "vnc-rdp-password-before";
+        ServerProfileDto tool = CreatePasswordServer("tool", "Tool", "ops", "TOOL:PING");
+        tool.RdpUsername = "tool-rdp-user-before";
+        tool.RdpPasswordEncrypted = "tool-rdp-password-before";
+        ServerProfileDto local = CreatePasswordServer("local", "Local", "ops", "LOCAL");
+        local.RdpUsername = "local-rdp-user-before";
+        local.RdpPasswordEncrypted = "local-rdp-password-before";
+        ServerProfileDto unknown = CreatePasswordServer("unknown", "Unknown", "ops", "UNKNOWN");
+        unknown.RdpUsername = "unknown-rdp-user-before";
+        unknown.RdpPasswordEncrypted = "unknown-rdp-password-before";
+
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"), rdp, vnc, tool, local, unknown);
+        fixture.ViewModel.SelectSingle(fixture.ServerById("rdp"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("vnc"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("tool"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("local"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("unknown"));
+
+        fixture.DialogService.NextBulkEditUsernameResult = "rdp-user-after";
+        await fixture.ViewModel.BulkEditUsernameCommand.ExecuteAsync(fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Equal(1, fixture.DialogService.BulkEditUsernameCallCount);
+        Assert.Equal(1, fixture.DialogService.LastBulkEditUsernameCount);
+        Assert.Equal("rdp-user-before", fixture.DialogService.LastBulkEditUsernameInitialUsername);
+        Assert.Equal("Username updated on 1 server(s).", fixture.LastStatusMessage);
+        AssertSelection(fixture.ViewModel, "rdp", "vnc", "tool", "local", "unknown");
+
+        fixture.DialogService.NextBulkEditPasswordResult = NewPassword;
+        await fixture.ViewModel.BulkEditPasswordCommand.ExecuteAsync(fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Equal(1, fixture.DialogService.BulkEditPasswordCallCount);
+        Assert.Equal(2, fixture.DialogService.LastBulkEditPasswordCount);
+        Assert.Equal("Password updated on 2 server(s).", fixture.LastStatusMessage);
+        AssertSelection(fixture.ViewModel, "rdp", "vnc", "tool", "local", "unknown");
+
+        Dictionary<string, ServerProfileDto> stored = (await fixture.ConfigManager.LoadServersAsync())
+            .ToDictionary(server => server.Id, StringComparer.Ordinal);
+        Assert.Equal("rdp-user-after", stored["rdp"].RdpUsername);
+        Assert.Equal("vnc-rdp-user-before", stored["vnc"].RdpUsername);
+        Assert.Equal("tool-rdp-user-before", stored["tool"].RdpUsername);
+        Assert.Equal("local-rdp-user-before", stored["local"].RdpUsername);
+        Assert.Equal("unknown-rdp-user-before", stored["unknown"].RdpUsername);
+        Assert.Equal(NewPassword, CredentialProtector.Unprotect(stored["rdp"].RdpPasswordEncrypted));
+        Assert.Equal(NewPassword, CredentialProtector.Unprotect(stored["vnc"].VncPassword));
+        Assert.Equal(stored["rdp"].RdpPasswordEncrypted, stored["vnc"].VncPassword);
+        Assert.Equal("vnc-rdp-password-before", stored["vnc"].RdpPasswordEncrypted);
+        Assert.Equal("tool-rdp-password-before", stored["tool"].RdpPasswordEncrypted);
+        Assert.Equal("local-rdp-password-before", stored["local"].RdpPasswordEncrypted);
+        Assert.Equal("unknown-rdp-password-before", stored["unknown"].RdpPasswordEncrypted);
     }
 
     [Fact]

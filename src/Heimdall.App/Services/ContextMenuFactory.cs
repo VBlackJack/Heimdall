@@ -814,6 +814,8 @@ public sealed class ContextMenuFactory
         MainViewModel vm,
         BulkSelectionContext bulkContext)
     {
+        var usernameTargetCount = vm.ServerList.GetBulkUsernameTargetCount(bulkContext.Items);
+        var passwordTargetCount = vm.ServerList.GetBulkPasswordTargetCount(bulkContext.Items);
         var item = new MenuItem
         {
             Header = vm.Localize("TreeCtxBulkEditMenu")
@@ -833,17 +835,19 @@ public sealed class ContextMenuFactory
             string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
                 vm.Localize("TreeCtxBulkEditUsername"),
-                bulkContext.Items.Count),
+                usernameTargetCount),
             vm.ServerList.BulkEditUsernameCommand,
-            bulkContext.Items));
+            bulkContext.Items,
+            isEnabled: usernameTargetCount > 0));
 
         item.Items.Add(CreateMenuItem(
             string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
                 vm.Localize("TreeCtxBulkEditPassword"),
-                bulkContext.Items.Count),
+                passwordTargetCount),
             vm.ServerList.BulkEditPasswordCommand,
-            bulkContext.Items));
+            bulkContext.Items,
+            isEnabled: passwordTargetCount > 0));
 
         return item;
     }
