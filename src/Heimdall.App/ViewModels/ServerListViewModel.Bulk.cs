@@ -1083,6 +1083,7 @@ public partial class ServerListViewModel
         var dtoMap = serverDtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
         var candidates = new List<BulkConnectCandidate>(selectedServers.Count);
         var skippedCount = 0;
+        var credentialGuardMessageShown = false;
 
         foreach (var server in selectedServers)
         {
@@ -1107,6 +1108,18 @@ public partial class ServerListViewModel
                 skippedCount++;
                 Core.Logging.FileLogger.Warn(
                     $"ConnectServersBulkCoreAsync skipped missing DTO for id={server.Id}.");
+                continue;
+            }
+
+            if (!await EnforceCredentialGuardAsync(
+                    serverDto,
+                    settings,
+                    Heimdall.App.Services.RdpModeOverride.UseProfile,
+                    cancellationToken,
+                    showMessage: !credentialGuardMessageShown))
+            {
+                credentialGuardMessageShown = true;
+                skippedCount++;
                 continue;
             }
 

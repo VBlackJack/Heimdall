@@ -173,7 +173,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         SessionHealthMonitor? healthMonitor = null,
         ICredentialProviderFactory? credentialProviderFactory = null,
         IWindowsHelloService? windowsHelloService = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ICredentialGuardService? credentialGuardService = null)
     {
         _configManager = configManager;
         _localizer = localizer;
@@ -190,6 +191,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         _healthMonitor = healthMonitor;
         _credentialProviderFactory = credentialProviderFactory ?? new CredentialProviderFactory();
         _windowsHelloService = windowsHelloService ?? new WindowsHelloService();
+        _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
 
         InitializeFilterOptions();
         InitializeSelectionModel();
@@ -260,6 +262,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     private readonly ICredentialProviderFactory _credentialProviderFactory;
 
     private readonly IWindowsHelloService _windowsHelloService;
+
+    private readonly ICredentialGuardService _credentialGuardService;
 
     /// <summary>
     /// In-memory timestamp of the last successful Windows Hello verification. Used to honor
@@ -768,6 +772,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
             var settings = await _configManager.LoadSettingsAsync();
 
+            if (!await EnforceCredentialGuardAsync(
+                    serverDto,
+                    settings,
+                    rdpModeOverride,
+                    cancellationToken,
+                    showMessage: true))
+            {
+                return false;
+            }
+
             // Windows Hello gate: when enabled, require a successful biometric/PIN
             // verification before any stored credentials are resolved or used.
             if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
@@ -865,6 +879,50 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         {
             _connectingServerIds.Remove(server.Id);
         }
+    }
+
+    internal async Task<bool> EnforceCredentialGuardAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        RdpModeOverride rdpModeOverride,
+        CancellationToken cancellationToken,
+        bool showMessage)
+    {
+        if (!settings.RequireCredentialGuard
+            || !string.Equals(server.ConnectionType, "RDP", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(
+                RdpHandler.ResolveEffectiveMode(server, rdpModeOverride),
+                "Embedded",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        CredentialGuardStatus credentialGuard =
+            await _credentialGuardService.GetStatusAsync(cancellationToken);
+        if (credentialGuard.State is CredentialGuardState.Active)
+        {
+            return true;
+        }
+
+        if (credentialGuard.State is CredentialGuardState.Indeterminate)
+        {
+            Core.Logging.FileLogger.Warn(
+                _localizer.Format(
+                    "LogCredentialGuardCheckFailed",
+                    credentialGuard.FailureReason ?? "unknown error"));
+        }
+
+        Core.Logging.FileLogger.Warn(
+            _localizer.Format("LogEmbeddedCredentialGuardBlocked", server.DisplayName));
+        if (showMessage)
+        {
+            _dialogService.ShowError(
+                _localizer["ErrorConnectionTitle"],
+                _localizer["ErrorEmbeddedCredentialGuardRequired"]);
+        }
+
+        return false;
     }
 
     internal async Task<BulkConnectOutcome> RunConnectionPipelineAsync(

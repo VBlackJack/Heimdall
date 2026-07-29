@@ -19,6 +19,7 @@
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="System.Management" Version="10.0.9" />
     <PackageReference Include="ThemeForge.Theme" Version="2.1.0" />
   </ItemGroup>
 

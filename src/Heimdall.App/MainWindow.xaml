@@ -3084,7 +3084,18 @@
                                         <TextBlock x:Name="Mw_SettingsCredProvFirstLineOnlyHint" Text="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         <TextBlock x:Name="Mw_SettingsCredProvKeePass2Hint" Text="{loc:Translate SettingsCredProviderKeePass2Hint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         </StackPanel>
-                                        <CheckBox x:Name="Mw_SettingsCredGuard" Content="{loc:Translate SettingsLabelCredentialGuard}" IsChecked="{Binding Settings.RequireCredentialGuard}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"/>
+                                        <DockPanel Margin="0,16,0,0">
+                                            <TextBlock Text="{Binding Settings.CredentialGuardStatusText}"
+                                                       Visibility="{Binding Settings.RequireCredentialGuard, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                                       Margin="12,0,0,0"
+                                                       DockPanel.Dock="Right"/>
+                                            <CheckBox x:Name="Mw_SettingsCredGuard"
+                                                      Content="{loc:Translate SettingsLabelCredentialGuard}"
+                                                      IsChecked="{Binding Settings.RequireCredentialGuard}"
+                                                      Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </DockPanel>
                                         <CheckBox x:Name="Mw_SettingsRequireWindowsHello" Content="{loc:Translate SettingsLabelRequireWindowsHello}" IsChecked="{Binding Settings.RequireWindowsHelloOnConnect}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"/>
                                         <TextBlock Text="{loc:Translate SettingsRequireWindowsHelloHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         <StackPanel Margin="0,8,0,0" IsEnabled="{Binding Settings.RequireWindowsHelloOnConnect}">

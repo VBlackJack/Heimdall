@@ -32,17 +32,20 @@ internal sealed class RdpHandler : IProtocolHandler
     private readonly ConnectionStateMachine _connectionSm;
     private readonly LocalizationManager _localizer;
     private readonly IRdpExternalClientLauncher _externalClientLauncher;
+    private readonly ICredentialGuardService _credentialGuardService;
 
     public RdpHandler(
         ITunnelService tunnelService,
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer,
-        IRdpExternalClientLauncher externalClientLauncher)
+        IRdpExternalClientLauncher externalClientLauncher,
+        ICredentialGuardService? credentialGuardService = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
         _localizer = localizer;
         _externalClientLauncher = externalClientLauncher;
+        _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
     }
 
     public string Protocol => "RDP";
@@ -68,6 +71,29 @@ internal sealed class RdpHandler : IProtocolHandler
         var rdpMode = ResolveEffectiveMode(server, rdpModeOverride);
         var isEmbedded = string.Equals(rdpMode, "Embedded", StringComparison.OrdinalIgnoreCase);
         Core.Logging.FileLogger.Info($"RDP mode: {rdpMode}");
+
+        if (settings.RequireCredentialGuard && isEmbedded)
+        {
+            CredentialGuardStatus credentialGuard =
+                await _credentialGuardService.GetStatusAsync(ct).ConfigureAwait(false);
+            if (credentialGuard.State is not CredentialGuardState.Active)
+            {
+                if (credentialGuard.State is CredentialGuardState.Indeterminate)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        _localizer.Format(
+                            "LogCredentialGuardCheckFailed",
+                            credentialGuard.FailureReason ?? "unknown error"));
+                }
+
+                Core.Logging.FileLogger.Warn(
+                    _localizer.Format("LogEmbeddedCredentialGuardBlocked", server.DisplayName));
+                return new ConnectionResult(
+                    false,
+                    _localizer["ErrorEmbeddedCredentialGuardRequired"],
+                    null);
+            }
+        }
 
         var (tunnelOk, usesTunnel, targetHost, targetPort, tunnelError) =
             await _tunnelService.SetupTunnelIfNeededAsync(

@@ -525,6 +525,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ConnectionService>(sp =>
             (ConnectionService)sp.GetRequiredService<IConnectionService>());
         services.AddSingleton<IUiDispatcher, WpfUiDispatcher>();
+        services.AddSingleton<ICredentialGuardService, CredentialGuardService>();
         services.AddSingleton<IRdpExternalClientLauncher, MstscRdpExternalClientLauncher>();
         services.AddSingleton<IProtocolHandler, RdpHandler>();
         services.AddSingleton<IProtocolHandler, SshHandler>();

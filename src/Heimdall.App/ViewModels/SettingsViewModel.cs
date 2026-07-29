@@ -23,6 +23,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Extensions;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Import;
 using Heimdall.App.ViewModels.Dialogs;
@@ -103,6 +104,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private readonly IUpdateInstallFlow _installFlow;
     private readonly IBrowserLauncher _browserLauncher;
     private readonly IProfileImportService? _profileImportService;
+    private readonly ICredentialGuardService _credentialGuardService;
 
     // The update found by the last successful check; drives the download-and-install action.
     private UpdateInfo? _availableUpdate;
@@ -467,6 +469,36 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _requireCredentialGuard;
 
     [ObservableProperty]
+    private string _credentialGuardStatusText = string.Empty;
+
+    partial void OnRequireCredentialGuardChanged(bool value)
+    {
+        if (!value)
+        {
+            CredentialGuardStatusText = string.Empty;
+            return;
+        }
+
+        RefreshCredentialGuardStatusAsync().SafeFireAndForget();
+    }
+
+    private async Task RefreshCredentialGuardStatusAsync()
+    {
+        CredentialGuardStatus status = await _credentialGuardService.GetStatusAsync();
+        CredentialGuardStatusText = status.State is CredentialGuardState.Active
+            ? _localizer["CredentialGuardEnabled"]
+            : _localizer["CredentialGuardDisabled"];
+
+        if (status.State is CredentialGuardState.Indeterminate)
+        {
+            FileLogger.Warn(
+                _localizer.Format(
+                    "LogCredentialGuardCheckFailed",
+                    status.FailureReason ?? "unknown error"));
+        }
+    }
+
+    [ObservableProperty]
     private bool _requireWindowsHelloOnConnect;
 
     [ObservableProperty]
@@ -670,7 +702,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IAppVersionProvider appVersionProvider,
         IUpdateInstallFlow installFlow,
         IBrowserLauncher browserLauncher,
-        IProfileImportService? profileImportService = null)
+        IProfileImportService? profileImportService = null,
+        ICredentialGuardService? credentialGuardService = null)
     {
         _configManager = configManager;
         _localizer = localizer;
@@ -682,6 +715,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _installFlow = installFlow;
         _browserLauncher = browserLauncher;
         _profileImportService = profileImportService;
+        _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
         TrustedHostKeys = trustedHostKeys;
     }
 
@@ -2396,6 +2430,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Mark dirty when any settings property changes, excluding non-settings properties
         if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
             or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
+            or nameof(CredentialGuardStatusText)
             or nameof(IsInstallingUpdate) or nameof(DownloadProgress) or nameof(IsUpdateAvailable)
             or nameof(IsUpdateReleaseAvailable)
             or nameof(SelectedGateway) or nameof(SelectedProject)
