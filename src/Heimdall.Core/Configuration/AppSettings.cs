@@ -73,6 +73,8 @@ public sealed class AppSettings
     public int RdpArtifactCleanupDelayMs { get; set; } = 10000;
     public int RdpResizeEnableDelayMs { get; set; } = 10000;
     public int RdpConnectWatchdogTimeoutMs { get; set; } = 45000;
+    public const int DefaultRdpAutoReconnectMaxAttempts = 20;
+    public int RdpAutoReconnectMaxAttempts { get; set; } = DefaultRdpAutoReconnectMaxAttempts;
     public int RdpKeepAliveIntervalMs { get; set; } = 60000;
     public const int DefaultSshKeepAliveIntervalSeconds = 30;
     public int SshKeepAliveIntervalSeconds { get; set; } = DefaultSshKeepAliveIntervalSeconds;
@@ -182,8 +184,8 @@ public sealed class AppSettings
 
     // Session
     public bool EnableSessionPersistence { get; set; }
-    public int MaxEmbeddedSessions { get; set; } = 10;
-    public int EmbeddedRdpTimeoutMs { get; set; } = 30000;
+    public const int DefaultMaxEmbeddedSessions = 10;
+    public int MaxEmbeddedSessions { get; set; } = DefaultMaxEmbeddedSessions;
     public int EmbeddedIdleTimeoutMs { get; set; }
     public bool SftpBrowserEnabled { get; set; } = true;
     public bool SftpAutoOpenOnSsh { get; set; } = true;

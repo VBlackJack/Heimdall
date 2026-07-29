@@ -568,8 +568,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1000, 120000, ErrorMessage = "Embedded RDP timeout must be between 1000 and 120000 ms.")]
-    private int _embeddedRdpTimeoutMs = 30000;
+    [Range(5000, 600000, ErrorMessage = "RDP connection watchdog timeout must be between 5000 and 600000 ms.")]
+    private int _rdpConnectWatchdogTimeoutMs = 45000;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
@@ -584,6 +584,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     private int _rdpCredentialAutofillTimeoutMs = 90000;
+
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(1, AppSettings.DefaultRdpAutoReconnectMaxAttempts, ErrorMessage = "RDP auto-reconnect maximum attempts must be between 1 and 20.")]
+    private int _rdpAutoReconnectMaxAttempts = AppSettings.DefaultRdpAutoReconnectMaxAttempts;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
@@ -1005,11 +1010,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SessionLoggingEnabled = settings.SessionLoggingEnabled;
         SessionLogDirectory = settings.SessionLogDirectory;
         TunnelEstablishmentDelayMs = settings.TunnelEstablishmentDelayMs;
-        EmbeddedRdpTimeoutMs = settings.EmbeddedRdpTimeoutMs;
+        RdpConnectWatchdogTimeoutMs = settings.RdpConnectWatchdogTimeoutMs;
         ExternalToolTimeoutMs = settings.ExternalToolTimeoutMs;
         RdpResizeEnableDelayMs = settings.RdpResizeEnableDelayMs;
         RdpArtifactCleanupDelayMs = settings.RdpArtifactCleanupDelayMs;
         RdpCredentialAutofillTimeoutMs = settings.RdpCredentialAutofillTimeoutMs;
+        RdpAutoReconnectMaxAttempts = settings.RdpAutoReconnectMaxAttempts;
         RdpKeepAliveIntervalMs = settings.RdpKeepAliveIntervalMs;
 
         UnsubscribeExternalToolTracking();
@@ -1280,11 +1286,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.SessionLoggingEnabled = SessionLoggingEnabled;
             settings.SessionLogDirectory = SessionLogDirectory;
             settings.TunnelEstablishmentDelayMs = TunnelEstablishmentDelayMs;
-            settings.EmbeddedRdpTimeoutMs = EmbeddedRdpTimeoutMs;
+            settings.RdpConnectWatchdogTimeoutMs = RdpConnectWatchdogTimeoutMs;
             settings.ExternalToolTimeoutMs = ExternalToolTimeoutMs;
             settings.RdpResizeEnableDelayMs = RdpResizeEnableDelayMs;
             settings.RdpArtifactCleanupDelayMs = RdpArtifactCleanupDelayMs;
             settings.RdpCredentialAutofillTimeoutMs = RdpCredentialAutofillTimeoutMs;
+            settings.RdpAutoReconnectMaxAttempts = RdpAutoReconnectMaxAttempts;
             settings.RdpKeepAliveIntervalMs = RdpKeepAliveIntervalMs;
 
             // UI state
@@ -1392,7 +1399,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpDefaultBitmapCaching = defaults.RdpDefaultBitmapCaching;
         RdpDefaultCompression = defaults.RdpDefaultCompression;
         RdpDefaultAudioMode = defaults.RdpDefaultAudioMode;
+        RdpResizeEnableDelayMs = defaults.RdpResizeEnableDelayMs;
+        RdpArtifactCleanupDelayMs = defaults.RdpArtifactCleanupDelayMs;
+        RdpCredentialAutofillTimeoutMs = defaults.RdpCredentialAutofillTimeoutMs;
+        RdpAutoReconnectMaxAttempts = defaults.RdpAutoReconnectMaxAttempts;
         RdpKeepAliveIntervalMs = defaults.RdpKeepAliveIntervalMs;
+        RdpDialogAdvancedDefault = defaults.RdpDialogAdvancedDefault;
+        RdpResolutionPresets = defaults.RdpResolutionPresets;
+        RdpConnectWatchdogTimeoutMs = defaults.RdpConnectWatchdogTimeoutMs;
     }
 
     [RelayCommand]
@@ -2444,7 +2458,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ["SSH TMOUT reset interval must be between 0 and 3600 seconds."] = "ValidationSettingsTmoutReset",
         ["SSH auto-reconnect attempts must be between 1 and 10."] = "ValidationSettingsSshAutoReconnectAttempts",
         ["Tunnel establishment delay must be between 0 and 30000 ms."] = "ValidationSettingsTunnelDelay",
-        ["Embedded RDP timeout must be between 1000 and 120000 ms."] = "ValidationSettingsRdpTimeout",
+        ["RDP connection watchdog timeout must be between 5000 and 600000 ms."] = "ValidationSettingsRdpTimeout",
+        ["RDP auto-reconnect maximum attempts must be between 1 and 20."] = "ValidationSettingsRdpAutoReconnectMaxAttempts",
         ["External tool timeout must be between 5000 and 600000 ms."] = "ValidationSettingsExtToolTimeout",
         ["Health check interval must be between 15 and 3600 seconds."] = "ValidationSettingsHealthCheckInterval",
         ["Probe timeout must be between 250 and 30000 ms."] = "ValidationSettingsHealthProbeTimeout",
@@ -2471,7 +2486,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private static readonly string[] AdvancedValidatedSettingPropertyNames =
     [
         nameof(TunnelEstablishmentDelayMs),
-        nameof(EmbeddedRdpTimeoutMs),
+        nameof(RdpConnectWatchdogTimeoutMs),
+        nameof(RdpAutoReconnectMaxAttempts),
         nameof(ExternalToolTimeoutMs),
         nameof(SessionHealthCheckIntervalSeconds),
         nameof(SessionHealthProbeTimeoutMs),

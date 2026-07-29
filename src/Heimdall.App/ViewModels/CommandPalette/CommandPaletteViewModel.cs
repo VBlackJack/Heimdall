@@ -19,6 +19,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Extensions;
 using Heimdall.App.Services;
+using Heimdall.App.ViewModels.Session;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -525,7 +526,17 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 
         if (result.Success && result.Session is not null)
         {
-            var tab = _main.Connection.AddSession(dto.Id, dto.DisplayName, connType);
+            var tab = _main.Connection.AddSession(
+                dto.Id,
+                dto.DisplayName,
+                connType,
+                settings.MaxEmbeddedSessions);
+            if (tab is null)
+            {
+                SessionCoordinator.SafeDisposeSessionResult(result.Session);
+                return;
+            }
+
             if (isAdHoc)
             {
                 tab.MarkAsAdHoc(dto);

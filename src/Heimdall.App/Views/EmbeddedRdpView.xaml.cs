@@ -1531,7 +1531,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             _pendingRedirections = RdpProfileResolver.BuildRedirections(_server, settings);
             _rdpHost.SetRedirections(_pendingRedirections);
             _rdpHost.SetResilienceOptions(
-                RdpActiveXHost.MaxAutoReconnectAttempts,
+                settings.RdpAutoReconnectMaxAttempts,
                 settings.RdpKeepAliveIntervalMs);
 
             if (!_eventSinkAttached)

@@ -214,7 +214,7 @@ public sealed class MigrationService
 
         // Session
         MapInt(legacy, "MaxEmbeddedSessions", v => target.MaxEmbeddedSessions = v);
-        MapInt(legacy, "EmbeddedRdpTimeoutMs", v => target.EmbeddedRdpTimeoutMs = v);
+        MapInt(legacy, "EmbeddedRdpTimeoutMs", v => target.RdpConnectWatchdogTimeoutMs = v);
         MapInt(legacy, "EmbeddedIdleTimeoutMs", v => target.EmbeddedIdleTimeoutMs = v);
         MapBool(legacy, "SftpBrowserEnabled", v => target.SftpBrowserEnabled = v);
         MapBool(legacy, "SftpAutoOpenOnSsh", v => target.SftpAutoOpenOnSsh = v);

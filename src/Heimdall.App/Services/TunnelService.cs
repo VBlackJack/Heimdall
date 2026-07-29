@@ -41,6 +41,7 @@ public sealed class TunnelService : ITunnelService
     private readonly LocalizationManager _localizer;
     private readonly IHostKeyVerifier _hostKeyVerifier;
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
+    private readonly TimeProvider _timeProvider;
 
     private AppSettings? _currentSettings;
     private readonly RecentForwardedPortFailureTracker _forwardedPortFailures = new();
@@ -59,7 +60,8 @@ public sealed class TunnelService : ITunnelService
             connectionSm,
             localizer,
             hostKeyVerifier,
-            new DefaultPlinkHostKeyProbe())
+            new DefaultPlinkHostKeyProbe(),
+            TimeProvider.System)
     {
     }
 
@@ -70,7 +72,8 @@ public sealed class TunnelService : ITunnelService
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer,
         IHostKeyVerifier hostKeyVerifier,
-        IPlinkHostKeyProbe plinkHostKeyProbe)
+        IPlinkHostKeyProbe plinkHostKeyProbe,
+        TimeProvider? timeProvider = null)
     {
         _tunnelManager = tunnelManager;
         _hostKeyStore = hostKeyStore;
@@ -79,6 +82,7 @@ public sealed class TunnelService : ITunnelService
         _localizer = localizer;
         _hostKeyVerifier = hostKeyVerifier;
         _plinkHostKeyProbe = plinkHostKeyProbe;
+        _timeProvider = timeProvider ?? TimeProvider.System;
 
         // TunnelService and TunnelManager are both DI singletons living for the
         // application lifetime, so this subscription needs no explicit teardown.
@@ -333,6 +337,12 @@ public sealed class TunnelService : ITunnelService
 
         if (result.Success)
         {
+            await WaitForTunnelEstablishmentAsync(
+                    settings.TunnelEstablishmentDelayMs,
+                    _timeProvider,
+                    ct)
+                .ConfigureAwait(false);
+
             int establishedLocalPort = result.Tunnel?.LocalPort ?? localPort;
             Core.Logging.FileLogger.Info($"Tunnel established for {serverId} on port {establishedLocalPort}");
             _connectionSm.SetTunnelInfo(serverId, establishedLocalPort, 0);
@@ -458,12 +468,30 @@ public sealed class TunnelService : ITunnelService
             return new TunnelResult(false, null, duplicateMessage, SshFailureCode.PortInUse);
         }
 
+        await WaitForTunnelEstablishmentAsync(
+                settings.TunnelEstablishmentDelayMs,
+                _timeProvider,
+                ct)
+            .ConfigureAwait(false);
+
         _connectionSm.SetTunnelInfo(serverId, localPort, runner.ProcessId ?? 0);
         _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
         Core.Logging.FileLogger.Info(
             $"Plink tunnel established for {serverId} on port {localPort} (pid={runner.ProcessId?.ToString() ?? "unknown"})");
 
         return new TunnelResult(true, tunnelInfo, null, null);
+    }
+
+    internal static Task WaitForTunnelEstablishmentAsync(
+        int delayMs,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        return delayMs <= 0
+            ? Task.CompletedTask
+            : Task.Delay(TimeSpan.FromMilliseconds(delayMs), timeProvider, cancellationToken);
     }
 
     internal static bool ShouldUseOsAssignedLocalPort(ServerProfileDto server, AppSettings settings)

@@ -588,7 +588,17 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
-        var tab = _main.Connection.AddSession(sessionId, displayName, connectionType);
+        var tab = _main.Connection.AddSession(
+            sessionId,
+            displayName,
+            connectionType,
+            settings.MaxEmbeddedSessions);
+        if (tab is null)
+        {
+            cancellationSource.Cancel();
+            return;
+        }
+
         tab.OriginalServerId = originalServerId;
         tab.FailureDetails = null;
         TrackConnectingCancellation(sessionId, tab, cancellationSource);
@@ -694,7 +704,19 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 $"SessionReady for SSH sessionId={sessionId} had no pre-mounted tab; falling back to legacy materialization.");
         }
 
-        var tab = _main.Connection.AddSession(sessionId, displayName, connectionType);
+        int maxEmbeddedSessions = _main.CurrentSettings?.MaxEmbeddedSessions
+            ?? AppSettings.DefaultMaxEmbeddedSessions;
+        var tab = _main.Connection.AddSession(
+            sessionId,
+            displayName,
+            connectionType,
+            maxEmbeddedSessions);
+        if (tab is null)
+        {
+            SafeDisposeSessionResult(session);
+            return;
+        }
+
         tab.OriginalServerId = originalServerId;
         tab.FailureDetails = null;
         ApplyRdpModeOverride(tab, connectionType, rdpModeOverride);
@@ -1213,7 +1235,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         return profile;
     }
 
-    private static void SafeDisposeSessionResult(ISessionResult? session)
+    internal static void SafeDisposeSessionResult(ISessionResult? session)
     {
         switch (session)
         {

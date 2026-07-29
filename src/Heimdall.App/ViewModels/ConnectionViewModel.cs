@@ -51,7 +51,36 @@ public partial class ConnectionViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Adds a new session tab for the given server.
+    /// Adds a new remote embedded session when the configured limit has not
+    /// been reached. Local tool tabs, external-client tabs, and reintroduced
+    /// sessions must use the three-argument overload because they do not create
+    /// another remote embedded session.
+    /// </summary>
+    public SessionTabViewModel? AddSession(
+        string serverId,
+        string title,
+        string connectionType,
+        int maxEmbeddedSessions)
+    {
+        int currentEmbeddedSessions = ActiveSessions
+            .SelectMany(session => Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent))
+            .Count(pane => pane.HostControl is not null
+                && !pane.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase));
+
+        if (currentEmbeddedSessions >= maxEmbeddedSessions)
+        {
+            _dialogService.ShowWarning(
+                _localizer["SessionLimitReachedTitle"],
+                _localizer.Format("SessionLimitReachedMessage", maxEmbeddedSessions));
+            return null;
+        }
+
+        return AddSession(serverId, title, connectionType);
+    }
+
+    /// <summary>
+    /// Adds an uncounted tab for a local tool, an external client, a diagnostic,
+    /// or a remote session that is being reintroduced after a split/window move.
     /// </summary>
     public SessionTabViewModel AddSession(string serverId, string title, string connectionType)
     {

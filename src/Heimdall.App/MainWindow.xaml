@@ -2891,71 +2891,19 @@
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    Margin="0,0,0,6"
                                                    TextWrapping="Wrap"/>
-                                        <Grid Margin="0,0,0,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="120"/>
-                                                <ColumnDefinition Width="12"/>
-                                                <ColumnDefinition Width="120"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{loc:Translate SettingsRdpResolutionPresetWidth}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       FontSize="{StaticResource FontSizeCaption}"/>
-                                            <TextBlock Grid.Column="2"
-                                                       Text="{loc:Translate SettingsRdpResolutionPresetHeight}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       FontSize="{StaticResource FontSizeCaption}"/>
-                                        </Grid>
-                                        <ItemsControl ItemsSource="{Binding Settings.RdpResolutionPresetItems}"
-                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpResolutionPresetsLabel}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Margin="0,0,0,8">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="120"/>
-                                                                <ColumnDefinition Width="12"/>
-                                                                <ColumnDefinition Width="120"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBox Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}"/>
-                                                            <TextBox Grid.Column="2"
-                                                                     Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}"/>
-                                                            <Button Grid.Column="4"
-                                                                    Content="{loc:Translate SettingsRdpResolutionPresetRemove}"
-                                                                    Command="{Binding DataContext.Settings.RemoveRdpResolutionPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Style="{DynamicResource GhostButtonStyle}"
-                                                                    FontSize="{StaticResource FontSizeCaption}"
-                                                                    Padding="6,3"
-                                                                    AutomationProperties.Name="{loc:Translate SettingsRdpResolutionPresetRemove}"/>
-                                                        </Grid>
-                                                        <TextBlock Text="{Binding Error}"
-                                                                   Foreground="{DynamicResource ErrorTextBrush}"
-                                                                   FontSize="{StaticResource FontSizeCaption}"
-                                                                   Margin="0,4,0,0"
-                                                                   Visibility="{Binding Error, Converter={StaticResource NullToVisibilityConverter}}"/>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <TextBox Text="{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=PropertyChanged}"
+                                                 AcceptsReturn="True"
+                                                 MinHeight="120"
+                                                 VerticalScrollBarVisibility="Auto"
+                                                 TextWrapping="NoWrap"
+                                                 AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpResolutionPresetsLabel}"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                            <Button Content="{loc:Translate SettingsRdpResolutionPresetAdd}"
-                                                    Command="{Binding Settings.AddRdpResolutionPresetCommand}"
-                                                    Style="{DynamicResource GhostButtonStyle}"
-                                                    FontSize="{StaticResource FontSizeCaption}"
-                                                    Foreground="{DynamicResource TextTertiaryBrush}"
-                                                    Padding="0,4"
-                                                    AutomationProperties.Name="{loc:Translate SettingsRdpResolutionPresetAdd}"/>
                                             <Button Content="{loc:Translate SettingsRdpResolutionPresetsReset}"
                                                     Command="{Binding Settings.ResetRdpResolutionPresetsCommand}"
                                                     Style="{DynamicResource GhostButtonStyle}"
                                                     FontSize="{StaticResource FontSizeCaption}"
                                                     Foreground="{DynamicResource TextTertiaryBrush}"
                                                     Padding="0,4"
-                                                    Margin="16,0,0,0"
                                                     AutomationProperties.Name="{loc:Translate SettingsRdpResolutionPresetsReset}"/>
                                         </StackPanel>
                                     </StackPanel>
@@ -3241,7 +3189,7 @@
                                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsRdpTimeoutLabel" Text="{loc:Translate SettingsLabelRdpTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.EmbeddedRdpTimeoutMs}" Width="100"/>
+                                                    <TextBox Text="{Binding Settings.RdpConnectWatchdogTimeoutMs, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
                                                     <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>

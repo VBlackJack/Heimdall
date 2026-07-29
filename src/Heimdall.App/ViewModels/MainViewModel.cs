@@ -745,7 +745,17 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         if (result.Success && result.Session is not null)
         {
-            var tab = Connection.AddSession(dto.Id, dto.DisplayName, connType);
+            var tab = Connection.AddSession(
+                dto.Id,
+                dto.DisplayName,
+                connType,
+                settings.MaxEmbeddedSessions);
+            if (tab is null)
+            {
+                SessionCoordinator.SafeDisposeSessionResult(result.Session);
+                return;
+            }
+
             tab.MarkAsAdHoc(dto);
 
             tab.HostControl = _embeddedSessionManager.CreateHostControl(
