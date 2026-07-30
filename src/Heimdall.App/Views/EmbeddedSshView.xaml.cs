@@ -397,6 +397,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         _session = session;
         _winRmEarlyOutputDiagnostic = null;
+        ShowHealthButton(true);
 
         _session.DataReceived += OnDataReceived;
         _session.Disconnected += OnDisconnected;
@@ -440,6 +441,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         _terminalSession = terminalSession;
         _autoReconnectOnProcessExit = autoReconnectOnProcessExit;
+        ShowHealthButton(false);
         _terminalSessionHasInput = false;
         _terminalSessionAttachedAtUtc = DateTimeOffset.UtcNow;
         _winRmEarlyOutputDiagnostic = IsWinRmSessionTab() ? new WinRmEarlyOutputDiagnostic() : null;
@@ -675,6 +677,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         HealthPanel.Visibility = Visibility.Collapsed;
         HealthColumnDef.Width = new GridLength(0);
         StopHealthMonitor();
+    }
+
+    private void ShowHealthButton(bool visible)
+    {
+        HealthToggleButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!visible && _healthPanelVisible)
+        {
+            _healthPanelVisible = false;
+            HideHealthPanel();
+        }
     }
 
     private void StopHealthMonitor()
@@ -2059,7 +2071,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     /// <summary>Show/hide the shield button for launching an elevated shell.</summary>
     public void ShowElevateButton(bool visible) =>
-        ElevateButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        ElevateButton.Visibility = visible && ElevateRequested is not null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
     /// <summary>Show/hide the ADMIN badge and hide the elevate button.</summary>
     public void SetElevatedIndicator(bool elevated)

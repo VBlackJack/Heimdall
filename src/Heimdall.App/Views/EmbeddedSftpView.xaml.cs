@@ -719,8 +719,10 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         // Rename targets exactly one entry, so hide it on a multi-selection.
         CtxRename.Visibility = singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxDelete.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
-        // Chmod now applies to the whole selection, so it stays visible on multi-selection.
-        CtxChmod.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        // Chmod applies to the whole selection, but only SFTP can mutate POSIX permissions.
+        CtxChmod.Visibility = hasSelection && _browser is SftpBrowser
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         CtxCut.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxCopy.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxPaste.Visibility = _viewModel.HasClipboard && _viewModel.IsConnected

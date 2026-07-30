@@ -54,7 +54,8 @@
                         ToolTip="{loc:Translate TooltipToggleHealthMonitoring}"
                         AutomationProperties.Name="{loc:Translate A11yToggleHealthMonitoring}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                        Visibility="Collapsed"/>
 
                 <Button x:Name="SplitButton"
                         DockPanel.Dock="Right"
