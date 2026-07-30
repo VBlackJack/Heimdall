@@ -87,19 +87,41 @@ public sealed class TerminalSessionLifecycleTests
         PipeModeSession session = new();
         TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int callbackCount = 0;
+        long receivedByteCount = 0;
+        int processExitNotificationCount = 0;
+        int observedExitCode = int.MinValue;
 
-        session.DataReceived += _ =>
+        session.DataReceived += data =>
         {
             Interlocked.Increment(ref callbackCount);
+            Interlocked.Add(ref receivedByteCount, data.Length);
             throw new InvalidOperationException("Test subscriber failure.");
         };
-        session.ProcessExited += exitCode => exited.TrySetResult(exitCode);
+        session.ProcessExited += exitCode =>
+        {
+            Interlocked.Increment(ref processExitNotificationCount);
+            Interlocked.Exchange(ref observedExitCode, exitCode);
+            exited.TrySetResult(exitCode);
+        };
 
         await session.StartAsync(
             TerminalTestHelpers.ResolvePowerShellExecutable(),
             "-NoLogo -NoProfile -NonInteractive -Command \"Write-Output 'first'; Start-Sleep -Milliseconds 300; Write-Output 'second'; exit 0\"");
 
-        int exitCode = await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        TerminalTimeoutContext timeoutContext = new(
+            "ProcessExited",
+            () => session.ProcessId,
+            () => session.IsRunning,
+            () => Volatile.Read(ref callbackCount),
+            () => Interlocked.Read(ref receivedByteCount),
+            () => Volatile.Read(ref processExitNotificationCount),
+            () => Volatile.Read(ref observedExitCode) == int.MinValue
+                ? null
+                : Volatile.Read(ref observedExitCode));
+        int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+            exited.Task,
+            TimeSpan.FromSeconds(10),
+            timeoutContext);
         session.Dispose();
 
         Assert.Equal(0, exitCode);
@@ -111,8 +133,22 @@ public sealed class TerminalSessionLifecycleTests
     {
         PipeModeSession session = new();
         TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int dataNotificationCount = 0;
+        long receivedByteCount = 0;
+        int processExitNotificationCount = 0;
+        int observedExitCode = int.MinValue;
 
-        session.ProcessExited += exitCode => exited.TrySetResult(exitCode);
+        session.DataReceived += data =>
+        {
+            Interlocked.Increment(ref dataNotificationCount);
+            Interlocked.Add(ref receivedByteCount, data.Length);
+        };
+        session.ProcessExited += exitCode =>
+        {
+            Interlocked.Increment(ref processExitNotificationCount);
+            Interlocked.Exchange(ref observedExitCode, exitCode);
+            exited.TrySetResult(exitCode);
+        };
         session.ProcessExited += _ => throw new InvalidOperationException("Test subscriber failure.");
 
         Exception? observedException = await Record.ExceptionAsync(async () =>
@@ -120,7 +156,20 @@ public sealed class TerminalSessionLifecycleTests
             await session.StartAsync(
                 TerminalTestHelpers.ResolvePowerShellExecutable(),
                 "-NoLogo -NoProfile -NonInteractive -Command \"exit 12\"");
-            int exitCode = await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            TerminalTimeoutContext timeoutContext = new(
+                "ProcessExited",
+                () => session.ProcessId,
+                () => session.IsRunning,
+                () => Volatile.Read(ref dataNotificationCount),
+                () => Interlocked.Read(ref receivedByteCount),
+                () => Volatile.Read(ref processExitNotificationCount),
+                () => Volatile.Read(ref observedExitCode) == int.MinValue
+                    ? null
+                    : Volatile.Read(ref observedExitCode));
+            int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+                exited.Task,
+                TimeSpan.FromSeconds(10),
+                timeoutContext);
             Assert.Equal(12, exitCode);
             session.Dispose();
         });

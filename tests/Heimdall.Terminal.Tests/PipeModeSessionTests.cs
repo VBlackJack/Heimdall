@@ -28,15 +28,26 @@ public sealed class PipeModeSessionTests
         StringBuilder output = new();
         object outputLock = new object();
         TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int dataNotificationCount = 0;
+        long receivedByteCount = 0;
+        int processExitNotificationCount = 0;
+        int observedExitCode = int.MinValue;
 
         session.DataReceived += data =>
         {
+            Interlocked.Increment(ref dataNotificationCount);
+            Interlocked.Add(ref receivedByteCount, data.Length);
             lock (outputLock)
             {
                 output.Append(Encoding.UTF8.GetString(data.Span));
             }
         };
-        session.ProcessExited += exitCode => exited.TrySetResult(exitCode);
+        session.ProcessExited += exitCode =>
+        {
+            Interlocked.Increment(ref processExitNotificationCount);
+            Interlocked.Exchange(ref observedExitCode, exitCode);
+            exited.TrySetResult(exitCode);
+        };
 
         try
         {
@@ -46,7 +57,20 @@ public sealed class PipeModeSessionTests
 
             session.Write(Encoding.UTF8.GetBytes("hello\r\n"));
 
-            int exitCode = await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            TerminalTimeoutContext timeoutContext = new(
+                "ProcessExited",
+                () => session.ProcessId,
+                () => session.IsRunning,
+                () => Volatile.Read(ref dataNotificationCount),
+                () => Interlocked.Read(ref receivedByteCount),
+                () => Volatile.Read(ref processExitNotificationCount),
+                () => Volatile.Read(ref observedExitCode) == int.MinValue
+                    ? null
+                    : Volatile.Read(ref observedExitCode));
+            int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+                exited.Task,
+                TimeSpan.FromSeconds(10),
+                timeoutContext);
             Assert.Equal(0, exitCode);
 
             string text;

@@ -168,8 +168,22 @@ public sealed class ConPtySessionTests
 
         ConPtySession session = new();
         TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int dataNotificationCount = 0;
+        long receivedByteCount = 0;
+        int processExitNotificationCount = 0;
+        int observedExitCode = int.MinValue;
 
-        session.ProcessExited += exitCode => exited.TrySetResult(exitCode);
+        session.DataReceived += data =>
+        {
+            Interlocked.Increment(ref dataNotificationCount);
+            Interlocked.Add(ref receivedByteCount, data.Length);
+        };
+        session.ProcessExited += exitCode =>
+        {
+            Interlocked.Increment(ref processExitNotificationCount);
+            Interlocked.Exchange(ref observedExitCode, exitCode);
+            exited.TrySetResult(exitCode);
+        };
 
         try
         {
@@ -177,7 +191,20 @@ public sealed class ConPtySessionTests
                 TerminalTestHelpers.ResolvePowerShellExecutable(),
                 BuildEncodedPowerShellArguments("exit 17"));
 
-            int exitCode = await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            TerminalTimeoutContext timeoutContext = new(
+                "ProcessExited",
+                () => session.ProcessId,
+                () => session.IsRunning,
+                () => Volatile.Read(ref dataNotificationCount),
+                () => Interlocked.Read(ref receivedByteCount),
+                () => Volatile.Read(ref processExitNotificationCount),
+                () => Volatile.Read(ref observedExitCode) == int.MinValue
+                    ? null
+                    : Volatile.Read(ref observedExitCode));
+            int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+                exited.Task,
+                TimeSpan.FromSeconds(10),
+                timeoutContext);
 
             Assert.Equal(17, exitCode);
         }
@@ -196,18 +223,52 @@ public sealed class ConPtySessionTests
         }
 
         ConPtySession session = new();
+        int dataNotificationCount = 0;
+        long receivedByteCount = 0;
+        int processExitNotificationCount = 0;
+        int observedExitCode = int.MinValue;
 
         try
         {
+            session.DataReceived += data =>
+            {
+                Interlocked.Increment(ref dataNotificationCount);
+                Interlocked.Add(ref receivedByteCount, data.Length);
+            };
             await session.StartAsync(
                 TerminalTestHelpers.ResolvePowerShellExecutable(),
                 BuildEncodedPowerShellArguments("exit 23"));
 
-            await WaitUntilStoppedAsync(session, TimeSpan.FromSeconds(10));
+            TerminalTimeoutContext stoppedTimeoutContext = new(
+                "SessionStopped",
+                () => session.ProcessId,
+                () => session.IsRunning,
+                () => Volatile.Read(ref dataNotificationCount),
+                () => Interlocked.Read(ref receivedByteCount),
+                () => Volatile.Read(ref processExitNotificationCount),
+                () => Volatile.Read(ref observedExitCode) == int.MinValue
+                    ? null
+                    : Volatile.Read(ref observedExitCode));
+            await WaitUntilStoppedAsync(
+                session,
+                TimeSpan.FromSeconds(10),
+                stoppedTimeoutContext);
 
             TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            session.ProcessExited += exitCode => exited.TrySetResult(exitCode);
-            int exitCode = await exited.Task.WaitAsync(ReplaySignalBackstop);
+            session.ProcessExited += exitCode =>
+            {
+                Interlocked.Increment(ref processExitNotificationCount);
+                Interlocked.Exchange(ref observedExitCode, exitCode);
+                exited.TrySetResult(exitCode);
+            };
+            TerminalTimeoutContext replayTimeoutContext = stoppedTimeoutContext with
+            {
+                AwaitedEvent = "ProcessExitedReplay",
+            };
+            int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+                exited.Task,
+                ReplaySignalBackstop,
+                replayTimeoutContext);
 
             Assert.Equal(23, exitCode);
         }
@@ -282,8 +343,12 @@ public sealed class ConPtySessionTests
         return $"-NoLogo -NoProfile -NonInteractive -EncodedCommand {encodedCommand}";
     }
 
-    private static async Task WaitUntilStoppedAsync(ConPtySession session, TimeSpan timeout)
+    private static async Task WaitUntilStoppedAsync(
+        ConPtySession session,
+        TimeSpan timeout,
+        TerminalTimeoutContext timeoutContext)
     {
+        System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
@@ -295,6 +360,10 @@ public sealed class ConPtySessionTests
             await Task.Delay(50);
         }
 
-        Assert.False(session.IsRunning);
+        bool isRunning = session.IsRunning;
+        string? message = isRunning
+            ? TerminalTimeoutDiagnostics.CreateMessage(timeoutContext, elapsed.Elapsed)
+            : null;
+        Assert.False(isRunning, message);
     }
 }
