@@ -33,7 +33,7 @@ public sealed class ServerItemViewModelLocalizationTests
             CreateSshServer(),
             localizer: localizer);
 
-        Assert.Equal("Clé SSH + Mot de passe + Agent", viewModel.AuthSummary);
+        Assert.Equal("Nom d'utilisateur + Clé SSH + Mot de passe", viewModel.AuthSummary);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class ServerItemViewModelLocalizationTests
     {
         ServerItemViewModel viewModel = ServerItemViewModel.FromDto(CreateSshServer());
 
-        Assert.Equal("SSH key + Password + Agent", viewModel.AuthSummary);
+        Assert.Equal("Username + SSH key + Password", viewModel.AuthSummary);
     }
 
     [Fact]
@@ -60,13 +60,177 @@ public sealed class ServerItemViewModelLocalizationTests
         var changed = new List<string?>();
         viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
 
-        Assert.Equal("Prompt", viewModel.AuthSummary);
+        Assert.Equal("No saved credentials", viewModel.AuthSummary);
 
         await localizer.SwitchLocaleAsync("fr");
         viewModel.RefreshLocalizedState();
 
-        Assert.Equal("Saisie requise", viewModel.AuthSummary);
+        Assert.Equal("Aucun identifiant enregistré", viewModel.AuthSummary);
         Assert.Contains(nameof(ServerItemViewModel.AuthSummary), changed);
+    }
+
+    [Theory]
+    [InlineData(false, false, false, "No saved credentials")]
+    [InlineData(true, false, false, "Username")]
+    [InlineData(false, true, false, "SSH key")]
+    [InlineData(false, false, true, "Password")]
+    [InlineData(true, true, false, "Username + SSH key")]
+    [InlineData(true, false, true, "Username + Password")]
+    [InlineData(false, true, true, "SSH key + Password")]
+    [InlineData(true, true, true, "Username + SSH key + Password")]
+    public void AuthSummary_Ssh_ReportsEveryConfiguredCredentialCombination(
+        bool hasUsername,
+        bool hasKey,
+        bool hasPassword,
+        string expected)
+    {
+        ServerProfileDto dto = CreateCredentialServer("SSH", hasUsername, hasPassword);
+        dto.SshKeyPath = hasKey ? @"C:\Keys\configured.ppk" : null;
+        dto.SshAgentForwarding = true;
+
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+
+        Assert.Equal(expected, viewModel.AuthSummary);
+    }
+
+    [Theory]
+    [InlineData(false, false, false, "No saved credentials")]
+    [InlineData(true, false, false, "Username")]
+    [InlineData(false, true, false, "SSH key")]
+    [InlineData(false, false, true, "Password")]
+    [InlineData(true, true, false, "Username + SSH key")]
+    [InlineData(true, false, true, "Username + Password")]
+    [InlineData(false, true, true, "SSH key + Password")]
+    [InlineData(true, true, true, "Username + SSH key + Password")]
+    public void AuthSummary_Sftp_ReportsEveryConfiguredCredentialCombination(
+        bool hasUsername,
+        bool hasKey,
+        bool hasPassword,
+        string expected)
+    {
+        ServerProfileDto dto = CreateCredentialServer("SFTP", hasUsername, hasPassword);
+        dto.SshKeyPath = hasKey ? @"C:\Keys\configured.ppk" : null;
+        dto.SshAgentForwarding = true;
+
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+
+        Assert.Equal(expected, viewModel.AuthSummary);
+    }
+
+    [Theory]
+    [InlineData(false, false, "No saved credentials")]
+    [InlineData(true, false, "Username")]
+    [InlineData(false, true, "Password")]
+    [InlineData(true, true, "Username + Password")]
+    public void AuthSummary_Rdp_ReportsEveryConfiguredCredentialCombination(
+        bool hasUsername,
+        bool hasPassword,
+        string expected)
+    {
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateCredentialServer("RDP", hasUsername, hasPassword));
+
+        Assert.Equal(expected, viewModel.AuthSummary);
+    }
+
+    [Theory]
+    [InlineData(false, false, "No saved credentials")]
+    [InlineData(true, false, "Username")]
+    [InlineData(false, true, "Password")]
+    [InlineData(true, true, "Username + Password")]
+    public void AuthSummary_WinRmCredential_ReportsEveryConfiguredCredentialCombination(
+        bool hasUsername,
+        bool hasPassword,
+        string expected)
+    {
+        ServerProfileDto dto = CreateCredentialServer("WINRM", hasUsername, hasPassword);
+        dto.WinRmIdentityMode = WinRmIdentityMode.Credential;
+
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+
+        Assert.Equal(expected, viewModel.AuthSummary);
+    }
+
+    [Fact]
+    public void AuthSummary_WinRmCurrentUser_ReportsConfiguredIdentityMode()
+    {
+        ServerProfileDto dto = CreateCredentialServer("WINRM", hasUsername: true, hasPassword: true);
+        dto.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
+
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+
+        Assert.Equal("Current user", viewModel.AuthSummary);
+    }
+
+    [Theory]
+    [InlineData(false, false, "No saved credentials")]
+    [InlineData(true, false, "Username")]
+    [InlineData(false, true, "Password")]
+    [InlineData(true, true, "Username + Password")]
+    public void AuthSummary_Ftp_ReportsEveryConfiguredCredentialCombination(
+        bool hasUsername,
+        bool hasPassword,
+        string expected)
+    {
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateCredentialServer("FTP", hasUsername, hasPassword));
+
+        Assert.Equal(expected, viewModel.AuthSummary);
+    }
+
+    [Theory]
+    [InlineData(false, false, "No saved credentials")]
+    [InlineData(true, false, "Username")]
+    [InlineData(false, true, "Password")]
+    [InlineData(true, true, "Username + Password")]
+    public void AuthSummary_Telnet_ReportsEveryConfiguredCredentialCombination(
+        bool hasUsername,
+        bool hasPassword,
+        string expected)
+    {
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateCredentialServer("TELNET", hasUsername, hasPassword));
+
+        Assert.Equal(expected, viewModel.AuthSummary);
+    }
+
+    [Theory]
+    [InlineData(false, "No saved credentials")]
+    [InlineData(true, "Password")]
+    public void AuthSummary_Vnc_ReportsEveryConfiguredCredentialCombination(
+        bool hasPassword,
+        string expected)
+    {
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateCredentialServer("VNC", hasUsername: false, hasPassword));
+
+        Assert.Equal(expected, viewModel.AuthSummary);
+    }
+
+    [Theory]
+    [InlineData("CITRIX")]
+    [InlineData("LOCAL")]
+    [InlineData("TOOL:PING")]
+    [InlineData("UNKNOWN")]
+    public void AuthSummary_TypeWithoutConfiguredCredentialBadge_RemainsEmpty(string connectionType)
+    {
+        ServerProfileDto dto = CreateCredentialServer(connectionType, hasUsername: true, hasPassword: true);
+        dto.RdpUsername = "rdp-user";
+        dto.RdpPasswordEncrypted = "rdp-password";
+        dto.SshUsername = "ssh-user";
+        dto.SshKeyPath = @"C:\Keys\configured.ppk";
+        dto.SshPasswordEncrypted = "ssh-password";
+        dto.WinRmUsername = "winrm-user";
+        dto.WinRmPasswordEncrypted = "winrm-password";
+        dto.FtpUsername = "ftp-user";
+        dto.FtpPasswordEncrypted = "ftp-password";
+        dto.TelnetUsername = "telnet-user";
+        dto.TelnetPasswordEncrypted = "telnet-password";
+        dto.VncPassword = "vnc-password";
+
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+
+        Assert.Equal(string.Empty, viewModel.AuthSummary);
     }
 
     [Fact]
@@ -179,10 +343,60 @@ public sealed class ServerItemViewModelLocalizationTests
         DisplayName = "Production",
         ConnectionType = "SSH",
         RemoteServer = "prod.example.test",
+        SshUsername = "operator",
         SshKeyPath = @"C:\Keys\production.ppk",
         SshPasswordEncrypted = "encrypted",
         SshAgentForwarding = true
     };
+
+    private static ServerProfileDto CreateCredentialServer(
+        string connectionType,
+        bool hasUsername,
+        bool hasPassword)
+    {
+        var dto = new ServerProfileDto
+        {
+            Id = $"auth-{connectionType.ToLowerInvariant()}",
+            DisplayName = connectionType,
+            ConnectionType = connectionType,
+            RemoteServer = "host.example.test"
+        };
+
+        switch (connectionType)
+        {
+            case "SSH":
+            case "SFTP":
+                dto.SshUsername = hasUsername ? "operator" : null;
+                dto.SshPasswordEncrypted = hasPassword ? "encrypted" : null;
+                break;
+
+            case "RDP":
+                dto.RdpUsername = hasUsername ? "operator" : null;
+                dto.RdpPasswordEncrypted = hasPassword ? "encrypted" : null;
+                break;
+
+            case "WINRM":
+                dto.WinRmUsername = hasUsername ? "operator" : null;
+                dto.WinRmPasswordEncrypted = hasPassword ? "encrypted" : null;
+                break;
+
+            case "FTP":
+                dto.FtpUsername = hasUsername ? "operator" : null;
+                dto.FtpPasswordEncrypted = hasPassword ? "encrypted" : null;
+                break;
+
+            case "TELNET":
+                dto.TelnetUsername = hasUsername ? "operator" : null;
+                dto.TelnetPasswordEncrypted = hasPassword ? "encrypted" : null;
+                break;
+
+            case "VNC":
+                dto.VncPassword = hasPassword ? "encrypted" : null;
+                break;
+        }
+
+        return dto;
+    }
 
     private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
     {

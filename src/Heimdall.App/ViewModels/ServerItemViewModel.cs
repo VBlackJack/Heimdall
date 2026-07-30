@@ -470,10 +470,10 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         "SessionGatewayBadgeTooltipVia" => "Routes through SSH gateway {0}.",
         "SessionGatewayBadgeTooltipMissing" => "This session references missing SSH gateway id {0}.",
         "SessionGatewayMissingDetail" => "Missing gateway ({0})",
+        "SessionAuthUsername" => "Username",
         "SessionAuthSshKey" => "SSH key",
         "SessionAuthPassword" => "Password",
-        "SessionAuthAgent" => "Agent",
-        "SessionAuthPrompt" => "Prompt",
+        "SessionAuthNoneSaved" => "No saved credentials",
         "SessionAuthCurrentUser" => "Current user",
         "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
         "SessionStatusConnected" => "Connected",
@@ -487,71 +487,59 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
     private string BuildAuthSummary(ServerProfileDto dto)
     {
         var type = dto.ConnectionType?.ToUpperInvariant();
+        var parts = new List<string>();
 
         switch (type)
         {
             case "SSH" or "SFTP":
-                {
-                    var parts = new List<string>();
-                    if (!string.IsNullOrWhiteSpace(dto.SshKeyPath))
-                    {
-                        parts.Add(T("SessionAuthSshKey"));
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(dto.SshPasswordEncrypted))
-                    {
-                        parts.Add(T("SessionAuthPassword"));
-                    }
-
-                    if (dto.SshAgentForwarding)
-                    {
-                        parts.Add(T("SessionAuthAgent"));
-                    }
-
-                    return parts.Count > 0
-                        ? string.Join(" + ", parts)
-                        : T("SessionAuthPassword");
-                }
+                AddIfConfigured(parts, dto.SshUsername, "SessionAuthUsername");
+                AddIfConfigured(parts, dto.SshKeyPath, "SessionAuthSshKey");
+                AddIfConfigured(parts, dto.SshPasswordEncrypted, "SessionAuthPassword");
+                break;
 
             case "RDP":
-                {
-                    return !string.IsNullOrWhiteSpace(dto.RdpPasswordEncrypted)
-                        ? T("SessionAuthPassword")
-                        : T("SessionAuthPrompt");
-                }
+                AddIfConfigured(parts, dto.RdpUsername, "SessionAuthUsername");
+                AddIfConfigured(parts, dto.RdpPasswordEncrypted, "SessionAuthPassword");
+                break;
 
             case "WINRM":
+                if (dto.WinRmIdentityMode == Core.Configuration.WinRmIdentityMode.CurrentUser)
                 {
-                    return dto.WinRmIdentityMode == Core.Configuration.WinRmIdentityMode.CurrentUser
-                        ? T("SessionAuthCurrentUser")
-                        : !string.IsNullOrWhiteSpace(dto.WinRmPasswordEncrypted)
-                            ? T("SessionAuthPassword")
-                            : T("SessionAuthPrompt");
+                    return T("SessionAuthCurrentUser");
                 }
+
+                AddIfConfigured(parts, dto.WinRmUsername, "SessionAuthUsername");
+                AddIfConfigured(parts, dto.WinRmPasswordEncrypted, "SessionAuthPassword");
+                break;
 
             case "FTP":
-                {
-                    return !string.IsNullOrWhiteSpace(dto.FtpPasswordEncrypted)
-                        ? T("SessionAuthPassword")
-                        : T("SessionAuthPrompt");
-                }
+                AddIfConfigured(parts, dto.FtpUsername, "SessionAuthUsername");
+                AddIfConfigured(parts, dto.FtpPasswordEncrypted, "SessionAuthPassword");
+                break;
 
             case "TELNET":
-                {
-                    return !string.IsNullOrWhiteSpace(dto.TelnetPasswordEncrypted)
-                        ? T("SessionAuthPassword")
-                        : T("SessionAuthPrompt");
-                }
+                AddIfConfigured(parts, dto.TelnetUsername, "SessionAuthUsername");
+                AddIfConfigured(parts, dto.TelnetPasswordEncrypted, "SessionAuthPassword");
+                break;
 
             case "VNC":
-                {
-                    return !string.IsNullOrWhiteSpace(dto.VncPassword)
-                        ? T("SessionAuthPassword")
-                        : T("SessionAuthPrompt");
-                }
+                AddIfConfigured(parts, dto.VncPassword, "SessionAuthPassword");
+                break;
 
             default:
                 return "";
+        }
+
+        return parts.Count > 0
+            ? string.Join(" + ", parts)
+            : T("SessionAuthNoneSaved");
+    }
+
+    private void AddIfConfigured(List<string> parts, string? value, string localizationKey)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            parts.Add(T(localizationKey));
         }
     }
 }
