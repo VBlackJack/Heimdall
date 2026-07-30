@@ -14,14 +14,71 @@
  * limitations under the License.
  */
 
+using System.Reflection;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
 
 public sealed partial class SessionCoordinatorPreMountTests
 {
+    [Fact]
+    public void DetachSessionToFloatingWindow_HostlessTab_RefusesWithoutRemovingTab()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            var openedSessions = new List<SessionTabViewModel>();
+            SessionWindowService service = CreateSessionWindowServiceForDetachTests(
+                openedSessions.Add);
+            SessionTabViewModel hostless = harness.Main.Connection.AddSession(
+                "external-rdp",
+                "External RDP",
+                "RDP");
+            Exception? hostlessException = Record.Exception(
+                () => service.DetachSessionToFloatingWindow(hostless, harness.Main));
+
+            Assert.Contains(hostless, harness.Main.Connection.ActiveSessions);
+            Assert.Empty(openedSessions);
+            Assert.Null(hostlessException);
+
+            SessionTabViewModel hosted = harness.Main.Connection.AddSession(
+                "embedded-rdp",
+                "Embedded RDP",
+                "RDP");
+            var host = new System.Windows.Controls.Border();
+            hosted.HostControl = host;
+            Exception? hostedException = Record.Exception(
+                () => service.DetachSessionToFloatingWindow(hosted, harness.Main));
+
+            Assert.Null(hostedException);
+            Assert.DoesNotContain(hosted, harness.Main.Connection.ActiveSessions);
+            Assert.Same(host, hosted.HostControl);
+            Assert.Contains(hosted, openedSessions);
+        });
+    }
+
+    private static SessionWindowService CreateSessionWindowServiceForDetachTests(
+        Action<SessionTabViewModel> onWindowOpened)
+    {
+        Type presenterType = typeof(Action<SessionTabViewModel, LocalizationManager>);
+        ConstructorInfo? constructor = typeof(SessionWindowService).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            [presenterType],
+            modifiers: null);
+        if (constructor is null)
+        {
+            return new SessionWindowService();
+        }
+
+        var presenter = new Action<SessionTabViewModel, LocalizationManager>(
+            (session, _) => onWindowOpened(session));
+        return Assert.IsType<SessionWindowService>(constructor.Invoke([presenter]));
+    }
+
     [Fact]
     public void UnsplitSession_NullSession_Throws()
     {

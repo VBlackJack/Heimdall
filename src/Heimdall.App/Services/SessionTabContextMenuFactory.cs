@@ -470,7 +470,11 @@ public sealed class SessionTabContextMenuFactory
     {
         if (!session.IsSplit)
         {
-            var detachItem = new MenuItem { Header = vm.Localize("SessionCtxDetach") };
+            var detachItem = new MenuItem
+            {
+                Header = vm.Localize("SessionCtxDetach"),
+                IsEnabled = session.HostControl is not null
+            };
             detachItem.Click += (_, _) => callbacks.DetachSessionToFloatingWindow(session);
             menu.Items.Add(detachItem);
         }

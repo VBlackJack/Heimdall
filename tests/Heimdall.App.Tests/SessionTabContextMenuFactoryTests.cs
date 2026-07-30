@@ -115,6 +115,41 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Fact]
+    public void SessionTabContextMenu_HostlessUnsplitSession_DisablesDetach()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel session = CreateSession("external-rdp", "RDP");
+
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, session);
+
+            MenuItem detachItem = AssertMenuItem(
+                menu,
+                harness.Main.Localize("SessionCtxDetach"));
+            Assert.False(detachItem.IsEnabled);
+        });
+    }
+
+    [Fact]
+    public void SessionTabContextMenu_HostedUnsplitSession_EnablesDetach()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel session = CreateSession("embedded-rdp", "RDP");
+            session.HostControl = new Border();
+
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, session);
+
+            MenuItem detachItem = AssertMenuItem(
+                menu,
+                harness.Main.Localize("SessionCtxDetach"));
+            Assert.True(detachItem.IsEnabled);
+        });
+    }
+
     private static void RunOnStaThread(Action action)
     {
         Exception? exception = null;

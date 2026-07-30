@@ -16,6 +16,7 @@
 
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
 
@@ -40,11 +41,21 @@ namespace Heimdall.App.Services;
 /// </remarks>
 public sealed class SessionWindowService : ISessionWindowService
 {
+    private readonly Action<SessionTabViewModel, LocalizationManager> _showFloatingWindow;
+
     /// <summary>
     /// Initialises a new <see cref="SessionWindowService"/>.
     /// </summary>
     public SessionWindowService()
+        : this(ShowFloatingWindow)
     {
+    }
+
+    internal SessionWindowService(
+        Action<SessionTabViewModel, LocalizationManager> showFloatingWindow)
+    {
+        _showFloatingWindow = showFloatingWindow
+            ?? throw new ArgumentNullException(nameof(showFloatingWindow));
     }
 
     /// <summary>
@@ -68,6 +79,7 @@ public sealed class SessionWindowService : ISessionWindowService
         ArgumentNullException.ThrowIfNull(vm);
 
         if (!vm.Connection.ActiveSessions.Contains(session)) return;
+        if (session.HostControl is null) return;
 
         // Detach the host control from the tab (UIElement single-parent rule)
         var hostControl = session.HostControl;
@@ -86,14 +98,21 @@ public sealed class SessionWindowService : ISessionWindowService
 
         // Spawn the floating window
         var localizer = vm.GetLocalizer();
+        _showFloatingWindow(session, localizer);
+
+        FileLogger.Info(
+            string.Format(localizer["LogSessionDetached"], session.Title));
+    }
+
+    private static void ShowFloatingWindow(
+        SessionTabViewModel session,
+        LocalizationManager localizer)
+    {
         var floatingWindow = new FloatingSessionWindow(session, localizer)
         {
             Owner = null // Independent top-level window
         };
         floatingWindow.Show();
-
-        FileLogger.Info(
-            string.Format(localizer["LogSessionDetached"], session.Title));
     }
 
     /// <summary>
