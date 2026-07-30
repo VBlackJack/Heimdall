@@ -589,7 +589,7 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     [InlineData("RDP", "rdp-user")]
     [InlineData("WINRM", "winrm-user")]
     [InlineData("FTP", "ftp-user")]
-    [InlineData("TELNET", "telnet-user")]
+    [InlineData("TELNET", "")]
     [InlineData("VNC", "")]
     [InlineData("CITRIX", "")]
     [InlineData("LOCAL", "")]
@@ -618,6 +618,13 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         {
             Assert.Contains(
                 ServerItemViewModel.NormalizeSearchTerm(expectedUsername),
+                server.NormalizedSearchText,
+                StringComparison.Ordinal);
+        }
+        else if (string.Equals(protocol, "TELNET", StringComparison.Ordinal))
+        {
+            Assert.DoesNotContain(
+                ServerItemViewModel.NormalizeSearchTerm("telnet-user"),
                 server.NormalizedSearchText,
                 StringComparison.Ordinal);
         }

@@ -81,13 +81,13 @@ public class MainViewModelConnectAsTests
     }
 
     [Fact]
-    public void BuildTransientProfile_Telnet_CarriesTelnetFields_NoPassword()
+    public void BuildTransientProfile_Telnet_CarriesPortWithoutCredentials()
     {
         var dto = MainViewModel.BuildTransientProfile(Server("host", "erin", "SSH"), "TELNET");
 
         Assert.Equal("TELNET", dto.ConnectionType);
         Assert.Equal(DefaultPorts.Telnet, dto.TelnetPort);
-        Assert.Equal("erin", dto.TelnetUsername);
+        Assert.Null(dto.TelnetUsername);
         Assert.Null(dto.TelnetPasswordEncrypted);
     }
 

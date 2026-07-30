@@ -1032,34 +1032,6 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Telnet credentials -->
-                                <Border>
-                                    <Border.Style>
-                                        <Style TargetType="Border" BasedOn="{StaticResource DialogSectionCardStyle}">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ConnectionType}" Value="Telnet">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <StackPanel>
-                                        <TextBlock x:Name="DlgSrv_BasicTelnetCredentialsTitle" Style="{StaticResource DialogSectionTitleStyle}"/>
-                                        <TextBlock x:Name="DlgSrv_BasicTelnetCredentialsDesc"
-                                                   Style="{StaticResource DialogSectionDescriptionStyle}"/>
-                                        <TextBlock x:Name="DlgSrv_BasicTelnetUsernameLabel" Style="{StaticResource LabelStyle}" Margin="0,14,0,4"/>
-                                        <TextBox x:Name="DlgSrv_TelnetUsernameBox" TabIndex="10"
-                                                 AutomationProperties.Name="{loc:Translate ServerDialogLabelUsername}"
-                                                 Text="{Binding TelnetUsername, UpdateSourceTrigger=PropertyChanged}"
-                                                 Style="{StaticResource DialogFormTextBoxStyle}"/>
-                                        <TextBlock x:Name="DlgSrv_BasicTelnetPasswordLabel" Style="{StaticResource LabelStyle}" Margin="0,12,0,4"/>
-                                        <PasswordBox x:Name="TelnetPasswordBox" TabIndex="11"
-                                                     AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
-                                                     Style="{StaticResource DialogFormPasswordBoxStyle}"/>
-                                    </StackPanel>
-                                </Border>
-
                                 <!-- Local Shell settings -->
                                 <Border>
                                     <Border.Style>

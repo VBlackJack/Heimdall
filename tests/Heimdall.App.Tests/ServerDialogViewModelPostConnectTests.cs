@@ -151,6 +151,31 @@ public sealed class ServerDialogViewModelPostConnectTests
     }
 
     [Fact]
+    public async Task LinkCommandLibrary_TelnetPreservesPortWithoutPrefillingHiddenUsername()
+    {
+        var provider = CommandLibraryTestHelpers.CreateResolverServiceProvider();
+        var dialogService = new FakeDialogService(null);
+        var vm = new ServerDialogViewModel
+        {
+            Localizer = await CommandLibraryTestHelpers.CreateAppLocalizerAsync(),
+            DialogService = dialogService,
+            ServiceScopeFactory = provider.GetRequiredService<IServiceScopeFactory>(),
+            RemoteServer = "telnet.example.com",
+            ConnectionType = "TELNET",
+            RemotePort = 2323,
+            TelnetUsername = "historical-user"
+        };
+        vm.AddPostConnectStepCommand.Execute(null);
+
+        await vm.LinkCommandLibraryCommand.ExecuteAsync(vm.PostConnectSteps[0]);
+
+        Assert.NotNull(dialogService.LastPrefillContext);
+        Assert.Equal("telnet.example.com", dialogService.LastPrefillContext!.Host);
+        Assert.Equal(2323, dialogService.LastPrefillContext.Port);
+        Assert.Null(dialogService.LastPrefillContext.Username);
+    }
+
+    [Fact]
     public void UnlinkCommandLibrary_ClearsLinkAndKeepsDormantInput()
     {
         var vm = new ServerDialogViewModel();

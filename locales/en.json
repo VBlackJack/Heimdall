@@ -3047,8 +3047,6 @@
   "ServerDialogVncCredentialsDesc": "Configure the VNC password for authentication.",
   "ServerDialogFtpCredentials": "FTP Authentication",
   "ServerDialogFtpCredentialsDesc": "Enter FTP credentials for the remote server.",
-  "ServerDialogTelnetCredentials": "Telnet Authentication",
-  "ServerDialogTelnetCredentialsDesc": "Enter credentials for the Telnet server. Note: Telnet transmits credentials in plaintext.",
   "ServerDialogSshAuthHint": "Provide an SSH key for key-based authentication, or leave empty to use password authentication or a loaded SSH agent key.",
   "ServerDialogSshAuthHintPassword": "Password authentication will be used. The password is stored encrypted on this machine (DPAPI).",
   "ServerDialogSshAuthHintKey": "Key-based authentication will be attempted first. The password (if any) is used as a fallback.",

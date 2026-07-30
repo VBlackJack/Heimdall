@@ -330,7 +330,6 @@ public partial class ServerDialogViewModel
         }
         else if (IsTelnetConnection)
         {
-            username = TelnetUsername;
             port = RemotePort;
         }
 

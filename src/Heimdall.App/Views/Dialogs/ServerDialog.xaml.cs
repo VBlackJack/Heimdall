@@ -159,7 +159,6 @@ public partial class ServerDialog : Window
         var rdpPwBox = FindName("RdpPasswordBox") as System.Windows.Controls.PasswordBox;
         var vncPwBox = FindName("VncPasswordBox") as System.Windows.Controls.PasswordBox;
         var ftpPwBox = FindName("FtpPasswordBox") as System.Windows.Controls.PasswordBox;
-        var telnetPwBox = FindName("TelnetPasswordBox") as System.Windows.Controls.PasswordBox;
         System.Windows.Controls.PasswordBox? winRmPwBox =
             FindName("WinRmPasswordBox") as System.Windows.Controls.PasswordBox;
 
@@ -172,7 +171,6 @@ public partial class ServerDialog : Window
         if (rdpPwBox is not null) vm.RdpPassword = rdpPwBox.Password;
         if (vncPwBox is not null) vm.VncPassword = vncPwBox.Password;
         if (ftpPwBox is not null) vm.FtpPassword = ftpPwBox.Password;
-        if (telnetPwBox is not null) vm.TelnetPassword = telnetPwBox.Password;
         if (winRmPwBox is not null) vm.WinRmPassword = winRmPwBox.Password;
 
         vm.ValidateCommand.Execute(null);
@@ -187,7 +185,6 @@ public partial class ServerDialog : Window
             rdpPwBox?.Clear();
             vncPwBox?.Clear();
             ftpPwBox?.Clear();
-            telnetPwBox?.Clear();
             winRmPwBox?.Clear();
         }
         else
@@ -343,7 +340,6 @@ public partial class ServerDialog : Window
         (FindName("RdpPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
         (FindName("VncPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
         (FindName("FtpPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
-        (FindName("TelnetPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
         (FindName("WinRmPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
     }
 
@@ -534,11 +530,6 @@ public partial class ServerDialog : Window
         DlgSrv_BasicFtpUsernameLabel.Text = _localizer["ServerDialogFtpUsername"];
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_FtpUsernameBox, DlgSrv_BasicFtpUsernameLabel);
         DlgSrv_BasicFtpPasswordLabel.Text = _localizer["ServerDialogFtpPassword"];
-        DlgSrv_BasicTelnetCredentialsTitle.Text = _localizer["ServerDialogTelnetCredentials"];
-        DlgSrv_BasicTelnetCredentialsDesc.Text = _localizer["ServerDialogTelnetCredentialsDesc"];
-        DlgSrv_BasicTelnetUsernameLabel.Text = _localizer["ServerDialogLabelUsername"];
-        System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_TelnetUsernameBox, DlgSrv_BasicTelnetUsernameLabel);
-        DlgSrv_BasicTelnetPasswordLabel.Text = _localizer["ServerDialogLabelPassword"];
         DlgSrv_BasicLocalShellTitle.Text = _localizer["ServerDialogLocalShell"];
         DlgSrv_BasicLocalShellDesc.Text = _localizer["ServerDialogLocalShellDesc"];
         DlgSrv_BasicExecutableLabel.Text = _localizer["ServerDialogLabelExecutable"];
@@ -730,8 +721,6 @@ public partial class ServerDialog : Window
         System.Windows.Automation.AutomationProperties.SetName(WinRmPasswordBox, _localizer["ServerDialogLabelPassword"]);
         System.Windows.Automation.AutomationProperties.SetName(FtpPasswordBox, _localizer["ServerDialogFtpPassword"]);
         System.Windows.Automation.AutomationProperties.SetName(VncPasswordBox, _localizer["ServerDialogVncPassword"]);
-        System.Windows.Automation.AutomationProperties.SetName(TelnetPasswordBox, _localizer["ServerDialogLabelPassword"]);
-
         // Accessibility: automation names for basic auth browse button
         System.Windows.Automation.AutomationProperties.SetName(DlgSrv_BasicBrowseBtn, _localizer["ServerDialogBtnBrowse"]);
     }

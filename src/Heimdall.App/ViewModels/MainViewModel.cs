@@ -785,9 +785,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
     /// <summary>
     /// Builds a transient (never persisted) <see cref="ServerProfileDto"/> that connects
-    /// the server's host with the chosen protocol. Carries the host, the protocol default
-    /// port, and the username in the protocol's username field. No password is set. The Id
-    /// is prefixed <c>adhoc-</c> so the session is treated as ad-hoc. Pure helper (no
+    /// the server's host with the chosen protocol. Carries the host and protocol default
+    /// port, plus the username when that protocol supports a profile username. No password
+    /// is set. The Id is prefixed <c>adhoc-</c> so the session is treated as ad-hoc. Pure helper (no
     /// connection) for unit testing.
     /// </summary>
     internal static ServerProfileDto BuildTransientProfile(ServerItemViewModel server, string protocol)
@@ -821,7 +821,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                 break;
             case "TELNET":
                 dto.TelnetPort = DefaultPorts.Telnet;
-                dto.TelnetUsername = username;
                 break;
             default: // SSH
                 dto.SshPort = DefaultPorts.Ssh;

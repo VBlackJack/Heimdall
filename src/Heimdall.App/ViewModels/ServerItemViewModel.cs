@@ -409,7 +409,6 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
             "RDP" => dto.RdpUsername ?? "",
             "WINRM" => dto.WinRmUsername ?? "",
             "FTP" => dto.FtpUsername ?? "",
-            "TELNET" => dto.TelnetUsername ?? "",
             _ => ""
         };
     }

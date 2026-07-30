@@ -3044,8 +3044,6 @@
   "ServerDialogVncCredentialsDesc": "Configurez le mot de passe VNC pour l'authentification.",
   "ServerDialogFtpCredentials": "Authentification FTP",
   "ServerDialogFtpCredentialsDesc": "Entrez les identifiants FTP pour le serveur distant.",
-  "ServerDialogTelnetCredentials": "Authentification Telnet",
-  "ServerDialogTelnetCredentialsDesc": "Entrez les identifiants pour le serveur Telnet. Note\u00a0: Telnet transmet les identifiants en clair.",
   "ServerDialogSshAuthHint": "Fournissez une cl\u00e9 SSH pour l'authentification par cl\u00e9, ou laissez vide pour utiliser un mot de passe ou une cl\u00e9 charg\u00e9e dans un agent SSH.",
   "ServerDialogSshAuthHintPassword": "Authentification par mot de passe. Le mot de passe est stock\u00e9 chiffr\u00e9 sur cette machine (DPAPI).",
   "ServerDialogSshAuthHintKey": "L'authentification par cl\u00e9 sera tent\u00e9e en premier. Le mot de passe (si d\u00e9fini) sert de repli.",
