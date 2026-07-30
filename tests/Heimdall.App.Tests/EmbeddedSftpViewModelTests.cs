@@ -740,6 +740,105 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task ChmodEntriesAsync_FtpThroughLoggingDecorator_ReportsOneUnsupportedMessageWithoutSuccess()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        using FtpBrowser ftpBrowser = new();
+        CapturingOperationLog operationLog = new();
+        using LoggingRemoteBrowser loggingBrowser = new(
+            ftpBrowser,
+            operationLog,
+            static () => true,
+            "FTP",
+            "ftp.example");
+        ConfirmingDialogService dialogService = new("755");
+        SetBrowser(viewModel, loggingBrowser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(dialogService);
+        SftpFileInfo[] entries = Enumerable.Range(1, 5)
+            .Select(index => CreateRemoteEntry(
+                $"file-{index}.txt",
+                $"/srv/file-{index}.txt",
+                isDirectory: false))
+            .ToArray();
+        List<string> statusUpdates = [];
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(EmbeddedSftpViewModel.StatusText))
+            {
+                statusUpdates.Add(viewModel.StatusText);
+            }
+        };
+
+        await viewModel.ChmodEntriesAsync(entries);
+
+        Assert.DoesNotContain(localizer["SftpChmodSuccess"], statusUpdates);
+        Assert.Equal(1, dialogService.InputCallCount);
+        Assert.Equal(localizer["SftpChmodNotSupported"], viewModel.StatusText);
+        Assert.NotEqual(localizer["SftpChmodSuccess"], viewModel.StatusText);
+        Assert.True(viewModel.IsErrorStatus);
+        Assert.Equal([localizer["SftpChmodNotSupported"]], statusUpdates);
+        Assert.Empty(operationLog.Records);
+    }
+
+    [Fact]
+    public async Task ChmodEntriesAsync_SupportedBrowser_MutatesEveryEntryThenRefreshes()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService("640"));
+        SftpFileInfo[] entries =
+        [
+            CreateRemoteEntry("one.txt", "/srv/one.txt", isDirectory: false),
+            CreateRemoteEntry("two.txt", "/srv/two.txt", isDirectory: false),
+        ];
+        List<string> statusUpdates = [];
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(EmbeddedSftpViewModel.StatusText))
+            {
+                statusUpdates.Add(viewModel.StatusText);
+            }
+        };
+
+        await viewModel.ChmodEntriesAsync(entries);
+
+        Assert.Equal(2, browser.ChmodCallCount);
+        Assert.Equal(1, browser.ListDirectoryCallCount);
+        Assert.Contains(localizer["SftpChmodSuccess"], statusUpdates);
+        Assert.False(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task ChmodEntriesAsync_BrowserFailure_ReportsFailureWithoutRefreshing()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            ChmodException = new IOException("chmod failed"),
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService("755"));
+        SftpFileInfo entry = CreateRemoteEntry("one.txt", "/srv/one.txt", isDirectory: false);
+
+        await viewModel.ChmodEntriesAsync([entry]);
+
+        Assert.Equal(1, browser.ChmodCallCount);
+        Assert.Equal(0, browser.ListDirectoryCallCount);
+        Assert.Equal(localizer["SftpStatusTransferFailed"], viewModel.StatusText);
+        Assert.True(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
     public async Task DeleteEntriesAsync_ProtectedRoot_DoesNotCallBrowserDelete()
     {
         FakeUiDispatcher dispatcher = new();
@@ -1080,6 +1179,7 @@ public sealed class EmbeddedSftpViewModelTests
         private int _createDirectoryCallCount;
         private int _chmodCallCount;
         private int _deleteCallCount;
+        private int _listDirectoryCallCount;
         private int _renameCallCount;
 
         public event Action<string>? DirectoryChanged
@@ -1114,6 +1214,8 @@ public sealed class EmbeddedSftpViewModelTests
 
         public int DeleteCallCount => Volatile.Read(ref _deleteCallCount);
 
+        public int ListDirectoryCallCount => Volatile.Read(ref _listDirectoryCallCount);
+
         public int RenameCallCount => Volatile.Read(ref _renameCallCount);
 
         public string? LastUploadedRemotePath { get; private set; }
@@ -1125,6 +1227,8 @@ public sealed class EmbeddedSftpViewModelTests
         public string? LastChmodPath { get; private set; }
 
         public short LastChmodMode { get; private set; }
+
+        public Exception? ChmodException { get; set; }
 
         public string? LastDeletedPath { get; private set; }
 
@@ -1140,6 +1244,7 @@ public sealed class EmbeddedSftpViewModelTests
             string? path = null,
             CancellationToken ct = default)
         {
+            Interlocked.Increment(ref _listDirectoryCallCount);
             if (ListDirectoryHandler is not null)
             {
                 return ListDirectoryHandler(path, ct);
@@ -1204,7 +1309,9 @@ public sealed class EmbeddedSftpViewModelTests
             LastChmodPath = path;
             LastChmodMode = mode;
             Interlocked.Increment(ref _chmodCallCount);
-            return Task.CompletedTask;
+            return ChmodException is null
+                ? Task.CompletedTask
+                : Task.FromException(ChmodException);
         }
 
         /// <summary>When set, RenameAsync throws for an entry whose old path equals this value.</summary>
@@ -1245,6 +1352,8 @@ public sealed class EmbeddedSftpViewModelTests
         private readonly string? _input;
         private readonly bool _hasInput;
 
+        public int InputCallCount { get; private set; }
+
         public ConfirmingDialogService()
         {
         }
@@ -1262,7 +1371,10 @@ public sealed class EmbeddedSftpViewModelTests
             => throw new NotSupportedException();
 
         public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null)
-            => _hasInput ? Task.FromResult(_input) : throw new NotSupportedException();
+        {
+            InputCallCount++;
+            return _hasInput ? Task.FromResult(_input) : throw new NotSupportedException();
+        }
 
         public Task<string?> ShowPasswordInputAsync(
             string title,
@@ -1335,6 +1447,20 @@ public sealed class EmbeddedSftpViewModelTests
         }
 
         public void ShowWarning(string title, string message)
+        {
+        }
+    }
+
+    private sealed class CapturingOperationLog : ISessionOperationLog
+    {
+        public List<SessionOperationRecord> Records { get; } = [];
+
+        public void LogOperation(SessionOperationRecord record)
+        {
+            Records.Add(record);
+        }
+
+        public void Dispose()
         {
         }
     }

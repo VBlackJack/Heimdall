@@ -1679,6 +1679,7 @@
   "SftpChmodTitle": "Modifier les permissions \u2014 {0}",
   "SftpChmodLabel": "Permissions (octal, ex : 755) :",
   "SftpChmodSuccess": "Permissions modifi\u00e9es avec succ\u00e8s.",
+  "SftpChmodNotSupported": "La modification des permissions n'est pas prise en charge par cette connexion.",
   "SftpBtnBookmark": "Ajouter aux favoris",
   "SftpBtnBookmarks": "Favoris",
   "SftpBtnMoreActions": "Plus d'actions",

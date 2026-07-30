@@ -1638,6 +1638,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpChmodSuccess")));
             await Refresh().ConfigureAwait(false);
         }
+        catch (NotSupportedException)
+        {
+            await RunOnUiAsync(() =>
+                SetErrorStatus(L10n("SftpChmodNotSupported")));
+        }
         catch (Exception ex)
         {
             await RunOnUiAsync(() =>

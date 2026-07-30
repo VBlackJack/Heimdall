@@ -409,9 +409,7 @@ public sealed class FtpBrowser : IRemoteBrowser
     public Task ChmodAsync(string path, short mode, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        // FTP does not natively support chmod; this is a no-op.
-        // Some servers support SITE CHMOD but it is non-standard.
-        return Task.CompletedTask;
+        throw new NotSupportedException("Changing POSIX permissions is not supported for FTP connections.");
     }
 
     /// <inheritdoc/>

@@ -71,6 +71,9 @@ public interface IRemoteBrowser : IDisposable
     Task DeleteAsync(string path, CancellationToken ct = default);
 
     /// <summary>Changes the POSIX permissions of a remote file or directory.</summary>
+    /// <exception cref="NotSupportedException">
+    /// The remote protocol does not support changing POSIX permissions.
+    /// </exception>
     Task ChmodAsync(string path, short mode, CancellationToken ct = default);
 
     /// <summary>Renames (moves) a remote file or directory.</summary>
