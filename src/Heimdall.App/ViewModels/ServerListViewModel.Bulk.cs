@@ -1586,9 +1586,7 @@ public partial class ServerListViewModel
                 dto.TelnetUsername = username;
                 return true;
 
-            // Citrix shares the RDP credential fields; see GetCredentialTarget.
             case "RDP":
-            case "CITRIX":
                 dto.RdpUsername = username;
                 return true;
 
@@ -1626,9 +1624,7 @@ public partial class ServerListViewModel
                 dto.VncPassword = encryptedPassword;
                 return true;
 
-            // Citrix shares the RDP credential fields; see GetCredentialTarget.
             case "RDP":
-            case "CITRIX":
                 dto.RdpPasswordEncrypted = encryptedPassword;
                 return true;
 
@@ -1640,13 +1636,13 @@ public partial class ServerListViewModel
     private static bool SupportsBulkUsername(string? connectionType)
     {
         return connectionType?.ToUpperInvariant() is
-            "RDP" or "CITRIX" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET";
+            "RDP" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET";
     }
 
     private static bool SupportsBulkPassword(string? connectionType)
     {
         return connectionType?.ToUpperInvariant() is
-            "RDP" or "CITRIX" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET" or "VNC";
+            "RDP" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET" or "VNC";
     }
 
     private static string? NormalizeProjectForPersistence(string? projectId)

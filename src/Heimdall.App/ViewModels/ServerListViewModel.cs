@@ -1091,7 +1091,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                 username => { if (string.IsNullOrEmpty(dto.SshUsername)) dto.SshUsername = username; });
         }
 
-        if (connType is "RDP" or "CITRIX" && string.IsNullOrEmpty(dto.RdpPasswordEncrypted))
+        if (connType is "RDP" && string.IsNullOrEmpty(dto.RdpPasswordEncrypted))
         {
             return new CredentialTarget(
                 dto.RemotePort, dto.RdpUsername,
