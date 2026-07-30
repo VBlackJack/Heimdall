@@ -377,8 +377,6 @@ public sealed class ContextMenuFactory
         ServerItemViewModel tool,
         IContextMenuCallbacks callbacks)
     {
-        _ = callbacks;
-
         var menu = CreateContextMenu();
 
         // "Open in Tab" — the primary action for tools
@@ -402,6 +400,14 @@ public sealed class ContextMenuFactory
         menu.Items.Add(CreateMoveToGroupMenu(vm, tool));
 
         menu.Items.Add(new Separator());
+
+        var renameItem = new MenuItem
+        {
+            Header = vm.Localize("TreeCtxRename"),
+            InputGestureText = "F2"
+        };
+        renameItem.Click += (_, _) => callbacks.BeginInlineRename(tool);
+        menu.Items.Add(renameItem);
 
         // Remove from inventory
         var removeItem = CreateMenuItem(

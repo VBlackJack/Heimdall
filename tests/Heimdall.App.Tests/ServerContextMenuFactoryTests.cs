@@ -186,7 +186,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             ContextMenu menu = factory.CreateTreeContextMenu(
                 bulkContext,
                 harness.Main,
-                new NullContextMenuCallbacks());
+                new RecordingContextMenuCallbacks());
 
             MenuItem bulkEdit = AssertMenuItem(menu, harness.Main.Localize("TreeCtxBulkEditMenu"));
             MenuItem? setGateway = FindChildMenuItem(
@@ -235,7 +235,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             ContextMenu menu = factory.CreateTreeContextMenu(
                 bulkContext,
                 harness.Main,
-                new NullContextMenuCallbacks());
+                new RecordingContextMenuCallbacks());
 
             MenuItem bulkEdit = AssertMenuItem(menu, harness.Main.Localize("TreeCtxBulkEditMenu"));
             string usernameHeader = string.Format(
@@ -282,7 +282,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             ContextMenu menu = factory.CreateTreeContextMenu(
                 bulkContext,
                 harness.Main,
-                new NullContextMenuCallbacks());
+                new RecordingContextMenuCallbacks());
 
             MenuItem bulkEdit = AssertMenuItem(menu, harness.Main.Localize("TreeCtxBulkEditMenu"));
             string usernameHeader = string.Format(
@@ -303,6 +303,115 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Fact]
+    public void ToolContextMenu_ToolNode_OffersEnabledRenameWithF2AndInvokesCallback()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            ServerProfileDto tool = harness.CreateServer("TOOL:PING");
+            harness.PersistServerAsync(tool).GetAwaiter().GetResult();
+            ServerItemViewModel toolVm = Assert.Single(
+                harness.Main.ServerList.Servers,
+                item => string.Equals(item.Id, tool.Id, StringComparison.Ordinal));
+            var callbacks = new RecordingContextMenuCallbacks();
+            ContextMenuFactory factory = new ContextMenuFactory(new ExternalToolProviderService());
+
+            ContextMenu menu = factory.CreateTreeContextMenu(toolVm, harness.Main, callbacks);
+
+            MenuItem rename = AssertMenuItem(menu, harness.Main.Localize("TreeCtxRename"));
+            Assert.True(rename.IsEnabled);
+            Assert.Equal("F2", rename.InputGestureText);
+            rename.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.Same(toolVm, callbacks.RenamedNode);
+            Assert.Equal(
+                [
+                    harness.Main.Localize("TreeCtxOpenToolInTab"),
+                    "<separator>",
+                    harness.Main.Localize("TreeCtxMoveToProject"),
+                    harness.Main.Localize("TreeCtxMoveToGroup"),
+                    "<separator>",
+                    harness.Main.Localize("TreeCtxRename"),
+                    harness.Main.Localize("TreeCtxRemoveTool")
+                ],
+                GetTopLevelMenuShape(menu));
+        });
+    }
+
+    [Fact]
+    public void NonToolContextMenus_PreserveServerAndFolderItemOrder()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            ServerProfileDto server = harness.CreateServer("RDP");
+            harness.PersistServerAsync(server).GetAwaiter().GetResult();
+            ServerItemViewModel serverVm = Assert.Single(
+                harness.Main.ServerList.Servers,
+                item => string.Equals(item.Id, server.Id, StringComparison.Ordinal));
+            var folder = new FolderViewModel { Name = "Ops", FullPath = "Ops" };
+            ContextMenuFactory factory = new ContextMenuFactory(new ExternalToolProviderService());
+            var callbacks = new RecordingContextMenuCallbacks();
+
+            ContextMenu serverMenu =
+                factory.CreateTreeContextMenu(serverVm, harness.Main, callbacks);
+            ContextMenu folderMenu =
+                factory.CreateTreeContextMenu(folder, harness.Main, callbacks);
+
+            Assert.Equal(
+                [
+                    harness.Main.Localize("TreeCtxConnect"),
+                    harness.Main.Localize("MenuItemConnectWith"),
+                    harness.Main.Localize("TreeCtxConnectAs"),
+                    harness.Main.Localize("TreeCtxOpenInSplit"),
+                    harness.Main.Localize("TreeCtxRename"),
+                    harness.Main.Localize("TreeCtxEdit"),
+                    harness.Main.Localize("TreeCtxDuplicate"),
+                    "<separator>",
+                    harness.Main.Localize("TreeCtxMoveToProject"),
+                    harness.Main.Localize("TreeCtxMoveToGroup"),
+                    "<separator>",
+                    harness.Main.Localize("TreeCtxCopyHostname"),
+                    harness.Main.Localize("TreeCtxCopyUsername"),
+                    harness.Main.Localize("TreeCtxCopyAddress"),
+                    harness.Main.Localize("TreeCtxTestReachability"),
+                    "<separator>",
+                    harness.Main.Localize("TreeCtxNotes"),
+                    "<separator>",
+                    harness.Main.Localize("TreeCtxDelete")
+                ],
+                GetTopLevelMenuShape(serverMenu));
+            Assert.Equal(
+                [
+                    string.Format(
+                        harness.Main.Localize("TreeCtxConnectAllCount"),
+                        0),
+                    "<separator>",
+                    harness.Main.Localize("DialogTitleAddServer"),
+                    harness.Main.Localize("TreeCtxNewGroup"),
+                    harness.Main.Localize("AddMenuTool"),
+                    "<separator>",
+                    harness.Main.Localize("TreeCtxRename"),
+                    harness.Main.Localize("TreeCtxDeleteGroup")
+                ],
+                GetTopLevelMenuShape(folderMenu));
+        });
+    }
+
+    private static string[] GetTopLevelMenuShape(ContextMenu menu)
+    {
+        return menu.Items
+            .Cast<object>()
+            .Select(item => item switch
+            {
+                Separator => "<separator>",
+                MenuItem menuItem => Assert.IsType<string>(menuItem.Header),
+                _ => throw new InvalidOperationException(
+                    $"Unexpected context menu item type: {item.GetType().FullName}")
+            })
+            .ToArray();
+    }
+
     private static MenuItem? FindChildMenuItem(MenuItem parent, string header)
     {
         foreach (object raw in parent.Items)
@@ -321,11 +430,13 @@ public sealed partial class SessionCoordinatorPreMountTests
     private static ContextMenu CreateServerMenu(MainViewModel vm, ServerItemViewModel server)
     {
         ContextMenuFactory factory = new ContextMenuFactory(new ExternalToolProviderService());
-        return factory.CreateTreeContextMenu(server, vm, new NullContextMenuCallbacks());
+        return factory.CreateTreeContextMenu(server, vm, new RecordingContextMenuCallbacks());
     }
 
-    private sealed class NullContextMenuCallbacks : IContextMenuCallbacks
+    private sealed class RecordingContextMenuCallbacks : IContextMenuCallbacks
     {
+        public object? RenamedNode { get; private set; }
+
         public void OpenNotesForServer(ServerItemViewModel server, NoteTemplateKind templateKind)
         {
         }
@@ -340,6 +451,11 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         public void AddToolFromMenu(string? group)
         {
+        }
+
+        public void BeginInlineRename(object node)
+        {
+            RenamedNode = node;
         }
     }
 }
