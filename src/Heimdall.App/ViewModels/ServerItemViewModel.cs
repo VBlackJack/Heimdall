@@ -517,11 +517,6 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
                 AddIfConfigured(parts, dto.FtpPasswordEncrypted, "SessionAuthPassword");
                 break;
 
-            case "TELNET":
-                AddIfConfigured(parts, dto.TelnetUsername, "SessionAuthUsername");
-                AddIfConfigured(parts, dto.TelnetPasswordEncrypted, "SessionAuthPassword");
-                break;
-
             case "VNC":
                 AddIfConfigured(parts, dto.VncPassword, "SessionAuthPassword");
                 break;

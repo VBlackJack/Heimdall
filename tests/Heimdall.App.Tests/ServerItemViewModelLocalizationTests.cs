@@ -179,19 +179,18 @@ public sealed class ServerItemViewModelLocalizationTests
     }
 
     [Theory]
-    [InlineData(false, false, "No saved credentials")]
-    [InlineData(true, false, "Username")]
-    [InlineData(false, true, "Password")]
-    [InlineData(true, true, "Username + Password")]
-    public void AuthSummary_Telnet_ReportsEveryConfiguredCredentialCombination(
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void AuthSummary_Telnet_RemainsEmptyForEveryStoredCredentialCombination(
         bool hasUsername,
-        bool hasPassword,
-        string expected)
+        bool hasPassword)
     {
         ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
             CreateCredentialServer("TELNET", hasUsername, hasPassword));
 
-        Assert.Equal(expected, viewModel.AuthSummary);
+        Assert.Equal(string.Empty, viewModel.AuthSummary);
     }
 
     [Theory]

@@ -1582,10 +1582,6 @@ public partial class ServerListViewModel
                 dto.WinRmIdentityMode = Core.Configuration.WinRmIdentityMode.Credential;
                 return true;
 
-            case "TELNET":
-                dto.TelnetUsername = username;
-                return true;
-
             case "RDP":
                 dto.RdpUsername = username;
                 return true;
@@ -1616,10 +1612,6 @@ public partial class ServerListViewModel
                 dto.WinRmIdentityMode = Core.Configuration.WinRmIdentityMode.Credential;
                 return true;
 
-            case "TELNET":
-                dto.TelnetPasswordEncrypted = encryptedPassword;
-                return true;
-
             case "VNC":
                 dto.VncPassword = encryptedPassword;
                 return true;
@@ -1636,13 +1628,13 @@ public partial class ServerListViewModel
     private static bool SupportsBulkUsername(string? connectionType)
     {
         return connectionType?.ToUpperInvariant() is
-            "RDP" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET";
+            "RDP" or "SSH" or "SFTP" or "FTP" or "WINRM";
     }
 
     private static bool SupportsBulkPassword(string? connectionType)
     {
         return connectionType?.ToUpperInvariant() is
-            "RDP" or "SSH" or "SFTP" or "FTP" or "WINRM" or "TELNET" or "VNC";
+            "RDP" or "SSH" or "SFTP" or "FTP" or "WINRM" or "VNC";
     }
 
     private static string? NormalizeProjectForPersistence(string? projectId)

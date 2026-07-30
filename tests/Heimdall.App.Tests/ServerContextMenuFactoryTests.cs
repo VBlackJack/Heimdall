@@ -241,11 +241,11 @@ public sealed partial class SessionCoordinatorPreMountTests
             string usernameHeader = string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
                 harness.Main.Localize("TreeCtxBulkEditUsername"),
-                2);
+                1);
             string passwordHeader = string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
                 harness.Main.Localize("TreeCtxBulkEditPassword"),
-                3);
+                2);
             MenuItem? username = FindChildMenuItem(bulkEdit, usernameHeader);
             MenuItem? password = FindChildMenuItem(bulkEdit, passwordHeader);
 

@@ -1117,14 +1117,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                 username => { if (string.IsNullOrEmpty(dto.FtpUsername)) dto.FtpUsername = username; });
         }
 
-        if (connType is "TELNET" && string.IsNullOrEmpty(dto.TelnetPasswordEncrypted))
-        {
-            return new CredentialTarget(
-                dto.TelnetPort, dto.TelnetUsername,
-                encrypted => dto.TelnetPasswordEncrypted = encrypted,
-                username => { if (string.IsNullOrEmpty(dto.TelnetUsername)) dto.TelnetUsername = username; });
-        }
-
         if (connType is "VNC" && string.IsNullOrEmpty(dto.VncPassword))
         {
             // VncPassword is DPAPI-encrypted despite the name; VNC has no username field.

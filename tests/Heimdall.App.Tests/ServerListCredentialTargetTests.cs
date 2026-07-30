@@ -71,7 +71,6 @@ public sealed class ServerListCredentialTargetTests
     [InlineData("SFTP", 2222, "SSH")]
     [InlineData("WINRM", 5986, "WINRM")]
     [InlineData("FTP", 2121, "FTP")]
-    [InlineData("TELNET", 2323, "TELNET")]
     [InlineData("VNC", 5901, "VNC")]
     public void GetCredentialTarget_OtherSupportedProtocols_PreserveTheirFieldMapping(
         string connectionType,
@@ -104,7 +103,7 @@ public sealed class ServerListCredentialTargetTests
     // ── Telnet ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void GetCredentialTarget_Telnet_EmptyPassword_TargetsTelnetFields()
+    public void GetCredentialTarget_Telnet_EmptyCredentials_ReturnsNullWithoutMutation()
     {
         var dto = new ServerProfileDto
         {
@@ -116,19 +115,13 @@ public sealed class ServerListCredentialTargetTests
 
         var target = ServerListViewModel.GetCredentialTarget(dto);
 
-        Assert.NotNull(target);
-        Assert.Equal(2323, target!.Value.Port);
-        Assert.Equal("", target.Value.Username);
-
-        target.Value.SetPassword("enc-telnet");
-        Assert.Equal("enc-telnet", dto.TelnetPasswordEncrypted);
-
-        target.Value.SetUsernameIfEmpty("vaultuser");
-        Assert.Equal("vaultuser", dto.TelnetUsername);
+        Assert.Null(target);
+        Assert.Equal("", dto.TelnetUsername);
+        Assert.Null(dto.TelnetPasswordEncrypted);
     }
 
     [Fact]
-    public void GetCredentialTarget_Telnet_DoesNotOverwriteExistingUsername()
+    public void GetCredentialTarget_Telnet_StoredUsernameWithoutPassword_ReturnsNullWithoutMutation()
     {
         var dto = new ServerProfileDto
         {
@@ -139,9 +132,9 @@ public sealed class ServerListCredentialTargetTests
 
         var target = ServerListViewModel.GetCredentialTarget(dto);
 
-        Assert.NotNull(target);
-        target!.Value.SetUsernameIfEmpty("vaultuser");
+        Assert.Null(target);
         Assert.Equal("stored", dto.TelnetUsername);
+        Assert.Null(dto.TelnetPasswordEncrypted);
     }
 
     [Fact]
@@ -156,6 +149,7 @@ public sealed class ServerListCredentialTargetTests
         var target = ServerListViewModel.GetCredentialTarget(dto);
 
         Assert.Null(target);
+        Assert.Equal("already-set", dto.TelnetPasswordEncrypted);
     }
 
     // ── VNC ─────────────────────────────────────────────────────────────
@@ -205,8 +199,8 @@ public sealed class ServerListCredentialTargetTests
         Assert.Equal(expectedFieldOwner == "WINRM" ? "vaultuser" : null, dto.WinRmUsername);
         Assert.Equal(expectedFieldOwner == "FTP" ? "encrypted" : null, dto.FtpPasswordEncrypted);
         Assert.Equal(expectedFieldOwner == "FTP" ? "vaultuser" : null, dto.FtpUsername);
-        Assert.Equal(expectedFieldOwner == "TELNET" ? "encrypted" : null, dto.TelnetPasswordEncrypted);
-        Assert.Equal(expectedFieldOwner == "TELNET" ? "vaultuser" : null, dto.TelnetUsername);
+        Assert.Null(dto.TelnetPasswordEncrypted);
+        Assert.Null(dto.TelnetUsername);
         Assert.Equal(expectedFieldOwner == "VNC" ? "encrypted" : null, dto.VncPassword);
         Assert.Null(dto.RdpPasswordEncrypted);
         Assert.Null(dto.RdpUsername);
