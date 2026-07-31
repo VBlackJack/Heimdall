@@ -25,6 +25,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerDialogViewModelPostConnectTests
 {
     [Fact]

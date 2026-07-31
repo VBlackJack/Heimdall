@@ -24,6 +24,7 @@ using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class CitrixHandlerTests
 {
     [Theory]

@@ -21,6 +21,7 @@ using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerDialogTelnetCredentialTests
 {
     private static readonly XNamespace s_xamlNamespace =

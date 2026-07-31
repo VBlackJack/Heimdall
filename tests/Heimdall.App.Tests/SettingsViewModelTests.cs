@@ -35,6 +35,7 @@ using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class SettingsViewModelTests
 {
     [Fact]

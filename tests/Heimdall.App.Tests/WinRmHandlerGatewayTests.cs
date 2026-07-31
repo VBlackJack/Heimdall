@@ -26,6 +26,7 @@ using Heimdall.Terminal;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class WinRmHandlerGatewayTests
 {
     [Fact]

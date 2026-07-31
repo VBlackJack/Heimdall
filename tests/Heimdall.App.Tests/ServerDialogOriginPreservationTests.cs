@@ -33,6 +33,7 @@ using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerDialogOriginPreservationTests
 {
     [Fact]

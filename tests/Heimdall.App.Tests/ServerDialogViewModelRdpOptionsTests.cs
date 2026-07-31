@@ -20,6 +20,7 @@ using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerDialogViewModelRdpOptionsTests
 {
     [Fact]
