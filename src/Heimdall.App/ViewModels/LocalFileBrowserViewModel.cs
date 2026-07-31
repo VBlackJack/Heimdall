@@ -20,8 +20,11 @@ using System.Linq;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Heimdall.App.Services;
+using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.App.Views.Dialogs;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Utilities;
+using Heimdall.Sftp;
 
 namespace Heimdall.App.ViewModels;
 
@@ -32,8 +35,6 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public sealed partial class LocalFileBrowserViewModel : ObservableObject
 {
-    private const int MaxCopyDepth = 256;
-
     private static readonly HashSet<string> RunnableExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".ps1", ".bat", ".cmd", ".sh"
@@ -51,6 +52,7 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
     private readonly List<LocalFileEntry> _allFiles = [];
     private readonly LocalizationManager? _localizer;
     private IDialogService? _dialogService;
+    private IFileConflictDialogPresenter? _fileConflictDialogPresenter;
     private int _loadGeneration;
 
     [ObservableProperty]
@@ -273,6 +275,34 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         _dialogService = dialogService;
     }
 
+    internal static IReadOnlyList<FileConflictPlanItem> BuildConflictPlanItems(
+        IReadOnlyList<LocalPasteOp> operations)
+    {
+        ArgumentNullException.ThrowIfNull(operations);
+
+        List<FileConflictPlanItem> planItems = new(operations.Count);
+        foreach (LocalPasteOp operation in operations)
+        {
+            FileConflictItemKind kind = operation.Kind switch
+            {
+                LocalPasteOpKind.CopyFile => FileConflictItemKind.File,
+                LocalPasteOpKind.CreateDirectory => FileConflictItemKind.Directory,
+                _ => throw new ArgumentOutOfRangeException(nameof(operations), operation.Kind, "Unknown paste operation."),
+            };
+            planItems.Add(new FileConflictPlanItem(operation.SourcePath, operation.TargetPath, kind));
+        }
+
+        return planItems;
+    }
+
+    internal static bool ShouldOverwriteOnCopy(
+        FileConflictAnalysisItem analysis,
+        FileConflictEffectiveAction action)
+    {
+        ArgumentNullException.ThrowIfNull(analysis);
+        return action == FileConflictEffectiveAction.Proceed && analysis.HasConflict;
+    }
+
     internal static LocalRenameCollisionAction DetermineRenameCollisionAction(
         bool isDirectory,
         string sourceFullPath,
@@ -491,14 +521,16 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
     /// <param name="sourcePaths">The clipboard file paths provided by the view.</param>
     public async Task PasteFilesAsync(IReadOnlyList<string> sourcePaths)
     {
-        if (sourcePaths.Count == 0 || !TryGetDialogService(out var dialogService))
+        if (sourcePaths.Count == 0 || !TryGetDialogService(out IDialogService dialogService))
         {
             return;
         }
 
-        var title = L10n("FileBrowserPasteOverwriteTitle");
+        string title = L10n("FileBrowserPasteOverwriteTitle");
+        List<(string SourcePath, IReadOnlyList<LocalPasteOp> Operations)> plannedRoots = [];
+        List<LocalPasteOp> operations = [];
 
-        foreach (var sourcePath in sourcePaths)
+        foreach (string sourcePath in sourcePaths)
         {
             if (string.IsNullOrWhiteSpace(sourcePath))
             {
@@ -507,31 +539,138 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
 
             try
             {
-                var name = Path.GetFileName(sourcePath);
-                var destinationPath = Path.Combine(CurrentPath, name);
-
+                bool isDirectory;
                 if (File.Exists(sourcePath))
                 {
-                    if (File.Exists(destinationPath))
-                    {
-                        var overwriteMessage = string.Format(L10n("FileBrowserPasteOverwriteMessage"), name);
-                        var overwrite = await dialogService.ShowConfirmAsync(title, overwriteMessage, "warning");
-                        if (!overwrite)
-                        {
-                            continue;
-                        }
-                    }
-
-                    await Task.Run(() => File.Copy(sourcePath, destinationPath, overwrite: true));
+                    isDirectory = false;
                 }
                 else if (Directory.Exists(sourcePath))
                 {
-                    await Task.Run(() => CopyDirectoryRecursive(sourcePath, destinationPath));
+                    isDirectory = true;
                 }
+                else
+                {
+                    continue;
+                }
+
+                FileAttributes attributes = File.GetAttributes(sourcePath);
+                LocalPasteEntry root = new(
+                    sourcePath,
+                    Path.GetFileName(sourcePath),
+                    isDirectory,
+                    (attributes & FileAttributes.ReparsePoint) != 0);
+                IReadOnlyList<LocalPasteOp> rootOperations = LocalPasteTreePlanner.Plan(
+                    [root],
+                    CurrentPath,
+                    directoryPath => Directory
+                        .EnumerateFileSystemEntries(directoryPath)
+                        .Select(childPath =>
+                        {
+                            FileAttributes childAttributes = File.GetAttributes(childPath);
+                            return new LocalPasteEntry(
+                                childPath,
+                                Path.GetFileName(childPath),
+                                (childAttributes & FileAttributes.Directory) != 0,
+                                (childAttributes & FileAttributes.ReparsePoint) != 0);
+                        })
+                        .ToList());
+                plannedRoots.Add((sourcePath, rootOperations));
+                operations.AddRange(rootOperations);
             }
             catch (Exception ex)
             {
-                var errorMessage = string.Format(L10n("FileBrowserPasteError"), Path.GetFileName(sourcePath), ex.Message);
+                string errorMessage = string.Format(
+                    L10n("FileBrowserPasteError"),
+                    Path.GetFileName(sourcePath),
+                    ex.Message);
+                dialogService.ShowError(title, errorMessage);
+            }
+        }
+
+        IReadOnlyList<FileConflictPlanItem> planItems = BuildConflictPlanItems(operations);
+        IReadOnlyList<FileConflictAnalysisItem> analysis = FileConflictPlanner.Analyze(
+            planItems,
+            path => File.Exists(path)
+                ? FileConflictItemKind.File
+                : Directory.Exists(path)
+                    ? FileConflictItemKind.Directory
+                    : null,
+            StringComparer.OrdinalIgnoreCase,
+            FileConflictPolicy.Transfer);
+        IReadOnlyList<FileConflictAnalysisItem> conflicts = analysis
+            .Where(item => item.HasConflict)
+            .ToList();
+
+        IReadOnlyList<FileConflictDecision> decisions = [];
+        if (conflicts.Count > 0)
+        {
+            _fileConflictDialogPresenter ??= new WpfFileConflictDialogPresenter();
+            FileConflictDialogViewModel dialogViewModel = new(conflicts, _localizer);
+            FileConflictDialogResult? dialogResult = await _fileConflictDialogPresenter
+                .ShowAsync(dialogViewModel);
+            if (dialogResult is null)
+            {
+                return;
+            }
+
+            decisions = dialogResult.Decisions;
+        }
+
+        IReadOnlyList<FileConflictResolvedItem> resolvedOperations = FileConflictPlanner.Resolve(
+            analysis,
+            decisions,
+            path => File.Exists(path) || Directory.Exists(path),
+            StringComparer.OrdinalIgnoreCase);
+
+        int rootStartIndex = 0;
+        foreach ((string sourcePath, IReadOnlyList<LocalPasteOp> rootOperations) in plannedRoots)
+        {
+            int currentRootStartIndex = rootStartIndex;
+            rootStartIndex += rootOperations.Count;
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    for (int localIndex = 0; localIndex < rootOperations.Count; localIndex++)
+                    {
+                        int operationIndex = currentRootStartIndex + localIndex;
+                        LocalPasteOp operation = rootOperations[localIndex];
+                        FileConflictResolvedItem resolved = resolvedOperations[operationIndex];
+                        if (resolved.Action == FileConflictEffectiveAction.Skip)
+                        {
+                            continue;
+                        }
+
+                        switch (operation.Kind)
+                        {
+                            case LocalPasteOpKind.CreateDirectory:
+                                Directory.CreateDirectory(resolved.EffectiveTargetPath);
+                                break;
+                            case LocalPasteOpKind.CopyFile:
+                                bool overwrite = ShouldOverwriteOnCopy(
+                                    analysis[operationIndex],
+                                    resolved.Action);
+                                File.Copy(
+                                    operation.SourcePath,
+                                    resolved.EffectiveTargetPath,
+                                    overwrite);
+                                break;
+                            default:
+                                throw new ArgumentOutOfRangeException(
+                                    nameof(rootOperations),
+                                    operation.Kind,
+                                    "Unknown paste operation.");
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                string errorMessage = string.Format(
+                    L10n("FileBrowserPasteError"),
+                    Path.GetFileName(sourcePath),
+                    ex.Message);
                 dialogService.ShowError(title, errorMessage);
             }
         }
@@ -697,33 +836,6 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         }
 
         return builder.ToString();
-    }
-
-    private static void CopyDirectoryRecursive(string sourceDir, string destDir, int depth = 0)
-    {
-        if (depth >= MaxCopyDepth)
-        {
-            throw new IOException($"Directory copy aborted: nesting exceeds {MaxCopyDepth} levels (possible junction loop).");
-        }
-
-        Directory.CreateDirectory(destDir);
-
-        foreach (string file in Directory.EnumerateFiles(sourceDir))
-        {
-            string destFile = Path.Combine(destDir, Path.GetFileName(file));
-            File.Copy(file, destFile, overwrite: true);
-        }
-
-        foreach (string dir in Directory.EnumerateDirectories(sourceDir))
-        {
-            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0)
-            {
-                continue;
-            }
-
-            string destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
-            CopyDirectoryRecursive(dir, destSubDir, depth + 1);
-        }
     }
 
     private bool TryGetDialogService(out IDialogService dialogService)
