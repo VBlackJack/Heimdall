@@ -857,11 +857,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         CancellationToken ct = transferCts.Token;
         TransferProgressValue = 0;
+        bool refreshAfterTransfer = true;
 
         try
         {
-            await UploadPlannedEntriesAsync(localPaths, targetRemoteDir, ct);
-            UpdateStatus(_localizer?["SftpStatusTransferComplete"] ?? "Transfer complete");
+            bool completed = await UploadPlannedEntriesAsync(localPaths, targetRemoteDir, ct);
+            refreshAfterTransfer = completed;
+            UpdateStatus(completed
+                ? _localizer?["SftpStatusTransferComplete"] ?? "Transfer complete"
+                : _localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
         }
         catch (OperationCanceledException)
         {
@@ -876,7 +880,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         finally
         {
             CompleteTransfer(transferCts);
-            _ = Refresh();
+            if (refreshAfterTransfer)
+            {
+                _ = Refresh();
+            }
         }
     }
 
@@ -885,17 +892,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// ordered operations against the (decorated, journaling) browser: <c>CreateDirectoryAsync</c> for
     /// each directory and <c>UploadFileAsync</c> for each file, keeping the sudo permission fallback.
     /// </summary>
-    private async Task UploadPlannedEntriesAsync(
+    private async Task<bool> UploadPlannedEntriesAsync(
         IReadOnlyList<string> localPaths,
         string targetRemoteDir,
         CancellationToken ct)
     {
         if (_browser is null)
         {
-            return;
+            return false;
         }
 
-        var roots = new List<LocalUploadEntry>(localPaths.Count);
+        List<LocalUploadEntry> roots = new(localPaths.Count);
         foreach (string path in localPaths)
         {
             bool isDirectory = Directory.Exists(path);
@@ -910,44 +917,91 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (roots.Count == 0)
         {
-            return;
+            return true;
         }
 
         IReadOnlyList<RemoteUploadOp> ops =
             RemoteUploadTreePlanner.Plan(roots, targetRemoteDir, EnumerateLocalChildren);
+        RemoteUploadConflictInventory inventory = await BuildRemoteUploadConflictInventoryAsync(
+            _browser,
+            ops,
+            ct);
+        IReadOnlyList<FileConflictAnalysisItem> conflictAnalysis = FileConflictPlanner.Analyze(
+            ops.Select(op => new FileConflictPlanItem(
+                op.LocalPath,
+                op.RemotePath,
+                op.Kind == RemoteUploadOpKind.MakeDirectory
+                    ? FileConflictItemKind.Directory
+                    : FileConflictItemKind.File))
+                .ToList(),
+            inventory.GetTargetKind,
+            StringComparer.Ordinal);
+        IReadOnlyList<FileConflictAnalysisItem> conflicts = conflictAnalysis
+            .Where(item => item.HasConflict)
+            .ToList();
 
-        int totalFiles = ops.Count(op => op.Kind == RemoteUploadOpKind.UploadFile);
+        IReadOnlyList<FileConflictDecision> decisions = [];
+        if (conflicts.Count > 0)
+        {
+            FileConflictDialogViewModel dialogViewModel = new(conflicts, _localizer);
+            FileConflictDialogResult? dialogResult = await _fileConflictDialogPresenter
+                .ShowAsync(dialogViewModel);
+            if (dialogResult is null)
+            {
+                return false;
+            }
+
+            decisions = dialogResult.Decisions;
+        }
+
+        IReadOnlyList<FileConflictResolvedItem> resolvedOps = FileConflictPlanner.Resolve(
+            conflictAnalysis,
+            decisions,
+            inventory.TargetExists,
+            StringComparer.Ordinal);
+
+        int totalFiles = resolvedOps.Count(item =>
+            item.Action != FileConflictEffectiveAction.Skip
+            && ops[item.Index].Kind == RemoteUploadOpKind.UploadFile);
         int uploadedFiles = 0;
 
-        if (ops.Any(op => op.Kind == RemoteUploadOpKind.MakeDirectory))
+        if (resolvedOps.Any(item =>
+            item.Action != FileConflictEffectiveAction.Skip
+            && ops[item.Index].Kind == RemoteUploadOpKind.MakeDirectory))
         {
             TransferStatusText = _localizer?["SftpStatusUploadingFolder"] ?? "Uploading folder...";
         }
 
-        foreach (RemoteUploadOp op in ops)
+        foreach (FileConflictResolvedItem resolved in resolvedOps)
         {
             ct.ThrowIfCancellationRequested();
+            if (resolved.Action == FileConflictEffectiveAction.Skip)
+            {
+                continue;
+            }
+
+            RemoteUploadOp op = ops[resolved.Index];
 
             if (op.Kind == RemoteUploadOpKind.MakeDirectory)
             {
                 try
                 {
-                    await _browser.CreateDirectoryAsync(op.RemotePath, ct);
+                    await _browser.CreateDirectoryAsync(resolved.EffectiveTargetPath, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     // mkdir fails either because the directory already exists (re-dropping into an
                     // existing tree, which must MERGE) or for a real reason (permission, quota). The
                     // transports expose no typed already-exists error - SSH.NET raises SftpException
-                    // with the generic message "Failure" - so probe the remote: tolerate only when the
-                    // directory actually exists, otherwise propagate the genuine failure.
-                    if (!await RemoteDirectoryExistsAsync(op.RemotePath, ct))
+                    // with the generic message "Failure" - so consult the pre-transfer inventory:
+                    // tolerate only a directory that was already known to exist.
+                    if (!inventory.DirectoryExists(resolved.EffectiveTargetPath))
                     {
                         throw;
                     }
 
                     Core.Logging.FileLogger.Info(
-                        $"EmbeddedSFTP upload merge: remote directory already exists, continuing: {op.RemotePath}");
+                        $"EmbeddedSFTP upload merge: remote directory already exists, continuing: {resolved.EffectiveTargetPath}");
                 }
 
                 continue;
@@ -961,22 +1015,101 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             try
             {
-                await _browser.UploadFileAsync(op.LocalPath, op.RemotePath, ct);
+                await _browser.UploadFileAsync(op.LocalPath, resolved.EffectiveTargetPath, ct);
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
-                await UploadViaSudoAsync(op.LocalPath, op.RemotePath, ct);
+                await UploadViaSudoAsync(op.LocalPath, resolved.EffectiveTargetPath, ct);
             }
         }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Lists each distinct planned parent once and materializes all remote conflict probes in memory.
+    /// </summary>
+    internal static async Task<RemoteUploadConflictInventory> BuildRemoteUploadConflictInventoryAsync(
+        IRemoteBrowser browser,
+        IReadOnlyList<RemoteUploadOp> ops,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(browser);
+        ArgumentNullException.ThrowIfNull(ops);
+
+        Dictionary<string, FileConflictItemKind> targetKinds = new(StringComparer.Ordinal);
+        HashSet<string> existingDirectories = new(StringComparer.Ordinal);
+        IEnumerable<string> parentDirectories = ops
+            .Select(op => GetParentPath(op.RemotePath))
+            .Distinct(StringComparer.Ordinal);
+
+        foreach (string parentDirectory in parentDirectories)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                IReadOnlyList<SftpFileInfo> entries = await browser
+                    .ListDirectoryAsync(parentDirectory, ct)
+                    .ConfigureAwait(false);
+                existingDirectories.Add(parentDirectory);
+
+                foreach (SftpFileInfo entry in entries)
+                {
+                    string targetPath = CombineRemotePath(parentDirectory, entry.Name);
+                    targetKinds[targetPath] = entry.IsDirectory
+                        ? FileConflictItemKind.Directory
+                        : FileConflictItemKind.File;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or SftpPathNotFoundException)
+            {
+                // A missing planned parent has no existing children and therefore no conflicts.
+            }
+        }
+
+        return new RemoteUploadConflictInventory(targetKinds, existingDirectories);
+    }
+
+    /// <summary>In-memory remote inventory used by upload analysis and execution.</summary>
+    internal sealed class RemoteUploadConflictInventory
+    {
+        private readonly IReadOnlyDictionary<string, FileConflictItemKind> _targetKinds;
+        private readonly IReadOnlySet<string> _existingDirectories;
+
+        internal RemoteUploadConflictInventory(
+            IReadOnlyDictionary<string, FileConflictItemKind> targetKinds,
+            IReadOnlySet<string> existingDirectories)
+        {
+            _targetKinds = targetKinds;
+            _existingDirectories = existingDirectories;
+        }
+
+        internal FileConflictItemKind? GetTargetKind(string targetPath)
+        {
+            if (_targetKinds.TryGetValue(targetPath, out FileConflictItemKind targetKind))
+            {
+                return targetKind;
+            }
+
+            return _existingDirectories.Contains(targetPath)
+                ? FileConflictItemKind.Directory
+                : null;
+        }
+
+        internal bool TargetExists(string targetPath) => GetTargetKind(targetPath) is not null;
+
+        internal bool DirectoryExists(string targetPath)
+            => GetTargetKind(targetPath) == FileConflictItemKind.Directory;
     }
 
     // Reads a local directory's immediate children into planner entries. The impure walk lives here;
     // the planner stays pure and is driven through this delegate.
     private static IReadOnlyList<LocalUploadEntry> EnumerateLocalChildren(string localDirectory)
     {
-        var children = new List<LocalUploadEntry>();
+        List<LocalUploadEntry> children = [];
         foreach (string entry in Directory.EnumerateFileSystemEntries(localDirectory))
         {
             children.Add(ToLocalUploadEntry(entry, Directory.Exists(entry)));

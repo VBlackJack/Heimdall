@@ -139,6 +139,7 @@
   "DialogFileConflictColTarget": "Destination",
   "DialogFileConflictColAction": "Action",
   "DialogFileConflictApply": "Apply",
+  "DialogFileConflictDirectorySkipDetail": "This folder and all of its planned contents will be skipped.",
   "BtnPaste": "Paste",
   "BtnOk": "OK",
   "ErrorSshUserEmpty": "Error: SSH username is required.",

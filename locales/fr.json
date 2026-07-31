@@ -139,6 +139,7 @@
   "DialogFileConflictColTarget": "Destination",
   "DialogFileConflictColAction": "Action",
   "DialogFileConflictApply": "Appliquer",
+  "DialogFileConflictDirectorySkipDetail": "Ce dossier et tout son contenu planifi\u00e9 seront ignor\u00e9s.",
   "BtnPaste": "Coller",
   "BtnOk": "OK",
   "ErrorSshUserEmpty": "Erreur : L'identifiant SSH est requis.",

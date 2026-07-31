@@ -66,6 +66,7 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
         ActionColumnHeader = L("DialogFileConflictColAction");
         ApplyText = L("DialogFileConflictApply");
         CancelText = L("BtnCancel");
+        DirectorySkipDetailText = L("DialogFileConflictDirectorySkipDetail");
 
         ConflictOptions =
         [
@@ -81,7 +82,10 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
         ];
 
         Rows = new ObservableCollection<FileConflictRowViewModel>(
-            conflicts.Select(item => new FileConflictRowViewModel(item)));
+            conflicts.Select(item => new FileConflictRowViewModel(
+                item,
+                ConflictOptions,
+                DirectorySkipDetailText)));
     }
 
     public event Action<bool>? CloseRequested;
@@ -108,6 +112,8 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
 
     public string CancelText { get; }
 
+    public string DirectorySkipDetailText { get; }
+
     public IReadOnlyList<FileConflictResolutionOption> ConflictOptions { get; }
 
     public ObservableCollection<FileConflictRowViewModel> Rows { get; }
@@ -126,6 +132,11 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
     [RelayCommand]
     private void Apply()
     {
+        if (Rows.Any(row => !row.Allows(row.Resolution)))
+        {
+            throw new InvalidOperationException("A conflict row contains a forbidden resolution.");
+        }
+
         Result = new FileConflictDialogResult(
             Rows.Select(row => new FileConflictDecision(row.ItemIndex, row.Resolution)).ToList());
         CloseRequested?.Invoke(true);
@@ -142,7 +153,10 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
     {
         foreach (FileConflictRowViewModel row in Rows)
         {
-            row.Resolution = resolution;
+            if (row.Allows(resolution))
+            {
+                row.Resolution = resolution;
+            }
         }
     }
 }
@@ -150,12 +164,32 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
 /// <summary>One colliding destination displayed in the batch dialog.</summary>
 public sealed partial class FileConflictRowViewModel : ObservableObject
 {
-    internal FileConflictRowViewModel(FileConflictAnalysisItem item)
+    internal FileConflictRowViewModel(
+        FileConflictAnalysisItem item,
+        IReadOnlyList<FileConflictResolutionOption> allOptions,
+        string directorySkipDetailText)
     {
         ItemIndex = item.Index;
         SourceIdentity = item.SourceIdentity;
         TargetPath = item.TargetPath;
-        Resolution = FileConflictResolutionChoice.AutoRename;
+        ConflictOptions = allOptions
+            .Where(option => Allows(item.AllowedActions, option.Value))
+            .ToList();
+        if (ConflictOptions.Count == 0)
+        {
+            throw new ArgumentException(
+                $"Conflicting item {item.Index} has no allowed resolution.",
+                nameof(item));
+        }
+
+        Resolution = ConflictOptions.Any(
+            option => option.Value == FileConflictResolutionChoice.AutoRename)
+            ? FileConflictResolutionChoice.AutoRename
+            : ConflictOptions[0].Value;
+        DetailText = item.PlannedKind == FileConflictItemKind.Directory
+            && item.AllowedActions == FileConflictResolutionActions.Skip
+                ? directorySkipDetailText
+                : string.Empty;
     }
 
     public int ItemIndex { get; }
@@ -163,6 +197,30 @@ public sealed partial class FileConflictRowViewModel : ObservableObject
     public string SourceIdentity { get; }
 
     public string TargetPath { get; }
+
+    public IReadOnlyList<FileConflictResolutionOption> ConflictOptions { get; }
+
+    public string DetailText { get; }
+
+    public bool HasDetail => !string.IsNullOrEmpty(DetailText);
+
+    internal bool Allows(FileConflictResolutionChoice resolution)
+        => ConflictOptions.Any(option => option.Value == resolution);
+
+    private static bool Allows(
+        FileConflictResolutionActions allowedActions,
+        FileConflictResolutionChoice resolution)
+    {
+        FileConflictResolutionActions action = resolution switch
+        {
+            FileConflictResolutionChoice.Skip => FileConflictResolutionActions.Skip,
+            FileConflictResolutionChoice.Replace => FileConflictResolutionActions.Replace,
+            FileConflictResolutionChoice.AutoRename => FileConflictResolutionActions.AutoRename,
+            _ => throw new ArgumentOutOfRangeException(nameof(resolution)),
+        };
+
+        return (allowedActions & action) == action;
+    }
 
     [ObservableProperty]
     private FileConflictResolutionChoice _resolution;

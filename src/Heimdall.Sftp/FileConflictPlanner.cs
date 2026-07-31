@@ -16,21 +16,61 @@
 
 namespace Heimdall.Sftp;
 
+/// <summary>The kind of destination represented by a conflict-planning item.</summary>
+public enum FileConflictItemKind
+{
+    /// <summary>A file destination.</summary>
+    File,
+
+    /// <summary>A directory destination.</summary>
+    Directory,
+}
+
+/// <summary>The conflict resolutions that may be selected for an analyzed item.</summary>
+[Flags]
+public enum FileConflictResolutionActions
+{
+    /// <summary>No resolution is applicable.</summary>
+    None = 0,
+
+    /// <summary>The item may be skipped.</summary>
+    Skip = 1,
+
+    /// <summary>The existing destination may be replaced.</summary>
+    Replace = 2,
+
+    /// <summary>The item may be transferred under a derived free name.</summary>
+    AutoRename = 4,
+
+    /// <summary>Every file-conflict resolution is available.</summary>
+    All = Skip | Replace | AutoRename,
+}
+
 /// <summary>A source item and its intended destination before conflict resolution.</summary>
 /// <param name="SourceIdentity">Stable identity used by the transfer caller.</param>
 /// <param name="TargetPath">Intended destination path.</param>
-public sealed record FileConflictPlanItem(string SourceIdentity, string TargetPath);
+/// <param name="Kind">Destination kind; defaults to file for download compatibility.</param>
+public sealed record FileConflictPlanItem(
+    string SourceIdentity,
+    string TargetPath,
+    FileConflictItemKind Kind = FileConflictItemKind.File);
 
 /// <summary>A planned item annotated with its pre-transfer conflict state.</summary>
 /// <param name="Index">Zero-based position in the original ordered batch.</param>
 /// <param name="SourceIdentity">Stable identity used by the transfer caller.</param>
 /// <param name="TargetPath">Intended destination path.</param>
 /// <param name="HasConflict">Whether the target exists or duplicates an earlier batch target.</param>
+/// <param name="PlannedKind">Kind of the planned destination.</param>
+/// <param name="ExistingTargetKind">Kind already occupying the target, or null when absent.</param>
+/// <param name="AllowedActions">Resolutions permitted by the kind matrix.</param>
 public sealed record FileConflictAnalysisItem(
     int Index,
     string SourceIdentity,
     string TargetPath,
-    bool HasConflict);
+    bool HasConflict,
+    FileConflictItemKind PlannedKind = FileConflictItemKind.File,
+    FileConflictItemKind? ExistingTargetKind = null,
+    FileConflictResolutionActions AllowedActions = FileConflictResolutionActions.All);
 
 /// <summary>The user-selectable resolution for an item whose destination collides.</summary>
 public enum FileConflictResolutionChoice
@@ -90,12 +130,30 @@ public static class FileConflictPlanner
         Func<string, bool> targetExists,
         StringComparer pathComparer)
     {
-        ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(targetExists);
+
+        return Analyze(
+            items,
+            targetPath => targetExists(targetPath)
+                ? FileConflictItemKind.File
+                : (FileConflictItemKind?)null,
+            pathComparer);
+    }
+
+    /// <summary>
+    /// Detects external and intra-batch collisions while preserving the kind of each destination.
+    /// </summary>
+    public static IReadOnlyList<FileConflictAnalysisItem> Analyze(
+        IReadOnlyList<FileConflictPlanItem> items,
+        Func<string, FileConflictItemKind?> getExistingTargetKind,
+        StringComparer pathComparer)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(getExistingTargetKind);
         ArgumentNullException.ThrowIfNull(pathComparer);
 
-        var claimedTargets = new HashSet<string>(pathComparer);
-        var analysis = new List<FileConflictAnalysisItem>(items.Count);
+        Dictionary<string, FileConflictItemKind> claimedTargets = new(pathComparer);
+        List<FileConflictAnalysisItem> analysis = new(items.Count);
 
         for (int index = 0; index < items.Count; index++)
         {
@@ -103,13 +161,36 @@ public static class FileConflictPlanner
             ArgumentException.ThrowIfNullOrWhiteSpace(item.SourceIdentity);
             ArgumentException.ThrowIfNullOrWhiteSpace(item.TargetPath);
 
-            bool alreadyClaimed = !claimedTargets.Add(item.TargetPath);
-            bool hasConflict = alreadyClaimed || targetExists(item.TargetPath);
+            FileConflictItemKind? externalKind = getExistingTargetKind(item.TargetPath);
+            bool hasClaimedTarget = claimedTargets.TryGetValue(
+                item.TargetPath,
+                out FileConflictItemKind claimedKind);
+            FileConflictResolutionActions allowedActions = FileConflictResolutionActions.All;
+            FileConflictItemKind? collisionKind = null;
+            bool hasConflict = false;
+
+            ApplyKindCollision(
+                item.Kind,
+                externalKind,
+                ref hasConflict,
+                ref allowedActions,
+                ref collisionKind);
+            ApplyKindCollision(
+                item.Kind,
+                hasClaimedTarget ? claimedKind : null,
+                ref hasConflict,
+                ref allowedActions,
+                ref collisionKind);
+
+            claimedTargets.TryAdd(item.TargetPath, item.Kind);
             analysis.Add(new FileConflictAnalysisItem(
                 index,
                 item.SourceIdentity,
                 item.TargetPath,
-                hasConflict));
+                hasConflict,
+                item.Kind,
+                collisionKind ?? externalKind ?? (hasClaimedTarget ? claimedKind : null),
+                hasConflict ? allowedActions : FileConflictResolutionActions.None));
         }
 
         return analysis;
@@ -132,13 +213,48 @@ public static class FileConflictPlanner
         Dictionary<int, FileConflictResolutionChoice> choices = decisions.ToDictionary(
             decision => decision.ItemIndex,
             decision => decision.Choice);
-        var reservedTargets = new HashSet<string>(
+        HashSet<string> reservedTargets = new(
             analysis.Select(item => item.TargetPath),
             pathComparer);
-        var resolved = new List<FileConflictResolvedItem>(analysis.Count);
+        List<FileConflictResolvedItem> resolved = new(analysis.Count);
+        List<IReadOnlyList<string>> skippedDirectorySegments = [];
+
+        foreach (FileConflictDecision decision in decisions)
+        {
+            FileConflictAnalysisItem? item = analysis.FirstOrDefault(
+                candidate => candidate.Index == decision.ItemIndex);
+            if (item is null || !item.HasConflict)
+            {
+                throw new ArgumentException(
+                    $"Decision targets a non-conflicting or unknown item {decision.ItemIndex}.",
+                    nameof(decisions));
+            }
+
+            if (!Allows(item.AllowedActions, decision.Choice))
+            {
+                throw new ArgumentException(
+                    $"Resolution '{decision.Choice}' is not allowed for conflicting item {item.Index}.",
+                    nameof(decisions));
+            }
+
+            if (item.PlannedKind == FileConflictItemKind.Directory
+                && decision.Choice == FileConflictResolutionChoice.Skip)
+            {
+                skippedDirectorySegments.Add(GetPathSegments(item.TargetPath));
+            }
+        }
 
         foreach (FileConflictAnalysisItem item in analysis)
         {
+            if (IsDescendantOfSkippedDirectory(
+                item.TargetPath,
+                skippedDirectorySegments,
+                pathComparer))
+            {
+                resolved.Add(ToResolved(item, item.TargetPath, FileConflictEffectiveAction.Skip));
+                continue;
+            }
+
             if (!item.HasConflict)
             {
                 resolved.Add(ToResolved(item, item.TargetPath, FileConflictEffectiveAction.Proceed));
@@ -178,6 +294,97 @@ public static class FileConflictPlanner
 
         return resolved;
     }
+
+    private static void ApplyKindCollision(
+        FileConflictItemKind plannedKind,
+        FileConflictItemKind? existingKind,
+        ref bool hasConflict,
+        ref FileConflictResolutionActions allowedActions,
+        ref FileConflictItemKind? collisionKind)
+    {
+        if (existingKind is null)
+        {
+            return;
+        }
+
+        FileConflictResolutionActions actions = GetAllowedActions(plannedKind, existingKind.Value);
+        if (actions == FileConflictResolutionActions.None)
+        {
+            return;
+        }
+
+        hasConflict = true;
+        allowedActions &= actions;
+        collisionKind ??= existingKind;
+    }
+
+    private static FileConflictResolutionActions GetAllowedActions(
+        FileConflictItemKind plannedKind,
+        FileConflictItemKind existingKind)
+        => (plannedKind, existingKind) switch
+        {
+            (FileConflictItemKind.File, FileConflictItemKind.File) =>
+                FileConflictResolutionActions.All,
+            (FileConflictItemKind.Directory, FileConflictItemKind.Directory) =>
+                FileConflictResolutionActions.None,
+            (FileConflictItemKind.File, FileConflictItemKind.Directory) =>
+                FileConflictResolutionActions.Skip | FileConflictResolutionActions.AutoRename,
+            (FileConflictItemKind.Directory, FileConflictItemKind.File) =>
+                FileConflictResolutionActions.Skip,
+            _ => throw new ArgumentOutOfRangeException(nameof(existingKind)),
+        };
+
+    private static bool Allows(
+        FileConflictResolutionActions allowedActions,
+        FileConflictResolutionChoice choice)
+    {
+        FileConflictResolutionActions requestedAction = choice switch
+        {
+            FileConflictResolutionChoice.Skip => FileConflictResolutionActions.Skip,
+            FileConflictResolutionChoice.Replace => FileConflictResolutionActions.Replace,
+            FileConflictResolutionChoice.AutoRename => FileConflictResolutionActions.AutoRename,
+            _ => throw new ArgumentOutOfRangeException(nameof(choice), choice, "Unknown conflict resolution."),
+        };
+
+        return (allowedActions & requestedAction) == requestedAction;
+    }
+
+    private static bool IsDescendantOfSkippedDirectory(
+        string targetPath,
+        IReadOnlyList<IReadOnlyList<string>> skippedDirectorySegments,
+        StringComparer pathComparer)
+    {
+        IReadOnlyList<string> targetSegments = GetPathSegments(targetPath);
+        foreach (IReadOnlyList<string> directorySegments in skippedDirectorySegments)
+        {
+            if (targetSegments.Count <= directorySegments.Count)
+            {
+                continue;
+            }
+
+            bool segmentsMatch = true;
+            for (int index = 0; index < directorySegments.Count; index++)
+            {
+                if (!pathComparer.Equals(targetSegments[index], directorySegments[index]))
+                {
+                    segmentsMatch = false;
+                    break;
+                }
+            }
+
+            if (segmentsMatch)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IReadOnlyList<string> GetPathSegments(string path)
+        => path
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
 
     private static FileConflictResolvedItem ToResolved(
         FileConflictAnalysisItem item,
