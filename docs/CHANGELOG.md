@@ -12,6 +12,247 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-07-31: Tier 1 of the audit campaign - the product stops promising what it does not do (v2026.073101)
+
+The first tier of the audit campaign opened on 2026-07-28. That campaign produced 151
+findings across six protocol and UX audits, regrouped by common cause into 19
+workstreams. Tier 1 is `C1` (trust), `C2` (dead settings) and `C13` (per-protocol
+capabilities): the three whose defects the user meets daily, and the three that make the
+interface state things the product does not do. **21 findings closed, 10 of the 37 P1
+addressed, 2 removed by product decision.**
+
+### Dead settings (C2)
+
+- **Four settings were loaded, validated, persisted and never read.**
+  `MaxEmbeddedSessions`, `TunnelEstablishmentDelayMs`, `RdpAutoReconnectMaxAttempts` and
+  the embedded RDP watchdog timeout each had a full round trip through
+  `AppSettings`, `SettingsViewModel`, `MigrationService` and in some cases
+  `SchemaValidator`, with no consumer at the point of use. They are now applied at
+  `SessionCoordinator.cs:595,707`, `TunnelService.cs:341` and
+  `EmbeddedRdpView.xaml.cs:1534`. The legacy `EmbeddedRdpTimeoutMs` key survives only as
+  a migration mapping onto `RdpConnectWatchdogTimeoutMs` (`MigrationService.cs:217`), so
+  an existing configuration keeps its value (`9a5145f8`, RDP-008, RDP-009, UXG-002,
+  UXG-003).
+- The RDP resolution preset editor bound to `Settings.RdpResolutionPresetItems`, a
+  collection that did not exist - the inner `TextBox` elements bound to items of nothing.
+  Replaced by a real multi-line `RdpResolutionPresetsText` property with a reset command
+  (`9a5145f8`, RDP-007).
+- `ApplyRdpDefaults` omitted `RdpResolutionPresets`, `RdpDialogAdvancedDefault`,
+  `RdpResizeEnableDelayMs`, `RdpArtifactCleanupDelayMs` and
+  `RdpCredentialAutofillTimeoutMs` while its confirmation promised to restore all
+  RDP-related defaults. Completed (`9a5145f8`, RDP-025).
+- **`RequireCredentialGuard` stated a compliance guarantee and enforced nothing.** The
+  symbol existed at six sites - declaration, property, load, save, migration, binding -
+  and had no consumer on any connection path. An administrator could believe connections
+  were blocked while they went through. Now checked before an embedded RDP session opens
+  (`bf990e5a`, UXG-001).
+- The transport option labelled as forcing TCP was reworded. Its documented intent is to
+  prevent the UDP probe that times out behind a firewall, which it does achieve by
+  disabling bandwidth detection and setting an explicit connection type
+  (`RdpActiveXHost.cs:1866-1871`); the label promised more than the workaround delivers.
+  Requalified from P1 to P3 on disk evidence, and fixed as a wording defect (RDP-004).
+
+### Trust (C1)
+
+- **Removing a trusted host key was never persisted.** The view dropped its row and the
+  service raised `EntryRemoved`, but nothing subscribed: neither `TrustedHostKeys` nor
+  `TrustedHostKeysV2` was ever written. The key came back on restart, so a trust decision
+  could not be revoked from the interface (`8cfb3771`, SSH-019).
+- **A pinned FTPS certificate short-circuited every non-overridable check.** When a
+  fingerprint was already stored and matched, `FtpBrowser` refreshed `LastSeen` and
+  returned true **without ever consulting `policyErrors`** - an expired, revoked or
+  wrongly-purposed certificate was accepted on the strength of having once been approved.
+  Pinned paths now run `EnsurePinnedCertificateRemainsValid` with the policy errors in
+  hand (`8cfb3771`, SFTP-002).
+- `RefreshLastSeen` mutated the store in memory without raising the event the application
+  persists on, so the timestamp reverted on restart. Both the SSH and the FTPS side are
+  fixed together: they were exact twins, and fixing one alone would have been incoherent
+  (`8cfb3771`, SFTP-029, SSH-027 - the latter absorbed from C17, explicitly and not
+  silently).
+- **Concurrent trust prompts were neither serialized nor deduplicated.** Each host-key
+  and each FTPS certificate request scheduled its own `ShowDialog` through the dispatcher
+  with the main window as owner; WPF modality opens a nested dispatcher loop and is not
+  an application queue. Launching several connections to unknown hosts could stack or
+  nest dialogs with no clear indication of which tab was asking, so a user could approve
+  the wrong fingerprint during a batch launch. `TrustPromptCoordinator` now holds a
+  single prompt slot and coalesces by trust kind, host, port and presented fingerprint
+  (`1cd861e9`, UXG-015).
+- **The FTPS data-channel limitation is declared rather than hidden.** FluentFTP 54.2.0
+  installs an unconditional certificate-acceptance handler on the data channel
+  (`FtpDataStream.cs:216-232`, comment *"always accept certificate no matter what"*), and
+  the same handler is present on current upstream. No `FtpConfig` option targets it, and
+  supplying a second callback through `ConfigureAuthentication` is rejected by .NET
+  because `SslStream` is already constructed with FluentFTP's. The limitation cannot be
+  fixed inside Heimdall, so it is now written into `docs/SECURITY.md` and surfaced during
+  an active FTPS session through `WarnFtpsDataChannelIdentityBadge`. Replacing the
+  transport, swapping the library and dropping FTPS were all considered and rejected: the
+  campaign exists to remove false promises, and creating one by omission would have been
+  incoherent (`8cfb3771`, SFTP-001).
+
+### Per-protocol capabilities (C13)
+
+- **Bulk credential editing wrote into fields the target type does not own.** The
+  `default:` branch of `SetEditableUsername` wrote to `dto.RdpUsername` and that of
+  `SetEditablePassword` to `RdpPasswordEncrypted` - not inert, but RDP. Since a tool
+  context pre-fills from `SshUsername ?? RdpUsername`, dirtying `RdpUsername` on a tool
+  node changed that tool's behaviour. A neighbouring asymmetry surfaced at the same time:
+  `SetEditablePort` and `SetEditablePassword` had a `VNC` case and `SetEditableUsername`
+  did not, so a VNC profile sent its password to `VncPassword` and its username to
+  `RdpUsername`. Split into two independent proofs - the menu only offers compatible
+  types, and the write boundary refuses the rest, now as `TrySetEditableUsername` and
+  `TrySetEditablePassword` returning false (`8e2d5d8a`, TREE-002).
+- Telnet username and password fields were offered, persisted and encrypted while no code
+  path transmits them. `TelnetSession.StartAsync(string executable, string arguments, …)`
+  ignores both parameters by contract - they were never credentials at all. The profile
+  logic stops promising them and the inputs are removed with their last consumers
+  (`e0e87cc8`, `1fd82774`).
+- Citrix claimed ownership of the RDP credential fields, though none of its three launch
+  modes - SelfServiceCache, ICA and StoreFront - reads them (`0bcf120c`).
+- The authentication badge described the DTO's fields while claiming to describe the
+  mechanism the connection would use, which was wrong on five protocols at once. It now
+  describes what it actually knows: the credentials on file (`67060c6a`).
+- `FtpBrowser.ChmodAsync` returned `Task.CompletedTask` with the comment *"FTP does not
+  natively support chmod; this is a no-op"*, and the caller reported success. It now
+  throws `NotSupportedException` and the caller surfaces `SftpChmodNotSupported`
+  (`17d210c2`, SFTP-019).
+- The shared terminal view exposed Elevate and Health to WinRM sessions, where Elevate
+  has no subscriber anywhere in the repository and Health can only query an SSH client.
+  Both are withdrawn on that protocol (`5f542c30`, WINRM-020).
+- Detach was offered on any non-split tab without checking for a host, so detaching an
+  external-application tab opened a window with a header and no content (`c5c92a81`,
+  UXG-021).
+- The inverse case: rename was reachable with F2 but absent from the tool context menu,
+  making an existing and valid action undiscoverable precisely on TOOL nodes
+  (`de334914`, TREE-020).
+
+### Removed by decision, not by fix
+
+- `SSH-002` (X11) and `SSH-020` (compression) have no consumer on the embedded path. They
+  are recorded as product decisions rather than counted as closed defects.
+
+### Test suite
+
+- **A test-isolation hole was closed, and its scope is deliberately narrow.**
+  `CredentialProtector` holds process-wide static vault state read by `Protect` and
+  `Unprotect`. `CredentialProtectorAppCollection` serializes its own members but runs
+  concurrently with other collections, so a test class outside it could observe the vault
+  flag set with no data encryption key and fail with `VaultLockedException`. The fourteen
+  App.Tests classes that invoke a **direct** reader now carry the collection attribute.
+  Transitive readers reaching that state through `ToolGatewayConnector.Connect` or
+  `ConnectionHelpers.DecryptPassword` are not covered: the call closure reaches 18 direct
+  members and 43 at the second level, and chasing it would have serialized a
+  disproportionate share of the suite (`1601e8df`).
+- Terminal wait timeouts now report what the session actually observed instead of an
+  identical assertion failure (`8efca829`).
+
+## 2026-07-28: Localization integrity, dead commands, and design-system naming (v2026.072801)
+
+A corrective release. Everything here removes something the interface stated but did not
+deliver: a label that was never rendered, buttons whose click did nothing, and a style
+name that claimed a scope it never had. No feature work.
+
+### Localization
+
+- **A menu key was declared twice in both locale files.** `TreeCtxRename` appeared at
+  lines 715 and 729 of `en.json` and `fr.json`. `LocalizationManager.LoadAsync`
+  deserializes into a `Dictionary<string, string>`, so System.Text.Json goes through the
+  indexer and the **last occurrence wins** - proven empirically, not assumed. One of the
+  two labels was dead and invisible. The CI parity check could not see it: it compares
+  unique keys, so it honestly reported zero difference. Closed by removing the duplicate
+  and by `LocaleDuplicateKeyGuardTests`, which scans with `Utf8JsonReader` instead of a
+  dictionary and fails naming the file, the key and every line number (`36803eb9`,
+  BL-0058).
+- Double-encoded emoji in locale values are repaired, and the mojibake guard no longer
+  lets that encoding through (`73dc93c7`).
+
+### Dead commands
+
+- **Two dead clicks, out of a strictly measured population of 400.** The audit counted
+  79 commands carrying a `CanExecute` predicate (the 59 quoted in BL-0050 and BL-0054 was
+  stale by 20) and 403 `Click`-wired buttons, 3 of which also carry `Command`. The
+  backlog premise - a population sweep rather than point fixes - is refuted by that
+  measurement: two cases, two distinct idioms, no common sweep. `BtnEnumerate` consulted
+  `EnumerateCommand.CanExecute` after the click; `BtnBrowseFile` cleared `TxtInput`
+  before consulting it, losing the field and producing no hash (`bcfc490e`, BL-0054).
+- **The twin a button census could not see.** `OnDrop` borrows the same `BeginFileHash`,
+  so drag-and-drop carried the identical defect without being a button. Found by reading
+  the method, closed by the same guard clause (`bcfc490e`, then `bf6910e5` for the drop
+  rejection path, BL-0060).
+
+### Design system
+
+- `ToolbarGhostButtonStyle` is renamed `GhostButtonStyle`: 84 occurrences across 17
+  files, 84 before and 84 after, no setter, trigger or value changed. The rename was
+  risky enough to warrant a guard - a missing `StaticResource` key throws at load, but a
+  missing **`DynamicResource` key does not**: the property keeps its default, the control
+  renders unstyled, and nothing reports it. On 74 `DynamicResource` references, one miss
+  would have been silent. `ButtonStyleResourceResolutionTests` fails when a ghost or
+  quiet key referenced by a view does not resolve in the merged dictionaries
+  (`5a00b673`, BL-0047).
+
+### Test suite
+
+- Accessibility tests now drain the live-region announcement emitted at window
+  initialization before measuring, instead of mixing it with announcements caused by the
+  action under test. Discriminating by announcement text is impossible by construction:
+  the FlaUI callback reads `element.Name` at delivery, not at emission, so a late initial
+  announcement presents under the current name (`bc812733`, BL-0048).
+- Password generator tests no longer share the real preset storage (`3e8fcbf4`).
+- Source-enumerating guards now exclude build output, which contains copies that skew
+  the counts (`d9647b1a`).
+
+## 2026-07-27: Update banner and disabled-button legibility (v2026.072701)
+
+A corrective release on the update banner and on how disabled buttons render. The banner
+defect is the most visible of the three releases documented here: the button that
+installs an update could stay disabled for a whole session.
+
+### Update banner
+
+- **The install button never became enabled after a successful check.**
+  `_availableUpdate` is a plain field, so assigning it in `CheckOnStartupAsync` raised no
+  notification, and CommunityToolkit's `RelayCommand` does not requery through WPF's
+  `CommandManager` either. The banner's primary button kept the `CanExecute=false` state
+  it evaluated at `DataContext` time. Closed by raising `CanExecuteChanged` right after
+  the assignment. The existing view-model test polled `ICommand.CanExecute` directly,
+  which never observes the event and so could not see this; the new test binds a real
+  `Button` the way `MainWindow.xaml` does and asserts `Button.IsEnabled` (`47c53f79`).
+- **That guard was decorative until it was moved.** Tagged `RequiresDesktop`, it only ran
+  in the informational lane at `ci.yml:105`, which is `continue-on-error`: deleting the
+  production `NotifyCanExecuteChanged` call would have left CI green. The trait was
+  unwarranted - the test shows no window and injects no input. Blocking lane goes from 5
+  to 6 UI tests and stays green (`9034e6f3`).
+- Three of the banner's four buttons shared `SecondaryButtonStyle`, including "Skip this
+  version", which persists `UpdateSkippedVersion` and which no UI can undo. A third
+  weight, `QuietButtonStyle`, now carries "Skip this version" and "View release"
+  (`25299448`).
+- The row rendered as Primary, Quiet, Secondary, Quiet - the only bordered button sat
+  between two quiet ones, so the layout contradicted the weights it expressed. Reordered
+  by decreasing weight; since no button carries an explicit `TabIndex`, keyboard tab
+  order now follows that same order, which it did not before (`67688a1f`).
+
+### Themes
+
+- **Disabled buttons repainted their fill instead of dimming.** The disabled triggers of
+  `PrimaryButtonStyle` and `SecondaryButtonStyle` repainted fill and border to a flat
+  surface colour: a disabled primary rendered as a resting secondary stripped of its
+  border, and either button vanished outright against a backdrop of its own repaint
+  colour - contrast measured exactly 1.00 for primary on a card, and for secondary on the
+  window background. Both now dim through the shared `OpacityDisabled` token, as the
+  seventeen other disabled triggers in the file already did, holding a floor of 2.41
+  across every theme, backdrop and accent combination (`042ad6bd`).
+
+### Test suite
+
+- The SFTP teardown test asserted that the disconnect ran on a different managed thread
+  than the caller. Thread identity does not witness that: `DisposeBrowserAsync` queues
+  the teardown with `Task.Run`, the caller returns its thread to the pool the moment it
+  awaits the disconnect-started signal, and the pool is then free to run the queued work
+  on that very thread. The assertion held only while the pool never made that choice, and
+  it eventually did, under full solution load. The surviving
+  `Assert.False(teardown.IsCompleted)` already carries the real contract, and was checked
+  for vacuity. Renamed accordingly (`d8e9e5ca`).
+
 ## 2026-07-26: Build, CI, and test-suite hardening (v2026.072601)
 
 A maintenance release. No new features and no user-visible fixes: the work sits in the
