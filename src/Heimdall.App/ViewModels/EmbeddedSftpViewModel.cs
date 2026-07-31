@@ -22,6 +22,8 @@ using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
+using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.App.Views.Dialogs;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.Utilities;
@@ -67,6 +69,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private readonly Stack<string> _navigationHistory = new();
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IRemoteClipboardService _remoteClipboard;
+    private readonly IFileConflictDialogPresenter _fileConflictDialogPresenter;
     private IRemoteBrowser? _browser;
     // Emits operation records for the SFTP sudo fallbacks (which bypass the decorated browser).
     private SessionOperationEmitter _sudoEmitter = SessionOperationEmitter.Disabled;
@@ -97,9 +100,19 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     public EmbeddedSftpViewModel(
         IUiDispatcher uiDispatcher,
         IRemoteClipboardService remoteClipboard)
+        : this(uiDispatcher, remoteClipboard, new WpfFileConflictDialogPresenter())
+    {
+    }
+
+    internal EmbeddedSftpViewModel(
+        IUiDispatcher uiDispatcher,
+        IRemoteClipboardService remoteClipboard,
+        IFileConflictDialogPresenter fileConflictDialogPresenter)
     {
         _uiDispatcher = uiDispatcher ?? throw new ArgumentNullException(nameof(uiDispatcher));
         _remoteClipboard = remoteClipboard ?? throw new ArgumentNullException(nameof(remoteClipboard));
+        _fileConflictDialogPresenter = fileConflictDialogPresenter
+            ?? throw new ArgumentNullException(nameof(fileConflictDialogPresenter));
         _remoteClipboard.Changed += OnRemoteClipboardChanged;
         Files = [];
         Bookmarks = [];
@@ -1037,6 +1050,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
+            var plannedDownloads = new List<(SftpFileInfo File, string TargetPath, int OriginalIndex)>();
             for (int i = 0; i < files.Count; i++)
             {
                 ct.ThrowIfCancellationRequested();
@@ -1055,19 +1069,62 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     continue;
                 }
 
+                plannedDownloads.Add((file, localPath, i));
+            }
+
+            IReadOnlyList<FileConflictAnalysisItem> conflictAnalysis = FileConflictPlanner.Analyze(
+                plannedDownloads
+                    .Select(item => new FileConflictPlanItem(item.File.FullPath, item.TargetPath))
+                    .ToList(),
+                File.Exists,
+                StringComparer.OrdinalIgnoreCase);
+            IReadOnlyList<FileConflictAnalysisItem> conflicts = conflictAnalysis
+                .Where(item => item.HasConflict)
+                .ToList();
+
+            IReadOnlyList<FileConflictDecision> decisions = [];
+            if (conflicts.Count > 0)
+            {
+                var dialogViewModel = new FileConflictDialogViewModel(conflicts, _localizer);
+                FileConflictDialogResult? dialogResult = await _fileConflictDialogPresenter
+                    .ShowAsync(dialogViewModel);
+                if (dialogResult is null)
+                {
+                    UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+                    return;
+                }
+
+                decisions = dialogResult.Decisions;
+            }
+
+            IReadOnlyList<FileConflictResolvedItem> resolvedDownloads = FileConflictPlanner.Resolve(
+                conflictAnalysis,
+                decisions,
+                File.Exists,
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (FileConflictResolvedItem resolved in resolvedDownloads)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (resolved.Action is FileConflictEffectiveAction.Skip)
+                {
+                    continue;
+                }
+
+                (SftpFileInfo file, _, int originalIndex) = plannedDownloads[resolved.Index];
                 TransferStatusText = _localizer?.Format(
                     "SftpStatusDownloadingFile", file.Name,
-                    $"{i + 1}/{files.Count}") ?? $"Downloading {file.Name}...";
+                    $"{originalIndex + 1}/{files.Count}") ?? $"Downloading {file.Name}...";
 
                 try
                 {
-                    await browser.DownloadFileAsync(file.FullPath, localPath, ct);
+                    await browser.DownloadFileAsync(file.FullPath, resolved.EffectiveTargetPath, ct);
                 }
                 catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
                 {
                     Core.Logging.FileLogger.Info(
                         $"EmbeddedSFTP download permission denied, falling back to sudo for {file.Name}");
-                    await DownloadViaSudoAsync(file.FullPath, localPath, ct);
+                    await DownloadViaSudoAsync(file.FullPath, resolved.EffectiveTargetPath, ct);
                 }
 
                 downloadedFiles++;
