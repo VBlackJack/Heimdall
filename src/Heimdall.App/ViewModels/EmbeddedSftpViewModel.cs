@@ -70,6 +70,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IRemoteClipboardService _remoteClipboard;
     private readonly IFileConflictDialogPresenter _fileConflictDialogPresenter;
+    private Func<string, CancellationToken, Task<SudoRenameCommandResult>>? _sudoRenameCommandExecutor;
     private IRemoteBrowser? _browser;
     // Emits operation records for the SFTP sudo fallbacks (which bypass the decorated browser).
     private SessionOperationEmitter _sudoEmitter = SessionOperationEmitter.Disabled;
@@ -330,6 +331,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     internal void SetDialogService(IDialogService? dialogService)
     {
         _dialogService = dialogService;
+    }
+
+    /// <summary>Overrides the privileged rename command channel for focused tests.</summary>
+    internal void SetSudoRenameCommandExecutor(
+        Func<string, CancellationToken, Task<SudoRenameCommandResult>> commandExecutor)
+    {
+        _sudoRenameCommandExecutor = commandExecutor
+            ?? throw new ArgumentNullException(nameof(commandExecutor));
     }
 
     /// <summary>
@@ -1687,22 +1696,197 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
                 Core.Logging.FileLogger.Info("EmbeddedSFTP rename permission denied, falling back to sudo");
-                await _sudoEmitter.RunRenameAsync(
-                    file.FullPath,
-                    newPath,
-                    () => RunSudoCommandAsync(
-                        $"mv {PathEscaper.EscapeForShell(file.FullPath)} {PathEscaper.EscapeForShell(newPath)}"),
-                    privileged: true);
+                bool renamed = await RenameEntryViaSudoAsync(file, newPath);
+                if (!renamed)
+                {
+                    return;
+                }
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessRename")));
             await Refresh().ConfigureAwait(false);
+        }
+        catch (SudoRenameCollisionException)
+        {
+            await RunOnUiAsync(() =>
+                SetErrorStatus(L10n("SftpErrorSudoRenameCollision")));
         }
         catch (Exception ex)
         {
             await RunOnUiAsync(() =>
                 SetTransferError(ex));
         }
+    }
+
+    private async Task<bool> RenameEntryViaSudoAsync(SftpFileInfo file, string requestedTargetPath)
+    {
+        FileConflictItemKind? existingKind = await ProbeSudoTargetKindAsync(requestedTargetPath);
+        FileConflictPlanItem[] plannedItems =
+        [
+            new FileConflictPlanItem(
+                file.FullPath,
+                requestedTargetPath,
+                file.IsDirectory ? FileConflictItemKind.Directory : FileConflictItemKind.File),
+        ];
+        IReadOnlyList<FileConflictAnalysisItem> analysis = FileConflictPlanner.Analyze(
+            plannedItems,
+            _ => existingKind,
+            StringComparer.Ordinal,
+            FileConflictPolicy.Rename);
+        IReadOnlyList<FileConflictAnalysisItem> conflicts = analysis
+            .Where(item => item.HasConflict)
+            .ToList();
+        IReadOnlyList<FileConflictDecision> decisions = [];
+
+        if (conflicts.Count > 0)
+        {
+            FileConflictDialogViewModel dialogViewModel = new(conflicts, _localizer);
+            FileConflictDialogResult? dialogResult = await _fileConflictDialogPresenter
+                .ShowAsync(dialogViewModel);
+            if (dialogResult is null)
+            {
+                UpdateStatus(L10n("SftpStatusTransferCancelled"));
+                return false;
+            }
+
+            decisions = dialogResult.Decisions;
+        }
+
+        HashSet<string> occupiedTargets = new(StringComparer.Ordinal);
+        if (existingKind is not null)
+        {
+            occupiedTargets.Add(requestedTargetPath);
+        }
+
+        FileConflictDecision? decision = decisions.FirstOrDefault(item => item.ItemIndex == 0);
+        if (decision?.Choice == FileConflictResolutionChoice.AutoRename)
+        {
+            foreach (string candidate in FileConflictPlanner.EnumerateAutoRenameTargets(requestedTargetPath))
+            {
+                FileConflictItemKind? candidateKind = await ProbeSudoTargetKindAsync(candidate)
+                    .ConfigureAwait(false);
+                if (candidateKind is null)
+                {
+                    break;
+                }
+
+                occupiedTargets.Add(candidate);
+            }
+        }
+
+        IReadOnlyList<FileConflictResolvedItem> resolvedItems = FileConflictPlanner.Resolve(
+            analysis,
+            decisions,
+            occupiedTargets.Contains,
+            StringComparer.Ordinal);
+        FileConflictResolvedItem resolved = resolvedItems.Single();
+        if (resolved.Action == FileConflictEffectiveAction.Skip)
+        {
+            return false;
+        }
+
+        bool replace = decision?.Choice == FileConflictResolutionChoice.Replace;
+        await _sudoEmitter.RunRenameAsync(
+            file.FullPath,
+            resolved.EffectiveTargetPath,
+            () => ExecuteSudoRenameMoveAsync(
+                file.FullPath,
+                resolved.EffectiveTargetPath,
+                replace),
+            privileged: true).ConfigureAwait(false);
+        return true;
+    }
+
+    private async Task<FileConflictItemKind?> ProbeSudoTargetKindAsync(string targetPath)
+    {
+        SudoRenameCommandResult existenceResult = await ExecuteSudoRenameCommandAsync(
+                SudoRenameCommands.BuildExistenceProbe(targetPath),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+        EnsureSudoProbeCompleted(existenceResult, "rename existence probe");
+        if (existenceResult.ExitStatus == 1)
+        {
+            return null;
+        }
+
+        SudoRenameCommandResult directoryResult = await ExecuteSudoRenameCommandAsync(
+                SudoRenameCommands.BuildDirectoryProbe(targetPath),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+        EnsureSudoProbeCompleted(directoryResult, "rename kind probe");
+        return directoryResult.ExitStatus == 0
+            ? FileConflictItemKind.Directory
+            : FileConflictItemKind.File;
+    }
+
+    private async Task ExecuteSudoRenameMoveAsync(
+        string sourcePath,
+        string targetPath,
+        bool replace)
+    {
+        SudoRenameCommandResult moveResult = await ExecuteSudoRenameCommandAsync(
+                SudoRenameCommands.BuildMove(sourcePath, targetPath, replace),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+        EnsureSudoSucceeded(moveResult.ExitStatus, moveResult.StandardError, "rename");
+
+        if (replace)
+        {
+            return;
+        }
+
+        SudoRenameCommandResult sourceResult = await ExecuteSudoRenameCommandAsync(
+                SudoRenameCommands.BuildExistenceProbe(sourcePath),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+        EnsureSudoProbeCompleted(sourceResult, "rename outcome probe");
+        if (sourceResult.ExitStatus == 0)
+        {
+            throw new SudoRenameCollisionException();
+        }
+    }
+
+    private async Task<SudoRenameCommandResult> ExecuteSudoRenameCommandAsync(
+        string privilegedBody,
+        CancellationToken ct)
+    {
+        if (_sudoRenameCommandExecutor is not null)
+        {
+            return await _sudoRenameCommandExecutor(privilegedBody, ct).ConfigureAwait(false);
+        }
+
+        using Renci.SshNet.SshClient ssh = await CreateSudoSshClientAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using Renci.SshNet.SshCommand command = await ExecuteSudoBodyAsync(ssh, privilegedBody, ct)
+                .ConfigureAwait(false);
+            return new SudoRenameCommandResult(
+                command.ExitStatus ?? -1,
+                command.Result ?? string.Empty,
+                command.Error ?? string.Empty);
+        }
+        finally
+        {
+            SafeDisconnect(ssh);
+        }
+    }
+
+    private static void EnsureSudoProbeCompleted(
+        SudoRenameCommandResult result,
+        string operationLabel)
+    {
+        SudoFailureKind failureKind = ClassifySudoStderr(result.StandardError);
+        if (failureKind is SudoFailureKind.PasswordUnavailable or SudoFailureKind.PasswordRejected)
+        {
+            throw new SudoAuthenticationException(failureKind, result.StandardError);
+        }
+
+        if (result.ExitStatus is 0 or 1)
+        {
+            return;
+        }
+
+        EnsureSudoSucceeded(result.ExitStatus, result.StandardError, operationLabel);
     }
 
     /// <summary>
@@ -2277,6 +2461,46 @@ internal enum SudoFailureKind
     None,
     PasswordUnavailable,
     PasswordRejected,
+}
+
+/// <summary>Completed result from the privileged channel used by sudo rename.</summary>
+/// <param name="ExitStatus">Remote process exit status.</param>
+/// <param name="StandardOutput">Remote standard output.</param>
+/// <param name="StandardError">Remote standard error.</param>
+internal sealed record SudoRenameCommandResult(
+    int ExitStatus,
+    string StandardOutput,
+    string StandardError);
+
+/// <summary>Raised when a no-clobber rename exits successfully without moving its source.</summary>
+internal sealed class SudoRenameCollisionException : InvalidOperationException;
+
+internal static class SudoRenameCommands
+{
+    /// <summary>Builds the privileged exact-target existence probe.</summary>
+    internal static string BuildExistenceProbe(string targetPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
+        string escapedPath = PathEscaper.EscapeForShell(targetPath);
+        return $"test -e {escapedPath} -o -L {escapedPath}";
+    }
+
+    /// <summary>Builds the privileged directory-kind probe.</summary>
+    internal static string BuildDirectoryProbe(string targetPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
+        return $"test -d {PathEscaper.EscapeForShell(targetPath)}";
+    }
+
+    /// <summary>Builds an exact-target move, adding no-clobber unless replacement was selected.</summary>
+    internal static string BuildMove(string sourcePath, string targetPath, bool replace)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
+
+        string flags = replace ? "-T" : "-nT";
+        return $"mv {flags} {PathEscaper.EscapeForShell(sourcePath)} {PathEscaper.EscapeForShell(targetPath)}";
+    }
 }
 
 internal static class SudoUploadCommands

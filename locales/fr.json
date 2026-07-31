@@ -1679,6 +1679,7 @@
   "SftpSuccessMkdir": "Dossier cr\u00e9\u00e9 avec succ\u00e8s.",
   "SftpSuccessDelete": "\u00c9l\u00e9ment supprim\u00e9 avec succ\u00e8s.",
   "SftpSuccessRename": "\u00c9l\u00e9ment renomm\u00e9 avec succ\u00e8s.",
+  "SftpErrorSudoRenameCollision": "L'\u00e9l\u00e9ment n'a pas \u00e9t\u00e9 renomm\u00e9, car la destination est apparue avant le d\u00e9placement.",
   "SftpPathHistoryEmpty": "Aucun historique de navigation",
   "SftpEmptyDirectory": "Ce r\u00e9pertoire est vide.",
   "SftpToggleHidden": "Afficher les fichiers cach\u00e9s",

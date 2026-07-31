@@ -26,6 +26,16 @@ public enum FileConflictItemKind
     Directory,
 }
 
+/// <summary>The operation semantics used to classify destination-kind collisions.</summary>
+public enum FileConflictPolicy
+{
+    /// <summary>Transfer semantics, where an existing directory may accept a directory merge.</summary>
+    Transfer,
+
+    /// <summary>Rename semantics, where the destination is always the exact target entry.</summary>
+    Rename,
+}
+
 /// <summary>The conflict resolutions that may be selected for an analyzed item.</summary>
 [Flags]
 public enum FileConflictResolutionActions
@@ -128,7 +138,8 @@ public static class FileConflictPlanner
     public static IReadOnlyList<FileConflictAnalysisItem> Analyze(
         IReadOnlyList<FileConflictPlanItem> items,
         Func<string, bool> targetExists,
-        StringComparer pathComparer)
+        StringComparer pathComparer,
+        FileConflictPolicy policy = FileConflictPolicy.Transfer)
     {
         ArgumentNullException.ThrowIfNull(targetExists);
 
@@ -137,7 +148,8 @@ public static class FileConflictPlanner
             targetPath => targetExists(targetPath)
                 ? FileConflictItemKind.File
                 : (FileConflictItemKind?)null,
-            pathComparer);
+            pathComparer,
+            policy);
     }
 
     /// <summary>
@@ -146,7 +158,8 @@ public static class FileConflictPlanner
     public static IReadOnlyList<FileConflictAnalysisItem> Analyze(
         IReadOnlyList<FileConflictPlanItem> items,
         Func<string, FileConflictItemKind?> getExistingTargetKind,
-        StringComparer pathComparer)
+        StringComparer pathComparer,
+        FileConflictPolicy policy = FileConflictPolicy.Transfer)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(getExistingTargetKind);
@@ -174,13 +187,15 @@ public static class FileConflictPlanner
                 externalKind,
                 ref hasConflict,
                 ref allowedActions,
-                ref collisionKind);
+                ref collisionKind,
+                policy);
             ApplyKindCollision(
                 item.Kind,
                 hasClaimedTarget ? claimedKind : null,
                 ref hasConflict,
                 ref allowedActions,
-                ref collisionKind);
+                ref collisionKind,
+                policy);
 
             claimedTargets.TryAdd(item.TargetPath, item.Kind);
             analysis.Add(new FileConflictAnalysisItem(
@@ -295,19 +310,43 @@ public static class FileConflictPlanner
         return resolved;
     }
 
+    /// <summary>
+    /// Enumerates derived sibling targets in the same order used by
+    /// <see cref="Resolve(IReadOnlyList{FileConflictAnalysisItem}, IReadOnlyList{FileConflictDecision}, Func{string, bool}, StringComparer)"/>.
+    /// </summary>
+    /// <param name="originalTargetPath">Original occupied target path.</param>
+    /// <returns>An unbounded sequence beginning with the unnumbered copy suffix.</returns>
+    public static IEnumerable<string> EnumerateAutoRenameTargets(string originalTargetPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(originalTargetPath);
+
+        (string directory, string leafName) = SplitTarget(originalTargetPath);
+        (string stem, string extension) = SplitNameAndExtension(leafName);
+
+        yield return CombineTarget(directory, $"{stem} (copy){extension}");
+        for (int counter = 2; ; counter++)
+        {
+            yield return CombineTarget(directory, $"{stem} (copy {counter}){extension}");
+        }
+    }
+
     private static void ApplyKindCollision(
         FileConflictItemKind plannedKind,
         FileConflictItemKind? existingKind,
         ref bool hasConflict,
         ref FileConflictResolutionActions allowedActions,
-        ref FileConflictItemKind? collisionKind)
+        ref FileConflictItemKind? collisionKind,
+        FileConflictPolicy policy)
     {
         if (existingKind is null)
         {
             return;
         }
 
-        FileConflictResolutionActions actions = GetAllowedActions(plannedKind, existingKind.Value);
+        FileConflictResolutionActions actions = GetAllowedActions(
+            plannedKind,
+            existingKind.Value,
+            policy);
         if (actions == FileConflictResolutionActions.None)
         {
             return;
@@ -320,18 +359,23 @@ public static class FileConflictPlanner
 
     private static FileConflictResolutionActions GetAllowedActions(
         FileConflictItemKind plannedKind,
-        FileConflictItemKind existingKind)
-        => (plannedKind, existingKind) switch
+        FileConflictItemKind existingKind,
+        FileConflictPolicy policy)
+        => (policy, plannedKind, existingKind) switch
         {
-            (FileConflictItemKind.File, FileConflictItemKind.File) =>
+            (FileConflictPolicy.Transfer, FileConflictItemKind.File, FileConflictItemKind.File) =>
                 FileConflictResolutionActions.All,
-            (FileConflictItemKind.Directory, FileConflictItemKind.Directory) =>
+            (FileConflictPolicy.Rename, FileConflictItemKind.File, FileConflictItemKind.File) =>
+                FileConflictResolutionActions.All,
+            (FileConflictPolicy.Transfer, FileConflictItemKind.Directory, FileConflictItemKind.Directory) =>
                 FileConflictResolutionActions.None,
-            (FileConflictItemKind.File, FileConflictItemKind.Directory) =>
+            (FileConflictPolicy.Transfer, FileConflictItemKind.File, FileConflictItemKind.Directory) =>
                 FileConflictResolutionActions.Skip | FileConflictResolutionActions.AutoRename,
-            (FileConflictItemKind.Directory, FileConflictItemKind.File) =>
+            (FileConflictPolicy.Transfer, FileConflictItemKind.Directory, FileConflictItemKind.File) =>
                 FileConflictResolutionActions.Skip,
-            _ => throw new ArgumentOutOfRangeException(nameof(existingKind)),
+            (FileConflictPolicy.Rename, _, _) =>
+                FileConflictResolutionActions.Skip | FileConflictResolutionActions.AutoRename,
+            _ => throw new ArgumentOutOfRangeException(nameof(policy)),
         };
 
     private static bool Allows(
@@ -402,23 +446,15 @@ public static class FileConflictPlanner
         HashSet<string> reservedTargets,
         Func<string, bool> targetExists)
     {
-        (string directory, string leafName) = SplitTarget(originalTargetPath);
-        (string stem, string extension) = SplitNameAndExtension(leafName);
-
-        string firstCandidate = CombineTarget(directory, $"{stem} (copy){extension}");
-        if (IsAvailable(firstCandidate, reservedTargets, targetExists))
+        foreach (string candidate in EnumerateAutoRenameTargets(originalTargetPath))
         {
-            return firstCandidate;
-        }
-
-        for (int counter = 2; ; counter++)
-        {
-            string candidate = CombineTarget(directory, $"{stem} (copy {counter}){extension}");
             if (IsAvailable(candidate, reservedTargets, targetExists))
             {
                 return candidate;
             }
         }
+
+        throw new InvalidOperationException("The auto-rename candidate sequence ended unexpectedly.");
     }
 
     private static bool IsAvailable(

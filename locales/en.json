@@ -1679,6 +1679,7 @@
   "SftpSuccessMkdir": "Folder created successfully.",
   "SftpSuccessDelete": "Item deleted successfully.",
   "SftpSuccessRename": "Item renamed successfully.",
+  "SftpErrorSudoRenameCollision": "The item was not renamed because the destination appeared before the move.",
   "SftpPathHistoryEmpty": "No navigation history",
   "SftpEmptyDirectory": "This directory is empty.",
   "SftpToggleHidden": "Show hidden files",
