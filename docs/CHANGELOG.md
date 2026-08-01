@@ -12,6 +12,58 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-01: Destructive remote replacements, and the last of tier 1 (v2026.080100)
+
+Four fixes. Three of them close the way Heimdall replaces a file on a remote server: the fallback
+paths used when a server cannot rename atomically were destructive, and could lose both the old and
+the new content on an interruption. The fourth closes `C13`, and with it tier 1 of the audit
+campaign. **Measured coverage after this release: 27 of the 151 findings closed, 15 of the 37 in
+the source P1 cohort.**
+
+Correction to the entry below. The v2026.073101 entry states 21 findings and 10 P1 closed. A full
+recount against the source on 2026-08-01, finding by finding with a fresh read of the current code
+required as proof, gives **19 and 9** at that commit. The earlier figure was carried forward rather
+than measured. Every number in the present entry is measured.
+
+### Remote file replacement (C4)
+
+- FTP no longer deletes the target before writing. `FtpAtomicUpload` moves an existing remote file
+  aside, commits with `FtpRemoteExists.Skip`, restores the backup if the commit fails, and cleans up
+  best-effort. FluentFTP 54.2.0 `MoveFile` with `FtpRemoteExists.Overwrite` calls `DeleteFile`
+  before `Rename`, which is what made an interruption lose both versions. Closes SFTP-005.
+  (`9912e786`)
+- The atomic-rename fallback is entered only on a genuine capability failure:
+  `NotSupportedException`, or `SftpException` with status `OperationUnsupported`. Permission,
+  transport and server errors now propagate without touching the target, and the case is logged.
+  The existing target is probed for regular-file type through a listing of its parent directory
+  rather than `Get` or `GetAttributes`, which canonicalise through `REALPATH` and therefore follow
+  symbolic links. Closes SFTP-009. Restricts SFTP-010, whose crash window between the two renames
+  remains open in both SFTP and FTP. (`1ff6b654`)
+- The replaced file's permission mode is preserved. The target's full POSIX mode, mask `0x0FFF` so
+  that setuid, setgid and sticky are included, is applied to the temporary file before the commit
+  rename and never to the final path. If the mode cannot be applied and the temporary carries a bit
+  the target did not have, the commit is refused and the original file is left intact: a lost
+  permission is tolerated, a silent widening is not. Addresses SFTP-011 for the mode on the normal
+  SFTP path only; ownership, POSIX ACLs, xattrs, capabilities, timestamps and the FTP path remain
+  open. (`a864b683`)
+
+### Per-path capabilities (C13)
+
+- X11 forwarding and SSH compression are honoured by the external PuTTY and Plink transports and
+  ignored by the in-process SSH.NET transport. The transport is not known before the attempt: it is
+  chosen in four places, one of them after an SSH.NET authentication failure. Capability is
+  therefore resolved when the transport is resolved. The X display server now starts only on
+  transports that can forward, instead of on every attempt, and the direct transport reports the
+  unavailable capabilities through a single non-blocking notice. Closes SSH-002 and SSH-020.
+  (`415f3fed`)
+
+### Measures
+
+- Test suite: 8459 to 8488 passing, 0 skipped.
+- Tier 1 (`C1`, `C2`, `C13`) is closed. `SFTP-001` remains open: the FTPS data channel certificate
+  is never validated by FluentFTP, at any version and under any configuration. The limitation is
+  declared in the FTPS session interface rather than masked.
+
 ## 2026-07-31: Tier 1 of the audit campaign - the product stops promising what it does not do (v2026.073101)
 
 The first tier of the audit campaign opened on 2026-07-28. That campaign produced 151
