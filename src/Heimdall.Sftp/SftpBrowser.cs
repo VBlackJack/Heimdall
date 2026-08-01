@@ -402,7 +402,10 @@ public sealed class SftpBrowser : IRemoteBrowser
                             {
                                 client.DeleteFile(path);
                             }
-                        });
+                        },
+                        canDemoteAtomicRenameFailure: IsAtomicRenameCapabilityFailure,
+                        isExistingTargetRegularFile: path =>
+                            GetEntryWithoutFollowingTarget(client, path).Entry.IsRegularFile);
                 }, ct).ConfigureAwait(false);
             }
             catch
@@ -868,6 +871,12 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         Interlocked.Exchange(ref _connectionParams, null);
         Interlocked.Exchange(ref _pinnedHostKeyVerifier, null);
+    }
+
+    private static bool IsAtomicRenameCapabilityFailure(Exception exception)
+    {
+        return exception is NotSupportedException
+            or Renci.SshNet.Common.SftpException { StatusCode: StatusCode.OperationUnsupported };
     }
 
     private void OnErrorOccurred(object? sender, Renci.SshNet.Common.ExceptionEventArgs e)

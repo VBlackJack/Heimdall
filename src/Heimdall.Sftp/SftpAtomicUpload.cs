@@ -34,13 +34,20 @@ public static class SftpAtomicUpload
     /// <summary>
     /// Replaces the final remote path with the uploaded temp path.
     /// </summary>
+    /// <remarks>
+    /// Omitting <paramref name="canDemoteAtomicRenameFailure"/> preserves the historical behavior where
+    /// every atomic-rename exception enters the fallback. Omitting <paramref name="isExistingTargetRegularFile"/>
+    /// preserves the historical behavior where every existing target is eligible for replacement.
+    /// </remarks>
     public static void CommitRename(
         string tempRemotePath,
         string finalRemotePath,
         Action<string, string> atomicRename,
         Action<string, string> plainRename,
         Func<string, bool> remoteExists,
-        Action<string> deleteRemote)
+        Action<string> deleteRemote,
+        Func<Exception, bool>? canDemoteAtomicRenameFailure = null,
+        Func<string, bool>? isExistingTargetRegularFile = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
@@ -56,6 +63,15 @@ public static class SftpAtomicUpload
         }
         catch (Exception ex)
         {
+            bool canDemote = canDemoteAtomicRenameFailure?.Invoke(ex) ?? true;
+            if (!canDemote)
+            {
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"SFTP atomic rename failed for '{finalRemotePath}' and fallback was not allowed "
+                    + $"({ex.GetType().Name}): {ex.Message}");
+                throw;
+            }
+
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"SFTP atomic rename unavailable for '{finalRemotePath}', falling back to replace: {ex.Message}");
         }
@@ -63,6 +79,14 @@ public static class SftpAtomicUpload
         string? backupRemotePath = null;
         if (remoteExists(finalRemotePath))
         {
+            if (isExistingTargetRegularFile is not null
+                && !isExistingTargetRegularFile(finalRemotePath))
+            {
+                throw new InvalidOperationException(
+                    $"SFTP fallback replacement refused for '{finalRemotePath}' because the existing target "
+                    + "is not a regular file.");
+            }
+
             backupRemotePath = CreateRemoteBackupPath(finalRemotePath);
             plainRename(finalRemotePath, backupRemotePath);
         }
