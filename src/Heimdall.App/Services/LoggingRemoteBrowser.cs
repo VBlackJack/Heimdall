@@ -96,6 +96,13 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
     }
 
     /// <inheritdoc />
+    public event Action<RemoteOperationWarning>? OperationWarningRaised
+    {
+        add => _inner.OperationWarningRaised += value;
+        remove => _inner.OperationWarningRaised -= value;
+    }
+
+    /// <inheritdoc />
     public event Action<string?>? Disconnected
     {
         add => _inner.Disconnected += value;

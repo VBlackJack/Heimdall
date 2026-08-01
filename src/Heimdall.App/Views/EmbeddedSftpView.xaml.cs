@@ -251,6 +251,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
         _browser.DirectoryChanged += OnDirectoryChanged;
         _browser.TransferProgress += OnTransferProgress;
+        _browser.OperationWarningRaised += OnOperationWarningRaised;
         _browser.Disconnected += OnBrowserDisconnected;
         if (_browser is SftpBrowser sftpBrowser)
         {
@@ -328,6 +329,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
             browser.DirectoryChanged -= OnDirectoryChanged;
             browser.TransferProgress -= OnTransferProgress;
+            browser.OperationWarningRaised -= OnOperationWarningRaised;
             browser.Disconnected -= OnBrowserDisconnected;
             if (browser is SftpBrowser sftpBrowser)
             {
@@ -1353,6 +1355,26 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             var message = FormatHostKeyMismatchMidSession(evt);
             _pendingBrowserSecurityStatus = message;
             ShowError(message);
+        });
+    }
+
+    private void OnOperationWarningRaised(RemoteOperationWarning warning)
+    {
+        LocalizationManager? localizer = _localizer;
+        if (localizer is null)
+        {
+            return;
+        }
+
+        string message = localizer.Format(warning.WarningKey, warning.RemotePath);
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _viewModel.ShowOperationWarning(message);
         });
     }
 

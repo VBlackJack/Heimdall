@@ -308,6 +308,41 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
     }
 
     [Fact]
+    public void OperationWarningRaised_IsForwardedFromInner()
+    {
+        CapturingOperationLog sink = new();
+        FakeRemoteBrowser inner = new();
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+        RemoteOperationWarning warning = RemoteOperationWarning.CreateNonAtomicReplacement(
+            "/srv/data/file.bin");
+        RemoteOperationWarning? receivedWarning = null;
+
+        decorator.OperationWarningRaised += received => receivedWarning = received;
+
+        inner.RaiseOperationWarning(warning);
+
+        receivedWarning.Should().BeSameAs(warning);
+    }
+
+    [Fact]
+    public void OperationWarningRaised_IsNotForwardedAfterUnsubscribe()
+    {
+        CapturingOperationLog sink = new();
+        FakeRemoteBrowser inner = new();
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+        int warningCount = 0;
+        Action<RemoteOperationWarning> handler = _ => warningCount++;
+
+        decorator.OperationWarningRaised += handler;
+        decorator.OperationWarningRaised -= handler;
+
+        inner.RaiseOperationWarning(RemoteOperationWarning.CreateNonAtomicReplacement(
+            "/srv/data/file.bin"));
+
+        warningCount.Should().Be(0);
+    }
+
+    [Fact]
     public void Dispose_DoesNotDisposeInner()
     {
         CapturingOperationLog sink = new();
@@ -365,6 +400,8 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
 
         public event Action<SftpTransferProgress>? TransferProgress;
 
+        public event Action<RemoteOperationWarning>? OperationWarningRaised;
+
         public event Action<string?>? Disconnected;
 
         public string CurrentDirectory => "/";
@@ -374,6 +411,8 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
         public void RaiseDirectoryChanged(string path) => DirectoryChanged?.Invoke(path);
 
         public void RaiseTransferProgress(SftpTransferProgress progress) => TransferProgress?.Invoke(progress);
+
+        public void RaiseOperationWarning(RemoteOperationWarning warning) => OperationWarningRaised?.Invoke(warning);
 
         public void RaiseDisconnected(string? message) => Disconnected?.Invoke(message);
 

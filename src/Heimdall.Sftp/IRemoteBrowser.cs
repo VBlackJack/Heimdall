@@ -34,6 +34,13 @@ public interface IRemoteBrowser : IDisposable
     /// <summary>Raised during file transfers to report progress.</summary>
     event Action<SftpTransferProgress>? TransferProgress;
 
+    // This event is shared because both SFTP and FTP replacement fallbacks can be non-atomic.
+    /// <summary>
+    /// Raised with an informational caveat for an operation that still succeeded.
+    /// Consumers must not treat the warning as an error.
+    /// </summary>
+    event Action<RemoteOperationWarning>? OperationWarningRaised;
+
     /// <summary>
     /// Raised when the connection is lost. The parameter contains an error
     /// message if the disconnection was unexpected, or null for a clean disconnect.

@@ -74,6 +74,9 @@ public sealed class FtpBrowser : IRemoteBrowser
     public event Action<SftpTransferProgress>? TransferProgress;
 
     /// <inheritdoc/>
+    public event Action<RemoteOperationWarning>? OperationWarningRaised;
+
+    /// <inheritdoc/>
     public event Action<string?>? Disconnected;
 
     /// <inheritdoc/>
@@ -347,7 +350,10 @@ public sealed class FtpBrowser : IRemoteBrowser
                     (source, destination, token) =>
                         client.MoveFile(source, destination, FtpRemoteExists.Skip, token),
                     (path, token) => client.DeleteFile(path, token),
-                    ct).ConfigureAwait(false);
+                    ct,
+                    onNonAtomicReplacement: () => OperationWarningRaised?.Invoke(
+                        RemoteOperationWarning.CreateNonAtomicReplacement(remotePath)))
+                    .ConfigureAwait(false);
             }
             catch
             {

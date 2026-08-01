@@ -105,6 +105,38 @@ public sealed class FtpAtomicUploadTests
     }
 
     [Fact]
+    public async Task CommitRenameAsync_RaisesNonAtomicReplacementOnce_WhenExistingTargetIsBackedUp()
+    {
+        int warningCount = 0;
+
+        await FtpAtomicUpload.CommitRenameAsync(
+            "/srv/app/config.txt.part",
+            "/srv/app/config.txt",
+            (path, _) => Task.FromResult(path == "/srv/app/config.txt"),
+            (_, _, _) => Task.FromResult(true),
+            (_, _) => Task.CompletedTask,
+            onNonAtomicReplacement: () => warningCount++);
+
+        Assert.Equal(1, warningCount);
+    }
+
+    [Fact]
+    public async Task CommitRenameAsync_DoesNotRaiseNonAtomicReplacement_WhenFinalPathIsAbsent()
+    {
+        int warningCount = 0;
+
+        await FtpAtomicUpload.CommitRenameAsync(
+            "/srv/app/config.txt.part",
+            "/srv/app/config.txt",
+            (_, _) => Task.FromResult(false),
+            (_, _, _) => Task.FromResult(true),
+            (_, _) => Task.CompletedTask,
+            onNonAtomicReplacement: () => warningCount++);
+
+        Assert.Equal(0, warningCount);
+    }
+
+    [Fact]
     public async Task CommitRenameAsync_RestoresBackupAndPropagates_WhenCommitMoveThrows()
     {
         HashSet<string> remote = new(StringComparer.Ordinal)

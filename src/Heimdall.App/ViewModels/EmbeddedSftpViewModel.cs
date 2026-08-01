@@ -730,6 +730,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Shows an already-localized non-blocking operation warning without marking the operation as failed.
+    /// </summary>
+    public void ShowOperationWarning(string message)
+    {
+        UpdateStatus(message);
+    }
+
+    /// <summary>
     /// Shows a persistent security notice for the active browser session.
     /// </summary>
     public void ShowSecurityNotice(string message)

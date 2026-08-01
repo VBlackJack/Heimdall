@@ -33,7 +33,8 @@ public static class FtpAtomicUpload
         Func<string, CancellationToken, Task<bool>> remoteExistsAsync,
         Func<string, string, CancellationToken, Task<bool>> moveRemoteAsync,
         Func<string, CancellationToken, Task> deleteRemoteAsync,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Action? onNonAtomicReplacement = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
@@ -45,6 +46,11 @@ public static class FtpAtomicUpload
         if (await remoteExistsAsync(finalRemotePath, ct).ConfigureAwait(false))
         {
             backupRemotePath = CreateRemoteBackupPath(finalRemotePath);
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"FTP replacement for '{finalRemotePath}' is not atomic; moving the existing target "
+                + $"to backup '{backupRemotePath}' before commit.");
+            // No warning is due when the final path is absent because no backup move opens a replacement window.
+            onNonAtomicReplacement?.Invoke();
             bool backupMoved = await moveRemoteAsync(finalRemotePath, backupRemotePath, ct)
                 .ConfigureAwait(false);
             if (!backupMoved)

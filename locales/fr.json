@@ -1992,6 +1992,7 @@
   "WarnFtpCleartext": "La session FTP vers {0}:{1} utilise un canal en clair. Le nom d'utilisateur et le mot de passe sont transmis sans chiffrement. Pr\u00e9f\u00e9rez SFTP lorsque c'est possible.",
   "WarnFtpCleartextBadge": "Identifiants transmis en clair (sans TLS)",
   "WarnFtpsDataChannelIdentityBadge": "L'identit\u00e9 du canal de donn\u00e9es FTPS n'est pas v\u00e9rifi\u00e9e",
+  "WarnRemoteReplacementNonAtomic": "La destination '{0}' a \u00e9t\u00e9 remplac\u00e9e sans garantie atomique.",
   "WarnRdpFileAclFailed": "Le fichier .rdp temporaire n\u2019a pas pu \u00eatre prot\u00e9g\u00e9 par une ACL restrictive. Il contient l\u2019h\u00f4te et le nom d\u2019utilisateur, mais pas le mot de passe ; la session a tout de m\u00eame \u00e9t\u00e9 lanc\u00e9e.",
   "ErrorTelnetConnectionFailed": "La connexion Telnet a \u00e9chou\u00e9 : {0}",
   "ErrorWinRmInvalidConfiguration": "La configuration WinRM est invalide.",

@@ -155,6 +155,57 @@ public sealed class SftpAtomicUploadTests
     }
 
     [Fact]
+    public void CommitRename_RaisesNonAtomicReplacementOnce_WhenFallbackReplacesExistingTarget()
+    {
+        int warningCount = 0;
+
+        SftpAtomicUpload.CommitRename(
+            "/srv/app/config.txt.part",
+            "/srv/app/config.txt",
+            atomicRename: (_, _) => throw new InvalidOperationException("extension unavailable"),
+            plainRename: (_, _) => { },
+            remoteExists: path => path == "/srv/app/config.txt",
+            deleteRemote: _ => { },
+            onNonAtomicReplacement: () => warningCount++);
+
+        Assert.Equal(1, warningCount);
+    }
+
+    [Fact]
+    public void CommitRename_DoesNotRaiseNonAtomicReplacement_WhenAtomicRenameSucceeds()
+    {
+        int warningCount = 0;
+
+        SftpAtomicUpload.CommitRename(
+            "/srv/app/config.txt.part",
+            "/srv/app/config.txt",
+            atomicRename: (_, _) => { },
+            plainRename: (_, _) => { },
+            remoteExists: _ => true,
+            deleteRemote: _ => { },
+            onNonAtomicReplacement: () => warningCount++);
+
+        Assert.Equal(0, warningCount);
+    }
+
+    [Fact]
+    public void CommitRename_DoesNotRaiseNonAtomicReplacement_WhenFallbackTargetIsAbsent()
+    {
+        int warningCount = 0;
+
+        SftpAtomicUpload.CommitRename(
+            "/srv/app/config.txt.part",
+            "/srv/app/config.txt",
+            atomicRename: (_, _) => throw new InvalidOperationException("extension unavailable"),
+            plainRename: (_, _) => { },
+            remoteExists: _ => false,
+            deleteRemote: _ => { },
+            onNonAtomicReplacement: () => warningCount++);
+
+        Assert.Equal(0, warningCount);
+    }
+
+    [Fact]
     public void Rollback_DeletesOnlyTempPath()
     {
         var deletedPaths = new List<string>();

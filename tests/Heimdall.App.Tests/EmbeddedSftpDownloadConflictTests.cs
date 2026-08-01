@@ -166,6 +166,12 @@ public sealed class EmbeddedSftpDownloadConflictTests
             remove { }
         }
 
+        public event Action<RemoteOperationWarning>? OperationWarningRaised
+        {
+            add { }
+            remove { }
+        }
+
         public event Action<string?>? Disconnected
         {
             add { }

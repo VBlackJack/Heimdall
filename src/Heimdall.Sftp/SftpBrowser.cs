@@ -76,6 +76,9 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <summary>Raised during file transfers to report progress.</summary>
     public event Action<SftpTransferProgress>? TransferProgress;
 
+    /// <inheritdoc/>
+    public event Action<RemoteOperationWarning>? OperationWarningRaised;
+
     /// <summary>
     /// Raised when the connection is lost. The parameter contains an error
     /// message if the disconnection was unexpected, or null for a clean disconnect.
@@ -406,7 +409,13 @@ public sealed class SftpBrowser : IRemoteBrowser
                     });
                     ct.ThrowIfCancellationRequested();
                     PreserveUploadModeBeforeCommit(client, tempRemotePath, remotePath);
-                    CommitUploadedTemp(client, tempRemotePath, remotePath, commitMode);
+                    CommitUploadedTemp(
+                        client,
+                        tempRemotePath,
+                        remotePath,
+                        commitMode,
+                        () => OperationWarningRaised?.Invoke(
+                            RemoteOperationWarning.CreateNonAtomicReplacement(remotePath)));
                 }, ct).ConfigureAwait(false);
             }
             catch
@@ -435,7 +444,8 @@ public sealed class SftpBrowser : IRemoteBrowser
         SftpClient client,
         string tempRemotePath,
         string remotePath,
-        UploadCommitMode commitMode)
+        UploadCommitMode commitMode,
+        Action onNonAtomicReplacement)
     {
         if (commitMode == UploadCommitMode.PublishIfAbsent)
         {
@@ -470,7 +480,8 @@ public sealed class SftpBrowser : IRemoteBrowser
             },
             canDemoteAtomicRenameFailure: IsAtomicRenameCapabilityFailure,
             isExistingTargetRegularFile: path =>
-                GetEntryWithoutFollowingTarget(client, path).Entry.IsRegularFile);
+                GetEntryWithoutFollowingTarget(client, path).Entry.IsRegularFile,
+            onNonAtomicReplacement: onNonAtomicReplacement);
     }
 
     /// <summary>Creates a directory on the remote host.</summary>

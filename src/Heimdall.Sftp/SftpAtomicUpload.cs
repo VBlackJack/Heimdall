@@ -76,7 +76,8 @@ public static class SftpAtomicUpload
     /// <remarks>
     /// Omitting <paramref name="canDemoteAtomicRenameFailure"/> preserves the historical behavior where
     /// every atomic-rename exception enters the fallback. Omitting <paramref name="isExistingTargetRegularFile"/>
-    /// preserves the historical behavior where every existing target is eligible for replacement.
+    /// preserves the historical behavior where every existing target is eligible for replacement. Omitting
+    /// <paramref name="onNonAtomicReplacement"/> preserves the historical behavior without a warning callback.
     /// </remarks>
     public static void CommitRename(
         string tempRemotePath,
@@ -86,7 +87,8 @@ public static class SftpAtomicUpload
         Func<string, bool> remoteExists,
         Action<string> deleteRemote,
         Func<Exception, bool>? canDemoteAtomicRenameFailure = null,
-        Func<string, bool>? isExistingTargetRegularFile = null)
+        Func<string, bool>? isExistingTargetRegularFile = null,
+        Action? onNonAtomicReplacement = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
@@ -127,6 +129,11 @@ public static class SftpAtomicUpload
             }
 
             backupRemotePath = CreateRemoteBackupPath(finalRemotePath);
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"SFTP replacement for '{finalRemotePath}' is not atomic; moving the existing target "
+                + $"to backup '{backupRemotePath}' before commit.");
+            // No warning is due when the final path is absent because no backup move opens a replacement window.
+            onNonAtomicReplacement?.Invoke();
             plainRename(finalRemotePath, backupRemotePath);
         }
 

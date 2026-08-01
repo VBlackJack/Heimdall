@@ -1194,6 +1194,12 @@ public sealed class EmbeddedSftpViewModelTests
             remove { }
         }
 
+        public event Action<RemoteOperationWarning>? OperationWarningRaised
+        {
+            add { }
+            remove { }
+        }
+
         public event Action<string?>? Disconnected
         {
             add { }
