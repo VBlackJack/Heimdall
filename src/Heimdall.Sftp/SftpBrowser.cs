@@ -528,7 +528,9 @@ public sealed class SftpBrowser : IRemoteBrowser
 
                 if (entry.IsSymbolicLink)
                 {
-                    client.DeleteFile(deletePath);
+                    // SftpClient.DeleteFile canonicalizes through SSH_FXP_REALPATH and can delete the link target.
+                    // ISftpFile.Delete acts on the listed entry's stored path instead.
+                    entry.Delete();
                 }
                 else if (entry.IsDirectory)
                 {
@@ -536,7 +538,7 @@ public sealed class SftpBrowser : IRemoteBrowser
                 }
                 else
                 {
-                    client.DeleteFile(deletePath);
+                    entry.Delete();
                 }
             }, ct).ConfigureAwait(false);
         }
