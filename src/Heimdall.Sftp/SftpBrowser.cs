@@ -390,6 +390,7 @@ public sealed class SftpBrowser : IRemoteBrowser
                             IsUpload: true));
                     });
                     ct.ThrowIfCancellationRequested();
+                    PreserveUploadModeBeforeCommit(client, tempRemotePath, remotePath);
                     SftpAtomicUpload.CommitRename(
                         tempRemotePath,
                         remotePath,
@@ -877,6 +878,107 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         return exception is NotSupportedException
             or Renci.SshNet.Common.SftpException { StatusCode: StatusCode.OperationUnsupported };
+    }
+
+    private static void PreserveUploadModeBeforeCommit(
+        SftpClient client,
+        string tempRemotePath,
+        string finalRemotePath)
+    {
+        ISftpFile? targetEntry = TryGetEntryWithoutFollowingTarget(client, finalRemotePath);
+        if (targetEntry is null || !targetEntry.IsRegularFile)
+        {
+            return;
+        }
+
+        SftpFileAttributes targetAttributes = targetEntry.Attributes;
+        SftpFileAttributes tempAttributes = client.GetAttributes(tempRemotePath);
+        uint targetPermissions = GetPermissionMode(targetAttributes);
+        uint tempPermissions = GetPermissionMode(tempAttributes);
+        uint? modeToApply = SftpModePreservation.ResolveModeToApply(
+            targetPermissions,
+            tempPermissions);
+        if (modeToApply is null)
+        {
+            return;
+        }
+
+        ApplyPermissionMode(tempAttributes, modeToApply.Value);
+
+        try
+        {
+            client.SetAttributes(tempRemotePath, tempAttributes);
+        }
+        catch (Exception ex)
+        {
+            string targetMode = FormatPermissionMode(targetPermissions);
+            string tempMode = FormatPermissionMode(tempPermissions);
+            if (SftpModePreservation.ShouldRefuseCommitAfterApplyFailure(
+                    targetPermissions,
+                    tempPermissions))
+            {
+                throw new InvalidOperationException(
+                    $"SFTP mode preservation failed for '{finalRemotePath}': target mode {targetMode}, "
+                    + $"temporary mode {tempMode}; commit refused because proceeding would widen permissions.",
+                    ex);
+            }
+
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"SFTP mode preservation failed for '{finalRemotePath}' (target mode {targetMode}, "
+                + $"temporary mode {tempMode}); commit will continue because permissions are not widened: "
+                + ex.Message);
+        }
+    }
+
+    private static void ApplyPermissionMode(SftpFileAttributes attributes, uint mode)
+    {
+        attributes.IsUIDBitSet = (mode & SftpModePreservation.SetUserIdBit) != 0;
+        attributes.IsGroupIDBitSet = (mode & SftpModePreservation.SetGroupIdBit) != 0;
+        attributes.IsStickyBitSet = (mode & SftpModePreservation.StickyBit) != 0;
+        attributes.OwnerCanRead = (mode & SftpModePreservation.OwnerReadBit) != 0;
+        attributes.OwnerCanWrite = (mode & SftpModePreservation.OwnerWriteBit) != 0;
+        attributes.OwnerCanExecute = (mode & SftpModePreservation.OwnerExecuteBit) != 0;
+        attributes.GroupCanRead = (mode & SftpModePreservation.GroupReadBit) != 0;
+        attributes.GroupCanWrite = (mode & SftpModePreservation.GroupWriteBit) != 0;
+        attributes.GroupCanExecute = (mode & SftpModePreservation.GroupExecuteBit) != 0;
+        attributes.OthersCanRead = (mode & SftpModePreservation.OthersReadBit) != 0;
+        attributes.OthersCanWrite = (mode & SftpModePreservation.OthersWriteBit) != 0;
+        attributes.OthersCanExecute = (mode & SftpModePreservation.OthersExecuteBit) != 0;
+    }
+
+    private static uint GetPermissionMode(SftpFileAttributes attributes)
+    {
+        uint mode = 0;
+        if (attributes.IsUIDBitSet) mode |= SftpModePreservation.SetUserIdBit;
+        if (attributes.IsGroupIDBitSet) mode |= SftpModePreservation.SetGroupIdBit;
+        if (attributes.IsStickyBitSet) mode |= SftpModePreservation.StickyBit;
+        if (attributes.OwnerCanRead) mode |= SftpModePreservation.OwnerReadBit;
+        if (attributes.OwnerCanWrite) mode |= SftpModePreservation.OwnerWriteBit;
+        if (attributes.OwnerCanExecute) mode |= SftpModePreservation.OwnerExecuteBit;
+        if (attributes.GroupCanRead) mode |= SftpModePreservation.GroupReadBit;
+        if (attributes.GroupCanWrite) mode |= SftpModePreservation.GroupWriteBit;
+        if (attributes.GroupCanExecute) mode |= SftpModePreservation.GroupExecuteBit;
+        if (attributes.OthersCanRead) mode |= SftpModePreservation.OthersReadBit;
+        if (attributes.OthersCanWrite) mode |= SftpModePreservation.OthersWriteBit;
+        if (attributes.OthersCanExecute) mode |= SftpModePreservation.OthersExecuteBit;
+        return mode;
+    }
+
+    private static string FormatPermissionMode(uint permissions)
+    {
+        return Convert.ToString(SftpModePreservation.GetMode(permissions), 8).PadLeft(4, '0');
+    }
+
+    private static ISftpFile? TryGetEntryWithoutFollowingTarget(SftpClient client, string path)
+    {
+        try
+        {
+            return GetEntryWithoutFollowingTarget(client, path).Entry;
+        }
+        catch (Renci.SshNet.Common.SftpPathNotFoundException)
+        {
+            return null;
+        }
     }
 
     private void OnErrorOccurred(object? sender, Renci.SshNet.Common.ExceptionEventArgs e)
