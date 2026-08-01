@@ -44,5 +44,8 @@ internal static class SshLocalizationKeys
     public const string ErrorTunnelFailed = "ErrorTunnelFailed";
     public const string ErrorTunnelNoLoopbackAlias = "ErrorTunnelNoLoopbackAlias";
     public const string ErrorTunnelPortConcurrent = "ErrorTunnelPortConcurrent";
+    public const string StatusSshDirectCompressionUnavailable = "StatusSshDirectCompressionUnavailable";
+    public const string StatusSshDirectX11AndCompressionUnavailable = "StatusSshDirectX11AndCompressionUnavailable";
+    public const string StatusSshDirectX11Unavailable = "StatusSshDirectX11Unavailable";
     public const string StatusSshRetryingViaPlink = "StatusSshRetryingViaPlink";
 }

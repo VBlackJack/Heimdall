@@ -105,11 +105,6 @@ internal sealed class SshHandler : IProtocolHandler
                 SshSessionDiagnosticFactory.CreateGatewayFailure(tunnelError));
         }
 
-        if (server.SshX11Forwarding)
-        {
-            await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
-        }
-
         _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingSsh);
 
         var sshMode = server.SshMode ?? "Embedded";
@@ -160,6 +155,11 @@ internal sealed class SshHandler : IProtocolHandler
         {
             Core.Logging.FileLogger.Info(
                 $"SSH using Plink fallback for {server.DisplayName}");
+            if (server.SshX11Forwarding)
+            {
+                await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
+            }
+
             return await ConnectSshViaPlinkAsync(
                     server,
                     settings,
@@ -169,6 +169,17 @@ internal sealed class SshHandler : IProtocolHandler
                     originalFailure: null,
                     ct)
                 .ConfigureAwait(false);
+        }
+
+        SshCapabilityNotice? capabilityNotice = SshCapabilityScope.Evaluate(
+            SshResolvedPath.Direct,
+            server.SshX11Forwarding,
+            server.SshCompression);
+        if (capabilityNotice is not null)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"SSH direct path cannot honor requested capabilities: {capabilityNotice.LogDescription}. Connection will continue without them.");
+            SetStatusText?.Invoke(_localizer[capabilityNotice.StatusLocalizationKey]);
         }
 
         var session = new SshShellSession();
@@ -249,6 +260,11 @@ internal sealed class SshHandler : IProtocolHandler
                 Core.Logging.FileLogger.Info(
                     $"SSH.NET auth failed ({failure.Code}), falling back to Plink: {failure.Message}");
                 SetStatusText?.Invoke(_localizer[SshLocalizationKeys.StatusSshRetryingViaPlink]);
+                if (server.SshX11Forwarding)
+                {
+                    await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
+                }
+
                 return await ConnectSshViaPlinkAsync(
                         server,
                         settings,
@@ -390,6 +406,11 @@ internal sealed class SshHandler : IProtocolHandler
                 target,
                 hostKeyArg);
             Core.Logging.FileLogger.Info($"Launching PuTTY: {puttyPath} for {targetHost}:{targetPort}");
+
+            if (server.SshX11Forwarding)
+            {
+                await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
+            }
 
             System.Diagnostics.Process? process = System.Diagnostics.Process.Start(psi);
 

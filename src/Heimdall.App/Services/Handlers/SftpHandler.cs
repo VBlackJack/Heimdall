@@ -110,6 +110,14 @@ internal sealed class SftpHandler : IProtocolHandler
 
         _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingSftp);
 
+        SshCapabilityNotice? capabilityNotice = SshCapabilityScope.Evaluate(
+            SshResolvedPath.Direct,
+            x11Forwarding: false,
+            compression: server.SshCompression);
+        string? capabilityWarning = capabilityNotice is null
+            ? null
+            : _localizer[capabilityNotice.StatusLocalizationKey];
+
         var sshParams = new SshConnectionParams
         {
             Host = targetHost,
@@ -180,7 +188,8 @@ internal sealed class SftpHandler : IProtocolHandler
         return new ConnectionResult(true, null, new SftpSessionBundle(
             browser,
             sshParams,
-            server.SessionLoggingOverride));
+            server.SessionLoggingOverride),
+            Warning: capabilityWarning);
     }
 
     private static bool IsValidSftpHost(string host)
