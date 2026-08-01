@@ -340,16 +340,14 @@ public sealed class FtpBrowser : IRemoteBrowser
 
                 ThrowIfFailed(status, tempRemotePath, "upload");
 
-                bool moved = await client.MoveFile(
+                await FtpAtomicUpload.CommitRenameAsync(
                     tempRemotePath,
                     remotePath,
-                    FtpRemoteExists.Overwrite,
+                    (path, token) => client.FileExists(path, token),
+                    (source, destination, token) =>
+                        client.MoveFile(source, destination, FtpRemoteExists.Skip, token),
+                    (path, token) => client.DeleteFile(path, token),
                     ct).ConfigureAwait(false);
-                if (!moved)
-                {
-                    FileLogger.Warn($"FTP upload commit move returned false for '{remotePath}'.");
-                    throw new IOException();
-                }
             }
             catch
             {
