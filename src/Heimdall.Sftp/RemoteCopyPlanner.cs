@@ -55,7 +55,8 @@ internal static class RemoteCopyPlanner
     /// The destination must not already exist; a directory source requires <paramref name="recursive"/>.
     /// </summary>
     /// <exception cref="IOException">
-    /// The destination already exists, or the source is a directory and <paramref name="recursive"/> is false.
+    /// The destination is the source or its descendant, the destination already exists, or the source
+    /// is a directory and <paramref name="recursive"/> is false.
     /// </exception>
     public static async Task CopyAsync(
         string sourcePath,
@@ -69,6 +70,12 @@ internal static class RemoteCopyPlanner
         ArgumentNullException.ThrowIfNull(ops);
 
         ct.ThrowIfCancellationRequested();
+
+        if (IsSameOrDescendantPath(sourcePath, destinationPath))
+        {
+            throw new IOException(
+                $"Refused to copy: destination is the source path or its descendant: {destinationPath}");
+        }
 
         if (await ops.DestinationExistsAsync(destinationPath, ct).ConfigureAwait(false))
         {
@@ -128,6 +135,24 @@ internal static class RemoteCopyPlanner
             await CopyNodeAsync(childSource, childDestination, recursive: true, ops, depth + 1, ct)
                 .ConfigureAwait(false);
         }
+    }
+
+    internal static bool IsSameOrDescendantPath(string sourcePath, string destinationPath)
+    {
+        string normalizedSource = sourcePath.TrimEnd('/');
+        string normalizedDestination = destinationPath.TrimEnd('/');
+
+        // Trimming the remote root produces an empty string. Reject it explicitly because every
+        // remote destination is within the server root.
+        if (normalizedSource.Length == 0)
+        {
+            return true;
+        }
+
+        return string.Equals(normalizedDestination, normalizedSource, StringComparison.Ordinal)
+            || normalizedDestination.StartsWith(
+                $"{normalizedSource}/",
+                StringComparison.Ordinal);
     }
 
     // Joins a remote directory path and a child leaf name using forward slashes, matching the

@@ -40,6 +40,94 @@ public sealed class RemoteCopyPlannerTests
     }
 
     [Fact]
+    public async Task CopyAsync_DestinationEqualsSource_ThrowsIOExceptionAndCopiesNothing()
+    {
+        FakeRemoteTree tree = new FakeRemoteTree();
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            RemoteCopyPlanner.CopyAsync("/srv/data", "/srv/data", recursive: true, tree.BuildOps()));
+
+        Assert.Empty(tree.CopiedFiles);
+        Assert.Empty(tree.CreatedDirectories);
+    }
+
+    [Fact]
+    public async Task CopyAsync_DestinationIsDescendantOfSource_ThrowsIOExceptionAndCopiesNothing()
+    {
+        FakeRemoteTree tree = new FakeRemoteTree();
+        tree.Directories.Add("/srv/data");
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            RemoteCopyPlanner.CopyAsync(
+                "/srv/data",
+                "/srv/data/backup",
+                recursive: true,
+                tree.BuildOps()));
+
+        Assert.Empty(tree.CopiedFiles);
+        Assert.Empty(tree.CreatedDirectories);
+    }
+
+    [Fact]
+    public async Task CopyAsync_DestinationSharesPrefixButIsNotDescendant_Succeeds()
+    {
+        FakeRemoteTree tree = new FakeRemoteTree();
+
+        await RemoteCopyPlanner.CopyAsync(
+            "/srv/data",
+            "/srv/database",
+            recursive: false,
+            tree.BuildOps());
+
+        Assert.Equal(
+            ("/srv/data", "/srv/database"),
+            Assert.Single(tree.CopiedFiles));
+        Assert.Empty(tree.CreatedDirectories);
+    }
+
+    [Fact]
+    public async Task CopyAsync_DestinationIsAncestorOfSource_Succeeds()
+    {
+        FakeRemoteTree tree = new FakeRemoteTree();
+
+        await RemoteCopyPlanner.CopyAsync(
+            "/srv/data/sub",
+            "/srv/out",
+            recursive: false,
+            tree.BuildOps());
+
+        Assert.Equal(
+            ("/srv/data/sub", "/srv/out"),
+            Assert.Single(tree.CopiedFiles));
+        Assert.Empty(tree.CreatedDirectories);
+    }
+
+    [Fact]
+    public async Task CopyAsync_SourceHasTrailingSlashAndDestinationIsDescendant_ThrowsIOException()
+    {
+        FakeRemoteTree tree = new FakeRemoteTree();
+        tree.Directories.Add("/srv/data/");
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            RemoteCopyPlanner.CopyAsync(
+                "/srv/data/",
+                "/srv/data/backup",
+                recursive: true,
+                tree.BuildOps()));
+
+        Assert.Empty(tree.CopiedFiles);
+        Assert.Empty(tree.CreatedDirectories);
+    }
+
+    [Fact]
+    public void IsSameOrDescendantPath_RootSource_RejectsEveryDestination()
+    {
+        Assert.True(RemoteCopyPlanner.IsSameOrDescendantPath("/", "/srv/data"));
+        Assert.True(RemoteCopyPlanner.IsSameOrDescendantPath("/", "/"));
+        Assert.True(RemoteCopyPlanner.IsSameOrDescendantPath("/", "/a/b/c"));
+    }
+
+    [Fact]
     public async Task CopyAsync_DirectorySourceWithoutRecursive_ThrowsIOException()
     {
         FakeRemoteTree tree = new FakeRemoteTree();
