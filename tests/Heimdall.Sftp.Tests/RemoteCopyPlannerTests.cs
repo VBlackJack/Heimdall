@@ -99,6 +99,78 @@ public sealed class RemoteCopyPlannerTests
         Assert.Equal("/srv/data/file.txt", RemoteCopyPlanner.JoinRemote("/srv/data", "file.txt"));
     }
 
+    [Fact]
+    public void SftpBrowserRoundtripFileCopy_UsesPublishIfAbsentCommitMode()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            FindRepoRoot(),
+            "src",
+            "Heimdall.Sftp",
+            "SftpBrowser.cs"));
+        string roundtripMethod = ExtractMethod(source, "private async Task CopyFileViaRoundtripAsync(");
+        string commitMethod = ExtractMethod(source, "private static void CommitUploadedTemp(");
+        int publishBranchStart = commitMethod.IndexOf(
+            "if (commitMode == UploadCommitMode.PublishIfAbsent)",
+            StringComparison.Ordinal);
+        int replaceBranchStart = commitMethod.IndexOf(
+            "if (commitMode != UploadCommitMode.ReplaceExisting)",
+            StringComparison.Ordinal);
+
+        Assert.True(publishBranchStart >= 0);
+        Assert.True(replaceBranchStart > publishBranchStart);
+
+        string publishBranch = commitMethod[publishBranchStart..replaceBranchStart];
+
+        Assert.Contains("UploadCommitMode.PublishIfAbsent", roundtripMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("UploadCommitMode.ReplaceExisting", roundtripMethod, StringComparison.Ordinal);
+        Assert.Contains("SftpAtomicUpload.CommitPublishIfAbsent(", publishBranch, StringComparison.Ordinal);
+        Assert.DoesNotContain("SftpAtomicUpload.CommitRename(", publishBranch, StringComparison.Ordinal);
+    }
+
+    private static string ExtractMethod(string source, string signature)
+    {
+        int methodStart = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(methodStart >= 0, $"Method signature was not found: {signature}");
+
+        int openingBrace = source.IndexOf('{', methodStart);
+        Assert.True(openingBrace >= 0, $"Method opening brace was not found: {signature}");
+
+        int depth = 0;
+        for (int index = openingBrace; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+            {
+                depth++;
+            }
+            else if (source[index] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[methodStart..(index + 1)];
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Method closing brace was not found: {signature}");
+    }
+
+    private static string FindRepoRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Repository root was not found.");
+    }
+
     private sealed class FakeRemoteTree
     {
         public HashSet<string> ExistingDestinations { get; } = new HashSet<string>(StringComparer.Ordinal);

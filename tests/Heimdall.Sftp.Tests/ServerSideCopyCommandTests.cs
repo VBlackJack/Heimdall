@@ -19,9 +19,9 @@ using Heimdall.Sftp;
 namespace Heimdall.Sftp.Tests;
 
 /// <summary>
-/// Unit tests for <see cref="ServerSideCopyCommand"/>: the exact <c>cp</c> command string, the
-/// <c>-p</c> (file) vs <c>-a</c> (directory) flag selection, the <c>--</c> end-of-options guard, and
-/// the single-quote shell escaping applied to both paths (CWE-78).
+/// Unit tests for <see cref="ServerSideCopyCommand"/>: exact non-clobbering command chains,
+/// sibling-temp cleanup, exclusive directory-root reservation, metadata flags, the <c>--</c>
+/// end-of-options guard, and single-quote shell escaping for every remote path (CWE-78).
 /// </summary>
 public sealed class ServerSideCopyCommandTests
 {
@@ -30,7 +30,10 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
 
-        Assert.Equal("cp -p -- '/srv/a.txt' '/srv/b.txt'", command);
+        Assert.Equal(
+            "cp -p -- '/srv/a.txt' '/srv/b.txt'.$$.part && ln -- '/srv/b.txt'.$$.part '/srv/b.txt'; "
+            + "status=$?; rm -f -- '/srv/b.txt'.$$.part; exit $status",
+            command);
     }
 
     [Fact]
@@ -38,7 +41,7 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive: true);
 
-        Assert.Equal("cp -a -- '/srv/data' '/srv/copy'", command);
+        Assert.Equal("mkdir -- '/srv/copy' && cp -a -- '/srv/data'/. '/srv/copy'", command);
     }
 
     [Fact]
@@ -51,7 +54,9 @@ public sealed class ServerSideCopyCommandTests
 
         // EscapeShellArg wraps in single quotes and rewrites each embedded ' as '\'' .
         Assert.Equal(
-            "cp -p -- '/srv/my dir/it'\\''s a file.txt' '/dst/o'\\''brien'",
+            "cp -p -- '/srv/my dir/it'\\''s a file.txt' '/dst/o'\\''brien'.$$.part "
+            + "&& ln -- '/dst/o'\\''brien'.$$.part '/dst/o'\\''brien'; status=$?; "
+            + "rm -f -- '/dst/o'\\''brien'.$$.part; exit $status",
             command);
     }
 
@@ -60,6 +65,83 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/my data", "/srv/my copy", recursive: true);
 
-        Assert.Equal("cp -a -- '/srv/my data' '/srv/my copy'", command);
+        Assert.Equal("mkdir -- '/srv/my copy' && cp -a -- '/srv/my data'/. '/srv/my copy'", command);
+    }
+
+    [Fact]
+    public void Build_File_WritesSiblingTempAndNeverCopiesDirectlyToDestination()
+    {
+        string command = ServerSideCopyCommand.Build(
+            "/srv/source.txt",
+            "/srv/destination.txt",
+            recursive: false);
+        string tempPath = "'/srv/destination.txt'.$$.part";
+
+        Assert.Contains($"cp -p -- '/srv/source.txt' {tempPath}", command, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "cp -p -- '/srv/source.txt' '/srv/destination.txt' ",
+            command,
+            StringComparison.Ordinal);
+        Assert.Contains($"ln -- {tempPath} '/srv/destination.txt'", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_File_CleansTempAfterLinkFailureBeforeReturningLinkStatus()
+    {
+        string command = ServerSideCopyCommand.Build(
+            "/srv/source.txt",
+            "/srv/destination.txt",
+            recursive: false);
+        string tempPath = "'/srv/destination.txt'.$$.part";
+        int linkIndex = command.IndexOf($"ln -- {tempPath}", StringComparison.Ordinal);
+        int statusIndex = command.IndexOf("; status=$?;", StringComparison.Ordinal);
+        int cleanupIndex = command.IndexOf($"rm -f -- {tempPath}", StringComparison.Ordinal);
+        int exitIndex = command.IndexOf("exit $status", StringComparison.Ordinal);
+
+        Assert.True(linkIndex >= 0);
+        Assert.True(statusIndex > linkIndex);
+        Assert.True(cleanupIndex > statusIndex);
+        Assert.True(exitIndex > cleanupIndex);
+    }
+
+    [Fact]
+    public void Build_File_GuardsEveryPathCommandAndEscapesEveryPath()
+    {
+        string command = ServerSideCopyCommand.Build(
+            "/srv/my dir/it's.txt",
+            "/dst/o'brien.txt",
+            recursive: false);
+        string escapedSource = "'/srv/my dir/it'\\''s.txt'";
+        string escapedDestination = "'/dst/o'\\''brien.txt'";
+        string escapedTemp = $"{escapedDestination}.$$.part";
+        string copyCommand = command[..command.IndexOf(" && ", StringComparison.Ordinal)];
+        int linkStart = command.IndexOf("ln ", StringComparison.Ordinal);
+        int linkEnd = command.IndexOf(';', linkStart);
+        string linkCommand = command[linkStart..linkEnd];
+        int cleanupStart = command.IndexOf("rm ", StringComparison.Ordinal);
+        int cleanupEnd = command.IndexOf(';', cleanupStart);
+        string cleanupCommand = command[cleanupStart..cleanupEnd];
+
+        Assert.Contains(" -- ", copyCommand, StringComparison.Ordinal);
+        Assert.Contains(" -- ", linkCommand, StringComparison.Ordinal);
+        Assert.Contains(" -- ", cleanupCommand, StringComparison.Ordinal);
+        Assert.Contains(escapedSource, copyCommand, StringComparison.Ordinal);
+        Assert.Contains(escapedTemp, copyCommand, StringComparison.Ordinal);
+        Assert.Contains(escapedTemp, linkCommand, StringComparison.Ordinal);
+        Assert.Contains(escapedDestination, linkCommand, StringComparison.Ordinal);
+        Assert.Contains(escapedTemp, cleanupCommand, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_Directory_ReservesRootBeforeArchiveCopy()
+    {
+        string command = ServerSideCopyCommand.Build("/srv/source", "/srv/destination", recursive: true);
+        int reserveIndex = command.IndexOf("mkdir -- '/srv/destination'", StringComparison.Ordinal);
+        int copyIndex = command.IndexOf(
+            "cp -a -- '/srv/source'/. '/srv/destination'",
+            StringComparison.Ordinal);
+
+        Assert.Equal(0, reserveIndex);
+        Assert.True(copyIndex > reserveIndex);
     }
 }

@@ -19,22 +19,21 @@ using Heimdall.Core.Security;
 namespace Heimdall.Sftp;
 
 /// <summary>
-/// Builds the <c>cp</c> command line for a server-side SFTP copy run over an SSH exec channel.
+/// Builds a non-clobbering server-side SFTP copy command run over an SSH exec channel.
 /// Pure string construction with no I/O, so the shell-escaping contract is unit-testable in isolation.
 /// </summary>
 /// <remarks>
 /// Both paths are single-quoted through <see cref="InputValidator.EscapeShellArg(string)"/> (CWE-78),
 /// and a <c>--</c> end-of-options guard prevents a path that begins with <c>-</c> from being parsed as
-/// a flag. Flag choice preserves metadata, fixing the permission/timestamp loss of the download +
-/// re-upload roundtrip: <c>-p</c> preserves mode, ownership and timestamps for a single file, and
-/// <c>-a</c> (archive) does the same recursively for a directory tree. No <c>-n</c>/<c>-f</c> is added:
-/// overwrite protection is enforced by the caller's destination-exists check before this command runs.
+/// a flag. File copies use a sibling temp followed by <c>ln</c>, so the final path appears complete and
+/// link creation fails atomically on collision. Directory copies reserve the root with <c>mkdir</c> before
+/// filling it. Metadata remains preserved through <c>-p</c> for files and <c>-a</c> for directory trees.
 /// </remarks>
 internal static class ServerSideCopyCommand
 {
     /// <summary>
-    /// Returns <c>cp -p -- '&lt;src&gt;' '&lt;dst&gt;'</c> for a file copy, or
-    /// <c>cp -a -- '&lt;src&gt;' '&lt;dst&gt;'</c> when <paramref name="recursive"/> is true.
+    /// Returns a sibling-temp and hard-link chain for a file copy, or an exclusive root reservation
+    /// followed by an archive copy when <paramref name="recursive"/> is true.
     /// </summary>
     /// <param name="sourcePath">Remote source path (escaped before use).</param>
     /// <param name="destinationPath">Remote destination path (escaped before use).</param>
@@ -44,10 +43,16 @@ internal static class ServerSideCopyCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        var flags = recursive ? "-a" : "-p";
-        var source = InputValidator.EscapeShellArg(sourcePath);
-        var destination = InputValidator.EscapeShellArg(destinationPath);
+        string source = InputValidator.EscapeShellArg(sourcePath);
+        string destination = InputValidator.EscapeShellArg(destinationPath);
 
-        return $"cp {flags} -- {source} {destination}";
+        if (recursive)
+        {
+            return $"mkdir -- {destination} && cp -a -- {source}/. {destination}";
+        }
+
+        string tempDestination = $"{destination}.$$.part";
+        return $"cp -p -- {source} {tempDestination} && ln -- {tempDestination} {destination}; "
+            + $"status=$?; rm -f -- {tempDestination}; exit $status";
     }
 }

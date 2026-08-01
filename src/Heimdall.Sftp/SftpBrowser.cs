@@ -32,6 +32,12 @@ namespace Heimdall.Sftp;
 /// </remarks>
 public sealed class SftpBrowser : IRemoteBrowser
 {
+    private enum UploadCommitMode
+    {
+        ReplaceExisting,
+        PublishIfAbsent,
+    }
+
     private static readonly TimeSpan DefaultDisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
 
     private SftpClient? _client;
@@ -345,26 +351,35 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <param name="localPath">Local source file path.</param>
     /// <param name="remotePath">Full remote destination path.</param>
     /// <param name="ct">Cancellation token.</param>
-    public async Task UploadFileAsync(
+    public Task UploadFileAsync(
         string localPath,
         string remotePath,
         CancellationToken ct = default)
+    {
+        return UploadFileAsync(localPath, remotePath, UploadCommitMode.ReplaceExisting, ct);
+    }
+
+    private async Task UploadFileAsync(
+        string localPath,
+        string remotePath,
+        UploadCommitMode commitMode,
+        CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
 
         string fileName = Path.GetFileName(localPath);
-        var fileInfo = LocalUploadSource.GetRequiredRegularFile(localPath);
+        FileInfo fileInfo = LocalUploadSource.GetRequiredRegularFile(localPath);
         long totalBytes = fileInfo.Length;
         string tempRemotePath = SftpAtomicUpload.CreateRemoteTempPath(remotePath);
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var client = GetConnectedClient();
+            SftpClient client = GetConnectedClient();
             try
             {
-                await using var fileStream = new FileStream(
+                await using FileStream fileStream = new FileStream(
                     localPath,
                     FileMode.Open,
                     FileAccess.Read,
@@ -391,22 +406,7 @@ public sealed class SftpBrowser : IRemoteBrowser
                     });
                     ct.ThrowIfCancellationRequested();
                     PreserveUploadModeBeforeCommit(client, tempRemotePath, remotePath);
-                    SftpAtomicUpload.CommitRename(
-                        tempRemotePath,
-                        remotePath,
-                        atomicRename: (temp, final) => client.RenameFile(temp, final, isPosix: true),
-                        plainRename: (temp, final) => client.RenameFile(temp, final),
-                        remoteExists: client.Exists,
-                        deleteRemote: path =>
-                        {
-                            if (client.Exists(path))
-                            {
-                                client.DeleteFile(path);
-                            }
-                        },
-                        canDemoteAtomicRenameFailure: IsAtomicRenameCapabilityFailure,
-                        isExistingTargetRegularFile: path =>
-                            GetEntryWithoutFollowingTarget(client, path).Entry.IsRegularFile);
+                    CommitUploadedTemp(client, tempRemotePath, remotePath, commitMode);
                 }, ct).ConfigureAwait(false);
             }
             catch
@@ -429,6 +429,48 @@ public sealed class SftpBrowser : IRemoteBrowser
         {
             _clientLock.Release();
         }
+    }
+
+    private static void CommitUploadedTemp(
+        SftpClient client,
+        string tempRemotePath,
+        string remotePath,
+        UploadCommitMode commitMode)
+    {
+        if (commitMode == UploadCommitMode.PublishIfAbsent)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] publish-if-absent for '{remotePath}' relies on plain SFTP rename semantics; "
+                + "a residual collision window may remain on some servers or filesystems.");
+            SftpAtomicUpload.CommitPublishIfAbsent(
+                tempRemotePath,
+                remotePath,
+                plainRename: (temp, final) => client.RenameFile(temp, final),
+                remoteExists: client.Exists);
+            return;
+        }
+
+        if (commitMode != UploadCommitMode.ReplaceExisting)
+        {
+            throw new ArgumentOutOfRangeException(nameof(commitMode), commitMode, null);
+        }
+
+        SftpAtomicUpload.CommitRename(
+            tempRemotePath,
+            remotePath,
+            atomicRename: (temp, final) => client.RenameFile(temp, final, isPosix: true),
+            plainRename: (temp, final) => client.RenameFile(temp, final),
+            remoteExists: client.Exists,
+            deleteRemote: path =>
+            {
+                if (client.Exists(path))
+                {
+                    client.DeleteFile(path);
+                }
+            },
+            canDemoteAtomicRenameFailure: IsAtomicRenameCapabilityFailure,
+            isExistingTargetRegularFile: path =>
+                GetEntryWithoutFollowingTarget(client, path).Entry.IsRegularFile);
     }
 
     /// <summary>Creates a directory on the remote host.</summary>
@@ -663,6 +705,8 @@ public sealed class SftpBrowser : IRemoteBrowser
                     return true;
                 }
 
+                // Collision, EXDEV, and missing-tool failures deliberately share this correctness fallback.
+                // Parsing stderr would be server-specific and cannot make the roundtrip commit safer.
                 Heimdall.Core.Logging.FileLogger.Warn(
                     $"[SftpBrowser] SFTP server-side copy on {connectionParams.Host} exited {cmd.ExitStatus}; "
                     + $"falling back to roundtrip. stderr: {cmd.Error}");
@@ -771,7 +815,12 @@ public sealed class SftpBrowser : IRemoteBrowser
         try
         {
             await DownloadFileAsync(sourcePath, localTemp, ct).ConfigureAwait(false);
-            await UploadFileAsync(localTemp, destinationPath, ct).ConfigureAwait(false);
+            await UploadFileAsync(
+                    localTemp,
+                    destinationPath,
+                    UploadCommitMode.PublishIfAbsent,
+                    ct)
+                .ConfigureAwait(false);
         }
         finally
         {

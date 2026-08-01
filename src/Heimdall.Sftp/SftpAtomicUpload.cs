@@ -32,6 +32,45 @@ public static class SftpAtomicUpload
     }
 
     /// <summary>
+    /// Publishes the uploaded temp path only when the final remote path is absent.
+    /// </summary>
+    /// <remarks>
+    /// The re-probe classifies the error message only and is deliberately not part of the data path; it can be
+    /// wrong under concurrency, which is harmless because the rename has already decided the outcome.
+    /// </remarks>
+    /// <param name="tempRemotePath">Uploaded temporary path to publish.</param>
+    /// <param name="finalRemotePath">Final path that must not be replaced.</param>
+    /// <param name="plainRename">Plain SFTP rename operation used for the publish attempt.</param>
+    /// <param name="remoteExists">Remote existence probe used only after a failed rename.</param>
+    public static void CommitPublishIfAbsent(
+        string tempRemotePath,
+        string finalRemotePath,
+        Action<string, string> plainRename,
+        Func<string, bool> remoteExists)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
+        ArgumentNullException.ThrowIfNull(plainRename);
+        ArgumentNullException.ThrowIfNull(remoteExists);
+
+        try
+        {
+            plainRename(tempRemotePath, finalRemotePath);
+        }
+        catch (Exception renameException)
+        {
+            if (remoteExists(finalRemotePath))
+            {
+                throw new IOException(
+                    $"Refused to copy: destination already exists: {finalRemotePath}",
+                    renameException);
+            }
+
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Replaces the final remote path with the uploaded temp path.
     /// </summary>
     /// <remarks>
