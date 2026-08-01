@@ -1147,7 +1147,9 @@ public sealed class SftpBrowser : IRemoteBrowser
                 }
                 else
                 {
-                    client.DeleteFile(fullPath);
+                    // SftpClient.DeleteFile canonicalizes through SSH_FXP_REALPATH and can delete a symlink target.
+                    // ISftpFile.Delete acts on the listed entry's stored path instead.
+                    entry.Delete();
                 }
             }
         }
