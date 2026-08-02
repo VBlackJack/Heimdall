@@ -93,6 +93,39 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Null(item.ExistingTargetKind);
     }
 
+    [Theory]
+    [InlineData(RemoteEntryKind.SymbolicLink)]
+    [InlineData(RemoteEntryKind.Fifo)]
+    [InlineData(RemoteEntryKind.Socket)]
+    [InlineData(RemoteEntryKind.Device)]
+    public async Task Inventory_UnsupportedEntry_IsExcludedFromConflictAnalysis(
+        RemoteEntryKind kind)
+    {
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/dst"] =
+        [
+            CreateRemoteEntry("entry", "/dst/entry", kind),
+        ];
+        IReadOnlyList<RemoteUploadOp> ops =
+        [
+            new RemoteUploadOp(RemoteUploadOpKind.UploadFile, "local", "/dst/entry"),
+        ];
+
+        EmbeddedSftpViewModel.RemoteUploadConflictInventory inventory =
+            await EmbeddedSftpViewModel.BuildRemoteUploadConflictInventoryAsync(
+                browser,
+                ops,
+                CancellationToken.None);
+        FileConflictAnalysisItem item = Assert.Single(FileConflictPlanner.Analyze(
+            ToPlanItems(ops),
+            inventory.GetTargetKind,
+            StringComparer.Ordinal));
+
+        Assert.Null(inventory.GetTargetKind("/dst/entry"));
+        Assert.True(inventory.IsUnsupportedTarget("/dst/entry"));
+        Assert.False(item.HasConflict);
+    }
+
     [Fact]
     public async Task UploadEntriesAsync_NoConflict_DoesNotShowDialog()
     {
@@ -111,6 +144,53 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Collection(
             browser.UploadCalls,
             call => Assert.Equal((localFile, "/srv/alpha.txt"), call));
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_SymbolicLinkDestination_SkipsUploadAndShowsWarning()
+    {
+        using TempDirectory temp = new();
+        string localFile = Path.Combine(temp.Path, "entry");
+        await File.WriteAllTextAsync(localFile, "payload");
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/dst"] =
+        [
+            CreateRemoteEntry("entry", "/dst/entry", RemoteEntryKind.SymbolicLink),
+        ];
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.UploadEntriesAsync([localFile], "/dst");
+
+        Assert.Empty(browser.UploadCalls);
+        Assert.Equal(0, presenter.CallCount);
+        Assert.Equal(
+            "Skipped 1 upload(s): the destination already exists and is not a regular file. See the log for details.",
+            viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_FolderMappedToSymbolicLink_SkipsWholeSubtree()
+    {
+        using TempDirectory temp = new();
+        string localDirectory = Path.Combine(temp.Path, "project");
+        Directory.CreateDirectory(localDirectory);
+        await File.WriteAllTextAsync(Path.Combine(localDirectory, "child.txt"), "payload");
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/dst"] =
+        [
+            CreateRemoteEntry("project", "/dst/project", RemoteEntryKind.SymbolicLink),
+        ];
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.UploadEntriesAsync([localDirectory], "/dst");
+
+        Assert.Empty(browser.UploadCalls);
+        Assert.Empty(browser.CreateDirectoryCalls);
+        Assert.Equal(0, presenter.CallCount);
     }
 
     [Fact]
@@ -204,6 +284,20 @@ public sealed class EmbeddedSftpUploadConflictTests
             isDirectory ? 0 : 1,
             DateTime.UnixEpoch,
             isDirectory ? "rwxr-xr-x" : "rw-r--r--",
+            "1000",
+            "1000");
+
+    private static SftpFileInfo CreateRemoteEntry(
+        string name,
+        string fullPath,
+        RemoteEntryKind kind)
+        => new SftpFileInfo(
+            name,
+            fullPath,
+            kind,
+            kind == RemoteEntryKind.Directory ? 0 : 1,
+            DateTime.UnixEpoch,
+            kind == RemoteEntryKind.Directory ? "rwxr-xr-x" : "rw-r--r--",
             "1000",
             "1000");
 

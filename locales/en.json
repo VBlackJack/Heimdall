@@ -1995,6 +1995,7 @@
   "WarnFtpCleartextBadge": "Credentials sent in clear text (no TLS)",
   "WarnFtpsDataChannelIdentityBadge": "FTPS data-channel identity is not verified",
   "WarnRemoteEntriesSkippedUnsupported": "Skipped {0} entries that are neither files nor directories. See the log for details.",
+  "WarnUploadTargetsSkippedUnsupported": "Skipped {0} upload(s): the destination already exists and is not a regular file. See the log for details.",
   "WarnRemoteReplacementNonAtomic": "Destination '{0}' was replaced without an atomic guarantee.",
   "WarnRdpFileAclFailed": "The temporary .rdp file could not be locked down with a restricted ACL. It contains the host and username, but no password; the session was still launched.",
   "ErrorTelnetConnectionFailed": "Telnet connection failed: {0}",

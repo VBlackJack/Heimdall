@@ -57,6 +57,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         Unavailable
     }
 
+    /// <summary>Outcome of a planned upload run: completion plus the destinations refused up front.</summary>
+    private readonly record struct UploadPlanOutcome(
+        bool Completed,
+        IReadOnlyList<string> SkippedUnsupportedTargets);
+
     private const string SudoStderrTerminalRequired = "a terminal is required";
     private const string SudoStderrNoTtyPresent = "no tty present";
     private const string SudoStderrNoAskpass = "no askpass";
@@ -880,14 +885,30 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         CancellationToken ct = transferCts.Token;
         TransferProgressValue = 0;
         bool refreshAfterTransfer = true;
+        string? pendingUnsupportedWarning = null;
 
         try
         {
-            bool completed = await UploadPlannedEntriesAsync(localPaths, targetRemoteDir, ct);
-            refreshAfterTransfer = completed;
-            UpdateStatus(completed
+            UploadPlanOutcome outcome = await UploadPlannedEntriesAsync(localPaths, targetRemoteDir, ct);
+            refreshAfterTransfer = outcome.Completed;
+            UpdateStatus(outcome.Completed
                 ? _localizer?["SftpStatusTransferComplete"] ?? "Transfer complete"
                 : _localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+
+            if (outcome.Completed && outcome.SkippedUnsupportedTargets.Count > 0)
+            {
+                foreach (string path in outcome.SkippedUnsupportedTargets)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"EmbeddedSFTP skipped upload to unsupported remote destination '{path}'.");
+                }
+
+                string warning = _localizer?.Format(
+                    "WarnUploadTargetsSkippedUnsupported",
+                    outcome.SkippedUnsupportedTargets.Count)
+                    ?? $"Skipped {outcome.SkippedUnsupportedTargets.Count} upload(s): the destination already exists and is not a regular file. See the log for details.";
+                pendingUnsupportedWarning = warning;
+            }
         }
         catch (OperationCanceledException)
         {
@@ -904,8 +925,22 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             CompleteTransfer(transferCts);
             if (refreshAfterTransfer)
             {
-                _ = Refresh();
+                if (pendingUnsupportedWarning is not null)
+                {
+                    // The refresh ends with UpdateStatus("Ready"); await it so the aggregated
+                    // warning below is the last message written, as the paste path already does.
+                    await Refresh();
+                }
+                else
+                {
+                    _ = Refresh();
+                }
             }
+        }
+
+        if (pendingUnsupportedWarning is not null)
+        {
+            ShowOperationWarning(pendingUnsupportedWarning);
         }
     }
 
@@ -914,14 +949,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// ordered operations against the (decorated, journaling) browser: <c>CreateDirectoryAsync</c> for
     /// each directory and <c>UploadFileAsync</c> for each file, keeping the sudo permission fallback.
     /// </summary>
-    private async Task<bool> UploadPlannedEntriesAsync(
+    private async Task<UploadPlanOutcome> UploadPlannedEntriesAsync(
         IReadOnlyList<string> localPaths,
         string targetRemoteDir,
         CancellationToken ct)
     {
+        List<string> skippedUnsupportedTargets = [];
+
         if (_browser is null)
         {
-            return false;
+            return new UploadPlanOutcome(false, skippedUnsupportedTargets);
         }
 
         List<LocalUploadEntry> roots = new(localPaths.Count);
@@ -939,7 +976,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (roots.Count == 0)
         {
-            return true;
+            return new UploadPlanOutcome(true, skippedUnsupportedTargets);
         }
 
         IReadOnlyList<RemoteUploadOp> ops =
@@ -948,8 +985,25 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             _browser,
             ops,
             ct);
+        List<RemoteUploadOp> plannedOps = new(ops.Count);
+        foreach (RemoteUploadOp op in ops)
+        {
+            if (inventory.IsUnsupportedTarget(op.RemotePath))
+            {
+                skippedUnsupportedTargets.Add(op.RemotePath);
+                continue;
+            }
+
+            plannedOps.Add(op);
+        }
+
+        if (plannedOps.Count == 0)
+        {
+            return new UploadPlanOutcome(true, skippedUnsupportedTargets);
+        }
+
         IReadOnlyList<FileConflictAnalysisItem> conflictAnalysis = FileConflictPlanner.Analyze(
-            ops.Select(op => new FileConflictPlanItem(
+            plannedOps.Select(op => new FileConflictPlanItem(
                 op.LocalPath,
                 op.RemotePath,
                 op.Kind == RemoteUploadOpKind.MakeDirectory
@@ -970,7 +1024,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 .ShowAsync(dialogViewModel);
             if (dialogResult is null)
             {
-                return false;
+                return new UploadPlanOutcome(false, skippedUnsupportedTargets);
             }
 
             decisions = dialogResult.Decisions;
@@ -984,12 +1038,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         int totalFiles = resolvedOps.Count(item =>
             item.Action != FileConflictEffectiveAction.Skip
-            && ops[item.Index].Kind == RemoteUploadOpKind.UploadFile);
+            && plannedOps[item.Index].Kind == RemoteUploadOpKind.UploadFile);
         int uploadedFiles = 0;
 
         if (resolvedOps.Any(item =>
             item.Action != FileConflictEffectiveAction.Skip
-            && ops[item.Index].Kind == RemoteUploadOpKind.MakeDirectory))
+            && plannedOps[item.Index].Kind == RemoteUploadOpKind.MakeDirectory))
         {
             TransferStatusText = _localizer?["SftpStatusUploadingFolder"] ?? "Uploading folder...";
         }
@@ -1002,7 +1056,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 continue;
             }
 
-            RemoteUploadOp op = ops[resolved.Index];
+            RemoteUploadOp op = plannedOps[resolved.Index];
 
             if (op.Kind == RemoteUploadOpKind.MakeDirectory)
             {
@@ -1047,7 +1101,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
         }
 
-        return true;
+        return new UploadPlanOutcome(true, skippedUnsupportedTargets);
     }
 
     /// <summary>
@@ -1063,6 +1117,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         Dictionary<string, FileConflictItemKind> targetKinds = new(StringComparer.Ordinal);
         HashSet<string> existingDirectories = new(StringComparer.Ordinal);
+        HashSet<string> unsupportedTargets = new(StringComparer.Ordinal);
         IEnumerable<string> parentDirectories = ops
             .Select(op => GetParentPath(op.RemotePath))
             .Distinct(StringComparer.Ordinal);
@@ -1081,9 +1136,21 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 foreach (SftpFileInfo entry in entries)
                 {
                     string targetPath = CombineRemotePath(parentDirectory, entry.Name);
-                    targetKinds[targetPath] = entry.IsDirectory
-                        ? FileConflictItemKind.Directory
-                        : FileConflictItemKind.File;
+                    switch (entry.Kind)
+                    {
+                        case RemoteEntryKind.Directory:
+                            targetKinds[targetPath] = FileConflictItemKind.Directory;
+                            break;
+                        case RemoteEntryKind.File:
+                            targetKinds[targetPath] = FileConflictItemKind.File;
+                            break;
+                        case RemoteEntryKind.SymbolicLink:
+                        case RemoteEntryKind.Fifo:
+                        case RemoteEntryKind.Socket:
+                        case RemoteEntryKind.Device:
+                            unsupportedTargets.Add(targetPath);
+                            break;
+                    }
                 }
             }
             catch (Exception ex) when (ex is IOException or SftpPathNotFoundException)
@@ -1092,7 +1159,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
         }
 
-        return new RemoteUploadConflictInventory(targetKinds, existingDirectories);
+        return new RemoteUploadConflictInventory(
+            targetKinds,
+            existingDirectories,
+            unsupportedTargets);
     }
 
     /// <summary>In-memory remote inventory used by upload analysis and execution.</summary>
@@ -1100,13 +1170,39 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         private readonly IReadOnlyDictionary<string, FileConflictItemKind> _targetKinds;
         private readonly IReadOnlySet<string> _existingDirectories;
+        private readonly IReadOnlySet<string> _unsupportedTargets;
 
         internal RemoteUploadConflictInventory(
             IReadOnlyDictionary<string, FileConflictItemKind> targetKinds,
-            IReadOnlySet<string> existingDirectories)
+            IReadOnlySet<string> existingDirectories,
+            IReadOnlySet<string> unsupportedTargets)
         {
             _targetKinds = targetKinds;
             _existingDirectories = existingDirectories;
+            _unsupportedTargets = unsupportedTargets;
+        }
+
+        /// <summary>
+        /// Gets whether the target path is, or lives under, a remote entry that is neither a
+        /// regular file nor a directory. Heimdall cannot write such a destination, and it will
+        /// not traverse it either.
+        /// </summary>
+        internal bool IsUnsupportedTarget(string targetPath)
+        {
+            if (_unsupportedTargets.Contains(targetPath))
+            {
+                return true;
+            }
+
+            foreach (string unsupported in _unsupportedTargets)
+            {
+                if (targetPath.StartsWith(unsupported + "/", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal FileConflictItemKind? GetTargetKind(string targetPath)
