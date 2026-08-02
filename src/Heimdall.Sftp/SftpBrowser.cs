@@ -1305,6 +1305,9 @@ public sealed record SftpFileInfo(
 {
     /// <summary>Gets whether this entry is a directory.</summary>
     public bool IsDirectory => Kind == RemoteEntryKind.Directory;
+
+    /// <summary>Gets whether this entry is a regular file (not a directory, link, fifo, socket or device).</summary>
+    public bool IsRegularFile => Kind == RemoteEntryKind.File;
 }
 
 /// <summary>Progress information for an SFTP file transfer.</summary>

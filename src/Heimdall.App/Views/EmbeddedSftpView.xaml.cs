@@ -707,16 +707,16 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {
         bool hasSelection = FileListView.SelectedItem is not null;
-        bool isFile = FileListView.SelectedItem is SftpFileInfo f && !f.IsDirectory;
+        bool isRegularFile = FileListView.SelectedItem is SftpFileInfo f && f.IsRegularFile;
         bool isDir = FileListView.SelectedItem is SftpFileInfo d && d.IsDirectory;
         bool singleSelection = FileListView.SelectedItems.Count == 1;
 
         CtxOpen.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
-        // Editing (integrated or external) is a single-file action: require a single file selection so it
-        // is hidden on directories, an empty selection, and a multi-selection (where it would silently
-        // act on the primary item alone).
-        CtxEdit.Visibility = isFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
-        CtxEditExternal.Visibility = isFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
+        // Editing (integrated or external) is a single-file action: require a single regular file selection.
+        // Links, fifos, sockets, and devices are hidden because Heimdall cannot write them back. Editing is
+        // also hidden on directories, an empty selection, and a multi-selection.
+        CtxEdit.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
+        CtxEditExternal.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxDownload.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         // Rename targets exactly one entry, so hide it on a multi-selection.
         CtxRename.Visibility = singleSelection ? Visibility.Visible : Visibility.Collapsed;
@@ -822,6 +822,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
     private async Task EditFileExternalAsync(SftpFileInfo file)
     {
+        if (!file.IsRegularFile)
+        {
+            UpdateStatus(_localizer?.Format("SftpStatusEditUnsupportedEntry", file.Name)
+                ?? $"Cannot edit {file.Name}: this entry is not a regular file.");
+            return;
+        }
+
         if (_disposed || _editor is null)
         {
             return;
@@ -861,6 +868,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
     private async Task EditFileAsync(SftpFileInfo file)
     {
+        if (!file.IsRegularFile)
+        {
+            UpdateStatus(_localizer?.Format("SftpStatusEditUnsupportedEntry", file.Name)
+                ?? $"Cannot edit {file.Name}: this entry is not a regular file.");
+            return;
+        }
+
         if (_disposed || _operationsBrowser is null)
         {
             return;
