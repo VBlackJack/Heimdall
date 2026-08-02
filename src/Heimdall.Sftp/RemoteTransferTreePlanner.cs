@@ -44,6 +44,16 @@ public sealed record RemoteTransferOp(
     string DestinationRemotePath);
 
 /// <summary>
+/// The ordered operations for a cross-endpoint transfer and the unsupported source entries that
+/// were deliberately excluded from it.
+/// </summary>
+/// <param name="Ops">The ordered remote transfer operations.</param>
+/// <param name="SkippedUnsupportedPaths">Source paths that are neither files nor directories.</param>
+public sealed record RemoteTransferPlan(
+    IReadOnlyList<RemoteTransferOp> Ops,
+    IReadOnlyList<string> SkippedUnsupportedPaths);
+
+/// <summary>
 /// Pure planner that flattens remote source files and directories into ordered cross-endpoint
 /// transfer operations. All source listing I/O is delegated through the <c>listDirectory</c> callback,
 /// so the planner is testable with an in-memory tree and works for SFTP and FTP browsers alike.
@@ -60,7 +70,7 @@ public static class RemoteTransferTreePlanner
     /// <param name="targetRemoteDir">The destination directory.</param>
     /// <param name="listDirectory">Lists immediate children of a remote source directory.</param>
     /// <exception cref="IOException">An entry name is unsafe, or recursion exceeds <see cref="MaxTransferDepth"/>.</exception>
-    public static async Task<IReadOnlyList<RemoteTransferOp>> PlanAsync(
+    public static async Task<RemoteTransferPlan> PlanAsync(
         IReadOnlyList<SftpFileInfo> roots,
         string targetRemoteDir,
         Func<string, CancellationToken, Task<IReadOnlyList<SftpFileInfo>>> listDirectory,
@@ -71,13 +81,21 @@ public static class RemoteTransferTreePlanner
         ArgumentNullException.ThrowIfNull(listDirectory);
 
         var ops = new List<RemoteTransferOp>();
+        var skippedUnsupportedPaths = new List<string>();
         foreach (SftpFileInfo root in roots)
         {
-            await AppendEntryAsync(root, targetRemoteDir, listDirectory, depth: 0, ops, ct)
+            await AppendEntryAsync(
+                root,
+                targetRemoteDir,
+                listDirectory,
+                depth: 0,
+                ops,
+                skippedUnsupportedPaths,
+                ct)
                 .ConfigureAwait(false);
         }
 
-        return ops;
+        return new RemoteTransferPlan(ops, skippedUnsupportedPaths);
     }
 
     private static async Task AppendEntryAsync(
@@ -86,9 +104,16 @@ public static class RemoteTransferTreePlanner
         Func<string, CancellationToken, Task<IReadOnlyList<SftpFileInfo>>> listDirectory,
         int depth,
         List<RemoteTransferOp> ops,
+        List<string> skippedUnsupportedPaths,
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+
+        if (entry.Kind is not (RemoteEntryKind.File or RemoteEntryKind.Directory))
+        {
+            skippedUnsupportedPaths.Add(entry.FullPath);
+            return;
+        }
 
         if (depth > MaxTransferDepth)
         {
@@ -114,7 +139,14 @@ public static class RemoteTransferTreePlanner
         IReadOnlyList<SftpFileInfo> children = await listDirectory(entry.FullPath, ct).ConfigureAwait(false);
         foreach (SftpFileInfo child in children)
         {
-            await AppendEntryAsync(child, remotePath, listDirectory, depth + 1, ops, ct)
+            await AppendEntryAsync(
+                child,
+                remotePath,
+                listDirectory,
+                depth + 1,
+                ops,
+                skippedUnsupportedPaths,
+                ct)
                 .ConfigureAwait(false);
         }
     }

@@ -1197,6 +1197,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         TransferProgressValue = 0;
         var downloadedFiles = 0;
         var skippedDirectories = 0;
+        var skippedUnsupportedPaths = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
@@ -1206,9 +1207,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 ct.ThrowIfCancellationRequested();
 
                 SftpFileInfo file = files[i];
-                if (file.IsDirectory)
+                if (file.Kind is not RemoteEntryKind.File)
                 {
-                    skippedDirectories++;
+                    if (file.Kind is RemoteEntryKind.Directory)
+                    {
+                        skippedDirectories++;
+                    }
+                    else
+                    {
+                        skippedUnsupportedPaths.Add(file.FullPath);
+                    }
+
                     continue;
                 }
 
@@ -1298,6 +1307,21 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 default:
                     UpdateStatus(_localizer?["SftpStatusTransferComplete"] ?? "Transfer complete");
                     break;
+            }
+
+            if (skippedUnsupportedPaths.Count > 0)
+            {
+                foreach (string path in skippedUnsupportedPaths)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"EmbeddedSFTP skipped unsupported remote entry '{path}' during download.");
+                }
+
+                string warning = _localizer?.Format(
+                    "WarnRemoteEntriesSkippedUnsupported",
+                    skippedUnsupportedPaths.Count)
+                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                ShowOperationWarning(warning);
             }
         }
         catch (OperationCanceledException)

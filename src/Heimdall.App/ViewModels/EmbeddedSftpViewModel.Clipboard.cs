@@ -82,10 +82,10 @@ public sealed partial class EmbeddedSftpViewModel
     }
 
     /// <summary>
-    /// Pastes the clipboard into the current directory. Copy mode copies each entry (clipboard kept,
-    /// repeatable); cut mode moves each entry and then clears the clipboard (consumed once). Every
-    /// destination name is resolved to be collision-free, so nothing is ever overwritten. A cut entry
-    /// that would resolve to its own path (same directory, same name) is skipped.
+    /// Pastes the clipboard into the current directory. Copy mode copies each supported entry
+    /// (clipboard kept, repeatable); cut mode moves supported entries and retains unsupported entries
+    /// in the clipboard. Every destination name is resolved to be collision-free, so nothing is ever
+    /// overwritten. A cut entry that would resolve to its own path (same directory, same name) is skipped.
     /// </summary>
     public async Task PasteClipboardAsync()
     {
@@ -143,11 +143,18 @@ public sealed partial class EmbeddedSftpViewModel
         // that have already moved away; the entries not yet processed (including the one that failed,
         // whose source still exists) are retained.
         var processedCutSources = new HashSet<string>(StringComparer.Ordinal);
+        var skippedUnsupportedPaths = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
             foreach (SftpFileInfo entry in clipboard.Entries)
             {
+                if (entry.Kind is not (RemoteEntryKind.File or RemoteEntryKind.Directory))
+                {
+                    skippedUnsupportedPaths.Add(entry.FullPath);
+                    continue;
+                }
+
                 string targetName = BuildNonCollidingName(existingNames, entry.Name);
                 string destination = CombineRemotePath(targetDirectory, targetName);
 
@@ -173,11 +180,40 @@ public sealed partial class EmbeddedSftpViewModel
 
             if (cut)
             {
-                _remoteClipboard.Clear();
+                List<SftpFileInfo> remaining = clipboard.Entries
+                    .Where(entry => !processedCutSources.Contains(entry.FullPath))
+                    .ToList();
+
+                await RunOnUiAsync(() =>
+                {
+                    if (remaining.Count > 0)
+                    {
+                        _remoteClipboard.Set(clipboard with { Entries = remaining });
+                    }
+                    else
+                    {
+                        _remoteClipboard.Clear();
+                    }
+                });
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusPasteComplete")));
             await Refresh().ConfigureAwait(false);
+
+            if (skippedUnsupportedPaths.Count > 0)
+            {
+                foreach (string path in skippedUnsupportedPaths)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"EmbeddedSFTP skipped unsupported remote entry '{path}' during same-endpoint paste.");
+                }
+
+                string warning = _localizer?.Format(
+                    "WarnRemoteEntriesSkippedUnsupported",
+                    skippedUnsupportedPaths.Count)
+                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                await RunOnUiAsync(() => ShowOperationWarning(warning));
+            }
         }
         catch (Exception ex)
         {
@@ -230,6 +266,7 @@ public sealed partial class EmbeddedSftpViewModel
 
         bool cut = clipboard.Mode == SftpClipboardMode.Cut;
         var processedCutSources = new HashSet<string>(StringComparer.Ordinal);
+        var skippedUnsupportedPaths = new HashSet<string>(StringComparer.Ordinal);
         Action<SftpTransferProgress> sourceProgress = progress =>
         {
             _ = _uiDispatcher.InvokeAsync(() =>
@@ -260,27 +297,64 @@ public sealed partial class EmbeddedSftpViewModel
                 SftpFileInfo plannedRoot = entry with { Name = targetName };
 
                 TransferStatusText = $"Transferring {entry.Name} ({index + 1}/{totalEntries})...";
-                await TransferCrossEndpointRootAsync(sourceBrowser, plannedRoot, targetDirectory, ct)
+                RemoteTransferPlan plan = await TransferCrossEndpointRootAsync(
+                    sourceBrowser,
+                    plannedRoot,
+                    targetDirectory,
+                    ct)
                     .ConfigureAwait(false);
+                skippedUnsupportedPaths.UnionWith(plan.SkippedUnsupportedPaths);
 
-                if (cut)
+                if (cut && plan.SkippedUnsupportedPaths.Count == 0)
                 {
                     await DeleteCrossEndpointSourceAsync(sourceBrowser, entry.FullPath, ct)
                         .ConfigureAwait(false);
                     processedCutSources.Add(entry.FullPath);
                 }
 
-                existingNames.Add(targetName);
+                if (plan.Ops.Count > 0)
+                {
+                    existingNames.Add(targetName);
+                }
             }
 
             if (cut)
             {
-                _remoteClipboard.Clear();
+                List<SftpFileInfo> remaining = clipboard.Entries
+                    .Where(entry => !processedCutSources.Contains(entry.FullPath))
+                    .ToList();
+
+                await RunOnUiAsync(() =>
+                {
+                    if (remaining.Count > 0)
+                    {
+                        _remoteClipboard.Set(clipboard with { Entries = remaining });
+                    }
+                    else
+                    {
+                        _remoteClipboard.Clear();
+                    }
+                }).ConfigureAwait(false);
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusPasteComplete")))
                 .ConfigureAwait(false);
             await Refresh().ConfigureAwait(false);
+
+            if (skippedUnsupportedPaths.Count > 0)
+            {
+                foreach (string path in skippedUnsupportedPaths)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"EmbeddedSFTP skipped unsupported remote entry '{path}' during cross-endpoint paste.");
+                }
+
+                string warning = _localizer?.Format(
+                    "WarnRemoteEntriesSkippedUnsupported",
+                    skippedUnsupportedPaths.Count)
+                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                await RunOnUiAsync(() => ShowOperationWarning(warning)).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -324,22 +398,22 @@ public sealed partial class EmbeddedSftpViewModel
         }
     }
 
-    private async Task TransferCrossEndpointRootAsync(
+    private async Task<RemoteTransferPlan> TransferCrossEndpointRootAsync(
         IRemoteBrowser sourceBrowser,
         SftpFileInfo root,
         string targetDirectory,
         CancellationToken ct)
     {
-        IReadOnlyList<RemoteTransferOp> ops = await RemoteTransferTreePlanner.PlanAsync(
+        RemoteTransferPlan plan = await RemoteTransferTreePlanner.PlanAsync(
             [root],
             targetDirectory,
             (path, listCt) => ListCrossEndpointSourceDirectoryAsync(sourceBrowser, path, listCt),
             ct).ConfigureAwait(false);
 
-        int totalFiles = ops.Count(op => op.Kind == RemoteTransferOpKind.TransferFile);
+        int totalFiles = plan.Ops.Count(op => op.Kind == RemoteTransferOpKind.TransferFile);
         int transferredFiles = 0;
 
-        foreach (RemoteTransferOp op in ops)
+        foreach (RemoteTransferOp op in plan.Ops)
         {
             ct.ThrowIfCancellationRequested();
 
@@ -354,6 +428,8 @@ public sealed partial class EmbeddedSftpViewModel
             TransferStatusText = $"Transferring {fileName} ({transferredFiles}/{totalFiles})...";
             await TransferCrossEndpointFileAsync(sourceBrowser, op, ct).ConfigureAwait(false);
         }
+
+        return plan;
     }
 
     private async Task CreateCrossEndpointDirectoryAsync(string destinationPath, CancellationToken ct)
@@ -520,11 +596,18 @@ public sealed partial class EmbeddedSftpViewModel
         var existingNames = new HashSet<string>(
             UnfilteredEntries.Select(entry => entry.Name),
             StringComparer.Ordinal);
+        var skippedUnsupportedPaths = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
             foreach (SftpFileInfo entry in entries)
             {
+                if (entry.Kind is not (RemoteEntryKind.File or RemoteEntryKind.Directory))
+                {
+                    skippedUnsupportedPaths.Add(entry.FullPath);
+                    continue;
+                }
+
                 string targetName = BuildNonCollidingName(existingNames, entry.Name);
                 string destination = CombineRemotePath(targetDirectory, targetName);
 
@@ -535,6 +618,21 @@ public sealed partial class EmbeddedSftpViewModel
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusDuplicateComplete")));
             await Refresh().ConfigureAwait(false);
+
+            if (skippedUnsupportedPaths.Count > 0)
+            {
+                foreach (string path in skippedUnsupportedPaths)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"EmbeddedSFTP skipped unsupported remote entry '{path}' during duplicate.");
+                }
+
+                string warning = _localizer?.Format(
+                    "WarnRemoteEntriesSkippedUnsupported",
+                    skippedUnsupportedPaths.Count)
+                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                await RunOnUiAsync(() => ShowOperationWarning(warning));
+            }
         }
         catch (Exception ex)
         {
