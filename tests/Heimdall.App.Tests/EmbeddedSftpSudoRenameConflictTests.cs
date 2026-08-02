@@ -182,10 +182,10 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
     }
 
     private static SftpFileInfo CreateFile()
-        => new(
+        => new SftpFileInfo(
             "old.txt",
             "/remote/old.txt",
-            false,
+            RemoteEntryKind.File,
             1,
             DateTime.UnixEpoch,
             "rw-r--r--",

@@ -2354,13 +2354,22 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 name = name[..arrowIndex];
             }
 
-            bool isDirectory = permissions[0] == 'd';
+            RemoteEntryKind kind = permissions[0] switch
+            {
+                'd' => RemoteEntryKind.Directory,
+                'l' => RemoteEntryKind.SymbolicLink,
+                'p' => RemoteEntryKind.Fifo,
+                's' => RemoteEntryKind.Socket,
+                'c' or 'b' => RemoteEntryKind.Device,
+                '-' => RemoteEntryKind.File,
+                _ => RemoteEntryKind.File,
+            };
             string fullPath = parentPath.EndsWith("/", StringComparison.Ordinal)
                 ? $"{parentPath}{name}"
                 : $"{parentPath}/{name}";
 
             results.Add(new SftpFileInfo(
-                name, fullPath, isDirectory, size, lastModified,
+                name, fullPath, kind, size, lastModified,
                 permissions, owner, group));
         }
 

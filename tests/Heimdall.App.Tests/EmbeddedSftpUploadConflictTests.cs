@@ -197,10 +197,10 @@ public sealed class EmbeddedSftpUploadConflictTests
         string name,
         string fullPath,
         bool isDirectory)
-        => new(
+        => new SftpFileInfo(
             name,
             fullPath,
-            isDirectory,
+            isDirectory ? RemoteEntryKind.Directory : RemoteEntryKind.File,
             isDirectory ? 0 : 1,
             DateTime.UnixEpoch,
             isDirectory ? "rwxr-xr-x" : "rw-r--r--",

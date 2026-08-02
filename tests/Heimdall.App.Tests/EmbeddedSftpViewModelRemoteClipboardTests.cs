@@ -414,7 +414,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         return new SftpFileInfo(
             name,
             fullPath,
-            isDirectory,
+            isDirectory ? RemoteEntryKind.Directory : RemoteEntryKind.File,
             1,
             DateTime.UnixEpoch,
             isDirectory ? "rwxr-xr-x" : "rw-r--r--",

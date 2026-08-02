@@ -111,19 +111,19 @@ public sealed class EmbeddedSftpViewModelTests
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
-        SftpFileInfo file = new(
+        SftpFileInfo file = new SftpFileInfo(
             "app.log",
             "/var/log/app.log",
-            false,
+            RemoteEntryKind.File,
             1,
             DateTime.UnixEpoch,
             "rw-r--r--",
             "1000",
             "1000");
-        SftpFileInfo directory = new(
+        SftpFileInfo directory = new SftpFileInfo(
             "archive",
             "/var/log/archive",
-            true,
+            RemoteEntryKind.Directory,
             0,
             DateTime.UnixEpoch,
             "rwxr-xr-x",
@@ -146,19 +146,19 @@ public sealed class EmbeddedSftpViewModelTests
         {
             CurrentPath = "/home/admin"
         };
-        SftpFileInfo directory = new(
+        SftpFileInfo directory = new SftpFileInfo(
             "logs",
             "/home/admin/logs",
-            true,
+            RemoteEntryKind.Directory,
             0,
             DateTime.UnixEpoch,
             "rwxr-xr-x",
             "1000",
             "1000");
-        SftpFileInfo file = new(
+        SftpFileInfo file = new SftpFileInfo(
             "app.log",
             "/home/admin/app.log",
-            false,
+            RemoteEntryKind.File,
             10,
             DateTime.UnixEpoch,
             "rw-r--r--",
@@ -1139,7 +1139,7 @@ public sealed class EmbeddedSftpViewModelTests
         return new SftpFileInfo(
             name,
             fullPath,
-            isDirectory,
+            isDirectory ? RemoteEntryKind.Directory : RemoteEntryKind.File,
             0,
             DateTime.UnixEpoch,
             isDirectory ? "rwxr-xr-x" : "rw-r--r--",

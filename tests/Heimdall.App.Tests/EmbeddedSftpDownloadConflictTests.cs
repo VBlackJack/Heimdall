@@ -137,7 +137,7 @@ public sealed class EmbeddedSftpDownloadConflictTests
     }
 
     private static SftpFileInfo CreateFile(string name)
-        => new(name, $"/remote/{name}", false, 1, DateTime.UnixEpoch, "rw-r--r--", "1000", "1000");
+        => new SftpFileInfo(name, $"/remote/{name}", RemoteEntryKind.File, 1, DateTime.UnixEpoch, "rw-r--r--", "1000", "1000");
 
     private sealed class RecordingConflictPresenter(
         Func<FileConflictDialogViewModel, FileConflictDialogResult?> show)

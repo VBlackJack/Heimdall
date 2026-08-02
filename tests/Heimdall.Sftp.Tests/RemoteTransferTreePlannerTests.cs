@@ -92,10 +92,10 @@ public sealed class RemoteTransferTreePlannerTests
     }
 
     private static SftpFileInfo Entry(string name, string fullPath)
-        => new(name, fullPath, IsDirectory: false, 1, DateTime.UnixEpoch, "rw-r--r--", "1000", "1000");
+        => new SftpFileInfo(name, fullPath, Kind: RemoteEntryKind.File, 1, DateTime.UnixEpoch, "rw-r--r--", "1000", "1000");
 
     private static SftpFileInfo Dir(string name, string fullPath)
-        => new(name, fullPath, IsDirectory: true, 0, DateTime.UnixEpoch, "rwxr-xr-x", "1000", "1000");
+        => new SftpFileInfo(name, fullPath, Kind: RemoteEntryKind.Directory, 0, DateTime.UnixEpoch, "rwxr-xr-x", "1000", "1000");
 
     private static void AssertTransfer(RemoteTransferOp op, string source, string destination)
     {

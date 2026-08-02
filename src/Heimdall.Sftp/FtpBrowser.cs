@@ -782,7 +782,23 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     internal static SftpFileInfo MapFtpItemToFileInfo(FtpListItem item, string parentPath)
     {
-        bool isDirectory = item.Type == FtpObjectType.Directory;
+        RemoteEntryKind kind = item.Type switch
+        {
+            FtpObjectType.Link => RemoteEntryKind.SymbolicLink,
+            FtpObjectType.Directory => RemoteEntryKind.Directory,
+            _ when !string.IsNullOrEmpty(item.RawPermissions) => item.RawPermissions[0] switch
+            {
+                'd' => RemoteEntryKind.Directory,
+                'l' => RemoteEntryKind.SymbolicLink,
+                'p' => RemoteEntryKind.Fifo,
+                's' => RemoteEntryKind.Socket,
+                'c' or 'b' => RemoteEntryKind.Device,
+                '-' => RemoteEntryKind.File,
+                _ => RemoteEntryKind.File,
+            },
+            _ => RemoteEntryKind.File,
+        };
+        bool isDirectory = kind == RemoteEntryKind.Directory;
         long size = isDirectory ? 0 : Math.Max(0, item.Size);
         DateTime lastModified = item.Modified == default
             ? DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc)
@@ -797,7 +813,7 @@ public sealed class FtpBrowser : IRemoteBrowser
         return new SftpFileInfo(
             Name: item.Name,
             FullPath: fullPath,
-            IsDirectory: isDirectory,
+            Kind: kind,
             Size: size,
             LastModified: lastModified,
             Permissions: permissions,

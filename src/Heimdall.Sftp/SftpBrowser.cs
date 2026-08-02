@@ -1159,11 +1159,42 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         // Build a rwxrwxrwx permission string from the file attributes
         string permissions = FormatPermissions(entry);
+        RemoteEntryKind kind;
+        if (entry.IsSymbolicLink)
+        {
+            kind = RemoteEntryKind.SymbolicLink;
+        }
+        else if (entry.IsDirectory)
+        {
+            kind = RemoteEntryKind.Directory;
+        }
+        else if (entry.IsNamedPipe)
+        {
+            kind = RemoteEntryKind.Fifo;
+        }
+        else if (entry.IsSocket)
+        {
+            kind = RemoteEntryKind.Socket;
+        }
+        else if (entry.IsBlockDevice || entry.IsCharacterDevice)
+        {
+            kind = RemoteEntryKind.Device;
+        }
+        else if (entry.IsRegularFile)
+        {
+            kind = RemoteEntryKind.File;
+        }
+        else
+        {
+            kind = RemoteEntryKind.File;
+            Heimdall.Core.Logging.FileLogger.Debug(
+                $"SftpBrowser: treating unrecognized remote entry type as a file: {entry.FullName}");
+        }
 
         return new SftpFileInfo(
             Name: entry.Name,
             FullPath: entry.FullName,
-            IsDirectory: entry.IsDirectory,
+            Kind: kind,
             Size: entry.Attributes.Size,
             LastModified: entry.LastWriteTimeUtc,
             Permissions: permissions,
@@ -1243,7 +1274,7 @@ internal static class SftpFileAttributesExtensions
 /// <summary>Represents a file or directory entry from a remote SFTP listing.</summary>
 /// <param name="Name">File or directory name (without path).</param>
 /// <param name="FullPath">Full remote path.</param>
-/// <param name="IsDirectory">Whether this entry is a directory.</param>
+/// <param name="Kind">Remote filesystem entry type.</param>
 /// <param name="Size">File size in bytes (0 for directories).</param>
 /// <param name="LastModified">Last modification time (UTC).</param>
 /// <param name="Permissions">POSIX permission string, e.g., "rwxr-xr-x".</param>
@@ -1252,12 +1283,16 @@ internal static class SftpFileAttributesExtensions
 public sealed record SftpFileInfo(
     string Name,
     string FullPath,
-    bool IsDirectory,
+    RemoteEntryKind Kind,
     long Size,
     DateTime LastModified,
     string Permissions,
     string Owner,
-    string Group);
+    string Group)
+{
+    /// <summary>Gets whether this entry is a directory.</summary>
+    public bool IsDirectory => Kind == RemoteEntryKind.Directory;
+}
 
 /// <summary>Progress information for an SFTP file transfer.</summary>
 /// <param name="FileName">Name of the file being transferred.</param>

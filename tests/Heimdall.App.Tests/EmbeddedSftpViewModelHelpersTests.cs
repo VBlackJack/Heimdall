@@ -52,10 +52,10 @@ public sealed class EmbeddedSftpViewModelHelpersTests
     [Fact]
     public void ResolveDropTargetDirectory_DirectoryHovered_ReturnsItsFullPath()
     {
-        SftpFileInfo folder = new(
+        SftpFileInfo folder = new SftpFileInfo(
             Name: "uploads",
             FullPath: "/srv/uploads",
-            IsDirectory: true,
+            Kind: RemoteEntryKind.Directory,
             Size: 0,
             LastModified: default,
             Permissions: "rwxr-xr-x",
@@ -70,10 +70,10 @@ public sealed class EmbeddedSftpViewModelHelpersTests
     [Fact]
     public void ResolveDropTargetDirectory_FileHovered_ReturnsCurrentDirectory()
     {
-        SftpFileInfo file = new(
+        SftpFileInfo file = new SftpFileInfo(
             Name: "notes.txt",
             FullPath: "/srv/notes.txt",
-            IsDirectory: false,
+            Kind: RemoteEntryKind.File,
             Size: 12,
             LastModified: default,
             Permissions: "rw-r--r--",
@@ -272,6 +272,27 @@ public sealed class EmbeddedSftpViewModelHelpersTests
         Assert.Equal("current", entries[0].Name);
         Assert.Equal("/srv/app/current", entries[0].FullPath);
         Assert.False(entries[0].IsDirectory);
+    }
+
+    [Theory]
+    [InlineData("lrwxrwxrwx", "current -> releases", RemoteEntryKind.SymbolicLink, "current")]
+    [InlineData("prw-r--r--", "events", RemoteEntryKind.Fifo, "events")]
+    [InlineData("srw-r--r--", "daemon.sock", RemoteEntryKind.Socket, "daemon.sock")]
+    [InlineData("crw-r--r--", "tty0", RemoteEntryKind.Device, "tty0")]
+    [InlineData("brw-r--r--", "sda", RemoteEntryKind.Device, "sda")]
+    public void ParseLsOutput_MapsRemoteEntryKind(
+        string permissions,
+        string listedName,
+        RemoteEntryKind expectedKind,
+        string expectedName)
+    {
+        string output = $"{permissions} 1 root root 1 2026-05-20 14:30 {listedName}\n";
+
+        IReadOnlyList<SftpFileInfo> entries = EmbeddedSftpViewModel.ParseLsOutput(output, "/srv");
+
+        Assert.Single(entries);
+        Assert.Equal(expectedKind, entries[0].Kind);
+        Assert.Equal(expectedName, entries[0].Name);
     }
 
     [Theory]

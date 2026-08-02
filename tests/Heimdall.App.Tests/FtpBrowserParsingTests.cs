@@ -118,6 +118,74 @@ public sealed class FtpBrowserParsingTests
     }
 
     [Fact]
+    public void MapFtpItemToFileInfo_Link_MapsSymbolicLinkKind()
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "current",
+            Type = FtpObjectType.Link,
+            RawPermissions = "drwxr-xr-x",
+        };
+
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+
+        Assert.Equal(RemoteEntryKind.SymbolicLink, entry.Kind);
+    }
+
+    [Theory]
+    [InlineData("prw-r--r--", RemoteEntryKind.Fifo)]
+    [InlineData("srw-r--r--", RemoteEntryKind.Socket)]
+    [InlineData("crw-r--r--", RemoteEntryKind.Device)]
+    [InlineData("brw-r--r--", RemoteEntryKind.Device)]
+    public void MapFtpItemToFileInfo_FileType_MapsRawPermissionKind(
+        string rawPermissions,
+        RemoteEntryKind expectedKind)
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "special",
+            Type = FtpObjectType.File,
+            RawPermissions = rawPermissions,
+        };
+
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/dev");
+
+        Assert.Equal(expectedKind, entry.Kind);
+    }
+
+    [Fact]
+    public void MapFtpItemToFileInfo_FileWithEmptyRawPermissions_MapsFileKind()
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "readme.txt",
+            Type = FtpObjectType.File,
+            RawPermissions = string.Empty,
+        };
+
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+
+        Assert.Equal(RemoteEntryKind.File, entry.Kind);
+    }
+
+    [Fact]
+    public void MapFtpItemToFileInfo_Directory_MapsDirectoryKindAndForcesSizeToZero()
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "archive",
+            Type = FtpObjectType.Directory,
+            Size = 4096,
+            RawPermissions = "-rw-r--r--",
+        };
+
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+
+        Assert.Equal(RemoteEntryKind.Directory, entry.Kind);
+        Assert.Equal(0, entry.Size);
+    }
+
+    [Fact]
     public void MapFtpItemToFileInfo_NegativeFileSize_ClampsToZero()
     {
         FtpListItem item = new FtpListItem

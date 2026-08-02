@@ -55,10 +55,10 @@ public sealed class RemoteClipboardServiceTests
 
     private static SftpClipboardContent CreateContent()
     {
-        SftpFileInfo entry = new(
+        SftpFileInfo entry = new SftpFileInfo(
             "a.txt",
             "/src/a.txt",
-            false,
+            RemoteEntryKind.File,
             1,
             DateTime.UnixEpoch,
             "rw-r--r--",
