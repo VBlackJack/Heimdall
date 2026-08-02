@@ -22,6 +22,40 @@ namespace Heimdall.Sftp;
 public static class SftpAtomicUpload
 {
     /// <summary>
+    /// Refuses an upload when the existing destination is an unsupported remote entry type.
+    /// </summary>
+    /// <param name="finalRemotePath">Final remote destination path.</param>
+    /// <param name="existingDestinationKind">
+    /// Existing destination kind, or <see langword="null"/> when the destination is absent.
+    /// </param>
+    public static void EnsureUploadTargetSupported(
+        string finalRemotePath,
+        RemoteEntryKind? existingDestinationKind)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
+
+        switch (existingDestinationKind)
+        {
+            case null:
+            case RemoteEntryKind.File:
+            case RemoteEntryKind.Directory:
+                return;
+            case RemoteEntryKind.SymbolicLink:
+            case RemoteEntryKind.Fifo:
+            case RemoteEntryKind.Socket:
+            case RemoteEntryKind.Device:
+                throw new RemoteUploadTargetUnsupportedException(
+                    finalRemotePath,
+                    existingDestinationKind.Value);
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(existingDestinationKind),
+                    existingDestinationKind,
+                    null);
+        }
+    }
+
+    /// <summary>
     /// Creates a unique temporary remote path next to the final remote path.
     /// </summary>
     public static string CreateRemoteTempPath(string finalRemotePath)

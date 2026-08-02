@@ -408,12 +408,18 @@ public sealed class SftpBrowser : IRemoteBrowser
                             IsUpload: true));
                     });
                     ct.ThrowIfCancellationRequested();
-                    PreserveUploadModeBeforeCommit(client, tempRemotePath, remotePath);
+                    ISftpFile? targetEntry = TryGetEntryWithoutFollowingTarget(client, remotePath);
+                    RemoteEntryKind? targetKind = targetEntry is null
+                        ? null
+                        : GetRemoteEntryKind(targetEntry);
+                    SftpAtomicUpload.EnsureUploadTargetSupported(remotePath, targetKind);
+                    PreserveUploadModeBeforeCommit(client, tempRemotePath, remotePath, targetEntry);
                     CommitUploadedTemp(
                         client,
                         tempRemotePath,
                         remotePath,
                         commitMode,
+                        targetEntry,
                         () => OperationWarningRaised?.Invoke(
                             RemoteOperationWarning.CreateNonAtomicReplacement(remotePath)));
                 }, ct).ConfigureAwait(false);
@@ -445,6 +451,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         string tempRemotePath,
         string remotePath,
         UploadCommitMode commitMode,
+        ISftpFile? targetEntry,
         Action onNonAtomicReplacement)
     {
         if (commitMode == UploadCommitMode.PublishIfAbsent)
@@ -479,8 +486,7 @@ public sealed class SftpBrowser : IRemoteBrowser
                 }
             },
             canDemoteAtomicRenameFailure: IsAtomicRenameCapabilityFailure,
-            isExistingTargetRegularFile: path =>
-                GetEntryWithoutFollowingTarget(client, path).Entry.IsRegularFile,
+            isExistingTargetRegularFile: _ => targetEntry?.IsRegularFile == true,
             onNonAtomicReplacement: onNonAtomicReplacement);
     }
 
@@ -945,9 +951,9 @@ public sealed class SftpBrowser : IRemoteBrowser
     private static void PreserveUploadModeBeforeCommit(
         SftpClient client,
         string tempRemotePath,
-        string finalRemotePath)
+        string finalRemotePath,
+        ISftpFile? targetEntry)
     {
-        ISftpFile? targetEntry = TryGetEntryWithoutFollowingTarget(client, finalRemotePath);
         if (targetEntry is null || !targetEntry.IsRegularFile)
         {
             return;
@@ -1159,37 +1165,7 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         // Build a rwxrwxrwx permission string from the file attributes
         string permissions = FormatPermissions(entry);
-        RemoteEntryKind kind;
-        if (entry.IsSymbolicLink)
-        {
-            kind = RemoteEntryKind.SymbolicLink;
-        }
-        else if (entry.IsDirectory)
-        {
-            kind = RemoteEntryKind.Directory;
-        }
-        else if (entry.IsNamedPipe)
-        {
-            kind = RemoteEntryKind.Fifo;
-        }
-        else if (entry.IsSocket)
-        {
-            kind = RemoteEntryKind.Socket;
-        }
-        else if (entry.IsBlockDevice || entry.IsCharacterDevice)
-        {
-            kind = RemoteEntryKind.Device;
-        }
-        else if (entry.IsRegularFile)
-        {
-            kind = RemoteEntryKind.File;
-        }
-        else
-        {
-            kind = RemoteEntryKind.File;
-            Heimdall.Core.Logging.FileLogger.Debug(
-                $"SftpBrowser: treating unrecognized remote entry type as a file: {entry.FullName}");
-        }
+        RemoteEntryKind kind = GetRemoteEntryKind(entry);
 
         return new SftpFileInfo(
             Name: entry.Name,
@@ -1200,6 +1176,43 @@ public sealed class SftpBrowser : IRemoteBrowser
             Permissions: permissions,
             Owner: entry.Attributes.GetOwnerIdOrDefault().ToString(),
             Group: entry.Attributes.GetGroupIdOrDefault().ToString());
+    }
+
+    private static RemoteEntryKind GetRemoteEntryKind(ISftpFile entry)
+    {
+        if (entry.IsSymbolicLink)
+        {
+            return RemoteEntryKind.SymbolicLink;
+        }
+
+        if (entry.IsDirectory)
+        {
+            return RemoteEntryKind.Directory;
+        }
+
+        if (entry.IsNamedPipe)
+        {
+            return RemoteEntryKind.Fifo;
+        }
+
+        if (entry.IsSocket)
+        {
+            return RemoteEntryKind.Socket;
+        }
+
+        if (entry.IsBlockDevice || entry.IsCharacterDevice)
+        {
+            return RemoteEntryKind.Device;
+        }
+
+        if (entry.IsRegularFile)
+        {
+            return RemoteEntryKind.File;
+        }
+
+        Heimdall.Core.Logging.FileLogger.Debug(
+            $"SftpBrowser: treating unrecognized remote entry type as a file: {entry.FullName}");
+        return RemoteEntryKind.File;
     }
 
     private static string FormatPermissions(ISftpFile entry)

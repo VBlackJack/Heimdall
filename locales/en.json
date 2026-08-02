@@ -869,6 +869,7 @@
   "SftpErrorSudoEditFileTooLarge": "Sudo edit refused: the remote file is {0}, which exceeds the {1} limit.",
   "SftpErrorLocalUploadFileMissing": "Local upload file was not found.",
   "SftpErrorLocalUploadNotRegularFile": "Local upload source must be a file, not a folder.",
+  "SftpErrorRemoteUploadTargetNotRegularFile": "Upload refused: the destination already exists and is not a regular file.",
   "SftpErrorProtectedRoot": "Cannot delete the protected root directory.",
   "SftpTransferInProgress": "A file transfer is already in progress.",
   "SftpStatusConnected": "Connected",
