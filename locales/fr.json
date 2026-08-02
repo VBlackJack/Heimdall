@@ -1659,6 +1659,7 @@
   "SftpStatusEditDownloadFailed": "Impossible de t\u00e9l\u00e9charger {0} pour \u00e9dition : {1}",
   "SftpStatusEditOpenFailed": "Impossible d'ouvrir l'\u00e9diteur : {0}",
   "SftpStatusEditUnsupportedEntry": "Impossible d'\u00e9diter {0} : cette entr\u00e9e n'est pas un fichier r\u00e9gulier.",
+  "SftpStatusRenameUnsupportedEntry": "Impossible de renommer un lien symbolique via SFTP : le serveur renommerait sa cible \u00e0 la place.",
   "SettingsExternalEditorLabel": "\u00c9diteur externe :",
   "SettingsExternalEditorHint": "Chemin vers l'\u00e9diteur de texte pour l'\u00e9dition SFTP distante (laisser vide pour le programme par d\u00e9faut)",
   "LogSftpEditStarted": "\u00c9dition SFTP d\u00e9marr\u00e9e : {0} (temp : {1})",

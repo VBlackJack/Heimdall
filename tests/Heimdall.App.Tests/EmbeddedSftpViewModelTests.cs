@@ -739,6 +739,54 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.False(viewModel.IsErrorStatus);
     }
 
+    [Theory]
+    [InlineData(true, RemoteEntryKind.SymbolicLink, 0, "SftpStatusRenameUnsupportedEntry")]
+    [InlineData(true, RemoteEntryKind.File, 1, null)]
+    [InlineData(true, RemoteEntryKind.Directory, 1, null)]
+    [InlineData(true, RemoteEntryKind.Fifo, 1, null)]
+    [InlineData(false, RemoteEntryKind.SymbolicLink, 1, null)]
+    public async Task RenameEntryAsync_SymlinkTargetFollowFact_GatesOnlySymbolicLinks(
+        bool renameFollowsSymlinkTarget,
+        RemoteEntryKind kind,
+        int expectedRenameCallCount,
+        string? expectedStatusKey)
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher)
+        {
+            CurrentPath = "/var/www",
+            RenameFollowsSymlinkTarget = renameFollowsSymlinkTarget
+        };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        ConfirmingDialogService dialogService = new("renamed-entry");
+        viewModel.SetDialogService(dialogService);
+        SftpFileInfo entry = new(
+            "entry",
+            "/var/www/entry",
+            kind,
+            1,
+            DateTime.UnixEpoch,
+            "rw-r--r--",
+            "1000",
+            "1000");
+
+        await viewModel.RenameEntryAsync(entry);
+
+        Assert.Equal(expectedRenameCallCount, browser.RenameCallCount);
+        if (expectedStatusKey is not null)
+        {
+            Assert.Equal(0, dialogService.InputCallCount);
+            Assert.Equal(localizer[expectedStatusKey], viewModel.StatusText);
+        }
+        else
+        {
+            Assert.Equal(1, dialogService.InputCallCount);
+        }
+    }
+
     [Fact]
     public async Task ChmodEntriesAsync_FtpThroughLoggingDecorator_ReportsOneUnsupportedMessageWithoutSuccess()
     {

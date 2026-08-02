@@ -40,6 +40,46 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
     }
 
     [Fact]
+    public void SftpSymlinkRenameRefusal_UsesRawBrowserFactInMenuAndViewModelGuard()
+    {
+        string viewSource = ReadRepoFile(
+            "src",
+            "Heimdall.App",
+            "Views",
+            "EmbeddedSftpView.xaml.cs");
+        string initialization = ExtractMethodBody(
+            viewSource,
+            "public void InitializeSession(");
+        string contextMenu = ExtractMethodBody(
+            viewSource,
+            "private void OnContextMenuOpened(object sender, RoutedEventArgs e)");
+        string viewModelSource = ReadRepoFile(
+            "src",
+            "Heimdall.App",
+            "ViewModels",
+            "EmbeddedSftpViewModel.cs");
+        string rename = ExtractMethodBody(
+            viewModelSource,
+            "public async Task RenameEntryAsync(SftpFileInfo file)");
+
+        Assert.Contains(
+            "_viewModel.RenameFollowsSymlinkTarget = browser is SftpBrowser;",
+            initialization,
+            StringComparison.Ordinal);
+        Assert.Contains("CtxRename.Visibility = singleSelection", contextMenu, StringComparison.Ordinal);
+        Assert.Contains("_browser is SftpBrowser", contextMenu, StringComparison.Ordinal);
+        Assert.Contains(
+            "Kind: RemoteEntryKind.SymbolicLink",
+            contextMenu,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RenameFollowsSymlinkTarget && file.Kind == RemoteEntryKind.SymbolicLink",
+            rename,
+            StringComparison.Ordinal);
+        Assert.Contains("SftpStatusRenameUnsupportedEntry", rename, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType()
     {
         string source = ReadRepoFile(

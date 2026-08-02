@@ -1659,6 +1659,7 @@
   "SftpStatusEditDownloadFailed": "Could not download {0} for editing: {1}",
   "SftpStatusEditOpenFailed": "Could not open editor: {0}",
   "SftpStatusEditUnsupportedEntry": "Cannot edit {0}: this entry is not a regular file.",
+  "SftpStatusRenameUnsupportedEntry": "Cannot rename a symbolic link over SFTP: the server would rename its target instead.",
   "SettingsExternalEditorLabel": "External Editor:",
   "SettingsExternalEditorHint": "Path to text editor for SFTP remote editing (leave empty for system default)",
   "LogSftpEditStarted": "SFTP edit started: {0} (temp: {1})",

@@ -191,6 +191,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         // LoggingRemoteBrowser decorator (when the operations log is wired) so the NON-sudo transfer
         // operations are recorded; the raw browser's lifecycle stays owned by this view's teardown.
         _browser = browser;
+        _viewModel.RenameFollowsSymlinkTarget = browser is SftpBrowser;
         _sessionTab = sessionTab;
         _localizer = localizer;
         _sshParams = sshParams;
@@ -718,8 +719,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         CtxEdit.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxEditExternal.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxDownload.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
-        // Rename targets exactly one entry, so hide it on a multi-selection.
-        CtxRename.Visibility = singleSelection ? Visibility.Visible : Visibility.Collapsed;
+        // Rename targets exactly one entry. Native SFTP rename follows a symbolic link to its target,
+        // so hide that unsafe action while preserving name-based FTP rename.
+        CtxRename.Visibility = singleSelection
+            && !(_browser is SftpBrowser
+                && FileListView.SelectedItem is SftpFileInfo { Kind: RemoteEntryKind.SymbolicLink })
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         CtxDelete.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         // Chmod applies to the whole selection, but only SFTP can mutate POSIX permissions.
         CtxChmod.Visibility = hasSelection && _browser is SftpBrowser

@@ -226,6 +226,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     public bool IsDisconnected => !IsConnected;
 
+    /// <summary>Gets or sets whether native rename resolves symbolic-link sources to their targets.</summary>
+    internal bool RenameFollowsSymlinkTarget { get; set; }
+
     partial void OnIsErrorStatusChanged(bool value)
     {
         if (value)
@@ -1793,6 +1796,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         if (_disposed || _browser is null || _dialogService is null)
         {
+            return;
+        }
+
+        if (RenameFollowsSymlinkTarget && file.Kind == RemoteEntryKind.SymbolicLink)
+        {
+            await RunOnUiAsync(() =>
+                UpdateStatus(L10n("SftpStatusRenameUnsupportedEntry"))).ConfigureAwait(false);
             return;
         }
 
