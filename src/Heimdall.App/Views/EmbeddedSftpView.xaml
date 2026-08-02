@@ -17,6 +17,7 @@
     <UserControl.Resources>
         <conv:FileSizeConverter x:Key="FileSizeConverter"/>
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <conv:RemoteEntryKindToDisplayNameConverter x:Key="RemoteEntryKindToDisplayNameConverter"/>
     </UserControl.Resources>
 
     <Grid Background="{DynamicResource BackgroundBrush}">
@@ -425,8 +426,24 @@
                                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <DataTemplate.Triggers>
-                                    <DataTrigger Binding="{Binding IsDirectory}" Value="True">
+                                    <DataTrigger Binding="{Binding Kind}" Value="Directory">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE8B7;"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="SymbolicLink">
+                                        <Setter TargetName="FileIcon" Property="Text" Value="&#xE71B;"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Fifo">
+                                        <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Socket">
+                                        <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Device">
+                                        <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
                                         <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
@@ -464,6 +481,11 @@
                             <ToolTip>
                                 <StackPanel>
                                     <TextBlock Text="{Binding FullPath}" FontWeight="SemiBold"/>
+                                    <TextBlock>
+                                        <Run Text="{loc:Translate SftpPropertiesType}"/>
+                                        <Run Text=" "/>
+                                        <Run Text="{Binding Kind, Converter={StaticResource RemoteEntryKindToDisplayNameConverter}}"/>
+                                    </TextBlock>
                                     <TextBlock Text="{Binding Size, Converter={StaticResource FileSizeConverter}}"/>
                                     <TextBlock Text="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"/>
                                     <TextBlock Text="{Binding Permissions}"/>

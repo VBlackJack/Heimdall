@@ -2167,9 +2167,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
-        string type = file.IsDirectory
-            ? L10n("SftpPropertiesTypeDirectory")
-            : L10n("SftpPropertiesTypeFile");
+        string type = L10n(GetRemoteEntryKindDisplayKey(file.Kind));
 
         string sizeText = file.IsDirectory ? "-" : FormatSize(file.Size);
         string octal = PermissionsToOctal(file.Permissions);
@@ -2185,6 +2183,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         _dialogService.ShowInfo(
             _localizer?.Format("SftpPropertiesTitle", file.Name) ?? $"Properties — {file.Name}",
             body);
+    }
+
+    internal static string GetRemoteEntryKindDisplayKey(RemoteEntryKind kind)
+    {
+        switch (kind)
+        {
+            case RemoteEntryKind.File:
+                return "SftpPropertiesTypeFile";
+            case RemoteEntryKind.Directory:
+                return "SftpPropertiesTypeDirectory";
+            case RemoteEntryKind.SymbolicLink:
+                return "SftpPropertiesTypeSymlink";
+            case RemoteEntryKind.Fifo:
+                return "SftpPropertiesTypeFifo";
+            case RemoteEntryKind.Socket:
+                return "SftpPropertiesTypeSocket";
+            case RemoteEntryKind.Device:
+                return "SftpPropertiesTypeDevice";
+        }
+
+        throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown remote entry kind.");
     }
 
     /// <summary>

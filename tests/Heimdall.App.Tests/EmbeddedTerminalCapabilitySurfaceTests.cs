@@ -40,6 +40,41 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
     }
 
     [Fact]
+    public void SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType()
+    {
+        string source = ReadRepoFile(
+            "src",
+            "Heimdall.App",
+            "Views",
+            "EmbeddedSftpView.xaml");
+
+        Assert.Contains(
+            "<DataTrigger Binding=\"{Binding Kind}\" Value=\"SymbolicLink\">",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<DataTrigger Binding=\"{Binding Kind}\" Value=\"Fifo\">",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<DataTrigger Binding=\"{Binding Kind}\" Value=\"Socket\">",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<DataTrigger Binding=\"{Binding Kind}\" Value=\"Device\">",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<Run Text=\"{loc:Translate SftpPropertiesType}\"/>",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<Run Text=\"{Binding Kind, Converter={StaticResource RemoteEntryKindToDisplayNameConverter}}\"/>",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SshHealthButton_DefaultsHiddenUntilDirectSessionIsAttached()
     {
         XDocument document = XDocument.Load(Path.Combine(

@@ -49,6 +49,22 @@ public sealed class EmbeddedSftpViewModelHelpersTests
         Assert.Equal(expected, actual);
     }
 
+    [Theory]
+    [InlineData(RemoteEntryKind.File, "SftpPropertiesTypeFile")]
+    [InlineData(RemoteEntryKind.Directory, "SftpPropertiesTypeDirectory")]
+    [InlineData(RemoteEntryKind.SymbolicLink, "SftpPropertiesTypeSymlink")]
+    [InlineData(RemoteEntryKind.Fifo, "SftpPropertiesTypeFifo")]
+    [InlineData(RemoteEntryKind.Socket, "SftpPropertiesTypeSocket")]
+    [InlineData(RemoteEntryKind.Device, "SftpPropertiesTypeDevice")]
+    public void GetRemoteEntryKindDisplayKey_ReturnsExpectedLocaleKey(
+        RemoteEntryKind kind,
+        string expected)
+    {
+        string actual = EmbeddedSftpViewModel.GetRemoteEntryKindDisplayKey(kind);
+
+        Assert.Equal(expected, actual);
+    }
+
     [Fact]
     public void ResolveDropTargetDirectory_DirectoryHovered_ReturnsItsFullPath()
     {
