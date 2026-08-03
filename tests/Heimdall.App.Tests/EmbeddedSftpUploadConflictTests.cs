@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using Heimdall.App.Services;
@@ -246,6 +247,157 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Equal(1, presenter.CallCount);
         Assert.Empty(browser.CreateDirectoryCalls);
         Assert.Empty(browser.UploadCalls);
+    }
+
+    [Fact]
+    public void ClassifyLocalUploadChild_FileReparsePoint_IsSkipped()
+    {
+        const string localPath = @"C:\source\file-link.txt";
+        List<string> skippedPaths = [];
+
+        LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadChild(
+            localPath,
+            FileAttributes.ReparsePoint,
+            skippedPaths);
+
+        Assert.Null(entry);
+        Assert.Equal([localPath], skippedPaths);
+    }
+
+    [Fact]
+    public void ClassifyLocalUploadChild_DirectoryReparsePoint_IsSkipped()
+    {
+        const string localPath = @"C:\source\directory-link";
+        List<string> skippedPaths = [];
+
+        LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadChild(
+            localPath,
+            FileAttributes.Directory | FileAttributes.ReparsePoint,
+            skippedPaths);
+
+        Assert.Null(entry);
+        Assert.Equal([localPath], skippedPaths);
+    }
+
+    [Fact]
+    public void ClassifyLocalUploadRoot_FileLinkReportedByFileExists_IsAccepted()
+    {
+        const string selectedLink = @"C:\source\selected-link.txt";
+
+        LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadRoot(
+            selectedLink,
+            directoryExists: false,
+            fileExists: true);
+
+        Assert.NotNull(entry);
+        Assert.False(entry!.IsDirectory);
+        Assert.Equal(selectedLink, entry.FullPath);
+        Assert.Equal("selected-link.txt", entry.Name);
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_RootDirectoryLink_RemainsTraversable()
+    {
+        using TempDirectory temp = new();
+        string targetDirectory = Path.Combine(temp.Path, "target-directory");
+        string selectedLink = Path.Combine(temp.Path, "selected-link");
+        Directory.CreateDirectory(targetDirectory);
+        string childFile = Path.Combine(targetDirectory, "child.txt");
+        await File.WriteAllTextAsync(childFile, "payload");
+        await CreateJunctionAsync(selectedLink, targetDirectory);
+        try
+        {
+            RecordingRemoteBrowser browser = new();
+            RecordingConflictPresenter presenter = new(_ =>
+                throw new InvalidOperationException("The dialog must not be shown."));
+            EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+            await viewModel.UploadEntriesAsync([selectedLink], "/dst");
+
+            Assert.Equal(0, presenter.CallCount);
+            Assert.Contains("/dst/selected-link", browser.CreateDirectoryCalls);
+            Assert.Collection(
+                browser.UploadCalls,
+                call => Assert.Equal(
+                    (Path.Combine(selectedLink, "child.txt"), "/dst/selected-link/child.txt"),
+                    call));
+        }
+        finally
+        {
+            Directory.Delete(selectedLink);
+        }
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_MixedTree_SkipsChildJunctionAndSurfacesCount()
+    {
+        using TempDirectory temp = new();
+        string selectedDirectory = Path.Combine(temp.Path, "source");
+        string nestedDirectory = Path.Combine(selectedDirectory, "nested");
+        string externalDirectory = Path.Combine(temp.Path, "external-directory");
+        Directory.CreateDirectory(nestedDirectory);
+        Directory.CreateDirectory(externalDirectory);
+        string regularFile = Path.Combine(selectedDirectory, "regular.txt");
+        string nestedFile = Path.Combine(nestedDirectory, "nested.txt");
+        await File.WriteAllTextAsync(regularFile, "regular");
+        await File.WriteAllTextAsync(nestedFile, "nested");
+        await File.WriteAllTextAsync(
+            Path.Combine(externalDirectory, "must-not-upload.txt"),
+            "external");
+        string directoryLink = Path.Combine(selectedDirectory, "directory-link");
+        await CreateJunctionAsync(directoryLink, externalDirectory);
+        try
+        {
+            RecordingRemoteBrowser browser = new();
+            RecordingConflictPresenter presenter = new(_ =>
+                throw new InvalidOperationException("The dialog must not be shown."));
+            EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+            await viewModel.UploadEntriesAsync([selectedDirectory], "/dst");
+
+            Assert.Equal(0, presenter.CallCount);
+            Assert.Equal(2, browser.UploadCalls.Count);
+            Assert.Contains((regularFile, "/dst/source/regular.txt"), browser.UploadCalls);
+            Assert.Contains((nestedFile, "/dst/source/nested/nested.txt"), browser.UploadCalls);
+            Assert.DoesNotContain(
+                browser.UploadCalls,
+                call => call.RemotePath.StartsWith("/dst/source/directory-link", StringComparison.Ordinal));
+            Assert.DoesNotContain("/dst/source/directory-link", browser.CreateDirectoryCalls);
+            Assert.Equal(
+                "Skipped 1 local link(s) encountered inside the selected upload tree. See the log for details.",
+                viewModel.StatusText);
+        }
+        finally
+        {
+            Directory.Delete(directoryLink);
+        }
+    }
+
+    private static async Task CreateJunctionAsync(string junctionPath, string targetPath)
+    {
+        ProcessStartInfo startInfo = new()
+        {
+            FileName = "cmd.exe",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        startInfo.ArgumentList.Add("/d");
+        startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add("mklink");
+        startInfo.ArgumentList.Add("/J");
+        startInfo.ArgumentList.Add(junctionPath);
+        startInfo.ArgumentList.Add(targetPath);
+
+        using Process process = new() { StartInfo = startInfo };
+        Assert.True(process.Start());
+        string standardOutput = await process.StandardOutput.ReadToEndAsync();
+        string standardError = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.True(
+            process.ExitCode == 0,
+            $"Failed to create junction '{junctionPath}' -> '{targetPath}'. stdout={standardOutput}; stderr={standardError}");
     }
 
     private static IReadOnlyList<FileConflictPlanItem> ToPlanItems(IReadOnlyList<RemoteUploadOp> ops)

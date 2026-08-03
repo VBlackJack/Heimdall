@@ -57,10 +57,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         Unavailable
     }
 
-    /// <summary>Outcome of a planned upload run: completion plus the destinations refused up front.</summary>
+    /// <summary>Outcome of a planned upload run, including sources and destinations refused up front.</summary>
     private readonly record struct UploadPlanOutcome(
         bool Completed,
-        IReadOnlyList<string> SkippedUnsupportedTargets);
+        IReadOnlyList<string> SkippedUnsupportedTargets,
+        IReadOnlyList<string> SkippedLocalReparsePoints);
 
     private const string SudoStderrTerminalRequired = "a terminal is required";
     private const string SudoStderrNoTtyPresent = "no tty present";
@@ -888,7 +889,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         CancellationToken ct = transferCts.Token;
         TransferProgressValue = 0;
         bool refreshAfterTransfer = true;
-        string? pendingUnsupportedWarning = null;
+        List<string> pendingOperationWarnings = [];
 
         try
         {
@@ -910,7 +911,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     "WarnUploadTargetsSkippedUnsupported",
                     outcome.SkippedUnsupportedTargets.Count)
                     ?? $"Skipped {outcome.SkippedUnsupportedTargets.Count} upload(s): the destination already exists and is not a regular file. See the log for details.";
-                pendingUnsupportedWarning = warning;
+                pendingOperationWarnings.Add(warning);
+            }
+
+            if (outcome.Completed && outcome.SkippedLocalReparsePoints.Count > 0)
+            {
+                string warning = _localizer?.Format(
+                    "WarnUploadSourcesSkippedReparsePoints",
+                    outcome.SkippedLocalReparsePoints.Count)
+                    ?? $"Skipped {outcome.SkippedLocalReparsePoints.Count} local link(s) encountered inside the selected upload tree. See the log for details.";
+                pendingOperationWarnings.Add(warning);
             }
         }
         catch (OperationCanceledException)
@@ -928,7 +938,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             CompleteTransfer(transferCts);
             if (refreshAfterTransfer)
             {
-                if (pendingUnsupportedWarning is not null)
+                if (pendingOperationWarnings.Count > 0)
                 {
                     // The refresh ends with UpdateStatus("Ready"); await it so the aggregated
                     // warning below is the last message written, as the paste path already does.
@@ -941,9 +951,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
         }
 
-        if (pendingUnsupportedWarning is not null)
+        if (pendingOperationWarnings.Count > 0)
         {
-            ShowOperationWarning(pendingUnsupportedWarning);
+            ShowOperationWarning(string.Join(Environment.NewLine, pendingOperationWarnings));
         }
     }
 
@@ -958,32 +968,46 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         CancellationToken ct)
     {
         List<string> skippedUnsupportedTargets = [];
+        List<string> skippedLocalReparsePoints = [];
 
         if (_browser is null)
         {
-            return new UploadPlanOutcome(false, skippedUnsupportedTargets);
+            return new UploadPlanOutcome(
+                false,
+                skippedUnsupportedTargets,
+                skippedLocalReparsePoints);
         }
 
         List<LocalUploadEntry> roots = new(localPaths.Count);
         foreach (string path in localPaths)
         {
             bool isDirectory = Directory.Exists(path);
-            if (!isDirectory && !File.Exists(path))
+            bool isFile = !isDirectory && File.Exists(path);
+            LocalUploadEntry? root = ClassifyLocalUploadRoot(path, isDirectory, isFile);
+            if (root is null)
             {
                 // Skip paths that no longer exist; a drop can race a delete on the source side.
                 continue;
             }
 
-            roots.Add(ToLocalUploadEntry(path, isDirectory));
+            roots.Add(root);
         }
 
         if (roots.Count == 0)
         {
-            return new UploadPlanOutcome(true, skippedUnsupportedTargets);
+            return new UploadPlanOutcome(
+                true,
+                skippedUnsupportedTargets,
+                skippedLocalReparsePoints);
         }
 
         IReadOnlyList<RemoteUploadOp> ops =
-            RemoteUploadTreePlanner.Plan(roots, targetRemoteDir, EnumerateLocalChildren);
+            RemoteUploadTreePlanner.Plan(
+                roots,
+                targetRemoteDir,
+                localDirectory => EnumerateLocalChildren(
+                    localDirectory,
+                    skippedLocalReparsePoints));
         RemoteUploadConflictInventory inventory = await BuildRemoteUploadConflictInventoryAsync(
             _browser,
             ops,
@@ -1002,7 +1026,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (plannedOps.Count == 0)
         {
-            return new UploadPlanOutcome(true, skippedUnsupportedTargets);
+            return new UploadPlanOutcome(
+                true,
+                skippedUnsupportedTargets,
+                skippedLocalReparsePoints);
         }
 
         IReadOnlyList<FileConflictAnalysisItem> conflictAnalysis = FileConflictPlanner.Analyze(
@@ -1027,7 +1054,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 .ShowAsync(dialogViewModel);
             if (dialogResult is null)
             {
-                return new UploadPlanOutcome(false, skippedUnsupportedTargets);
+                return new UploadPlanOutcome(
+                    false,
+                    skippedUnsupportedTargets,
+                    skippedLocalReparsePoints);
             }
 
             decisions = dialogResult.Decisions;
@@ -1104,7 +1134,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
         }
 
-        return new UploadPlanOutcome(true, skippedUnsupportedTargets);
+        return new UploadPlanOutcome(
+            true,
+            skippedUnsupportedTargets,
+            skippedLocalReparsePoints);
     }
 
     /// <summary>
@@ -1228,15 +1261,66 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     // Reads a local directory's immediate children into planner entries. The impure walk lives here;
     // the planner stays pure and is driven through this delegate.
-    private static IReadOnlyList<LocalUploadEntry> EnumerateLocalChildren(string localDirectory)
+    private static IReadOnlyList<LocalUploadEntry> EnumerateLocalChildren(
+        string localDirectory,
+        ICollection<string> skippedLocalReparsePoints)
     {
         List<LocalUploadEntry> children = [];
         foreach (string entry in Directory.EnumerateFileSystemEntries(localDirectory))
         {
-            children.Add(ToLocalUploadEntry(entry, Directory.Exists(entry)));
+            FileAttributes attributes = File.GetAttributes(entry);
+            LocalUploadEntry? child = ClassifyLocalUploadChild(
+                entry,
+                attributes,
+                skippedLocalReparsePoints);
+            if (child is not null)
+            {
+                children.Add(child);
+            }
         }
 
         return children;
+    }
+
+    /// <summary>
+    /// Accepts an explicitly selected upload root based on the existing following existence probes.
+    /// </summary>
+    internal static LocalUploadEntry? ClassifyLocalUploadRoot(
+        string localPath,
+        bool directoryExists,
+        bool fileExists)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+        if (!directoryExists && !fileExists)
+        {
+            return null;
+        }
+
+        return ToLocalUploadEntry(localPath, directoryExists);
+    }
+
+    /// <summary>
+    /// Rejects reparse points discovered below an explicitly selected upload root.
+    /// </summary>
+    internal static LocalUploadEntry? ClassifyLocalUploadChild(
+        string localPath,
+        FileAttributes attributes,
+        ICollection<string> skippedLocalReparsePoints)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+        ArgumentNullException.ThrowIfNull(skippedLocalReparsePoints);
+
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            skippedLocalReparsePoints.Add(localPath);
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP skipped local reparse point '{localPath}' during upload planning.");
+            return null;
+        }
+
+        return ToLocalUploadEntry(
+            localPath,
+            (attributes & FileAttributes.Directory) != 0);
     }
 
     private static LocalUploadEntry ToLocalUploadEntry(string localPath, bool isDirectory)
