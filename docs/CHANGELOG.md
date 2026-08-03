@@ -12,6 +12,27 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-03: Remote recursive deletion confinement (v2026.080301)
+
+### Fixed
+
+- **Remote recursive deletion is delegated to the server's own `rm`** (`e124001b`). Deleting a
+  remote directory now runs `LC_ALL=C rm -r -- <path>` over a pinned SSH exec channel, which
+  guarantees symbolic links are never followed - a guarantee the client-side traversal could not
+  give. When no exec channel is available, or the shell or `rm` is missing, the recursive deletion
+  is refused with a typed reason (exec unavailable, shell or rm unavailable, permission denied,
+  command failed) instead of attempted without the guarantee. Files and links keep the direct
+  no-follow SFTP path. The client-side recursive traversal is removed. Closes SFTP-017.
+- **Refused entries no longer abort the remaining selection** (`4f3a72c5`). A refusal or failure
+  on one entry is reported and the safe siblings proceed; one aggregated summary is shown after
+  the operation, after the browser refresh. Sudo escalation is preserved and its failure is
+  non-blocking. A cross-session cut whose source could not be deleted keeps the transfer and
+  warns. Five new localized messages (EN and FR).
+
+### Notes
+
+- Test suite: 8581 to 8618, 0 skipped.
+
 ## 2026-08-03: Local transfer tree confinement (v2026.080300)
 
 ### Fixed
@@ -31,6 +52,45 @@ All notable changes to Heimdall are documented in this file.
 ### Notes
 
 - Test suite: 8566 to 8581, 0 skipped.
+
+## 2026-08-03: Symbolic links and special entries on remote servers (v2026.080200)
+
+Backfilled entry: the v2026.080200 release commit (`c80807d1`) updated only the version; this
+entry documents what it shipped - twelve commits closing the whole of SFTP-016.
+
+### Fixed
+
+- **Deleting a symbolic link no longer deletes its target**, and a recursive deletion no longer
+  traverses links to destroy what they point to.
+- **Renaming a symbolic link over SFTP is refused** - the server rename followed the link and
+  renamed the target with no way to prevent it; FTP keeps the rename, where it acts on the link
+  itself.
+- **Editing or replacing a non-regular entry is refused** - a socket or a pipe can no longer be
+  overwritten as if it were a file; transfers skip unsupported entries instead of treating them
+  as files.
+- **The remote browser shows the real nature of each entry**: dedicated icon, type in the tooltip
+  and in the Properties window.
+- **Same-server copy**: copying a directory into one of its own subdirectories is refused instead
+  of looping; a copy can no longer overwrite a destination that appeared between check and write.
+- **Non-atomic replacement is signalled** by a non-blocking warning when a server cannot replace a
+  file atomically.
+
+### Notes
+
+- Test suite: to 8566, 0 skipped.
+- Commits:
+  - `cdb48b6f` fix(sftp): stop remote copy from overwriting a destination created after the check
+  - `a8348238` feat(sftp): surface non-atomic remote replacement as a non-blocking warning
+  - `23c05a76` fix(sftp): delete the symbolic link itself instead of its target
+  - `d1ce928e` fix(sftp): stop recursive delete from destroying symlink targets
+  - `b7d83ed9` fix(sftp): reject copy destinations inside the source tree
+  - `94259429` feat(sftp): carry an explicit remote entry kind through remote listings
+  - `39e5bdd0` feat(sftp): keep unsupported remote entries out of transfer paths
+  - `1f861ec1` feat(sftp): refuse uploads whose existing destination is not a regular file
+  - `ee67d938` fix(sftp): block editing of remote entries that are not regular files
+  - `0b4be893` fix(sftp): skip uploads whose destination is not a regular file
+  - `2e2e1667` fix(ui): show remote entry kinds truthfully in the SFTP browser
+  - `8d664aef` fix(sftp): refuse renaming symbolic links over native SFTP
 
 ## 2026-08-01: Destructive remote replacements, and the last of tier 1 (v2026.080100)
 
