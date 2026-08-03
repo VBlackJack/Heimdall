@@ -269,6 +269,45 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
     }
 
     [Fact]
+    public async Task PasteClipboardAsync_CutSourceRefusalKeepsSuccessfulTransferAndWarns()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel targetPane = new(new FakeUiDispatcher(), clipboard)
+        {
+            CurrentPath = "/dst",
+            IsConnected = true,
+            UnfilteredEntries = []
+        };
+        FakeRemoteBrowser sourceBrowser = new()
+        {
+            DeleteException = new RemoteRecursiveDeleteException(
+                RemoteRecursiveDeleteFailureReason.ExecUnavailable),
+        };
+        FakeRemoteBrowser targetBrowser = new();
+        SetBrowser(targetPane, targetBrowser);
+        SetEndpointKey(targetPane, "host=b;port=22;user=bob");
+        SftpFileInfo sourceEntry = CreateEntry(
+            "a.txt",
+            "/src/a.txt",
+            isDirectory: false);
+        clipboard.Set(new SftpClipboardContent(
+            [sourceEntry],
+            "/src",
+            SftpClipboardMode.Cut,
+            "host=a;port=22;user=alice",
+            sourceBrowser));
+
+        await targetPane.PasteClipboardAsync();
+
+        Assert.Single(targetBrowser.UploadCalls);
+        Assert.Equal(["/src/a.txt"], sourceBrowser.DeleteCalls);
+        SftpClipboardContent remaining = Assert.IsType<SftpClipboardContent>(clipboard.Current);
+        Assert.Equal("/src/a.txt", Assert.Single(remaining.Entries).FullPath);
+        Assert.Equal("SftpCutSourceNotDeleted", targetPane.StatusText);
+        Assert.False(targetPane.IsErrorStatus);
+    }
+
+    [Fact]
     public async Task PasteClipboardAsync_CutDifferentEndpointFailureKeepsUntransferredSources()
     {
         RemoteClipboardService clipboard = new();
@@ -512,6 +551,8 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
 
         public string? FailUploadRemotePath { get; set; }
 
+        public Exception? DeleteException { get; set; }
+
         public Task<IReadOnlyList<SftpFileInfo>> ListDirectoryAsync(string? path = null, CancellationToken ct = default)
         {
             EnsureConnected();
@@ -578,7 +619,9 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         {
             EnsureConnected();
             DeleteCalls.Add(path);
-            return Task.CompletedTask;
+            return DeleteException is null
+                ? Task.CompletedTask
+                : Task.FromException(DeleteException);
         }
 
         public Task ChmodAsync(string path, short mode, CancellationToken ct = default)

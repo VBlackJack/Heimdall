@@ -25,6 +25,7 @@ using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Ssh;
 using Heimdall.Sftp;
+using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
 
@@ -905,6 +906,189 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task DeleteEntriesAsync_OneExecRefusalContinuesSiblingWarnsAndRefreshes()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (path, _) => string.Equals(path, "/srv/refused", StringComparison.Ordinal)
+                ? Task.FromException(new RemoteRecursiveDeleteException(
+                    RemoteRecursiveDeleteFailureReason.ExecUnavailable))
+                : Task.CompletedTask,
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService());
+        IReadOnlyList<SftpFileInfo> entries =
+        [
+            CreateRemoteEntry("refused", "/srv/refused", isDirectory: true),
+            CreateRemoteEntry("safe.txt", "/srv/safe.txt", isDirectory: false),
+        ];
+
+        await viewModel.DeleteEntriesAsync(entries);
+
+        Assert.Equal(["/srv/refused", "/srv/safe.txt"], browser.DeleteCalls);
+        Assert.Equal(1, browser.ListDirectoryCallCount);
+        Assert.Equal(localizer["SftpDeleteRefusedExecUnavailable"], viewModel.StatusText);
+        Assert.False(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_AllEntriesRefusedSetsAggregateErrorWithoutRefresh()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (_, _) => Task.FromException(new RemoteRecursiveDeleteException(
+                RemoteRecursiveDeleteFailureReason.CommandFailed)),
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService());
+        IReadOnlyList<SftpFileInfo> entries =
+        [
+            CreateRemoteEntry("first", "/srv/first", isDirectory: true),
+            CreateRemoteEntry("second", "/srv/second", isDirectory: true),
+        ];
+
+        await viewModel.DeleteEntriesAsync(entries);
+
+        Assert.Equal(["/srv/first", "/srv/second"], browser.DeleteCalls);
+        Assert.Equal(0, browser.ListDirectoryCallCount);
+        Assert.Equal(
+            localizer.Format("SftpDeletePartialSummary", 2, 2),
+            viewModel.StatusText);
+        Assert.True(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_ProtectedRootMidSelectionContinuesSafeSiblings()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService());
+        IReadOnlyList<SftpFileInfo> entries =
+        [
+            CreateRemoteEntry("first.txt", "/srv/first.txt", isDirectory: false),
+            CreateRemoteEntry("/", "/", isDirectory: true),
+            CreateRemoteEntry("last.txt", "/srv/last.txt", isDirectory: false),
+        ];
+
+        await viewModel.DeleteEntriesAsync(entries);
+
+        Assert.Equal(["/srv/first.txt", "/srv/last.txt"], browser.DeleteCalls);
+        Assert.Equal(1, browser.ListDirectoryCallCount);
+        Assert.Equal(localizer.Format("SftpDeleteFailedEntry", "/"), viewModel.StatusText);
+        Assert.False(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_SudoFailureDoesNotAbortRemainingEntry()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (path, _) => string.Equals(path, "/srv/denied", StringComparison.Ordinal)
+                ? Task.FromException(new RemoteRecursiveDeleteException(
+                    RemoteRecursiveDeleteFailureReason.PermissionDenied))
+                : Task.CompletedTask,
+        };
+        int sudoCallCount = 0;
+        string? sudoCommand = null;
+        Func<string, CancellationToken, Task> sudoExecutor = (command, _) =>
+        {
+            sudoCallCount++;
+            sudoCommand = command;
+            return Task.FromException(new IOException("sudo failed"));
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        SetPrivateField(
+            viewModel,
+            "_sshParams",
+            new SshConnectionParams { Host = "example.test", Username = "tester" });
+        SetPrivateField(viewModel, "_sudoDeleteCommandExecutor", sudoExecutor);
+        viewModel.SetDialogService(new ConfirmingDialogService());
+        IReadOnlyList<SftpFileInfo> entries =
+        [
+            CreateRemoteEntry("denied", "/srv/denied", isDirectory: true),
+            CreateRemoteEntry("safe.txt", "/srv/safe.txt", isDirectory: false),
+        ];
+
+        await viewModel.DeleteEntriesAsync(entries);
+
+        Assert.Equal(["/srv/denied", "/srv/safe.txt"], browser.DeleteCalls);
+        Assert.Equal(1, sudoCallCount);
+        Assert.Equal("rm -rf '/srv/denied'", sudoCommand);
+        Assert.Equal(1, browser.ListDirectoryCallCount);
+        Assert.Equal(localizer.Format("SftpDeleteFailedEntry", "denied"), viewModel.StatusText);
+        Assert.False(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_OperationCanceledAbortsLoopWithoutWarning()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (path, _) => string.Equals(path, "/srv/cancel", StringComparison.Ordinal)
+                ? Task.FromException(new OperationCanceledException())
+                : Task.CompletedTask,
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService());
+        IReadOnlyList<SftpFileInfo> entries =
+        [
+            CreateRemoteEntry("first.txt", "/srv/first.txt", isDirectory: false),
+            CreateRemoteEntry("cancel", "/srv/cancel", isDirectory: true),
+            CreateRemoteEntry("last.txt", "/srv/last.txt", isDirectory: false),
+        ];
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => viewModel.DeleteEntriesAsync(entries));
+
+        Assert.Equal(["/srv/first.txt", "/srv/cancel"], browser.DeleteCalls);
+        Assert.Equal(0, browser.ListDirectoryCallCount);
+        Assert.False(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_SingleShellRefusalUsesReasonSpecificError()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (_, _) => Task.FromException(new RemoteRecursiveDeleteException(
+                RemoteRecursiveDeleteFailureReason.ShellOrRmUnavailable)),
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService());
+
+        await viewModel.DeleteEntriesAsync(
+            [CreateRemoteEntry("tree", "/srv/tree", isDirectory: true)]);
+
+        Assert.Equal(localizer["SftpDeleteRefusedShellUnavailable"], viewModel.StatusText);
+        Assert.True(viewModel.IsErrorStatus);
+        Assert.Equal(0, browser.ListDirectoryCallCount);
+    }
+
+    [Fact]
     public void CutSelectedCommand_CapturesSelectionAndSourceDirectoryAsCut()
     {
         FakeUiDispatcher dispatcher = new();
@@ -1213,6 +1397,18 @@ public sealed class EmbeddedSftpViewModelTests
         field!.SetValue(viewModel, localizer);
     }
 
+    private static void SetPrivateField<T>(
+        EmbeddedSftpViewModel viewModel,
+        string fieldName,
+        T value)
+    {
+        FieldInfo? field = typeof(EmbeddedSftpViewModel).GetField(
+            fieldName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(viewModel, value);
+    }
+
     private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
     {
         LocalizationManager manager = new();
@@ -1283,6 +1479,10 @@ public sealed class EmbeddedSftpViewModelTests
         public short LastChmodMode { get; private set; }
 
         public Exception? ChmodException { get; set; }
+
+        public Func<string, CancellationToken, Task>? DeleteHandler { get; set; }
+
+        public List<string> DeleteCalls { get; } = [];
 
         public string? LastDeletedPath { get; private set; }
 
@@ -1355,7 +1555,10 @@ public sealed class EmbeddedSftpViewModelTests
             LastDeletedPath = path;
             LastDeleteCancellationToken = ct;
             Interlocked.Increment(ref _deleteCallCount);
-            return Task.CompletedTask;
+            DeleteCalls.Add(path);
+            return DeleteHandler is null
+                ? Task.CompletedTask
+                : DeleteHandler(path, ct);
         }
 
         public Task ChmodAsync(string path, short mode, CancellationToken ct = default)

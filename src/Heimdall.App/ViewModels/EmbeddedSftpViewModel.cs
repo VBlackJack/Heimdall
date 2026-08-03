@@ -77,6 +77,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private readonly IRemoteClipboardService _remoteClipboard;
     private readonly IFileConflictDialogPresenter _fileConflictDialogPresenter;
     private Func<string, CancellationToken, Task<SudoRenameCommandResult>>? _sudoRenameCommandExecutor;
+    private Func<string, CancellationToken, Task>? _sudoDeleteCommandExecutor = null;
     private IRemoteBrowser? _browser;
     // Emits operation records for the SFTP sudo fallbacks (which bypass the decorated browser).
     private SessionOperationEmitter _sudoEmitter = SessionOperationEmitter.Disabled;
@@ -2142,42 +2143,149 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
+        IRemoteBrowser browser = _browser;
+        List<DeleteEntryFailure> failures = [];
+        int deletedCount = 0;
+
         try
         {
-            foreach (var file in entries)
+            foreach (SftpFileInfo file in entries)
             {
-                if (SftpPathGuard.IsProtectedRoot(file.FullPath))
+                DeleteEntryFailure? failure = await TryDeleteEntryAsync(browser, file)
+                    .ConfigureAwait(false);
+                if (failure is null)
                 {
-                    await RunOnUiAsync(() => SetErrorStatus(L10n("SftpErrorProtectedRoot"))).ConfigureAwait(false);
-                    return;
+                    deletedCount++;
                 }
-
-                try
+                else
                 {
-                    await _browser.DeleteAsync(file.FullPath);
-                }
-                catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
-                {
-                    SftpPathGuard.ThrowIfProtectedRoot(file.FullPath, "sudo delete");
-                    Core.Logging.FileLogger.Info(
-                        $"EmbeddedSFTP delete permission denied, falling back to sudo for {file.Name}");
-                    string flag = file.IsDirectory ? "-rf" : "-f";
-                    await _sudoEmitter.RunDeleteAsync(
-                        file.FullPath,
-                        () => RunSudoCommandAsync(
-                            $"rm {flag} {PathEscaper.EscapeForShell(file.FullPath)}"),
-                        privileged: true);
+                    failures.Add(failure);
                 }
             }
 
-            await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessDelete")));
+            if (failures.Count == 0)
+            {
+                await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessDelete")));
+                await Refresh().ConfigureAwait(false);
+                return;
+            }
+
+            string summary = GetDeleteFailureSummary(failures, entries.Count);
+            if (deletedCount == 0)
+            {
+                await RunOnUiAsync(() => SetErrorStatus(summary)).ConfigureAwait(false);
+                return;
+            }
+
             await Refresh().ConfigureAwait(false);
+            await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             await RunOnUiAsync(() =>
                 SetTransferError(ex));
         }
+    }
+
+    private async Task<DeleteEntryFailure?> TryDeleteEntryAsync(
+        IRemoteBrowser browser,
+        SftpFileInfo file)
+    {
+        if (SftpPathGuard.IsProtectedRoot(file.FullPath))
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP refused deletion of protected root '{file.FullPath}'.");
+            return new DeleteEntryFailure(file.Name, null, IsProtectedRoot: true);
+        }
+
+        try
+        {
+            await browser.DeleteAsync(file.FullPath).ConfigureAwait(false);
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
+        {
+            try
+            {
+                SftpPathGuard.ThrowIfProtectedRoot(file.FullPath, "sudo delete");
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedSFTP delete permission denied, falling back to sudo for {file.Name}");
+                string flag = file.IsDirectory ? "-rf" : "-f";
+                await _sudoEmitter.RunDeleteAsync(
+                    file.FullPath,
+                    () => RunSudoDeleteCommandAsync(
+                        $"rm {flag} {PathEscaper.EscapeForShell(file.FullPath)}",
+                        CancellationToken.None),
+                    privileged: true).ConfigureAwait(false);
+                return null;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception sudoException)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"EmbeddedSFTP sudo deletion failed for '{file.FullPath}' "
+                    + $"[{sudoException.GetType().Name}]: {sudoException.Message}");
+                return new DeleteEntryFailure(file.Name, null);
+            }
+        }
+        catch (RemoteRecursiveDeleteException ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP recursive deletion refused for '{file.FullPath}' ({ex.Reason}).");
+            return new DeleteEntryFailure(file.Name, ex.Reason);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP deletion failed for '{file.FullPath}' "
+                + $"[{ex.GetType().Name}]: {ex.Message}");
+            return new DeleteEntryFailure(file.Name, null);
+        }
+    }
+
+    private Task RunSudoDeleteCommandAsync(string command, CancellationToken ct)
+    {
+        return _sudoDeleteCommandExecutor is null
+            ? RunSudoCommandAsync(command, ct)
+            : _sudoDeleteCommandExecutor(command, ct);
+    }
+
+    private string GetDeleteFailureSummary(
+        IReadOnlyList<DeleteEntryFailure> failures,
+        int totalCount)
+    {
+        DeleteEntryFailure firstFailure = failures[0];
+        if (failures.Count == 1)
+        {
+            if (totalCount == 1 && firstFailure.IsProtectedRoot)
+            {
+                return L10n("SftpErrorProtectedRoot");
+            }
+
+            return firstFailure.Reason switch
+            {
+                RemoteRecursiveDeleteFailureReason.ExecUnavailable =>
+                    L10n("SftpDeleteRefusedExecUnavailable"),
+                RemoteRecursiveDeleteFailureReason.ShellOrRmUnavailable =>
+                    L10n("SftpDeleteRefusedShellUnavailable"),
+                _ => _localizer?.Format("SftpDeleteFailedEntry", firstFailure.Name)
+                    ?? "SftpDeleteFailedEntry",
+            };
+        }
+
+        return _localizer?.Format("SftpDeletePartialSummary", failures.Count, totalCount)
+            ?? "SftpDeletePartialSummary";
     }
 
     /// <summary>
@@ -2701,6 +2809,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         _errorHighlightTimer?.Dispose();
         _errorHighlightTimer = null;
     }
+
+    private sealed record DeleteEntryFailure(
+        string Name,
+        RemoteRecursiveDeleteFailureReason? Reason,
+        bool IsProtectedRoot = false);
 
     private string L10n(string key) => _localizer?.GetString(key) ?? key;
 

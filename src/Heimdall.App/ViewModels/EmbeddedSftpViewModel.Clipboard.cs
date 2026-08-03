@@ -265,6 +265,7 @@ public sealed partial class EmbeddedSftpViewModel
         IsTransferInProgress = true;
 
         bool cut = clipboard.Mode == SftpClipboardMode.Cut;
+        bool cutSourceNotDeleted = false;
         var processedCutSources = new HashSet<string>(StringComparer.Ordinal);
         var skippedUnsupportedPaths = new HashSet<string>(StringComparer.Ordinal);
         Action<SftpTransferProgress> sourceProgress = progress =>
@@ -307,9 +308,19 @@ public sealed partial class EmbeddedSftpViewModel
 
                 if (cut && plan.SkippedUnsupportedPaths.Count == 0)
                 {
-                    await DeleteCrossEndpointSourceAsync(sourceBrowser, entry.FullPath, ct)
+                    bool sourceDeleted = await DeleteCrossEndpointSourceAsync(
+                            sourceBrowser,
+                            entry.FullPath,
+                            ct)
                         .ConfigureAwait(false);
-                    processedCutSources.Add(entry.FullPath);
+                    if (sourceDeleted)
+                    {
+                        processedCutSources.Add(entry.FullPath);
+                    }
+                    else
+                    {
+                        cutSourceNotDeleted = true;
+                    }
                 }
 
                 if (plan.Ops.Count > 0)
@@ -341,6 +352,7 @@ public sealed partial class EmbeddedSftpViewModel
                 .ConfigureAwait(false);
             await Refresh().ConfigureAwait(false);
 
+            List<string> completionWarnings = [];
             if (skippedUnsupportedPaths.Count > 0)
             {
                 foreach (string path in skippedUnsupportedPaths)
@@ -353,6 +365,17 @@ public sealed partial class EmbeddedSftpViewModel
                     "WarnRemoteEntriesSkippedUnsupported",
                     skippedUnsupportedPaths.Count)
                     ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                completionWarnings.Add(warning);
+            }
+
+            if (cutSourceNotDeleted)
+            {
+                completionWarnings.Add(L10n("SftpCutSourceNotDeleted"));
+            }
+
+            if (completionWarnings.Count > 0)
+            {
+                string warning = string.Join(Environment.NewLine, completionWarnings);
                 await RunOnUiAsync(() => ShowOperationWarning(warning)).ConfigureAwait(false);
             }
         }
@@ -501,7 +524,7 @@ public sealed partial class EmbeddedSftpViewModel
         }
     }
 
-    private static async Task DeleteCrossEndpointSourceAsync(
+    private static async Task<bool> DeleteCrossEndpointSourceAsync(
         IRemoteBrowser sourceBrowser,
         string sourcePath,
         CancellationToken ct)
@@ -509,6 +532,13 @@ public sealed partial class EmbeddedSftpViewModel
         try
         {
             await sourceBrowser.DeleteAsync(sourcePath, ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (RemoteRecursiveDeleteException ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP cross-endpoint cut left source '{sourcePath}' in place ({ex.Reason}).");
+            return false;
         }
         catch (Exception ex) when (IsSourceUnavailableException(ex))
         {
