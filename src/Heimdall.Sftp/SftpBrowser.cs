@@ -39,15 +39,20 @@ public sealed class SftpBrowser : IRemoteBrowser
     }
 
     private static readonly TimeSpan DefaultDisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
+    private const int SuccessfulExitStatus = 0;
+    private const int CommandNotFoundExitStatus = 127;
+    private const string PermissionDeniedDiagnostic = "permission denied";
 
     private SftpClient? _client;
     private int _disposeState;
     private readonly SemaphoreSlim _clientLock = new(1, 1);
     private readonly TimeSpan _disconnectLockTimeout;
+    private readonly ISftpExecCommandRunner? _injectedExecCommandRunner;
 
-    // Connection context retained so a short-lived SSH exec channel can be opened later for a
-    // server-side copy, pinned to the SAME host key resolved at connect time (fail-closed: no
-    // re-prompt, no auto-accept). Both are cleared on Disconnect alongside the SFTP client.
+    // Connection context retained so short-lived SSH exec channels can be opened later for
+    // server-side copy and recursive deletion, pinned to the SAME host key resolved at connect
+    // time (fail-closed: no re-prompt, no auto-accept). Both are cleared on Disconnect alongside
+    // the SFTP client.
     private SshConnectionParams? _connectionParams;
     private PinnedFingerprintVerifier? _pinnedHostKeyVerifier;
 
@@ -56,11 +61,25 @@ public sealed class SftpBrowser : IRemoteBrowser
     private static readonly TimeSpan ServerSideCopyCommandTimeout = TimeSpan.FromMinutes(10);
 
     public SftpBrowser()
-        : this(DefaultDisconnectLockTimeout)
+        : this(DefaultDisconnectLockTimeout, null)
     {
     }
 
     internal SftpBrowser(TimeSpan disconnectLockTimeout)
+        : this(disconnectLockTimeout, null)
+    {
+    }
+
+    internal SftpBrowser(ISftpExecCommandRunner execCommandRunner)
+        : this(
+            DefaultDisconnectLockTimeout,
+            execCommandRunner ?? throw new ArgumentNullException(nameof(execCommandRunner)))
+    {
+    }
+
+    private SftpBrowser(
+        TimeSpan disconnectLockTimeout,
+        ISftpExecCommandRunner? injectedExecCommandRunner)
     {
         if (disconnectLockTimeout < TimeSpan.Zero)
         {
@@ -68,6 +87,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         }
 
         _disconnectLockTimeout = disconnectLockTimeout;
+        _injectedExecCommandRunner = injectedExecCommandRunner;
     }
 
     /// <summary>Raised when the current working directory changes.</summary>
@@ -141,7 +161,7 @@ public sealed class SftpBrowser : IRemoteBrowser
             connectionParams,
             pinnedVerifier);
 
-        // Retain the resolved params + pinned verifier for the later server-side-copy exec channel.
+        // Retain the resolved params + pinned verifier for later trusted SSH exec channels.
         _connectionParams = connectionParams;
         _pinnedHostKeyVerifier = pinnedVerifier;
 
@@ -526,27 +546,34 @@ public sealed class SftpBrowser : IRemoteBrowser
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var client = GetConnectedClient();
-            await Task.Run(() =>
+            SftpClient client = GetConnectedClient();
+            string? directoryPath = await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
-                var (entry, deletePath) = GetEntryWithoutFollowingTarget(client, path);
+                (ISftpFile Entry, string DeletePath) target =
+                    GetEntryWithoutFollowingTarget(client, path);
 
-                if (entry.IsSymbolicLink)
+                if (target.Entry.IsSymbolicLink)
                 {
                     // SftpClient.DeleteFile canonicalizes through SSH_FXP_REALPATH and can delete the link target.
                     // ISftpFile.Delete acts on the listed entry's stored path instead.
-                    entry.Delete();
+                    target.Entry.Delete();
+                    return null;
                 }
-                else if (entry.IsDirectory)
+
+                if (target.Entry.IsDirectory)
                 {
-                    DeleteDirectoryRecursive(client, deletePath, ct);
+                    return target.DeletePath;
                 }
-                else
-                {
-                    entry.Delete();
-                }
+
+                target.Entry.Delete();
+                return null;
             }, ct).ConfigureAwait(false);
+
+            if (directoryPath is not null)
+            {
+                await DeleteDirectoryViaExecAsync(directoryPath, ct).ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -1093,72 +1120,79 @@ public sealed class SftpBrowser : IRemoteBrowser
             $"Remote path not found: {path}");
     }
 
-    /// <summary>
-    /// Hard cap on the depth of <see cref="DeleteDirectoryRecursive"/>.
-    /// A malicious or corrupted remote filesystem with deep nesting cannot
-    /// blow the managed stack; the iterative traversal also avoids the
-    /// implicit per-level frame cost of the recursive form.
-    /// </summary>
-    internal const int MaxDeleteDepth = 256;
-
-    private static void DeleteDirectoryRecursive(
-        SftpClient client,
-        string path,
-        CancellationToken ct)
+    internal async Task DeleteDirectoryViaExecAsync(string path, CancellationToken ct)
     {
-        // Iterative post-order traversal with an explicit stack:
-        // 1. Push (dir, expanded=false) for each directory we discover.
-        // 2. On first pop, list its contents: delete files inline, push
-        //    nested dirs (expanded=false), and push the dir itself with
-        //    expanded=true so we revisit it after children are gone.
-        // 3. On second pop (expanded=true), the directory is empty and we
-        //    delete it.
-        var stack = new Stack<(string Path, int Depth, bool Expanded)>();
-        stack.Push((path, 0, false));
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ct.ThrowIfCancellationRequested();
 
-        while (stack.Count > 0)
+        ISftpExecCommandRunner? runner = _injectedExecCommandRunner;
+        if (runner is null)
         {
-            ct.ThrowIfCancellationRequested();
-            var (currentPath, depth, expanded) = stack.Pop();
-
-            if (depth > MaxDeleteDepth)
+            SshConnectionParams? connectionParams = _connectionParams;
+            PinnedFingerprintVerifier? pinnedVerifier = _pinnedHostKeyVerifier;
+            if (connectionParams is null || pinnedVerifier is null)
             {
-                throw new InvalidOperationException(
-                    $"Refused to delete '{currentPath}': remote directory depth exceeds {MaxDeleteDepth}.");
+                throw new RemoteRecursiveDeleteException(
+                    RemoteRecursiveDeleteFailureReason.ExecUnavailable);
             }
 
-            if (expanded)
-            {
-                client.DeleteDirectory(currentPath);
-                continue;
-            }
-
-            // Re-queue this directory for its post-order delete pass.
-            stack.Push((currentPath, depth, true));
-
-            foreach (ISftpFile entry in client.ListDirectory(currentPath))
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (entry.Name is "." or "..")
-                {
-                    continue;
-                }
-
-                string fullPath = $"{currentPath.TrimEnd('/')}/{entry.Name}";
-
-                if (entry.IsDirectory)
-                {
-                    stack.Push((fullPath, depth + 1, false));
-                }
-                else
-                {
-                    // SftpClient.DeleteFile canonicalizes through SSH_FXP_REALPATH and can delete a symlink target.
-                    // ISftpFile.Delete acts on the listed entry's stored path instead.
-                    entry.Delete();
-                }
-            }
+            runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
         }
+
+        string command = RemoteDeleteCommand.Build(path);
+        SftpExecResult result;
+        try
+        {
+            result = await runner.ExecuteAsync(command, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HostKeyRejectedException ex)
+        {
+            string rejectionKind = ex.IsMismatch ? "mismatch" : "rejection";
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] host-key {rejectionKind} on recursive-delete exec channel; "
+                + "recursive deletion refused.");
+            throw new RemoteRecursiveDeleteException(
+                RemoteRecursiveDeleteFailureReason.ExecUnavailable,
+                ex);
+        }
+        catch (Exception ex) when (
+            ex is Renci.SshNet.Common.SshException
+                or System.Net.Sockets.SocketException
+                or IOException
+                or TimeoutException)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] recursive-delete exec channel unavailable ({ex.GetType().Name}); "
+                + "recursive deletion refused.");
+            throw new RemoteRecursiveDeleteException(
+                RemoteRecursiveDeleteFailureReason.ExecUnavailable,
+                ex);
+        }
+
+        if (result.ExitStatus == SuccessfulExitStatus)
+        {
+            return;
+        }
+
+        string standardError = result.StandardError ?? string.Empty;
+        Heimdall.Core.Logging.FileLogger.Warn(
+            $"[SftpBrowser] recursive-delete command exited {result.ExitStatus}. "
+            + $"stderr: {standardError}");
+
+        RemoteRecursiveDeleteFailureReason reason = result.ExitStatus switch
+        {
+            CommandNotFoundExitStatus => RemoteRecursiveDeleteFailureReason.ShellOrRmUnavailable,
+            _ when standardError.Contains(
+                PermissionDeniedDiagnostic,
+                StringComparison.OrdinalIgnoreCase) => RemoteRecursiveDeleteFailureReason.PermissionDenied,
+            _ => RemoteRecursiveDeleteFailureReason.CommandFailed,
+        };
+
+        throw new RemoteRecursiveDeleteException(reason);
     }
 
     private static SftpFileInfo ToSftpFileInfo(ISftpFile entry)

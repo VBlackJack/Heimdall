@@ -16,6 +16,7 @@
 
 using System.IO;
 using Heimdall.App.ViewModels;
+using Heimdall.Sftp;
 using Renci.SshNet.Common;
 
 namespace Heimdall.App.Tests;
@@ -36,6 +37,24 @@ public sealed class IsPermissionDeniedTests
         var ex = new UnauthorizedAccessException("Access denied.");
 
         Assert.True(EmbeddedSftpViewModel.IsPermissionDenied(ex));
+    }
+
+    [Fact]
+    public void Returns_True_For_RemoteRecursiveDeletePermissionDenied()
+    {
+        RemoteRecursiveDeleteException ex = new(
+            RemoteRecursiveDeleteFailureReason.PermissionDenied);
+
+        Assert.True(EmbeddedSftpViewModel.IsPermissionDenied(ex));
+    }
+
+    [Fact]
+    public void Returns_False_For_RemoteRecursiveDeleteCommandFailed()
+    {
+        RemoteRecursiveDeleteException ex = new(
+            RemoteRecursiveDeleteFailureReason.CommandFailed);
+
+        Assert.False(EmbeddedSftpViewModel.IsPermissionDenied(ex));
     }
 
     [Fact]

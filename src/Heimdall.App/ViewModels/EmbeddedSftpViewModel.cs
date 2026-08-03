@@ -2419,7 +2419,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(ex);
 
         return ex is SftpPermissionDeniedException
-            or UnauthorizedAccessException;
+            or UnauthorizedAccessException
+            or RemoteRecursiveDeleteException
+        {
+            Reason: RemoteRecursiveDeleteFailureReason.PermissionDenied,
+        };
     }
 
     /// <summary>

@@ -45,8 +45,8 @@ internal sealed record RemoteCopyOps(
 internal static class RemoteCopyPlanner
 {
     /// <summary>
-    /// Hard cap on copy recursion depth, mirroring <see cref="SftpBrowser.MaxDeleteDepth"/>, so a
-    /// corrupted or hostile remote tree cannot drive unbounded recursion.
+    /// Hard cap on copy recursion depth, so a corrupted or hostile remote tree cannot drive
+    /// unbounded recursion.
     /// </summary>
     internal const int MaxCopyDepth = 256;
 
