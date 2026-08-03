@@ -12,6 +12,26 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-03: Local transfer tree confinement (v2026.080300)
+
+### Fixed
+
+- **Local upload walks skip links below the selected root** (`487e59f4`). The upload
+  classification rejects any reparse point encountered below a selected root - files and
+  directories, junctions and symbolic links alike - before the entry enters the transfer plan.
+  The selected root itself may still be a link, matching the local paste policy. Skipped entries
+  are reported through one aggregated, non-blocking warning after the browser refresh.
+  Closes SFTP-015.
+- **Local paste refuses the source tree as destination** (`db7ccd8a`). Pasting a folder into
+  itself or one of its descendants is refused per root with one aggregated dialog; the remaining
+  pasted roots proceed. The containment check is lexical and case-insensitive, aligned with the
+  same-server remote copy rejection. Previously the pre-planned walk produced a finite nested
+  snapshot.
+
+### Notes
+
+- Test suite: 8566 to 8581, 0 skipped.
+
 ## 2026-08-01: Destructive remote replacements, and the last of tier 1 (v2026.080100)
 
 Four fixes. Three of them close the way Heimdall replaces a file on a remote server: the fallback
