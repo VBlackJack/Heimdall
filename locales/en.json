@@ -2084,6 +2084,7 @@
   "FileBrowserPasteOverwriteTitle": "Paste",
   "FileBrowserPasteOverwriteMessage": "\"{0}\" already exists. Overwrite?",
   "FileBrowserPasteError": "Failed to paste \"{0}\": {1}",
+  "FileBrowserPasteRefusedSelfTarget": "Cannot paste {0} into itself or its own subfolder.",
   "FileBrowserPropertiesTitle": "Properties",
   "FileBrowserPropertiesName": "Name",
   "FileBrowserPropertiesPath": "Path",

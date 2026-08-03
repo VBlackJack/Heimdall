@@ -23,6 +23,27 @@ namespace Heimdall.App.Tests;
 
 public sealed class LocalPasteTreePlannerTests
 {
+    [Theory]
+    [InlineData(@"C:\data", @"C:\data", true)]
+    [InlineData(@"C:\data", @"C:\DATA", true)]
+    [InlineData(@"C:\data\", @"C:\data", true)]
+    [InlineData(@"C:\data", @"C:\data\backup", true)]
+    [InlineData(@"C:\data", @"C:\data\a\b\c", true)]
+    [InlineData(@"C:\data", @"C:\database", false)]
+    [InlineData(@"C:\data\sub", @"C:\data", false)]
+    [InlineData(@"C:\data", @"C:\elsewhere", false)]
+    [InlineData("C:/data", @"C:\data\backup", true)]
+    [InlineData(@"C:\", @"C:\anything", true)]
+    public void IsSameOrDescendantPath_ReturnsExpected(
+        string sourcePath,
+        string targetDirectory,
+        bool expected)
+    {
+        bool result = LocalPasteTreePlanner.IsSameOrDescendantPath(sourcePath, targetDirectory);
+
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void Plan_FileRoot_EmitsSingleCopyOp()
     {

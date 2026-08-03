@@ -53,6 +53,29 @@ public static class LocalPasteTreePlanner
     /// <summary>Maximum accepted entry depth before planning aborts to contain possible junction loops.</summary>
     public const int MaxCopyDepth = 256;
 
+    /// <summary>
+    /// Determines lexically whether a target directory is the source path or one of its descendants,
+    /// as required by product decision 7.8. Link aliases are outside the scope of this check.
+    /// </summary>
+    /// <param name="sourcePath">The source directory path.</param>
+    /// <param name="targetDirectory">The candidate target directory path.</param>
+    /// <returns><see langword="true"/> when the normalized target is the source or its descendant.</returns>
+    public static bool IsSameOrDescendantPath(string sourcePath, string targetDirectory)
+    {
+        string normalizedSource = Path.GetFullPath(sourcePath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string normalizedTarget = Path.GetFullPath(targetDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (string.Equals(normalizedSource, normalizedTarget, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string sourcePrefix = normalizedSource + Path.DirectorySeparatorChar;
+        return normalizedTarget.StartsWith(sourcePrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Builds an ordered, depth-first local paste plan with directories emitted before their children.</summary>
     /// <param name="roots">The pasted top-level entries, processed in their supplied order.</param>
     /// <param name="targetDirectory">The directory into which the roots will be pasted.</param>

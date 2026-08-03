@@ -2084,6 +2084,7 @@
   "FileBrowserPasteOverwriteTitle": "Coller",
   "FileBrowserPasteOverwriteMessage": "\u00ab {0} \u00bb existe d\u00e9j\u00e0. \u00c9craser ?",
   "FileBrowserPasteError": "\u00c9chec du collage de \u00ab {0} \u00bb : {1}",
+  "FileBrowserPasteRefusedSelfTarget": "Impossible de coller {0} dans lui-m\u00eame ou dans son propre sous-dossier.",
   "FileBrowserPropertiesTitle": "Propri\u00e9t\u00e9s",
   "FileBrowserPropertiesName": "Nom",
   "FileBrowserPropertiesPath": "Chemin",

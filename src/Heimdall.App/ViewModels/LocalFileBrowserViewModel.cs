@@ -529,6 +529,7 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         string title = L10n("FileBrowserPasteOverwriteTitle");
         List<(string SourcePath, IReadOnlyList<LocalPasteOp> Operations)> plannedRoots = [];
         List<LocalPasteOp> operations = [];
+        List<string> refusedRootNames = [];
 
         foreach (string sourcePath in sourcePaths)
         {
@@ -550,6 +551,12 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
                 }
                 else
                 {
+                    continue;
+                }
+
+                if (isDirectory && LocalPasteTreePlanner.IsSameOrDescendantPath(sourcePath, CurrentPath))
+                {
+                    refusedRootNames.Add(Path.GetFileName(sourcePath));
                     continue;
                 }
 
@@ -585,6 +592,13 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
                     ex.Message);
                 dialogService.ShowError(title, errorMessage);
             }
+        }
+
+        if (refusedRootNames.Count > 0)
+        {
+            string refusedNames = string.Join(", ", refusedRootNames);
+            string errorMessage = string.Format(L10n("FileBrowserPasteRefusedSelfTarget"), refusedNames);
+            dialogService.ShowError(title, errorMessage);
         }
 
         IReadOnlyList<FileConflictPlanItem> planItems = BuildConflictPlanItems(operations);
