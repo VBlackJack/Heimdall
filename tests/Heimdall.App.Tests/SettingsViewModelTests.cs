@@ -1331,6 +1331,98 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task ImportCitrixApps_VaultDisabled_PreservesHistoricPlaintextPath()
+    {
+        const string launchToken = "-qlaunch app=LegacyCalculator";
+        ResetCredentialProtector();
+        try
+        {
+            FakeConfigManager config = new();
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog);
+            viewModel.CitrixScanProvider = () => CreateCitrixScanResult(launchToken);
+
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+            ServerProfileDto imported = Assert.Single(config.Servers);
+            Assert.Equal(launchToken, imported.CitrixLaunchCommandLine);
+            Assert.Contains("servers", config.PersistenceCalls);
+            Assert.Single(dialog.InfoCalls);
+        }
+        finally
+        {
+            ResetCredentialProtector();
+        }
+    }
+
+    [Fact]
+    public async Task ImportCitrixApps_VaultEnabledAndUnlocked_EncryptsBeforeMutation()
+    {
+        const string launchToken = "-qlaunch app=ProtectedCalculator";
+        ResetCredentialProtector();
+        try
+        {
+            using VaultDekHolder dek = VaultKeyManager.GenerateDek();
+            CredentialProtector.SetVaultEnabled(true);
+            CredentialProtector.SetVaultKey(dek);
+            FakeConfigManager config = new();
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog);
+            viewModel.CitrixScanProvider = () => CreateCitrixScanResult(launchToken);
+
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+            ServerProfileDto imported = Assert.Single(config.Servers);
+            Assert.True(VaultSecretBlob.IsSecretBlob(imported.CitrixLaunchCommandLine));
+            Assert.NotEqual(launchToken, imported.CitrixLaunchCommandLine);
+            Assert.Equal(launchToken, CredentialProtector.Unprotect(imported.CitrixLaunchCommandLine));
+            Assert.Contains("servers", config.PersistenceCalls);
+        }
+        finally
+        {
+            ResetCredentialProtector();
+        }
+    }
+
+    [Fact]
+    public async Task ImportCitrixApps_VaultEnabledAndLocked_RefusesWithLocalizedMessageWithoutMutation()
+    {
+        const string launchToken = "-qlaunch app=LockedCalculator";
+        ResetCredentialProtector();
+        try
+        {
+            CredentialProtector.SetVaultEnabled(true);
+            LocalizationManager localizer = await CreateLocalizerAsync();
+            FakeConfigManager config = new()
+            {
+                Servers = [CreateServer("existing", "Existing", null)]
+            };
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+            CitrixScanResult scanResult = CreateCitrixScanResult(launchToken);
+            viewModel.CitrixScanProvider = () => scanResult;
+            int configurationChangedCount = 0;
+            viewModel.ConfigurationChanged += () => configurationChangedCount++;
+
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+            Assert.Single(config.Servers);
+            Assert.Equal("existing", config.Servers[0].Id);
+            Assert.Null(config.SavedServers);
+            Assert.DoesNotContain("servers", config.PersistenceCalls);
+            Assert.Equal(0, configurationChangedCount);
+            (string Title, string Message) info = Assert.Single(dialog.InfoCalls);
+            Assert.Equal(localizer["CitrixScanTitle"], info.Title);
+            Assert.Equal(localizer["CitrixImportVaultLocked"], info.Message);
+            Assert.Equal(launchToken, Assert.Single(scanResult.Resources).LaunchCommandLine);
+        }
+        finally
+        {
+            ResetCredentialProtector();
+        }
+    }
+
+    [Fact]
     public void Dispose_UnsubscribesExternalToolTracking()
     {
         SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
@@ -1683,6 +1775,25 @@ public sealed class SettingsViewModelTests
             SshGatewayId = gatewayId
         };
 
+    private static CitrixScanResult CreateCitrixScanResult(string launchToken)
+    {
+        var result = new CitrixScanResult();
+        result.Resources.Add(new CitrixResource
+        {
+            FriendlyName = "Calculator",
+            LaunchCommandLine = launchToken,
+            StoreFrontUrl = "https://citrix.example.test"
+        });
+        return result;
+    }
+
+    private static void ResetCredentialProtector()
+    {
+        CredentialProtector.ClearVaultKey();
+        CredentialProtector.SetVaultEnabled(false);
+        CredentialProtector.Initialize(null);
+    }
+
     private static async Task<AppSettings> LoadExpectedFactoryDefaultsAsync()
     {
         var defaultsPath = Path.Combine(AppContext.BaseDirectory, "config", "settings.default.json");
@@ -1866,6 +1977,8 @@ public sealed class SettingsViewModelTests
 
         public List<(string Title, string Message)> WarningCalls { get; } = [];
 
+        public List<(string Title, string Message)> InfoCalls { get; } = [];
+
         public PinSetupResult? PinSetupResultToReturn { get; set; }
 
         public PinSetupDialogViewModel? LastPinSetupViewModel { get; private set; }
@@ -1961,6 +2074,7 @@ public sealed class SettingsViewModelTests
 
         public void ShowInfo(string title, string message)
         {
+            InfoCalls.Add((title, message));
         }
 
         public void ShowWarning(string title, string message)

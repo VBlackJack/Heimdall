@@ -2658,6 +2658,7 @@
   "CitrixScanTitle": "Applications Citrix",
   "CitrixNoAppsFound": "Aucune application Citrix trouv\u00e9e dans le cache local. Ouvrez Citrix Workspace et connectez-vous \u00e0 un magasin.",
   "CitrixScanConfirm": "Importer {0} application(s) Citrix depuis le cache Workspace local ?",
+  "CitrixImportVaultLocked": "D\u00e9verrouillez le coffre avant d'importer des applications Citrix.",
   "CitrixScanSuccess": "{0} application(s) Citrix import\u00e9e(s) avec succ\u00e8s.",
   "BtnImportCitrix": "Importer apps Citrix",
   "TooltipImportCitrix": "Scanner le cache Citrix Workspace local pour les applications publi\u00e9es",

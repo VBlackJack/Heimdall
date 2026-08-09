@@ -830,6 +830,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     internal Func<string?>? ImportFilePathProvider { get; set; }
 
+    internal Func<CitrixScanResult>? CitrixScanProvider { get; set; }
+
     internal Func<GatewayOverviewMutationRequest, CancellationToken, Task<int>>? GatewayReferenceMutationHandler { get; set; }
 
     /// <summary>
@@ -1771,7 +1773,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         try
         {
-            var scanResult = CitrixCacheScanner.Scan();
+            CitrixScanResult scanResult = CitrixScanProvider?.Invoke() ?? CitrixCacheScanner.Scan();
 
             if (scanResult.Resources.Count == 0)
             {
@@ -1788,7 +1790,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             if (!confirmed) return;
 
-            var imported = CitrixCacheScanner.ToServerProfiles(scanResult.Resources);
+            List<ServerProfileDto> imported = CitrixCacheScanner.ToServerProfiles(scanResult.Resources);
+            if (!TryProtectCitrixImportsForCurrentVaultState(imported))
+            {
+                return;
+            }
+
             int newCount = await _configManager.MutateServersAsync(existing =>
             {
                 existing.AddRange(imported);
@@ -1805,6 +1812,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             FileLogger.Info($"Imported {newCount} Citrix app(s) from local cache");
             ConfigurationChanged?.Invoke();
         }
+        catch (VaultLockedException)
+        {
+            FileLogger.Warn("Citrix cache import refused because the vault locked before persistence");
+            ShowCitrixImportVaultLocked();
+        }
         catch (Exception ex)
         {
             FileLogger.Error("Citrix scan failed", ex);
@@ -1812,6 +1824,40 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 _localizer["CitrixScanTitle"],
                 _localizer.Format("StatusImportFailed", ex.Message));
         }
+    }
+
+    private bool TryProtectCitrixImportsForCurrentVaultState(List<ServerProfileDto> imported)
+    {
+        bool vaultEnabled = CredentialProtector.IsVaultEnabled;
+        if (!vaultEnabled)
+        {
+            return true;
+        }
+
+        bool vaultUnlocked = CredentialProtector.IsVaultUnlocked;
+        if (!vaultUnlocked)
+        {
+            ShowCitrixImportVaultLocked();
+            return false;
+        }
+
+        foreach (ServerProfileDto profile in imported)
+        {
+            string? launchToken = profile.CitrixLaunchCommandLine;
+            if (!string.IsNullOrEmpty(launchToken))
+            {
+                profile.CitrixLaunchCommandLine = CredentialProtector.Protect(launchToken);
+            }
+        }
+
+        return true;
+    }
+
+    private void ShowCitrixImportVaultLocked()
+    {
+        _dialogService.ShowInfo(
+            _localizer["CitrixScanTitle"],
+            _localizer["CitrixImportVaultLocked"]);
     }
 
     [RelayCommand]

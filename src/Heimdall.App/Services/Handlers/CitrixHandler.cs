@@ -164,16 +164,13 @@ internal sealed class CitrixHandler : IProtocolHandler
                     $"Citrix launch: mode=SelfServiceCache launcher={selfServicePath} hasLaunchCmd=true");
 
                 /*
-                 * CitrixLaunchCommandLine is stored as an encrypted opaque blob produced
-                 * from CitrixCacheScanner data and is decrypted only in this launch branch.
-                 * ImportedProfileSanitizer.Sanitize is the live gate that strips this field
-                 * from externally imported profiles before they are persisted into
-                 * configuration. Manual servers.json edits still bypass that gate; wiring
-                 * SchemaValidator into the ConfigManager load path with an explicit failure
-                 * policy is tracked as follow-up backlog work.
+                 * SettingsViewModel protects new local-cache launch tokens at its persistence
+                 * boundary when the vault is enabled. ImportedProfileSanitizer covers external
+                 * profile imports only; it is not the gate for the local Citrix cache flow.
                  *
-                 * Keep the launch path narrow here and avoid introducing a second ad-hoc
-                 * string sanitizer with rules that could drift from the import boundary.
+                 * Legacy configurations may still contain plaintext tokens, so this consumer
+                 * deliberately accepts either plaintext or a vault blob until a lifecycle
+                 * reconciliation migrates values persisted before the current admission gate.
                  */
                 var startInfo = new ProcessStartInfo
                 {
