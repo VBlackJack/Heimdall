@@ -631,7 +631,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
 
         Core.Logging.FileLogger.Info(
-            $"EmbeddedRDP focus skipped: viewVisible={viewVisible} reconnectOverlayVisible={reconnectOverlayVisible} windowIsForeground={windowIsForeground} autofillInFlight={autofillInFlight}");
+            $"EmbeddedRDP focus skipped: viewVisible={viewVisible} reconnectOverlayVisible={reconnectOverlayVisible} windowIsForeground={windowIsForeground}");
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -2160,9 +2160,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _autofillCts = new CancellationTokenSource();
         var token = _autofillCts.Token;
 
-        Core.Logging.FileLogger.Info(
-            $"EmbeddedRDP starting CredUI autofill watcher for hostHint={hostHint}");
-
         _ = TryAutofillCredentialsAsync(password, hostHint, token);
     }
 
@@ -2310,8 +2307,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             _autofillFilledTimer.Start();
         }
 
-        Core.Logging.FileLogger.Info(
-            $"EmbeddedRDP autofill state changed: state={state} phase={_connectionPhase} retryContext={(_autofillRetryContext is not null ? "present" : "null")} attemptInFlight={_autofillAttemptInFlight}");
     }
 
     private void OnAutofillFilledTimerTick(object? sender, EventArgs e)
@@ -2352,13 +2347,8 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         if (!canRetry || context is null)
         {
-            Core.Logging.FileLogger.Info(
-                $"EmbeddedRDP autofill retry click ignored: phase={_connectionPhase} retryContext={(context is not null ? "present" : "null")} attemptInFlight={_autofillAttemptInFlight}");
             return;
         }
-
-        Core.Logging.FileLogger.Info(
-            $"EmbeddedRDP autofill retry clicked: phase={_connectionPhase} hostHint={context.HostHint}");
 
         StartCredentialAutofill(context.Password, context.HostHint);
     }
@@ -2370,7 +2360,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        Core.Logging.FileLogger.Info($"EmbeddedRDP autofill dismiss clicked: phase={_connectionPhase}");
         _autofillRetryContext = null;
         UpdateAutofillState(RdpAutofillState.None);
     }
