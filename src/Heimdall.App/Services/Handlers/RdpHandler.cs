@@ -33,19 +33,28 @@ internal sealed class RdpHandler : IProtocolHandler
     private readonly LocalizationManager _localizer;
     private readonly IRdpExternalClientLauncher _externalClientLauncher;
     private readonly ICredentialGuardService _credentialGuardService;
+    private readonly IRdpCredentialManager _credentialManager;
+    private readonly Func<string?, string?> _decryptPassword;
+    private readonly RdpCredentialAutofillOperation _credentialAutofill;
 
     public RdpHandler(
         ITunnelService tunnelService,
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer,
         IRdpExternalClientLauncher externalClientLauncher,
-        ICredentialGuardService? credentialGuardService = null)
+        ICredentialGuardService? credentialGuardService = null,
+        IRdpCredentialManager? credentialManager = null,
+        Func<string?, string?>? decryptPassword = null,
+        RdpCredentialAutofillOperation? credentialAutofill = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
         _localizer = localizer;
         _externalClientLauncher = externalClientLauncher;
         _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
+        _credentialManager = credentialManager ?? new RdpCredentialManager();
+        _decryptPassword = decryptPassword ?? ConnectionHelpers.DecryptPassword;
+        _credentialAutofill = credentialAutofill ?? Heimdall.Rdp.CredentialAutofill.WaitAndFillAsync;
     }
 
     public string Protocol => "RDP";
@@ -124,6 +133,9 @@ internal sealed class RdpHandler : IProtocolHandler
         string? rdpPassword = null;
         bool releaseTunnel = usesTunnel;
         string? warning = null;
+        string? credentialCleanupTarget = null;
+        string? credentialOwnershipMarker = null;
+        bool credentialCleanupScheduled = false;
         try
         {
             string rdpHost = targetHost;
@@ -132,29 +144,44 @@ internal sealed class RdpHandler : IProtocolHandler
             if (!string.IsNullOrEmpty(server.RdpUsername) &&
                 !string.IsNullOrEmpty(server.RdpPasswordEncrypted))
             {
-                rdpPassword = ConnectionHelpers.DecryptPassword(server.RdpPasswordEncrypted);
+                rdpPassword = _decryptPassword(server.RdpPasswordEncrypted);
                 if (rdpPassword is null)
                 {
                     throw new InvalidOperationException(_localizer["RdpErrorDecryptPassword"]);
                 }
 
-                var credTarget = $"TERMSRV/{rdpHost}";
-                if (!Heimdall.Rdp.CredentialManagerHelper.WriteDomainCredential(
-                    credTarget,
+                string credentialTarget = $"TERMSRV/{rdpHost}";
+                string ownershipMarker = _credentialManager.CreateOwnershipMarker();
+                if (!_credentialManager.WriteDomainCredential(
+                    credentialTarget,
                     server.RdpUsername,
                     rdpPassword,
-                    out var credError))
+                    ownershipMarker,
+                    out bool credentialWritten,
+                    out string? credentialError))
                 {
                     Core.Logging.FileLogger.Warn(
-                        $"Failed to store RDP credentials: {credError ?? "unknown error"}");
+                        $"Failed to store RDP credentials: {credentialError ?? "unknown error"}");
                     return new ConnectionResult(
                         false,
                         _localizer["RdpErrorStoreCredentials"],
                         null,
-                        RdpSessionDiagnosticFactory.FromCredentialWriteFailure(credError));
+                        RdpSessionDiagnosticFactory.FromCredentialWriteFailure(credentialError));
                 }
 
-                Core.Logging.FileLogger.Info($"RDP credentials stored for {credTarget}");
+                if (credentialWritten)
+                {
+                    credentialCleanupTarget = credentialTarget;
+                    credentialOwnershipMarker = ownershipMarker;
+                    Core.Logging.FileLogger.Info($"RDP credentials stored for {credentialTarget}");
+                }
+                else
+                {
+                    warning = _localizer["RdpExistingWindowsCredentialNotice"];
+                    rdpPassword = null;
+                    Core.Logging.FileLogger.Info(
+                        $"RDP credential injection skipped for {credentialTarget}: existing entry is not owned by Heimdall");
+                }
             }
 
             var rdpFile = Path.Combine(Path.GetTempPath(), $"heimdall_{server.Id}_{Guid.NewGuid():N}.rdp");
@@ -217,7 +244,7 @@ internal sealed class RdpHandler : IProtocolHandler
                     {
                         Core.Logging.FileLogger.Error(
                             $"Failed to set ACL on .rdp file — file has inherited permissions: {aclEx.Message}");
-                        warning = _localizer["WarnRdpFileAclFailed"];
+                        warning ??= _localizer["WarnRdpFileAclFailed"];
                     }
                 }
             }
@@ -335,7 +362,7 @@ internal sealed class RdpHandler : IProtocolHandler
                     try
                     {
                         var autofillTimeout = TimeSpan.FromMilliseconds(settings.RdpCredentialAutofillTimeoutMs);
-                        var filled = await Heimdall.Rdp.CredentialAutofill.WaitAndFillAsync(
+                        var filled = await _credentialAutofill(
                                 mstscPid,
                                 rdpHost,
                                 autofillPassword,
@@ -355,22 +382,25 @@ internal sealed class RdpHandler : IProtocolHandler
                 }, CancellationToken.None);
             }
 
-            var credCleanupTarget = !string.IsNullOrEmpty(server.RdpUsername) &&
-                                    !string.IsNullOrEmpty(server.RdpPasswordEncrypted)
-                ? $"TERMSRV/{rdpHost}"
-                : null;
             var cleanupDelay = TimeSpan.FromMilliseconds(settings.RdpArtifactCleanupDelayMs);
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await CleanupRdpArtifactsAsync(rdpFile, credCleanupTarget, cleanupDelay, ct);
+                    await CleanupRdpArtifactsAsync(
+                            rdpFile,
+                            credentialCleanupTarget,
+                            credentialOwnershipMarker,
+                            cleanupDelay,
+                            ct)
+                        .ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     Core.Logging.FileLogger.Warn($"RDP cleanup failed: {ex.Message}");
                 }
             }, CancellationToken.None);
+            credentialCleanupScheduled = true;
 
             return new ConnectionResult(true, null, null, Warning: warning);
         }
@@ -385,6 +415,13 @@ internal sealed class RdpHandler : IProtocolHandler
         }
         finally
         {
+            if (!credentialCleanupScheduled &&
+                credentialCleanupTarget is not null &&
+                credentialOwnershipMarker is not null)
+            {
+                ReleaseOwnedCredential(credentialCleanupTarget, credentialOwnershipMarker);
+            }
+
             rdpPassword = null;
             ReleaseTunnelIfNeeded(releaseTunnel, targetPort);
         }
@@ -420,9 +457,10 @@ internal sealed class RdpHandler : IProtocolHandler
     /// <summary>
     /// Cleans up the temporary .rdp file and CredMan entry after a delay.
     /// </summary>
-    private static async Task CleanupRdpArtifactsAsync(
+    private async Task CleanupRdpArtifactsAsync(
         string rdpFile,
-        string? credCleanupTarget,
+        string? credentialCleanupTarget,
+        string? credentialOwnershipMarker,
         TimeSpan cleanupDelay,
         CancellationToken ct)
     {
@@ -444,10 +482,97 @@ internal sealed class RdpHandler : IProtocolHandler
                 $"RDP artifact cleanup: failed to delete temp .rdp file '{rdpFile}': {ex.Message}");
         }
 
-        if (credCleanupTarget is not null)
+        if (credentialCleanupTarget is not null && credentialOwnershipMarker is not null)
         {
-            Heimdall.Rdp.CredentialManagerHelper.DeleteCredential(credCleanupTarget, out _);
-            Core.Logging.FileLogger.Info($"RDP CredMan entry cleaned: {credCleanupTarget}");
+            ReleaseOwnedCredential(credentialCleanupTarget, credentialOwnershipMarker);
         }
+    }
+
+    private void ReleaseOwnedCredential(string credentialTarget, string ownershipMarker)
+    {
+        bool operationSucceeded = _credentialManager.DeleteCredential(
+            credentialTarget,
+            ownershipMarker,
+            out bool credentialDeleted,
+            out string? credentialError);
+        if (!operationSucceeded)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"RDP CredMan cleanup failed for {credentialTarget}: {credentialError ?? "unknown error"}");
+            return;
+        }
+
+        if (credentialDeleted)
+        {
+            Core.Logging.FileLogger.Info($"RDP CredMan entry cleaned: {credentialTarget}");
+            return;
+        }
+
+        Core.Logging.FileLogger.Info(
+            $"RDP CredMan cleanup skipped for {credentialTarget}: ownership marker is absent or changed");
+    }
+}
+
+internal interface IRdpCredentialManager
+{
+    string CreateOwnershipMarker();
+
+    bool WriteDomainCredential(
+        string targetName,
+        string username,
+        string password,
+        string ownershipMarker,
+        out bool credentialWritten,
+        out string? error);
+
+    bool DeleteCredential(
+        string targetName,
+        string ownershipMarker,
+        out bool credentialDeleted,
+        out string? error);
+}
+
+internal delegate Task<bool> RdpCredentialAutofillOperation(
+    int processId,
+    string host,
+    string password,
+    TimeSpan timeout,
+    CancellationToken cancellationToken);
+
+internal sealed class RdpCredentialManager : IRdpCredentialManager
+{
+    public string CreateOwnershipMarker()
+    {
+        return Heimdall.Rdp.CredentialManagerHelper.CreateDomainCredentialOwnershipMarker();
+    }
+
+    public bool WriteDomainCredential(
+        string targetName,
+        string username,
+        string password,
+        string ownershipMarker,
+        out bool credentialWritten,
+        out string? error)
+    {
+        return Heimdall.Rdp.CredentialManagerHelper.WriteDomainCredential(
+            targetName,
+            username,
+            password,
+            ownershipMarker,
+            out credentialWritten,
+            out error);
+    }
+
+    public bool DeleteCredential(
+        string targetName,
+        string ownershipMarker,
+        out bool credentialDeleted,
+        out string? error)
+    {
+        return Heimdall.Rdp.CredentialManagerHelper.DeleteCredential(
+            targetName,
+            ownershipMarker,
+            out credentialDeleted,
+            out error);
     }
 }

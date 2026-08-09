@@ -2002,6 +2002,7 @@
   "ErrorFtpConnectionFailed": "FTP connection failed.",
   "WarnFtpCleartext": "FTP session to {0}:{1} is using a cleartext channel. Username and password are transmitted unencrypted. Prefer SFTP when available.",
   "WarnFtpCleartextBadge": "Credentials sent in clear text (no TLS)",
+  "RdpExistingWindowsCredentialNotice": "An existing Windows credential is being used; Heimdall's stored credential was not injected.",
   "WarnFtpsDataChannelIdentityBadge": "FTPS data-channel identity is not verified",
   "WarnRemoteEntriesSkippedUnsupported": "Skipped {0} entries that are neither files nor directories. See the log for details.",
   "WarnUploadTargetsSkippedUnsupported": "Skipped {0} upload(s): the destination already exists and is not a regular file. See the log for details.",

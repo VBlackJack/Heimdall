@@ -32,7 +32,9 @@ public static class CredentialManagerHelper
     internal const uint CredTypeDomainPassword = 2;
     private const uint CredPersistSession = 1;
     private const int CredMaxCredentialBlobSize = 512;
+    internal const string DomainCredentialOwnershipPrefix = "Heimdall:RDP:";
     internal const int ErrorNotFound = 1168;
+    private const int ErrorInvalidData = 13;
 
     #endregion
 
@@ -55,6 +57,23 @@ public static class CredentialManagerHelper
         public string UserName;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeCredentialPointers
+    {
+        public uint Flags;
+        public uint Type;
+        public IntPtr TargetName;
+        public IntPtr Comment;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+        public uint SecretSize;
+        public IntPtr SecretPointer;
+        public uint Persist;
+        public uint AttributeCount;
+        public IntPtr Attributes;
+        public IntPtr TargetAlias;
+        public IntPtr UserName;
+    }
+
     [DllImport("advapi32.dll", EntryPoint = "CredWriteW", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CredWrite(ref NativeCredential userCredential, uint flags);
@@ -63,6 +82,17 @@ public static class CredentialManagerHelper
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CredDelete(string target, uint type, uint flags);
 
+    [DllImport("advapi32.dll", EntryPoint = "CredReadW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CredRead(
+        string target,
+        uint type,
+        uint flags,
+        out IntPtr credentialPointer);
+
+    [DllImport("advapi32.dll", EntryPoint = "CredFree")]
+    private static extern void CredFree(IntPtr buffer);
+
     #endregion
 
     /// <summary>
@@ -70,28 +100,63 @@ public static class CredentialManagerHelper
     /// </summary>
     public static bool WriteGenericCredential(string targetName, string username, string password, out string? error)
     {
-        return WriteCredential(targetName, username, password, CredTypeGeneric, CredPersistSession, out error);
+        return WriteCredential(
+            targetName,
+            username,
+            password,
+            CredTypeGeneric,
+            CredPersistSession,
+            null,
+            out error);
     }
 
     /// <summary>
-    /// Store a DOMAIN_PASSWORD credential (CRED_TYPE=2) recognized by mstsc.exe / RDP.
+    /// Creates a per-launch marker used to prove ownership of an RDP credential.
+    /// </summary>
+    public static string CreateDomainCredentialOwnershipMarker()
+    {
+        return $"{DomainCredentialOwnershipPrefix}{Guid.NewGuid():N}";
+    }
+
+    /// <summary>
+    /// Stores a DOMAIN_PASSWORD credential (CRED_TYPE=2) recognized by mstsc.exe / RDP
+    /// only when the target is absent or already carries a Heimdall ownership marker.
     /// Target must follow the TERMSRV/host format for RDP auto-login.
     /// Persist is set to Session — credential lives only until logoff and is cleaned
     /// up by the caller after the RDP session launches (defense-in-depth).
     /// </summary>
-    public static bool WriteDomainCredential(string targetName, string username, string password, out string? error)
+    public static bool WriteDomainCredential(
+        string targetName,
+        string username,
+        string password,
+        string ownershipMarker,
+        out bool credentialWritten,
+        out string? error)
     {
-        return WriteCredential(targetName, username, password, CredTypeDomainPassword, CredPersistSession, out error);
+        return WriteDomainCredential(
+            targetName,
+            username,
+            password,
+            ownershipMarker,
+            (target, marker) => ProbeCredential(target, CredTypeDomainPassword, marker, exactMarker: false),
+            WriteCredential,
+            out credentialWritten,
+            out error);
     }
 
     /// <summary>
-    /// Delete credentials for the specified target.
-    /// Attempts to delete both DOMAIN_PASSWORD and GENERIC types for backward compatibility.
+    /// Deletes the DOMAIN_PASSWORD credential only when it still carries this launch's marker.
     /// </summary>
-    public static bool DeleteCredential(string targetName, out string? error)
+    public static bool DeleteCredential(
+        string targetName,
+        string ownershipMarker,
+        out bool credentialDeleted,
+        out string? error)
     {
         return DeleteCredential(
             targetName,
+            ownershipMarker,
+            (target, marker) => ProbeCredential(target, CredTypeDomainPassword, marker, exactMarker: true),
             (target, type) =>
             {
                 bool deleted = CredDelete(target, type, 0);
@@ -99,14 +164,21 @@ public static class CredentialManagerHelper
                     deleted,
                     deleted ? 0 : Marshal.GetLastWin32Error());
             },
+            out credentialDeleted,
             out error);
     }
 
-    internal static bool DeleteCredential(
+    internal static bool WriteDomainCredential(
         string targetName,
-        Func<string, uint, CredentialDeleteResult> deleteCredential,
+        string username,
+        string password,
+        string ownershipMarker,
+        Func<string, string, CredentialProbeResult> probeCredential,
+        CredentialWriteOperation writeCredential,
+        out bool credentialWritten,
         out string? error)
     {
+        credentialWritten = false;
         error = null;
 
         if (string.IsNullOrWhiteSpace(targetName))
@@ -115,34 +187,197 @@ public static class CredentialManagerHelper
             return false;
         }
 
-        ArgumentNullException.ThrowIfNull(deleteCredential);
-
-        var failures = new List<string>();
-        (uint Type, string Name)[] credentialTypes =
-        [
-            (CredTypeDomainPassword, "DOMAIN_PASSWORD"),
-            (CredTypeGeneric, "GENERIC")
-        ];
-
-        foreach ((uint type, string name) in credentialTypes)
+        if (string.IsNullOrWhiteSpace(ownershipMarker) ||
+            !ownershipMarker.StartsWith(DomainCredentialOwnershipPrefix, StringComparison.Ordinal))
         {
-            CredentialDeleteResult result = deleteCredential(targetName, type);
-            if (!result.Success && result.ErrorCode != ErrorNotFound)
-            {
-                failures.Add($"{name}: WIN32_ERROR_{result.ErrorCode}");
-            }
-        }
-
-        if (failures.Count > 0)
-        {
-            error = string.Join("; ", failures);
+            error = "Credential ownership marker is invalid.";
             return false;
         }
 
+        ArgumentNullException.ThrowIfNull(probeCredential);
+        ArgumentNullException.ThrowIfNull(writeCredential);
+
+        CredentialProbeResult probe = probeCredential(targetName, DomainCredentialOwnershipPrefix);
+        if (!probe.Success)
+        {
+            error = probe.Error;
+            return false;
+        }
+
+        if (probe.Exists && !probe.MarkerMatches)
+        {
+            return true;
+        }
+
+        bool written = writeCredential(
+            targetName,
+            username,
+            password,
+            CredTypeDomainPassword,
+            CredPersistSession,
+            ownershipMarker,
+            out error);
+        credentialWritten = written;
+        return written;
+    }
+
+    internal static bool DeleteCredential(
+        string targetName,
+        string ownershipMarker,
+        Func<string, string, CredentialProbeResult> probeCredential,
+        Func<string, uint, CredentialDeleteResult> deleteCredential,
+        out bool credentialDeleted,
+        out string? error)
+    {
+        credentialDeleted = false;
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            error = "Credential target cannot be empty.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(ownershipMarker))
+        {
+            error = "Credential ownership marker cannot be empty.";
+            return false;
+        }
+
+        ArgumentNullException.ThrowIfNull(probeCredential);
+        ArgumentNullException.ThrowIfNull(deleteCredential);
+
+        CredentialProbeResult probe = probeCredential(targetName, ownershipMarker);
+        if (!probe.Success)
+        {
+            error = probe.Error;
+            return false;
+        }
+
+        if (!probe.Exists || !probe.MarkerMatches)
+        {
+            return true;
+        }
+
+        CredentialDeleteResult result = deleteCredential(targetName, CredTypeDomainPassword);
+        if (!result.Success && result.ErrorCode != ErrorNotFound)
+        {
+            error = $"WIN32_ERROR_{result.ErrorCode}";
+            return false;
+        }
+
+        credentialDeleted = result.Success;
         return true;
     }
 
+    internal delegate bool CredentialWriteOperation(
+        string target,
+        string userName,
+        string secret,
+        uint credType,
+        uint credPersist,
+        string? comment,
+        out string? error);
+
+    internal delegate bool CredentialReadOperation(
+        string targetName,
+        uint credentialType,
+        out IntPtr credentialPointer,
+        out int errorCode);
+
+    internal readonly record struct CredentialProbeResult(
+        bool Success,
+        bool Exists,
+        bool MarkerMatches,
+        string? Error);
+
     internal readonly record struct CredentialDeleteResult(bool Success, int ErrorCode);
+
+    internal static CredentialProbeResult ProbeCredential(
+        string targetName,
+        uint credentialType,
+        string marker,
+        bool exactMarker,
+        CredentialReadOperation readCredential,
+        Action<IntPtr> freeCredential,
+        Func<IntPtr, string?> readComment)
+    {
+        ArgumentNullException.ThrowIfNull(readCredential);
+        ArgumentNullException.ThrowIfNull(freeCredential);
+        ArgumentNullException.ThrowIfNull(readComment);
+
+        IntPtr credentialPointer = IntPtr.Zero;
+        try
+        {
+            bool read = readCredential(
+                targetName,
+                credentialType,
+                out credentialPointer,
+                out int errorCode);
+            if (!read)
+            {
+                return errorCode == ErrorNotFound
+                    ? new CredentialProbeResult(true, false, false, null)
+                    : new CredentialProbeResult(false, false, false, $"WIN32_ERROR_{errorCode}");
+            }
+
+            if (credentialPointer == IntPtr.Zero)
+            {
+                return new CredentialProbeResult(false, false, false, $"WIN32_ERROR_{ErrorInvalidData}");
+            }
+
+            string? comment = readComment(credentialPointer);
+            bool markerMatches = exactMarker
+                ? string.Equals(comment, marker, StringComparison.Ordinal)
+                : comment?.StartsWith(marker, StringComparison.Ordinal) == true;
+            return new CredentialProbeResult(true, true, markerMatches, null);
+        }
+        finally
+        {
+            if (credentialPointer != IntPtr.Zero)
+            {
+                freeCredential(credentialPointer);
+            }
+        }
+    }
+
+    private static CredentialProbeResult ProbeCredential(
+        string targetName,
+        uint credentialType,
+        string marker,
+        bool exactMarker)
+    {
+        return ProbeCredential(
+            targetName,
+            credentialType,
+            marker,
+            exactMarker,
+            (string target, uint type, out IntPtr credentialPointer, out int errorCode) =>
+            {
+                bool read = CredRead(target, type, 0, out credentialPointer);
+                errorCode = read ? 0 : Marshal.GetLastWin32Error();
+                return read;
+            },
+            CredFree,
+            ReadCredentialComment);
+    }
+
+    private static string? ReadCredentialComment(IntPtr credentialPointer)
+    {
+        int typeOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.Type)).ToInt32();
+        int targetNameOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.TargetName)).ToInt32();
+        int userNameOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.UserName)).ToInt32();
+        int commentOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.Comment)).ToInt32();
+
+        _ = Marshal.ReadInt32(credentialPointer, typeOffset);
+        _ = Marshal.PtrToStringUni(Marshal.ReadIntPtr(credentialPointer, targetNameOffset));
+        _ = Marshal.PtrToStringUni(Marshal.ReadIntPtr(credentialPointer, userNameOffset));
+        return Marshal.PtrToStringUni(Marshal.ReadIntPtr(credentialPointer, commentOffset));
+    }
 
     /// <summary>
     /// Shared implementation for writing a Windows credential via CredWriteW.
@@ -155,6 +390,7 @@ public static class CredentialManagerHelper
         string secret,
         uint credType,
         uint credPersist,
+        string? comment,
         out string? error)
     {
         error = null;
@@ -189,11 +425,11 @@ public static class CredentialManagerHelper
 
             secretPtr = Marshal.StringToCoTaskMemUni(secret);
 
-            var credential = new NativeCredential
+            NativeCredential credential = new NativeCredential
             {
                 AttributeCount = 0,
                 Attributes = IntPtr.Zero,
-                Comment = null,
+                Comment = comment,
                 TargetAlias = null,
                 Type = credType,
                 Persist = credPersist,

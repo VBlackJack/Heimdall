@@ -152,6 +152,119 @@ public sealed class RdpHandlerTests
     }
 
     [Fact]
+    public async Task ConnectAsync_ForeignCredential_ContinuesWithNoticeWithoutWriteOrDelete()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = false
+        };
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        int autofillCalls = 0;
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            localizer,
+            (_, _, _, _, _) =>
+            {
+                autofillCalls++;
+                return Task.FromResult(true);
+            });
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.Equal(
+            "An existing Windows credential is being used; Heimdall's stored credential was not injected.",
+            result.Warning);
+        Assert.Equal(1, credentialManager.WriteCalls);
+        Assert.Equal(0, credentialManager.DeleteCalls);
+        Assert.Equal(1, launcher.LaunchCalls);
+
+        await Task.Delay(100);
+
+        Assert.Equal(0, autofillCalls);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_CredentialWrittenThenLaunchFails_ReleasesImmediately()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher();
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        RdpHandler handler = CreateHandler(launcher, credentialManager, new LocalizationManager());
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, credentialManager.WriteCalls);
+        Assert.Equal(1, credentialManager.DeleteCalls);
+        Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_Success_TransfersCredentialToDelayedCleanup()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        RdpHandler handler = CreateHandler(launcher, credentialManager, new LocalizationManager());
+        ServerProfileDto server = CreateCredentialedServer();
+        using CancellationTokenSource cleanupCancellation = new CancellationTokenSource();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            cleanupCancellation.Token,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, credentialManager.DeleteCalls);
+
+        cleanupCancellation.Cancel();
+        await credentialManager.DeleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, credentialManager.DeleteCalls);
+        Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
+    }
+
+    [Fact]
     public async Task ConnectAsync_ForceExternalDecryptFailureReturnsFailureBeforeLaunching()
     {
         var launcher = new TrackingRdpExternalClientLauncher
@@ -323,6 +436,22 @@ public sealed class RdpHandlerTests
             launcher);
     }
 
+    private static RdpHandler CreateHandler(
+        IRdpExternalClientLauncher launcher,
+        IRdpCredentialManager credentialManager,
+        LocalizationManager localizer,
+        RdpCredentialAutofillOperation? credentialAutofill = null)
+    {
+        return new RdpHandler(
+            new PassThroughTunnelService(),
+            new ConnectionStateMachine(),
+            localizer,
+            launcher,
+            credentialManager: credentialManager,
+            decryptPassword: _ => "password",
+            credentialAutofill: credentialAutofill);
+    }
+
     private static ServerProfileDto CreateServer(string rdpMode) =>
         new()
         {
@@ -334,6 +463,14 @@ public sealed class RdpHandlerTests
             RdpMode = rdpMode,
             UseDirectConnection = true
         };
+
+    private static ServerProfileDto CreateCredentialedServer()
+    {
+        ServerProfileDto server = CreateServer("External");
+        server.RdpUsername = "user";
+        server.RdpPasswordEncrypted = "encrypted";
+        return server;
+    }
 
     private sealed class PassThroughTunnelService : ITunnelService
     {
@@ -413,6 +550,56 @@ public sealed class RdpHandlerTests
             }
 
             return ProcessToReturn;
+        }
+    }
+
+    private sealed class TrackingRdpCredentialManager : IRdpCredentialManager
+    {
+        public bool CredentialWritten { get; init; }
+
+        public int WriteCalls { get; private set; }
+
+        public int DeleteCalls { get; private set; }
+
+        public string? LastWriteMarker { get; private set; }
+
+        public string? LastDeleteMarker { get; private set; }
+
+        public TaskCompletionSource DeleteObserved { get; } =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string CreateOwnershipMarker()
+        {
+            return "Heimdall:RDP:test-launch";
+        }
+
+        public bool WriteDomainCredential(
+            string targetName,
+            string username,
+            string password,
+            string ownershipMarker,
+            out bool credentialWritten,
+            out string? error)
+        {
+            WriteCalls++;
+            LastWriteMarker = ownershipMarker;
+            credentialWritten = CredentialWritten;
+            error = null;
+            return true;
+        }
+
+        public bool DeleteCredential(
+            string targetName,
+            string ownershipMarker,
+            out bool credentialDeleted,
+            out string? error)
+        {
+            DeleteCalls++;
+            LastDeleteMarker = ownershipMarker;
+            credentialDeleted = true;
+            error = null;
+            DeleteObserved.TrySetResult();
+            return true;
         }
     }
 
