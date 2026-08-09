@@ -35,6 +35,7 @@ internal sealed class CitrixHandler : IProtocolHandler
     private readonly Func<ProcessStartInfo, Process?> _startProcess;
     private readonly Func<string, string?> _unprotectSecret;
     private readonly Func<string?> _resolveSelfServicePath;
+    private readonly Func<string?> _resolveCitrixLauncher;
     private readonly Action<string> _logInfo;
     private readonly Action<string> _logWarning;
 
@@ -59,7 +60,8 @@ internal sealed class CitrixHandler : IProtocolHandler
         Func<string, string?> unprotectSecret,
         Func<string?> resolveSelfServicePath,
         Action<string> logInfo,
-        Action<string> logWarning)
+        Action<string> logWarning,
+        Func<string?>? resolveCitrixLauncher = null)
     {
         ArgumentNullException.ThrowIfNull(connectionSm);
         ArgumentNullException.ThrowIfNull(localizer);
@@ -74,6 +76,7 @@ internal sealed class CitrixHandler : IProtocolHandler
         _startProcess = startProcess;
         _unprotectSecret = unprotectSecret;
         _resolveSelfServicePath = resolveSelfServicePath;
+        _resolveCitrixLauncher = resolveCitrixLauncher ?? ResolveCitrixLauncher;
         _logInfo = logInfo;
         _logWarning = logWarning;
     }
@@ -91,10 +94,35 @@ internal sealed class CitrixHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(server);
 
-        _logInfo(
-            $"ConnectCitrixAsync: {server.DisplayName} hasLaunchCmd={!string.IsNullOrWhiteSpace(server.CitrixLaunchCommandLine)} storeFront={server.CitrixStoreFrontUrl ?? "none"} icaFile={server.CitrixIcaFilePath ?? "none"}");
-
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
+
+        string? validatedStoreFrontUrl = null;
+        string safeStoreFrontLogValue = "none";
+        if (!string.IsNullOrWhiteSpace(server.CitrixStoreFrontUrl))
+        {
+            Uri? storeFrontUri;
+            bool containsCredentials;
+            if (!TryParseStoreFrontUrl(
+                    server.CitrixStoreFrontUrl,
+                    out storeFrontUri,
+                    out containsCredentials) ||
+                storeFrontUri is null)
+            {
+                string errorKey = containsCredentials
+                    ? "CitrixStoreFrontCredentialsNotAllowed"
+                    : "CitrixInvalidStoreFrontUrl";
+                string message = _localizer[errorKey];
+                _connectionSm.SetError(server.Id, message);
+                return Task.FromResult(new ConnectionResult(false, message, null));
+            }
+
+            validatedStoreFrontUrl = storeFrontUri.AbsoluteUri;
+            safeStoreFrontLogValue = BuildSafeStoreFrontLogValue(storeFrontUri);
+        }
+
+        _logInfo(
+            $"ConnectCitrixAsync: {server.DisplayName} hasLaunchCmd={!string.IsNullOrWhiteSpace(server.CitrixLaunchCommandLine)} storeFront={safeStoreFrontLogValue} icaFile={server.CitrixIcaFilePath ?? "none"}");
+
         _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingCitrix);
 
         Process? process = null;
@@ -174,20 +202,13 @@ internal sealed class CitrixHandler : IProtocolHandler
                     UseShellExecute = true
                 });
             }
-            else if (!string.IsNullOrWhiteSpace(server.CitrixStoreFrontUrl) &&
+            else if (validatedStoreFrontUrl is not null &&
                      !string.IsNullOrWhiteSpace(server.CitrixAppName))
             {
-                if (!TryValidateStoreFrontUrl(server.CitrixStoreFrontUrl, out var validatedStoreFrontUrl))
-                {
-                    var msg = _localizer["CitrixInvalidStoreFrontUrl"];
-                    _connectionSm.SetError(server.Id, msg);
-                    return Task.FromResult(new ConnectionResult(false, msg, null));
-                }
-
                 mode = CitrixLaunchMode.StoreFront;
                 resultStoreFrontUrl = validatedStoreFrontUrl;
                 resultAppName = server.CitrixAppName;
-                var launcher = ResolveCitrixLauncher();
+                string? launcher = _resolveCitrixLauncher();
                 if (launcher is null)
                 {
                     var msg = _localizer["CitrixWorkspaceNotFound"];
@@ -202,7 +223,7 @@ internal sealed class CitrixHandler : IProtocolHandler
                     server.CitrixUseSso);
 
                 _logInfo(
-                    $"Citrix launch (StoreFront): launcher={launcher} app={server.CitrixAppName} store={validatedStoreFrontUrl} sso={server.CitrixUseSso}");
+                    $"Citrix launch (StoreFront): launcher={launcher} app={server.CitrixAppName} store={safeStoreFrontLogValue} sso={server.CitrixUseSso}");
 
                 process = _startProcess(startInfo);
             }
@@ -331,15 +352,51 @@ internal sealed class CitrixHandler : IProtocolHandler
     {
         validatedUrl = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(rawUrl) ||
-            !Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        Uri? uri;
+        bool containsCredentials;
+        if (!TryParseStoreFrontUrl(rawUrl, out uri, out containsCredentials) || uri is null)
         {
             return false;
         }
 
         validatedUrl = uri.AbsoluteUri;
         return true;
+    }
+
+    private static bool TryParseStoreFrontUrl(
+        string? rawUrl,
+        out Uri? validatedUri,
+        out bool containsCredentials)
+    {
+        validatedUri = null;
+        containsCredentials = false;
+
+        if (string.IsNullOrWhiteSpace(rawUrl) ||
+            !Uri.TryCreate(rawUrl, UriKind.Absolute, out Uri? uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            containsCredentials = true;
+            return false;
+        }
+
+        validatedUri = uri;
+        return true;
+    }
+
+    private static string BuildSafeStoreFrontLogValue(Uri storeFrontUri)
+    {
+        int port = storeFrontUri.IsDefaultPort ? -1 : storeFrontUri.Port;
+        UriBuilder safeUri = new(
+            storeFrontUri.Scheme,
+            storeFrontUri.Host,
+            port,
+            storeFrontUri.AbsolutePath);
+        return safeUri.Uri.AbsoluteUri;
     }
 
     internal static ProcessStartInfo CreateStoreFrontStartInfo(

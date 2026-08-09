@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.Text;
+using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -53,6 +54,17 @@ public sealed class CitrixHandlerTests
 
         Assert.True(isValid);
         Assert.Equal(rawUrl, validatedUrl);
+    }
+
+    [Fact]
+    public void TryValidateStoreFrontUrl_RejectsUserInfo()
+    {
+        const string rawUrl = "https://user:secret@citrix.example.com/Citrix/StoreWeb/";
+
+        bool isValid = CitrixHandler.TryValidateStoreFrontUrl(rawUrl, out string validatedUrl);
+
+        Assert.False(isValid);
+        Assert.Equal(string.Empty, validatedUrl);
     }
 
     [Fact]
@@ -109,6 +121,83 @@ public sealed class CitrixHandlerTests
         Assert.False(result.Success);
         Assert.Equal("CitrixInvalidStoreFrontUrl", result.ErrorMessage);
         Assert.Null(result.Session);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_StoreFrontUserInfo_ReturnsDedicatedErrorBeforeLogging()
+    {
+        const string rawUrl = "https://user:secret@citrix.example.com/Citrix/StoreWeb/";
+        int launchCallCount = 0;
+        List<string> logs = [];
+        CitrixHandler handler = CreateHandler(
+            _ =>
+            {
+                launchCallCount++;
+                return null;
+            },
+            static stored => stored,
+            logInfo: logs.Add,
+            logWarning: logs.Add);
+        ServerProfileDto server = new()
+        {
+            Id = "srv-citrix-userinfo",
+            DisplayName = "Citrix userinfo test",
+            CitrixAppName = "Calculator",
+            CitrixStoreFrontUrl = rawUrl
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixStoreFrontCredentialsNotAllowed", result.ErrorMessage);
+        Assert.Equal(0, launchCallCount);
+        Assert.Empty(logs);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ValidStoreFrontUrl_LogsOnlySafeUrl()
+    {
+        const string rawUrl =
+            "https://citrix.example.com:8443/Citrix/StoreWeb/?access_token=secret#fragment";
+        const string safeLogUrl = "https://citrix.example.com:8443/Citrix/StoreWeb/";
+        List<string> logs = [];
+        ProcessStartInfo? launchedStartInfo = null;
+        CitrixHandler handler = CreateHandler(
+            startInfo =>
+            {
+                launchedStartInfo = startInfo;
+                return null;
+            },
+            static stored => stored,
+            logInfo: logs.Add,
+            logWarning: logs.Add);
+        ServerProfileDto server = new()
+        {
+            Id = "srv-citrix-safe-log",
+            DisplayName = "Citrix safe log test",
+            CitrixAppName = "Calculator",
+            CitrixStoreFrontUrl = rawUrl
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(launchedStartInfo);
+        Assert.Equal(rawUrl, launchedStartInfo.ArgumentList[^1]);
+        Assert.Equal(2, logs.Count);
+        Assert.All(logs, log =>
+        {
+            Assert.Contains(safeLogUrl, log, StringComparison.Ordinal);
+            Assert.DoesNotContain(rawUrl, log, StringComparison.Ordinal);
+            Assert.DoesNotContain("access_token", log, StringComparison.Ordinal);
+            Assert.DoesNotContain("fragment", log, StringComparison.Ordinal);
+        });
     }
 
     [Fact]
@@ -309,7 +398,8 @@ public sealed class CitrixHandlerTests
             unprotectSecret,
             static () => "SelfService.exe",
             logInfo ?? (static _ => { }),
-            logWarning ?? (static _ => { }));
+            logWarning ?? (static _ => { }),
+            static () => "storebrowse.exe");
 
     private static ServerProfileDto CreateCacheServer(string launchCommandLine) =>
         new()

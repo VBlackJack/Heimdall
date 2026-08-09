@@ -2649,6 +2649,7 @@
   "CitrixUseSso": "Utiliser le SSO (Kerberos)",
   "CitrixWorkspaceNotFound": "Citrix Workspace introuvable. Installez Citrix Workspace App.",
   "CitrixInvalidStoreFrontUrl": "URL Citrix StoreFront invalide. Utilisez une URL HTTP ou HTTPS absolue.",
+  "CitrixStoreFrontCredentialsNotAllowed": "L'URL Citrix StoreFront ne peut pas contenir d'identifiants.",
   "CitrixLaunchCommandRejected": "La commande de lancement Citrix contient des caract\u00e8res interdits (|, &, ;, `, $, retours \u00e0 la ligne).",
   "CitrixLaunchVaultLocked": "D\u00e9verrouillez le coffre avant de lancer cette session Citrix.",
   "CitrixLaunchFailed": "\u00c9chec du lancement de la session Citrix.",
