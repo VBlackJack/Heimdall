@@ -16,10 +16,10 @@
 
 using System.Diagnostics;
 using System.Net;
-using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Network;
 using Heimdall.Core.Security;
 
 namespace Heimdall.Ssh.Plink;
@@ -47,6 +47,7 @@ public sealed class PlinkTunnelRunner : IDisposable
     private static readonly int PortCheckMaxAttempts = 15;
     private readonly TimeSpan _portCheckInterval;
     private readonly TimeSpan _processKillGracePeriod;
+    private readonly ITcpListenerOwnershipProbe _listenerOwnershipProbe;
 
     private Process? _process;
     private string? _pwFilePath;
@@ -69,10 +70,19 @@ public sealed class PlinkTunnelRunner : IDisposable
     }
 
     public PlinkTunnelRunner(PlinkTunnelRunnerOptions options)
+        : this(options, WindowsTcpListenerOwnershipProbe.Instance)
+    {
+    }
+
+    internal PlinkTunnelRunner(
+        PlinkTunnelRunnerOptions options,
+        ITcpListenerOwnershipProbe listenerOwnershipProbe)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(listenerOwnershipProbe);
         _portCheckInterval = TimeSpan.FromMilliseconds(options.PortCheckIntervalMs);
         _processKillGracePeriod = TimeSpan.FromMilliseconds(options.KillGracePeriodMs);
+        _listenerOwnershipProbe = listenerOwnershipProbe;
     }
 
     /// <summary>Whether the underlying plink process is running.</summary>
@@ -149,6 +159,7 @@ public sealed class PlinkTunnelRunner : IDisposable
         }
 
         Process? process = null;
+        int expectedProcessId;
         try
         {
             var newProcess = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
@@ -160,6 +171,7 @@ public sealed class PlinkTunnelRunner : IDisposable
             }
 
             _process = newProcess;
+            expectedProcessId = newProcess.Id;
         }
         catch (Exception ex)
         {
@@ -202,10 +214,15 @@ public sealed class PlinkTunnelRunner : IDisposable
 
         try
         {
-            // Wait for the local port to become reachable (tunnel established)
-            bool portReady = await WaitForPortBindAsync(localPort, localBindHost, cancellationToken).ConfigureAwait(false);
+            // Wait until the process we started owns the forwarded listener.
+            TcpListenerOwnership ownership = await WaitForPortBindAsync(
+                    localPort,
+                    localBindHost,
+                    expectedProcessId,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-            if (!portReady)
+            if (ownership != TcpListenerOwnership.OwnedByExpectedProcess)
             {
                 // Process may have already exited with an error
                 var exitInfo = _process is { HasExited: true }
@@ -213,9 +230,12 @@ public sealed class PlinkTunnelRunner : IDisposable
                     : "(still running but port not bound)";
                 Stop();
 
-                var message = $"Plink tunnel failed to bind port {localPort} within timeout {exitInfo}";
+                SshFailureCode failureCode = ToFailureCode(ownership);
+                var message =
+                    $"Configured Plink executable '{plinkPath}' did not open forwarded port " +
+                    $"{localBindHost}:{localPort} itself within the startup timeout {exitInfo}.";
                 Core.Logging.FileLogger.Error(message);
-                return new PlinkTunnelResult(false, message, SshFailureCode.Unknown);
+                return new PlinkTunnelResult(false, message, failureCode);
             }
 
             // Plink consumes -pwfile during process startup. Once the local
@@ -584,47 +604,49 @@ public sealed class PlinkTunnelRunner : IDisposable
     }
 
     /// <summary>
-    /// Waits for the local forwarded port to become reachable, indicating
-    /// the tunnel is established and forwarding traffic.
+    /// Waits for the local forwarded port to be owned by the process Heimdall started.
     /// Uses a retry loop with configurable attempts and interval.
     /// </summary>
-    private async Task<bool> WaitForPortBindAsync(
+    private async Task<TcpListenerOwnership> WaitForPortBindAsync(
         int localPort,
         string localBindHost,
+        int expectedProcessId,
         CancellationToken cancellationToken)
     {
+        TcpListenerOwnership ownership = TcpListenerOwnership.NothingListening;
         for (int attempt = 0; attempt < PortCheckMaxAttempts; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             await Task.Delay(_portCheckInterval, cancellationToken).ConfigureAwait(false);
 
-            if (await IsPortListeningAsync(localBindHost, localPort).ConfigureAwait(false))
+            ownership = _listenerOwnershipProbe.Probe(
+                localBindHost,
+                localPort,
+                expectedProcessId);
+            Core.Logging.FileLogger.Info(
+                $"Plink listener ownership bind={localBindHost}:{localPort} expectedPid={expectedProcessId} outcome={ownership}");
+            if (ownership == TcpListenerOwnership.OwnedByExpectedProcess)
             {
-                return true;
+                return ownership;
             }
         }
 
-        return false;
+        return ownership;
     }
 
-    /// <summary>
-    /// Checks if a TCP port is listening on localhost by attempting a brief connection.
-    /// </summary>
-    private static async Task<bool> IsPortListeningAsync(string localBindHost, int port)
+    private static SshFailureCode ToFailureCode(TcpListenerOwnership ownership)
     {
-        try
+        return ownership switch
         {
-            using var client = new TcpClient();
-            var connectTask = client.ConnectAsync(localBindHost, port);
-            var completed = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(1)))
-                .ConfigureAwait(false);
-            return completed == connectTask && client.Connected;
-        }
-        catch (SocketException)
-        {
-            return false;
-        }
+            TcpListenerOwnership.OwnedByDifferentProcess =>
+                SshFailureCode.TunnelPortOwnedByDifferentProcess,
+            TcpListenerOwnership.NothingListening =>
+                SshFailureCode.TunnelPortNotListening,
+            TcpListenerOwnership.Indeterminate =>
+                SshFailureCode.TunnelPortOwnershipIndeterminate,
+            _ => throw new ArgumentOutOfRangeException(nameof(ownership), ownership, null)
+        };
     }
 
     /// <summary>

@@ -151,6 +151,9 @@ internal static class SshSessionDiagnosticFactory
                 or SshFailureCode.ForwardingFailed
                 or SshFailureCode.PortInUse
                 or SshFailureCode.TunnelBroken
+                or SshFailureCode.TunnelPortOwnedByDifferentProcess
+                or SshFailureCode.TunnelPortNotListening
+                or SshFailureCode.TunnelPortOwnershipIndeterminate
                 or SshFailureCode.ChainDepthExceeded
                 or SshFailureCode.CircularChainDependency
                 => SessionFailureStage.SshGateway,
@@ -173,6 +176,10 @@ internal static class SshSessionDiagnosticFactory
             null => fallbackKey,
             SshFailureCode.PageantKeyUnavailable => "ErrorNoSshAgentRunning",
             SshFailureCode.PageantNoIdentities => "ErrorSshAgentHasNoIdentities",
+            SshFailureCode.TunnelPortOwnedByDifferentProcess
+                or SshFailureCode.TunnelPortNotListening
+                or SshFailureCode.TunnelPortOwnershipIndeterminate
+                => "ErrorSshTunnelPortOwnershipUnattested",
             _ => $"ErrorSsh{code.Value}"
         };
     }

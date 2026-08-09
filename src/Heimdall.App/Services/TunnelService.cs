@@ -440,7 +440,12 @@ public sealed class TunnelService : ITunnelService
         if (!result.Success)
         {
             _tunnelManager.ReleaseLoopbackAliasReservation(localBindHost);
-            string errorMsg = result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
+            string errorMsg = result.FailureCode is SshFailureCode.TunnelPortOwnedByDifferentProcess
+                    or SshFailureCode.TunnelPortNotListening
+                    or SshFailureCode.TunnelPortOwnershipIndeterminate
+                ? _localizer[SshLocalizationKeys.ErrorSshTunnelPortOwnershipUnattested] +
+                    $" ({plinkPath})"
+                : result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
             Core.Logging.FileLogger.Error(
                 $"Plink tunnel failed for {serverId} via {gatewayParams.Host}:{gatewayParams.Port}: {errorMsg}");
             _connectionSm.SetError(serverId, errorMsg);

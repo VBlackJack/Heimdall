@@ -1557,6 +1557,10 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                 StartCredentialAutofill(password, _server.RemoteServer);
             }
         }
+        catch (RdpGatewayAttestationException ex)
+        {
+            HandleGatewayAttestationFailure(ex);
+        }
         catch (Exception ex)
         {
             HandleFailure("Unable to start the embedded Remote Desktop session.", ex);
@@ -2899,6 +2903,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         UpdateSessionStatus(RdpSessionStatus.Error);
         StatusTextBlock.Text = _localizer?.Format("RdpStatusErrorDetail", message, ex.Message)
             ?? $"{message} {ex.Message}";
+    }
+
+    private void HandleGatewayAttestationFailure(RdpGatewayAttestationException ex)
+    {
+        HandleFailure(L("RdpGatewayAttestationFailed"), ex);
     }
 
     private void SetPaneDiagnostic(SessionDiagnostic diagnostic)

@@ -113,6 +113,15 @@ public enum SshFailureCode
     /// <summary>The tunnel was unexpectedly closed by the server.</summary>
     TunnelBroken,
 
+    /// <summary>The forwarded port is listening, but another process owns it.</summary>
+    TunnelPortOwnedByDifferentProcess,
+
+    /// <summary>No process is listening on the forwarded port.</summary>
+    TunnelPortNotListening,
+
+    /// <summary>The operating system could not attest ownership of the forwarded port.</summary>
+    TunnelPortOwnershipIndeterminate,
+
     // ── Chain-specific failures ────────────────────────────────────────
 
     /// <summary>Maximum gateway chain depth exceeded.</summary>

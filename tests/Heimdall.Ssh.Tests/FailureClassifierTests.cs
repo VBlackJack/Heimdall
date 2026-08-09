@@ -328,6 +328,21 @@ public class FailureClassifierTests
         Assert.Equal("Something broke.", result);
     }
 
+    [Theory]
+    [InlineData(SshFailureCode.TunnelPortOwnedByDifferentProcess)]
+    [InlineData(SshFailureCode.TunnelPortNotListening)]
+    [InlineData(SshFailureCode.TunnelPortOwnershipIndeterminate)]
+    public void FormatMessage_UnattestedPortCodes_ShareSingleLocalizationKey(SshFailureCode code)
+    {
+        var info = new SshFailureInfo(code, "Ownership failed.", true);
+
+        string result = FailureClassifier.FormatMessage(
+            info,
+            key => key == "ErrorSshTunnelPortOwnershipUnattested" ? "Localized ownership failure." : null);
+
+        Assert.Equal("Localized ownership failure.", result);
+    }
+
     [Fact]
     public void FormatMessage_NullInfo_ThrowsArgumentNull()
     {

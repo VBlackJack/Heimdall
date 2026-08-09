@@ -1872,33 +1872,32 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     private void ApplyGatewaySettings(object ocx)
     {
         string? gateway = _pendingRedirections.GatewayHostname;
-        if (string.IsNullOrWhiteSpace(gateway)
-            || !Core.Security.InputValidator.Validate(gateway, "Address"))
+        if (string.IsNullOrWhiteSpace(gateway))
         {
             // No gateway configured — leave MsTscAx at its default (direct).
             return;
         }
 
+        object? transport;
         try
         {
             dynamic ax = ocx;
-            dynamic transport = ax.TransportSettings;
-            // Values mirror RdpFileGenerator for embedded/external parity:
-            // GatewayUsageMethod 1 = TSC_PROXY_MODE_DIRECT (always use gateway)
-            // GatewayProfileUsageMethod 1 = explicit profile
-            // GatewayCredsSource 0 = TSC_PROXY_CREDS_MODE_USERPASS
-            transport.GatewayHostname = gateway;
-            transport.GatewayUsageMethod = 1;
-            transport.GatewayProfileUsageMethod = 1;
-            transport.GatewayCredsSource = 0;
-            Core.Logging.FileLogger.Info(
-                $"RdpActiveXHost.ApplyGatewaySettings: RD Gateway enabled host={gateway}");
+            transport = ax.TransportSettings;
         }
         catch (Exception ex)
         {
-            Core.Logging.FileLogger.Warn(
-                $"RdpActiveXHost.ApplyGatewaySettings failed; embedded RD Gateway not applied, falling back to direct connection: {ex.Message}");
+            throw new RdpGatewayAttestationException(
+                gateway,
+                RdpGatewayAttestationStep.SettingsAvailability,
+                ex);
         }
+
+        IRdpGatewayTransportSettings? settings = transport is null
+            ? null
+            : new DynamicRdpGatewayTransportSettings(transport);
+        RdpGatewayAttestation.Apply(gateway, settings);
+        Core.Logging.FileLogger.Info(
+            $"RdpActiveXHost.ApplyGatewaySettings: RD Gateway attested host={gateway}");
     }
 
     #endregion

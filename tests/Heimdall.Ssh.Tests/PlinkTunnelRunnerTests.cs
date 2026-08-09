@@ -17,6 +17,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using Heimdall.Core.Network;
 using Heimdall.Ssh.Plink;
 
 namespace Heimdall.Ssh.Tests;
@@ -296,7 +297,7 @@ public class PlinkTunnelRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task TunnelPasswordFile_DeletedAfterSuccessfulBind()
+    public async Task TunnelPasswordFile_ForeignListenerFailsClosed()
     {
         string tempDirectory = Path.GetTempPath();
         HashSet<string> existingPasswordFiles = Directory
@@ -322,7 +323,10 @@ public class PlinkTunnelRunnerTests : IDisposable
             listener.Start();
             PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(5));
 
-            Assert.True(result.Success, result.ErrorMessage);
+            Assert.False(result.Success);
+            Assert.Equal(SshFailureCode.TunnelPortOwnedByDifferentProcess, result.FailureCode);
+            Assert.Contains("did not open forwarded port", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains("cmd.exe", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
             Assert.False(File.Exists(passwordFilePath));
         }
         finally
@@ -334,6 +338,83 @@ public class PlinkTunnelRunnerTests : IDisposable
                 File.Delete(passwordFilePath);
             }
         }
+    }
+
+    [Fact]
+    public async Task TunnelPasswordFile_DeletedAfterAttestedBind()
+    {
+        string tempDirectory = Path.GetTempPath();
+        HashSet<string> existingPasswordFiles = Directory
+            .EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var probe = new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess);
+        using var runner = CreateRunner(probe);
+        string? passwordFilePath = null;
+
+        try
+        {
+            Task<PlinkTunnelResult> startTask = runner.StartAsync(
+                GetCommandProcessorPath(),
+                "gw.test", 22, "user", null, "s3cret",
+                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+            passwordFilePath = Assert.Single(
+                Directory.EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern),
+                path => !existingPasswordFiles.Contains(path));
+            Assert.True(File.Exists(passwordFilePath));
+
+            PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.False(File.Exists(passwordFilePath));
+            Assert.True(probe.LastExpectedProcessId > 0);
+        }
+        finally
+        {
+            runner.Stop();
+            if (passwordFilePath is not null)
+            {
+                File.Delete(passwordFilePath);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(TcpListenerOwnership.OwnedByDifferentProcess, SshFailureCode.TunnelPortOwnedByDifferentProcess)]
+    [InlineData(TcpListenerOwnership.NothingListening, SshFailureCode.TunnelPortNotListening)]
+    [InlineData(TcpListenerOwnership.Indeterminate, SshFailureCode.TunnelPortOwnershipIndeterminate)]
+    public async Task StartAsync_UnattestedOwnership_ReturnsDistinctFailureCode(
+        TcpListenerOwnership ownership,
+        SshFailureCode expectedFailureCode)
+    {
+        using var runner = CreateRunner(new FakeOwnershipProbe(ownership));
+
+        PlinkTunnelResult result = await runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gw.test", 22, "user", null, null,
+            "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedFailureCode, result.FailureCode);
+    }
+
+    [Fact]
+    public async Task StartAsync_CancelledDuringOwnershipWait_StopsPromptly()
+    {
+        using var runner = CreateRunner(new FakeOwnershipProbe(TcpListenerOwnership.NothingListening));
+        using var cancellation = new CancellationTokenSource();
+
+        Task<PlinkTunnelResult> startTask = runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gw.test", 22, "user", null, null,
+            "remote", 22, GetAvailableLoopbackPort(), "SHA256:test",
+            cancellation.Token);
+        cancellation.Cancel();
+
+        PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
     }
 
     [Fact]
@@ -593,6 +674,32 @@ public class PlinkTunnelRunnerTests : IDisposable
         finally
         {
             listener.Stop();
+        }
+    }
+
+    private static PlinkTunnelRunner CreateRunner(ITcpListenerOwnershipProbe probe)
+    {
+        return new PlinkTunnelRunner(
+            new PlinkTunnelRunnerOptions(1, 100),
+            probe);
+    }
+
+    private static string GetCommandProcessorPath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "cmd.exe");
+    }
+
+    private sealed class FakeOwnershipProbe(TcpListenerOwnership ownership)
+        : ITcpListenerOwnershipProbe
+    {
+        public int LastExpectedProcessId { get; private set; }
+
+        public TcpListenerOwnership Probe(string bindHost, int port, int expectedProcessId)
+        {
+            LastExpectedProcessId = expectedProcessId;
+            return ownership;
         }
     }
 }

@@ -108,6 +108,10 @@ public static class FailureClassifier
         {
             SshFailureCode.PageantKeyUnavailable => "ErrorNoSshAgentRunning",
             SshFailureCode.PageantNoIdentities => "ErrorSshAgentHasNoIdentities",
+            SshFailureCode.TunnelPortOwnedByDifferentProcess
+                or SshFailureCode.TunnelPortNotListening
+                or SshFailureCode.TunnelPortOwnershipIndeterminate
+                => "ErrorSshTunnelPortOwnershipUnattested",
             _ => $"ErrorSsh{info.Code}"
         };
         var localized = localizer(key);

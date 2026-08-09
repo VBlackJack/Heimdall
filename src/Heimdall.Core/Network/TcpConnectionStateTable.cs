@@ -23,10 +23,13 @@ namespace Heimdall.Core.Network;
 /// </summary>
 public static class TcpConnectionStateTable
 {
+    /// <summary>Windows MIB state value for a listening TCP endpoint.</summary>
+    public const uint ListeningState = 2;
+
     public static string NameOf(uint state) => state switch
     {
         1 => "CLOSED",
-        2 => "LISTEN",
+        ListeningState => "LISTEN",
         3 => "SYN_SENT",
         4 => "SYN_RCVD",
         5 => "ESTABLISHED",

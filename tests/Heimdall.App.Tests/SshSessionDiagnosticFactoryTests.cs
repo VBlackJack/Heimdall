@@ -97,4 +97,18 @@ public sealed class SshSessionDiagnosticFactoryTests
         Assert.Equal((int)code, diagnostic.Code);
         Assert.Equal("Network failure.", diagnostic.Detail);
     }
+
+    [Theory]
+    [InlineData(SshFailureCode.TunnelPortOwnedByDifferentProcess)]
+    [InlineData(SshFailureCode.TunnelPortNotListening)]
+    [InlineData(SshFailureCode.TunnelPortOwnershipIndeterminate)]
+    public void FromClassifiedFailure_ForUnattestedPort_UsesSharedGatewayDiagnostic(SshFailureCode code)
+    {
+        var diagnostic = SshSessionDiagnosticFactory.FromClassifiedFailure(
+            new SshFailureInfo(code, "Ownership failed.", true));
+
+        Assert.Equal(SessionFailureStage.SshGateway, diagnostic.Stage);
+        Assert.Equal("ErrorSshTunnelPortOwnershipUnattested", diagnostic.MessageKey);
+        Assert.Equal((int)code, diagnostic.Code);
+    }
 }
