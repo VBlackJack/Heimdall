@@ -12,6 +12,46 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-09: Windows credential ownership and credential-free logs (v2026.080900)
+
+### Fixed
+
+- **StoreFront URL validation runs before the first log line** (`5d5c6081`). The Citrix handler
+  validates the StoreFront URL before any `_logInfo` call and rejects a URL carrying
+  `Uri.UserInfo`; log lines are reduced to `scheme://host[:port]/path`. Because the validation
+  refuses userinfo outright, no future log line of that handler can leak an identifier - an
+  impossibility, not an absence. Closes RDP-002.
+- **Heimdall no longer overwrites or deletes a Windows credential it cannot prove is its own**
+  (`8a8d4d51`). Ownership is carried by a `Heimdall:RDP:<GUID>` marker in the entry's `Comment`.
+  The write path matches the marker non-exactly, so an entry left by an earlier Heimdall launch
+  stays replaceable; the delete path requires an exact match, so only the current launch can
+  erase its own entry. The `GENERIC` credential type is never deleted. Accepted consequence: an
+  entry left by an older version survives - surviving beats destroying an entry that is not ours.
+  Closes RDP-001 and RDP-011.
+- **A cached Citrix launch token is protected at import** (`e3636214`). Importing a profile that
+  carries a cached launch token resolves against the vault state in three explicit branches, with
+  no silent drop. Closes the admission path of RDP-003; the lifecycle reconciliation residual
+  stays open.
+- **Credential presence is no longer logged on the RDP paths** (`96e972ad`). Eight emissions
+  asserting the presence, injection, success or cleanup of a credential are removed
+  (`RdpActiveXHost` 3, `RdpHandler` 4, `EmbeddedRdpView` 1). Six failure diagnostics are kept at
+  `Warn` and are covered by tests that assert they are always emitted: an operator must still be
+  able to tell a Credential Manager write failure from a launch failure.
+  `CredentialManagerHelper.WriteGenericCredential` is removed - it had no caller in production,
+  and since `GENERIC` entries are never deleted a future caller would have created entries
+  Heimdall could not remove. Closes RDP-024.
+
+### Added
+
+- **Static guard against StoreFront URL leaks in logs**
+  (`tests/Heimdall.App.Tests/SensitiveLoggingGuardTests.cs`). A repo-scanning test fails with
+  file and line when a log emission reintroduces a StoreFront URL beyond
+  `scheme://host[:port]/path`. Empty allowlist; non-vacuity proven by mutation.
+
+### Notes
+
+- Test suite: 8618 to 8648, 0 skipped.
+
 ## 2026-08-03: Remote recursive deletion confinement (v2026.080301)
 
 ### Fixed
