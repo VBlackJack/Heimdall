@@ -289,8 +289,6 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         _pendingUsername = username;
         _pendingPassword = password;
         _pendingDomain = domain;
-        Core.Logging.FileLogger.Info(
-            $"RdpActiveXHost.SetCredentials: valuesReceived=True handleCreated={IsHandleCreated}");
 
         var ocx = GetActiveXInstance();
         if (ocx is not null)
@@ -654,7 +652,6 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
             var nonScriptable = (IMsTscNonScriptable)ocx;
             nonScriptable.put_ClearTextPassword(password);
             LastError = null;
-            Core.Logging.FileLogger.Info("RdpActiveXHost.SetClearTextPassword: success=True");
             return true;
         }
         catch (Exception ex)
@@ -1708,9 +1705,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         // Password must be set via IMsTscNonScriptable, not via IDispatch
         if (_pendingPassword is not null)
         {
-            var passwordInjected = SetClearTextPassword(_pendingPassword);
-            Core.Logging.FileLogger.Info(
-                $"RdpActiveXHost.ApplyCredentialSettings: passwordInjected={passwordInjected}");
+            SetClearTextPassword(_pendingPassword);
         }
     }
 

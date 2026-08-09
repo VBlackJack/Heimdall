@@ -96,21 +96,6 @@ public static class CredentialManagerHelper
     #endregion
 
     /// <summary>
-    /// Store a GENERIC credential (CRED_TYPE=1) with session persistence.
-    /// </summary>
-    public static bool WriteGenericCredential(string targetName, string username, string password, out string? error)
-    {
-        return WriteCredential(
-            targetName,
-            username,
-            password,
-            CredTypeGeneric,
-            CredPersistSession,
-            null,
-            out error);
-    }
-
-    /// <summary>
     /// Creates a per-launch marker used to prove ownership of an RDP credential.
     /// </summary>
     public static string CreateDomainCredentialOwnershipMarker()

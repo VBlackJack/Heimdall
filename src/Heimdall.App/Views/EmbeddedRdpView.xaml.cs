@@ -1510,7 +1510,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             if (!string.IsNullOrWhiteSpace(username))
             {
                 _rdpHost.SetCredentials(username, password, domain);
-                Core.Logging.FileLogger.Info("EmbeddedRDP SetCredentials called.");
             }
 
             _rdpHost.SetDisplayScaleFactors(

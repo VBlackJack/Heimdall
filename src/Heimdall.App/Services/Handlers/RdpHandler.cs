@@ -173,14 +173,11 @@ internal sealed class RdpHandler : IProtocolHandler
                 {
                     credentialCleanupTarget = credentialTarget;
                     credentialOwnershipMarker = ownershipMarker;
-                    Core.Logging.FileLogger.Info($"RDP credentials stored for {credentialTarget}");
                 }
                 else
                 {
                     warning = _localizer["RdpExistingWindowsCredentialNotice"];
                     rdpPassword = null;
-                    Core.Logging.FileLogger.Info(
-                        $"RDP credential injection skipped for {credentialTarget}: existing entry is not owned by Heimdall");
                 }
             }
 
@@ -493,7 +490,7 @@ internal sealed class RdpHandler : IProtocolHandler
         bool operationSucceeded = _credentialManager.DeleteCredential(
             credentialTarget,
             ownershipMarker,
-            out bool credentialDeleted,
+            out _,
             out string? credentialError);
         if (!operationSucceeded)
         {
@@ -501,15 +498,6 @@ internal sealed class RdpHandler : IProtocolHandler
                 $"RDP CredMan cleanup failed for {credentialTarget}: {credentialError ?? "unknown error"}");
             return;
         }
-
-        if (credentialDeleted)
-        {
-            Core.Logging.FileLogger.Info($"RDP CredMan entry cleaned: {credentialTarget}");
-            return;
-        }
-
-        Core.Logging.FileLogger.Info(
-            $"RDP CredMan cleanup skipped for {credentialTarget}: ownership marker is absent or changed");
     }
 }
 
