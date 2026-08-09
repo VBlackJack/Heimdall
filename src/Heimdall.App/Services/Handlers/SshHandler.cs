@@ -32,7 +32,7 @@ namespace Heimdall.App.Services.Handlers;
 /// <summary>
 /// Handles SSH connection logic.
 /// </summary>
-internal sealed class SshHandler : IProtocolHandler
+internal sealed class SshHandler : IProtocolHandler, IDisposable
 {
     private readonly ITunnelService _tunnelService;
     private readonly ConnectionStateMachine _connectionSm;
@@ -44,6 +44,7 @@ internal sealed class SshHandler : IProtocolHandler
     private readonly IDialogService _dialogService;
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
+    private readonly SensitiveFileJanitorScheduler _plinkPasswordFileJanitorScheduler;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -69,10 +70,18 @@ internal sealed class SshHandler : IProtocolHandler
         _dialogService = dialogService;
         _plinkHostKeyProbe = plinkHostKeyProbe ?? new DefaultPlinkHostKeyProbe();
         _plinkPasswordFileJanitor = plinkPasswordFileJanitor ?? new PlinkPasswordFileJanitor();
-        _ = Task.Run(SweepStalePlinkPasswordFiles);
+        _plinkPasswordFileJanitorScheduler = new SensitiveFileJanitorScheduler(
+            nameof(PlinkPasswordFileJanitor),
+            _plinkPasswordFileJanitor.SweepStale);
+        _plinkPasswordFileJanitorScheduler.Start();
     }
 
     public string Protocol => "SSH";
+
+    public void Dispose()
+    {
+        _plinkPasswordFileJanitorScheduler.Dispose();
+    }
 
     /// <summary>
     /// Establishes an SSH shell connection, optionally through a tunnel.
@@ -722,19 +731,6 @@ internal sealed class SshHandler : IProtocolHandler
         catch (UnauthorizedAccessException ex)
         {
             Core.Logging.FileLogger.Warn($"[SshHandler] DeletePlinkPasswordFile: {ex.Message}");
-        }
-    }
-
-    private void SweepStalePlinkPasswordFiles()
-    {
-        try
-        {
-            _plinkPasswordFileJanitor.SweepStale();
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Warn(
-                $"[SshHandler] Startup plink password-file sweep failed: {ex.Message}");
         }
     }
 

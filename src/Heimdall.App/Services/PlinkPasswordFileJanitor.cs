@@ -52,7 +52,7 @@ internal sealed class PlinkPasswordFileJanitor
         _maxAge = maxAge ?? TimeSpan.FromMinutes(DefaultMaxAgeMinutes);
     }
 
-    public int SweepStale()
+    public SensitiveFileJanitorSweepResult SweepStale()
     {
         DateTime threshold = _utcNow() - _maxAge;
         string directory = _tempDirectory();
@@ -65,28 +65,36 @@ internal sealed class PlinkPasswordFileJanitor
         catch (IOException ex)
         {
             FileLogger.Warn($"[PlinkPasswordFileJanitor] Enumerate failed: {ex.Message}");
-            return 0;
+            return new SensitiveFileJanitorSweepResult(0, null);
         }
         catch (UnauthorizedAccessException ex)
         {
             FileLogger.Warn($"[PlinkPasswordFileJanitor] Enumerate unauthorized: {ex.Message}");
-            return 0;
+            return new SensitiveFileJanitorSweepResult(0, null);
         }
 
         int removed = 0;
+        DateTime? nextEligibleUtc = null;
         try
         {
             foreach (string path in candidates)
             {
                 try
                 {
-                    if (_getLastWriteTimeUtc(path) > threshold)
+                    DateTime lastWriteTimeUtc = _getLastWriteTimeUtc(path);
+                    if (!IsOwnedByCurrentUser(path))
                     {
                         continue;
                     }
 
-                    if (!IsOwnedByCurrentUser(path))
+                    if (lastWriteTimeUtc > threshold)
                     {
+                        DateTime eligibleUtc = lastWriteTimeUtc + _maxAge;
+                        if (nextEligibleUtc is null || eligibleUtc < nextEligibleUtc)
+                        {
+                            nextEligibleUtc = eligibleUtc;
+                        }
+
                         continue;
                     }
 
@@ -117,7 +125,7 @@ internal sealed class PlinkPasswordFileJanitor
             FileLogger.Info($"[PlinkPasswordFileJanitor] Swept {removed} stale plink password file(s).");
         }
 
-        return removed;
+        return new SensitiveFileJanitorSweepResult(removed, nextEligibleUtc);
     }
 
     private static IEnumerable<string> DefaultEnumerate(string directory)

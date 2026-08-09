@@ -51,9 +51,10 @@ public sealed class PlinkPasswordFileJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(1, removed);
+        Assert.Equal(1, result.Removed);
+        Assert.Null(result.NextEligibleUtc);
         Assert.Equal(new string[] { stalePath }, deleted);
     }
 
@@ -71,9 +72,10 @@ public sealed class PlinkPasswordFileJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(0, removed);
+        Assert.Equal(0, result.Removed);
+        Assert.Equal(FixedUtcNow.AddMinutes(55), result.NextEligibleUtc);
         Assert.Empty(deleted);
     }
 
@@ -95,10 +97,34 @@ public sealed class PlinkPasswordFileJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(2, removed);
+        Assert.Equal(2, result.Removed);
+        Assert.Equal(FixedUtcNow.AddMinutes(50), result.NextEligibleUtc);
         Assert.Equal(new string[] { stalePath1, stalePath2 }, deleted);
+    }
+
+    [Fact]
+    public void SweepStale_UsesEarliestEligibilityAcrossYoungOwnedFiles()
+    {
+        string olderFreshPath = GetTestPasswordFilePath("older_fresh");
+        string newerFreshPath = GetTestPasswordFilePath("newer_fresh");
+        Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
+        {
+            [olderFreshPath] = FixedUtcNow.AddMinutes(-15),
+            [newerFreshPath] = FixedUtcNow.AddMinutes(-5)
+        };
+        List<string> deleted = new List<string>();
+        PlinkPasswordFileJanitor janitor = CreateJanitor(
+            new string[] { newerFreshPath, olderFreshPath },
+            lastWriteTimes,
+            deleted);
+
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
+
+        Assert.Equal(0, result.Removed);
+        Assert.Equal(FixedUtcNow.AddMinutes(45), result.NextEligibleUtc);
+        Assert.Empty(deleted);
     }
 
     [Fact]
@@ -114,8 +140,9 @@ public sealed class PlinkPasswordFileJanitorTests
 
         Exception? exception = Record.Exception(() =>
         {
-            int removed = janitor.SweepStale();
-            Assert.Equal(0, removed);
+            SensitiveFileJanitorSweepResult result = janitor.SweepStale();
+            Assert.Equal(0, result.Removed);
+            Assert.Null(result.NextEligibleUtc);
         });
 
         Assert.Null(exception);
@@ -146,9 +173,10 @@ public sealed class PlinkPasswordFileJanitorTests
                 deleted.Add(path);
             });
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(1, removed);
+        Assert.Equal(1, result.Removed);
+        Assert.Null(result.NextEligibleUtc);
         Assert.Equal(new string[] { deletedPath }, deleted);
     }
 
@@ -162,33 +190,35 @@ public sealed class PlinkPasswordFileJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(0, removed);
+        Assert.Equal(0, result.Removed);
+        Assert.Null(result.NextEligibleUtc);
         Assert.Empty(deleted);
     }
 
     [Fact]
-    public void SweepStale_SkipsPasswordFileNotOwnedByCurrentUser()
+    public void SweepStale_YoungPasswordFileNotOwnedByCurrentUser_HasNoNextEligibility()
     {
-        string stalePath = GetTestPasswordFilePath("other_owner");
+        string youngPath = GetTestPasswordFilePath("other_owner");
         Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
         {
-            [stalePath] = FixedUtcNow.AddHours(-2)
+            [youngPath] = FixedUtcNow.AddMinutes(-5)
         };
         List<string> deleted = new List<string>();
         PlinkPasswordFileJanitor janitor = new PlinkPasswordFileJanitor(
             tempDirectory: () => @"C:\Temp",
-            enumerateFiles: _ => new string[] { stalePath },
+            enumerateFiles: _ => new string[] { youngPath },
             getLastWriteTimeUtc: path => lastWriteTimes[path],
             isOwnedByCurrentUser: _ => false,
             delete: path => deleted.Add(path),
             utcNow: () => FixedUtcNow,
             maxAge: TimeSpan.FromHours(1));
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(0, removed);
+        Assert.Equal(0, result.Removed);
+        Assert.Null(result.NextEligibleUtc);
         Assert.Empty(deleted);
     }
 
@@ -233,9 +263,10 @@ public sealed class PlinkPasswordFileJanitorTests
                 utcNow: () => FixedUtcNow,
                 maxAge: TimeSpan.FromHours(1));
 
-            int removed = janitor.SweepStale();
+            SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-            Assert.Equal(1, removed);
+            Assert.Equal(1, result.Removed);
+            Assert.Null(result.NextEligibleUtc);
             Assert.False(File.Exists(orphanPath));
         }
         finally

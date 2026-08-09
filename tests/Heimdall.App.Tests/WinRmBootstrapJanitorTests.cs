@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using Heimdall.App.Services;
 using Heimdall.App.Services.WinRm;
 
 namespace Heimdall.App.Tests;
@@ -38,9 +39,10 @@ public sealed class WinRmBootstrapJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(1, removed);
+        Assert.Equal(1, result.Removed);
+        Assert.Null(result.NextEligibleUtc);
         Assert.Equal(new string[] { stalePath }, deleted);
     }
 
@@ -58,9 +60,10 @@ public sealed class WinRmBootstrapJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(0, removed);
+        Assert.Equal(0, result.Removed);
+        Assert.Equal(FixedUtcNow.AddMinutes(55), result.NextEligibleUtc);
         Assert.Empty(deleted);
     }
 
@@ -82,10 +85,34 @@ public sealed class WinRmBootstrapJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(2, removed);
+        Assert.Equal(2, result.Removed);
+        Assert.Equal(FixedUtcNow.AddMinutes(50), result.NextEligibleUtc);
         Assert.Equal(new string[] { stalePath1, stalePath2 }, deleted);
+    }
+
+    [Fact]
+    public void SweepStale_UsesEarliestEligibilityAcrossYoungScripts()
+    {
+        const string olderFreshPath = @"C:\Temp\heimdall_winrm_older_fresh.ps1";
+        const string newerFreshPath = @"C:\Temp\heimdall_winrm_newer_fresh.ps1";
+        Dictionary<string, DateTime> lastWriteTimes = new Dictionary<string, DateTime>
+        {
+            [olderFreshPath] = FixedUtcNow.AddMinutes(-15),
+            [newerFreshPath] = FixedUtcNow.AddMinutes(-5)
+        };
+        List<string> deleted = new List<string>();
+        WinRmBootstrapJanitor janitor = CreateJanitor(
+            new string[] { newerFreshPath, olderFreshPath },
+            lastWriteTimes,
+            deleted);
+
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
+
+        Assert.Equal(0, result.Removed);
+        Assert.Equal(FixedUtcNow.AddMinutes(45), result.NextEligibleUtc);
+        Assert.Empty(deleted);
     }
 
     [Fact]
@@ -101,8 +128,9 @@ public sealed class WinRmBootstrapJanitorTests
 
         Exception? exception = Record.Exception(() =>
         {
-            int removed = janitor.SweepStale();
-            Assert.Equal(0, removed);
+            SensitiveFileJanitorSweepResult result = janitor.SweepStale();
+            Assert.Equal(0, result.Removed);
+            Assert.Null(result.NextEligibleUtc);
         });
 
         Assert.Null(exception);
@@ -133,9 +161,10 @@ public sealed class WinRmBootstrapJanitorTests
                 deleted.Add(path);
             });
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(1, removed);
+        Assert.Equal(1, result.Removed);
+        Assert.Null(result.NextEligibleUtc);
         Assert.Equal(new string[] { deletedPath }, deleted);
     }
 
@@ -149,9 +178,10 @@ public sealed class WinRmBootstrapJanitorTests
             lastWriteTimes,
             deleted);
 
-        int removed = janitor.SweepStale();
+        SensitiveFileJanitorSweepResult result = janitor.SweepStale();
 
-        Assert.Equal(0, removed);
+        Assert.Equal(0, result.Removed);
+        Assert.Null(result.NextEligibleUtc);
         Assert.Empty(deleted);
     }
 

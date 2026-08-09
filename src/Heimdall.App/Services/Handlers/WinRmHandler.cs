@@ -16,6 +16,7 @@
 
 using System.Threading;
 using System.Threading.Tasks;
+using Heimdall.App.Services;
 using Heimdall.App.Services.WinRm;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -29,7 +30,7 @@ namespace Heimdall.App.Services.Handlers;
 /// <summary>
 /// Handles WinRM sessions by launching a local PowerShell host inside an embedded terminal.
 /// </summary>
-internal sealed class WinRmHandler : IProtocolHandler
+internal sealed class WinRmHandler : IProtocolHandler, IDisposable
 {
     private readonly ITunnelService _tunnelService;
     private readonly ConnectionStateMachine _connectionSm;
@@ -39,6 +40,7 @@ internal sealed class WinRmHandler : IProtocolHandler
     private readonly WinRmPowerShellLaunchBuilder _launchBuilder;
     private readonly Func<WinRmCredentialBootstrap> _credentialBootstrapFactory;
     private readonly WinRmBootstrapJanitor _bootstrapJanitor;
+    private readonly SensitiveFileJanitorScheduler _bootstrapJanitorScheduler;
 
     public WinRmHandler(
         ITunnelService tunnelService,
@@ -58,11 +60,18 @@ internal sealed class WinRmHandler : IProtocolHandler
         _launchBuilder = launchBuilder ?? new WinRmPowerShellLaunchBuilder();
         _credentialBootstrapFactory = credentialBootstrapFactory ?? (() => new WinRmCredentialBootstrap());
         _bootstrapJanitor = bootstrapJanitor ?? new WinRmBootstrapJanitor();
-        // Best-effort startup cleanup; SweepStaleBootstrapScripts handles its own failures.
-        _ = Task.Run(SweepStaleBootstrapScripts);
+        _bootstrapJanitorScheduler = new SensitiveFileJanitorScheduler(
+            nameof(WinRmBootstrapJanitor),
+            _bootstrapJanitor.SweepStale);
+        _bootstrapJanitorScheduler.Start();
     }
 
     public string Protocol => "WINRM";
+
+    public void Dispose()
+    {
+        _bootstrapJanitorScheduler.Dispose();
+    }
 
     public async Task<ConnectionResult> ConnectAsync(
         ServerProfileDto server,
@@ -291,19 +300,6 @@ internal sealed class WinRmHandler : IProtocolHandler
         return ConPtySession.IsAvailable
             ? new ConPtySession()
             : new PipeModeSession();
-    }
-
-    private void SweepStaleBootstrapScripts()
-    {
-        try
-        {
-            _bootstrapJanitor.SweepStale();
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Warn(
-                $"[WinRmHandler] Startup bootstrap sweep failed: {ex.Message}");
-        }
     }
 
     private static void DeleteBootstrap(

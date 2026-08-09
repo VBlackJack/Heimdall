@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using Heimdall.App.Services;
 using Heimdall.Core.Logging;
 
 namespace Heimdall.App.Services.WinRm;
@@ -46,7 +47,7 @@ internal sealed class WinRmBootstrapJanitor
         _maxAge = maxAge ?? TimeSpan.FromMinutes(DefaultMaxAgeMinutes);
     }
 
-    public int SweepStale()
+    public SensitiveFileJanitorSweepResult SweepStale()
     {
         DateTime threshold = _utcNow() - _maxAge;
         string directory = _tempDirectory();
@@ -59,23 +60,31 @@ internal sealed class WinRmBootstrapJanitor
         catch (IOException ex)
         {
             FileLogger.Warn($"[WinRmBootstrapJanitor] Enumerate failed: {ex.Message}");
-            return 0;
+            return new SensitiveFileJanitorSweepResult(0, null);
         }
         catch (UnauthorizedAccessException ex)
         {
             FileLogger.Warn($"[WinRmBootstrapJanitor] Enumerate unauthorized: {ex.Message}");
-            return 0;
+            return new SensitiveFileJanitorSweepResult(0, null);
         }
 
         int removed = 0;
+        DateTime? nextEligibleUtc = null;
         try
         {
             foreach (string path in candidates)
             {
                 try
                 {
-                    if (_getLastWriteTimeUtc(path) > threshold)
+                    DateTime lastWriteTimeUtc = _getLastWriteTimeUtc(path);
+                    if (lastWriteTimeUtc > threshold)
                     {
+                        DateTime eligibleUtc = lastWriteTimeUtc + _maxAge;
+                        if (nextEligibleUtc is null || eligibleUtc < nextEligibleUtc)
+                        {
+                            nextEligibleUtc = eligibleUtc;
+                        }
+
                         continue;
                     }
 
@@ -106,7 +115,7 @@ internal sealed class WinRmBootstrapJanitor
             FileLogger.Info($"[WinRmBootstrapJanitor] Swept {removed} stale bootstrap script(s).");
         }
 
-        return removed;
+        return new SensitiveFileJanitorSweepResult(removed, nextEligibleUtc);
     }
 
     private static IEnumerable<string> DefaultEnumerate(string directory)
