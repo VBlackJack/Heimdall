@@ -78,8 +78,25 @@ public sealed class MigrationService
 
         try
         {
-            await ImportSettingsAsync(legacyPath, result, ct);
-            await ImportServersAsync(legacyPath, result, ct);
+            AppSettings settings = await PrepareLegacySettingsAsync(legacyPath, ct);
+            List<ServerProfileDto> servers = await PrepareLegacyServersAsync(
+                legacyPath,
+                result,
+                ct);
+
+            await _configManager.SaveSettingsAsync(settings);
+            result.SettingsImported = true;
+
+            if (servers.Count > 0)
+            {
+                await _configManager.MutateServersAsync(inventory =>
+                {
+                    inventory.Clear();
+                    inventory.AddRange(servers);
+                    return servers.Count;
+                });
+            }
+
             result.Success = true;
         }
         catch (Exception ex)
@@ -90,43 +107,42 @@ public sealed class MigrationService
         return result;
     }
 
-    private async Task ImportSettingsAsync(
-        string legacyPath, MigrationResult result, CancellationToken ct)
+    private async Task<AppSettings> PrepareLegacySettingsAsync(
+        string legacyPath, CancellationToken ct)
     {
-        var legacySettingsPath = Path.Combine(
+        string legacySettingsPath = Path.Combine(
             legacyPath,
             AppConstants.BundledConfigDirectoryName,
             "settings.json");
-        var legacyJson = await File.ReadAllTextAsync(legacySettingsPath, ct);
-        var legacySettings = JsonSerializer.Deserialize<JsonElement>(legacyJson);
+        string legacyJson = await File.ReadAllTextAsync(legacySettingsPath, ct);
+        JsonElement legacySettings = JsonSerializer.Deserialize<JsonElement>(legacyJson);
 
-        var settings = await _configManager.LoadSettingsAsync();
+        AppSettings settings = await _configManager.LoadSettingsAsync();
         MapLegacySettings(legacySettings, settings);
-        await _configManager.SaveSettingsAsync(settings);
-        result.SettingsImported = true;
+        return settings;
     }
 
-    private async Task ImportServersAsync(
+    private async Task<List<ServerProfileDto>> PrepareLegacyServersAsync(
         string legacyPath, MigrationResult result, CancellationToken ct)
     {
-        var legacyServersPath = Path.Combine(
+        string legacyServersPath = Path.Combine(
             legacyPath,
             AppConstants.BundledConfigDirectoryName,
             "servers.json");
-        var legacyJson = await File.ReadAllTextAsync(legacyServersPath, ct);
-        var legacyServers = JsonSerializer.Deserialize<List<JsonElement>>(legacyJson);
+        string legacyJson = await File.ReadAllTextAsync(legacyServersPath, ct);
+        List<JsonElement>? legacyServers = JsonSerializer.Deserialize<List<JsonElement>>(legacyJson);
 
         if (legacyServers is null || legacyServers.Count == 0)
         {
-            return;
+            return [];
         }
 
-        var servers = new List<ServerProfileDto>();
-        foreach (var legacySrv in legacyServers)
+        List<ServerProfileDto> servers = [];
+        foreach (JsonElement legacyServer in legacyServers)
         {
             try
             {
-                var server = MapLegacyServer(legacySrv);
+                ServerProfileDto server = MapLegacyServer(legacyServer);
                 servers.Add(server);
                 result.ServersImported++;
             }
@@ -137,12 +153,7 @@ public sealed class MigrationService
             }
         }
 
-        await _configManager.MutateServersAsync(inventory =>
-        {
-            inventory.Clear();
-            inventory.AddRange(servers);
-            return servers.Count;
-        });
+        return servers;
     }
 
     // -- Settings mapping --------------------------------------------------

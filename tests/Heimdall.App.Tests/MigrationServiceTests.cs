@@ -249,4 +249,42 @@ public class MigrationServiceTests : IDisposable
         Assert.False(result.Success);
         Assert.NotNull(result.Error);
     }
+
+    [Fact]
+    public async Task ImportFromLegacyAsync_MalformedServers_DoesNotReplaceCurrentSettings()
+    {
+        AppSettings currentSettings = new()
+        {
+            DefaultResolutionWidth = 1600,
+            DefaultLocale = "en",
+            DefaultTheme = "Slate"
+        };
+        await _configManager.SaveSettingsAsync(currentSettings);
+        byte[] originalSettingsBytes = await File.ReadAllBytesAsync(_configManager.SettingsPath);
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"),
+            """
+            {
+              "DefaultResolutionWidth": 1920,
+              "DefaultLocale": "fr",
+              "DefaultTheme": "Dracula"
+            }
+            """);
+        WriteLegacyFile(Path.Combine("config", "servers.json"), "{ not valid json");
+
+        int settingsChangedCount = 0;
+        _configManager.SettingsChanged += _ => settingsChangedCount++;
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+        byte[] persistedSettingsBytes = await File.ReadAllBytesAsync(_configManager.SettingsPath);
+        AppSettings persistedSettings = await _configManager.LoadSettingsAsync();
+
+        Assert.False(result.Success);
+        Assert.False(result.SettingsImported);
+        Assert.Equal(0, settingsChangedCount);
+        Assert.Equal(originalSettingsBytes, persistedSettingsBytes);
+        Assert.Equal(1600, persistedSettings.DefaultResolutionWidth);
+        Assert.Equal("en", persistedSettings.DefaultLocale);
+        Assert.Equal("Slate", persistedSettings.DefaultTheme);
+    }
 }
