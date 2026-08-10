@@ -62,8 +62,7 @@ public class TracerouteViewModelTests
         };
 
         var vm = new TracerouteViewModel(service);
-        await vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
-        await Task.Delay(50);
+        await TraceAndDrainProgressAsync(vm, new TraceInputs("1.1.1.1", 5));
 
         Assert.Equal(3, vm.Hops.Count);
         Assert.True(vm.SessionCompleted);
@@ -85,8 +84,7 @@ public class TracerouteViewModelTests
         vm.Hops.Add(new TraceHopResult(1, "old", string.Empty, "*", HopStatus.Timeout));
         vm.Hops.Add(new TraceHopResult(2, "old2", string.Empty, "*", HopStatus.Timeout));
 
-        await vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
-        await Task.Delay(50);
+        await TraceAndDrainProgressAsync(vm, new TraceInputs("1.1.1.1", 5));
 
         Assert.Single(vm.Hops);
         Assert.Equal("10.0.0.3", vm.Hops[0].Address);
@@ -105,8 +103,7 @@ public class TracerouteViewModelTests
         };
 
         var vm = new TracerouteViewModel(service);
-        await vm.TraceAsync(new TraceInputs("1.1.1.1", 30));
-        await Task.Delay(50);
+        await TraceAndDrainProgressAsync(vm, new TraceInputs("1.1.1.1", 30));
 
         Assert.Equal(5, vm.CurrentHop);
         Assert.Equal(30, vm.MaxHops);
@@ -126,8 +123,7 @@ public class TracerouteViewModelTests
         };
 
         var vm = new TracerouteViewModel(service);
-        await vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
-        await Task.Delay(50);
+        await TraceAndDrainProgressAsync(vm, new TraceInputs("1.1.1.1", 5));
 
         Assert.Equal("gw.local", vm.Hops[0].Hostname);
     }
@@ -146,8 +142,7 @@ public class TracerouteViewModelTests
         };
 
         var vm = new TracerouteViewModel(service);
-        await vm.TraceAsync(new TraceInputs("1.1.1.1", 5));
-        await Task.Delay(50);
+        await TraceAndDrainProgressAsync(vm, new TraceInputs("1.1.1.1", 5));
 
         Assert.Equal(string.Empty, vm.Hops[0].Hostname);
     }
@@ -284,6 +279,47 @@ public class TracerouteViewModelTests
         await first;
 
         Assert.Equal(1, service.CallCount);
+    }
+
+    private static async Task TraceAndDrainProgressAsync(
+        TracerouteViewModel viewModel,
+        TraceInputs inputs)
+    {
+        SynchronizationContext? originalContext = SynchronizationContext.Current;
+        QueuedSynchronizationContext progressContext = new();
+        try
+        {
+            SynchronizationContext.SetSynchronizationContext(progressContext);
+            Task traceTask = viewModel.TraceAsync(inputs);
+            Assert.True(
+                traceTask.IsCompleted,
+                "The focused fake traceroute handler must complete synchronously.");
+            await traceTask.ConfigureAwait(false);
+            progressContext.RunPostedCallbacks();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
+    }
+
+    private sealed class QueuedSynchronizationContext : SynchronizationContext
+    {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> _callbacks = new();
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            _callbacks.Enqueue((callback, state));
+        }
+
+        public void RunPostedCallbacks()
+        {
+            while (_callbacks.TryDequeue(
+                out (SendOrPostCallback Callback, object? State) callback))
+            {
+                callback.Callback(callback.State);
+            }
+        }
     }
 
     private sealed class FakeTracerouteService : ITracerouteService
