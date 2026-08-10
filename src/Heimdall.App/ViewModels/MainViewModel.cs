@@ -164,7 +164,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <summary>
     /// Shows the save/discard/cancel dialog asynchronously when leaving the
     /// Settings tab with unsaved changes, then navigates to the target tab
-    /// if the user chose Save or Discard.
+    /// if the user chose Discard or the requested save completed successfully.
     /// </summary>
     private async Task HandleUnsavedSettingsGuardAsync(string targetTab)
     {
@@ -181,7 +181,11 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         if (result == true)
         {
             // Save
-            Settings.SaveCommand.Execute(null);
+            bool settingsSaved = await Settings.TrySaveAsync();
+            if (!settingsSaved)
+            {
+                return;
+            }
         }
         else
         {
