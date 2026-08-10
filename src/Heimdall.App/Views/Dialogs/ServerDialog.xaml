@@ -23,7 +23,7 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Themes/DialogCommonStyles.xaml"/>
+                <ResourceDictionary Source="/Heimdall;component/Themes/DialogCommonStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
@@ -757,6 +757,7 @@
                                         <TextBlock x:Name="DlgSrv_BasicRdpPasswordLabel" Style="{StaticResource LabelStyle}" Margin="0,12,0,4"/>
                                         <PasswordBox x:Name="RdpPasswordBox" TabIndex="12"
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
+                                                     PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
                                         <DockPanel Margin="0,8,0,0"
                                                    LastChildFill="False">
@@ -851,6 +852,7 @@
                                             <PasswordBox x:Name="WinRmPasswordBox"
                                                          TabIndex="13"
                                                          AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicWinRmPasswordLabel}"
+                                                         PasswordChanged="OnCredentialPasswordChanged"
                                                          Style="{StaticResource DialogFormPasswordBoxStyle}"/>
                                         </StackPanel>
                                     </StackPanel>
@@ -908,6 +910,7 @@
                                                    Margin="0,12,0,4"/>
                                         <PasswordBox x:Name="SshPasswordBox" TabIndex="12"
                                                      AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicSshPasswordLabel}"
+                                                     PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
                                         <TextBlock x:Name="DlgSrv_BasicSshAuthHint" Text="{Binding SshAuthHint}"
                                                    Style="{StaticResource DialogHintTextStyle}" Margin="0,8,0,0"
@@ -971,6 +974,7 @@
                                                        Margin="0,12,0,4"/>
                                             <PasswordBox x:Name="SshKeyPassphraseBox" TabIndex="13"
                                                          AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicSshKeyPassphraseLabel}"
+                                                         PasswordChanged="OnCredentialPasswordChanged"
                                                          Style="{StaticResource DialogFormPasswordBoxStyle}"/>
                                             <TextBlock x:Name="DlgSrv_BasicSshKeyPassphraseHint"
                                                        Text="{Binding SshKeyPassphraseHint}"
@@ -1000,6 +1004,7 @@
                                         <TextBlock x:Name="DlgSrv_BasicVncPasswordLabel" Style="{StaticResource LabelStyle}" Margin="0,14,0,4"/>
                                         <PasswordBox x:Name="VncPasswordBox" TabIndex="10"
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
+                                                     PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
                                     </StackPanel>
                                 </Border>
@@ -1028,6 +1033,7 @@
                                         <TextBlock x:Name="DlgSrv_BasicFtpPasswordLabel" Style="{StaticResource LabelStyle}" Margin="0,12,0,4"/>
                                         <PasswordBox x:Name="FtpPasswordBox" TabIndex="11"
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
+                                                     PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
                                     </StackPanel>
                                 </Border>

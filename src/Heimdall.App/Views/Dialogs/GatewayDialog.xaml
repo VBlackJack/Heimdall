@@ -20,7 +20,7 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Themes/DialogCommonStyles.xaml"/>
+                <ResourceDictionary Source="/Heimdall;component/Themes/DialogCommonStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
@@ -95,6 +95,7 @@
                 <PasswordBox x:Name="PasswordBox"
                              AutomationProperties.Name="{Binding Text, ElementName=LblPassword}"
                              Style="{StaticResource DialogFormPasswordBoxStyle}"
+                             PasswordChanged="OnCredentialPasswordChanged"
                              TabIndex="6"/>
                 <TextBlock Text="{Binding GatewayAuthHint}"
                            Style="{StaticResource DialogHintTextStyle}" Margin="0,4,0,0"
@@ -107,6 +108,7 @@
                     <PasswordBox x:Name="KeyPassphraseBox"
                                  AutomationProperties.Name="{Binding Text, ElementName=LblKeyPassphrase}"
                                  Style="{StaticResource DialogFormPasswordBoxStyle}"
+                                 PasswordChanged="OnCredentialPasswordChanged"
                                  TabIndex="7"/>
                     <TextBlock Text="{Binding GatewayKeyPassphraseHint}"
                                Style="{StaticResource DialogHintTextStyle}"
