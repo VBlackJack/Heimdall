@@ -352,6 +352,14 @@ public partial class MainWindow
         FullscreenShortcutAction action = FullscreenShortcutRouter.Resolve(key, modifiers, _uiState.IsFullscreen);
         if (action == FullscreenShortcutAction.None)
         {
+            if (IsActive && LowLevelGlobalShortcutRouter.ShouldRoute(key, modifiers))
+            {
+                Dispatcher.BeginInvoke(
+                    DispatcherPriority.Input,
+                    new Action(() => _keyboardShortcutService.TryHandle(key, modifiers)));
+                return true;
+            }
+
             if (key == Key.K
                 && modifiers == ModifierKeys.Control
                 && RdpKeyboardEscapeHook.IsRegisteredRdpViewFocused())
