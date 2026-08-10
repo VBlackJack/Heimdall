@@ -44,6 +44,16 @@ jobs:
           # that leaves the gate depending on runner behaviour invisible in this file.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure PowerShell over Build.ps1 and a temporary notes sandbox. Keep this
+      # fail-fast gate beside the typography guard: a missing hand-written notes
+      # file must stop a release before the .NET setup and long build/test job.
+      - name: Check release-notes requirement
+        shell: pwsh
+        run: |
+          ./scripts/Test-ReleaseNotesRequirement.ps1
+          # The script runs in a child scope, so propagate its explicit exit code.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Same reasoning as the gate above: pure PowerShell over Build.ps1 and the
       # application project, no .NET and no build needed. Proves that
       # Build.ps1 -DryRun cannot rewrite the tracked application project file.

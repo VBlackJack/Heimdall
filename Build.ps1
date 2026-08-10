@@ -21,13 +21,18 @@
     Optional path to a hand-written notes file (e.g. localized highlights) prepended
     above the auto-generated Downloads/Checksums section of the GitHub release notes.
     When omitted, the tracked convention file 'docs/release-notes/v<version>.md' is used
-    if present; otherwise only the auto-generated notes are published.
+    and is required unless -AllowAutoNotesOnly is passed.
 
 .PARAMETER AllowNonAsciiNotes
     Override the typography guard. By default the publish step refuses to publish when
     the hand-written notes contain a character the French AZERTY keyboard cannot type
     (smart punctuation, French guillemets, non-standard spaces, arrows, emoji); pass
     this switch to publish anyway.
+
+.PARAMETER AllowAutoNotesOnly
+    Override the hand-written release-notes requirement. By default the publish step
+    refuses to continue when neither -ReleaseNotesFile nor the tracked convention file
+    exists; pass this switch to publish the generated Downloads/Checksums sections only.
 
 .EXAMPLE
     .\Build.ps1                              # Debug build
@@ -63,7 +68,10 @@ param(
     [string]$ReleaseNotesFile,
 
     # Override the release-notes typography guard (publish despite banned characters).
-    [switch]$AllowNonAsciiNotes
+    [switch]$AllowNonAsciiNotes,
+
+    # Override the hand-written release-notes requirement (publish generated notes only).
+    [switch]$AllowAutoNotesOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -71,6 +79,8 @@ $ProjectRoot = $PSScriptRoot
 
 # Release-notes typography guard (allow-list of AZERTY-typeable characters).
 . (Join-Path $ProjectRoot 'scripts\NotesTypographyGuard.ps1')
+# Release-notes path resolution and fail-closed decision.
+. (Join-Path $ProjectRoot 'scripts\ReleaseNotesResolution.ps1')
 # Version stamping, and the rule that a dry run never writes the project file.
 . (Join-Path $ProjectRoot 'scripts\BuildVersioning.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
@@ -508,29 +518,33 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     # Build release notes
     $notes = "## Heimdall v${buildNumber}`n`n"
 
-    # Optional hand-written notes prepended above the auto-generated Downloads
-    # section. Resolution order: explicit -ReleaseNotesFile, then the tracked
-    # convention docs/release-notes/v<version>.md, otherwise auto notes only.
-    $customNotesPath = $null
-    if ($ReleaseNotesFile) {
-        if (Test-Path -LiteralPath $ReleaseNotesFile) {
-            $customNotesPath = $ReleaseNotesFile
-        } else {
-            Write-Host "[!] -ReleaseNotesFile not found: $ReleaseNotesFile" -ForegroundColor Red
+    # Resolve the hand-written notes once. This block only translates the pure
+    # decision into the publish path's messages and exit behaviour.
+    $releaseNotesResolution = Resolve-ReleaseNotes `
+        -ProjectRoot $ProjectRoot `
+        -BuildNumber $buildNumber `
+        -ReleaseNotesFile $ReleaseNotesFile `
+        -AllowAutoNotesOnly:$AllowAutoNotesOnly
+    $customNotesPath = $releaseNotesResolution.Path
+
+    switch ($releaseNotesResolution.Decision) {
+        'UseNotes' { }
+        'Abort' {
+            if ($releaseNotesResolution.Source -eq 'Explicit') {
+                Write-Host "[!] -ReleaseNotesFile not found: $($releaseNotesResolution.CandidatePath)" -ForegroundColor Red
+            } else {
+                Write-Host "[!] Required hand-written release notes not found: $($releaseNotesResolution.CandidatePath)" -ForegroundColor Red
+                Write-Host "    Create that file, pass -ReleaseNotesFile, or pass -AllowAutoNotesOnly to override. Refusing to publish." -ForegroundColor Red
+            }
             exit 1
         }
-    } else {
-        $conventionNotes = Join-Path $ProjectRoot "docs\release-notes\v${buildNumber}.md"
-        if (Test-Path -LiteralPath $conventionNotes) {
-            $customNotesPath = $conventionNotes
-        } else {
-            # Deliberately a warning, not an error: shipping with auto-generated
-            # notes only is a legitimate choice. But it used to happen in total
-            # silence, so forgetting to write the notes was indistinguishable from
-            # deciding not to. Name the exact path so the operator can abort on
-            # purpose rather than discover it after the release is out.
-            Write-Host "[$label] WARNING: no hand-written release notes at $conventionNotes." -ForegroundColor Yellow
-            Write-Host "    Publishing with auto-generated notes only. Create that file, or pass -ReleaseNotesFile, if that is not what you want." -ForegroundColor Yellow
+        'AutoOnly' {
+            Write-Host "[$label] WARNING: no hand-written release notes at $($releaseNotesResolution.CandidatePath)." -ForegroundColor Yellow
+            Write-Host "    Publishing with auto-generated notes only because -AllowAutoNotesOnly was passed." -ForegroundColor Yellow
+        }
+        default {
+            Write-Host "[!] Unexpected release-notes decision: $($releaseNotesResolution.Decision)" -ForegroundColor Red
+            exit 1
         }
     }
     if ($customNotesPath) {
