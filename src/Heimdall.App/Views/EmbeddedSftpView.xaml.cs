@@ -932,7 +932,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                 bool isSaving = false;
 
                 // Save → upload back to server
-                editorView.FileSaved += async (_, savedContent) =>
+                editorView.SaveRequested += async (_, savedContent) =>
                 {
                     isSaving = true;
                     try
@@ -944,7 +944,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                         catch (Exception localWriteEx)
                         {
                             ShowError(_viewModel.DescribeTransferError(localWriteEx));
-                            return;
+                            return false;
                         }
 
                         try
@@ -952,7 +952,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                             await _operationsBrowser.UploadFileAsync(localPath, remotePath);
                             UpdateStatus(_localizer?.Format("SftpStatusAutoUploaded", file.Name)
                                 ?? $"Uploaded: {file.Name}");
-                            editorView.ConfirmRemoteSaved();
+                            return true;
                         }
                         catch (Exception uploadEx)
                             when (_sshParams is not null && EmbeddedSftpViewModel.IsPermissionDenied(uploadEx))
@@ -965,16 +965,18 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                                 await _viewModel.UploadViaSudoAsync(localPath, remotePath, CancellationToken.None);
                                 UpdateStatus(_localizer?.Format("SftpStatusUploadedViaSudo", file.Name)
                                     ?? $"Saved via sudo: {file.Name}");
-                                editorView.ConfirmRemoteSaved();
+                                return true;
                             }
                             catch (Exception sudoEx)
                             {
                                 ShowError(_viewModel.DescribeTransferError(sudoEx));
+                                return false;
                             }
                         }
                         catch (Exception uploadEx)
                         {
                             ShowError(_viewModel.DescribeTransferError(uploadEx));
+                            return false;
                         }
                     }
                     finally

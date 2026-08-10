@@ -28,7 +28,9 @@ namespace Heimdall.App.ViewModels;
 public sealed partial class EmbeddedEditorViewModel : ObservableObject
 {
     private readonly LocalizationManager? _localizer;
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
     private IDialogService? _dialogService;
+    private long _contentRevision;
 
     [ObservableProperty]
     private string _displayTitle = "";
@@ -71,9 +73,9 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     public string? LoadErrorMessage { get; private set; }
 
     /// <summary>
-    /// Raised when the current content is saved.
+    /// Requests durable persistence of the current remote content.
     /// </summary>
-    public event Action<string, string>? FileSaved;
+    public event Func<string, string, Task<bool>>? SaveRequested;
 
     /// <summary>
     /// Raised when the editor requests to close.
@@ -96,6 +98,7 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     /// <returns>The file content on success; otherwise <see langword="null"/>.</returns>
     public async Task<string?> LoadFileAsync(string filePath)
     {
+        Interlocked.Increment(ref _contentRevision);
         FilePath = filePath;
         IsRemote = false;
         IsModified = false;
@@ -122,6 +125,7 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     /// <param name="syntaxOverride">Optional explicit syntax name.</param>
     public void LoadContent(string fileName, string? syntaxOverride = null)
     {
+        Interlocked.Increment(ref _contentRevision);
         FilePath = fileName;
         IsRemote = true;
         IsModified = false;
@@ -131,31 +135,44 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Saves the current content and raises the save event used by existing consumers.
+    /// Saves a revisioned snapshot of the current content.
     /// </summary>
     /// <param name="currentText">The current editor text to persist.</param>
     /// <returns>
-    /// <see langword="true"/> on success; otherwise <see langword="false"/>. For remote files,
-    /// <see langword="true"/> means the save was dispatched; the modified state is cleared
-    /// by <see cref="ConfirmRemoteSaved"/> when the upload is confirmed.
+    /// <see langword="true"/> only after persistence succeeds; otherwise <see langword="false"/>.
+    /// The modified state is cleared only when no newer content revision exists.
     /// </returns>
     public async Task<bool> SaveAsync(string currentText)
     {
-        if (string.IsNullOrEmpty(FilePath))
+        string? currentFilePath = FilePath;
+        if (string.IsNullOrEmpty(currentFilePath))
         {
             return false;
         }
 
+        string filePath = currentFilePath;
+        bool isRemote = IsRemote;
+        long saveRevision = Interlocked.Read(ref _contentRevision);
+        await _saveGate.WaitAsync();
         try
         {
-            if (!IsRemote)
+            bool persisted;
+            if (!isRemote)
             {
-                await File.WriteAllTextAsync(FilePath, currentText);
+                await File.WriteAllTextAsync(filePath, currentText);
+                persisted = true;
+            }
+            else
+            {
+                persisted = await PersistRemoteAsync(filePath, currentText);
+            }
+
+            if (persisted && saveRevision == Interlocked.Read(ref _contentRevision))
+            {
                 IsModified = false;
             }
 
-            FileSaved?.Invoke(FilePath, currentText);
-            return true;
+            return persisted;
         }
         catch (Exception ex)
         {
@@ -173,15 +190,10 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
 
             return false;
         }
-    }
-
-    /// <summary>
-    /// Clears the modified state after a remote save has been confirmed by the
-    /// consumer that performed the upload.
-    /// </summary>
-    public void ConfirmRemoteSaved()
-    {
-        IsModified = false;
+        finally
+        {
+            _saveGate.Release();
+        }
     }
 
     /// <summary>
@@ -226,6 +238,7 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     /// </summary>
     public void NotifyTextChanged()
     {
+        Interlocked.Increment(ref _contentRevision);
         if (!IsModified)
         {
             IsModified = true;
@@ -243,5 +256,29 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
         string name = Path.GetFileName(FilePath) ?? (_localizer?["EditorUntitled"] ?? "Untitled");
         DisplayTitle = IsModified ? $"{name} *" : name;
     }
+
+    private async Task<bool> PersistRemoteAsync(string filePath, string currentText)
+    {
+        Func<string, string, Task<bool>>? handlers = SaveRequested;
+        if (handlers is null)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                "EmbeddedEditor remote save has no persistence handler.");
+            return false;
+        }
+
+        foreach (Delegate handlerDelegate in handlers.GetInvocationList())
+        {
+            Func<string, string, Task<bool>> handler =
+                (Func<string, string, Task<bool>>)handlerDelegate;
+            if (!await handler(filePath, currentText))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private string L(string key) => _localizer?[key] ?? key;
 }

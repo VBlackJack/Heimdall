@@ -38,11 +38,11 @@ public partial class EmbeddedEditorView : UserControl
     private HeimdallThemeService? _themeService;
     private bool _suppressTextChangeNotifications;
 
-    /// <summary>Raised when the user saves the file.</summary>
-    public event Action<string, string>? FileSaved
+    /// <summary>Requests durable persistence when the user saves a remote file.</summary>
+    public event Func<string, string, Task<bool>>? SaveRequested
     {
-        add => _viewModel.FileSaved += value;
-        remove => _viewModel.FileSaved -= value;
+        add => _viewModel.SaveRequested += value;
+        remove => _viewModel.SaveRequested -= value;
     }
 
     /// <summary>Raised when the user closes the editor.</summary>
@@ -132,14 +132,6 @@ public partial class EmbeddedEditorView : UserControl
         SetEditorText(content);
         ApplySyntaxHighlighting();
         _viewModel.UpdateCursorPosition(Editor.TextArea.Caret.Line, Editor.TextArea.Caret.Column);
-    }
-
-    /// <summary>
-    /// Confirms that the remote save dispatched by the editor was uploaded successfully.
-    /// </summary>
-    public void ConfirmRemoteSaved()
-    {
-        _viewModel.ConfirmRemoteSaved();
     }
 
     private async void OnSaveClick(object sender, RoutedEventArgs e)
