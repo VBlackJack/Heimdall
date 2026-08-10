@@ -142,10 +142,7 @@ internal static class RdpGatewayAttestation
 
         if (divergentProperties.Count > 0)
         {
-            throw new RdpGatewayAttestationException(
-                gatewayHost,
-                RdpGatewayAttestationStep.SettingsComparison,
-                divergentProperties);
+            throw RdpGatewayAttestationException.ForComparison(gatewayHost, divergentProperties);
         }
     }
 

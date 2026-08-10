@@ -65,19 +65,18 @@ public sealed class RdpGatewayAttestationException : Exception
     }
 
     /// <summary>
-    /// Initializes a comparison failure with every divergent setting in declaration order.
+    /// Creates a comparison failure carrying every divergent setting, in declaration order.
     /// </summary>
-    public RdpGatewayAttestationException(
+    public static RdpGatewayAttestationException ForComparison(
         string gatewayHost,
-        RdpGatewayAttestationStep step,
         IReadOnlyList<RdpGatewayAttestationProperty> divergentProperties,
         Exception? innerException = null)
-        : this(
-            gatewayHost,
-            step,
-            innerException,
-            NormalizeDivergentProperties(step, divergentProperties))
     {
+        return new(
+            gatewayHost,
+            RdpGatewayAttestationStep.SettingsComparison,
+            innerException,
+            NormalizeDivergentProperties(divergentProperties));
     }
 
     private RdpGatewayAttestationException(
@@ -104,16 +103,22 @@ public sealed class RdpGatewayAttestationException : Exception
     public IReadOnlyList<RdpGatewayAttestationProperty> DivergentProperties { get; }
 
     private static IReadOnlyList<RdpGatewayAttestationProperty> NormalizeDivergentProperties(
-        RdpGatewayAttestationStep step,
         IReadOnlyList<RdpGatewayAttestationProperty> divergentProperties)
     {
         ArgumentNullException.ThrowIfNull(divergentProperties);
-        if (step != RdpGatewayAttestationStep.SettingsComparison || divergentProperties.Count == 0)
+        if (divergentProperties.Count == 0)
         {
-            return Array.Empty<RdpGatewayAttestationProperty>();
+            throw new ArgumentException(
+                "At least one divergent property is required.",
+                nameof(divergentProperties));
         }
 
-        return Array.AsReadOnly(divergentProperties.ToArray());
+        RdpGatewayAttestationProperty[] normalizedProperties = divergentProperties
+            .Distinct()
+            .OrderBy(static property => (int)property)
+            .ToArray();
+
+        return Array.AsReadOnly(normalizedProperties);
     }
 
     private static string CreateMessage(
