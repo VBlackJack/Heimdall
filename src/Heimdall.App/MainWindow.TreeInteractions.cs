@@ -180,8 +180,10 @@ public partial class MainWindow
             return;
         }
 
-        var server = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.DataContext as ServerItemViewModel
-            ?? vm.ServerList.SelectedServer;
+        TreeViewItem? hitContainer = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        ServerItemViewModel? server = ResolveTreeDoubleClickServer(
+            hitContainer?.DataContext,
+            vm.ServerList.SelectedServer);
         if (server is null) return;
 
         if (server.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
@@ -198,6 +200,19 @@ public partial class MainWindow
         {
             vm.ServerList.ConnectCommand.Execute(server);
         }
+    }
+
+    /// <summary>
+    /// Resolves a double-click target only when the hit container is a server.
+    /// </summary>
+    /// <param name="hitTarget">The data context of the container under the pointer.</param>
+    /// <param name="selectedServer">The globally selected server, which must not affect hit testing.</param>
+    /// <returns>The hit server, or <see langword="null"/> for any other target.</returns>
+    internal static ServerItemViewModel? ResolveTreeDoubleClickServer(
+        object? hitTarget,
+        ServerItemViewModel? selectedServer)
+    {
+        return hitTarget as ServerItemViewModel;
     }
 
     private void OnSessionTreeViewItemPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
