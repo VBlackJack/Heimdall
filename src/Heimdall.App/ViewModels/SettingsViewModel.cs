@@ -149,6 +149,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _preventSleepDuringSession = true;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ReofferLegacyMigrationNextStartupCommand))]
+    private bool _legacyMigrationReofferAvailable;
+
+    [ObservableProperty]
     private bool _collapseTunnelsPanelByDefault = true;
 
     [ObservableProperty]
@@ -949,6 +953,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         UpdateCheckIntervalHours = settings.UpdateCheckIntervalHours;
         _updateOwner = settings.UpdateRepositoryOwner;
         _updateRepo = settings.UpdateRepositoryName;
+        LegacyMigrationReofferAvailable =
+            LegacyMigrationDecisionPolicy.HasDeclineMarker(settings);
 
         // UI state
         ShowToolsPanel = settings.ShowToolsPanel;
@@ -1377,6 +1383,31 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         LoadFromSettings(defaults);
         IsDirty = true;
+    }
+
+    private bool CanReofferLegacyMigrationNextStartup() =>
+        LegacyMigrationReofferAvailable;
+
+    [RelayCommand(CanExecute = nameof(CanReofferLegacyMigrationNextStartup))]
+    private async Task ReofferLegacyMigrationNextStartupAsync()
+    {
+        try
+        {
+            await LegacyMigrationDecisionPolicy.ClearDeclineAsync(_configManager);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error("Failed to clear the declined legacy migration offer.", ex);
+            _dialogService.ShowError(
+                _localizer["SettingsSectionLegacyMigration"],
+                _localizer["SettingsLegacyMigrationReofferFailed"]);
+            return;
+        }
+
+        LegacyMigrationReofferAvailable = false;
+        _dialogService.ShowInfo(
+            _localizer["SettingsSectionLegacyMigration"],
+            _localizer["SettingsLegacyMigrationReofferScheduled"]);
     }
 
     [RelayCommand]

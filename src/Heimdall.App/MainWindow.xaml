@@ -2260,6 +2260,29 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border Padding="{StaticResource SpacingLg}"
+                                        Background="{DynamicResource CardBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource CornerRadiusLg}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Translate SettingsSectionLegacyMigration}"
+                                                   FontSize="{StaticResource FontSizeSubtitle}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="{loc:Translate SettingsLegacyMigrationReofferDescription}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="{StaticResource SpacingMd}"/>
+                                        <Button Content="{loc:Translate SettingsLegacyMigrationReofferButton}"
+                                                Command="{Binding Settings.ReofferLegacyMigrationNextStartupCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                HorizontalAlignment="Left"
+                                                AutomationProperties.Name="{loc:Translate SettingsLegacyMigrationReofferButton}"/>
+                                    </StackPanel>
+                                </Border>
+
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

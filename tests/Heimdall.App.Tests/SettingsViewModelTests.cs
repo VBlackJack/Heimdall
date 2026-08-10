@@ -1108,6 +1108,70 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task ReofferLegacyMigrationNextStartupCommand_ClearsBothMarkersWithoutPromptingNow()
+    {
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                LegacyMigrationDeclinedOfferVersion = 2,
+                LegacyMigrationDeclinedSourceFingerprint = "ABC123",
+            },
+        };
+        FakeDialogService dialog = new();
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.True(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+
+        await viewModel.ReofferLegacyMigrationNextStartupCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, config.Settings.LegacyMigrationDeclinedOfferVersion);
+        Assert.Null(config.Settings.LegacyMigrationDeclinedSourceFingerprint);
+        Assert.False(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+        Assert.Equal(["settings"], config.PersistenceCalls);
+        Assert.Empty(dialog.ConfirmCalls);
+        (string title, string message) = Assert.Single(dialog.InfoCalls);
+        Assert.Equal("SettingsSectionLegacyMigration", title);
+        Assert.Equal("SettingsLegacyMigrationReofferScheduled", message);
+    }
+
+    [Fact]
+    public void ReofferLegacyMigrationNextStartupCommand_NoMarker_IsDisabled()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+
+        viewModel.LoadFromSettings(new AppSettings());
+
+        Assert.False(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ReofferLegacyMigrationNextStartupCommand_PersistenceFailureKeepsCommandAvailable()
+    {
+        FakeConfigManager config = new()
+        {
+            FailOnMergeSetting = true,
+            Settings = new AppSettings
+            {
+                LegacyMigrationDeclinedOfferVersion = 1,
+                LegacyMigrationDeclinedSourceFingerprint = "ABC123",
+            },
+        };
+        FakeDialogService dialog = new();
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.ReofferLegacyMigrationNextStartupCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+        Assert.Empty(dialog.InfoCalls);
+        (string title, string message) = Assert.Single(dialog.ErrorCalls);
+        Assert.Equal("SettingsSectionLegacyMigration", title);
+        Assert.Equal("SettingsLegacyMigrationReofferFailed", message);
+    }
+
+    [Fact]
     public async Task ResetRdpDefaultsCommand_RestoresRdpDefaults()
     {
         var dialog = new FakeDialogService { ConfirmResult = true };
