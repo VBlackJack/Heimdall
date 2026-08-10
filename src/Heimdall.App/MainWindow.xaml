@@ -620,6 +620,8 @@
                                                          VerticalContentAlignment="Center"
                                                          AutomationProperties.Name="{loc:Translate InlineRenameEditorA11y}"
                                                          PreviewKeyDown="OnInlineRenameEditorPreviewKeyDown"
+                                                         behaviors:InlineRenameFocusBehavior.CommitOnLostKeyboardFocus="True"
+                                                         behaviors:InlineRenameFocusBehavior.CommitRequested="OnInlineRenameEditorCommitRequested"
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
                                             <TextBlock Grid.Column="2"
@@ -695,6 +697,8 @@
                                                          VerticalContentAlignment="Center"
                                                          AutomationProperties.Name="{loc:Translate InlineRenameEditorA11y}"
                                                          PreviewKeyDown="OnInlineRenameEditorPreviewKeyDown"
+                                                         behaviors:InlineRenameFocusBehavior.CommitOnLostKeyboardFocus="True"
+                                                         behaviors:InlineRenameFocusBehavior.CommitRequested="OnInlineRenameEditorCommitRequested"
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
                                             <StackPanel Grid.Column="3"

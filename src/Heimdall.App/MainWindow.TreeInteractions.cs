@@ -40,6 +40,7 @@ namespace Heimdall.App;
 public partial class MainWindow
 {
     private IInlineRenameNode? _inlineRenameNode;
+    private bool _inlineRenameCommitInProgress;
 
     // ── Keyboard context menu (Apps / Shift+F10) ─────────────────────
 
@@ -345,11 +346,29 @@ public partial class MainWindow
         }
 
         e.Handled = true;
-        await CommitInlineRenameAsync(node, editor);
+        await CommitInlineRenameAsync(node, editor, restoreFocusAfterCompletion: true);
+    }
+
+    private async void OnInlineRenameEditorCommitRequested(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is not WpfTextBox editor || editor.DataContext is not IInlineRenameNode node)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await CommitInlineRenameAsync(node, editor, restoreFocusAfterCompletion: false);
     }
 
     private bool BeginSessionTreeInlineRename(object? node)
     {
+        if (_inlineRenameCommitInProgress)
+        {
+            return false;
+        }
+
         if (node is not IInlineRenameNode editableNode)
         {
             return false;
@@ -370,43 +389,50 @@ public partial class MainWindow
         return true;
     }
 
-    private async Task CommitInlineRenameAsync(IInlineRenameNode node, WpfTextBox editor)
+    private async Task CommitInlineRenameAsync(
+        IInlineRenameNode node,
+        WpfTextBox editor,
+        bool restoreFocusAfterCompletion)
     {
-        if (DataContext is not MainViewModel vm)
+        if (_inlineRenameCommitInProgress
+            || !node.IsEditing
+            || DataContext is not MainViewModel vm)
         {
             return;
         }
 
-        string requestedName = node.EditName.Trim();
-        if (requestedName.Length == 0)
-        {
-            SessionTreeInlineRename.CancelEdit(node, RestoreInlineRenameFocus);
-            return;
-        }
-
+        _inlineRenameCommitInProgress = true;
         editor.IsEnabled = false;
         try
         {
             switch (node)
             {
                 case ServerItemViewModel server:
-                    await CommitServerInlineRenameAsync(vm, server);
+                    await CommitServerInlineRenameAsync(
+                        vm,
+                        server,
+                        restoreFocusAfterCompletion);
                     break;
 
                 case FolderViewModel folder:
-                    await CommitFolderInlineRenameAsync(vm, folder);
+                    await CommitFolderInlineRenameAsync(
+                        vm,
+                        folder,
+                        restoreFocusAfterCompletion);
                     break;
             }
         }
         finally
         {
             editor.IsEnabled = true;
+            _inlineRenameCommitInProgress = false;
         }
     }
 
     private async Task CommitServerInlineRenameAsync(
         MainViewModel vm,
-        ServerItemViewModel server)
+        ServerItemViewModel server,
+        bool restoreFocusAfterCompletion)
     {
         try
         {
@@ -422,11 +448,11 @@ public partial class MainWindow
                         result.Server
                             ?? throw new InvalidOperationException(
                                 "A successful server rename must return the persisted server."));
-                    SessionTreeInlineRename.CompleteEdit(server, RestoreInlineRenameFocus);
+                    CompleteInlineRename(server, restoreFocusAfterCompletion);
                     break;
 
                 case ServerRenameStatus.NoChange:
-                    SessionTreeInlineRename.CompleteEdit(server, RestoreInlineRenameFocus);
+                    CompleteInlineRename(server, restoreFocusAfterCompletion);
                     break;
 
                 case ServerRenameStatus.InvalidName:
@@ -469,7 +495,8 @@ public partial class MainWindow
 
     private async Task CommitFolderInlineRenameAsync(
         MainViewModel vm,
-        FolderViewModel folder)
+        FolderViewModel folder,
+        bool restoreFocusAfterCompletion)
     {
         string oldPath = folder.FullPath;
         try
@@ -482,7 +509,7 @@ public partial class MainWindow
             {
                 case FolderRenameStatus.Renamed:
                     vm.ServerList.ApplyInlineFolderRename(folder, oldPath, result);
-                    SessionTreeInlineRename.CompleteEdit(folder, RestoreInlineRenameFocus);
+                    CompleteInlineRename(folder, restoreFocusAfterCompletion);
                     vm.StatusText = string.Format(
                         vm.Localize("StatusGroupRenamed"),
                         oldPath,
@@ -490,7 +517,7 @@ public partial class MainWindow
                     break;
 
                 case FolderRenameStatus.NoChange:
-                    SessionTreeInlineRename.CompleteEdit(folder, RestoreInlineRenameFocus);
+                    CompleteInlineRename(folder, restoreFocusAfterCompletion);
                     break;
 
                 case FolderRenameStatus.InvalidSegment:
@@ -522,6 +549,24 @@ public partial class MainWindow
         }
     }
 
+    private void CompleteInlineRename(
+        IInlineRenameNode node,
+        bool restoreFocusAfterCompletion)
+    {
+        Action<IInlineRenameNode> completion = restoreFocusAfterCompletion
+            ? RestoreInlineRenameFocus
+            : ReleaseInlineRename;
+        SessionTreeInlineRename.CompleteEdit(node, completion);
+    }
+
+    private void ReleaseInlineRename(IInlineRenameNode node)
+    {
+        if (ReferenceEquals(_inlineRenameNode, node))
+        {
+            _inlineRenameNode = null;
+        }
+    }
+
     private void RefocusInlineRenameEditor(IInlineRenameNode node)
     {
         _ = Dispatcher.BeginInvoke(
@@ -547,10 +592,12 @@ public partial class MainWindow
 
     private void RestoreInlineRenameFocus(IInlineRenameNode node)
     {
-        if (ReferenceEquals(_inlineRenameNode, node))
+        if (!ReferenceEquals(_inlineRenameNode, node))
         {
-            _inlineRenameNode = null;
+            return;
         }
+
+        _inlineRenameNode = null;
 
         _ = Dispatcher.BeginInvoke(
             DispatcherPriority.Input,
