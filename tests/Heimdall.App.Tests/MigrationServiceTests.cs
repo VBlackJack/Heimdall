@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -286,5 +287,55 @@ public class MigrationServiceTests : IDisposable
         Assert.Equal(1600, persistedSettings.DefaultResolutionWidth);
         Assert.Equal("en", persistedSettings.DefaultLocale);
         Assert.Equal("Slate", persistedSettings.DefaultTheme);
+    }
+
+    [Fact]
+    public async Task ImportFromLegacyAsync_MixedInventoryReportsSafeRejectedProfileIdentity()
+    {
+        const string FakeSecret = "DO-NOT-DISPLAY-FAKE-SECRET";
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");
+        WriteLegacyFile(Path.Combine("config", "servers.json"),
+            $$"""
+            [
+              {
+                "Id": "valid-profile",
+                "DisplayName": "Valid profile",
+                "RemoteServer": "valid.example.test",
+                "RemotePort": 3389,
+                "ConnectionType": "RDP"
+              },
+              {
+                "Id": "rejected-profile",
+                "DisplayName": "Rejected\r\nprofile XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "RemoteServer": "rejected.example.test",
+                "RemotePort": 999999999999999999999999999999,
+                "ConnectionType": "SSH",
+                "SshPasswordEncrypted": "{{FakeSecret}}"
+              }
+            ]
+            """);
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+        List<ServerProfileDto> persistedServers = await _configManager.LoadServersAsync();
+        MigrationWarning warning = Assert.Single(result.Warnings);
+        string serializedWarning = JsonSerializer.Serialize(warning);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.ServersExamined);
+        Assert.Equal(1, result.ServersImported);
+        Assert.Equal(1, result.ServersSkipped);
+        ServerProfileDto persistedServer = Assert.Single(persistedServers);
+        Assert.Equal("valid-profile", persistedServer.Id);
+        Assert.Equal(2, warning.Index);
+        Assert.NotNull(warning.Identity);
+        Assert.StartsWith("Rejected profile", warning.Identity, StringComparison.Ordinal);
+        Assert.Equal(64, warning.Identity.Length);
+        Assert.DoesNotContain('\r', warning.Identity);
+        Assert.DoesNotContain('\n', warning.Identity);
+        Assert.Equal(MigrationWarningReason.InvalidLegacyField, warning.Reason);
+        Assert.DoesNotContain(FakeSecret, serializedWarning, StringComparison.Ordinal);
+        Assert.DoesNotContain("RemotePort", serializedWarning, StringComparison.Ordinal);
+        Assert.DoesNotContain("Int32", serializedWarning, StringComparison.OrdinalIgnoreCase);
     }
 }

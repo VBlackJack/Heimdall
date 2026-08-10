@@ -966,20 +966,23 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var migrationService = new MigrationService(configManager, localization);
-        var result = await migrationService.ImportFromLegacyAsync(legacyPath);
+        MigrationService migrationService = new(configManager, localization);
+        MigrationResult result = await migrationService.ImportFromLegacyAsync(legacyPath);
+        MigrationPresentation presentation = MigrationPresentationPolicy.Create(
+            result,
+            localization);
 
-        if (result.Success)
+        if (presentation.Kind == MigrationPresentationKind.Info)
         {
             dialogService.ShowInfo(
                 localization["MigrationTitle"],
-                localization.Format("MigrationSuccess", result.ServersImported));
+                presentation.Message);
         }
         else
         {
             dialogService.ShowWarning(
                 localization["MigrationTitle"],
-                localization.Format("MigrationFailed", result.Error ?? ""));
+                presentation.Message);
         }
     }
 
