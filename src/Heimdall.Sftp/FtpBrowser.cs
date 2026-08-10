@@ -921,7 +921,7 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     private IProgress<FtpProgress> CreateProgress(string fileName, long totalBytes, bool isUpload)
     {
-        return new Progress<FtpProgress>(progress =>
+        return new SynchronousFtpProgress(progress =>
         {
             long transferredBytes = Math.Max(0, progress.TransferredBytes);
             TransferProgress?.Invoke(new SftpTransferProgress(
@@ -930,6 +930,21 @@ public sealed class FtpBrowser : IRemoteBrowser
                 totalBytes,
                 isUpload));
         });
+    }
+
+    private sealed class SynchronousFtpProgress : IProgress<FtpProgress>
+    {
+        private readonly Action<FtpProgress> _handler;
+
+        public SynchronousFtpProgress(Action<FtpProgress> handler)
+        {
+            _handler = handler;
+        }
+
+        public void Report(FtpProgress value)
+        {
+            _handler(value);
+        }
     }
 
     private void EnsureConnected()

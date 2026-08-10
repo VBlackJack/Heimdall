@@ -1668,6 +1668,7 @@
   "SftpHostKeyRotatedDuringUpload": "Host key for {1}:{2} changed since you opened {0}. Save aborted. Presented fingerprint: {3}. Re-open the file to re-establish trust.",
   "SftpHostKeyMismatchMidSession": "Security warning: host key for {0}:{1} changed during the session. Possible MITM. Presented fingerprint: {2}. Trusted fingerprint: {3}. Disconnect and reconnect to re-establish trust.",
   "SftpStatusEditDownloadFailed": "Could not download {0} for editing: {1}",
+  "SftpStatusEditFileTooLarge": "Cannot edit {0}: files larger than 16 MiB must be downloaded instead.",
   "SftpStatusEditOpenFailed": "Could not open editor: {0}",
   "SftpStatusEditUnsupportedEntry": "Cannot edit {0}: this entry is not a regular file.",
   "SftpStatusRenameUnsupportedEntry": "Cannot rename a symbolic link over SFTP: the server would rename its target instead.",

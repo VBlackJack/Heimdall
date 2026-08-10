@@ -50,6 +50,8 @@ namespace Heimdall.App.Views;
 /// </remarks>
 public partial class EmbeddedSftpView : UserControl, IDisposable
 {
+    private const long MaxInlineEditFileBytes = 16L * 1024 * 1024;
+
     private const double FileListWidthPadding = 10;
     private const double MinimumNameColumnWidth = 200;
     // Toolbar width (px) below which the labelled actions collapse into the
@@ -981,6 +983,12 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             return;
         }
 
+        if (file.Size > MaxInlineEditFileBytes)
+        {
+            ShowInlineEditFileTooLarge(file.Name);
+            return;
+        }
+
         string? tempPath = null;
 
         try
@@ -995,9 +1003,42 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             string localPath = Path.Combine(tempPath, Path.GetFileName(file.Name));
 
             bool useSudo = false;
+            int downloadExceededSizeLimit = 0;
+            using CancellationTokenSource downloadCancellation = new();
+
+            void EnforceInlineEditDownloadLimit(SftpTransferProgress progress)
+            {
+                if (!progress.IsUpload
+                    && string.Equals(progress.FileName, file.Name, StringComparison.Ordinal)
+                    && (progress.BytesTransferred > MaxInlineEditFileBytes
+                        || progress.TotalBytes > MaxInlineEditFileBytes))
+                {
+                    Interlocked.Exchange(ref downloadExceededSizeLimit, 1);
+                    downloadCancellation.Cancel();
+                }
+            }
+
             try
             {
-                await operationsBrowser.DownloadFileAsync(file.FullPath, localPath);
+                operationsBrowser.TransferProgress += EnforceInlineEditDownloadLimit;
+                try
+                {
+                    await operationsBrowser.DownloadFileAsync(
+                        file.FullPath,
+                        localPath,
+                        downloadCancellation.Token);
+                }
+                finally
+                {
+                    operationsBrowser.TransferProgress -= EnforceInlineEditDownloadLimit;
+                }
+            }
+            catch (OperationCanceledException)
+                when (Volatile.Read(ref downloadExceededSizeLimit) != 0)
+            {
+                ShowInlineEditFileTooLarge(file.Name);
+                CleanupEditTempDir(tempPath);
+                return;
             }
             catch (Exception ex) when (_sshParams is not null && EmbeddedSftpViewModel.IsPermissionDenied(ex))
             {
@@ -1016,6 +1057,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
             if (!useSudo)
             {
+                if (new FileInfo(localPath).Length > MaxInlineEditFileBytes)
+                {
+                    ShowInlineEditFileTooLarge(file.Name);
+                    CleanupEditTempDir(tempPath);
+                    return;
+                }
+
                 RemoteTextDocument document = await RemoteTextFileCodec.ReadAsync(localPath);
                 string content = document.Text;
                 string remotePath = file.FullPath;
@@ -1582,6 +1630,12 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private void ShowError(string message)
     {
         _viewModel.SetErrorStatus(message);
+    }
+
+    private void ShowInlineEditFileTooLarge(string fileName)
+    {
+        ShowError(_localizer?.Format("SftpStatusEditFileTooLarge", fileName)
+            ?? "SftpStatusEditFileTooLarge");
     }
 
     private List<SftpFileInfo> GetSelectedFiles()

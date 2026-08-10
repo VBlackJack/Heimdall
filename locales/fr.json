@@ -1668,6 +1668,7 @@
   "SftpHostKeyRotatedDuringUpload": "La cl\u00e9 d'h\u00f4te de {1}:{2} a chang\u00e9 depuis l'ouverture de {0}. Sauvegarde refus\u00e9e. Empreinte pr\u00e9sent\u00e9e : {3}. R\u00e9-ouvrez le fichier pour r\u00e9tablir la confiance.",
   "SftpHostKeyMismatchMidSession": "Avertissement de s\u00e9curit\u00e9 : la cl\u00e9 d'h\u00f4te de {0}:{1} a chang\u00e9 en cours de session. Possible MITM. Empreinte pr\u00e9sent\u00e9e : {2}. Empreinte de confiance : {3}. D\u00e9connectez-vous et reconnectez-vous pour r\u00e9tablir la confiance.",
   "SftpStatusEditDownloadFailed": "Impossible de t\u00e9l\u00e9charger {0} pour \u00e9dition : {1}",
+  "SftpStatusEditFileTooLarge": "Impossible d'\u00e9diter {0} : les fichiers de plus de 16 Mio doivent \u00eatre t\u00e9l\u00e9charg\u00e9s \u00e0 la place.",
   "SftpStatusEditOpenFailed": "Impossible d'ouvrir l'\u00e9diteur : {0}",
   "SftpStatusEditUnsupportedEntry": "Impossible d'\u00e9diter {0} : cette entr\u00e9e n'est pas un fichier r\u00e9gulier.",
   "SftpStatusRenameUnsupportedEntry": "Impossible de renommer un lien symbolique via SFTP : le serveur renommerait sa cible \u00e0 la place.",

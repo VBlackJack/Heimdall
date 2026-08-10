@@ -34,6 +34,70 @@ namespace Heimdall.App.UiTests;
 [Collection(DesktopUiCollection.Name)]
 public sealed class EmbeddedSftpInlineEditorLifecycleTests
 {
+    private const long MaxInlineEditFileBytes = 16L * 1024 * 1024;
+
+    [Fact]
+    public async Task InlineEditor_KnownOversizeFile_RefusesBeforeDownload()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(async () =>
+        {
+            BlockingUploadRemoteBrowser browser = new();
+            LocalizationManager localizer = await CreateEnglishLocalizer();
+            (EmbeddedSftpView owner, _) = CreateInitializedOwner(browser, localizer);
+            try
+            {
+                SftpFileInfo file = CreateRemoteFile(MaxInlineEditFileBytes + 1);
+
+                await InvokeEditFile(owner, file);
+
+                EmbeddedSftpViewModel viewModel =
+                    Assert.IsType<EmbeddedSftpViewModel>(owner.DataContext);
+                Assert.Equal(0, browser.DownloadCallCount);
+                Assert.Null(GetActiveInlineEditor(owner));
+                Assert.True(viewModel.IsErrorStatus);
+                Assert.Contains("16 MiB", viewModel.StatusText, StringComparison.Ordinal);
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }).Task.Unwrap();
+    }
+
+    [Fact]
+    public async Task InlineEditor_UnknownSizeGrowingPastLimit_CancelsBeforeDecodeAndEditor()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(async () =>
+        {
+            BlockingUploadRemoteBrowser browser = new()
+            {
+                ReportedDownloadBytes = MaxInlineEditFileBytes + 1,
+                EmitUnrelatedOversizeProgressFirst = true
+            };
+            LocalizationManager localizer = await CreateEnglishLocalizer();
+            (EmbeddedSftpView owner, _) = CreateInitializedOwner(browser, localizer);
+            try
+            {
+                SftpFileInfo file = CreateRemoteFile(size: 0);
+
+                await InvokeEditFile(owner, file);
+
+                EmbeddedSftpViewModel viewModel =
+                    Assert.IsType<EmbeddedSftpViewModel>(owner.DataContext);
+                Assert.Equal(1, browser.DownloadCallCount);
+                Assert.False(browser.UnrelatedProgressCausedCancellation);
+                Assert.True(browser.DownloadCancellationObserved);
+                Assert.Null(GetActiveInlineEditor(owner));
+                Assert.True(viewModel.IsErrorStatus);
+                Assert.Contains("16 MiB", viewModel.StatusText, StringComparison.Ordinal);
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }).Task.Unwrap();
+    }
+
     [Fact]
     public async Task InlineEditor_EditSaveCloseAndSessionDispose_PreserveSftpPaneOwnership()
     {
@@ -148,7 +212,8 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
     }
 
     private static (EmbeddedSftpView Owner, SessionPaneModel Pane) CreateInitializedOwner(
-        IRemoteBrowser browser)
+        IRemoteBrowser browser,
+        LocalizationManager? localizer = null)
     {
         ConstructorInfo? constructor = typeof(EmbeddedSftpView).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
@@ -176,10 +241,17 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             sessionTab,
             "Test SFTP",
             "test.example:22",
-            new LocalizationManager(),
+            localizer ?? new LocalizationManager(),
             DispatchProxy.Create<IDialogService, NullDialogProxy>(),
             new HostKeyStore());
         return (owner, pane);
+    }
+
+    private static async Task<LocalizationManager> CreateEnglishLocalizer()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
     }
 
     private static Task InvokeEditFile(EmbeddedSftpView owner, SftpFileInfo file)
@@ -189,6 +261,19 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return Assert.IsAssignableFrom<Task>(method.Invoke(owner, [file]));
+    }
+
+    private static SftpFileInfo CreateRemoteFile(long size)
+    {
+        return new SftpFileInfo(
+            "settings.conf",
+            "/remote/settings.conf",
+            RemoteEntryKind.File,
+            size,
+            DateTime.UtcNow,
+            "rw-r--r--",
+            "1000",
+            "1000");
     }
 
     private static TaskCompletionSource NewSignal()
@@ -269,11 +354,7 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             remove { }
         }
 
-        public event Action<SftpTransferProgress>? TransferProgress
-        {
-            add { }
-            remove { }
-        }
+        public event Action<SftpTransferProgress>? TransferProgress;
 
         public event Action<RemoteOperationWarning>? OperationWarningRaised
         {
@@ -296,6 +377,16 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
         public TaskCompletionSource UploadCancellationObserved { get; private set; } = NewSignal();
 
         public string? UploadedContent { get; private set; }
+
+        public int DownloadCallCount { get; private set; }
+
+        public long? ReportedDownloadBytes { get; init; }
+
+        public bool EmitUnrelatedOversizeProgressFirst { get; init; }
+
+        public bool UnrelatedProgressCausedCancellation { get; private set; }
+
+        public bool DownloadCancellationObserved { get; private set; }
 
         public void PrepareUpload()
         {
@@ -332,7 +423,28 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             string localPath,
             CancellationToken ct = default)
         {
-            _ = remotePath;
+            DownloadCallCount++;
+            if (ReportedDownloadBytes is long reportedBytes)
+            {
+                if (EmitUnrelatedOversizeProgressFirst)
+                {
+                    TransferProgress?.Invoke(new SftpTransferProgress(
+                        "other.log",
+                        reportedBytes,
+                        reportedBytes,
+                        IsUpload: false));
+                    UnrelatedProgressCausedCancellation = ct.IsCancellationRequested;
+                }
+
+                TransferProgress?.Invoke(new SftpTransferProgress(
+                    Path.GetFileName(remotePath),
+                    reportedBytes,
+                    reportedBytes,
+                    IsUpload: false));
+                DownloadCancellationObserved = ct.IsCancellationRequested;
+                ct.ThrowIfCancellationRequested();
+            }
+
             await File.WriteAllTextAsync(localPath, "initial", Encoding.UTF8, ct);
         }
 
