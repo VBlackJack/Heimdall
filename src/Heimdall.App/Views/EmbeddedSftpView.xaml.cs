@@ -43,8 +43,8 @@ namespace Heimdall.App.Views;
 /// Win32 file/folder pickers (<c>OpenFileDialog</c> / <c>FolderBrowserDialog</c>,
 /// since <c>IDialogService</c> has no file-picker); drag-and-drop;
 /// <c>GridView</c> column sizing and sort-header management; the embedded-editor
-/// hand-off (<c>EditFileAsync</c> creates an <c>EmbeddedEditorView</c> and swaps
-/// panes in the split tree); the bookmarks overflow <c>ContextMenu</c> built in
+/// hand-off (<c>EditFileAsync</c> creates an <c>EmbeddedEditorView</c> and overlays
+/// it without transferring pane ownership); the bookmarks overflow <c>ContextMenu</c> built in
 /// code; and session lifecycle — browser/editor creation, reconnect requests,
 /// the health-check timer, and the browser/editor event relays into the ViewModel.
 /// </remarks>
@@ -77,8 +77,12 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private System.Threading.Timer? _healthTimer;
     private string? _pendingBrowserSecurityStatus;
+    private EmbeddedEditorView? _activeInlineEditor;
+    private CancellationTokenSource? _inlineEditorCancellation;
+    private string? _activeInlineEditorTempPath;
 
     private bool _disposed;
+    private bool _inlineEditorSaveInProgress;
     private bool _toolbarCompact;
 
     /// <summary>
@@ -147,17 +151,95 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     }
 
     public EmbeddedSftpView()
+        : this(
+            ResolveRequiredService<IUiDispatcher>(),
+            ResolveRequiredService<IRemoteClipboardService>(),
+            ResolveRequiredService<IHostKeyVerifier>())
     {
-        InitializeComponent();
-        var services = (Application.Current as App)?.Services;
-        var uiDispatcher = services?.GetRequiredService<IUiDispatcher>()
-            ?? throw new InvalidOperationException("IUiDispatcher is not registered.");
-        var remoteClipboard = services?.GetRequiredService<IRemoteClipboardService>()
-            ?? throw new InvalidOperationException("IRemoteClipboardService is not registered.");
-        _hostKeyVerifier = services?.GetRequiredService<IHostKeyVerifier>()
-            ?? throw new InvalidOperationException("IHostKeyVerifier is not registered.");
+    }
+
+    internal EmbeddedSftpView(
+        IUiDispatcher uiDispatcher,
+        IRemoteClipboardService remoteClipboard,
+        IHostKeyVerifier hostKeyVerifier)
+    {
+        ArgumentNullException.ThrowIfNull(uiDispatcher);
+        ArgumentNullException.ThrowIfNull(remoteClipboard);
+        ArgumentNullException.ThrowIfNull(hostKeyVerifier);
+
+        _hostKeyVerifier = hostKeyVerifier;
         _viewModel = new EmbeddedSftpViewModel(uiDispatcher, remoteClipboard);
+        InitializeComponent();
         DataContext = _viewModel;
+    }
+
+    internal EmbeddedEditorView? ActiveInlineEditor => _activeInlineEditor;
+
+    internal bool ShowInlineEditor(
+        SessionPaneModel pane,
+        EmbeddedEditorView editorView,
+        string? tempPath = null)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        ArgumentNullException.ThrowIfNull(editorView);
+
+        if (_disposed
+            || _activeInlineEditor is not null
+            || !ReferenceEquals(pane.HostControl, this))
+        {
+            return false;
+        }
+
+        _activeInlineEditor = editorView;
+        _activeInlineEditorTempPath = tempPath;
+        _inlineEditorCancellation = new CancellationTokenSource();
+        BrowserSurface.Visibility = Visibility.Collapsed;
+        InlineEditorHost.Content = editorView;
+        InlineEditorHost.Visibility = Visibility.Visible;
+        AllowDrop = false;
+        return true;
+    }
+
+    internal bool RestoreInlineEditor(SessionPaneModel pane, EmbeddedEditorView editorView)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        ArgumentNullException.ThrowIfNull(editorView);
+
+        if (!ReferenceEquals(pane.HostControl, this)
+            || !ReferenceEquals(_activeInlineEditor, editorView))
+        {
+            return false;
+        }
+
+        DismissInlineEditor();
+        return true;
+    }
+
+    private void DismissInlineEditor()
+    {
+        CancellationTokenSource? cancellation = _inlineEditorCancellation;
+        _inlineEditorCancellation = null;
+        cancellation?.Cancel();
+        cancellation?.Dispose();
+
+        InlineEditorHost.Content = null;
+        InlineEditorHost.Visibility = Visibility.Collapsed;
+        BrowserSurface.Visibility = _disposed ? Visibility.Collapsed : Visibility.Visible;
+        AllowDrop = !_disposed;
+        _activeInlineEditor = null;
+        _activeInlineEditorTempPath = null;
+    }
+
+    private static T ResolveRequiredService<T>()
+        where T : notnull
+    {
+        IServiceProvider? services = (Application.Current as App)?.Services;
+        if (services is null)
+        {
+            throw new InvalidOperationException("Application services are not available.");
+        }
+
+        return services.GetRequiredService<T>();
     }
 
     /// <summary>
@@ -310,6 +392,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         }
 
         _disposed = true;
+        bool inlineEditorSaveInProgress = _inlineEditorSaveInProgress;
+        string? activeInlineEditorTempPath = _activeInlineEditorTempPath;
+        DismissInlineEditor();
         _viewModel.MarkDisposed();
 
         StopHealthTimer();
@@ -349,6 +434,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         List<string> activeEditTempDirs = _activeEditTempDirs.ToList();
         foreach (string tempPath in activeEditTempDirs)
         {
+            if (inlineEditorSaveInProgress
+                && string.Equals(
+                    tempPath,
+                    activeInlineEditorTempPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             CleanupEditTempDir(tempPath);
         }
 
@@ -881,7 +975,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             return;
         }
 
-        if (_disposed || _operationsBrowser is null)
+        IRemoteBrowser? operationsBrowser = _operationsBrowser;
+        if (_disposed || operationsBrowser is null)
         {
             return;
         }
@@ -902,7 +997,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             bool useSudo = false;
             try
             {
-                await _operationsBrowser.DownloadFileAsync(file.FullPath, localPath);
+                await operationsBrowser.DownloadFileAsync(file.FullPath, localPath);
             }
             catch (Exception ex) when (_sshParams is not null && EmbeddedSftpViewModel.IsPermissionDenied(ex))
             {
@@ -923,108 +1018,171 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
             {
                 RemoteTextDocument document = await RemoteTextFileCodec.ReadAsync(localPath);
                 string content = document.Text;
-                var remotePath = file.FullPath;
+                string remotePath = file.FullPath;
 
                 // Open in embedded AvalonEdit editor
-                var editorView = new EmbeddedEditorView(_localizer);
+                EmbeddedEditorView editorView = new(_localizer);
                 editorView.OpenContent(file.Name, content);
 
-                // Track whether an upload is in progress to prevent close during save
-                bool isSaving = false;
+                SessionPaneModel? inlineEditorPane = _ownerPane;
+                if (inlineEditorPane is null && _sessionTab is not null)
+                {
+                    inlineEditorPane = Heimdall.Core.Models.SplitTreeHelper.FindPaneByHostControl(
+                        _sessionTab.RootContent, this);
+                }
+
+                if (inlineEditorPane is null)
+                {
+                    CleanupEditTempDir(tempPath);
+                    return;
+                }
+
+                if (!ShowInlineEditor(inlineEditorPane, editorView, tempPath))
+                {
+                    CleanupEditTempDir(tempPath);
+                    return;
+                }
+
+                CancellationToken inlineEditorCancellation =
+                    _inlineEditorCancellation?.Token ?? new CancellationToken(canceled: true);
 
                 // Save → upload back to server
                 editorView.SaveRequested += async (_, savedContent) =>
                 {
-                    isSaving = true;
+                    if (_disposed || inlineEditorCancellation.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+
+                    _inlineEditorSaveInProgress = true;
                     try
                     {
                         try
                         {
-                            await RemoteTextFileCodec.WriteAsync(localPath, savedContent, document);
+                            await RemoteTextFileCodec.WriteAsync(
+                                localPath,
+                                savedContent,
+                                document,
+                                inlineEditorCancellation);
+                        }
+                        catch (OperationCanceledException)
+                            when (inlineEditorCancellation.IsCancellationRequested)
+                        {
+                            return false;
                         }
                         catch (Exception localWriteEx)
                         {
+                            if (_disposed || inlineEditorCancellation.IsCancellationRequested)
+                            {
+                                return false;
+                            }
+
                             ShowError(_viewModel.DescribeTransferError(localWriteEx));
                             return false;
                         }
 
                         try
                         {
-                            await _operationsBrowser.UploadFileAsync(localPath, remotePath);
+                            await operationsBrowser.UploadFileAsync(
+                                localPath,
+                                remotePath,
+                                inlineEditorCancellation);
+                            if (_disposed || inlineEditorCancellation.IsCancellationRequested)
+                            {
+                                return false;
+                            }
+
                             UpdateStatus(_localizer?.Format("SftpStatusAutoUploaded", file.Name)
                                 ?? $"Uploaded: {file.Name}");
                             return true;
                         }
+                        catch (OperationCanceledException)
+                            when (inlineEditorCancellation.IsCancellationRequested)
+                        {
+                            return false;
+                        }
                         catch (Exception uploadEx)
                             when (_sshParams is not null && EmbeddedSftpViewModel.IsPermissionDenied(uploadEx))
                         {
+                            if (_disposed || inlineEditorCancellation.IsCancellationRequested)
+                            {
+                                return false;
+                            }
+
                             Core.Logging.FileLogger.Info(
                                 $"EmbeddedSFTP inline save permission denied, falling back to sudo for {file.Name}");
 
                             try
                             {
-                                await _viewModel.UploadViaSudoAsync(localPath, remotePath, CancellationToken.None);
+                                await _viewModel.UploadViaSudoAsync(
+                                    localPath,
+                                    remotePath,
+                                    inlineEditorCancellation);
+                                if (_disposed || inlineEditorCancellation.IsCancellationRequested)
+                                {
+                                    return false;
+                                }
+
                                 UpdateStatus(_localizer?.Format("SftpStatusUploadedViaSudo", file.Name)
                                     ?? $"Saved via sudo: {file.Name}");
                                 return true;
                             }
+                            catch (OperationCanceledException)
+                                when (inlineEditorCancellation.IsCancellationRequested)
+                            {
+                                return false;
+                            }
                             catch (Exception sudoEx)
                             {
+                                if (_disposed || inlineEditorCancellation.IsCancellationRequested)
+                                {
+                                    return false;
+                                }
+
                                 ShowError(_viewModel.DescribeTransferError(sudoEx));
                                 return false;
                             }
                         }
                         catch (Exception uploadEx)
                         {
+                            if (_disposed || inlineEditorCancellation.IsCancellationRequested)
+                            {
+                                return false;
+                            }
+
                             ShowError(_viewModel.DescribeTransferError(uploadEx));
                             return false;
                         }
                     }
                     finally
                     {
-                        isSaving = false;
+                        _inlineEditorSaveInProgress = false;
+                        if (_disposed)
+                        {
+                            CleanupEditTempDir(tempPath);
+                        }
                     }
                 };
 
                 // Close → restore SFTP panel, refresh listing
-                var sftpPanel = this;
-                var parentTab = _sessionTab;
                 editorView.CloseRequested += () =>
                 {
-                    if (isSaving)
+                    if (_inlineEditorSaveInProgress)
                     {
                         // Upload still in progress; ignore close to avoid deleting temp file
                         return;
                     }
 
-                    if (parentTab is not null)
+                    if (RestoreInlineEditor(inlineEditorPane, editorView))
                     {
-                        // Find the pane containing the editor and swap back to SFTP
-                        var editorPane = Heimdall.Core.Models.SplitTreeHelper.FindPaneByHostControl(
-                            parentTab.RootContent, editorView);
-                        if (editorPane is not null)
-                        {
-                            editorPane.HostControl = sftpPanel;
-                        }
+                        _ = RefreshRemoteAsync();
                     }
-                    _ = RefreshRemoteAsync();
                 };
-
-                // Replace this SFTP view with the editor in the pane that contains it
-                if (_sessionTab is not null)
-                {
-                    var sftpPane = Heimdall.Core.Models.SplitTreeHelper.FindPaneByHostControl(
-                        _sessionTab.RootContent, this);
-                    if (sftpPane is not null)
-                    {
-                        sftpPane.HostControl = editorView;
-                    }
-                }
 
                 // Cleanup temp on close
                 editorView.CloseRequested += () =>
                 {
-                    if (isSaving) return;
+                    if (_inlineEditorSaveInProgress) return;
                     CleanupEditTempDir(tempPath);
                 };
             }
