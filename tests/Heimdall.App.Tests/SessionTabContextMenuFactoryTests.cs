@@ -115,6 +115,165 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Theory]
+    [InlineData("SSH")]
+    [InlineData("RDP")]
+    public async Task SessionTabContextMenu_AdHocDuplicate_UsesSnapshotAndKeepsSource(string protocol)
+    {
+        TestHarness? harness = null;
+        ControlledProtocolHandler? protocolHandler = null;
+        ServerProfileDto? snapshot = null;
+        SessionTabViewModel? source = null;
+        string expectedSnapshotId = $"adhoc-{protocol.ToLowerInvariant()}-demo.example.com";
+        TaskCompletionSource<SessionTabViewModel> duplicateAdded = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            RunOnStaThread(() =>
+            {
+                harness = TestHarness.Create();
+                protocolHandler = harness.GetHandler(protocol);
+                snapshot = harness.CreateServer(protocol);
+                snapshot.Id = expectedSnapshotId;
+                source = harness.Main.Connection.AddSession(
+                    snapshot.Id,
+                    snapshot.DisplayName,
+                    snapshot.ConnectionType);
+                source.MarkAsAdHoc(snapshot);
+                harness.Main.Connection.ActiveSessions.CollectionChanged += (_, args) =>
+                {
+                    if (args.NewItems is null)
+                    {
+                        return;
+                    }
+
+                    foreach (object item in args.NewItems)
+                    {
+                        if (item is SessionTabViewModel added && !ReferenceEquals(added, source))
+                        {
+                            added.PropertyChanged += (_, changeArgs) =>
+                            {
+                                if (string.Equals(
+                                        changeArgs.PropertyName,
+                                        nameof(SessionTabViewModel.AdHocProfileSnapshot),
+                                        StringComparison.Ordinal)
+                                    && added.IsAdHoc)
+                                {
+                                    duplicateAdded.TrySetResult(added);
+                                }
+                            };
+                        }
+                    }
+                };
+
+                ContextMenu menu = CreateSessionTabMenu(harness.Main, source);
+                MenuItem duplicateItem = AssertMenuItem(
+                    menu,
+                    harness.Main.Localize("SessionDuplicateTab"));
+
+                duplicateItem.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+            });
+
+            Assert.NotNull(harness);
+            Assert.NotNull(protocolHandler);
+            Assert.NotNull(snapshot);
+            Assert.NotNull(source);
+
+            CancellationToken token = await protocolHandler.Started.Task.WaitAsync(TestTimeout);
+            Assert.False(token.IsCancellationRequested);
+            Assert.Contains(source, harness.Main.Connection.ActiveSessions);
+            Assert.Equal(expectedSnapshotId, snapshot.Id);
+
+            protocolHandler.Result.SetResult(SuccessWithTerminalSession());
+            SessionTabViewModel duplicate = await duplicateAdded.Task.WaitAsync(TestTimeout);
+
+            Assert.Contains(source, harness.Main.Connection.ActiveSessions);
+            Assert.True(duplicate.IsAdHoc);
+            Assert.Same(snapshot, duplicate.AdHocProfileSnapshot);
+            Assert.NotEqual(source.ServerId, duplicate.ServerId);
+            Assert.Equal(expectedSnapshotId, snapshot.Id);
+        }
+        finally
+        {
+            harness?.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task SessionTabContextMenu_PersistedDuplicate_StillUsesInventoryConnection()
+    {
+        TestHarness? harness = null;
+        ControlledProtocolHandler? sshHandler = null;
+        ServerProfileDto? server = null;
+        SessionTabViewModel? source = null;
+        TaskCompletionSource<SessionTabViewModel> duplicateAdded = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            RunOnStaThread(() =>
+            {
+                harness = TestHarness.Create();
+                sshHandler = harness.GetHandler("SSH");
+                server = harness.CreateServer("SSH");
+            });
+
+            Assert.NotNull(harness);
+            Assert.NotNull(sshHandler);
+            Assert.NotNull(server);
+            await harness.PersistServerAsync(server);
+
+            RunOnStaThread(() =>
+            {
+                source = harness.Main.Connection.AddSession(
+                    "existing-runtime-session",
+                    server.DisplayName,
+                    server.ConnectionType);
+                source.OriginalServerId = server.Id;
+                harness.Main.Connection.ActiveSessions.CollectionChanged += (_, args) =>
+                {
+                    if (args.NewItems is null)
+                    {
+                        return;
+                    }
+
+                    foreach (object item in args.NewItems)
+                    {
+                        if (item is SessionTabViewModel added && !ReferenceEquals(added, source))
+                        {
+                            duplicateAdded.TrySetResult(added);
+                        }
+                    }
+                };
+
+                ContextMenu menu = CreateSessionTabMenu(harness.Main, source);
+                MenuItem duplicateItem = AssertMenuItem(
+                    menu,
+                    harness.Main.Localize("SessionDuplicateTab"));
+
+                duplicateItem.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+            });
+
+            Assert.NotNull(source);
+
+            CancellationToken token = await sshHandler.Started.Task.WaitAsync(TestTimeout);
+            Assert.False(token.IsCancellationRequested);
+            SessionTabViewModel duplicate = await duplicateAdded.Task.WaitAsync(TestTimeout);
+
+            Assert.Contains(source, harness.Main.Connection.ActiveSessions);
+            Assert.False(duplicate.IsAdHoc);
+            Assert.Equal(server.Id, duplicate.OriginalServerId);
+
+            sshHandler.Result.SetResult(SuccessWithTerminalSession());
+            await WaitUntilAsync(() => harness.EmbeddedSessionManager.AttachSshSessionCalls == 1);
+        }
+        finally
+        {
+            harness?.Dispose();
+        }
+    }
+
     [Fact]
     public void SessionTabContextMenu_HostlessUnsplitSession_DisablesDetach()
     {

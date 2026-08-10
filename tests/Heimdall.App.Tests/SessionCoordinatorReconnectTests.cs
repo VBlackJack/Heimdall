@@ -157,6 +157,81 @@ public sealed partial class SessionCoordinatorPreMountTests
         await WaitUntilAsync(() => harness.EmbeddedSessionManager.AttachSshSessionCalls == 2);
     }
 
+    [Theory]
+    [InlineData("SSH")]
+    [InlineData("RDP")]
+    public async Task ReconnectSession_AdHoc_UsesSnapshotWithoutInventoryLookup(string protocol)
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler protocolHandler = harness.GetHandler(protocol);
+        ServerProfileDto snapshot = harness.CreateServer(protocol);
+        string expectedSnapshotId = $"adhoc-{protocol.ToLowerInvariant()}-demo.example.com";
+        snapshot.Id = expectedSnapshotId;
+        SessionTabViewModel source = harness.Main.Connection.AddSession(
+            snapshot.Id,
+            snapshot.DisplayName,
+            snapshot.ConnectionType);
+        source.MarkAsAdHoc(snapshot);
+
+        TaskCompletionSource<bool> serverNotFound = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Main.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(args.PropertyName, nameof(MainViewModel.StatusText), StringComparison.Ordinal)
+                && string.Equals(
+                    harness.Main.StatusText,
+                    harness.Main.GetLocalizer()["ErrorServerNotFound"],
+                    StringComparison.Ordinal))
+            {
+                serverNotFound.TrySetResult(true);
+            }
+        };
+
+        TaskCompletionSource<SessionTabViewModel> replacementAdded = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Main.Connection.ActiveSessions.CollectionChanged += (_, args) =>
+        {
+            if (args.NewItems is null)
+            {
+                return;
+            }
+
+            foreach (object item in args.NewItems)
+            {
+                if (item is SessionTabViewModel added && !ReferenceEquals(added, source))
+                {
+                    added.PropertyChanged += (_, changeArgs) =>
+                    {
+                        if (string.Equals(
+                                changeArgs.PropertyName,
+                                nameof(SessionTabViewModel.AdHocProfileSnapshot),
+                                StringComparison.Ordinal)
+                            && added.IsAdHoc)
+                        {
+                            replacementAdded.TrySetResult(added);
+                        }
+                    };
+                }
+            }
+        };
+
+        harness.Main.Session.ReconnectSession(source);
+
+        Task firstOutcome = await Task.WhenAny(protocolHandler.Started.Task, serverNotFound.Task)
+            .WaitAsync(TestTimeout);
+        Assert.Same(protocolHandler.Started.Task, firstOutcome);
+        Assert.DoesNotContain(source, harness.Main.Connection.ActiveSessions);
+        Assert.Equal(expectedSnapshotId, snapshot.Id);
+
+        protocolHandler.Result.SetResult(SuccessWithTerminalSession());
+        SessionTabViewModel replacement = await replacementAdded.Task.WaitAsync(TestTimeout);
+
+        Assert.True(replacement.IsAdHoc);
+        Assert.Same(snapshot, replacement.AdHocProfileSnapshot);
+        Assert.NotEqual(snapshot.Id, replacement.ServerId);
+        Assert.Equal(expectedSnapshotId, snapshot.Id);
+    }
+
     [Fact]
     public async Task SftpPaneReconnectCallback_ReconnectsPaneWithoutClosingSshTab()
     {

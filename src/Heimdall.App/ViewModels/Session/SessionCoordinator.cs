@@ -15,12 +15,14 @@
  */
 
 using System.Text;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Extensions;
 using Heimdall.App.Services;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Views;
+using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
@@ -912,6 +914,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
+        if (tab.IsAdHoc && tab.AdHocProfileSnapshot is ServerProfileDto snapshot)
+        {
+            ServerProfileDto runtimeProfile = CloneAdHocProfileForConnection(snapshot);
+            OnReconnectAdHocRequestedAsync(tab, snapshot, runtimeProfile).SafeFireAndForget();
+            return;
+        }
+
         string serverId = tab.ProfileLookupServerId;
 
         if (string.IsNullOrEmpty(serverId))
@@ -920,6 +929,39 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
 
         OnReconnectRequested(tab, serverId, tab.ConnectionType);
+    }
+
+    /// <summary>
+    /// Opens another connection for the supplied tab while retaining the source tab.
+    /// Ad-hoc tabs reconnect from their immutable profile snapshot; persisted tabs keep
+    /// using the inventory-backed connect command.
+    /// </summary>
+    public void DuplicateSession(SessionTabViewModel? tab)
+    {
+        if (tab is null)
+        {
+            return;
+        }
+
+        if (tab.IsAdHoc && tab.AdHocProfileSnapshot is ServerProfileDto snapshot)
+        {
+            ServerProfileDto runtimeProfile = CloneAdHocProfileForConnection(snapshot);
+            ConnectAdHocProfileAsync(snapshot, runtimeProfile).SafeFireAndForget();
+            return;
+        }
+
+        string lookupId = tab.ProfileLookupServerId;
+        if (string.IsNullOrEmpty(lookupId) || _main.ServerList.ConnectCommand is null)
+        {
+            return;
+        }
+
+        ServerItemViewModel? server = _main.ServerList.Servers.FirstOrDefault(
+            candidate => string.Equals(candidate.Id, lookupId, StringComparison.Ordinal));
+        if (server is not null)
+        {
+            _main.ServerList.ConnectCommand.Execute(server);
+        }
     }
 
     private void OnDisconnectRequested(
@@ -1068,6 +1110,118 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             FileLogger.Error($"Reconnect failed for {serverId}", ex);
             _main.StatusText = _localizer.Format("StatusReconnectFailed", ex.Message);
         }
+    }
+
+    private async Task OnReconnectAdHocRequestedAsync(
+        SessionTabViewModel tab,
+        ServerProfileDto snapshot,
+        ServerProfileDto runtimeProfile)
+    {
+        try
+        {
+            AppSettings settings = await _configManager.LoadSettingsAsync();
+
+            await _main.Connection.CloseSessionAsync(
+                tab,
+                DisconnectReason.ReconnectInitiated,
+                confirm: false);
+
+            await ConnectAdHocProfileAsync(snapshot, runtimeProfile, settings);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error($"Ad-hoc reconnect failed for {snapshot.Id}", ex);
+            _main.StatusText = _localizer.Format("StatusReconnectFailed", ex.Message);
+        }
+    }
+
+    private async Task ConnectAdHocProfileAsync(
+        ServerProfileDto snapshot,
+        ServerProfileDto runtimeProfile)
+    {
+        try
+        {
+            AppSettings settings = await _configManager.LoadSettingsAsync();
+            await ConnectAdHocProfileAsync(snapshot, runtimeProfile, settings);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error($"Ad-hoc duplicate failed for {snapshot.Id}", ex);
+            _main.StatusText = _localizer["ErrorConnectionFailed"];
+        }
+    }
+
+    private async Task ConnectAdHocProfileAsync(
+        ServerProfileDto snapshot,
+        ServerProfileDto runtimeProfile,
+        AppSettings settings)
+    {
+        string connectionType = runtimeProfile.ConnectionType.ToUpperInvariant();
+        ConnectionResult result = connectionType switch
+        {
+            "RDP" => await _main.ServerList.ConnectionService.ConnectRdpAsync(runtimeProfile, settings),
+            "SFTP" => await _main.ServerList.ConnectionService.ConnectSftpAsync(runtimeProfile, settings),
+            "VNC" => await _main.ServerList.ConnectionService.ConnectVncAsync(runtimeProfile, settings),
+            "TELNET" => await _main.ServerList.ConnectionService.ConnectTelnetAsync(runtimeProfile, settings),
+            _ => await _main.ServerList.ConnectionService.ConnectSshAsync(runtimeProfile, settings),
+        };
+
+        if (result.Success && result.Session is not null)
+        {
+            SessionTabViewModel? tab = _main.Connection.AddSession(
+                runtimeProfile.Id,
+                runtimeProfile.DisplayName,
+                connectionType,
+                settings.MaxEmbeddedSessions);
+            if (tab is null)
+            {
+                SafeDisposeSessionResult(result.Session);
+                return;
+            }
+
+            tab.MarkAsAdHoc(snapshot);
+            tab.HostControl = _embeddedSessionManager.CreateHostControl(
+                tab,
+                runtimeProfile.DisplayName,
+                connectionType,
+                result.Session,
+                settings);
+            if (tab.HostControl is EmbeddedRdpView rdpView)
+            {
+                rdpView.SetOwningPane(tab.PrimaryPane);
+            }
+
+            tab.Status = _localizer["StatusConnected"];
+            _main.StatusText = _localizer.Format(
+                "StatusConnected",
+                !string.IsNullOrWhiteSpace(runtimeProfile.DisplayName)
+                    ? runtimeProfile.DisplayName
+                    : runtimeProfile.RemoteServer);
+            return;
+        }
+
+        if (result.Success)
+        {
+            SessionTabViewModel tab = _main.Connection.AddSession(
+                runtimeProfile.Id,
+                runtimeProfile.DisplayName,
+                connectionType);
+            tab.MarkAsAdHoc(snapshot);
+            tab.Status = _localizer["StatusLaunchedExternalClient"];
+            _main.StatusText = _localizer["StatusLaunchedExternalClient"];
+            return;
+        }
+
+        _main.StatusText = result.ErrorMessage ?? _localizer["ErrorConnectionFailed"];
+    }
+
+    private static ServerProfileDto CloneAdHocProfileForConnection(ServerProfileDto snapshot)
+    {
+        string serializedSnapshot = JsonSerializer.Serialize(snapshot);
+        ServerProfileDto runtimeProfile = JsonSerializer.Deserialize<ServerProfileDto>(serializedSnapshot)
+            ?? throw new InvalidOperationException("Ad-hoc profile snapshot could not be cloned.");
+        runtimeProfile.Id = SessionIdCodec.Create(snapshot.Id);
+        return runtimeProfile;
     }
 
     private async Task OnDisconnectRequestedAsync(

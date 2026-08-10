@@ -237,20 +237,7 @@ public sealed class SessionTabContextMenuFactory
         // Duplicate session: open a second tab for the same server while
         // keeping the current one. Distinct from "Reconnect".
         var duplicateItem = new MenuItem { Header = vm.Localize("SessionDuplicateTab") };
-        duplicateItem.Click += (_, _) =>
-        {
-            string lookupId = session.ProfileLookupServerId;
-
-            if (!string.IsNullOrEmpty(lookupId) && vm.ServerList.ConnectCommand is not null)
-            {
-                var serverVm = vm.ServerList.Servers.FirstOrDefault(
-                    s => string.Equals(s.Id, lookupId, StringComparison.Ordinal));
-                if (serverVm is not null)
-                {
-                    vm.ServerList.ConnectCommand.Execute(serverVm);
-                }
-            }
-        };
+        duplicateItem.Click += (_, _) => vm.Session.DuplicateSession(session);
         menu.Items.Add(duplicateItem);
 
         if (session.IsAdHoc && session.AdHocProfileSnapshot is not null)
