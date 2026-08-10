@@ -36,66 +36,116 @@ public sealed class RdpGatewayAttestationTests
     [Fact]
     public void Apply_InvalidGateway_ThrowsValidationFailure()
     {
-        var exception = Assert.Throws<RdpGatewayAttestationException>(
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
             () => RdpGatewayAttestation.Apply("invalid gateway!", new FakeSettings()));
 
         Assert.Equal(RdpGatewayAttestationStep.GatewayValidation, exception.Step);
+        Assert.Empty(exception.DivergentProperties);
     }
 
     [Fact]
     public void Apply_NullSettings_ThrowsAvailabilityFailure()
     {
-        var exception = Assert.Throws<RdpGatewayAttestationException>(
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
             () => RdpGatewayAttestation.Apply("gateway.example.com", null));
 
         Assert.Equal(RdpGatewayAttestationStep.SettingsAvailability, exception.Step);
+        Assert.Empty(exception.DivergentProperties);
     }
 
     [Fact]
     public void Apply_WriteThrows_ThrowsWriteFailure()
     {
-        var settings = new FakeSettings { ThrowOnWrite = true };
+        FakeSettings settings = new() { ThrowOnWrite = true };
 
-        var exception = Assert.Throws<RdpGatewayAttestationException>(
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
             () => RdpGatewayAttestation.Apply("gateway.example.com", settings));
 
         Assert.Equal(RdpGatewayAttestationStep.SettingsWrite, exception.Step);
+        Assert.Empty(exception.DivergentProperties);
     }
 
     [Fact]
     public void Apply_ReadBackThrows_ThrowsReadBackFailure()
     {
-        var settings = new FakeSettings { ThrowOnRead = true };
+        FakeSettings settings = new() { ThrowOnRead = true };
 
-        var exception = Assert.Throws<RdpGatewayAttestationException>(
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
             () => RdpGatewayAttestation.Apply("gateway.example.com", settings));
 
         Assert.Equal(RdpGatewayAttestationStep.SettingsReadBack, exception.Step);
+        Assert.Empty(exception.DivergentProperties);
     }
 
     [Fact]
     public void Apply_HostnameMismatch_ThrowsComparisonFailure()
     {
-        var settings = new FakeSettings { ReadGatewayHostname = "other.example.com" };
+        FakeSettings settings = new() { ReadGatewayHostname = "other.example.com" };
 
-        var exception = Assert.Throws<RdpGatewayAttestationException>(
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
             () => RdpGatewayAttestation.Apply("gateway.example.com", settings));
 
         Assert.Equal(RdpGatewayAttestationStep.SettingsComparison, exception.Step);
+        Assert.Equal(
+            new[] { RdpGatewayAttestationProperty.GatewayHostname },
+            exception.DivergentProperties);
     }
 
     [Theory]
-    [InlineData(nameof(IRdpGatewayTransportSettings.GatewayUsageMethod))]
-    [InlineData(nameof(IRdpGatewayTransportSettings.GatewayProfileUsageMethod))]
-    [InlineData(nameof(IRdpGatewayTransportSettings.GatewayCredsSource))]
-    public void Apply_NumericMismatch_ThrowsComparisonFailure(string propertyName)
+    [InlineData(
+        nameof(IRdpGatewayTransportSettings.GatewayUsageMethod),
+        RdpGatewayAttestationProperty.GatewayUsageMethod)]
+    [InlineData(
+        nameof(IRdpGatewayTransportSettings.GatewayProfileUsageMethod),
+        RdpGatewayAttestationProperty.GatewayProfileUsageMethod)]
+    [InlineData(
+        nameof(IRdpGatewayTransportSettings.GatewayCredsSource),
+        RdpGatewayAttestationProperty.GatewayCredsSource)]
+    public void Apply_NumericMismatch_ThrowsComparisonFailure(
+        string propertyName,
+        RdpGatewayAttestationProperty expectedProperty)
     {
-        var settings = new FakeSettings { MismatchedNumericProperty = propertyName };
+        FakeSettings settings = new()
+        {
+            MismatchedNumericProperties = new HashSet<string>(StringComparer.Ordinal) { propertyName }
+        };
 
-        var exception = Assert.Throws<RdpGatewayAttestationException>(
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
             () => RdpGatewayAttestation.Apply("gateway.example.com", settings));
 
         Assert.Equal(RdpGatewayAttestationStep.SettingsComparison, exception.Step);
+        Assert.Equal(new[] { expectedProperty }, exception.DivergentProperties);
+    }
+
+    [Fact]
+    public void Apply_MultipleMismatches_ReportsEveryPropertyInDeclarationOrder()
+    {
+        FakeSettings settings = new()
+        {
+            ReadGatewayHostname = "other.example.com",
+            MismatchedNumericProperties = new HashSet<string>(StringComparer.Ordinal)
+            {
+                nameof(IRdpGatewayTransportSettings.GatewayCredsSource),
+                nameof(IRdpGatewayTransportSettings.GatewayProfileUsageMethod),
+                nameof(IRdpGatewayTransportSettings.GatewayUsageMethod)
+            }
+        };
+
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
+            () => RdpGatewayAttestation.Apply("gateway.example.com", settings));
+
+        RdpGatewayAttestationProperty[] expectedProperties =
+        [
+            RdpGatewayAttestationProperty.GatewayHostname,
+            RdpGatewayAttestationProperty.GatewayUsageMethod,
+            RdpGatewayAttestationProperty.GatewayProfileUsageMethod,
+            RdpGatewayAttestationProperty.GatewayCredsSource
+        ];
+        Assert.Equal(expectedProperties, exception.DivergentProperties);
+        Assert.Contains(
+            "(divergent: GatewayHostname, GatewayUsageMethod, GatewayProfileUsageMethod, GatewayCredsSource).",
+            exception.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -126,7 +176,8 @@ public sealed class RdpGatewayAttestationTests
 
         public string? ReadGatewayHostname { get; init; }
 
-        public string? MismatchedNumericProperty { get; init; }
+        public IReadOnlySet<string> MismatchedNumericProperties { get; init; } =
+            new HashSet<string>(StringComparer.Ordinal);
 
         public int AccessCount { get; private set; }
 
@@ -157,7 +208,7 @@ public sealed class RdpGatewayAttestationTests
             get
             {
                 OnRead();
-                return MismatchedNumericProperty == nameof(GatewayUsageMethod)
+                return MismatchedNumericProperties.Contains(nameof(GatewayUsageMethod))
                     ? 2L
                     : Convert.ToInt64(_gatewayUsageMethod);
             }
@@ -173,7 +224,7 @@ public sealed class RdpGatewayAttestationTests
             get
             {
                 OnRead();
-                return MismatchedNumericProperty == nameof(GatewayProfileUsageMethod)
+                return MismatchedNumericProperties.Contains(nameof(GatewayProfileUsageMethod))
                     ? 2L
                     : Convert.ToInt64(_gatewayProfileUsageMethod);
             }
@@ -189,7 +240,7 @@ public sealed class RdpGatewayAttestationTests
             get
             {
                 OnRead();
-                return MismatchedNumericProperty == nameof(GatewayCredsSource)
+                return MismatchedNumericProperties.Contains(nameof(GatewayCredsSource))
                     ? 1L
                     : Convert.ToInt64(_gatewayCredsSource);
             }

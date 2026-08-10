@@ -152,6 +152,32 @@ public sealed class RdpHandlerTests
     }
 
     [Fact]
+    public async Task ConnectAsync_ForceExternalInvalidGatewayReturnsLocalizedAttestationErrorWithoutLaunching()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher();
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        RdpHandler handler = CreateHandler(new PassThroughTunnelService(), localizer, launcher);
+        ServerProfileDto server = CreateServer("Embedded");
+        server.RdpGateway = "invalid gateway!";
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.False(result.Success);
+        Assert.Equal(localizer["RdpGatewayAttestationFailed"], result.ErrorMessage);
+        Assert.Equal(0, launcher.LaunchCalls);
+    }
+
+    [Fact]
     public async Task ConnectAsync_ForeignCredential_ContinuesWithNoticeWithoutWriteOrDelete()
     {
         TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher

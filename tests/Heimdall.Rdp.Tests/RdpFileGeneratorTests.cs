@@ -163,29 +163,57 @@ public class RdpFileGeneratorTests
     [Fact]
     public void Generate_WithGateway_IncludesGatewaySettings()
     {
-        var options = new RdpFileOptions
+        RdpFileOptions options = new()
         {
             Host = "srv",
             GatewayHostname = "gw.example.com"
         };
 
-        var content = RdpFileGenerator.Generate(options);
+        string content = RdpFileGenerator.Generate(options);
 
-        Assert.Contains("gatewayusagemethod:i:1", content);
-        Assert.Contains("gatewayprofileusagemethod:i:1", content);
-        Assert.Contains("gatewayhostname:s:gw.example.com", content);
-        Assert.Contains("gatewaycredentialssource:i:0", content);
+        Assert.Contains("gatewayusagemethod:i:1\r\n", content, StringComparison.Ordinal);
+        Assert.Contains("gatewayprofileusagemethod:i:1\r\n", content, StringComparison.Ordinal);
+        Assert.Contains("gatewayhostname:s:gw.example.com\r\n", content, StringComparison.Ordinal);
+        Assert.Contains("gatewaycredentialssource:i:0\r\n", content, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Generate_WithoutGateway_DisablesGateway()
+    public void Generate_InvalidGateway_ThrowsValidationFailure()
     {
-        var options = new RdpFileOptions { Host = "srv" };
+        RdpFileOptions options = new() { Host = "srv", GatewayHostname = "invalid gateway!" };
 
-        var content = RdpFileGenerator.Generate(options);
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
+            () => RdpFileGenerator.Generate(options));
 
-        Assert.Contains("gatewayusagemethod:i:0", content);
-        Assert.DoesNotContain("gatewayhostname:s:", content);
+        Assert.Equal("invalid gateway!", exception.GatewayHost);
+        Assert.Equal(RdpGatewayAttestationStep.GatewayValidation, exception.Step);
+        Assert.Empty(exception.DivergentProperties);
+    }
+
+    [Fact]
+    public void Generate_EmptyGateway_DisablesGatewayWithoutOtherGatewaySettings()
+    {
+        RdpFileOptions options = new() { Host = "srv", GatewayHostname = string.Empty };
+
+        string content = RdpFileGenerator.Generate(options);
+
+        Assert.Contains("gatewayusagemethod:i:0\r\n", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatewayprofileusagemethod:i:", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatewayhostname:s:", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatewaycredentialssource:i:", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_NullGateway_DisablesGateway()
+    {
+        RdpFileOptions options = new() { Host = "srv", GatewayHostname = null };
+
+        string content = RdpFileGenerator.Generate(options);
+
+        Assert.Contains("gatewayusagemethod:i:0\r\n", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatewayprofileusagemethod:i:", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatewayhostname:s:", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatewaycredentialssource:i:", content, StringComparison.Ordinal);
     }
 
     // ── Redirection options ───────────────────────────────────────────

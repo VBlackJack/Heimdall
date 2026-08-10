@@ -401,6 +401,15 @@ internal sealed class RdpHandler : IProtocolHandler
 
             return new ConnectionResult(true, null, null, Warning: warning);
         }
+        catch (Heimdall.Rdp.RdpGatewayAttestationException gex)
+        {
+            Core.Logging.FileLogger.Error("RDP gateway attestation failed", gex);
+            return new ConnectionResult(
+                false,
+                _localizer["RdpGatewayAttestationFailed"],
+                null,
+                RdpSessionDiagnosticFactory.FromGenericException(gex));
+        }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Error("RDP launch failed", ex);

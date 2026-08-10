@@ -165,9 +165,15 @@ public static class RdpFileGenerator
         }
 
         // RD Gateway — validate hostname before writing to .rdp file
-        if (!string.IsNullOrWhiteSpace(options.GatewayHostname)
-            && Core.Security.InputValidator.Validate(options.GatewayHostname, "Address"))
+        if (!string.IsNullOrWhiteSpace(options.GatewayHostname))
         {
+            if (!Core.Security.InputValidator.Validate(options.GatewayHostname, "Address"))
+            {
+                throw new RdpGatewayAttestationException(
+                    options.GatewayHostname,
+                    RdpGatewayAttestationStep.GatewayValidation);
+            }
+
             sb.AppendLine("gatewayusagemethod:i:1");
             sb.AppendLine("gatewayprofileusagemethod:i:1");
             AppendSanitized(sb, "gatewayhostname:s:", options.GatewayHostname);

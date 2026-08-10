@@ -119,12 +119,33 @@ internal static class RdpGatewayAttestation
             throw CreateFailure(gatewayHost, RdpGatewayAttestationStep.SettingsReadBack, ex);
         }
 
-        if (!string.Equals(readGatewayHost, gatewayHost, StringComparison.Ordinal)
-            || readUsageMethod != GatewayUsageMethod
-            || readProfileUsageMethod != GatewayProfileUsageMethod
-            || readCredsSource != GatewayCredsSource)
+        List<RdpGatewayAttestationProperty> divergentProperties = [];
+        if (!string.Equals(readGatewayHost, gatewayHost, StringComparison.Ordinal))
         {
-            throw CreateFailure(gatewayHost, RdpGatewayAttestationStep.SettingsComparison);
+            divergentProperties.Add(RdpGatewayAttestationProperty.GatewayHostname);
+        }
+
+        if (readUsageMethod != GatewayUsageMethod)
+        {
+            divergentProperties.Add(RdpGatewayAttestationProperty.GatewayUsageMethod);
+        }
+
+        if (readProfileUsageMethod != GatewayProfileUsageMethod)
+        {
+            divergentProperties.Add(RdpGatewayAttestationProperty.GatewayProfileUsageMethod);
+        }
+
+        if (readCredsSource != GatewayCredsSource)
+        {
+            divergentProperties.Add(RdpGatewayAttestationProperty.GatewayCredsSource);
+        }
+
+        if (divergentProperties.Count > 0)
+        {
+            throw new RdpGatewayAttestationException(
+                gatewayHost,
+                RdpGatewayAttestationStep.SettingsComparison,
+                divergentProperties);
         }
     }
 
