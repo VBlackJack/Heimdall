@@ -148,6 +148,40 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task CollapseGroup_PurgesHiddenSelectionAndKeepsVisiblePrimaryAnchorAndBulkContext()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("root", "root/hidden", "root/visible"),
+            CreateServer("hidden", "Hidden", "root/hidden"),
+            CreateServer("visible-a", "Visible A", "root/visible"),
+            CreateServer("visible-b", "Visible B", "root/visible"));
+        ServerItemViewModel hidden = fixture.ServerById("hidden");
+        ServerItemViewModel visibleA = fixture.ServerById("visible-a");
+        ServerItemViewModel visibleB = fixture.ServerById("visible-b");
+        fixture.ViewModel.SelectSingle(hidden);
+        fixture.ViewModel.ToggleSelection(visibleA);
+        fixture.ViewModel.ToggleSelection(visibleB);
+
+        fixture.CollapseGroup("root/hidden");
+
+        AssertSelection(fixture.ViewModel, "visible-a", "visible-b");
+        Assert.False(hidden.IsSelected);
+        Assert.Same(visibleB, fixture.ViewModel.SelectedServer);
+        BulkSelectionContext bulkContext = Assert.IsType<BulkSelectionContext>(
+            fixture.ViewModel.CreateBulkSelectionContext());
+        Assert.Equal(
+            ["visible-a", "visible-b"],
+            bulkContext.Items.Select(item => item.Id).OrderBy(id => id, StringComparer.Ordinal));
+        Assert.Same(visibleB, bulkContext.Primary);
+
+        fixture.ViewModel.ExtendSelectionTo(visibleA);
+
+        AssertSelection(fixture.ViewModel, "visible-a", "visible-b");
+        Assert.Same(visibleA, fixture.ViewModel.SelectedServer);
+    }
+
+    [Fact]
     public async Task SearchFilter_PurgesInvisibleSelectionsAndKeepsVisiblePrimary()
     {
         var timeProvider = new FakeTimeProvider();

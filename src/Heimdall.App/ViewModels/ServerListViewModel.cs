@@ -1809,6 +1809,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         else
         {
             _expandedNodes.Remove(key);
+            SynchronizeSelection(null);
         }
 
         ScheduleExpandStateSave();
@@ -1892,9 +1893,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
     private void SynchronizeSelection(string? preferredSelectedServerId)
     {
+        List<ServerItemViewModel> visibleLeaves = SelectionHelpers
+            .EnumerateVisibleLeaves(GroupedServers)
+            .ToList();
+
         if (!string.IsNullOrWhiteSpace(preferredSelectedServerId))
         {
-            var preferred = Servers.FirstOrDefault(
+            ServerItemViewModel? preferred = visibleLeaves.FirstOrDefault(
                 server => string.Equals(server.Id, preferredSelectedServerId, StringComparison.Ordinal));
 
             if (preferred is not null)
@@ -1905,7 +1910,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         }
 
         var visibleSelection = SelectedItems
-            .Where(Servers.Contains)
+            .Where(visibleLeaves.Contains)
             .ToList();
 
         if (visibleSelection.Count == 0)
