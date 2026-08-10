@@ -193,6 +193,39 @@ public class MigrationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportFromLegacyAsync_PreservesEncryptedSshPasswordAndMacAddressExactly()
+    {
+        const string LegacySshPassword = "AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAA|opaque==";
+        const string LegacyMacAddress = "AA:bb:CC:dd:EE:fF";
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");
+        WriteLegacyFile(Path.Combine("config", "servers.json"),
+            $$"""
+            [
+              {
+                "Id": "srv-sensitive-fields",
+                "DisplayName": "Legacy SSH",
+                "RemoteServer": "10.0.0.3",
+                "ConnectionType": "SSH",
+                "SshPasswordEncrypted": "{{LegacySshPassword}}",
+                "MacAddress": "{{LegacyMacAddress}}"
+              }
+            ]
+            """);
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, result.ServersImported);
+        Assert.Empty(result.Warnings);
+
+        List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+        ServerProfileDto imported = Assert.Single(servers);
+        Assert.Equal(LegacySshPassword, imported.SshPasswordEncrypted);
+        Assert.Equal(LegacyMacAddress, imported.MacAddress);
+    }
+
+    [Fact]
     public async Task ImportFromLegacyAsync_Empty_Server_Array_Reports_Zero_Imported()
     {
         WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");

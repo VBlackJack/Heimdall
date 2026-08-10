@@ -288,7 +288,7 @@ public sealed class MigrationService
         MapBool(legacy, "SshCompression", v => dto.SshCompression = v);
         MapBool(legacy, "SshX11Forwarding", v => dto.SshX11Forwarding = v);
         MapNullableString(legacy, "SshPasswordEncrypted",
-            v => { /* SshPasswordEncrypted not in ServerProfileDto; skip */ });
+            v => dto.SshPasswordEncrypted = v);
 
         // RDP display settings
         MapBool(legacy, "RdpAntiIdle", v => dto.RdpAntiIdle = v);
@@ -320,10 +320,7 @@ public sealed class MigrationService
 
         // Metadata
         MapNullableString(legacy, "Environment", v => dto.Environment = v);
-        MapNullableString(legacy, "MacAddress", v =>
-        {
-            /* MacAddress not in ServerProfileDto; skip gracefully */
-        });
+        MapNullableString(legacy, "MacAddress", v => dto.MacAddress = v);
 
         return dto;
     }
