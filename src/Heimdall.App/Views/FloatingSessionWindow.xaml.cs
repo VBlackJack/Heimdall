@@ -101,10 +101,7 @@ public partial class FloatingSessionWindow : Window
         // Detach the host control from this window first (UIElement single-parent rule)
         SessionHost.Content = null;
 
-        // Re-add the session to the main window's active sessions
-        vm.Connection.ActiveSessions.Add(_session);
-        vm.Connection.ActiveSession = _session;
-        vm.Connection.HasActiveSessions = vm.Connection.ActiveSessions.Count > 0;
+        RestoreSession(vm);
 
         Heimdall.Core.Logging.FileLogger.Info(
             string.Format(_localizer["LogSessionReattached"], _session.Title));
@@ -123,9 +120,8 @@ public partial class FloatingSessionWindow : Window
                 // Detach host control from this window before ConnectionViewModel disposes it
                 SessionHost.Content = null;
 
-                // Temporarily add the session back so CloseSession can clean up state machine,
-                // tunnels, and connection history
-                vm.Connection.ActiveSessions.Add(_session);
+                // Restore the session before CloseSession prompts so a declined close keeps it visible.
+                RestoreSession(vm);
                 vm.Connection.CloseSessionCommand.Execute(_session);
             }
             else
@@ -142,6 +138,17 @@ public partial class FloatingSessionWindow : Window
 
         _localizer.LocaleChanged -= OnLocaleChanged;
         base.OnClosed(e);
+    }
+
+    private void RestoreSession(MainViewModel vm)
+    {
+        if (!vm.Connection.ActiveSessions.Contains(_session))
+        {
+            vm.Connection.ActiveSessions.Add(_session);
+        }
+
+        vm.Connection.ActiveSession = _session;
+        vm.Connection.HasActiveSessions = vm.Connection.ActiveSessions.Count > 0;
     }
 
     private void OnLocaleChanged(string _)
