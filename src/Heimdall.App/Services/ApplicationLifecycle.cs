@@ -22,7 +22,26 @@ namespace Heimdall.App.Services;
 /// </summary>
 internal sealed class ApplicationLifecycle : IApplicationLifecycle
 {
-    public void RequestShutdown() =>
-        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-            System.Windows.Application.Current.Shutdown());
+    public void RequestShutdown()
+    {
+        System.Windows.Application? application = System.Windows.Application.Current;
+        application?.Dispatcher.Invoke(() => RunShutdownSequence(
+            () =>
+            {
+                if (application is Heimdall.App.App app)
+                {
+                    app.IsShuttingDown = true;
+                }
+            },
+            application.Shutdown));
+    }
+
+    internal static void RunShutdownSequence(Action markShutdownConfirmed, Action requestShutdown)
+    {
+        ArgumentNullException.ThrowIfNull(markShutdownConfirmed);
+        ArgumentNullException.ThrowIfNull(requestShutdown);
+
+        markShutdownConfirmed();
+        requestShutdown();
+    }
 }

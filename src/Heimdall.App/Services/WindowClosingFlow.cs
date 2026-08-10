@@ -31,8 +31,28 @@ internal static class WindowClosingFlow
         Func<Task> persistWindowStateAsync,
         Action warnSaveFailed)
     {
+        return await TryPrepareCloseAsync(
+            settingsDirty,
+            connectedSessionCount: 0,
+            promptSaveDiscardCancelAsync,
+            trySaveSettingsAsync,
+            () => Task.FromResult(true),
+            persistWindowStateAsync,
+            warnSaveFailed);
+    }
+
+    internal static async Task<bool> TryPrepareCloseAsync(
+        bool settingsDirty,
+        int connectedSessionCount,
+        Func<Task<bool?>> promptSaveDiscardCancelAsync,
+        Func<Task<bool>> trySaveSettingsAsync,
+        Func<Task<bool>> promptCloseConnectedSessionsAsync,
+        Func<Task> persistWindowStateAsync,
+        Action warnSaveFailed)
+    {
         ArgumentNullException.ThrowIfNull(promptSaveDiscardCancelAsync);
         ArgumentNullException.ThrowIfNull(trySaveSettingsAsync);
+        ArgumentNullException.ThrowIfNull(promptCloseConnectedSessionsAsync);
         ArgumentNullException.ThrowIfNull(persistWindowStateAsync);
         ArgumentNullException.ThrowIfNull(warnSaveFailed);
 
@@ -56,6 +76,22 @@ internal static class WindowClosingFlow
         catch (Exception ex)
         {
             FileLogger.Error("Main window close preparation failed", ex);
+        }
+
+        if (connectedSessionCount > 0)
+        {
+            try
+            {
+                if (!await promptCloseConnectedSessionsAsync())
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Error("Main window session close confirmation failed", ex);
+                return false;
+            }
         }
 
         try

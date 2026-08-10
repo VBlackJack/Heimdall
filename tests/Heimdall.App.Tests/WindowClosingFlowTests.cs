@@ -22,6 +22,76 @@ namespace Heimdall.App.Tests;
 public sealed class WindowClosingFlowTests
 {
     [Fact]
+    public async Task Close_ConnectedSessions_UserDeclines_StaysOpenBeforePersistence()
+    {
+        int sessionPromptCount = 0;
+        int windowStateSaveCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: false,
+            connectedSessionCount: 2,
+            () => throw new InvalidOperationException("Settings prompt must not run."),
+            () => throw new InvalidOperationException("Settings save must not run."),
+            () =>
+            {
+                sessionPromptCount++;
+                return Task.FromResult(false);
+            },
+            () =>
+            {
+                windowStateSaveCount++;
+                return Task.CompletedTask;
+            },
+            () => throw new InvalidOperationException("Warning must not run."));
+
+        Assert.False(canClose);
+        Assert.Equal(1, sessionPromptCount);
+        Assert.Equal(0, windowStateSaveCount);
+    }
+
+    [Fact]
+    public async Task Close_DirtySettingsAndConnectedSessions_UsesDeterministicPromptOrder()
+    {
+        List<string> steps = [];
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: true,
+            connectedSessionCount: 1,
+            () =>
+            {
+                steps.Add("settings");
+                return Task.FromResult<bool?>(false);
+            },
+            () => throw new InvalidOperationException("Discard must not save settings."),
+            () =>
+            {
+                steps.Add("sessions");
+                return Task.FromResult(true);
+            },
+            () =>
+            {
+                steps.Add("window-state");
+                return Task.CompletedTask;
+            },
+            () => throw new InvalidOperationException("Warning must not run."));
+
+        Assert.True(canClose);
+        Assert.Equal(["settings", "sessions", "window-state"], steps);
+    }
+
+    [Fact]
+    public void UpdateShutdown_MarksConfirmedBeforeRequest_ExactlyOnce()
+    {
+        List<string> steps = [];
+
+        ApplicationLifecycle.RunShutdownSequence(
+            () => steps.Add("confirmed"),
+            () => steps.Add("shutdown"));
+
+        Assert.Equal(["confirmed", "shutdown"], steps);
+    }
+
+    [Fact]
     public async Task Close_CleanSettings_WindowStateSaveThrows_StillCloses_NoWarning()
     {
         var promptCount = 0;

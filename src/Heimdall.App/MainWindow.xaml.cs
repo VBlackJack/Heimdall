@@ -3205,6 +3205,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         if (DataContext is not MainViewModel vm) return;
 
+        if (Application.Current is Heimdall.App.App { IsShuttingDown: true })
+        {
+            return;
+        }
+
         if (_closeConfirmed)
         {
             // This window will close on the current pass. Arm the shutdown guard
@@ -3231,12 +3236,25 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             string warningTitle = vm.Localize("SettingsCloseSaveFailedTitle");
             string warningMessage = vm.Localize("SettingsCloseSaveFailedMessage");
+            int connectedSessionCount = vm.Connection.ActiveSessions.Count(session =>
+                Heimdall.Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
+                    .Any(pane => string.Equals(
+                        pane.Status,
+                        "Connected",
+                        StringComparison.Ordinal)));
             bool prepared = await WindowClosingFlow.TryPrepareCloseAsync(
                 vm.Settings.IsDirty,
+                connectedSessionCount,
                 () => vm.DialogService.ShowSaveDiscardCancelAsync(
                     vm.Localize("SettingsUnsavedWarningTitle"),
                     vm.Localize("SettingsUnsavedWarning")),
                 () => vm.Settings.TrySaveAsync(),
+                () => vm.DialogService.ShowConfirmAsync(
+                    vm.Localize("ConfirmCloseAllTabs"),
+                    string.Format(
+                        vm.Localize("ConfirmCloseAllTabsMessage"),
+                        connectedSessionCount),
+                    "warning"),
                 () => SaveWindowBoundsAsync(vm),
                 () => vm.DialogService.ShowWarning(warningTitle, warningMessage));
 
