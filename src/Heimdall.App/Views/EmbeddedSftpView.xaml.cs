@@ -921,7 +921,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
             if (!useSudo)
             {
-                string content = await File.ReadAllTextAsync(localPath);
+                RemoteTextDocument document = await RemoteTextFileCodec.ReadAsync(localPath);
+                string content = document.Text;
                 var remotePath = file.FullPath;
 
                 // Open in embedded AvalonEdit editor
@@ -939,7 +940,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                     {
                         try
                         {
-                            await File.WriteAllTextAsync(localPath, savedContent);
+                            await RemoteTextFileCodec.WriteAsync(localPath, savedContent, document);
                         }
                         catch (Exception localWriteEx)
                         {
