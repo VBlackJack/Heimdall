@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
 using Heimdall.App.Theming;
@@ -54,14 +55,12 @@ public partial class FloatingSessionWindow : Window
 
         // Re-apply localized strings when language changes at runtime
         _localizer.LocaleChanged += OnLocaleChanged;
+        _session.PropertyChanged += OnSessionPropertyChanged;
     }
 
     private void ApplySessionInfo()
     {
-        Title = string.Format(_localizer["SessionDetachTitle"], _session.Title);
-        SessionTitle.Text = _session.Title;
-        StatusText.Text = _session.Status;
-        TunnelRouteText.Text = _session.TunnelRoute;
+        ApplyWindowTitle();
         ReattachButton.Content = _localizer["SessionCtxReattach"];
         System.Windows.Automation.AutomationProperties.SetName(ReattachButton, _localizer["SessionCtxReattach"]);
 
@@ -136,6 +135,7 @@ public partial class FloatingSessionWindow : Window
             }
         }
 
+        _session.PropertyChanged -= OnSessionPropertyChanged;
         _localizer.LocaleChanged -= OnLocaleChanged;
         base.OnClosed(e);
     }
@@ -151,11 +151,33 @@ public partial class FloatingSessionWindow : Window
         vm.Connection.HasActiveSessions = vm.Connection.ActiveSessions.Count > 0;
     }
 
+    private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(e.PropertyName)
+            && e.PropertyName != nameof(SessionTabViewModel.Title))
+        {
+            return;
+        }
+
+        if (Dispatcher.CheckAccess())
+        {
+            ApplyWindowTitle();
+            return;
+        }
+
+        Dispatcher.BeginInvoke(new Action(ApplyWindowTitle));
+    }
+
+    private void ApplyWindowTitle()
+    {
+        Title = string.Format(_localizer["SessionDetachTitle"], _session.Title);
+    }
+
     private void OnLocaleChanged(string _)
     {
         Dispatcher.Invoke(() =>
         {
-            Title = string.Format(_localizer["SessionDetachTitle"], _session.Title);
+            ApplyWindowTitle();
             ReattachButton.Content = _localizer["SessionCtxReattach"];
             System.Windows.Automation.AutomationProperties.SetName(
                 ReattachButton, _localizer["SessionCtxReattach"]);

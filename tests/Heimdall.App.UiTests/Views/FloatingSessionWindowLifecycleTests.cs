@@ -18,6 +18,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.UiTests.Infrastructure;
 using Heimdall.App.ViewModels;
@@ -28,6 +29,57 @@ namespace Heimdall.App.UiTests.Views;
 [Collection(DesktopUiCollection.Name)]
 public sealed class FloatingSessionWindowLifecycleTests
 {
+    [StaFact]
+    [Trait("Category", "RequiresDesktop")]
+    public void Header_WhenSessionChangesAfterConstruction_TracksLiveSessionState()
+    {
+        WpfTestHost.Invoke(() =>
+        {
+            const string InitialTitle = "Initial session";
+            const string UpdatedTitle = "Updated session";
+            const string InitialStatus = "Connecting";
+            const string UpdatedStatus = "Error";
+            const string InitialTunnelRoute = "via gateway-a";
+            const string UpdatedTunnelRoute = "via gateway-b";
+            SessionTabViewModel session = new()
+            {
+                Title = InitialTitle,
+                ConnectionType = "SSH",
+                Status = InitialStatus,
+                TunnelRoute = InitialTunnelRoute,
+                HostControl = new Border()
+            };
+            FloatingSessionWindow window = new(session, WpfTestHost.Localizer);
+            TextBlock sessionTitle = Assert.IsType<TextBlock>(window.FindName("SessionTitle"));
+            TextBlock statusText = Assert.IsType<TextBlock>(window.FindName("StatusText"));
+            TextBlock tunnelRouteText = Assert.IsType<TextBlock>(window.FindName("TunnelRouteText"));
+
+            try
+            {
+                FlushDispatcher();
+                Assert.Equal(InitialTitle, sessionTitle.Text);
+                Assert.Equal(InitialStatus, statusText.Text);
+                Assert.Equal(InitialTunnelRoute, tunnelRouteText.Text);
+
+                session.Title = UpdatedTitle;
+                session.Status = UpdatedStatus;
+                session.TunnelRoute = UpdatedTunnelRoute;
+                FlushDispatcher();
+
+                Assert.Equal(UpdatedTitle, sessionTitle.Text);
+                Assert.Equal(UpdatedStatus, statusText.Text);
+                Assert.Equal(UpdatedTunnelRoute, tunnelRouteText.Text);
+                Assert.Equal(
+                    string.Format(WpfTestHost.Localizer["SessionDetachTitle"], UpdatedTitle),
+                    window.Title);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
     [StaFact]
     [Trait("Category", "RequiresDesktop")]
     public void Close_WhenConnectedCloseIsDeclined_RestoresVisibleActiveSessionOnce()
@@ -133,6 +185,11 @@ public sealed class FloatingSessionWindowLifecycleTests
         Assert.NotNull(connectionField);
         connectionField.SetValue(main, connection);
         return main;
+    }
+
+    private static void FlushDispatcher()
+    {
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
     }
 
     private sealed class DecliningDialogProxy

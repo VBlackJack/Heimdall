@@ -31,23 +31,24 @@
                         Style="{DynamicResource SecondaryButtonStyle}"/>
 
                 <!-- Left: Connection type icon + title -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                            DataContext="{Binding Session, RelativeSource={RelativeSource AncestorType=Window}}">
                     <Path x:Name="TypeIcon"
                           Style="{StaticResource GeoIconSmall}"
                           Fill="{DynamicResource InfoBrush}"
                           VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <TextBlock x:Name="SessionTitle" Text=""
+                    <TextBlock x:Name="SessionTitle" Text="{Binding Title, Mode=OneWay}"
                                FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="StatusText" Text=""
+                    <TextBlock x:Name="StatusText" Text="{Binding Status, Mode=OneWay}"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"/>
-                    <TextBlock x:Name="TunnelRouteText" Text=""
+                    <TextBlock x:Name="TunnelRouteText" Text="{Binding TunnelRoute, Mode=OneWay}"
                                FontSize="{StaticResource FontSizeSmallCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center" Margin="6,0,0,0"/>
