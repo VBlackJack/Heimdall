@@ -22,6 +22,13 @@ using Heimdall.Core.Logging;
 
 namespace Heimdall.App.Tests;
 
+[CollectionDefinition(Name)]
+public sealed class DialogVerifierFileLoggerCollection
+{
+    public const string Name = "DialogVerifierFileLogger";
+}
+
+[Collection(DialogVerifierFileLoggerCollection.Name)]
 public sealed class DialogFtpsCertificateVerifierTests
 {
     [Fact]

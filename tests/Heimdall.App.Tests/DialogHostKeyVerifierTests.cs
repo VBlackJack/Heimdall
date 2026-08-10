@@ -22,6 +22,7 @@ using Heimdall.Core.Ssh;
 
 namespace Heimdall.App.Tests;
 
+[Collection(DialogVerifierFileLoggerCollection.Name)]
 public sealed class DialogHostKeyVerifierTests
 {
     [Fact]
