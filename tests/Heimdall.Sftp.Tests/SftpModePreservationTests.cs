@@ -41,13 +41,51 @@ public sealed class SftpModePreservationTests
     }
 
     [Fact]
-    public void ShouldRefuseCommitAfterApplyFailure_ReturnsFalse_WhenTempIsMoreRestrictive()
+    public void ShouldRefuseCommitAfterApplyFailure_ReturnsTrue_WhenTempIsMoreRestrictive()
     {
         bool shouldRefuse = SftpModePreservation.ShouldRefuseCommitAfterApplyFailure(
-            targetPermissions: 0x1A4,
+            targetPermissions: 0x1ED,
             tempPermissions: 0x180);
 
-        Assert.False(shouldRefuse);
+        Assert.True(shouldRefuse);
+    }
+
+    [Fact]
+    public void ApplyUploadModeBeforeCommit_RefusesCommitAndLeavesExistingFinalUntouched_WhenApplyFails()
+    {
+        const string FinalRemotePath = "/srv/app.sh";
+        const string TempRemotePath = "/srv/.app.sh.heimdall.part";
+        Dictionary<string, string> remoteFiles = new(StringComparer.Ordinal)
+        {
+            [FinalRemotePath] = "old-content",
+            [TempRemotePath] = "new-content",
+        };
+        bool commitCalled = false;
+
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            SftpBrowser.ApplyUploadModeBeforeCommit(
+                FinalRemotePath,
+                targetPermissions: 0x1ED,
+                tempPermissions: 0x180,
+                applyMode: _ => throw new IOException("SetAttributes refused."));
+            commitCalled = true;
+            SftpAtomicUpload.CommitRename(
+                TempRemotePath,
+                FinalRemotePath,
+                atomicRename: (source, destination) =>
+                {
+                    remoteFiles[destination] = remoteFiles[source];
+                    remoteFiles.Remove(source);
+                },
+                plainRename: (_, _) => throw new InvalidOperationException("Fallback was not expected."),
+                remoteExists: remoteFiles.ContainsKey,
+                deleteRemote: path => remoteFiles.Remove(path));
+        });
+
+        Assert.False(commitCalled);
+        Assert.Equal("old-content", remoteFiles[FinalRemotePath]);
+        Assert.Equal("new-content", remoteFiles[TempRemotePath]);
     }
 
     [Fact]

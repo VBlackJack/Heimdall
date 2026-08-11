@@ -990,6 +990,27 @@ public sealed class SftpBrowser : IRemoteBrowser
         SftpFileAttributes tempAttributes = client.GetAttributes(tempRemotePath);
         uint targetPermissions = GetPermissionMode(targetAttributes);
         uint tempPermissions = GetPermissionMode(tempAttributes);
+
+        ApplyUploadModeBeforeCommit(
+            finalRemotePath,
+            targetPermissions,
+            tempPermissions,
+            modeToApply =>
+            {
+                ApplyPermissionMode(tempAttributes, modeToApply);
+                client.SetAttributes(tempRemotePath, tempAttributes);
+            });
+    }
+
+    internal static void ApplyUploadModeBeforeCommit(
+        string finalRemotePath,
+        uint targetPermissions,
+        uint tempPermissions,
+        Action<uint> applyMode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
+        ArgumentNullException.ThrowIfNull(applyMode);
+
         uint? modeToApply = SftpModePreservation.ResolveModeToApply(
             targetPermissions,
             tempPermissions);
@@ -998,11 +1019,9 @@ public sealed class SftpBrowser : IRemoteBrowser
             return;
         }
 
-        ApplyPermissionMode(tempAttributes, modeToApply.Value);
-
         try
         {
-            client.SetAttributes(tempRemotePath, tempAttributes);
+            applyMode(modeToApply.Value);
         }
         catch (Exception ex)
         {
@@ -1014,7 +1033,7 @@ public sealed class SftpBrowser : IRemoteBrowser
             {
                 throw new InvalidOperationException(
                     $"SFTP mode preservation failed for '{finalRemotePath}': target mode {targetMode}, "
-                    + $"temporary mode {tempMode}; commit refused because proceeding would widen permissions.",
+                    + $"temporary mode {tempMode}; commit refused because exact mode preservation is required.",
                     ex);
             }
 

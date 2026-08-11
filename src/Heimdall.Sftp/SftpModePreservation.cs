@@ -50,7 +50,7 @@ public static class SftpModePreservation
 
     /// <summary>
     /// Returns whether a failed mode application must refuse the commit because the temporary
-    /// file grants at least one permission or special mode bit absent from the target.
+    /// file would not retain the target's exact permission and special-mode bits.
     /// </summary>
     public static bool ShouldRefuseCommitAfterApplyFailure(
         uint targetPermissions,
@@ -59,7 +59,7 @@ public static class SftpModePreservation
         uint targetMode = GetMode(targetPermissions);
         uint tempMode = GetMode(tempPermissions);
 
-        return (tempMode & ~targetMode & PermissionModeMask) != 0;
+        return targetMode != tempMode;
     }
 
     internal static uint GetMode(uint permissions)
