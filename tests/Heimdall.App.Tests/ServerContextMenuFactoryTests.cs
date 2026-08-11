@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Windows.Controls;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
@@ -424,6 +425,27 @@ public sealed partial class SessionCoordinatorPreMountTests
             harness.PersistServerAsync(nestedServer).GetAwaiter().GetResult();
             harness.PersistServerAsync(hiddenTool).GetAwaiter().GetResult();
             harness.PersistServerAsync(prefixSibling).GetAwaiter().GetResult();
+            harness.Main.ConfigManager.MergeSettingAsync(settings =>
+            {
+                settings.DefaultTheme = "Vesper";
+                settings.EmptyGroups = ["Ops", "Ops/Child", "Ops2"];
+                settings.TreeExpandedNodes = ["Ops", "Ops/Child", "Ops2"];
+                settings.GroupDefaults = new Dictionary<string, GroupDefaultsDto>
+                {
+                    ["Ops"] = new() { SshUsername = "ops-default" },
+                    ["Ops/Child"] = new() { SshUsername = "child-default" },
+                    ["Ops2"] = new() { SshUsername = "prefix-default" }
+                };
+            }).GetAwaiter().GetResult();
+            AppSettings persistedSettings = harness.Main.ConfigManager
+                .LoadSettingsAsync()
+                .GetAwaiter()
+                .GetResult();
+            List<ServerProfileDto> persistedServers = harness.Main.ConfigManager
+                .LoadServersAsync()
+                .GetAwaiter()
+                .GetResult();
+            harness.Main.ServerList.LoadServers(persistedServers, persistedSettings);
             ServerItemViewModel visibleItem = Assert.Single(
                 harness.Main.ServerList.Servers,
                 item => string.Equals(item.Id, visibleServer.Id, StringComparison.Ordinal));
@@ -450,6 +472,10 @@ public sealed partial class SessionCoordinatorPreMountTests
                 .OrderBy(server => server.Id, StringComparer.Ordinal)
                 .Select(server => (server.Id, server.Group))
                 .ToList();
+            byte[] settingsBeforeRefusal = File.ReadAllBytes(
+                harness.Main.ConfigManager.SettingsPath);
+            byte[] serversBeforeRefusal = File.ReadAllBytes(
+                harness.Main.ConfigManager.ServersPath);
 
             MenuItem deleteGroup = AssertMenuItem(
                 menu,
@@ -477,6 +503,12 @@ public sealed partial class SessionCoordinatorPreMountTests
                 .Select(server => (server.Id, server.Group))
                 .ToList();
             Assert.Equal(beforeRefusal, afterRefusal);
+            Assert.Equal(
+                settingsBeforeRefusal,
+                File.ReadAllBytes(harness.Main.ConfigManager.SettingsPath));
+            Assert.Equal(
+                serversBeforeRefusal,
+                File.ReadAllBytes(harness.Main.ConfigManager.ServersPath));
         });
     }
 

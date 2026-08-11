@@ -605,27 +605,11 @@ public sealed class ContextMenuFactory
 
                 if (!confirmed) return;
 
-                var settings = await vm.ConfigManager.LoadSettingsAsync();
-                settings.EmptyGroups.RemoveAll(p =>
-                    p.Equals(folder.FullPath, StringComparison.OrdinalIgnoreCase) ||
-                    p.StartsWith(folder.FullPath + "/", StringComparison.OrdinalIgnoreCase));
-                List<ServerProfileDto> servers =
-                    await vm.ConfigManager.MutateServersAsync(inventory =>
-                    {
-                        foreach (ServerProfileDto dto in inventory)
-                        {
-                            if (dto.Group is not null &&
-                                (dto.Group.Equals(folder.FullPath, StringComparison.OrdinalIgnoreCase) ||
-                                 dto.Group.StartsWith(folder.FullPath + "/", StringComparison.OrdinalIgnoreCase)))
-                            {
-                                dto.Group = null;
-                            }
-                        }
-
-                        return inventory;
-                    });
-                await vm.ConfigManager.SaveSettingsAsync(settings);
-                vm.ServerList.LoadServers(servers, settings);
+                FolderDeletionService deletionService = new(vm.ConfigManager);
+                FolderDeletionResult result = await deletionService.DeleteAsync(
+                    folder.FullPath,
+                    vm.ServerList.FlushExpandStateForCloseAsync);
+                vm.ServerList.LoadServers(result.Servers, result.Settings);
             };
             menu.Items.Add(deleteItem);
         }
