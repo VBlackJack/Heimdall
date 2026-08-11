@@ -165,13 +165,14 @@ public sealed partial class TunnelManager
         }
     }
 
-    private static TunnelInfo BuildTunnelInfo(
+    internal static TunnelInfo BuildTunnelInfo(
         string gatewayHost,
         int localPort,
         string remoteHost,
         int remotePort,
         int socksProxyPort,
         int remoteBindPort,
+        int remoteLocalPort,
         string? label = null,
         string? gatewayChainKey = null,
         string localBindHost = LoopbackBinding.DefaultHost)
@@ -186,10 +187,23 @@ public sealed partial class TunnelManager
         {
             SocksProxyPort = socksProxyPort,
             RemoteBindPort = remoteBindPort,
+            EffectiveRemoteLocalPort = ResolveEffectiveRemoteLocalPort(
+                remoteBindPort,
+                remoteLocalPort),
             LocalBindHost = LoopbackBinding.NormalizeHost(localBindHost),
             Label = string.IsNullOrWhiteSpace(label) ? null : label.Trim(),
             GatewayChainKey = gatewayChainKey ?? string.Empty
         };
+    }
+
+    private static int ResolveEffectiveRemoteLocalPort(int remoteBindPort, int remoteLocalPort)
+    {
+        if (remoteBindPort <= 0)
+        {
+            return 0;
+        }
+
+        return remoteLocalPort > 0 ? remoteLocalPort : remoteBindPort;
     }
 
     internal TunnelResult RegisterTunnelSession(

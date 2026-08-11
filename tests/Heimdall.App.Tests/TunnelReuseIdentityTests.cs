@@ -135,154 +135,233 @@ public sealed class TunnelReuseIdentityTests
     }
 
     [Fact]
-    public void FindReusableTunnel_SameChainAndTarget_ReturnsExistingTunnel()
+    public void AcquireReusableTunnel_SameChainAndTarget_ReturnsExistingTunnel()
     {
         var existing = MakeTunnel(gatewayChainKey: "gw-A");
 
-        var result = TunnelService.FindReusableTunnel(
-            [existing],
+        var result = AcquireFromSingleCandidate(
+            existing,
             "gw-A",
             "10.0.0.5",
             3389,
             socksProxyPort: 0,
-            remoteBindPort: 0);
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
 
-        Assert.Same(existing, result);
+        Assert.Equal(existing.LocalPort, result?.LocalPort);
     }
 
     [Fact]
-    public void FindReusableTunnel_DifferentChainSameTarget_ReturnsNull()
+    public void AcquireReusableTunnel_DifferentChainSameTarget_ReturnsNull()
     {
         var existing = MakeTunnel(gatewayChainKey: "gw-A");
 
-        var result = TunnelService.FindReusableTunnel(
-            [existing],
+        var result = AcquireFromSingleCandidate(
+            existing,
             "gw-B",
             "10.0.0.5",
             3389,
             socksProxyPort: 0,
-            remoteBindPort: 0);
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
 
         Assert.Null(result);
     }
 
     [Fact]
-    public void FindReusableTunnel_SameChainDifferentTarget_ReturnsNull()
+    public void AcquireReusableTunnel_SameChainDifferentTarget_ReturnsNull()
     {
         var existing = MakeTunnel(gatewayChainKey: "gw-A");
 
-        var result = TunnelService.FindReusableTunnel(
-            [existing],
+        var result = AcquireFromSingleCandidate(
+            existing,
             "gw-A",
             "10.0.0.5",
             3390,
             socksProxyPort: 0,
-            remoteBindPort: 0);
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
 
         Assert.Null(result);
     }
 
     [Fact]
-    public void FindReusableTunnel_DifferentSocksProxyPort_ReturnsNull()
+    public void AcquireReusableTunnel_DifferentSocksProxyPort_ReturnsNull()
     {
         var existing = MakeTunnel(gatewayChainKey: "gw-A", socksProxyPort: 1080);
 
-        var result = TunnelService.FindReusableTunnel(
-            [existing],
+        var result = AcquireFromSingleCandidate(
+            existing,
             "gw-A",
             "10.0.0.5",
             3389,
             socksProxyPort: 1081,
-            remoteBindPort: 0);
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
 
         Assert.Null(result);
     }
 
     [Fact]
-    public void FindReusableTunnel_DifferentRemoteBindPort_ReturnsNull()
+    public void AcquireReusableTunnel_DifferentRemoteBindPort_ReturnsNull()
     {
         var existing = MakeTunnel(gatewayChainKey: "gw-A", remoteBindPort: 2222);
 
-        var result = TunnelService.FindReusableTunnel(
-            [existing],
+        var result = AcquireFromSingleCandidate(
+            existing,
             "gw-A",
             "10.0.0.5",
             3389,
             socksProxyPort: 0,
-            remoteBindPort: 2223);
+            remoteBindPort: 2223,
+            remoteLocalPort: 0);
 
         Assert.Null(result);
     }
 
     [Fact]
-    public void FindReusableTunnel_DeadTunnel_ReturnsNull()
+    public void AcquireReusableTunnel_DifferentEffectiveRemoteLocalPort_ReturnsNull()
+    {
+        using var tunnelManager = new TunnelManager();
+        TunnelInfo existing = MakeTunnel(
+            gatewayChainKey: "gw-A",
+            remoteBindPort: 2222,
+            effectiveRemoteLocalPort: 2200);
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(
+            existing,
+            new TestDisposable(),
+            () => true));
+
+        TunnelInfo? result = tunnelManager.AcquireReusableTunnel(
+            "gw-A",
+            "10.0.0.5",
+            3389,
+            socksProxyPort: 0,
+            remoteBindPort: 2222,
+            remoteLocalPort: 2201);
+
+        Assert.Null(result);
+        Assert.True(tunnelManager.ReleaseReference(existing.LocalPort));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2222)]
+    public void AcquireReusableTunnel_DefaultAndExplicitReverseLocalPort_AreEquivalent(
+        int requestedRemoteLocalPort)
+    {
+        using var tunnelManager = new TunnelManager();
+        TunnelInfo existing = MakeTunnel(
+            gatewayChainKey: "gw-A",
+            remoteBindPort: 2222,
+            effectiveRemoteLocalPort: 2222);
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(
+            existing,
+            new TestDisposable(),
+            () => true));
+
+        TunnelInfo? result = tunnelManager.AcquireReusableTunnel(
+            "gw-A",
+            "10.0.0.5",
+            3389,
+            socksProxyPort: 0,
+            remoteBindPort: 2222,
+            remoteLocalPort: requestedRemoteLocalPort);
+
+        Assert.NotNull(result);
+        Assert.Equal(existing.LocalPort, result.LocalPort);
+        Assert.False(tunnelManager.ReleaseReference(existing.LocalPort));
+        Assert.True(tunnelManager.ReleaseReference(existing.LocalPort));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_ReverseDisabled_IgnoresRemoteLocalPort()
+    {
+        using var tunnelManager = new TunnelManager();
+        TunnelInfo existing = MakeTunnel(
+            gatewayChainKey: "gw-A",
+            remoteBindPort: 0,
+            effectiveRemoteLocalPort: 0);
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(
+            existing,
+            new TestDisposable(),
+            () => true));
+
+        TunnelInfo? result = tunnelManager.AcquireReusableTunnel(
+            "gw-A",
+            "10.0.0.5",
+            3389,
+            socksProxyPort: 0,
+            remoteBindPort: 0,
+            remoteLocalPort: 65535);
+
+        Assert.NotNull(result);
+        Assert.False(tunnelManager.ReleaseReference(existing.LocalPort));
+        Assert.True(tunnelManager.ReleaseReference(existing.LocalPort));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_DeadTunnel_ReturnsNull()
     {
         var existing = MakeTunnel(gatewayChainKey: "gw-A", isAlive: false);
 
-        var result = TunnelService.FindReusableTunnel(
-            [existing],
+        var result = AcquireFromSingleCandidate(
+            existing,
             "gw-A",
             "10.0.0.5",
             3389,
             socksProxyPort: 0,
-            remoteBindPort: 0);
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
 
         Assert.Null(result);
     }
 
     [Fact]
-    public void FindReusableTunnel_EmptyChainKeyMatchesEmptyChainKey()
+    public void AcquireReusableTunnel_EmptyChainKeyMatchesEmptyChainKey()
     {
         var existing = MakeTunnel(gatewayChainKey: string.Empty);
 
-        var result = TunnelService.FindReusableTunnel(
-            [existing],
+        var result = AcquireFromSingleCandidate(
+            existing,
             string.Empty,
             "10.0.0.5",
             3389,
             socksProxyPort: 0,
-            remoteBindPort: 0);
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
 
-        Assert.Same(existing, result);
+        Assert.Equal(existing.LocalPort, result?.LocalPort);
     }
 
     [Fact]
-    public void FindReusableTunnel_NullActiveTunnels_Throws()
+    public void AcquireReusableTunnel_NullGatewayChainKey_Throws()
     {
-        Assert.Throws<ArgumentNullException>(
-            () => TunnelService.FindReusableTunnel(
-                null!,
-                "gw-A",
-                "10.0.0.5",
-                3389,
-                socksProxyPort: 0,
-                remoteBindPort: 0));
-    }
+        using var tunnelManager = new TunnelManager();
 
-    [Fact]
-    public void FindReusableTunnel_NullGatewayChainKey_Throws()
-    {
         Assert.Throws<ArgumentNullException>(
-            () => TunnelService.FindReusableTunnel(
-                [],
+            () => tunnelManager.AcquireReusableTunnel(
                 null!,
                 "10.0.0.5",
                 3389,
                 socksProxyPort: 0,
-                remoteBindPort: 0));
+                remoteBindPort: 0,
+                remoteLocalPort: 0));
     }
 
     [Fact]
-    public void FindReusableTunnel_NullRemoteHost_Throws()
+    public void AcquireReusableTunnel_NullRemoteHost_Throws()
     {
+        using var tunnelManager = new TunnelManager();
+
         Assert.Throws<ArgumentNullException>(
-            () => TunnelService.FindReusableTunnel(
-                [],
+            () => tunnelManager.AcquireReusableTunnel(
                 "gw-A",
                 null!,
                 3389,
                 socksProxyPort: 0,
-                remoteBindPort: 0));
+                remoteBindPort: 0,
+                remoteLocalPort: 0));
     }
 
     [Fact]
@@ -336,7 +415,8 @@ public sealed class TunnelReuseIdentityTests
         int remotePort = 3389,
         bool isAlive = true,
         int socksProxyPort = 0,
-        int remoteBindPort = 0)
+        int remoteBindPort = 0,
+        int effectiveRemoteLocalPort = 0)
     {
         return new TunnelInfo(
             "gateway",
@@ -348,8 +428,33 @@ public sealed class TunnelReuseIdentityTests
         {
             GatewayChainKey = gatewayChainKey,
             SocksProxyPort = socksProxyPort,
-            RemoteBindPort = remoteBindPort
+            RemoteBindPort = remoteBindPort,
+            EffectiveRemoteLocalPort = effectiveRemoteLocalPort
         };
+    }
+
+    private static TunnelInfo? AcquireFromSingleCandidate(
+        TunnelInfo existing,
+        string gatewayChainKey,
+        string remoteHost,
+        int remotePort,
+        int socksProxyPort,
+        int remoteBindPort,
+        int remoteLocalPort)
+    {
+        using var tunnelManager = new TunnelManager();
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(
+            existing,
+            new TestDisposable(),
+            () => existing.IsAlive));
+
+        return tunnelManager.AcquireReusableTunnel(
+            gatewayChainKey,
+            remoteHost,
+            remotePort,
+            socksProxyPort,
+            remoteBindPort,
+            remoteLocalPort);
     }
 
     private sealed class TestDisposable : IDisposable
