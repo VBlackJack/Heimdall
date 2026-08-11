@@ -77,7 +77,7 @@ public sealed class ServerStatusToColorConverter : IMultiValueConverter
             "initializing" or "validatingconfig" or "establishingtunnel"
                 or "tunnelestablished" or "launchingrdp" or "launchingssh"
                 or "launchingsftp" or "launchingftp" or "launchingvnc"
-                or "launchingtelnet" or "launchinglocal" or "launchingcitrix"
+                or "launchingtelnet" or "launchinglocal" or "launchingcitrix" or "launchingwinrm"
                 or "disconnecting" => ResolveBrush("WarningBrush", Brushes.Orange),
             // Disconnected (or unknown state): prefer the live health verdict when
             // available, otherwise fall back to the legacy connection-type palette.
