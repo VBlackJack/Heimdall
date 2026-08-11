@@ -80,7 +80,7 @@ public partial class ServerListViewModel
 
         var updated = SelectedItems.ToList();
         updated.Add(item);
-        ApplySelection(updated, item, _selectionAnchor ?? item, updateSelectedServer: true);
+        ApplySelection(updated, item, item, updateSelectedServer: true);
     }
 
     public void ExtendSelectionTo(ServerItemViewModel item)

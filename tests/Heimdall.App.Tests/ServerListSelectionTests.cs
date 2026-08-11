@@ -74,6 +74,34 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task ToggleSelection_AddMovesAnchorForNextRange()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups(
+                "ops",
+                "ops/a",
+                "ops/b",
+                "ops/c",
+                "ops/d",
+                "ops/e",
+                "ops/f"),
+            CreateServer("alpha", "Alpha", "ops/a"),
+            CreateServer("beta", "Beta", "ops/b"),
+            CreateServer("gamma", "Gamma", "ops/c"),
+            CreateServer("delta", "Delta", "ops/d"),
+            CreateServer("epsilon", "Epsilon", "ops/e"),
+            CreateServer("foxtrot", "Foxtrot", "ops/f"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("delta"));
+
+        fixture.ViewModel.ExtendSelectionTo(fixture.ServerById("foxtrot"));
+
+        AssertSelection(fixture.ViewModel, "delta", "epsilon", "foxtrot");
+        Assert.Same(fixture.ServerById("foxtrot"), fixture.ViewModel.SelectedServer);
+    }
+
+    [Fact]
     public async Task ToggleSelection_RemovingPrimaryFallsBackToLastRemaining()
     {
         await using var fixture = await ServerListSelectionFixture.CreateAsync();
@@ -162,12 +190,12 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         fixture.ViewModel.ToggleSelection(fixture.ServerById("epsilon"));
         fixture.ViewModel.AddSelectionRangeTo(fixture.ServerById("delta"));
 
-        AssertSelection(fixture.ViewModel, "beta", "delta", "epsilon", "gamma");
+        AssertSelection(fixture.ViewModel, "beta", "delta", "epsilon");
         Assert.Same(fixture.ServerById("delta"), fixture.ViewModel.SelectedServer);
 
         fixture.ViewModel.ExtendSelectionTo(fixture.ServerById("alpha"));
 
-        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        AssertSelection(fixture.ViewModel, "alpha", "beta", "delta", "epsilon", "gamma");
     }
 
     [Fact]
