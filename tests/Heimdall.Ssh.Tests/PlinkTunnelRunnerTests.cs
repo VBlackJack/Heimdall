@@ -622,6 +622,116 @@ public class PlinkTunnelRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task Stop_WhenKillTimesOut_ReaperRetainsProcessUntilExit()
+    {
+        FakePlinkProcess process = new()
+        {
+            WaitForExitResult = false
+        };
+        using PlinkTunnelRunner runner = CreateRunner(
+            new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess),
+            _ => process);
+        PlinkTunnelResult result = await runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gateway.example.com",
+            22,
+            "user",
+            null,
+            null,
+            "target.internal",
+            3389,
+            13389,
+            "SHA256:test");
+
+        Assert.True(result.Success);
+
+        runner.Stop();
+
+        Assert.Equal(1, process.KillCount);
+        Assert.Equal(0, process.DisposeCount);
+        Assert.False(runner.IsRunning);
+        Assert.Equal(1, PlinkProcessReaper.PendingCount);
+
+        process.CompleteExit();
+        await process.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, process.DisposeCount);
+        Assert.Equal(0, PlinkProcessReaper.PendingCount);
+    }
+
+    [Fact]
+    public async Task Stop_WhenKillThrowsWin32_ReaperRetainsProcessAndPasswordFileIsCleaned()
+    {
+        HashSet<string> filesBefore = Directory
+            .EnumerateFiles(Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        FakePlinkProcess process = new()
+        {
+            KillException = new System.ComponentModel.Win32Exception("Simulated kill failure")
+        };
+        using PlinkTunnelRunner runner = CreateRunner(
+            new FakeOwnershipProbe(TcpListenerOwnership.NothingListening),
+            _ => process);
+
+        PlinkTunnelResult result = await runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gateway.example.com",
+            22,
+            "user",
+            null,
+            "s3cret",
+            "target.internal",
+            3389,
+            13390,
+            "SHA256:test");
+
+        Assert.False(result.Success);
+        Assert.Equal(1, process.KillCount);
+        Assert.Equal(0, process.DisposeCount);
+        Assert.DoesNotContain(
+            Directory.EnumerateFiles(Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern),
+            path => !filesBefore.Contains(path));
+        Assert.Equal(1, PlinkProcessReaper.PendingCount);
+
+        process.CompleteExit();
+        await process.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, process.DisposeCount);
+        Assert.Equal(0, PlinkProcessReaper.PendingCount);
+    }
+
+    [Fact]
+    public async Task Stop_WhenExitIsConfirmed_DisposesImmediatelyWithoutReaper()
+    {
+        FakePlinkProcess process = new()
+        {
+            WaitForExitResult = true
+        };
+        using PlinkTunnelRunner runner = CreateRunner(
+            new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess),
+            _ => process);
+        PlinkTunnelResult result = await runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gateway.example.com",
+            22,
+            "user",
+            null,
+            null,
+            "target.internal",
+            3389,
+            13391,
+            "SHA256:test");
+
+        Assert.True(result.Success);
+
+        runner.Stop();
+
+        Assert.Equal(1, process.KillCount);
+        Assert.Equal(1, process.DisposeCount);
+        Assert.Equal(0, PlinkProcessReaper.PendingCount);
+    }
+
+    [Fact]
     public void Dispose_WithoutStart_IsNoOpAndIdempotent()
     {
         var runner = new PlinkTunnelRunner();
@@ -684,6 +794,16 @@ public class PlinkTunnelRunnerTests : IDisposable
             probe);
     }
 
+    private static PlinkTunnelRunner CreateRunner(
+        ITcpListenerOwnershipProbe probe,
+        Func<ProcessStartInfo, IPlinkProcess> processFactory)
+    {
+        return new PlinkTunnelRunner(
+            new PlinkTunnelRunnerOptions(1, 100),
+            probe,
+            processFactory);
+    }
+
     private static string GetCommandProcessorPath()
     {
         return Path.Combine(
@@ -700,6 +820,81 @@ public class PlinkTunnelRunnerTests : IDisposable
         {
             LastExpectedProcessId = expectedProcessId;
             return ownership;
+        }
+    }
+
+    private sealed class FakePlinkProcess : IPlinkProcess
+    {
+        private static int _nextProcessId = 10000;
+        private readonly StreamReader _standardError = new(new MemoryStream([]));
+        private readonly TaskCompletionSource _exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public event EventHandler? Exited;
+
+        public int Id { get; } = Interlocked.Increment(ref _nextProcessId);
+
+        public bool HasExited { get; private set; }
+
+        public int ExitCode => 0;
+
+        public StreamReader StandardError => _standardError;
+
+        public bool WaitForExitResult { get; init; }
+
+        public Exception? KillException { get; init; }
+
+        public int KillCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
+        public TaskCompletionSource Disposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool Start()
+        {
+            return true;
+        }
+
+        public void Kill()
+        {
+            KillCount++;
+            if (KillException is not null)
+            {
+                throw KillException;
+            }
+        }
+
+        public bool WaitForExit(int milliseconds)
+        {
+            if (WaitForExitResult)
+            {
+                CompleteExit();
+            }
+
+            return WaitForExitResult;
+        }
+
+        public Task WaitForExitAsync(CancellationToken cancellationToken = default)
+        {
+            return _exited.Task.WaitAsync(cancellationToken);
+        }
+
+        public void CompleteExit()
+        {
+            if (HasExited)
+            {
+                return;
+            }
+
+            HasExited = true;
+            _exited.TrySetResult();
+            Exited?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            _standardError.Dispose();
+            Disposed.TrySetResult();
         }
     }
 }
