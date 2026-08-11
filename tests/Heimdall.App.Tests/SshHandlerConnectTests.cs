@@ -29,11 +29,53 @@ using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
+using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Tests;
 
 public sealed class SshHandlerConnectTests
 {
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
+    [Fact]
+    public async Task Constructor_YoungPasswordOrphan_ReschedulesAndDeletesAtEligibility()
+    {
+        DateTime firstSweepUtc = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        TimeSpan maxAge = TimeSpan.FromMinutes(10);
+        DateTime lastWriteUtc = firstSweepUtc - TimeSpan.FromMinutes(5);
+        DateTime eligibilityUtc = lastWriteUtc + maxAge;
+        string orphanPath = Path.Combine(
+            Path.GetTempPath(),
+            $"{PlinkPasswordFileNaming.Prefix}scheduler-wiring");
+        int sweepCount = 0;
+        int utcNowCallCount = 0;
+        TaskCompletionSource<string> deleted = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        PlinkPasswordFileJanitor janitor = new PlinkPasswordFileJanitor(
+            enumerateFiles: _ =>
+            {
+                Interlocked.Increment(ref sweepCount);
+                return new string[] { orphanPath };
+            },
+            getLastWriteTimeUtc: _ => lastWriteUtc,
+            isOwnedByCurrentUser: _ => true,
+            delete: path => deleted.TrySetResult(path),
+            utcNow: () => Interlocked.Increment(ref utcNowCallCount) == 1
+                ? firstSweepUtc
+                : eligibilityUtc,
+            maxAge: maxAge);
+
+        using SshHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            plinkPasswordFileJanitor: janitor);
+
+        string deletedPath = await deleted.Task.WaitAsync(TestTimeout);
+
+        Assert.Equal(orphanPath, deletedPath);
+        Assert.Equal(2, Volatile.Read(ref sweepCount));
+        Assert.Equal(2, Volatile.Read(ref utcNowCallCount));
+    }
+
     [Fact]
     public async Task ConnectAsync_TunneledConnectFailureReleasesTunnelReference()
     {
@@ -289,7 +331,8 @@ public sealed class SshHandlerConnectTests
     private static SshHandler CreateHandler(
         FakeTunnelService tunnelService,
         IHostKeyTrustService? hostKeyTrustService = null,
-        IPlinkHostKeyProbe? plinkHostKeyProbe = null)
+        IPlinkHostKeyProbe? plinkHostKeyProbe = null,
+        PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null)
     {
         LocalizationManager localizer = new LocalizationManager();
         IHostKeyTrustService effectiveHostKeyTrustService =
@@ -304,7 +347,8 @@ public sealed class SshHandlerConnectTests
             new X11ServerManager(new InMemoryConfigManager(), localizer),
             new ThrowingDialogService(),
             plinkHostKeyProbe: plinkHostKeyProbe,
-            plinkPasswordFileJanitor: CreateNoOpPlinkPasswordFileJanitor());
+            plinkPasswordFileJanitor:
+                plinkPasswordFileJanitor ?? CreateNoOpPlinkPasswordFileJanitor());
     }
 
     private static PlinkPasswordFileJanitor CreateNoOpPlinkPasswordFileJanitor()
