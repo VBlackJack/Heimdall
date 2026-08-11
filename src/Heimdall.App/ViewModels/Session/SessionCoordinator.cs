@@ -590,7 +590,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
-        var tab = _main.Connection.AddSession(
+        SessionTabViewModel? tab = _main.Connection.AddSession(
             sessionId,
             displayName,
             connectionType,
@@ -722,25 +722,44 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         tab.OriginalServerId = originalServerId;
         tab.FailureDetails = null;
         ApplyRdpModeOverride(tab, connectionType, rdpModeOverride);
-        tab.HostControl = _embeddedSessionManager.CreateHostControl(
-            tab,
-            displayName,
-            connectionType,
-            session,
-            _main.CurrentSettings);
-        if (tab.HostControl is EmbeddedRdpView rdpView)
+        bool hostOwnsSession = false;
+        try
         {
-            rdpView.SetOwningPane(tab.PrimaryPane);
-        }
-        else if (tab.HostControl is EmbeddedSftpView sftpView)
-        {
-            sftpView.SetOwningPane(tab.PrimaryPane);
-        }
-        tab.Status = string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase)
-            ? _localizer["StatusConnectingProgress"]
-            : _localizer["StatusConnected"];
+            object hostControl = _embeddedSessionManager.CreateHostControl(
+                tab,
+                displayName,
+                connectionType,
+                session,
+                _main.CurrentSettings);
+            tab.HostControl = hostControl;
+            hostOwnsSession = true;
+            if (hostControl is EmbeddedRdpView rdpView)
+            {
+                rdpView.SetOwningPane(tab.PrimaryPane);
+            }
+            else if (hostControl is EmbeddedSftpView sftpView)
+            {
+                sftpView.SetOwningPane(tab.PrimaryPane);
+            }
 
-        CompleteReadySession(tab, sessionId, originalServerId, displayName, connectionType, session);
+            tab.Status = string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase)
+                ? _localizer["StatusConnectingProgress"]
+                : string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
+                    ? "RemoteSessionHandedOff"
+                    : _localizer["StatusConnected"];
+
+            CompleteReadySession(tab, sessionId, originalServerId, displayName, connectionType, session);
+        }
+        catch
+        {
+            if (!hostOwnsSession)
+            {
+                SafeDisposeSessionResult(session);
+            }
+
+            _main.Connection.CloseFailedMaterialization(tab);
+            throw;
+        }
     }
 
     private void CompleteReadySession(

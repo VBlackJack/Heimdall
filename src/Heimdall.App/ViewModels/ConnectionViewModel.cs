@@ -19,6 +19,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
 using Heimdall.Core.Localization;
+using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.ViewModels;
 
@@ -165,13 +166,13 @@ public partial class ConnectionViewModel : ObservableObject
         }
 
         // Check ALL panes in the split tree for connected status (not just the primary shim)
-        var anyConnected = Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
-            .Any(p => string.Equals(p.Status, "Connected", StringComparison.Ordinal));
+        bool anyConnected = Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
+            .Any(pane => ConnectionStateSets.IsConnected(pane.Status));
         if (confirm && anyConnected)
         {
-            var title = _localizer["ConfirmCloseSessionTitle"];
-            var message = _localizer.Format("ConfirmCloseSessionMessage", session.Title);
-            var confirmed = await _dialogService.ShowConfirmAsync(title, message, "warning");
+            string title = _localizer["ConfirmCloseSessionTitle"];
+            string message = _localizer.Format("ConfirmCloseSessionMessage", session.Title);
+            bool confirmed = await _dialogService.ShowConfirmAsync(title, message, "warning");
             if (!confirmed)
             {
                 return;
@@ -192,7 +193,7 @@ public partial class ConnectionViewModel : ObservableObject
     {
         int connectedCount = sessions.Count(session =>
             Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
-                .Any(pane => string.Equals(pane.Status, "Connected", StringComparison.Ordinal)));
+                .Any(pane => ConnectionStateSets.IsConnected(pane.Status)));
 
         if (connectedCount > 0)
         {
@@ -212,6 +213,22 @@ public partial class ConnectionViewModel : ObservableObject
         {
             await CloseSessionAsync(session, reason, confirm: false);
         }
+    }
+
+    /// <summary>
+    /// Synchronously closes the exact tab whose host materialization failed, so
+    /// tunnel release occurs before the connection pipeline tears down its state.
+    /// </summary>
+    internal void CloseFailedMaterialization(SessionTabViewModel session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (!ActiveSessions.Contains(session))
+        {
+            return;
+        }
+
+        CloseSessionInternal(session, DisconnectReason.FailedSession);
     }
 
     /// <summary>
@@ -253,13 +270,13 @@ public partial class ConnectionViewModel : ObservableObject
         // Count connected sessions to decide whether to prompt
         int connectedCount = ActiveSessions.Count(s =>
             Core.Models.SplitTreeHelper.EnumerateLeaves(s.RootContent)
-                .Any(p => string.Equals(p.Status, "Connected", StringComparison.Ordinal)));
+                .Any(pane => ConnectionStateSets.IsConnected(pane.Status)));
 
         if (connectedCount > 0)
         {
-            var title = _localizer["ConfirmCloseAllTabs"];
-            var message = _localizer.Format("ConfirmCloseAllTabsMessage", connectedCount);
-            var confirmed = await _dialogService.ShowConfirmAsync(title, message, "warning");
+            string title = _localizer["ConfirmCloseAllTabs"];
+            string message = _localizer.Format("ConfirmCloseAllTabsMessage", connectedCount);
+            bool confirmed = await _dialogService.ShowConfirmAsync(title, message, "warning");
             if (!confirmed)
             {
                 return;

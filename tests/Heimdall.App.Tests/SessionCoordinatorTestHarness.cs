@@ -73,6 +73,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             FakeDialogService dialogService,
             FakeEmbeddedSessionManager embeddedSessionManager,
             ConnectionStateMachine stateMachine,
+            TunnelManager tunnelManager,
             IReadOnlyDictionary<string, ControlledProtocolHandler> handlers)
         {
             _rootPath = rootPath;
@@ -81,6 +82,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             DialogService = dialogService;
             EmbeddedSessionManager = embeddedSessionManager;
             StateMachine = stateMachine;
+            TunnelManager = tunnelManager;
             Handlers = handlers;
         }
 
@@ -93,6 +95,8 @@ public sealed partial class SessionCoordinatorPreMountTests
         public FakeEmbeddedSessionManager EmbeddedSessionManager { get; }
 
         public ConnectionStateMachine StateMachine { get; }
+
+        public TunnelManager TunnelManager { get; }
 
         private IReadOnlyDictionary<string, ControlledProtocolHandler> Handlers { get; }
 
@@ -121,7 +125,8 @@ public sealed partial class SessionCoordinatorPreMountTests
             {
                 ["SSH"] = new("SSH"),
                 ["RDP"] = new("RDP"),
-                ["SFTP"] = new("SFTP")
+                ["SFTP"] = new("SFTP"),
+                ["WINRM"] = new("WINRM")
             };
             ConnectionService connectionService = new ConnectionService(
                 configManager,
@@ -195,6 +200,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 dialogService,
                 embeddedSessionManager,
                 connectionStateMachine,
+                tunnelManager,
                 handlers);
         }
 
@@ -259,6 +265,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         public void Dispose()
         {
             Main.Session.Dispose();
+            TunnelManager.Dispose();
 
             try
             {
@@ -322,6 +329,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         public int CreateHostControlCalls { get; private set; }
         public int CreateConnectingSshHostControlCalls { get; private set; }
         public int AttachSshSessionCalls { get; private set; }
+        public Func<SessionTabViewModel, string, object>? CreateHostControlBehavior { get; set; }
         public Func<SessionTabViewModel, string, ToolContext?, AppSettings?, object>? CreateToolControlBehavior { get; set; }
         public int CreateToolControlCalls { get; private set; }
 
@@ -334,7 +342,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             string? initialRemotePath = null)
         {
             CreateHostControlCalls++;
-            return new object();
+            return CreateHostControlBehavior?.Invoke(sessionTab, connectionType) ?? new object();
         }
 
         public void DisconnectSession(SessionPaneModel pane, DisconnectReason reason)
@@ -384,6 +392,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         public bool IsRunning => true;
         public int? ProcessId => 1234;
         public Dictionary<string, string>? EnvironmentVariables { get; set; }
+        public int DisposeCount { get; private set; }
 
         public Task StartAsync(
             string executable,
@@ -416,6 +425,17 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         public void Dispose()
         {
+            DisposeCount++;
+        }
+    }
+
+    private sealed class TrackingDisposable : IDisposable
+    {
+        public int DisposeCount { get; private set; }
+
+        public void Dispose()
+        {
+            DisposeCount++;
         }
     }
 

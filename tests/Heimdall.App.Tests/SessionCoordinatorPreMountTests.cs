@@ -20,11 +20,140 @@ using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.SessionDiagnostics;
+using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
 
 public sealed partial class SessionCoordinatorPreMountTests
 {
+    [Fact]
+    public async Task RunConnectionPipelineAsync_WinRmHostCreationFailure_RollsBackOwnedResources()
+    {
+        const string SessionId = "session-winrm-host-failure";
+        const int TunnelLocalPort = 45991;
+
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler winRmHandler = harness.GetHandler("WINRM");
+        ServerProfileDto server = harness.CreateServer("WINRM");
+        string originalId = server.Id;
+        SessionTabViewModel existingTab = harness.Main.Connection.AddSession(
+            "existing-session",
+            "Existing session",
+            "RDP");
+        existingTab.Status = "Disconnected";
+        FakeTerminalSession terminalSession = new FakeTerminalSession();
+        TrackingDisposable tunnelHandle = new TrackingDisposable();
+        TunnelInfo tunnelInfo = new TunnelInfo(
+            "gateway.example.com",
+            TunnelLocalPort,
+            server.RemoteServer,
+            server.RemotePort,
+            DateTime.UtcNow,
+            true);
+        Assert.True(harness.TunnelManager.TryRegisterExternalTunnel(
+            tunnelInfo,
+            tunnelHandle,
+            () => true));
+        harness.StateMachine.SetTunnelInfo(SessionId, TunnelLocalPort, 0);
+        harness.EmbeddedSessionManager.CreateHostControlBehavior = (_, _) =>
+            throw new InvalidOperationException("host creation failed");
+        winRmHandler.Result.SetResult(new ConnectionResult(
+            true,
+            null,
+            new TerminalSessionResult(terminalSession)));
+
+        BulkConnectOutcome outcome = await harness.RunPipelineAsync(server, SessionId)
+            .WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.ConnectionFailed, outcome.Status);
+        Assert.Equal(1, terminalSession.DisposeCount);
+        Assert.Equal(1, tunnelHandle.DisposeCount);
+        Assert.Same(existingTab, Assert.Single(harness.Main.Connection.ActiveSessions));
+        Assert.DoesNotContain(
+            harness.Main.Connection.ActiveSessions,
+            tab => string.Equals(tab.ServerId, SessionId, StringComparison.Ordinal));
+        Assert.Null(harness.StateMachine.GetStateData(SessionId));
+        Assert.Empty(harness.TunnelManager.GetActiveTunnels());
+        Assert.Equal(originalId, server.Id);
+    }
+
+    [Fact]
+    public async Task RunConnectionPipelineAsync_WinRmHostCreationFailure_ReleasesOneSharedTunnelReference()
+    {
+        const string SessionId = "session-winrm-shared-tunnel-failure";
+        const int TunnelLocalPort = 45992;
+
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler winRmHandler = harness.GetHandler("WINRM");
+        ServerProfileDto server = harness.CreateServer("WINRM");
+        FakeTerminalSession terminalSession = new FakeTerminalSession();
+        TrackingDisposable tunnelHandle = new TrackingDisposable();
+        TunnelInfo tunnelInfo = new TunnelInfo(
+            "gateway.example.com",
+            TunnelLocalPort,
+            server.RemoteServer,
+            server.RemotePort,
+            DateTime.UtcNow,
+            true);
+        Assert.True(harness.TunnelManager.TryRegisterExternalTunnel(
+            tunnelInfo,
+            tunnelHandle,
+            () => true));
+        harness.TunnelManager.AddReference(TunnelLocalPort);
+        harness.StateMachine.SetTunnelInfo(SessionId, TunnelLocalPort, 0);
+        harness.EmbeddedSessionManager.CreateHostControlBehavior = (_, _) =>
+            throw new InvalidOperationException("host creation failed");
+        winRmHandler.Result.SetResult(new ConnectionResult(
+            true,
+            null,
+            new TerminalSessionResult(terminalSession)));
+
+        BulkConnectOutcome outcome = await harness.RunPipelineAsync(server, SessionId)
+            .WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.ConnectionFailed, outcome.Status);
+        Assert.Equal(1, terminalSession.DisposeCount);
+        Assert.Equal(0, tunnelHandle.DisposeCount);
+        Assert.Single(harness.TunnelManager.GetActiveTunnels());
+
+        Assert.True(harness.TunnelManager.ReleaseReference(TunnelLocalPort));
+        Assert.Equal(1, tunnelHandle.DisposeCount);
+        Assert.Empty(harness.TunnelManager.GetActiveTunnels());
+    }
+
+    [Fact]
+    public async Task RunConnectionPipelineAsync_WinRmSuccess_PreservesHandedOffStatusAndOwnership()
+    {
+        const string SessionId = "session-winrm-success";
+
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler winRmHandler = harness.GetHandler("WINRM");
+        ServerProfileDto server = harness.CreateServer("WINRM");
+        string originalId = server.Id;
+        FakeTerminalSession terminalSession = new FakeTerminalSession();
+        harness.EmbeddedSessionManager.CreateHostControlBehavior = (sessionTab, connectionType) =>
+        {
+            Assert.Equal("WINRM", connectionType);
+            sessionTab.Status = "RemoteSessionHandedOff";
+            return new object();
+        };
+        winRmHandler.Result.SetResult(new ConnectionResult(
+            true,
+            null,
+            new TerminalSessionResult(terminalSession)));
+
+        BulkConnectOutcome outcome = await harness.RunPipelineAsync(server, SessionId)
+            .WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.Success, outcome.Status);
+        SessionTabViewModel tab = Assert.Single(harness.Main.Connection.ActiveSessions);
+        Assert.Equal("RemoteSessionHandedOff", tab.Status);
+        Assert.DoesNotContain("{0}", tab.Status);
+        Assert.Equal(0, terminalSession.DisposeCount);
+        Assert.NotNull(harness.StateMachine.GetStateData(SessionId));
+        Assert.Equal(originalId, server.Id);
+    }
+
     [Fact]
     public async Task RunConnectionPipelineAsync_ExternalSsh_DoesNotCreatePlaceholderOrLinkedCancellation()
     {
