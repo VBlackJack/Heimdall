@@ -117,7 +117,7 @@ internal sealed class CitrixHandler : IProtocolHandler
             }
 
             validatedStoreFrontUrl = storeFrontUri.AbsoluteUri;
-            safeStoreFrontLogValue = BuildSafeStoreFrontLogValue(storeFrontUri);
+            safeStoreFrontLogValue = CitrixStoreFrontUrlSanitizer.Sanitize(storeFrontUri);
         }
 
         _logInfo(
@@ -393,17 +393,6 @@ internal sealed class CitrixHandler : IProtocolHandler
 
         validatedUri = uri;
         return true;
-    }
-
-    private static string BuildSafeStoreFrontLogValue(Uri storeFrontUri)
-    {
-        int port = storeFrontUri.IsDefaultPort ? -1 : storeFrontUri.Port;
-        UriBuilder safeUri = new(
-            storeFrontUri.Scheme,
-            storeFrontUri.Host,
-            port,
-            storeFrontUri.AbsolutePath);
-        return safeUri.Uri.AbsoluteUri;
     }
 
     internal static ProcessStartInfo CreateStoreFrontStartInfo(
