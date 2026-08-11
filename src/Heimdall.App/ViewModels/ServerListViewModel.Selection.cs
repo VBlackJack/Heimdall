@@ -85,6 +85,20 @@ public partial class ServerListViewModel
 
     public void ExtendSelectionTo(ServerItemViewModel item)
     {
+        ExtendSelectionTo(item, additive: false);
+    }
+
+    /// <summary>
+    /// Adds the visible range from the existing anchor to the target to the current selection.
+    /// </summary>
+    /// <param name="item">The range target and resulting primary selection.</param>
+    internal void AddSelectionRangeTo(ServerItemViewModel item)
+    {
+        ExtendSelectionTo(item, additive: true);
+    }
+
+    private void ExtendSelectionTo(ServerItemViewModel item, bool additive)
+    {
         ArgumentNullException.ThrowIfNull(item);
 
         if (!Servers.Contains(item))
@@ -111,8 +125,11 @@ public partial class ServerListViewModel
         var start = Math.Min(anchorIndex, itemIndex);
         var length = Math.Abs(itemIndex - anchorIndex) + 1;
         var range = visibleLeaves.GetRange(start, length);
+        IReadOnlyList<ServerItemViewModel> requestedItems = additive
+            ? SelectedItems.Concat(range).ToList()
+            : range;
 
-        ApplySelection(range, item, _selectionAnchor, updateSelectedServer: true);
+        ApplySelection(requestedItems, item, _selectionAnchor, updateSelectedServer: true);
     }
 
     public void ClearSelection()

@@ -148,6 +148,29 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task AddSelectionRangeTo_PreservesDisjointSelectionPrimaryAndAnchor()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops", "ops/a", "ops/b", "ops/c", "ops/d", "ops/e"),
+            CreateServer("alpha", "Alpha", "ops/a"),
+            CreateServer("beta", "Beta", "ops/b"),
+            CreateServer("gamma", "Gamma", "ops/c"),
+            CreateServer("delta", "Delta", "ops/d"),
+            CreateServer("epsilon", "Epsilon", "ops/e"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("beta"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("epsilon"));
+        fixture.ViewModel.AddSelectionRangeTo(fixture.ServerById("delta"));
+
+        AssertSelection(fixture.ViewModel, "beta", "delta", "epsilon", "gamma");
+        Assert.Same(fixture.ServerById("delta"), fixture.ViewModel.SelectedServer);
+
+        fixture.ViewModel.ExtendSelectionTo(fixture.ServerById("alpha"));
+
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+    }
+
+    [Fact]
     public async Task CollapseGroup_PurgesHiddenSelectionAndKeepsVisiblePrimaryAnchorAndBulkContext()
     {
         await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();

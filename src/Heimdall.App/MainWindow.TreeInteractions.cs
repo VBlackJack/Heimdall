@@ -232,8 +232,19 @@ public partial class MainWindow
             return;
         }
 
-        var modifiers = Keyboard.Modifiers;
-        if ((modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        (bool toggle, bool extend, bool additive) = ResolveTreePointerSelection(modifiers);
+        if (additive)
+        {
+            _treeState.SuppressSelectedItemSync = true;
+            vm.ServerList.AddSelectionRangeTo(server);
+            treeViewItem.Focus();
+            ShowTreeSelection(vm, vm.ServerList.SelectedServer);
+            e.Handled = true;
+            return;
+        }
+
+        if (toggle)
         {
             vm.ServerList.ToggleSelection(server);
             SynchronizeNativeTreeSelection(
@@ -244,7 +255,7 @@ public partial class MainWindow
             return;
         }
 
-        if ((modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+        if (extend)
         {
             _treeState.SuppressSelectedItemSync = true;
             vm.ServerList.ExtendSelectionTo(server);
@@ -256,6 +267,31 @@ public partial class MainWindow
 
         _treeState.SuppressSelectedItemSync = false;
         vm.ServerList.SelectSingle(server);
+    }
+
+    /// <summary>
+    /// Resolves pointer selection modifiers with additive range taking precedence over toggle.
+    /// </summary>
+    /// <param name="modifiers">The pointer event's keyboard modifier mask.</param>
+    /// <returns>Whether the gesture toggles, replaces with a range, or adds a range.</returns>
+    internal static (bool Toggle, bool Extend, bool Additive) ResolveTreePointerSelection(
+        ModifierKeys modifiers)
+    {
+        bool control = (modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        bool shift = (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+        if (control && shift)
+        {
+            return (false, false, true);
+        }
+
+        if (control)
+        {
+            return (true, false, false);
+        }
+
+        return shift
+            ? (false, true, false)
+            : default;
     }
 
     /// <summary>
