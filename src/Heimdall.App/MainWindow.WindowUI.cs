@@ -144,13 +144,7 @@ public partial class MainWindow
     private void NotifyEmbeddedViewsFullscreen(bool isFullscreen)
     {
         if (DataContext is not MainViewModel vm) return;
-        foreach (var session in vm.Connection.ActiveSessions)
-        {
-            if (session.HostControl is Views.EmbeddedRdpView rdpView)
-                rdpView.SetFullscreen(isFullscreen);
-            else if (session.HostControl is Views.EmbeddedSshView sshView)
-                sshView.Visibility = Visibility.Visible; // SSH always visible
-        }
+        EmbeddedFullscreenNotifier.Notify(vm.Connection.ActiveSessions, isFullscreen);
 
         // Hide/show entire tab strip by collapsing the TabPanel
         // Single session fullscreen = no tab bar needed
