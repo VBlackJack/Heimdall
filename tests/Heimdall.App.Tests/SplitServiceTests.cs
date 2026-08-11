@@ -35,9 +35,9 @@ namespace Heimdall.App.Tests;
 /// or a full integration harness: the per-session cancellation token
 /// lifecycle, server-pane tunnel cleanup, <c>CloseAllPanes</c>'s close guards,
 /// <c>ToggleSplitOrientation</c>, and <c>SplitSessionWithTool</c>'s short-circuit
-/// guards (unknown tool, max panes). Async coverage is limited to dispatcher-free
-/// error handling in <c>ReconnectPaneAsync</c>; the WPF dispatcher-dependent swap
-/// flow remains out of scope here.
+/// guards (unknown tool, max panes). Async coverage includes dispatcher-free
+/// split identity, orphan cleanup, and reconnect error handling; the WPF
+/// dispatcher-dependent swap flow remains out of scope here.
 /// </summary>
 public sealed class SplitServiceTests : IDisposable
 {
@@ -380,6 +380,220 @@ public sealed class SplitServiceTests : IDisposable
 
         AssertServerStateReset(serverId);
         AssertSingleTunnelReferenceReleased(localPort);
+    }
+
+    [Fact]
+    public async Task SplitSessionWithServerAsync_SameWinRmProfile_UsesIndependentRuntimeStateKeys()
+    {
+        const string inventoryServerId = "winrm-server-1";
+        const int localPort = 45127;
+        TunnelInfo tunnelInfo = new(
+            "gateway-1",
+            localPort,
+            "winrm.example.test",
+            5986,
+            DateTime.UtcNow,
+            true);
+        SharedTunnelWinRmConnectionService connectionService = new(
+            _connectionSm,
+            _tunnelManager,
+            tunnelInfo);
+        FakeEmbeddedSessionManager hostManager = new FakeEmbeddedSessionManager
+        {
+            CreateHostControlCallback = (sessionTab, _, _, _, _, _) =>
+            {
+                SessionPaneModel connectingPane = Assert.Single(
+                    SplitTreeHelper.EnumerateLeaves(sessionTab.RootContent),
+                    pane => string.Equals(
+                        pane.OriginalServerId,
+                        inventoryServerId,
+                        StringComparison.Ordinal)
+                        && pane.HostControl is null);
+                Assert.Equal(connectionService.ServerIds[^1], connectingPane.ServerId);
+                return new DisposableHost();
+            }
+        };
+        SplitService sut = CreateSplitService(connectionService, hostManager);
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = inventoryServerId,
+                DisplayName = "WinRM server",
+                ConnectionType = "WINRM",
+                RemoteServer = tunnelInfo.RemoteHost,
+                RemotePort = tunnelInfo.RemotePort
+            }
+        });
+
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-session",
+            connectionType: "SSH");
+        primaryPane.OriginalServerId = "primary-server";
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = primaryPane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new() { session };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        await sut.SplitSessionWithServerAsync(
+            session,
+            inventoryServerId,
+            SplitOrientation.Vertical,
+            primaryPane.PaneId);
+        await sut.SplitSessionWithServerAsync(
+            session,
+            inventoryServerId,
+            SplitOrientation.Horizontal,
+            primaryPane.PaneId);
+
+        List<SessionPaneModel> splitPanes = SplitTreeHelper
+            .EnumerateLeaves(session.RootContent)
+            .Where(pane => string.Equals(
+                pane.OriginalServerId,
+                inventoryServerId,
+                StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(2, splitPanes.Count);
+        Assert.Equal(2, connectionService.ServerIds.Count);
+        Assert.Equal(2, connectionService.ServerIds.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(connectionService.ServerIds, serverId =>
+            Assert.NotEqual(inventoryServerId, serverId));
+        Assert.All(splitPanes, pane =>
+        {
+            Assert.Equal(inventoryServerId, pane.OriginalServerId);
+            Assert.NotEqual(inventoryServerId, pane.ServerId);
+            Assert.Contains(pane.ServerId, connectionService.ServerIds);
+            Assert.Equal(localPort, _connectionSm.GetStateData(pane.ServerId)?.TunnelLocalPort);
+        });
+        Assert.True(_tunnelManager.HasTunnel(localPort));
+
+        bool closed = sut.CloseAllPanes(session);
+
+        Assert.True(closed);
+        Assert.All(connectionService.ServerIds, serverId =>
+            Assert.Null(_connectionSm.GetStateData(serverId)));
+        Assert.False(_tunnelManager.HasTunnel(localPort));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SplitSessionWithServerAsync_AbortedAfterConnect_CleansRuntimeState(
+        bool removeSessionBeforeMaterialization)
+    {
+        const string inventoryServerId = "winrm-orphan-server";
+        const int localPort = 45128;
+        TunnelInfo tunnelInfo = new(
+            "gateway-1",
+            localPort,
+            "winrm.example.test",
+            5986,
+            DateTime.UtcNow,
+            true);
+        SharedTunnelWinRmConnectionService connectionService = new(
+            _connectionSm,
+            _tunnelManager,
+            tunnelInfo);
+        FakeEmbeddedSessionManager hostManager = new FakeEmbeddedSessionManager
+        {
+            CreateHostControlCallback = (_, _, _, _, _, _) =>
+                throw new InvalidOperationException("Host factory failed.")
+        };
+        SplitService sut = CreateSplitService(connectionService, hostManager);
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = inventoryServerId,
+                DisplayName = "WinRM orphan server",
+                ConnectionType = "WINRM",
+                RemoteServer = tunnelInfo.RemoteHost,
+                RemotePort = tunnelInfo.RemotePort
+            }
+        });
+
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-session",
+            connectionType: "SSH");
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = primaryPane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new() { session };
+        sut.ActiveSessionsProvider = () => removeSessionBeforeMaterialization
+            ? new ObservableCollection<SessionTabViewModel>()
+            : activeSessions;
+
+        await sut.SplitSessionWithServerAsync(
+            session,
+            inventoryServerId,
+            SplitOrientation.Vertical,
+            primaryPane.PaneId);
+
+        string runtimeServerId = Assert.Single(connectionService.ServerIds);
+        Assert.NotEqual(inventoryServerId, runtimeServerId);
+        Assert.Null(_connectionSm.GetStateData(runtimeServerId));
+        Assert.False(_tunnelManager.HasTunnel(localPort));
+        if (!removeSessionBeforeMaterialization)
+        {
+            Assert.Same(primaryPane, session.RootContent);
+        }
+    }
+
+    [Theory]
+    [InlineData(WinRmConnectionOutcome.FailureAfterTransportCleanup)]
+    [InlineData(WinRmConnectionOutcome.CancellationAfterTransportCleanup)]
+    [InlineData(WinRmConnectionOutcome.ExceptionAfterTransportCleanup)]
+    public async Task SplitSessionWithServerAsync_FailedDispatch_TearsDownStateWithoutDoubleRelease(
+        WinRmConnectionOutcome outcome)
+    {
+        const string inventoryServerId = "winrm-failed-server";
+        const int localPort = 45129;
+        TunnelInfo tunnelInfo = new(
+            "gateway-1",
+            localPort,
+            "winrm.example.test",
+            5986,
+            DateTime.UtcNow,
+            true);
+        SharedTunnelWinRmConnectionService connectionService = new(
+            _connectionSm,
+            _tunnelManager,
+            tunnelInfo,
+            outcome);
+        SplitService sut = CreateSplitService(connectionService);
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = inventoryServerId,
+                DisplayName = "Failed WinRM server",
+                ConnectionType = "WINRM",
+                RemoteServer = tunnelInfo.RemoteHost,
+                RemotePort = tunnelInfo.RemotePort
+            }
+        });
+
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-session",
+            connectionType: "SSH");
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = primaryPane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new() { session };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        Exception? exception = await Record.ExceptionAsync(() =>
+            sut.SplitSessionWithServerAsync(
+                session,
+                inventoryServerId,
+                SplitOrientation.Vertical,
+                primaryPane.PaneId));
+
+        Assert.Null(exception);
+        string runtimeServerId = Assert.Single(connectionService.ServerIds);
+        Assert.NotEqual(inventoryServerId, runtimeServerId);
+        Assert.Null(_connectionSm.GetStateData(runtimeServerId));
+        Assert.True(_tunnelManager.HasTunnel(localPort));
+        Assert.True(_tunnelManager.ReleaseReference(localPort));
+        Assert.False(_tunnelManager.HasTunnel(localPort));
     }
 
     // ── Category D: Reconnect exception handling ─────────────────────────
@@ -1295,6 +1509,159 @@ public sealed class SplitServiceTests : IDisposable
             LastProtocol = protocol;
             LastServer = server;
         }
+    }
+
+    private sealed class SharedTunnelWinRmConnectionService : IConnectionService
+    {
+        private readonly ConnectionStateMachine _connectionSm;
+        private readonly TunnelManager _tunnelManager;
+        private readonly TunnelInfo _tunnelInfo;
+        private readonly WinRmConnectionOutcome _outcome;
+        private readonly List<string> _serverIds = [];
+
+        public SharedTunnelWinRmConnectionService(
+            ConnectionStateMachine connectionSm,
+            TunnelManager tunnelManager,
+            TunnelInfo tunnelInfo,
+            WinRmConnectionOutcome outcome = WinRmConnectionOutcome.Success)
+        {
+            _connectionSm = connectionSm;
+            _tunnelManager = tunnelManager;
+            _tunnelInfo = tunnelInfo;
+            _outcome = outcome;
+        }
+
+        public IReadOnlyList<string> ServerIds => _serverIds;
+
+        public AppSettings? CurrentSettings => null;
+
+        public PreflightResult RunPreflight(ServerProfileDto server, AppSettings settings)
+            => PreflightResult.Ok();
+
+        public Task<ConnectionResult> ConnectSshAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectRdpAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default,
+            RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectSftpAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectVncAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectTelnetAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectFtpAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectCitrixAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectLocalShellAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => NotScriptedAsync();
+
+        public Task<ConnectionResult> ConnectWinRmAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            _serverIds.Add(server.Id);
+
+            if (_serverIds.Count == 1)
+            {
+                bool registered = _tunnelManager.TryRegisterExternalTunnel(
+                    _tunnelInfo,
+                    new DisposableHost(),
+                    () => true);
+                if (!registered)
+                {
+                    throw new InvalidOperationException("Shared test tunnel registration failed.");
+                }
+            }
+            else
+            {
+                _tunnelManager.AddReference(_tunnelInfo.LocalPort);
+            }
+
+            if (_outcome != WinRmConnectionOutcome.Success)
+            {
+                _tunnelManager.AddReference(_tunnelInfo.LocalPort);
+            }
+
+            _connectionSm.SetTunnelInfo(server.Id, _tunnelInfo.LocalPort, processId: 0);
+
+            if (_outcome != WinRmConnectionOutcome.Success)
+            {
+                bool closed = _tunnelManager.ReleaseReference(_tunnelInfo.LocalPort);
+                if (closed)
+                {
+                    throw new InvalidOperationException(
+                        "Failed connection unexpectedly closed the shared test tunnel.");
+                }
+            }
+
+            if (_outcome == WinRmConnectionOutcome.FailureAfterTransportCleanup)
+            {
+                return Task.FromResult(new ConnectionResult(false, "connection failed", null));
+            }
+
+            if (_outcome == WinRmConnectionOutcome.CancellationAfterTransportCleanup)
+            {
+                throw new OperationCanceledException(ct);
+            }
+
+            if (_outcome == WinRmConnectionOutcome.ExceptionAfterTransportCleanup)
+            {
+                throw new InvalidOperationException("connection failed after transport cleanup");
+            }
+
+            ISessionResult sessionResult = new DisposableSessionResult();
+            return Task.FromResult(new ConnectionResult(true, null, sessionResult));
+        }
+
+        public void Dispose() { }
+
+        private static Task<ConnectionResult> NotScriptedAsync()
+            => Task.FromResult(new ConnectionResult(false, "not scripted", null));
+    }
+
+    /// <summary>
+    /// Scripted WINRM dispatch outcomes used to verify split-state ownership.
+    /// </summary>
+    public enum WinRmConnectionOutcome
+    {
+        Success,
+        FailureAfterTransportCleanup,
+        CancellationAfterTransportCleanup,
+        ExceptionAfterTransportCleanup
     }
 
     private sealed class SuccessfulRdpConnectionService : IConnectionService
