@@ -45,6 +45,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
     private readonly SensitiveFileJanitorScheduler _plinkPasswordFileJanitorScheduler;
+    private readonly Action<string?> _deletePlinkPasswordFile;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -58,7 +59,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         X11ServerManager x11ServerManager,
         IDialogService dialogService,
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
-        PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null)
+        PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
+        Action<string?>? deletePlinkPasswordFile = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -70,6 +72,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _dialogService = dialogService;
         _plinkHostKeyProbe = plinkHostKeyProbe ?? new DefaultPlinkHostKeyProbe();
         _plinkPasswordFileJanitor = plinkPasswordFileJanitor ?? new PlinkPasswordFileJanitor();
+        _deletePlinkPasswordFile = deletePlinkPasswordFile ?? DeletePlinkPasswordFile;
         _plinkPasswordFileJanitorScheduler = new SensitiveFileJanitorScheduler(
             nameof(PlinkPasswordFileJanitor),
             _plinkPasswordFileJanitor.SweepStale);
@@ -237,6 +240,12 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 null,
                 SshSessionDiagnosticFactory.FromClassifiedFailure(
                     new SshFailureInfo(SshFailureCode.Cancelled, cancelledMessage, false, ex)));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            session.Dispose();
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            throw;
         }
         catch (Exception ex)
         {
@@ -620,7 +629,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             if (!string.IsNullOrEmpty(passwordFilePath))
             {
                 string fileToDelete = passwordFilePath;
-                terminalSession.ProcessExited += _ => DeletePlinkPasswordFile(fileToDelete);
+                terminalSession.ProcessExited += _ => _deletePlinkPasswordFile(fileToDelete);
             }
 
             try
@@ -630,10 +639,16 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 Core.Logging.FileLogger.Info($"Plink SSH session started: PID={terminalSession.ProcessId}");
                 passwordFilePath = null;
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                terminalSession.Dispose();
+                _deletePlinkPasswordFile(passwordFilePath);
+                throw;
+            }
             catch (Exception ex)
             {
                 terminalSession.Dispose();
-                DeletePlinkPasswordFile(passwordFilePath);
+                _deletePlinkPasswordFile(passwordFilePath);
                 Core.Logging.FileLogger.Error("Plink SSH launch failed", ex);
                 _connectionSm.SetError(server.Id, ex.Message);
                 return new ConnectionResult(
