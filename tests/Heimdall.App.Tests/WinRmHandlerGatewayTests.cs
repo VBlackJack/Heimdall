@@ -410,7 +410,7 @@ public sealed class WinRmHandlerGatewayTests
     }
 
     [Fact]
-    public async Task ConnectAsync_TunneledCredentialMode_DoesNotWarnAboutKerberosFallback()
+    public async Task ConnectAsync_TunneledCredentialMode_WarnsAboutKerberosFallback()
     {
         FakeTunnelService tunnelService = new FakeTunnelService
         {
@@ -435,7 +435,7 @@ public sealed class WinRmHandlerGatewayTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Null(result.Warning);
+        Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
         Assert.NotNull(terminalSession.Arguments);
         Assert.Contains("-File", terminalSession.Arguments, StringComparison.Ordinal);
     }

@@ -172,7 +172,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
             {
                 warning = _localizer["WarnWinRmSkipCertificateCheck"];
             }
-            else if (usesTunnel && server.WinRmIdentityMode == WinRmIdentityMode.CurrentUser)
+            else if (usesTunnel)
             {
                 warning = _localizer["WarnWinRmGatewayKerberos"];
             }
