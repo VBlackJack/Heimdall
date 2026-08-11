@@ -32,9 +32,113 @@ public sealed class PipeModeSession : ITerminalSession
     private Task? _stderrLoop;
     private CancellationTokenSource? _cts;
     private bool _disposed;
+    private readonly object _processExitedLock = new();
+    private Action<int>? _processExited;
+    private bool _processExitedRaised;
+    private int _processExitCode;
+    private readonly object _dataLock = new();
+    private readonly object _deliveryLock = new();
+    private Action<ReadOnlyMemory<byte>>? _dataReceived;
+    private List<byte[]>? _bootstrapBuffer = new();
+    private int _bootstrapBufferedBytes;
+    private bool _dataSubscriberAttached;
+    private bool _bootstrapCapLogged;
 
-    public event Action<ReadOnlyMemory<byte>>? DataReceived;
-    public event Action<int>? ProcessExited;
+    public event Action<ReadOnlyMemory<byte>>? DataReceived
+    {
+        add
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            lock (_deliveryLock)
+            {
+                bool firstSubscriber;
+                byte[][] replay;
+                Action<ReadOnlyMemory<byte>>? target;
+                lock (_dataLock)
+                {
+                    _dataReceived += value;
+                    target = _dataReceived;
+                    firstSubscriber = !_dataSubscriberAttached;
+                    if (firstSubscriber)
+                    {
+                        _dataSubscriberAttached = true;
+                        replay = _bootstrapBuffer is { Count: > 0 }
+                            ? _bootstrapBuffer.ToArray()
+                            : [];
+                        _bootstrapBuffer = null;
+                    }
+                    else
+                    {
+                        replay = [];
+                    }
+                }
+
+                if (firstSubscriber)
+                {
+                    foreach (byte[] chunk in replay)
+                    {
+                        SafeInvokeDataReceived(target, chunk.AsMemory());
+                    }
+                }
+            }
+        }
+        remove
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            lock (_dataLock)
+            {
+                _dataReceived -= value;
+            }
+        }
+    }
+
+    public event Action<int>? ProcessExited
+    {
+        add
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            bool invokeImmediately;
+            int exitCode;
+            lock (_processExitedLock)
+            {
+                invokeImmediately = _processExitedRaised;
+                exitCode = _processExitCode;
+                if (!invokeImmediately)
+                {
+                    _processExited += value;
+                }
+            }
+
+            if (invokeImmediately)
+            {
+                SafeInvokeProcessExitedHandler(value, exitCode);
+            }
+        }
+        remove
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            lock (_processExitedLock)
+            {
+                _processExited -= value;
+            }
+        }
+    }
 
     public bool IsRunning => _process is not null && !_process.HasExited;
     public int? ProcessId => _process?.Id;
@@ -151,6 +255,11 @@ public sealed class PipeModeSession : ITerminalSession
         _cts?.Cancel();
         KillProcess();
 
+        lock (_dataLock)
+        {
+            _bootstrapBuffer = null;
+        }
+
         if (_process is not null)
         {
             _process.Exited -= OnProcessExited;
@@ -208,7 +317,7 @@ public sealed class PipeModeSession : ITerminalSession
 
                 byte[] copy = new byte[bytesRead];
                 Buffer.BlockCopy(buffer, 0, copy, 0, bytesRead);
-                SafeInvokeDataReceived(new ReadOnlyMemory<byte>(copy, 0, bytesRead));
+                DeliverOrBuffer(copy);
             }
         }
         catch (OperationCanceledException) { /* Expected when session is disposed or cancelled */ }
@@ -219,14 +328,66 @@ public sealed class PipeModeSession : ITerminalSession
     {
         int exitCode = 0;
         try { exitCode = _process?.ExitCode ?? -1; } catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] OnProcessExited: {ex.Message}"); }
-        SafeInvokeProcessExited(exitCode);
+        SafeInvokeProcessExitedOnce(exitCode);
     }
 
-    private void SafeInvokeDataReceived(ReadOnlyMemory<byte> data)
+    private void DeliverOrBuffer(byte[] chunk)
     {
+        lock (_deliveryLock)
+        {
+            Action<ReadOnlyMemory<byte>>? target;
+            lock (_dataLock)
+            {
+                if (!_dataSubscriberAttached)
+                {
+                    BufferBootstrapChunk(chunk);
+                    return;
+                }
+
+                target = _dataReceived;
+            }
+
+            SafeInvokeDataReceived(target, chunk.AsMemory());
+        }
+    }
+
+    private void BufferBootstrapChunk(byte[] chunk)
+    {
+        if (_bootstrapBuffer is null)
+        {
+            return;
+        }
+
+        if (_bootstrapBufferedBytes + chunk.Length > Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes)
+        {
+            if (!_bootstrapCapLogged)
+            {
+                _bootstrapCapLogged = true;
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    "[PipeModeSession] Bootstrap output exceeded " +
+                    $"{Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes} bytes " +
+                    "before a subscriber attached; dropping further bootstrap bytes.");
+            }
+
+            return;
+        }
+
+        _bootstrapBuffer.Add(chunk);
+        _bootstrapBufferedBytes += chunk.Length;
+    }
+
+    private static void SafeInvokeDataReceived(
+        Action<ReadOnlyMemory<byte>>? handler,
+        ReadOnlyMemory<byte> data)
+    {
+        if (handler is null)
+        {
+            return;
+        }
+
         try
         {
-            DataReceived?.Invoke(data);
+            handler(data);
         }
         catch (Exception ex)
         {
@@ -234,11 +395,37 @@ public sealed class PipeModeSession : ITerminalSession
         }
     }
 
-    private void SafeInvokeProcessExited(int exitCode)
+    private void SafeInvokeProcessExitedOnce(int exitCode)
+    {
+        Action<int>? handlers;
+        lock (_processExitedLock)
+        {
+            if (_processExitedRaised)
+            {
+                return;
+            }
+
+            _processExitedRaised = true;
+            _processExitCode = exitCode;
+            handlers = _processExited;
+        }
+
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (Action<int> handler in handlers.GetInvocationList())
+        {
+            SafeInvokeProcessExitedHandler(handler, exitCode);
+        }
+    }
+
+    private static void SafeInvokeProcessExitedHandler(Action<int> handler, int exitCode)
     {
         try
         {
-            ProcessExited?.Invoke(exitCode);
+            handler(exitCode);
         }
         catch (Exception ex)
         {

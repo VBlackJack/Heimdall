@@ -22,6 +22,93 @@ namespace Heimdall.Terminal.Tests;
 public sealed class PipeModeSessionTests
 {
     [Fact]
+    public async Task DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput()
+    {
+        string signalPath = Path.Combine(Path.GetTempPath(), $"heimdall-pipe-ready-{Guid.NewGuid():N}.txt");
+        string escapedSignalPath = signalPath.Replace("'", "''", StringComparison.Ordinal);
+        PipeModeSession session = new();
+        StringBuilder output = new();
+        object outputLock = new object();
+        TaskCompletionSource<bool> liveOutput = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            await session.StartAsync(
+                TerminalTestHelpers.ResolvePowerShellExecutable(),
+                $"-NoLogo -NoProfile -Command \"$payload = 'PIPE-BOOTSTRAP:' + ('X' * 131072); " +
+                "[Console]::Out.WriteLine($payload); [Console]::Out.Flush(); " +
+                $"[IO.File]::WriteAllText('{escapedSignalPath}', 'ready'); " +
+                "$line = Read-Host; [Console]::Out.WriteLine('PIPE-LIVE:' + $line)\"");
+
+            Assert.True(
+                SpinWait.SpinUntil(() => File.Exists(signalPath), TimeSpan.FromSeconds(10)),
+                "The child process did not confirm that its bootstrap output was written.");
+
+            session.DataReceived += data =>
+            {
+                string text = Encoding.UTF8.GetString(data.Span);
+                bool hasLiveOutput;
+                lock (outputLock)
+                {
+                    output.Append(text);
+                    hasLiveOutput = output.ToString().Contains("PIPE-LIVE:after-replay", StringComparison.Ordinal);
+                }
+
+                if (hasLiveOutput)
+                {
+                    liveOutput.TrySetResult(true);
+                }
+            };
+
+            session.Write("after-replay\r\n");
+
+            await liveOutput.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            string text;
+            lock (outputLock)
+            {
+                text = output.ToString();
+            }
+
+            int bootstrapIndex = text.IndexOf("PIPE-BOOTSTRAP:", StringComparison.Ordinal);
+            int liveIndex = text.IndexOf("PIPE-LIVE:after-replay", StringComparison.Ordinal);
+            Assert.True(bootstrapIndex >= 0, "The late subscriber did not receive the buffered bootstrap output.");
+            Assert.True(liveIndex > bootstrapIndex, "Live output was delivered before the bootstrap replay.");
+        }
+        finally
+        {
+            session.Dispose();
+            File.Delete(signalPath);
+        }
+    }
+
+    [Fact]
+    public async Task ProcessExited_SubscriberAddedAfterFastExit_ReplaysExitCode()
+    {
+        PipeModeSession session = new();
+        TaskCompletionSource<int> replayed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            await session.StartAsync(
+                TerminalTestHelpers.ResolvePowerShellExecutable(),
+                "-NoLogo -NoProfile -Command \"exit 37\"");
+
+            Assert.True(
+                SpinWait.SpinUntil(() => !session.IsRunning, TimeSpan.FromSeconds(10)),
+                "The child process did not exit.");
+
+            session.ProcessExited += exitCode => replayed.TrySetResult(exitCode);
+
+            int exitCode = await replayed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(37, exitCode);
+        }
+        finally
+        {
+            session.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task Write_InputReachesProcessStdin()
     {
         PipeModeSession session = new();
