@@ -46,6 +46,17 @@ public sealed class WinRmEarlyOutputDiagnosticTests
     }
 
     [Fact]
+    public void Observe_NtlmCodeWithoutWinRmContext_DoesNotMatch()
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes("Process returned 0x8009030e."));
+
+        Assert.Null(result);
+        Assert.True(diagnostic.IsActive);
+    }
+
+    [Fact]
     public void Observe_WsMan12152WithContext_ReturnsKey()
     {
         WinRmEarlyOutputDiagnostic diagnostic = new();
@@ -68,15 +79,40 @@ public sealed class WinRmEarlyOutputDiagnosticTests
         Assert.True(diagnostic.IsActive);
     }
 
-    [Fact]
-    public void Observe_CleanOutput_DoesNotMatchAndStaysActive()
+    [Theory]
+    [InlineData("PowerShell 7.5.0\r\nPS C:\\> ")]
+    [InlineData("[server.example]: PS C:\\Users\\operator> ")]
+    public void Observe_ConfirmedPowerShellPrompt_DisablesDiagnostic(string output)
     {
         WinRmEarlyOutputDiagnostic diagnostic = new();
 
-        string? result = diagnostic.Observe(Bytes("PowerShell 7.5.0\r\nPS C:\\> "));
+        string? result = diagnostic.Observe(Bytes(output));
+
+        Assert.Null(result);
+        Assert.False(diagnostic.IsActive);
+        Assert.Null(diagnostic.Observe(Bytes("WinRM 0x8009030e")));
+    }
+
+    [Fact]
+    public void Observe_CleanBannerWithoutPrompt_StaysActive()
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes("PowerShell 7.5.0\r\nCopyright Microsoft Corporation."));
 
         Assert.Null(result);
         Assert.True(diagnostic.IsActive);
+    }
+
+    [Fact]
+    public void MarkUserInput_DisablesDiagnostic()
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        diagnostic.MarkUserInput();
+
+        Assert.False(diagnostic.IsActive);
+        Assert.Null(diagnostic.Observe(Bytes("WinRM 0x8009030e")));
     }
 
     [Fact]

@@ -1650,7 +1650,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             if (marksTerminalInput && _terminalSession is not null)
             {
-                _terminalSessionHasInput = true;
+                MarkTerminalInput();
             }
 
             _terminalSession?.Write(data);
@@ -1848,11 +1848,18 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             if (marksTerminalInput && _terminalSession is not null)
             {
-                _terminalSessionHasInput = true;
+                MarkTerminalInput();
             }
 
             _terminalSession?.Write(text);
         }
+    }
+
+    private void MarkTerminalInput()
+    {
+        _terminalSessionHasInput = true;
+        _winRmEarlyOutputDiagnostic?.MarkUserInput();
+        _winRmEarlyOutputDiagnostic = null;
     }
 
     /// <summary>Whether a macro recording is currently in progress.</summary>
