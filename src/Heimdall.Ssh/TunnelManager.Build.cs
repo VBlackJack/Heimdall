@@ -289,11 +289,11 @@ public sealed partial class TunnelManager
                 null,
                 socketEx.Message,
                 ClassifySocketException(socketEx)),
-            SshConnectionException connectionEx when !isChained => new TunnelResult(
+            SshConnectionException connectionEx => new TunnelResult(
                 false,
                 null,
                 connectionEx.Message,
-                SshFailureCode.NetworkRefused),
+                FailureClassifier.Classify(connectionEx).Code),
             SshException sshEx when !isChained && sshEx.Message.Contains("port", StringComparison.OrdinalIgnoreCase) => new TunnelResult(
                 false,
                 null,

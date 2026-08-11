@@ -1003,6 +1003,31 @@ public class TunnelManagerTests : IDisposable
         Assert.False(SshReconnectPolicy.AllowsAutoReconnect(result.FailureCode!.Value));
     }
 
+    [Theory]
+    [InlineData(false, "Connection refused by remote host", SshFailureCode.NetworkRefused)]
+    [InlineData(true, "Connection refused by remote host", SshFailureCode.NetworkRefused)]
+    [InlineData(false, "Connection reset by peer", SshFailureCode.NetworkReset)]
+    [InlineData(true, "Connection reset by peer", SshFailureCode.NetworkReset)]
+    [InlineData(false, "SSH protocol version mismatch", SshFailureCode.ProtocolError)]
+    [InlineData(true, "SSH protocol version mismatch", SshFailureCode.ProtocolError)]
+    public void ClassifyAndBuildFailureResult_ConnectionFailure_IsIndependentOfChainShape(
+        bool isChained,
+        string message,
+        SshFailureCode expectedCode)
+    {
+        SshConnectionException exception = new(message);
+        int cleanupCalls = 0;
+
+        TunnelResult result = TunnelManager.ClassifyAndBuildFailureResult(
+            exception,
+            () => cleanupCalls++,
+            isChained);
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedCode, result.FailureCode);
+        Assert.Equal(1, cleanupCalls);
+    }
+
     // ── Dispose ───────────────────────────────────────────────────────
 
     [Fact]

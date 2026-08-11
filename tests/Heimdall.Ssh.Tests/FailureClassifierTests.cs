@@ -74,6 +74,42 @@ public class FailureClassifierTests
     }
 
     [Fact]
+    public void Classify_AuthException_KeyboardInteractiveWithoutPassword_ReturnsDedicatedCode()
+    {
+        SshAuthenticationException exception = new(
+            "Server requires keyboard-interactive authentication.");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyboardInteractiveNoPassword, result.Code);
+        Assert.True(result.IsFatal);
+        Assert.Same(exception, result.OriginalException);
+    }
+
+    [Fact]
+    public void Classify_AuthException_KeyboardInteractiveWithPassword_DoesNotUseMissingPasswordCode()
+    {
+        SshAuthenticationException exception = new(
+            "Server requires keyboard-interactive authentication.");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyRejected, result.Code);
+        Assert.NotEqual(SshFailureCode.KeyboardInteractiveNoPassword, result.Code);
+    }
+
+    [Fact]
     public void Classify_AuthException_GenericMessage_ReturnsNoSupportedAuth()
     {
         var ex = new SshAuthenticationException("No auth methods available");
