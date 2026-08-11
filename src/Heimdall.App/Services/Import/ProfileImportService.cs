@@ -41,25 +41,8 @@ public sealed class ProfileImportService(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    /// <summary>
-    /// Mirrors the ConnectionService handler protocol keys. Keep in sync when adding protocol handlers.
-    /// </summary>
-    private static readonly IReadOnlyDictionary<string, string> CanonicalConnectionTypes =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["RDP"] = "RDP",
-            ["SSH"] = "SSH",
-            ["SFTP"] = "SFTP",
-            ["VNC"] = "VNC",
-            ["TELNET"] = "Telnet",
-            ["FTP"] = "FTP",
-            ["CITRIX"] = "Citrix",
-            ["LOCAL"] = "Local",
-            ["WINRM"] = "WINRM"
-        };
-
     internal static readonly IReadOnlySet<string> SupportedConnectionTypes =
-        CanonicalConnectionTypes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ConnectionTypeCatalog.CanonicalTypes;
 
     private readonly IConfigManager _configManager = configManager;
     private readonly LocalizationManager _localizer = localizer;
@@ -560,8 +543,6 @@ public sealed class ProfileImportService(
 
     private static string CanonicalizeConnectionType(string connectionType)
     {
-        return CanonicalConnectionTypes.TryGetValue(connectionType, out string? canonicalConnectionType)
-                ? canonicalConnectionType
-                : connectionType;
+        return ConnectionTypeCatalog.Canonicalize(connectionType);
     }
 }

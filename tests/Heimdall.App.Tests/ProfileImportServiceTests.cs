@@ -435,6 +435,7 @@ public sealed class ProfileImportServiceTests
             "WINRM"
         ];
 
+        Assert.Same(ConnectionTypeCatalog.CanonicalTypes, ProfileImportService.SupportedConnectionTypes);
         Assert.Equal(expected.Length, ProfileImportService.SupportedConnectionTypes.Count);
         foreach (string connectionType in expected)
         {

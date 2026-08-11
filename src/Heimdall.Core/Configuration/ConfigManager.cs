@@ -339,6 +339,7 @@ public sealed class ConfigManager : IConfigManager
             MergeExtensionData(currentSettings.ExtensionData, settingsToSave.ExtensionData);
             settingsToSave.SchemaVersion = AppSettings.CurrentSchemaVersion;
             NormalizeTrustedHostKeys(settingsToSave);
+            ValidateSettingsWriteInvariants(settingsToSave);
             var json = JsonSerializer.Serialize(settingsToSave, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
             TryPublishSettingsSnapshot(ReserveSettingsRevision(), settingsToSave);
@@ -379,6 +380,7 @@ public sealed class ConfigManager : IConfigManager
             settings.TrustedHostKeysV2[hostPortKey] = entry;
             settings.TrustedHostKeys.TryAdd(hostPortKey, fingerprint);
             settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+            ValidateSettingsWriteInvariants(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
             TryPublishSettingsSnapshot(ReserveSettingsRevision(), settings);
@@ -424,6 +426,7 @@ public sealed class ConfigManager : IConfigManager
             if (added > 0)
             {
                 settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+                ValidateSettingsWriteInvariants(settings);
                 var json = JsonSerializer.Serialize(settings, JsonOptions);
                 await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
                 TryPublishSettingsSnapshot(ReserveSettingsRevision(), settings);
@@ -454,6 +457,7 @@ public sealed class ConfigManager : IConfigManager
             mutate(settings);
             settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
             NormalizeTrustedHostKeys(settings);
+            ValidateSettingsWriteInvariants(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
             TryPublishSettingsSnapshot(ReserveSettingsRevision(), settings);
@@ -487,6 +491,20 @@ public sealed class ConfigManager : IConfigManager
             AppSettings.CurrentSchemaVersion,
             requireSupportedSchemaForWrite);
         NormalizeTrustedHostKeys(settings);
+        List<ValidationDiagnostic> diagnostics = [.. SchemaValidator.DiagnoseSettingsLoad(settings).Diagnostics];
+        for (int index = 0; index < settings.SshGateways.Count; index++)
+        {
+            foreach (ValidationDiagnostic diagnostic in
+                SchemaValidator.DiagnoseGatewayLoad(settings.SshGateways[index]).Diagnostics)
+            {
+                diagnostics.Add(diagnostic with
+                {
+                    Message = $"SshGateways[{index}].{diagnostic.Message}"
+                });
+            }
+        }
+
+        LogValidationDiagnostics("settings.json", diagnostics);
         return settings;
     }
 
@@ -686,7 +704,57 @@ public sealed class ConfigManager : IConfigManager
             RdpResolutionProfileMigration.Migrate(server);
         }
 
+        List<ValidationDiagnostic> diagnostics = [];
+        for (int index = 0; index < document.Servers.Count; index++)
+        {
+            foreach (ValidationDiagnostic diagnostic in
+                SchemaValidator.DiagnoseServerLoad(document.Servers[index]).Diagnostics)
+            {
+                diagnostics.Add(diagnostic with
+                {
+                    Message = $"Servers[{index}].{diagnostic.Message}"
+                });
+            }
+        }
+
+        LogValidationDiagnostics("servers.json", diagnostics);
+
         return document;
+    }
+
+    private static void ValidateSettingsWriteInvariants(AppSettings settings)
+    {
+        List<string> errors = [.. SchemaValidator.ValidateSettingsWriteInvariants(settings).Errors];
+        for (int index = 0; index < settings.SshGateways.Count; index++)
+        {
+            foreach (string error in SchemaValidator
+                .ValidateGatewayWriteInvariants(settings.SshGateways[index]).Errors)
+            {
+                errors.Add($"SshGateways[{index}].{error}");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new ConfigurationValidationException("settings.json", errors);
+        }
+    }
+
+    private static void LogValidationDiagnostics(
+        string documentName,
+        IReadOnlyCollection<ValidationDiagnostic> diagnostics)
+    {
+        if (diagnostics.Count == 0)
+        {
+            return;
+        }
+
+        string detail = string.Join(
+            "; ",
+            diagnostics.Select(diagnostic =>
+                $"[{diagnostic.Severity}] {diagnostic.Message}"));
+        Logging.FileLogger.Warn(
+            $"Configuration diagnostics for {documentName}: {detail}");
     }
 
     /// <summary>
@@ -888,4 +956,24 @@ public sealed class ConfigManager : IConfigManager
             Logging.FileLogger.Warn($"ACL application skipped (non-NTFS or restricted): {ex.Message}");
         }
     }
+}
+
+/// <summary>
+/// Raised when a settings write would persist a configuration that violates
+/// a security-critical invariant.
+/// </summary>
+public sealed class ConfigurationValidationException : InvalidOperationException
+{
+    public ConfigurationValidationException(
+        string documentName,
+        IReadOnlyCollection<string> errors)
+        : base($"{documentName} cannot be saved: {string.Join("; ", errors)}")
+    {
+        DocumentName = documentName;
+        Errors = errors.ToArray();
+    }
+
+    public string DocumentName { get; }
+
+    public IReadOnlyList<string> Errors { get; }
 }

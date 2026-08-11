@@ -51,18 +51,6 @@ public static partial class SchemaValidator
         "en", "fr"
     };
 
-    private static readonly HashSet<string> ValidThemes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Dracula", "Drakul", "Striga", "Cinder", "Bracken", "Tarn", "Mortis", "Slate",
-        "Magellan", "Voivode", "Carmilla", "Whitby", "Vesper", "Parchment", "Folio",
-        "Wormwood", "Sconce"
-    };
-
-    private static readonly HashSet<string> ValidConnectionTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "RDP", "SSH", "SFTP"
-    };
-
     private static readonly HashSet<string> ValidModes = new(StringComparer.OrdinalIgnoreCase)
     {
         "External", "Embedded"
@@ -90,11 +78,6 @@ public static partial class SchemaValidator
         if (!ValidLocales.Contains(settings.DefaultLocale))
         {
             errors.Add($"{nameof(settings.DefaultLocale)}: unsupported locale '{settings.DefaultLocale}'.");
-        }
-
-        if (!ValidThemes.Contains(settings.DefaultTheme))
-        {
-            errors.Add($"{nameof(settings.DefaultTheme)}: unsupported theme '{settings.DefaultTheme}'.");
         }
 
         ValidateRange(errors, settings.TunnelEstablishmentDelayMs, 0, 60000,
@@ -269,11 +252,13 @@ public static partial class SchemaValidator
             errors.Add($"{nameof(server.DisplayName)}: required.");
         }
 
-        if (string.IsNullOrWhiteSpace(server.RemoteServer))
+        if (ConnectionTypeCatalog.RequiresRemoteServer(server.ConnectionType)
+            && string.IsNullOrWhiteSpace(server.RemoteServer))
         {
             errors.Add($"{nameof(server.RemoteServer)}: required.");
         }
-        else if (!HostnameRegex().IsMatch(server.RemoteServer))
+        else if (!string.IsNullOrWhiteSpace(server.RemoteServer)
+            && !HostnameRegex().IsMatch(server.RemoteServer))
         {
             errors.Add($"{nameof(server.RemoteServer)}: invalid hostname or IP address.");
         }
@@ -282,9 +267,10 @@ public static partial class SchemaValidator
         ValidatePort(errors, server.LocalPort, nameof(server.LocalPort));
         ValidatePort(errors, server.SshPort, nameof(server.SshPort));
 
-        if (!ValidConnectionTypes.Contains(server.ConnectionType))
+        if (!ConnectionTypeCatalog.IsKnown(server.ConnectionType))
         {
-            errors.Add($"{nameof(server.ConnectionType)}: must be 'RDP', 'SSH', or 'SFTP'.");
+            errors.Add(
+                $"{nameof(server.ConnectionType)}: unsupported type '{server.ConnectionType}'.");
         }
 
         if (!ValidModes.Contains(server.SshMode))
@@ -396,17 +382,72 @@ public static partial class SchemaValidator
             errors.Add($"{nameof(gateway.User)}: required.");
         }
 
-        if (!string.IsNullOrEmpty(gateway.KeyPath) && !File.Exists(gateway.KeyPath))
-        {
-            errors.Add($"{nameof(gateway.KeyPath)}: file not found '{gateway.KeyPath}'.");
-        }
-
         if (gateway.ParentGatewayId == gateway.Id && !string.IsNullOrEmpty(gateway.Id))
         {
             errors.Add($"{nameof(gateway.ParentGatewayId)}: gateway cannot be its own parent.");
         }
 
         return new ValidationResult(errors.Count == 0, errors);
+    }
+
+    internal static ValidationResult DiagnoseSettingsLoad(AppSettings settings)
+    {
+        ValidationResult strictResult = ValidateSettings(settings);
+        List<string> blockingMessages = [];
+        ValidateVault(blockingMessages, settings);
+        return ValidationResult.FromDiagnostics(
+            strictResult.Errors.Select(message => new ValidationDiagnostic(
+                blockingMessages.Contains(message, StringComparer.Ordinal)
+                    ? ValidationSeverity.Error
+                    : ValidationSeverity.Warning,
+                message)));
+    }
+
+    internal static ValidationResult DiagnoseServerLoad(ServerProfileDto server)
+    {
+        ValidationResult strictResult = ValidateServer(server);
+        return ValidationResult.FromDiagnostics(
+            strictResult.Errors.Select(message =>
+                new ValidationDiagnostic(ValidationSeverity.Warning, message)));
+    }
+
+    internal static ValidationResult DiagnoseGatewayLoad(SshGatewayDto gateway)
+    {
+        ValidationResult strictResult = ValidateGateway(gateway);
+        List<string> blockingMessages = [];
+        ValidateGatewayWriteInvariants(blockingMessages, gateway);
+        return ValidationResult.FromDiagnostics(
+            strictResult.Errors.Select(message => new ValidationDiagnostic(
+                blockingMessages.Contains(message, StringComparer.Ordinal)
+                    ? ValidationSeverity.Error
+                    : ValidationSeverity.Warning,
+                message)));
+    }
+
+    internal static ValidationResult ValidateSettingsWriteInvariants(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        List<string> errors = [];
+        ValidateVault(errors, settings);
+        return new ValidationResult(errors.Count == 0, errors);
+    }
+
+    internal static ValidationResult ValidateGatewayWriteInvariants(SshGatewayDto gateway)
+    {
+        ArgumentNullException.ThrowIfNull(gateway);
+        List<string> errors = [];
+        ValidateGatewayWriteInvariants(errors, gateway);
+        return new ValidationResult(errors.Count == 0, errors);
+    }
+
+    private static void ValidateGatewayWriteInvariants(
+        List<string> errors,
+        SshGatewayDto gateway)
+    {
+        if (gateway.ParentGatewayId == gateway.Id && !string.IsNullOrEmpty(gateway.Id))
+        {
+            errors.Add($"{nameof(gateway.ParentGatewayId)}: gateway cannot be its own parent.");
+        }
     }
 
     private static void ValidateRange(List<string> errors, int value, int min, int max, string name)
@@ -432,6 +473,54 @@ public static partial class SchemaValidator
 /// <summary>
 /// Result of a schema validation operation.
 /// </summary>
-/// <param name="IsValid">Whether the validation passed without errors.</param>
-/// <param name="Errors">List of validation error messages (empty if valid).</param>
-public sealed record ValidationResult(bool IsValid, List<string> Errors);
+public enum ValidationSeverity
+{
+    Warning,
+    Error
+}
+
+public sealed record ValidationDiagnostic(ValidationSeverity Severity, string Message);
+
+/// <summary>
+/// Result of a schema validation operation.
+/// </summary>
+public sealed class ValidationResult
+{
+    public ValidationResult(bool isValid, List<string> errors)
+    {
+        IsValid = isValid;
+        Errors = errors;
+        Warnings = [];
+        Diagnostics = errors
+            .Select(message => new ValidationDiagnostic(ValidationSeverity.Error, message))
+            .ToArray();
+    }
+
+    private ValidationResult(IReadOnlyList<ValidationDiagnostic> diagnostics)
+    {
+        Diagnostics = diagnostics;
+        Errors = diagnostics
+            .Where(diagnostic => diagnostic.Severity == ValidationSeverity.Error)
+            .Select(diagnostic => diagnostic.Message)
+            .ToList();
+        Warnings = diagnostics
+            .Where(diagnostic => diagnostic.Severity == ValidationSeverity.Warning)
+            .Select(diagnostic => diagnostic.Message)
+            .ToList();
+        IsValid = Errors.Count == 0;
+    }
+
+    public bool IsValid { get; }
+
+    public List<string> Errors { get; }
+
+    public List<string> Warnings { get; }
+
+    public IReadOnlyList<ValidationDiagnostic> Diagnostics { get; }
+
+    internal static ValidationResult FromDiagnostics(
+        IEnumerable<ValidationDiagnostic> diagnostics)
+    {
+        return new ValidationResult(diagnostics.ToArray());
+    }
+}

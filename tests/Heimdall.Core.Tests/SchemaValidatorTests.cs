@@ -92,14 +92,14 @@ public class SchemaValidatorTests
     }
 
     [Fact]
-    public void ValidateSettings_InvalidTheme_ReturnsError()
+    public void ValidateSettings_UnknownTheme_IsAccepted()
     {
         var settings = new AppSettings { DefaultTheme = "Blue" };
 
         var result = SchemaValidator.ValidateSettings(settings);
 
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("DefaultTheme"));
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, e => e.Contains("DefaultTheme"));
     }
 
     [Fact]
@@ -533,7 +533,6 @@ public class SchemaValidatorTests
             DefaultResolutionWidth = 0,
             DefaultResolutionHeight = 0,
             DefaultLocale = "xx",
-            DefaultTheme = "Neon",
             SshDefaultMode = "invalid",
             RdpDefaultMode = "invalid",
             MaxEmbeddedSessions = 0
@@ -542,7 +541,7 @@ public class SchemaValidatorTests
         var result = SchemaValidator.ValidateSettings(settings);
 
         Assert.False(result.IsValid);
-        Assert.True(result.Errors.Count >= 7);
+        Assert.True(result.Errors.Count >= 6);
     }
 
     // ── ValidateServer: valid inputs ──────────────────────────────────
@@ -832,10 +831,22 @@ public class SchemaValidatorTests
     // ── ValidateServer: invalid connection type / modes ────────────────
 
     [Fact]
+    public void ValidateServer_ToolConnectionType_IsValid()
+    {
+        ServerProfileDto server = CreateValidServer();
+        server.ConnectionType = "TOOL:PING";
+
+        ValidationResult result = SchemaValidator.ValidateServer(server);
+
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
     public void ValidateServer_InvalidConnectionType_ReturnsError()
     {
         var server = CreateValidServer();
-        server.ConnectionType = "VNC";
+        server.ConnectionType = "GOPHER";
 
         var result = SchemaValidator.ValidateServer(server);
 
@@ -1195,15 +1206,15 @@ public class SchemaValidatorTests
     }
 
     [Fact]
-    public void ValidateGateway_NonExistentKeyPath_ReturnsError()
+    public void ValidateGateway_NonExistentKeyPath_IsAccepted()
     {
         var gateway = CreateValidGateway();
         gateway.KeyPath = @"C:\nonexistent\path\key.ppk";
 
         var result = SchemaValidator.ValidateGateway(gateway);
 
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("KeyPath") && e.Contains("file not found"));
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, e => e.Contains("KeyPath"));
     }
 
     [Fact]
