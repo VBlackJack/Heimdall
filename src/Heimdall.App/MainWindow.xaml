@@ -3775,10 +3775,12 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 AutomationProperties.Name="{loc:Translate A11yStatusBar}">
             <DockPanel Margin="8,0">
-                <TextBlock Text="{Binding StatusText}"
+                <TextBlock Text="{Binding StatusText, NotifyOnTargetUpdated=True}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center" FontSize="{StaticResource FontSizeCaption}"
-                           AutomationProperties.LiveSetting="Polite"/>
+                           AutomationProperties.Name="{Binding StatusText}"
+                           AutomationProperties.LiveSetting="Polite"
+                           behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 <!-- Subtle F1 shortcut hint — visible when status shows default ready text -->
                 <TextBlock x:Name="Mw_StatusBarShortcutHint" Text="{loc:Translate StatusBarShortcutHint}"
                            FontSize="{StaticResource FontSizeSmallCaption}"

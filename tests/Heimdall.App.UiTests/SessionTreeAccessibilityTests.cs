@@ -16,6 +16,7 @@
 
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -23,6 +24,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Xml.Linq;
 using FlaUI.UIA3;
 using Heimdall.App.Behaviors;
 using Heimdall.App.Services;
@@ -103,6 +105,81 @@ public sealed class SessionTreeAccessibilityTests
         {
             WpfTestHost.Invoke(() => window!.Close());
         }
+    }
+
+    [StaFact]
+    public void GlobalStatus_XamlContractRaisesLiveRegionEventForVisibleBindingChange()
+    {
+        TextSource? source = null;
+        TextBlock? status = null;
+        Window? window = null;
+        IntPtr windowHandle = IntPtr.Zero;
+        WpfTestHost.Invoke(() =>
+        {
+            source = new TextSource { Value = "Ready" };
+            status = new TextBlock();
+            AutomationProperties.SetAutomationId(status, "GlobalStatus");
+            AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
+            BindingOperations.SetBinding(
+                status,
+                TextBlock.TextProperty,
+                new WpfBinding(nameof(TextSource.Value))
+                {
+                    Source = source,
+                    NotifyOnTargetUpdated = true
+                });
+            BindingOperations.SetBinding(
+                status,
+                AutomationProperties.NameProperty,
+                new WpfBinding(nameof(TextSource.Value))
+                {
+                    Source = source
+                });
+            LiveRegionBehavior.SetAnnounceOnTargetUpdated(status, true);
+            window = Show(status);
+            windowHandle = new WindowInteropHelper(window).Handle;
+        });
+        WpfTestHost.Invoke(DrainDispatcher);
+
+        ConcurrentQueue<string> announcements = new();
+        using ManualResetEventSlim announcementReceived = new(false);
+        using UIA3Automation automation = new();
+        FlaUI.Core.AutomationElements.AutomationElement root =
+            automation.FromHandle(windowHandle);
+        FlaUI.Core.AutomationElements.AutomationElement statusElement =
+            Assert.IsAssignableFrom<FlaUI.Core.AutomationElements.AutomationElement>(
+                root.FindFirstDescendant(
+                    condition => condition.ByAutomationId("GlobalStatus")));
+        using IDisposable eventHandler = statusElement.RegisterAutomationEvent(
+            automation.EventLibrary.Element.LiveRegionChangedEvent,
+            FlaUI.Core.Definitions.TreeScope.Element,
+            (element, _) =>
+            {
+                announcements.Enqueue(element.Name);
+                announcementReceived.Set();
+            });
+        try
+        {
+            WpfTestHost.Invoke(() => source!.Value = "Connection failed");
+            WpfTestHost.Invoke(DrainDispatcher);
+
+            Assert.True(
+                announcementReceived.Wait(TimeSpan.FromSeconds(3)),
+                "The visible global status did not raise LiveRegionChanged.");
+            Assert.Equal(
+                AutomationLiveSetting.Polite,
+                WpfTestHost.Invoke(() => AutomationProperties.GetLiveSetting(status!)));
+            Assert.NotEmpty(announcements);
+            Assert.All(
+                announcements,
+                announcement => Assert.Equal("Connection failed", announcement));
+        }
+        finally
+        {
+            WpfTestHost.Invoke(() => window!.Close());
+        }
+
+        AssertGlobalStatusXamlContract();
     }
 
     [StaFact]
@@ -213,6 +290,51 @@ public sealed class SessionTreeAccessibilityTests
         {
             Thread.Sleep(20);
         }
+    }
+
+    private static void AssertGlobalStatusXamlContract()
+    {
+        string sourcePath = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Heimdall.App",
+            "MainWindow.xaml");
+        XDocument document = XDocument.Load(sourcePath);
+        XNamespace presentationNamespace = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace behaviorsNamespace = "clr-namespace:Heimdall.App.Behaviors";
+        XElement status = Assert.Single(
+            document.Descendants(presentationNamespace + "TextBlock"),
+            element =>
+                ((string?)element.Attribute("Text"))?.StartsWith(
+                    "{Binding StatusText",
+                    StringComparison.Ordinal) == true);
+
+        Assert.Equal(
+            "{Binding StatusText, NotifyOnTargetUpdated=True}",
+            (string?)status.Attribute("Text"));
+        Assert.Equal(
+            "{Binding StatusText}",
+            (string?)status.Attribute("AutomationProperties.Name"));
+        Assert.Equal(
+            "Polite",
+            (string?)status.Attribute("AutomationProperties.LiveSetting"));
+        Assert.Equal(
+            "True",
+            (string?)status.Attribute(
+                behaviorsNamespace + "LiveRegionBehavior.AnnounceOnTargetUpdated"));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null
+            && !File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory.FullName;
     }
 
     private sealed class TextSource : INotifyPropertyChanged
