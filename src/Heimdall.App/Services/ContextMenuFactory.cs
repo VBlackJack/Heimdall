@@ -593,9 +593,14 @@ public sealed class ContextMenuFactory
             ApplyDestructiveForeground(deleteItem);
             deleteItem.Click += async (_, _) =>
             {
-                var confirmed = await vm.DialogService.ShowConfirmAsync(
+                int affectedEntryCount =
+                    vm.ServerList.GetCanonicalFolderEntryCount(folder.FullPath);
+                bool confirmed = await vm.DialogService.ShowConfirmAsync(
                     vm.Localize("TreeCtxDeleteGroup"),
-                    string.Format(vm.Localize("TreeCtxDeleteGroupConfirm"), folder.Name),
+                    string.Format(
+                        vm.Localize("TreeCtxDeleteGroupConfirm"),
+                        folder.Name,
+                        affectedEntryCount),
                     "warning");
 
                 if (!confirmed) return;

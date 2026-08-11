@@ -748,7 +748,7 @@
   "TreeCtxNewServer": "Nouvelle session ici",
   "TreeCtxRenameGroup": "Renommer le groupe",
   "TreeCtxDeleteGroup": "Supprimer le groupe",
-  "TreeCtxDeleteGroupConfirm": "Supprimer le groupe \"{0}\" ? Les sessions seront d\u00e9plac\u00e9es dans \"Sans groupe\".",
+  "TreeCtxDeleteGroupConfirm": "Supprimer le groupe \"{0}\" ? Entr\u00e9es concern\u00e9es dans ce groupe et ses sous-groupes, y compris celles masqu\u00e9es par le filtre actuel : {1}. Elles seront toutes d\u00e9plac\u00e9es dans \"Sans groupe\".",
   "TreeCtxSortAsc": "Trier A \u2192 Z",
   "TreeCtxSortDesc": "Trier Z \u2192 A",
   "TreeCtxExportProject": "Exporter le projet",

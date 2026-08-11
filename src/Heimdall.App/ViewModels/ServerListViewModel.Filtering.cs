@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.ViewModels;
 
@@ -65,6 +66,19 @@ public partial class ServerListViewModel
     internal int ConnectedMembershipRefreshCount { get; private set; }
 
     internal TimeSpan LastFilterPassDuration { get; private set; }
+
+    /// <summary>
+    /// Counts every inventory entry in a folder or one of its descendants,
+    /// independently from the current visible filter projection.
+    /// </summary>
+    internal int GetCanonicalFolderEntryCount(string folderPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+
+        return _allServers.Count(server =>
+            server.Group is string group
+            && FolderPath.IsSelfOrDescendant(group, folderPath));
+    }
 
     private void InitializeFilterOptions()
     {

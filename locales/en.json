@@ -748,7 +748,7 @@
   "TreeCtxNewServer": "New session here",
   "TreeCtxRenameGroup": "Rename group",
   "TreeCtxDeleteGroup": "Delete group",
-  "TreeCtxDeleteGroupConfirm": "Delete group \"{0}\"? Sessions will be moved to \"No Group\".",
+  "TreeCtxDeleteGroupConfirm": "Delete group \"{0}\"? Affected entries in this group and its subgroups, including entries hidden by the current filter: {1}. All will be moved to \"No Group\".",
   "TreeCtxSortAsc": "Sort A \u2192 Z",
   "TreeCtxSortDesc": "Sort Z \u2192 A",
   "TreeCtxExportProject": "Export project",
