@@ -4784,6 +4784,8 @@
   "SessionFailureStageSshPreflight": "Pr\u00e9-v\u00e9rification SSH",
   "SessionFailureStageSshAuth": "Authentification SSH",
   "SessionFailureStageSshHostKey": "Cl\u00e9 h\u00f4te SSH",
+  "SessionFailureStageSshPlinkFallback": "Repli Plink",
+  "SessionFailureStageSshPipeMode": "Mode pipe",
   "SessionFailureStageRdpTunnel": "Tunnel RDP",
   "SessionFailureStageRdpCredentialWrite": "\u00c9criture identifiants RDP",
   "SessionFailureStageRdpFileWrite": "\u00c9criture fichier RDP",
