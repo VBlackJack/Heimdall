@@ -262,7 +262,11 @@ public sealed class SplitService : ISplitService
             }
 
             newPane.HostControl = hostControl;
-            if (hostControl is EmbeddedRdpView rdpView)
+            if (hostControl is ISessionPaneOwner paneOwner)
+            {
+                paneOwner.SetOwningPane(newPane);
+            }
+            else if (hostControl is EmbeddedRdpView rdpView)
             {
                 rdpView.SetOwningPane(newPane);
             }
@@ -696,7 +700,11 @@ public sealed class SplitService : ISplitService
             }
 
             pane.HostControl = hostControl;
-            if (hostControl is EmbeddedRdpView rdpView)
+            if (hostControl is ISessionPaneOwner paneOwner)
+            {
+                paneOwner.SetOwningPane(pane);
+            }
+            else if (hostControl is EmbeddedRdpView rdpView)
             {
                 rdpView.SetOwningPane(pane);
             }

@@ -23,6 +23,17 @@ using Heimdall.Ssh;
 namespace Heimdall.App.Services;
 
 /// <summary>
+/// Assigns the exact pane that owns a hosted session surface.
+/// </summary>
+public interface ISessionPaneOwner
+{
+    /// <summary>
+    /// Associates the host with the pane whose runtime lifecycle it represents.
+    /// </summary>
+    void SetOwningPane(SessionPaneModel pane);
+}
+
+/// <summary>
 /// Factory for embedded session host controls (terminals, RDP, SFTP, tools).
 /// </summary>
 public interface IEmbeddedSessionManager

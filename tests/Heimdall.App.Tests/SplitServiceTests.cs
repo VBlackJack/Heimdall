@@ -390,13 +390,14 @@ public sealed class SplitServiceTests : IDisposable
         RecordingConnectionService connectionService = new RecordingConnectionService(
             stateMachine: _connectionSm,
             successfulWinRmSession: connectionSession);
+        RecordingPaneOwnerHost ownerHost = new RecordingPaneOwnerHost();
         FakeEmbeddedSessionManager hostManager = new FakeEmbeddedSessionManager
         {
             CreateHostControlCallback = (_, _, connectionType, sessionResult, _, _) =>
             {
                 Assert.Equal("WINRM", connectionType);
                 Assert.Same(connectionSession, sessionResult);
-                return new DisposableHost();
+                return ownerHost;
             }
         };
         SplitService sut = CreateSplitService(connectionService, hostManager);
@@ -439,6 +440,7 @@ public sealed class SplitServiceTests : IDisposable
         Assert.NotEqual(inventoryServerId, winRmPane.ServerId);
         Assert.Equal(ConnectionState.RemoteSessionHandedOff, _connectionSm.GetState(winRmPane.ServerId));
         Assert.Equal("Connected", winRmPane.Status);
+        Assert.Same(winRmPane, ownerHost.OwningPane);
         Assert.Null(_connectionSm.GetStateData(inventoryServerId));
     }
 
@@ -882,13 +884,14 @@ public sealed class SplitServiceTests : IDisposable
         RecordingConnectionService connectionService = new RecordingConnectionService(
             stateMachine: _connectionSm,
             successfulWinRmSession: connectionSession);
+        RecordingPaneOwnerHost ownerHost = new RecordingPaneOwnerHost();
         FakeEmbeddedSessionManager hostManager = new FakeEmbeddedSessionManager
         {
             CreateHostControlCallback = (_, _, connectionType, sessionResult, _, _) =>
             {
                 Assert.Equal("WINRM", connectionType);
                 Assert.Same(connectionSession, sessionResult);
-                return new DisposableHost();
+                return ownerHost;
             }
         };
         SplitService sut = CreateSplitService(connectionService, hostManager);
@@ -910,7 +913,19 @@ public sealed class SplitServiceTests : IDisposable
         pane.OriginalServerId = inventoryServerId;
         pane.Title = "WinRM server";
         pane.HostControl = oldHost;
-        SessionTabViewModel session = new SessionTabViewModel { RootContent = pane };
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-runtime",
+            connectionType: "SSH");
+        SessionTabViewModel session = new SessionTabViewModel
+        {
+            RootContent = new SplitContainerModel
+            {
+                First = primaryPane,
+                Second = pane,
+                Orientation = SplitOrientation.Vertical
+            }
+        };
         ObservableCollection<SessionTabViewModel> activeSessions = new ObservableCollection<SessionTabViewModel>
         {
             session
@@ -929,6 +944,7 @@ public sealed class SplitServiceTests : IDisposable
         Assert.Equal(runtimeServerId, connectionService.WinRmServerIdAtDispatch);
         Assert.Equal(ConnectionState.RemoteSessionHandedOff, _connectionSm.GetState(runtimeServerId));
         Assert.Equal("Connected", pane.Status);
+        Assert.Same(pane, ownerHost.OwningPane);
         Assert.Null(_connectionSm.GetStateData(inventoryServerId));
     }
 
@@ -2045,5 +2061,15 @@ public sealed class SplitServiceTests : IDisposable
         }
 
         public bool TrySendCommandToSession(SessionTabViewModel session, string command) => false;
+    }
+
+    private sealed class RecordingPaneOwnerHost : ISessionPaneOwner
+    {
+        public SessionPaneModel? OwningPane { get; private set; }
+
+        public void SetOwningPane(SessionPaneModel pane)
+        {
+            OwningPane = pane;
+        }
     }
 }

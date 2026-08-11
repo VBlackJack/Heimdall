@@ -14,8 +14,15 @@
  * limitations under the License.
  */
 
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using Heimdall.App.Services;
+using Heimdall.App.ViewModels;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
+using Heimdall.Core.StateMachine;
+using Heimdall.Ssh;
+using Heimdall.Terminal;
 
 namespace Heimdall.App.Tests;
 
@@ -31,8 +38,106 @@ namespace Heimdall.App.Tests;
 /// MsTscAx raises <c>OnDisconnected</c> after <c>CancelAutoReconnect</c>, re-surfacing the overlay,
 /// is a runtime COM contract and remains validated manually on a live RDP target.
 /// </remarks>
+[Collection(CredentialDialogPasswordDirtyCollection.Name)]
 public sealed class EmbeddedSessionManagerDisconnectTests
 {
+    [Fact]
+    public void WinRmProcessExit_ReleasesTunnelAndTearsDownRuntimeState()
+    {
+        RunOnStaThread(() =>
+        {
+            App application = CreateApplication();
+            try
+            {
+                const string runtimeServerId = "winrm-runtime-exit";
+                const int localPort = 45131;
+                ConnectionStateMachine stateMachine = new ConnectionStateMachine();
+                SeedWinRmHandedOffState(stateMachine, runtimeServerId, localPort);
+                RecordingTunnelService tunnelService = new RecordingTunnelService();
+                RaisingTerminalSession terminalSession = new RaisingTerminalSession();
+                EmbeddedSessionManager manager = CreateManager(stateMachine, tunnelService);
+                SessionPaneModel pane = new SessionPaneModel
+                {
+                    PaneId = "winrm-root-pane",
+                    ServerId = runtimeServerId,
+                    OriginalServerId = "winrm-inventory",
+                    Title = "WinRM root",
+                    ConnectionType = "WINRM",
+                    Status = "RemoteSessionHandedOff"
+                };
+                SessionTabViewModel tab = new SessionTabViewModel { RootContent = pane };
+                object host = manager.CreateHostControl(
+                    tab,
+                    pane.Title,
+                    pane.ConnectionType,
+                    new TerminalSessionResult(terminalSession));
+                pane.HostControl = host;
+
+                terminalSession.RaiseProcessExited(0);
+                terminalSession.RaiseProcessExited(0);
+
+                Assert.Null(stateMachine.GetStateData(runtimeServerId));
+                Assert.Equal(new[] { localPort }, tunnelService.ReleasedPorts);
+
+                ((IDisposable)host).Dispose();
+
+                const string primaryServerId = "winrm-primary-runtime";
+                const string splitServerId = "winrm-split-runtime";
+                const int primaryPort = 45132;
+                const int splitPort = 45133;
+                ConnectionStateMachine splitStateMachine = new ConnectionStateMachine();
+                SeedWinRmHandedOffState(splitStateMachine, primaryServerId, primaryPort);
+                SeedWinRmHandedOffState(splitStateMachine, splitServerId, splitPort);
+                RecordingTunnelService splitTunnelService = new RecordingTunnelService();
+                RaisingTerminalSession splitTerminalSession = new RaisingTerminalSession();
+                EmbeddedSessionManager splitManager = CreateManager(splitStateMachine, splitTunnelService);
+                SessionPaneModel primaryPane = new SessionPaneModel
+                {
+                    PaneId = "winrm-primary-pane",
+                    ServerId = primaryServerId,
+                    ConnectionType = "WINRM"
+                };
+                SessionPaneModel splitPane = new SessionPaneModel
+                {
+                    PaneId = "winrm-split-pane",
+                    ServerId = splitServerId,
+                    ConnectionType = "WINRM"
+                };
+                SessionTabViewModel splitTab = new SessionTabViewModel
+                {
+                    RootContent = new SplitContainerModel
+                    {
+                        First = primaryPane,
+                        Second = splitPane,
+                        Orientation = SplitOrientation.Vertical
+                    }
+                };
+                object splitHost = splitManager.CreateHostControl(
+                    splitTab,
+                    "WinRM split",
+                    "WINRM",
+                    new TerminalSessionResult(splitTerminalSession));
+                ISessionPaneOwner paneOwner = Assert.IsAssignableFrom<ISessionPaneOwner>(splitHost);
+                paneOwner.SetOwningPane(splitPane);
+                splitPane.HostControl = splitHost;
+
+                splitTerminalSession.RaiseProcessExited(0);
+
+                Assert.Equal(ConnectionState.RemoteSessionHandedOff, splitStateMachine.GetState(primaryServerId));
+                Assert.Null(splitStateMachine.GetStateData(splitServerId));
+                Assert.Equal(new[] { splitPort }, splitTunnelService.ReleasedPorts);
+
+                ((IDisposable)splitHost).Dispose();
+            }
+            finally
+            {
+                application.Shutdown();
+                application.Dispatcher.InvokeShutdown();
+                ResetApplicationSingletonForTest(application);
+            }
+        });
+    }
+
     [Fact]
     public void DisconnectSession_NullPane_Throws()
     {
@@ -158,6 +263,85 @@ public sealed class EmbeddedSessionManagerDisconnectTests
     private static EmbeddedSessionManager CreateManager()
         => new EmbeddedSessionManager(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
 
+    private static App CreateApplication()
+    {
+        Assert.Null(System.Windows.Application.Current);
+        App application = new App();
+        application.InitializeComponent();
+        return application;
+    }
+
+    private static void ResetApplicationSingletonForTest(App application)
+    {
+        Assert.Same(application, System.Windows.Application.Current);
+        BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+        FieldInfo? appInstance = typeof(System.Windows.Application).GetField("_appInstance", flags);
+        FieldInfo? appCreated = typeof(System.Windows.Application).GetField("_appCreatedInThisAppDomain", flags);
+        FieldInfo? isShuttingDown = typeof(System.Windows.Application).GetField("_isShuttingDown", flags);
+        Assert.NotNull(appInstance);
+        Assert.NotNull(appCreated);
+        Assert.NotNull(isShuttingDown);
+        appInstance.SetValue(null, null);
+        appCreated.SetValue(null, false);
+        isShuttingDown.SetValue(null, false);
+        Assert.Null(System.Windows.Application.Current);
+    }
+
+    private static EmbeddedSessionManager CreateManager(
+        ConnectionStateMachine stateMachine,
+        ITunnelService tunnelService)
+    {
+        return new EmbeddedSessionManager(
+            null!,
+            null!,
+            null!,
+            stateMachine,
+            null!,
+            tunnelService,
+            null!,
+            null!,
+            null!,
+            null!);
+    }
+
+    private static void SeedWinRmHandedOffState(
+        ConnectionStateMachine stateMachine,
+        string serverId,
+        int localPort)
+    {
+        Assert.True(stateMachine.TryTransition(serverId, ConnectionState.Initializing));
+        Assert.True(stateMachine.TryTransition(serverId, ConnectionState.ValidatingConfig));
+        Assert.True(stateMachine.TryTransition(serverId, ConnectionState.EstablishingTunnel));
+        stateMachine.SetTunnelInfo(serverId, localPort, processId: 0);
+        Assert.True(stateMachine.TryTransition(serverId, ConnectionState.TunnelEstablished));
+        Assert.True(stateMachine.TryTransition(serverId, ConnectionState.LaunchingWinRm));
+        Assert.True(stateMachine.TryTransition(serverId, ConnectionState.RemoteSessionHandedOff));
+    }
+
+    private static void RunOnStaThread(Action action)
+    {
+        Exception? captured = null;
+        Thread thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                captured = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (captured is not null)
+        {
+            ExceptionDispatchInfo.Capture(captured).Throw();
+        }
+    }
+
     private static SessionPaneModel CreatePane(object? hostControl)
     {
         return new SessionPaneModel
@@ -188,6 +372,86 @@ public sealed class EmbeddedSessionManagerDisconnectTests
             {
                 throw _exceptionToThrow;
             }
+        }
+    }
+
+    private sealed class RecordingTunnelService : ITunnelService
+    {
+        public List<int> ReleasedPorts { get; } = new List<int>();
+
+        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)>
+            SetupTunnelIfNeededAsync(
+                ServerProfileDto server,
+                int remotePort,
+                AppSettings settings,
+                CancellationToken ct = default,
+                bool useOsAssignedLocalPort = false)
+        {
+            throw new NotSupportedException();
+        }
+
+        public void UpdateSettings(AppSettings settings)
+        {
+        }
+
+        public TunnelForwardedPortFailure? GetRecentForwardedPortFailure(int localPort)
+            => null;
+
+        public void ReleaseTunnelReference(int localPort)
+            => ReleasedPorts.Add(localPort);
+    }
+
+    private sealed class RaisingTerminalSession : ITerminalSession
+    {
+        public event Action<ReadOnlyMemory<byte>>? DataReceived
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<int>? ProcessExited;
+
+        public bool IsRunning { get; private set; } = true;
+
+        public int? ProcessId => IsRunning ? 1234 : null;
+
+        public Dictionary<string, string>? EnvironmentVariables { get; set; }
+
+        public Task StartAsync(
+            string executable,
+            string arguments,
+            int columns = 80,
+            int rows = 24,
+            string? workingDirectory = null,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public void Write(ReadOnlySpan<byte> data)
+        {
+        }
+
+        public void Write(string text)
+        {
+        }
+
+        public void Resize(int columns, int rows)
+        {
+        }
+
+        public void Kill()
+        {
+            IsRunning = false;
+        }
+
+        public void Dispose()
+        {
+            IsRunning = false;
+        }
+
+        public void RaiseProcessExited(int exitCode)
+        {
+            IsRunning = false;
+            ProcessExited?.Invoke(exitCode);
         }
     }
 }

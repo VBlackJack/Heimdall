@@ -69,7 +69,7 @@ internal sealed class AutoReconnectTickScheduler
 /// WPF host for an interactive SSH shell session rendered through WebView2 + xterm.js.
 /// The browser surface handles VT parsing, ANSI colors, cursor movement, and scrollback.
 /// </summary>
-public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink
+public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ISessionPaneOwner
 {
     private static readonly (string Tag, Func<string> ContentFactory, string WrapperStart, string WrapperEnd)[] InlineAssets =
     [
@@ -226,6 +226,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private SshShellSession? _session;
     private Heimdall.Terminal.ITerminalSession? _terminalSession;
     private SessionTabViewModel? _sessionTab;
+    private SessionPaneModel? _ownerPane;
     private System.Threading.Timer? _keepAliveTimer;
     private System.Threading.Timer? _autoReconnectTimer;
     private readonly AutoReconnectTickScheduler _autoReconnectTickScheduler = new();
@@ -307,6 +308,19 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// through the shared <c>ConnectionViewModel.CloseSessionAsync</c> path.
     /// </summary>
     public event Action? CloseRequested;
+
+    /// <summary>
+    /// Raised synchronously when the hosted terminal process exits.
+    /// </summary>
+    internal event Action? TerminalProcessExited;
+
+    internal SessionPaneModel? OwningPane => _ownerPane;
+
+    public void SetOwningPane(SessionPaneModel pane)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        _ownerPane = pane;
+    }
 
     public EmbeddedSshView()
     {
@@ -1545,6 +1559,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private void OnTerminalProcessExited(int exitCode)
     {
+        TerminalProcessExited?.Invoke();
+
         TimeSpan runtime = _terminalSessionAttachedAtUtc is { } attachedAt
             ? DateTimeOffset.UtcNow - attachedAt
             : TimeSpan.Zero;

@@ -485,7 +485,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 settings,
                 endpoint: winRmResult.Endpoint,
                 connectedStatus: "RemoteSessionHandedOff",
-                sessionLoggingOverride: winRmResult.SessionLoggingOverride);
+                sessionLoggingOverride: winRmResult.SessionLoggingOverride,
+                trackWinRmLifecycle: true);
         }
 
         return new DisposablePlaceholderView(displayName, connectionType, session);
@@ -804,7 +805,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         bool isElevated = false,
         string? endpoint = null,
         string connectedStatus = "Connected",
-        bool? sessionLoggingOverride = null)
+        bool? sessionLoggingOverride = null,
+        bool trackWinRmLifecycle = false)
     {
         var view = new EmbeddedSshView
         {
@@ -835,7 +837,48 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         WireBroadcast(view);
         WireSplitRequested(view, tab);
         WireReconnectRequested(view, tab);
+        if (trackWinRmLifecycle)
+        {
+            WireWinRmTerminalProcessExited(view, tab);
+        }
         return view;
+    }
+
+    private void WireWinRmTerminalProcessExited(EmbeddedSshView view, SessionTabViewModel tab)
+    {
+        view.TerminalProcessExited += () =>
+        {
+            SessionPaneModel? pane = view.OwningPane;
+            if (pane is null && !tab.IsSplit)
+            {
+                pane = tab.PrimaryPane;
+            }
+
+            if (pane is null)
+            {
+                Core.Logging.FileLogger.Warn(
+                    "WINRM terminal exited before its split-pane ownership was assigned.");
+                return;
+            }
+
+            ConnectionStateData? state = _connectionSm.GetStateData(pane.ServerId);
+            if (state is null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (state.TunnelLocalPort is int localPort && localPort > 0)
+                {
+                    _tunnelService.ReleaseTunnelReference(localPort);
+                }
+            }
+            finally
+            {
+                _connectionSm.Teardown(pane.ServerId);
+            }
+        };
     }
 
     private void WireBroadcast(EmbeddedSshView view)
