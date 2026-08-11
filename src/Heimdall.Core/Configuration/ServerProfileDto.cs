@@ -25,8 +25,9 @@ namespace Heimdall.Core.Configuration;
 /// Compatible with legacy servers.json format.
 /// The ViewModel layer converts these to ObservableObject models.
 /// </summary>
-public sealed class ServerProfileDto
+public sealed class ServerProfileDto : IJsonOnDeserialized
 {
+    private int _winRmPort = DefaultPorts.WinRmHttp;
     private string? _sshKeyPassphraseEncrypted;
     private RdpResolutionMode _rdpResolutionMode = RdpResolutionMode.FitWindow;
     private int? _rdpFixedWidth;
@@ -64,7 +65,19 @@ public sealed class ServerProfileDto
     public string? VaultEntryName { get; set; }
 
     // WinRM settings
-    public int WinRmPort { get; set; } = DefaultPorts.WinRmHttp;
+    public int WinRmPort
+    {
+        get => _winRmPort;
+        set
+        {
+            _winRmPort = value;
+            HasWinRmPortField = true;
+        }
+    }
+
+    [JsonIgnore]
+    public bool HasWinRmPortField { get; private set; }
+
     public string? WinRmUsername { get; set; }
     public string? WinRmPasswordEncrypted { get; set; }
     public bool WinRmUseSsl { get; set; }
@@ -72,6 +85,16 @@ public sealed class ServerProfileDto
 
     [JsonConverter(typeof(WinRmIdentityModeJsonConverter))]
     public WinRmIdentityMode WinRmIdentityMode { get; set; } = WinRmIdentityMode.CurrentUser;
+
+    void IJsonOnDeserialized.OnDeserialized()
+    {
+        if (!HasWinRmPortField)
+        {
+            _winRmPort = WinRmUseSsl
+                ? DefaultPorts.WinRmHttps
+                : DefaultPorts.WinRmHttp;
+        }
+    }
 
     // SSH settings
     public string? SshUsername { get; set; }

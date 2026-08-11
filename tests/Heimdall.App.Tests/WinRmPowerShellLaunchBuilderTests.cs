@@ -230,6 +230,43 @@ public sealed class WinRmPowerShellLaunchBuilderTests
     }
 
     [Fact]
+    public void Build_WithImplicitPort_UsesSslAwareDefault()
+    {
+        ServerProfileDto server = new ServerProfileDto
+        {
+            ConnectionType = "WINRM",
+            RemoteServer = "server01.contoso.local",
+            WinRmUseSsl = true
+        };
+
+        string command = WinRmPowerShellLaunchBuilder.BuildEnterPSSessionCommand(
+            server,
+            credentialExpression: null);
+
+        Assert.Contains("-Port 5986", command, StringComparison.Ordinal);
+        Assert.Contains("-UseSSL", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_WithExplicitHttpPortAndSsl_PreservesExplicitPort()
+    {
+        ServerProfileDto server = new ServerProfileDto
+        {
+            ConnectionType = "WINRM",
+            RemoteServer = "server01.contoso.local",
+            WinRmPort = DefaultPorts.WinRmHttp,
+            WinRmUseSsl = true
+        };
+
+        string command = WinRmPowerShellLaunchBuilder.BuildEnterPSSessionCommand(
+            server,
+            credentialExpression: null);
+
+        Assert.Contains("-Port 5985", command, StringComparison.Ordinal);
+        Assert.Contains("-UseSSL", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Build_WithInvalidHost_Throws()
     {
         WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(_ => null);

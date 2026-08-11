@@ -55,6 +55,23 @@ public sealed class ServerDialogWinRmTests
     }
 
     [Fact]
+    public void ReselectProtocol_WinRmSsl_RestoresHttpsDefaultPort()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel();
+        vm.SelectProtocolCommand.Execute("WINRM");
+        vm.WinRmUseSsl = true;
+        vm.BackToProtocolSelectorCommand.Execute(null);
+        vm.SelectProtocolCommand.Execute("SSH");
+        vm.BackToProtocolSelectorCommand.Execute(null);
+
+        vm.SelectProtocolCommand.Execute("WINRM");
+
+        Assert.True(vm.WinRmUseSsl);
+        Assert.Equal(DefaultPorts.WinRmHttps, vm.WinRmPort);
+        Assert.Equal(DefaultPorts.WinRmHttps, vm.EndpointPort);
+    }
+
+    [Fact]
     public void WinRmUseSsl_PreservesCustomPort()
     {
         ServerDialogViewModel vm = new ServerDialogViewModel

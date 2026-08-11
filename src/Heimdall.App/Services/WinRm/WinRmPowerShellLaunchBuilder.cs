@@ -187,7 +187,7 @@ internal sealed class WinRmPowerShellLaunchBuilder
     internal static int ResolvePort(ServerProfileDto server)
     {
         ArgumentNullException.ThrowIfNull(server);
-        return server.WinRmPort > 0
+        return server.HasWinRmPortField && server.WinRmPort > 0
             ? server.WinRmPort
             : server.WinRmUseSsl ? DefaultPorts.WinRmHttps : DefaultPorts.WinRmHttp;
     }
