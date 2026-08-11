@@ -154,18 +154,156 @@ public sealed class WindowClosingFlowTests
         Assert.Equal(0, warningCount);
     }
 
+    [Theory]
+    [InlineData(true, 0, WindowUIState.MinSidebarWidth, false, true)]
+    [InlineData(false, 1000, WindowUIState.MaxSidebarWidth, true, false)]
+    public void RestoreSidebarState_SeedsNormalizedCanonicalProjection(
+        bool isSidebarHidden,
+        int persistedWidth,
+        double expectedWidth,
+        bool expectedVisible,
+        bool expectedRestoreButton)
+    {
+        WindowUIState state = new()
+        {
+            IsSidebarHidden = !isSidebarHidden,
+            SavedSidebarWidth = WindowUIState.DefaultSidebarWidth
+        };
+        AppSettings settings = new()
+        {
+            SidebarCollapsed = isSidebarHidden,
+            SidebarWidth = persistedWidth
+        };
+
+        SidebarLayoutProjection projection = WindowBoundsPersistence.RestoreSidebarState(
+            state,
+            settings);
+
+        Assert.Equal(isSidebarHidden, state.IsSidebarHidden);
+        Assert.Equal(expectedWidth, state.SavedSidebarWidth);
+        Assert.Equal(expectedVisible, projection.IsVisible);
+        Assert.Equal(expectedRestoreButton, projection.ShowRestoreButton);
+        Assert.Equal(expectedWidth, projection.Width);
+    }
+
+    [Fact]
+    public async Task SaveWindowBounds_VisibleSidebar_PersistsActualWidthInAtomicMerge()
+    {
+        RecordingConfigManager configManager = new();
+        configManager.CurrentSettings.DefaultTheme = "Dracula";
+        WindowUIState state = new()
+        {
+            SavedSidebarWidth = 360d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: 437d);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.False(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(437, configManager.CurrentSettings.SidebarWidth);
+        Assert.Equal(800d, configManager.CurrentSettings.WindowWidth);
+        Assert.Equal("Dracula", configManager.CurrentSettings.DefaultTheme);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task SaveWindowBounds_TemporarilySuppressedSidebar_IgnoresActualWidth(
+        bool isSuppressedByTab,
+        bool isFullscreen)
+    {
+        RecordingConfigManager configManager = new();
+        WindowUIState state = new()
+        {
+            IsSidebarSuppressedByTab = isSuppressedByTab,
+            IsFullscreen = isFullscreen,
+            SavedSidebarWidth = 375d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: 437d);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.False(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(375, configManager.CurrentSettings.SidebarWidth);
+    }
+
+    [Fact]
+    public async Task SaveWindowBounds_CollapsedSidebar_PreservesPreferredWidth()
+    {
+        RecordingConfigManager configManager = new();
+        WindowUIState state = new()
+        {
+            IsSidebarHidden = true,
+            SavedSidebarWidth = 375d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: 0d);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.True(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(375, configManager.CurrentSettings.SidebarWidth);
+    }
+
+    [Fact]
+    public async Task SaveWindowBounds_VisibleSidebarWithInvalidMeasurement_PersistsSavedWidth()
+    {
+        RecordingConfigManager configManager = new();
+        WindowUIState state = new()
+        {
+            SavedSidebarWidth = 390d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: double.NaN);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.False(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(390, configManager.CurrentSettings.SidebarWidth);
+    }
+
     [Fact]
     public async Task SaveWindowBounds_NonFiniteOrDegenerate_DoesNotThrow_SkipsWrite()
     {
         var configManager = new RecordingConfigManager();
         WindowBoundsSnapshot[] invalidSnapshots =
         [
-            new(double.NaN, 20, 800, 600, false),
-            new(10, double.NegativeInfinity, 800, 600, false),
-            new(10, 20, double.PositiveInfinity, 600, false),
-            new(10, 20, 800, double.NaN, false),
-            new(10, 20, 0, 600, false),
-            new(10, 20, 800, -1, false)
+            new(double.NaN, 20, 800, 600, false, false, 320),
+            new(10, double.NegativeInfinity, 800, 600, false, false, 320),
+            new(10, 20, double.PositiveInfinity, 600, false, false, 320),
+            new(10, 20, 800, double.NaN, false, false, 320),
+            new(10, 20, 0, 600, false, false, 320),
+            new(10, 20, 800, -1, false, false, 320)
         ];
 
         foreach (WindowBoundsSnapshot snapshot in invalidSnapshots)
@@ -344,11 +482,13 @@ public sealed class WindowClosingFlowTests
 
         public int MergeSettingCallCount { get; private set; }
 
+        public AppSettings CurrentSettings { get; } = new();
+
         public event Action<AppSettings>? SettingsChanged;
 
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(new AppSettings());
+        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(CurrentSettings);
 
         public Task SaveSettingsAsync(AppSettings settings) => Task.CompletedTask;
 
@@ -362,9 +502,8 @@ public sealed class WindowClosingFlowTests
         public Task MergeSettingAsync(Action<AppSettings> mutate)
         {
             MergeSettingCallCount++;
-            var settings = new AppSettings();
-            mutate(settings);
-            SettingsChanged?.Invoke(settings);
+            mutate(CurrentSettings);
+            SettingsChanged?.Invoke(CurrentSettings);
             return Task.CompletedTask;
         }
 

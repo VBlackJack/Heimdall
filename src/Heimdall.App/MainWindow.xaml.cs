@@ -3123,6 +3123,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void RestoreWindowBounds(Heimdall.Core.Configuration.AppSettings settings)
     {
+        SidebarLayoutProjection sidebarLayout = WindowBoundsPersistence.RestoreSidebarState(
+            _uiState,
+            settings);
+        ApplySidebarLayout(sidebarLayout);
+
         if (settings.WindowWidth > 0 && settings.WindowHeight > 0)
         {
             Rect savedBounds = new(
@@ -3155,16 +3160,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         // Save Normal-state bounds even when maximized
         bool isMaximized = WindowState == WindowState.Maximized;
-        var bounds = isMaximized
+        Rect bounds = isMaximized
             ? RestoreBounds
-            : new System.Windows.Rect(Left, Top, Width, Height);
+            : new Rect(Left, Top, Width, Height);
 
-        var snapshot = new WindowBoundsSnapshot(
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
             bounds.Left,
             bounds.Top,
             bounds.Width,
             bounds.Height,
-            isMaximized);
+            isMaximized,
+            _uiState,
+            SessionTreeColumn.ActualWidth);
         return WindowBoundsPersistence.PersistAsync(vm.ConfigManager, snapshot);
     }
 

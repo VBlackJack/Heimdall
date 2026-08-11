@@ -26,7 +26,9 @@ internal readonly record struct WindowBoundsSnapshot(
     double Top,
     double Width,
     double Height,
-    bool IsMaximized)
+    bool IsMaximized,
+    bool IsSidebarHidden,
+    double SidebarWidth)
 {
     internal bool IsValid =>
         double.IsFinite(Left) &&
@@ -42,6 +44,45 @@ internal readonly record struct WindowBoundsSnapshot(
 /// </summary>
 internal static class WindowBoundsPersistence
 {
+    internal static SidebarLayoutProjection RestoreSidebarState(
+        WindowUIState state,
+        AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        state.IsSidebarHidden = settings.SidebarCollapsed;
+        state.SavedSidebarWidth = NormalizeSidebarWidth(settings.SidebarWidth);
+        return state.SidebarLayout;
+    }
+
+    internal static WindowBoundsSnapshot CaptureSnapshot(
+        double left,
+        double top,
+        double width,
+        double height,
+        bool isMaximized,
+        WindowUIState state,
+        double actualSidebarWidth)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        double sidebarWidth = state.SidebarLayout.IsVisible
+            && double.IsFinite(actualSidebarWidth)
+            && actualSidebarWidth > 0d
+                ? actualSidebarWidth
+                : state.SavedSidebarWidth;
+
+        return new WindowBoundsSnapshot(
+            left,
+            top,
+            width,
+            height,
+            isMaximized,
+            state.IsSidebarHidden,
+            NormalizeSidebarWidth(sidebarWidth));
+    }
+
     internal static Task PersistAsync(
         IConfigManager configManager,
         WindowBoundsSnapshot snapshot)
@@ -59,6 +100,23 @@ internal static class WindowBoundsPersistence
             settings.WindowLeft = snapshot.Left;
             settings.WindowTop = snapshot.Top;
             settings.WindowMaximized = snapshot.IsMaximized;
+            settings.SidebarCollapsed = snapshot.IsSidebarHidden;
+            settings.SidebarWidth = (int)Math.Round(
+                NormalizeSidebarWidth(snapshot.SidebarWidth),
+                MidpointRounding.AwayFromZero);
         });
+    }
+
+    private static double NormalizeSidebarWidth(double width)
+    {
+        if (!double.IsFinite(width))
+        {
+            return WindowUIState.DefaultSidebarWidth;
+        }
+
+        return Math.Clamp(
+            width,
+            WindowUIState.MinSidebarWidth,
+            WindowUIState.MaxSidebarWidth);
     }
 }
