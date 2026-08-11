@@ -6027,6 +6027,7 @@
   "OnboardingBtnSkip": "Skip",
   "OnboardingBtnNext": "Next",
   "OnboardingBtnGetStarted": "Get Started",
+  "OnboardingCompletionSaveFailed": "Heimdall couldn't save setup completion. Check access to the configuration folder, then try again.",
 
   "A11ySessionsTab": "Sessions tab",
   "A11yTunnelsTab": "Tunnels tab",

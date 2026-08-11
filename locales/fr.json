@@ -6026,6 +6026,7 @@
   "OnboardingBtnSkip": "Passer",
   "OnboardingBtnNext": "Suivant",
   "OnboardingBtnGetStarted": "Commencer",
+  "OnboardingCompletionSaveFailed": "Heimdall n'a pas pu enregistrer la fin de la configuration. V\u00e9rifiez l'acc\u00e8s au dossier de configuration, puis r\u00e9essayez.",
 
   "A11ySessionsTab": "Onglet sessions",
   "A11yTunnelsTab": "Onglet tunnels",

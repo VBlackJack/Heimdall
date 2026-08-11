@@ -18,6 +18,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Logging;
 
 namespace Heimdall.App.ViewModels.Onboarding;
 
@@ -48,6 +49,7 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
     private readonly LocalizationManager _localizer;
     private readonly IConfigManager _configManager;
     private AppSettings? _settings;
+    private bool _completionInProgress;
 
     /// <summary>
     /// Creates a new onboarding view-model. Call <see cref="Attach"/> with
@@ -84,6 +86,10 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
     /// <summary>Whether the overlay should currently be displayed.</summary>
     [ObservableProperty]
     private bool _isVisible;
+
+    /// <summary>Localized recovery guidance shown when completion cannot be persisted.</summary>
+    [ObservableProperty]
+    private string _completionErrorText = string.Empty;
 
     /// <summary>
     /// Step indicator states bound by the view's dot ItemsControl. The
@@ -134,6 +140,7 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
     public void Start()
     {
         CurrentStep = 0;
+        CompletionErrorText = string.Empty;
         IsVisible = true;
         RefreshLabels();
     }
@@ -162,15 +169,62 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
 
     private async Task CompleteAsync()
     {
-        IsVisible = false;
-        if (_settings is null)
+        if (_completionInProgress || !IsVisible)
         {
             return;
         }
 
-        _settings.OnboardingCompleted = true;
-        await _configManager.MergeSettingAsync(s => s.OnboardingCompleted = true).ConfigureAwait(true);
-        Completed?.Invoke(this, EventArgs.Empty);
+        _completionInProgress = true;
+        try
+        {
+            if (_settings is null)
+            {
+                FileLogger.Warn("Onboarding completion skipped because settings are not attached.");
+                CompletionErrorText = _localizer["OnboardingCompletionSaveFailed"];
+                return;
+            }
+
+            CompletionErrorText = string.Empty;
+            bool persisted = await TryPersistCompletionAsync().ConfigureAwait(true);
+            if (!persisted)
+            {
+                CompletionErrorText = _localizer["OnboardingCompletionSaveFailed"];
+                return;
+            }
+
+            _settings.OnboardingCompleted = true;
+            IsVisible = false;
+            Completed?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            _completionInProgress = false;
+        }
+    }
+
+    private async Task<bool> TryPersistCompletionAsync()
+    {
+        try
+        {
+            await _configManager.MergeSettingAsync(
+                settings => settings.OnboardingCompleted = true).ConfigureAwait(true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error("Onboarding completion persistence failed", ex);
+        }
+
+        try
+        {
+            AppSettings persistedSettings = await _configManager.LoadSettingsAsync().ConfigureAwait(true);
+            return persistedSettings.OnboardingCompleted;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error("Onboarding completion state reload failed", ex);
+            return false;
+        }
     }
 
     partial void OnCurrentStepChanged(int value)

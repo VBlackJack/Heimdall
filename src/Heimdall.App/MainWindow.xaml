@@ -4536,6 +4536,15 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,24"/>
 
+                    <TextBlock Text="{Binding CompletionErrorText}"
+                               Visibility="{Binding CompletionErrorText, Converter={StaticResource NullToVisibilityConverter}}"
+                               Foreground="{DynamicResource ErrorTextBrush}"
+                               FontSize="{StaticResource FontSizeBody}"
+                               HorizontalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Margin="{StaticResource MarginStackItem}"
+                               AutomationProperties.LiveSetting="Assertive"/>
+
                     <!-- Navigation buttons -->
                     <DockPanel HorizontalAlignment="Stretch"
                                KeyboardNavigation.TabNavigation="Cycle">
