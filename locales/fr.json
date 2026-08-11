@@ -1513,6 +1513,8 @@
   "ErrorInvalidResolution": "Valeur de r\u00e9solution invalide. Veuillez entrer un nombre valide.",
   "ConfirmCloseAllTabs": "Fermer toutes les sessions",
   "ConfirmCloseAllTabsMessage": "Fermer les {0} sessions int\u00e9gr\u00e9es ?",
+  "ConfirmCloseSessionGroupTitle": "Fermer les sessions",
+  "ConfirmCloseSessionGroupMessage": "Sessions \u00e0 fermer : {0}. Encore connect\u00e9es : {1}. Continuer ?",
   "DisconnectReasonPrefix": "Raison : {0}",
   "StatusSshFallbackExternal": "SSH int\u00e9gr\u00e9 indisponible \u2014 basculement vers le client externe",
   "StatusEmbeddedRdpConnecting": "Ouverture de la session RDP int\u00e9gr\u00e9e : {0}...",

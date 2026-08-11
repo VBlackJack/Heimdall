@@ -543,9 +543,26 @@ public sealed partial class SessionCoordinatorPreMountTests
     {
         public int ErrorCallCount { get; private set; }
 
+        public bool ConfirmResult { get; set; } = true;
+
+        public int ConfirmCallCount { get; private set; }
+
+        public string? LastConfirmTitle { get; private set; }
+
+        public string? LastConfirmMessage { get; private set; }
+
+        public string? LastConfirmSeverity { get; private set; }
+
+        public Action? ConfirmInvoked { get; set; }
+
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
         {
-            return Task.FromResult(true);
+            ConfirmCallCount++;
+            LastConfirmTitle = title;
+            LastConfirmMessage = message;
+            LastConfirmSeverity = severity;
+            ConfirmInvoked?.Invoke();
+            return Task.FromResult(ConfirmResult);
         }
 
         public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)

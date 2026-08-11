@@ -1513,6 +1513,8 @@
   "ErrorInvalidResolution": "Invalid resolution value. Please enter a valid number.",
   "ConfirmCloseAllTabs": "Close All Sessions",
   "ConfirmCloseAllTabsMessage": "Close all {0} embedded sessions?",
+  "ConfirmCloseSessionGroupTitle": "Close Sessions",
+  "ConfirmCloseSessionGroupMessage": "Sessions to close: {0}. Still connected: {1}. Continue?",
   "DisconnectReasonPrefix": "Reason: {0}",
   "StatusSshFallbackExternal": "Embedded SSH unavailable \u2014 falling back to external client",
   "StatusEmbeddedRdpConnecting": "Opening embedded RDP session: {0}...",

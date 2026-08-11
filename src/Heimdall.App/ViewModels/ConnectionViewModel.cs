@@ -182,6 +182,39 @@ public partial class ConnectionViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Confirms a fixed group of connected sessions once, then closes every target
+    /// without repeating the per-session confirmation. Busy tool tabs keep the
+    /// existing fail-closed behavior of <see cref="ISplitService.CloseAllPanes"/>.
+    /// </summary>
+    internal async Task CloseSessionsAsync(
+        IReadOnlyList<SessionTabViewModel> sessions,
+        DisconnectReason reason)
+    {
+        int connectedCount = sessions.Count(session =>
+            Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
+                .Any(pane => string.Equals(pane.Status, "Connected", StringComparison.Ordinal)));
+
+        if (connectedCount > 0)
+        {
+            string title = _localizer["ConfirmCloseSessionGroupTitle"];
+            string message = _localizer.Format(
+                "ConfirmCloseSessionGroupMessage",
+                sessions.Count,
+                connectedCount);
+            bool confirmed = await _dialogService.ShowConfirmAsync(title, message, "warning");
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        foreach (SessionTabViewModel session in sessions)
+        {
+            await CloseSessionAsync(session, reason, confirm: false);
+        }
+    }
+
+    /// <summary>
     /// Closes a session without showing a confirmation dialog.
     /// Used by <see cref="CloseAllSessions"/> to avoid multiple prompts.
     /// Delegates per-pane cleanup to <see cref="ISplitService.CloseAllPanes"/>.

@@ -659,32 +659,34 @@ public sealed class SessionTabContextMenuFactory
     {
         var ordered = vm.Connection.ActiveSessions;
 
+        IReadOnlyList<SessionTabViewModel> closeOthersTargets =
+            SessionsToCloseOthers(ordered.ToList(), session);
+        IReadOnlyList<SessionTabViewModel> closeRightTargets =
+            SessionsToCloseToRight(ordered.ToList(), session);
+
         var closeOthersItem = new MenuItem
         {
             Header = vm.Localize("SessionCloseOthers"),
-            IsEnabled = ordered.Count > 1
+            IsEnabled = closeOthersTargets.Count > 0
         };
         closeOthersItem.Click += async (_, _) =>
         {
-            // Snapshot before closing: ActiveSessions mutates as each tab closes.
-            foreach (var target in SessionsToCloseOthers(ordered.ToList(), session))
-            {
-                await vm.Connection.CloseSessionAsync(target, DisconnectReason.UserAction);
-            }
+            await vm.Connection.CloseSessionsAsync(
+                closeOthersTargets,
+                DisconnectReason.UserAction);
         };
         menu.Items.Add(closeOthersItem);
 
         var closeRightItem = new MenuItem
         {
             Header = vm.Localize("SessionCloseToRight"),
-            IsEnabled = SessionsToCloseToRight(ordered.ToList(), session).Count > 0
+            IsEnabled = closeRightTargets.Count > 0
         };
         closeRightItem.Click += async (_, _) =>
         {
-            foreach (var target in SessionsToCloseToRight(ordered.ToList(), session))
-            {
-                await vm.Connection.CloseSessionAsync(target, DisconnectReason.UserAction);
-            }
+            await vm.Connection.CloseSessionsAsync(
+                closeRightTargets,
+                DisconnectReason.UserAction);
         };
         menu.Items.Add(closeRightItem);
     }
