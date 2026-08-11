@@ -73,6 +73,113 @@ public sealed class WinRmHandlerGatewayTests
         Assert.Equal(2, Volatile.Read(ref utcNowCallCount));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConnectAsync_ForcedTerminalClose_DeletesBootstrapWithoutProcessExit(bool killFirst)
+    {
+        string testDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall_winrm_cleanup_{Guid.NewGuid():N}");
+        string scriptPath = Path.Combine(testDirectory, "bootstrap.ps1");
+        Directory.CreateDirectory(testDirectory);
+
+        try
+        {
+            WinRmCredentialBootstrap bootstrap = new WinRmCredentialBootstrap(
+                createScriptPath: () => scriptPath,
+                writeAndProtect: (path, content) => File.WriteAllText(path, content),
+                unprotectStoredPasswordBytes: _ => Encoding.UTF8.GetBytes("secret"),
+                protectBootstrapPasswordBytes: _ => "protected-bootstrap-password");
+            CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+            using WinRmHandler handler = CreateHandler(
+                new FakeTunnelService(),
+                new CountingWinRmPreflight(),
+                terminalSession,
+                credentialBootstrapFactory: () => bootstrap);
+            ServerProfileDto server = CreateDirectServer();
+            server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+            server.WinRmUsername = "user";
+            server.WinRmPasswordEncrypted = "encrypted";
+
+            ConnectionResult result = await handler.ConnectAsync(
+                server,
+                new AppSettings(),
+                CancellationToken.None);
+            TerminalSessionResult terminalResult = Assert.IsType<TerminalSessionResult>(result.Session);
+            Assert.True(File.Exists(scriptPath));
+
+            if (killFirst)
+            {
+                terminalResult.Session.Kill();
+                Assert.False(File.Exists(scriptPath));
+            }
+
+            terminalResult.Session.Dispose();
+
+            Assert.False(File.Exists(scriptPath));
+            Assert.True(terminalSession.IsDisposed);
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ProcessExit_DeletesBootstrapAndForwardsExitEvent()
+    {
+        string testDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall_winrm_exit_{Guid.NewGuid():N}");
+        string scriptPath = Path.Combine(testDirectory, "bootstrap.ps1");
+        Directory.CreateDirectory(testDirectory);
+
+        try
+        {
+            WinRmCredentialBootstrap bootstrap = new WinRmCredentialBootstrap(
+                createScriptPath: () => scriptPath,
+                writeAndProtect: (path, content) => File.WriteAllText(path, content),
+                unprotectStoredPasswordBytes: _ => Encoding.UTF8.GetBytes("secret"),
+                protectBootstrapPasswordBytes: _ => "protected-bootstrap-password");
+            CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+            using WinRmHandler handler = CreateHandler(
+                new FakeTunnelService(),
+                new CountingWinRmPreflight(),
+                terminalSession,
+                credentialBootstrapFactory: () => bootstrap);
+            ServerProfileDto server = CreateDirectServer();
+            server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+            server.WinRmUsername = "user";
+            server.WinRmPasswordEncrypted = "encrypted";
+
+            ConnectionResult result = await handler.ConnectAsync(
+                server,
+                new AppSettings(),
+                CancellationToken.None);
+            TerminalSessionResult terminalResult = Assert.IsType<TerminalSessionResult>(result.Session);
+            int exitEventCount = 0;
+            terminalResult.Session.ProcessExited += _ => exitEventCount++;
+            Assert.True(File.Exists(scriptPath));
+
+            terminalSession.RaiseProcessExited(0);
+
+            Assert.False(File.Exists(scriptPath));
+            Assert.Equal(1, exitEventCount);
+            terminalResult.Session.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task ConnectAsync_TunneledProfile_LaunchesPowerShellAgainstTunnelEndpoint()
     {
@@ -491,11 +598,7 @@ public sealed class WinRmHandlerGatewayTests
             remove { }
         }
 
-        public event Action<int>? ProcessExited
-        {
-            add { }
-            remove { }
-        }
+        public event Action<int>? ProcessExited;
 
         public bool IsRunning { get; private set; }
         public int? ProcessId => IsRunning ? 1234 : null;
@@ -541,6 +644,12 @@ public sealed class WinRmHandlerGatewayTests
         public void Kill()
         {
             IsRunning = false;
+        }
+
+        public void RaiseProcessExited(int exitCode)
+        {
+            IsRunning = false;
+            ProcessExited?.Invoke(exitCode);
         }
 
         public void Dispose()

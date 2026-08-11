@@ -164,7 +164,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                 $"WinRM terminal started for host '{server.RemoteServer}'");
 
             _connectionSm.TryTransition(server.Id, ConnectionState.RemoteSessionHandedOff);
-            ScheduleBootstrapCleanupOnExit(session, bootstrap, bootstrapScriptPath);
+            session = WrapTerminalSessionWithBootstrapCleanup(session, bootstrap, bootstrapScriptPath);
             string? warning = null;
             if (server.WinRmUseSsl && server.WinRmSkipCertificateCheck)
             {
@@ -312,36 +312,133 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         bootstrap.Delete(bootstrapScriptPath);
     }
 
-    private static void ScheduleBootstrapCleanupOnExit(
+    private static ITerminalSession WrapTerminalSessionWithBootstrapCleanup(
         ITerminalSession session,
         WinRmCredentialBootstrap? bootstrap,
         string? bootstrapScriptPath)
     {
         if (bootstrap is null || string.IsNullOrWhiteSpace(bootstrapScriptPath))
         {
-            return;
+            return session;
         }
 
-        WinRmCredentialBootstrap capturedBootstrap = bootstrap;
-        string capturedPath = bootstrapScriptPath;
-        int cleaned = 0;
+        return new BootstrapCleanupTerminalSession(
+            session,
+            () => bootstrap.Delete(bootstrapScriptPath));
+    }
 
-        void OnProcessExited(int exitCode)
+    private sealed class BootstrapCleanupTerminalSession : ITerminalSession
+    {
+        private readonly ITerminalSession _inner;
+        private Action? _cleanup;
+        private int _disposed;
+
+        public BootstrapCleanupTerminalSession(ITerminalSession inner, Action cleanup)
         {
-            if (Interlocked.Exchange(ref cleaned, 1) != 0)
+            _inner = inner;
+            _cleanup = cleanup;
+            _inner.ProcessExited += OnProcessExited;
+
+            if (!_inner.IsRunning)
+            {
+                Cleanup();
+            }
+        }
+
+        public event Action<ReadOnlyMemory<byte>>? DataReceived
+        {
+            add => _inner.DataReceived += value;
+            remove => _inner.DataReceived -= value;
+        }
+
+        public event Action<int>? ProcessExited
+        {
+            add => _inner.ProcessExited += value;
+            remove => _inner.ProcessExited -= value;
+        }
+
+        public bool IsRunning => _inner.IsRunning;
+
+        public int? ProcessId => _inner.ProcessId;
+
+        public Dictionary<string, string>? EnvironmentVariables
+        {
+            get => _inner.EnvironmentVariables;
+            set => _inner.EnvironmentVariables = value;
+        }
+
+        public Task StartAsync(
+            string executable,
+            string arguments,
+            int columns = 80,
+            int rows = 24,
+            string? workingDirectory = null,
+            CancellationToken cancellationToken = default)
+        {
+            return _inner.StartAsync(
+                executable,
+                arguments,
+                columns,
+                rows,
+                workingDirectory,
+                cancellationToken);
+        }
+
+        public void Write(ReadOnlySpan<byte> data)
+        {
+            _inner.Write(data);
+        }
+
+        public void Write(string text)
+        {
+            _inner.Write(text);
+        }
+
+        public void Resize(int columns, int rows)
+        {
+            _inner.Resize(columns, rows);
+        }
+
+        public void Kill()
+        {
+            try
+            {
+                _inner.Kill();
+            }
+            finally
+            {
+                Cleanup();
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
             {
                 return;
             }
 
-            session.ProcessExited -= OnProcessExited;
-            capturedBootstrap.Delete(capturedPath);
+            try
+            {
+                _inner.Dispose();
+            }
+            finally
+            {
+                _inner.ProcessExited -= OnProcessExited;
+                Cleanup();
+            }
         }
 
-        session.ProcessExited += OnProcessExited;
-
-        if (!session.IsRunning)
+        private void OnProcessExited(int exitCode)
         {
-            OnProcessExited(0);
+            _ = exitCode;
+            Cleanup();
+        }
+
+        private void Cleanup()
+        {
+            Action? cleanup = Interlocked.Exchange(ref _cleanup, null);
+            cleanup?.Invoke();
         }
     }
 }
