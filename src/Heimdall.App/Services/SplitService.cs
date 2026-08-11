@@ -944,6 +944,11 @@ public sealed class SplitService : ISplitService
             paneConnectionType,
             serverDto.ConnectionType);
 
+        if (string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase))
+        {
+            _connectionSm.TryTransition(serverDto.Id, ConnectionState.Initializing);
+        }
+
         return connectionType.ToUpperInvariant() switch
         {
             "SSH" => await _connectionService.ConnectSshAsync(serverDto, settings, ct),

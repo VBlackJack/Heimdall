@@ -383,6 +383,66 @@ public sealed class SplitServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SplitSessionWithServerAsync_WinRm_InitializesRuntimeStateBeforeDispatch()
+    {
+        const string inventoryServerId = "winrm-inventory-1";
+        DisposableSessionResult connectionSession = new DisposableSessionResult();
+        RecordingConnectionService connectionService = new RecordingConnectionService(
+            stateMachine: _connectionSm,
+            successfulWinRmSession: connectionSession);
+        FakeEmbeddedSessionManager hostManager = new FakeEmbeddedSessionManager
+        {
+            CreateHostControlCallback = (_, _, connectionType, sessionResult, _, _) =>
+            {
+                Assert.Equal("WINRM", connectionType);
+                Assert.Same(connectionSession, sessionResult);
+                return new DisposableHost();
+            }
+        };
+        SplitService sut = CreateSplitService(connectionService, hostManager);
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new ServerProfileDto
+            {
+                Id = inventoryServerId,
+                DisplayName = "WinRM server",
+                ConnectionType = "WINRM"
+            }
+        });
+
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-runtime",
+            connectionType: "SSH");
+        primaryPane.OriginalServerId = "primary-inventory";
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = primaryPane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new ObservableCollection<SessionTabViewModel>
+        {
+            session
+        };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        await sut.SplitSessionWithServerAsync(
+            session,
+            inventoryServerId,
+            SplitOrientation.Vertical,
+            primaryPane.PaneId);
+
+        SessionPaneModel winRmPane = Assert.Single(
+            SplitTreeHelper.EnumerateLeaves(session.RootContent),
+            pane => string.Equals(
+                pane.OriginalServerId,
+                inventoryServerId,
+                StringComparison.Ordinal));
+        Assert.Equal(ConnectionState.Initializing, connectionService.WinRmStateAtDispatch);
+        Assert.Equal(winRmPane.ServerId, connectionService.WinRmServerIdAtDispatch);
+        Assert.NotEqual(inventoryServerId, winRmPane.ServerId);
+        Assert.Equal(ConnectionState.RemoteSessionHandedOff, _connectionSm.GetState(winRmPane.ServerId));
+        Assert.Equal("Connected", winRmPane.Status);
+        Assert.Null(_connectionSm.GetStateData(inventoryServerId));
+    }
+
+    [Fact]
     public async Task SplitSessionWithServerAsync_SameWinRmProfile_UsesIndependentRuntimeStateKeys()
     {
         const string inventoryServerId = "winrm-server-1";
@@ -811,6 +871,65 @@ public sealed class SplitServiceTests : IDisposable
         Assert.Equal("server-1", pane.ServerId);
         Assert.Equal("Connected", pane.Status);
         Assert.Equal(ConnectionState.Connected, _connectionSm.GetState("server-1"));
+    }
+
+    [Fact]
+    public async Task ReconnectPaneAsync_WinRm_InitializesRuntimeStateBeforeDispatch()
+    {
+        const string inventoryServerId = "winrm-inventory-1";
+        const string runtimeServerId = "winrm-runtime-1";
+        DisposableSessionResult connectionSession = new DisposableSessionResult();
+        RecordingConnectionService connectionService = new RecordingConnectionService(
+            stateMachine: _connectionSm,
+            successfulWinRmSession: connectionSession);
+        FakeEmbeddedSessionManager hostManager = new FakeEmbeddedSessionManager
+        {
+            CreateHostControlCallback = (_, _, connectionType, sessionResult, _, _) =>
+            {
+                Assert.Equal("WINRM", connectionType);
+                Assert.Same(connectionSession, sessionResult);
+                return new DisposableHost();
+            }
+        };
+        SplitService sut = CreateSplitService(connectionService, hostManager);
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new ServerProfileDto
+            {
+                Id = inventoryServerId,
+                DisplayName = "WinRM server",
+                ConnectionType = "WINRM"
+            }
+        });
+
+        DisposableHost oldHost = new DisposableHost();
+        SessionPaneModel pane = MakePane(
+            paneId: "winrm-pane",
+            serverId: runtimeServerId,
+            connectionType: "WINRM");
+        pane.OriginalServerId = inventoryServerId;
+        pane.Title = "WinRM server";
+        pane.HostControl = oldHost;
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = pane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new ObservableCollection<SessionTabViewModel>
+        {
+            session
+        };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        Assert.True(_connectionSm.TryTransition(runtimeServerId, ConnectionState.Initializing));
+        Assert.True(_connectionSm.TryTransition(runtimeServerId, ConnectionState.ValidatingConfig));
+        Assert.True(_connectionSm.TryTransition(runtimeServerId, ConnectionState.LaunchingWinRm));
+        Assert.True(_connectionSm.TryTransition(runtimeServerId, ConnectionState.RemoteSessionHandedOff));
+
+        await sut.ReconnectPaneAsync(session, pane.PaneId);
+
+        Assert.True(oldHost.Disposed);
+        Assert.Equal(ConnectionState.Initializing, connectionService.WinRmStateAtDispatch);
+        Assert.Equal(runtimeServerId, connectionService.WinRmServerIdAtDispatch);
+        Assert.Equal(ConnectionState.RemoteSessionHandedOff, _connectionSm.GetState(runtimeServerId));
+        Assert.Equal("Connected", pane.Status);
+        Assert.Null(_connectionSm.GetStateData(inventoryServerId));
     }
 
     [Fact]
@@ -1410,18 +1529,26 @@ public sealed class SplitServiceTests : IDisposable
     {
         private readonly ISessionResult? _successfulSftpSession;
         private readonly ConnectionResult? _failureResult;
+        private readonly ConnectionStateMachine? _stateMachine;
+        private readonly ISessionResult? _successfulWinRmSession;
 
         public RecordingConnectionService(
             ISessionResult? successfulSftpSession = null,
-            ConnectionResult? failureResult = null)
+            ConnectionResult? failureResult = null,
+            ConnectionStateMachine? stateMachine = null,
+            ISessionResult? successfulWinRmSession = null)
         {
             _successfulSftpSession = successfulSftpSession;
             _failureResult = failureResult;
+            _stateMachine = stateMachine;
+            _successfulWinRmSession = successfulWinRmSession;
         }
 
         public bool ConnectInvoked { get; private set; }
         public string? LastProtocol { get; private set; }
         public ServerProfileDto? LastServer { get; private set; }
+        public ConnectionState? WinRmStateAtDispatch { get; private set; }
+        public string? WinRmServerIdAtDispatch { get; private set; }
 
         public AppSettings? CurrentSettings => null;
 
@@ -1489,7 +1616,25 @@ public sealed class SplitServiceTests : IDisposable
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync("WINRM", server, ct);
+        {
+            RecordConnect("WINRM", server, ct);
+            if (_stateMachine is null || _successfulWinRmSession is null)
+            {
+                return Task.FromResult(
+                    _failureResult ?? new ConnectionResult(false, "unexpected connect", null));
+            }
+
+            WinRmServerIdAtDispatch = server.Id;
+            WinRmStateAtDispatch = _stateMachine.GetState(server.Id);
+
+            // Mirror WinRmHandler: attempt downstream transitions without
+            // manufacturing the caller-owned Initializing state.
+            _stateMachine.TryTransition(server.Id, ConnectionState.ValidatingConfig);
+            _stateMachine.TryTransition(server.Id, ConnectionState.LaunchingWinRm);
+            _stateMachine.TryTransition(server.Id, ConnectionState.RemoteSessionHandedOff);
+
+            return Task.FromResult(new ConnectionResult(true, null, _successfulWinRmSession));
+        }
 
         public void Dispose() { }
 
