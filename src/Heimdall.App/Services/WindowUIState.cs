@@ -45,7 +45,7 @@ public sealed class WindowUIState
     public const double DefaultSidebarWidth = 320d;
 
     /// <summary>Minimum sidebar column width when visible.</summary>
-    public const double MinSidebarWidth = 180d;
+    public const double MinSidebarWidth = 243d;
 
     /// <summary>Maximum sidebar column width when visible.</summary>
     public const double MaxSidebarWidth = 500d;

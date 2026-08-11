@@ -296,7 +296,7 @@
             <Grid Visibility="{Binding IsSessionsTabSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <!-- Left: TreeView panel -->
-                    <ColumnDefinition x:Name="SessionTreeColumn" Width="260" MinWidth="180" MaxWidth="500"/>
+                    <ColumnDefinition x:Name="SessionTreeColumn" Width="260" MinWidth="243" MaxWidth="500"/>
                     <!-- Splitter -->
                     <ColumnDefinition x:Name="SplitterColumn" Width="Auto"/>
                     <!-- Right: Detail / session content -->
