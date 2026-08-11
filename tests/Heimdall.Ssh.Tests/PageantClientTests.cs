@@ -27,6 +27,93 @@ namespace Heimdall.Ssh.Tests;
 /// </summary>
 public class PageantClientTests
 {
+    [Fact]
+    public void SendCopyDataWithTimeout_UsesBoundedAbortIfHungFlags()
+    {
+        IntPtr expectedWindow = new(42);
+        IntPtr capturedWindow = IntPtr.Zero;
+        uint capturedMessage = 0;
+        IntPtr capturedWParam = new(1);
+        NativeMethods.SendMessageTimeoutFlags capturedFlags = 0;
+        uint capturedTimeoutMilliseconds = 0;
+        NativeMethods.COPYDATASTRUCT copyData = new();
+        PageantMessageSender sender = (
+            IntPtr window,
+            uint message,
+            IntPtr wParam,
+            ref NativeMethods.COPYDATASTRUCT _,
+            NativeMethods.SendMessageTimeoutFlags flags,
+            uint timeoutMilliseconds,
+            out UIntPtr messageResult) =>
+        {
+            capturedWindow = window;
+            capturedMessage = message;
+            capturedWParam = wParam;
+            capturedFlags = flags;
+            capturedTimeoutMilliseconds = timeoutMilliseconds;
+            messageResult = new UIntPtr(1);
+            return new IntPtr(1);
+        };
+
+        PageantClient.SendCopyDataWithTimeout(expectedWindow, ref copyData, sender);
+
+        Assert.Equal(expectedWindow, capturedWindow);
+        Assert.Equal(0x004Au, capturedMessage);
+        Assert.Equal(IntPtr.Zero, capturedWParam);
+        Assert.Equal(
+            NativeMethods.SendMessageTimeoutFlags.Block |
+            NativeMethods.SendMessageTimeoutFlags.AbortIfHung |
+            NativeMethods.SendMessageTimeoutFlags.ErrorOnExit,
+            capturedFlags);
+        Assert.Equal(5000u, capturedTimeoutMilliseconds);
+    }
+
+    [Fact]
+    public void SendCopyDataWithTimeout_NoResponse_ThrowsTimeoutException()
+    {
+        NativeMethods.COPYDATASTRUCT copyData = new();
+        PageantMessageSender sender = (
+            IntPtr _,
+            uint _,
+            IntPtr _,
+            ref NativeMethods.COPYDATASTRUCT _,
+            NativeMethods.SendMessageTimeoutFlags _,
+            uint _,
+            out UIntPtr messageResult) =>
+        {
+            messageResult = UIntPtr.Zero;
+            return IntPtr.Zero;
+        };
+
+        TimeoutException exception = Assert.Throws<TimeoutException>(() =>
+            PageantClient.SendCopyDataWithTimeout(IntPtr.Zero, ref copyData, sender));
+
+        Assert.Contains("did not respond", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SendCopyDataWithTimeout_RejectedResponse_ThrowsInvalidOperationException()
+    {
+        NativeMethods.COPYDATASTRUCT copyData = new();
+        PageantMessageSender sender = (
+            IntPtr _,
+            uint _,
+            IntPtr _,
+            ref NativeMethods.COPYDATASTRUCT _,
+            NativeMethods.SendMessageTimeoutFlags _,
+            uint _,
+            out UIntPtr messageResult) =>
+        {
+            messageResult = UIntPtr.Zero;
+            return new IntPtr(1);
+        };
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            PageantClient.SendCopyDataWithTimeout(IntPtr.Zero, ref copyData, sender));
+
+        Assert.Contains("rejected", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── BigEndian helpers ─────────────────────────────────────────────
 
     [Fact]

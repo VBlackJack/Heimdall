@@ -21,6 +21,15 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Heimdall.Ssh.Pageant;
 
+internal delegate IntPtr PageantMessageSender(
+    IntPtr hWnd,
+    uint message,
+    IntPtr wParam,
+    ref NativeMethods.COPYDATASTRUCT copyData,
+    NativeMethods.SendMessageTimeoutFlags flags,
+    uint timeoutMilliseconds,
+    out UIntPtr messageResult);
+
 /// <summary>
 /// Communicates with PuTTY Pageant via shared memory IPC to access loaded SSH keys.
 /// Supports SSH agent protocol operations: listing identities and signing data.
@@ -34,6 +43,7 @@ public sealed class PageantClient : IPageantClient
     private const byte SSH2_AGENT_SIGN_RESPONSE = 14;
     private const int WM_COPYDATA = 0x004A;
     internal const int AgentMaxMessageLength = 262144;
+    internal const uint PageantIpcTimeoutMilliseconds = 5000;
 
     /// <summary>
     /// Magic value required by Pageant in COPYDATASTRUCT.dwData.
@@ -55,6 +65,7 @@ public sealed class PageantClient : IPageantClient
     /// </summary>
     /// <returns>List of loaded keys with their type, blob, and comment.</returns>
     /// <exception cref="InvalidOperationException">Pageant is not running or returned an invalid response.</exception>
+    /// <exception cref="TimeoutException">Pageant did not answer the bounded IPC request.</exception>
     public List<PageantKey> GetIdentities()
     {
         // Build request: [length:4 big-endian][SSH2_AGENTC_REQUEST_IDENTITIES:1]
@@ -75,6 +86,7 @@ public sealed class PageantClient : IPageantClient
     /// <param name="flags">Agent signature flags (0 for default behavior).</param>
     /// <returns>The full SSH signature blob from the agent (algorithm name + signature, each length-prefixed) — not raw signature bytes.</returns>
     /// <exception cref="InvalidOperationException">Pageant is not running or signing failed.</exception>
+    /// <exception cref="TimeoutException">Pageant did not answer the bounded IPC request.</exception>
     public byte[] SignData(byte[] keyBlob, byte[] data, uint flags = 0)
     {
         ArgumentNullException.ThrowIfNull(keyBlob);
@@ -222,11 +234,10 @@ public sealed class PageantClient : IPageantClient
                     lpData = lpData
                 };
 
-                var result = NativeMethods.SendMessage(hwnd, WM_COPYDATA, IntPtr.Zero, ref copyData);
-                if (result == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("Pageant rejected the agent request.");
-                }
+                SendCopyDataWithTimeout(
+                    hwnd,
+                    ref copyData,
+                    NativeMethods.SendMessageTimeout);
             }
             finally
             {
@@ -246,6 +257,38 @@ public sealed class PageantClient : IPageantClient
         finally
         {
             NativeMethods.UnmapViewOfFile(view);
+        }
+    }
+
+    internal static void SendCopyDataWithTimeout(
+        IntPtr hwnd,
+        ref NativeMethods.COPYDATASTRUCT copyData,
+        PageantMessageSender sender)
+    {
+        ArgumentNullException.ThrowIfNull(sender);
+
+        NativeMethods.SendMessageTimeoutFlags flags =
+            NativeMethods.SendMessageTimeoutFlags.Block |
+            NativeMethods.SendMessageTimeoutFlags.AbortIfHung |
+            NativeMethods.SendMessageTimeoutFlags.ErrorOnExit;
+        IntPtr sendStatus = sender(
+            hwnd,
+            WM_COPYDATA,
+            IntPtr.Zero,
+            ref copyData,
+            flags,
+            PageantIpcTimeoutMilliseconds,
+            out UIntPtr messageResult);
+
+        if (sendStatus == IntPtr.Zero)
+        {
+            throw new TimeoutException(
+                $"Pageant did not respond within {PageantIpcTimeoutMilliseconds} ms or exited before completing the agent request.");
+        }
+
+        if (messageResult == UIntPtr.Zero)
+        {
+            throw new InvalidOperationException("Pageant rejected the agent request.");
         }
     }
 
