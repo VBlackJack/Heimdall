@@ -229,6 +229,14 @@ internal sealed class WinRmPowerShellLaunchBuilder
                 "Server profile is not a WinRM profile.");
         }
 
+        if (!Enum.IsDefined(server.WinRmIdentityMode))
+        {
+            throw new WinRmConfigurationException(
+                "ErrorWinRmProfileInvalid",
+                [],
+                "WinRM identity mode is invalid.");
+        }
+
         if (!IsValidHost(server.RemoteServer))
         {
             throw new WinRmConfigurationException(

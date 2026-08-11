@@ -242,6 +242,20 @@ public sealed class WinRmPowerShellLaunchBuilderTests
         Assert.Equal("ErrorWinRmInvalidHost", ex.LocalizationKey);
     }
 
+    [Fact]
+    public void Build_WithUndefinedIdentityMode_ThrowsProfileInvalid()
+    {
+        WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(
+            FindWindowsPowerShellNameOnly);
+        ServerProfileDto server = CreateServer();
+        server.WinRmIdentityMode = (WinRmIdentityMode)2;
+
+        WinRmConfigurationException ex =
+            Assert.Throws<WinRmConfigurationException>(() => builder.Build(server));
+
+        Assert.Equal("ErrorWinRmProfileInvalid", ex.LocalizationKey);
+    }
+
     private static ServerProfileDto CreateServer()
         => new ServerProfileDto
         {

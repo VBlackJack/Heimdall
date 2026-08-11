@@ -70,7 +70,7 @@ public sealed class ServerProfileDto
     public bool WinRmUseSsl { get; set; }
     public bool WinRmSkipCertificateCheck { get; set; }
 
-    [JsonConverter(typeof(JsonStringEnumConverter<WinRmIdentityMode>))]
+    [JsonConverter(typeof(WinRmIdentityModeJsonConverter))]
     public WinRmIdentityMode WinRmIdentityMode { get; set; } = WinRmIdentityMode.CurrentUser;
 
     // SSH settings
@@ -276,4 +276,13 @@ public sealed class ServerProfileDto
     public int TelnetPort { get; set; } = DefaultPorts.Telnet;
     public string? TelnetUsername { get; set; }
     public string? TelnetPasswordEncrypted { get; set; }
+}
+
+internal sealed class WinRmIdentityModeJsonConverter
+    : JsonStringEnumConverter<WinRmIdentityMode>
+{
+    public WinRmIdentityModeJsonConverter()
+        : base(namingPolicy: null, allowIntegerValues: false)
+    {
+    }
 }

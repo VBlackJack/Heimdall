@@ -188,6 +188,23 @@ public sealed class ImportedProfileValidatorTests
     }
 
     [Fact]
+    public void FilterValid_UndefinedWinRmIdentityMode_AddsFailureAndExcludesProfile()
+    {
+        ServerProfileDto profile = CreateValidProfile();
+        profile.DisplayName = "Invalid WinRM identity";
+        profile.ConnectionType = "WINRM";
+        profile.WinRmIdentityMode = (WinRmIdentityMode)2;
+
+        (List<ServerProfileDto> valid, List<string> failures) =
+            ImportedProfileValidator.FilterValid([profile], SupportedConnectionTypes);
+
+        Assert.Empty(valid);
+        string failure = Assert.Single(failures);
+        Assert.Contains("Invalid WinRM identity", failure, StringComparison.Ordinal);
+        Assert.Contains(nameof(ServerProfileDto.WinRmIdentityMode), failure, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FilterValid_MixedInput_PartitionsProfilesAndPreservesValidInstances()
     {
         ServerProfileDto validProfile = CreateValidProfile();

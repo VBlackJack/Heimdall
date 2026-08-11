@@ -484,6 +484,22 @@ public class ServerProfileDtoTests
         Assert.Contains("\"WinRmIdentityMode\":\"Credential\"", json);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void JsonDeserialization_WinRmIdentityMode_RejectsNumericValues(int numericValue)
+    {
+        string json = $$"""
+        {
+            "ConnectionType": "WINRM",
+            "WinRmIdentityMode": {{numericValue}}
+        }
+        """;
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ServerProfileDto>(json));
+    }
+
     [Fact]
     public void JsonSerialization_UsesBackCompatibleFixedResolutionNames()
     {
