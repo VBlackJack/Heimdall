@@ -101,8 +101,8 @@ public sealed class GroupDefaultsDto
         if (string.IsNullOrEmpty(server.SshKeyPath))
             server.SshKeyPath = SshKeyPath;
 
-        if (server.SshPort == 22 && SshPort.HasValue)
-            server.SshPort = SshPort.Value;
+        if (!server.HasSshPortField && SshPort.HasValue)
+            server.ApplyInheritedSshPort(SshPort.Value);
 
         // ConnectionType is a non-nullable string defaulting to "RDP"; an explicitly
         // empty value is the "unset" sentinel. Inherit only when the server leaves it

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text.Json;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.Core.Tests;
@@ -228,14 +229,99 @@ public class GroupDefaultsDtoTests
     }
 
     [Fact]
-    public void ApplyTo_SetsSshPortWhenServerHasDefault22()
+    public void ApplyTo_PreservesExplicitSshPort22()
     {
-        var groupDefaults = new GroupDefaultsDto { SshPort = 2222 };
-        var server = new ServerProfileDto { SshPort = 22 };
+        GroupDefaultsDto groupDefaults = new() { SshPort = 2222 };
+        ServerProfileDto server = new() { SshPort = 22 };
 
         groupDefaults.ApplyTo(server);
 
+        Assert.True(server.HasSshPortField);
+        Assert.Equal(22, server.SshPort);
+    }
+
+    [Fact]
+    public void ApplyTo_InheritsSshPortWhenJsonFieldIsAbsent()
+    {
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        ServerProfileDto? server = JsonSerializer.Deserialize<ServerProfileDto>(
+            """{"displayName":"Legacy","connectionType":"SSH"}""",
+            options);
+        Assert.NotNull(server);
+        Assert.False(server.HasSshPortField);
+
+        GroupDefaultsDto groupDefaults = new() { SshPort = 2222 };
+        groupDefaults.ApplyTo(server);
+
         Assert.Equal(2222, server.SshPort);
+    }
+
+    [Fact]
+    public void ApplyTo_PreservesExplicitSshPort22FromJson()
+    {
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        ServerProfileDto? server = JsonSerializer.Deserialize<ServerProfileDto>(
+            """{"displayName":"Explicit","connectionType":"SSH","sshPort":22}""",
+            options);
+        Assert.NotNull(server);
+        Assert.True(server.HasSshPortField);
+
+        GroupDefaultsDto groupDefaults = new() { SshPort = 2222 };
+        groupDefaults.ApplyTo(server);
+
+        Assert.Equal(22, server.SshPort);
+    }
+
+    [Fact]
+    public void JsonRoundTrip_PreservesAbsentSshPortField()
+    {
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        ServerProfileDto? server = JsonSerializer.Deserialize<ServerProfileDto>(
+            """{"displayName":"Legacy","connectionType":"SSH"}""",
+            options);
+        Assert.NotNull(server);
+        Assert.False(server.HasSshPortField);
+
+        string json = JsonSerializer.Serialize(server, options);
+        ServerProfileDto? roundTripped = JsonSerializer.Deserialize<ServerProfileDto>(json, options);
+
+        Assert.NotNull(roundTripped);
+        Assert.False(roundTripped.HasSshPortField);
+        Assert.Equal(22, roundTripped.SshPort);
+    }
+
+    [Fact]
+    public async Task ConfigManagerRoundTrip_PreservesAbsentSshPortField()
+    {
+        string tempPath = Path.Combine(
+            Path.GetTempPath(),
+            "Heimdall.SshPortPresence." + Guid.NewGuid().ToString("N"));
+        string configPath = Path.Combine(tempPath, "config");
+        Directory.CreateDirectory(configPath);
+
+        try
+        {
+            string serversPath = Path.Combine(configPath, "servers.json");
+            await File.WriteAllTextAsync(
+                serversPath,
+                """[{"id":"legacy","displayName":"Legacy","connectionType":"SSH"}]""");
+            ConfigManager manager = new(tempPath);
+
+            List<ServerProfileDto> loaded = await manager.LoadServersAsync();
+            Assert.False(Assert.Single(loaded).HasSshPortField);
+
+            await manager.SaveServersAsync(loaded);
+
+            string persistedJson = await File.ReadAllTextAsync(serversPath);
+            Assert.DoesNotContain("\"sshPort\"", persistedJson, StringComparison.OrdinalIgnoreCase);
+            ServerProfileDto persisted = Assert.Single(await manager.LoadServersAsync());
+            Assert.False(persisted.HasSshPortField);
+            Assert.Equal(22, persisted.SshPort);
+        }
+        finally
+        {
+            Directory.Delete(tempPath, recursive: true);
+        }
     }
 
     // ── ApplyTo: does NOT override existing values ──────────────────────

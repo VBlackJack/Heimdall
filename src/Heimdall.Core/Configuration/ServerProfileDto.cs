@@ -28,6 +28,7 @@ namespace Heimdall.Core.Configuration;
 public sealed class ServerProfileDto : IJsonOnDeserialized
 {
     private int _winRmPort = DefaultPorts.WinRmHttp;
+    private int _sshPort = DefaultPorts.Ssh;
     private string? _sshKeyPassphraseEncrypted;
     private RdpResolutionMode _rdpResolutionMode = RdpResolutionMode.FitWindow;
     private int? _rdpFixedWidth;
@@ -98,7 +99,42 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
     // SSH settings
     public string? SshUsername { get; set; }
-    public int SshPort { get; set; } = DefaultPorts.Ssh;
+
+    [JsonIgnore]
+    public int SshPort
+    {
+        get => _sshPort;
+        set
+        {
+            _sshPort = value;
+            HasSshPortField = true;
+        }
+    }
+
+    [JsonIgnore]
+    public bool HasSshPortField { get; private set; }
+
+    [JsonInclude]
+    [JsonPropertyName("sshPort")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    internal int? SerializedSshPort
+    {
+        get => HasSshPortField ? _sshPort : null;
+        set
+        {
+            if (value.HasValue)
+            {
+                _sshPort = value.Value;
+                HasSshPortField = true;
+            }
+        }
+    }
+
+    internal void ApplyInheritedSshPort(int port)
+    {
+        _sshPort = port;
+    }
+
     public string SshMode { get; set; } = "Embedded";
     public bool SshAgentForwarding { get; set; }
     public string? SshKeyPath { get; set; }
