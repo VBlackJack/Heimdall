@@ -18,6 +18,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -70,6 +71,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private const string SudoStderrIncorrectPasswordAttempt = "incorrect password attempt";
     private const string SudoStderrSorryTryAgain = "sorry, try again";
     private const string SudoStderrNoPasswordProvided = "no password was provided";
+    private const int SudoStreamBufferSize = 81_920;
+    private const int MaximumCapturedSudoStandardErrorBytes = 65_536;
     private static readonly TimeSpan ErrorHighlightDuration = TimeSpan.FromSeconds(5);
 
     private readonly Stack<string> _navigationHistory = new();
@@ -1652,13 +1655,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             command = ssh.CreateCommand(commandText);
             executeTask = command.ExecuteAsync(ct);
-            byte[] passwordBytes = Encoding.UTF8.GetBytes(password + "\n");
-
-            using (Stream inputStream = command.CreateInputStream())
-            {
-                await inputStream.WriteAsync(passwordBytes, 0, passwordBytes.Length, ct)
-                    .ConfigureAwait(false);
-            }
+            await WriteSudoPasswordAsync(command, password, ct).ConfigureAwait(false);
 
             await executeTask.ConfigureAwait(false);
 
@@ -1701,31 +1698,254 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private async Task DownloadViaSudoCoreAsync(string remotePath, string localPath, CancellationToken ct)
     {
         string privilegedBody = BuildSudoBase64DownloadBody(remotePath);
-        string tempPath = AtomicLocalFile.CreateTempPath(localPath);
+        string? password = _sshParams?.Password;
+        bool authenticateViaStdin = !string.IsNullOrEmpty(password);
+        string commandText = BuildSudoInvocation(privilegedBody, authenticateViaStdin);
         using Renci.SshNet.SshClient ssh = await CreateSudoSshClientAsync(ct).ConfigureAwait(false);
 
         try
         {
-            using Renci.SshNet.SshCommand cmd = await ExecuteSudoBodyAsync(ssh, privilegedBody, ct)
-                .ConfigureAwait(false);
-
-            EnsureSudoSucceeded(cmd, "base64");
-
-            byte[] bytes = DecodeSudoBase64(cmd.Result ?? string.Empty);
+            using Renci.SshNet.SshCommand command = ssh.CreateCommand(commandText);
+            using CancellationTokenSource commandCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(ct);
+            Task commandExecution = command.ExecuteAsync(commandCancellation.Token);
+            Task? downloadCommit = null;
             try
             {
-                await File.WriteAllBytesAsync(tempPath, bytes, ct).ConfigureAwait(false);
-                AtomicLocalFile.Commit(tempPath, localPath);
+                downloadCommit = CommitSudoDownloadAsync(
+                    command.OutputStream,
+                    command.ExtendedOutputStream,
+                    commandExecution,
+                    () => command.ExitStatus ?? -1,
+                    commandCancellation,
+                    localPath,
+                    ct);
+
+                if (authenticateViaStdin)
+                {
+                    await WriteSudoPasswordAsync(command, password!, commandCancellation.Token)
+                        .ConfigureAwait(false);
+                }
+
+                await downloadCommit.ConfigureAwait(false);
             }
             catch
             {
-                AtomicLocalFile.Rollback(tempPath);
+                commandCancellation.Cancel();
+                await ObserveFailedOperationAsync(commandExecution).ConfigureAwait(false);
+                if (downloadCommit is not null)
+                {
+                    await ObserveFailedOperationAsync(downloadCommit).ConfigureAwait(false);
+                }
+
                 throw;
             }
         }
         finally
         {
             SafeDisconnect(ssh);
+        }
+    }
+
+    private static async Task WriteSudoPasswordAsync(
+        Renci.SshNet.SshCommand command,
+        string password,
+        CancellationToken ct)
+    {
+        byte[] passwordBytes = Encoding.UTF8.GetBytes(password + "\n");
+        try
+        {
+            using Stream inputStream = command.CreateInputStream();
+            await inputStream.WriteAsync(passwordBytes, 0, passwordBytes.Length, ct)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(passwordBytes);
+        }
+    }
+
+    private static async Task ObserveFailedOperationAsync(Task operation)
+    {
+        try
+        {
+            await operation.ConfigureAwait(false);
+        }
+        catch
+        {
+            // The caller preserves the original streaming, stdin, or cancellation failure.
+        }
+    }
+
+    internal static async Task CommitSudoDownloadAsync(
+        Stream standardOutput,
+        Stream standardError,
+        Task commandExecution,
+        Func<int> exitStatusProvider,
+        CancellationTokenSource commandCancellation,
+        string localPath,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(standardOutput);
+        ArgumentNullException.ThrowIfNull(standardError);
+        ArgumentNullException.ThrowIfNull(commandExecution);
+        ArgumentNullException.ThrowIfNull(exitStatusProvider);
+        ArgumentNullException.ThrowIfNull(commandCancellation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+
+        string tempPath = AtomicLocalFile.CreateTempPath(localPath);
+        try
+        {
+            string standardErrorText;
+            await using (FileStream destination = new(
+                tempPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.Read,
+                SudoStreamBufferSize,
+                FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                standardErrorText = await StreamSudoBase64OutputAsync(
+                        standardOutput,
+                        standardError,
+                        destination,
+                        commandExecution,
+                        commandCancellation,
+                        ct)
+                    .ConfigureAwait(false);
+                await destination.FlushAsync(commandCancellation.Token).ConfigureAwait(false);
+            }
+
+            EnsureSudoSucceeded(exitStatusProvider(), standardErrorText, "base64");
+            AtomicLocalFile.Commit(tempPath, localPath);
+        }
+        catch
+        {
+            commandCancellation.Cancel();
+            AtomicLocalFile.Rollback(tempPath);
+            throw;
+        }
+    }
+
+    internal static async Task<string> StreamSudoBase64OutputAsync(
+        Stream standardOutput,
+        Stream standardError,
+        Stream destination,
+        Task commandExecution,
+        CancellationTokenSource commandCancellation,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(standardOutput);
+        ArgumentNullException.ThrowIfNull(standardError);
+        ArgumentNullException.ThrowIfNull(destination);
+        ArgumentNullException.ThrowIfNull(commandExecution);
+        ArgumentNullException.ThrowIfNull(commandCancellation);
+
+        using CancellationTokenRegistration cancellationRegistration = ct.Register(
+            commandCancellation.Cancel);
+        CancellationToken commandToken = commandCancellation.Token;
+        Task decodeTask = DecodeSudoBase64OutputAsync(standardOutput, destination, commandToken);
+        Task<string> standardErrorTask = DrainSudoStandardErrorAsync(standardError, commandToken);
+        TaskCompletionSource<Task> firstFailure = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task commandMonitor = CancelCommandOnFailureAsync(
+            commandExecution,
+            commandCancellation,
+            firstFailure);
+        Task decodeMonitor = CancelCommandOnFailureAsync(
+            decodeTask,
+            commandCancellation,
+            firstFailure);
+        Task standardErrorMonitor = CancelCommandOnFailureAsync(
+            standardErrorTask,
+            commandCancellation,
+            firstFailure);
+
+        try
+        {
+            await Task.WhenAll(
+                    commandExecution,
+                    decodeTask,
+                    standardErrorTask,
+                    commandMonitor,
+                    decodeMonitor,
+                    standardErrorMonitor)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            commandCancellation.Cancel();
+            ct.ThrowIfCancellationRequested();
+
+            if (firstFailure.Task.IsCompletedSuccessfully)
+            {
+                Task failedOperation = await firstFailure.Task.ConfigureAwait(false);
+                await failedOperation.ConfigureAwait(false);
+            }
+
+            throw;
+        }
+
+        return await standardErrorTask.ConfigureAwait(false);
+    }
+
+    private static async Task DecodeSudoBase64OutputAsync(
+        Stream standardOutput,
+        Stream destination,
+        CancellationToken ct)
+    {
+        try
+        {
+            using FromBase64Transform decoder = new(FromBase64TransformMode.IgnoreWhiteSpaces);
+            using CryptoStream decodedOutput = new(
+                standardOutput,
+                decoder,
+                CryptoStreamMode.Read,
+                leaveOpen: true);
+            await decodedOutput.CopyToAsync(destination, SudoStreamBufferSize, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is FormatException or CryptographicException)
+        {
+            throw new InvalidOperationException("sudo base64 returned invalid base64 output.", ex);
+        }
+    }
+
+    private static async Task<string> DrainSudoStandardErrorAsync(Stream standardError, CancellationToken ct)
+    {
+        byte[] buffer = new byte[SudoStreamBufferSize];
+        using MemoryStream captured = new(MaximumCapturedSudoStandardErrorBytes);
+        while (true)
+        {
+            int bytesRead = await standardError.ReadAsync(buffer, ct).ConfigureAwait(false);
+            if (bytesRead == 0)
+            {
+                break;
+            }
+
+            int remainingCapacity = MaximumCapturedSudoStandardErrorBytes - (int)captured.Length;
+            int bytesToCapture = Math.Min(bytesRead, Math.Max(0, remainingCapacity));
+            if (bytesToCapture > 0)
+            {
+                await captured.WriteAsync(buffer.AsMemory(0, bytesToCapture), ct).ConfigureAwait(false);
+            }
+        }
+
+        return Encoding.UTF8.GetString(captured.GetBuffer(), 0, (int)captured.Length);
+    }
+
+    private static async Task CancelCommandOnFailureAsync(
+        Task operation,
+        CancellationTokenSource commandCancellation,
+        TaskCompletionSource<Task> firstFailure)
+    {
+        try
+        {
+            await operation.ConfigureAwait(false);
+        }
+        catch
+        {
+            firstFailure.TrySetResult(operation);
+            commandCancellation.Cancel();
+            throw;
         }
     }
 
@@ -2491,11 +2711,6 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     internal static string BuildSudoBase64DownloadBody(string remotePath)
     {
         return PrivilegedFileCommands.BuildNoFollowBase64ReadBody(remotePath);
-    }
-
-    internal static byte[] DecodeSudoBase64(string commandOutput)
-    {
-        return Convert.FromBase64String(commandOutput ?? string.Empty);
     }
 
     /// <summary>
