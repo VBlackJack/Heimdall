@@ -136,10 +136,8 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                     $"WinRM TLS certificate validation is being skipped for host '{server.RemoteServer}' protocol=WINRM");
             }
 
-            if (!usesTunnel)
-            {
-                await _preflight.EnsureReachableAsync(server, ct).ConfigureAwait(false);
-            }
+            await _preflight.EnsureReachableAsync(server, targetHost, targetPort, ct)
+                .ConfigureAwait(false);
 
             if (server.WinRmIdentityMode == WinRmIdentityMode.Credential)
             {

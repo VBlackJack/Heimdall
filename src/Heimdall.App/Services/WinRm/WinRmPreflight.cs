@@ -51,6 +51,19 @@ internal sealed class WinRmPreflight
 
         string host = server.RemoteServer;
         int port = WinRmPowerShellLaunchBuilder.ResolvePort(server);
+        await EnsureReachableAsync(server, host, port, ct).ConfigureAwait(false);
+    }
+
+    public async Task EnsureReachableAsync(
+        ServerProfileDto server,
+        string host,
+        int port,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(port, ushort.MaxValue);
 
         await RunTcpProbeAsync(host, port, ct).ConfigureAwait(false);
         if (server.WinRmUseSsl)

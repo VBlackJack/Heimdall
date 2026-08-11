@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Net.Sockets;
 using System.Text;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -51,8 +52,54 @@ public sealed class WinRmHandlerGatewayTests
         Assert.NotNull(terminalSession.Arguments);
         Assert.Contains("-ComputerName '127.0.0.1'", terminalSession.Arguments, StringComparison.Ordinal);
         Assert.Contains("-Port 55985", terminalSession.Arguments, StringComparison.Ordinal);
-        Assert.Equal(0, preflight.TcpProbeCount);
+        Assert.Equal(1, preflight.TcpProbeCount);
+        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
+        Assert.Equal(55985, preflight.LastTcpPort);
         Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_TunneledCredentialProfile_PreflightFailureStopsBeforeBootstrap()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = 55985
+        };
+        CountingWinRmPreflight preflight = new CountingWinRmPreflight
+        {
+            TcpException = new SocketException((int)SocketError.ConnectionRefused)
+        };
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+        int bootstrapFactoryCallCount = 0;
+        WinRmHandler handler = CreateHandler(
+            tunnelService,
+            preflight,
+            terminalSession,
+            () =>
+            {
+                bootstrapFactoryCallCount++;
+                return CreateTestBootstrap();
+            });
+        ServerProfileDto server = CreateGatewayServer();
+        server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+        server.WinRmUsername = @"CONTOSO\operator";
+        server.WinRmPasswordEncrypted = "encrypted";
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, preflight.TcpProbeCount);
+        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
+        Assert.Equal(55985, preflight.LastTcpPort);
+        Assert.Equal(0, bootstrapFactoryCallCount);
+        Assert.Null(terminalSession.Arguments);
+        Assert.Equal(1, tunnelService.ReleaseCount);
+        Assert.Equal(55985, tunnelService.ReleasedLocalPort);
     }
 
     [Fact]
@@ -318,6 +365,9 @@ public sealed class WinRmHandlerGatewayTests
         public int TcpProbeCount { get; private set; }
         public int TlsProbeCount { get; private set; }
         public bool LastSkipCertValidation { get; private set; }
+        public string? LastTcpHost { get; private set; }
+        public int LastTcpPort { get; private set; }
+        public Exception? TcpException { get; init; }
 
         public WinRmPreflight Create()
         {
@@ -333,6 +383,13 @@ public sealed class WinRmHandlerGatewayTests
             CancellationToken token)
         {
             TcpProbeCount++;
+            LastTcpHost = host;
+            LastTcpPort = port;
+            if (TcpException is not null)
+            {
+                return Task.FromException(TcpException);
+            }
+
             return Task.CompletedTask;
         }
 
