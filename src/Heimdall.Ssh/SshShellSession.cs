@@ -21,6 +21,19 @@ using Renci.SshNet;
 
 namespace Heimdall.Ssh;
 
+internal interface ISshShellStream : IDisposable
+{
+    ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken);
+
+    void Write(byte[] data, int offset, int count);
+
+    void Flush();
+
+    void ChangeWindowSize(uint columns, uint rows, uint width, uint height);
+
+    void Close();
+}
+
 /// <summary>
 /// Manages an interactive SSH shell session with PTY allocation.
 /// Provides event-driven data reception and supports terminal resize.
@@ -43,10 +56,11 @@ public sealed class SshShellSession : IDisposable
 
     private readonly TimeProvider _timeProvider;
     private SshClient? _client;
-    private ShellStream? _stream;
+    private ISshShellStream? _stream;
     private CancellationTokenSource? _readCts;
     private Task? _readLoopTask;
     private readonly object _teardownGate = new();
+    private readonly object _streamGate = new();
     private int _disconnectNotified;
     private bool _teardownStarted;
     private bool _disposed;
@@ -80,7 +94,7 @@ public sealed class SshShellSession : IDisposable
     public event Action<SshSessionSecurityEvent>? SecurityEventOccurred;
 
     /// <summary>Whether the underlying SSH connection is active.</summary>
-    public bool IsConnected => _client?.IsConnected == true && _stream is not null;
+    public bool IsConnected => _client?.IsConnected == true && Volatile.Read(ref _stream) is not null;
 
     /// <summary>Exposes the underlying SSH client for multiplexed operations (e.g. health monitoring).</summary>
     public SshClient? Client => _client;
@@ -153,13 +167,17 @@ public sealed class SshShellSession : IDisposable
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        _stream = _client.CreateShellStream(
+        ShellStream shellStream = _client.CreateShellStream(
             terminalName: "xterm-256color",
             columns: (uint)terminalColumns,
             rows: (uint)terminalRows,
             width: 0,
             height: 0,
             bufferSize: ReadBufferSize);
+        lock (_streamGate)
+        {
+            _stream = new SshNetShellStream(shellStream);
+        }
 
         // Link the read-loop CTS to the external cancellation token so
         // a cancel signal from the caller propagates all the way down to
@@ -174,13 +192,17 @@ public sealed class SshShellSession : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_stream is null)
+        lock (_streamGate)
         {
-            throw new InvalidOperationException("Session is not connected.");
-        }
+            ISshShellStream? stream = _stream;
+            if (stream is null)
+            {
+                throw new InvalidOperationException("Session is not connected.");
+            }
 
-        _stream.Write(data, 0, data.Length);
-        _stream.Flush();
+            stream.Write(data, 0, data.Length);
+            stream.Flush();
+        }
     }
 
     /// <summary>Writes a UTF-8 encoded string to the shell's standard input.</summary>
@@ -201,24 +223,28 @@ public sealed class SshShellSession : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_stream is null)
+        lock (_streamGate)
         {
-            throw new InvalidOperationException("Session is not connected.");
-        }
+            ISshShellStream? stream = _stream;
+            if (stream is null)
+            {
+                throw new InvalidOperationException("Session is not connected.");
+            }
 
-        try
-        {
-            _stream.ChangeWindowSize((uint)columns, (uint)rows, 0u, 0u);
-        }
-        catch (ObjectDisposedException ex)
-        {
-            Core.Logging.FileLogger.Warn(
-                $"SSH window-change request skipped because the shell stream is disposed: {ex.Message}");
-        }
-        catch (InvalidOperationException ex)
-        {
-            Core.Logging.FileLogger.Warn(
-                $"SSH window-change request failed for {columns}x{rows}: {ex.Message}");
+            try
+            {
+                stream.ChangeWindowSize((uint)columns, (uint)rows, 0u, 0u);
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"SSH window-change request skipped because the shell stream is disposed: {ex.Message}");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"SSH window-change request failed for {columns}x{rows}: {ex.Message}");
+            }
         }
     }
 
@@ -248,13 +274,19 @@ public sealed class SshShellSession : IDisposable
 
         try
         {
-            while (!cancellationToken.IsCancellationRequested && !_disposed && _stream is not null)
+            while (!cancellationToken.IsCancellationRequested && !_disposed)
             {
+                ISshShellStream? stream = Volatile.Read(ref _stream);
+                if (stream is null)
+                {
+                    break;
+                }
+
                 int bytesRead;
 
                 try
                 {
-                    bytesRead = await _stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)
+                    bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)
                         .ConfigureAwait(false);
                 }
                 catch (ObjectDisposedException)
@@ -374,7 +406,7 @@ public sealed class SshShellSession : IDisposable
 
             if (markDisposed
                 && _client is null
-                && _stream is null
+                && Volatile.Read(ref _stream) is null
                 && _readLoopTask is null
                 && _readCts is null)
             {
@@ -558,22 +590,59 @@ public sealed class SshShellSession : IDisposable
     /// <summary>Closes and disposes the shell stream.</summary>
     private void CleanupStream()
     {
-        var stream = Interlocked.Exchange(ref _stream, null);
-        if (stream is not null)
+        lock (_streamGate)
         {
-            try
+            ISshShellStream? stream = _stream;
+            _stream = null;
+            if (stream is not null)
             {
-                stream.Close();
-                stream.Dispose();
+                try
+                {
+                    stream.Close();
+                    stream.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Expected when disposing already-closed resources.
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.Debug("SSH shell stream cleanup suppressed", ex);
+                }
             }
-            catch (ObjectDisposedException)
-            {
-                // Expected when disposing already-closed resources.
-            }
-            catch (Exception ex)
-            {
-                FileLogger.Debug("SSH shell stream cleanup suppressed", ex);
-            }
+        }
+    }
+
+    private sealed class SshNetShellStream(ShellStream inner) : ISshShellStream
+    {
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            return inner.ReadAsync(buffer, cancellationToken);
+        }
+
+        public void Write(byte[] data, int offset, int count)
+        {
+            inner.Write(data, offset, count);
+        }
+
+        public void Flush()
+        {
+            inner.Flush();
+        }
+
+        public void ChangeWindowSize(uint columns, uint rows, uint width, uint height)
+        {
+            inner.ChangeWindowSize(columns, rows, width, height);
+        }
+
+        public void Close()
+        {
+            inner.Close();
+        }
+
+        public void Dispose()
+        {
+            inner.Dispose();
         }
     }
 

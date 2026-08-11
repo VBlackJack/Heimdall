@@ -179,6 +179,25 @@ public sealed class SshShellSessionTeardownTests
         Assert.Throws<ObjectDisposedException>(() => session.Write("x"));
     }
 
+    [Fact]
+    public void WriteAndCleanup_HoldTheSameStreamLifecycleGate()
+    {
+        using SshShellSession session = new();
+        object streamGate = GetPrivateField<object>(session, "_streamGate");
+        FakeShellStream stream = new(() => Monitor.IsEntered(streamGate));
+        SetPrivateField<ISshShellStream>(session, "_stream", stream);
+
+        session.Write([0x41]);
+        InvokePrivateMethod(session, "CleanupStream");
+
+        Assert.True(stream.WriteObservedGateHeld);
+        Assert.True(stream.CloseObservedGateHeld);
+        Assert.Equal(1, stream.WriteCount);
+        Assert.Equal(1, stream.FlushCount);
+        Assert.Equal(1, stream.CloseCount);
+        Assert.Equal(1, stream.DisposeCount);
+    }
+
     /// <summary>
     /// Advances the controllable clock until <paramref name="completion"/> finishes.
     /// The session registers its final-wait timer from a thread-pool thread, so a
@@ -218,5 +237,69 @@ public sealed class SshShellSessionTeardownTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         field!.SetValue(session, value);
+    }
+
+    private static T GetPrivateField<T>(SshShellSession session, string fieldName)
+    {
+        FieldInfo? field = typeof(SshShellSession).GetField(
+            fieldName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsType<T>(field!.GetValue(session));
+    }
+
+    private static void InvokePrivateMethod(SshShellSession session, string methodName)
+    {
+        MethodInfo? method = typeof(SshShellSession).GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(session, null);
+    }
+
+    private sealed class FakeShellStream(Func<bool> isGateHeld) : ISshShellStream
+    {
+        public bool WriteObservedGateHeld { get; private set; }
+
+        public bool CloseObservedGateHeld { get; private set; }
+
+        public int WriteCount { get; private set; }
+
+        public int FlushCount { get; private set; }
+
+        public int CloseCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(0);
+        }
+
+        public void Write(byte[] data, int offset, int count)
+        {
+            WriteObservedGateHeld = isGateHeld();
+            WriteCount++;
+        }
+
+        public void Flush()
+        {
+            FlushCount++;
+        }
+
+        public void ChangeWindowSize(uint columns, uint rows, uint width, uint height)
+        {
+        }
+
+        public void Close()
+        {
+            CloseObservedGateHeld = isGateHeld();
+            CloseCount++;
+        }
+
+        public void Dispose()
+        {
+            DisposeCount++;
+        }
     }
 }
