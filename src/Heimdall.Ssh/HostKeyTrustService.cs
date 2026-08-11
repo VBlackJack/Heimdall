@@ -50,16 +50,16 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
             return true;
         }
 
+        string hashedHostCandidate = port == 22 ? host : $"[{host}]:{port}";
         foreach (var (storedHostPort, storedEntry) in _store.GetAllEntries())
         {
-            if (!HostKeyFormats.TryParseKey(storedHostPort, out var storedHost, out var storedPort)
-                || storedPort != port
+            if (!HostKeyFormats.TryParseKey(storedHostPort, out var storedHost, out _)
                 || !storedHost.StartsWith("|1|", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            if (KnownHostsHash.TryMatches(storedHost, host))
+            if (KnownHostsHash.TryMatches(storedHost, hashedHostCandidate))
             {
                 hostPort = storedHostPort;
                 entry = storedEntry;
