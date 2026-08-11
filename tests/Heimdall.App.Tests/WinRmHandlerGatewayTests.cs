@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using Heimdall.App.Services;
@@ -30,6 +31,48 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class WinRmHandlerGatewayTests
 {
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
+    [Fact]
+    public async Task Constructor_YoungBootstrapOrphan_ReschedulesAndDeletesAtEligibility()
+    {
+        DateTime firstSweepUtc = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        TimeSpan maxAge = TimeSpan.FromMinutes(10);
+        DateTime lastWriteUtc = firstSweepUtc - TimeSpan.FromMinutes(5);
+        DateTime eligibilityUtc = lastWriteUtc + maxAge;
+        string orphanPath = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall_winrm_scheduler_wiring.ps1");
+        int sweepCount = 0;
+        int utcNowCallCount = 0;
+        TaskCompletionSource<string> deleted = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        WinRmBootstrapJanitor janitor = new WinRmBootstrapJanitor(
+            enumerateScripts: _ =>
+            {
+                Interlocked.Increment(ref sweepCount);
+                return new string[] { orphanPath };
+            },
+            getLastWriteTimeUtc: _ => lastWriteUtc,
+            delete: path => deleted.TrySetResult(path),
+            utcNow: () => Interlocked.Increment(ref utcNowCallCount) == 1
+                ? firstSweepUtc
+                : eligibilityUtc,
+            maxAge: maxAge);
+
+        using WinRmHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            new CountingWinRmPreflight(),
+            new CapturingTerminalSession(),
+            bootstrapJanitor: janitor);
+
+        string deletedPath = await deleted.Task.WaitAsync(TestTimeout);
+
+        Assert.Equal(orphanPath, deletedPath);
+        Assert.Equal(2, Volatile.Read(ref sweepCount));
+        Assert.Equal(2, Volatile.Read(ref utcNowCallCount));
+    }
+
     [Fact]
     public async Task ConnectAsync_TunneledProfile_LaunchesPowerShellAgainstTunnelEndpoint()
     {
@@ -292,7 +335,8 @@ public sealed class WinRmHandlerGatewayTests
         CountingWinRmPreflight preflight,
         CapturingTerminalSession terminalSession,
         Func<WinRmCredentialBootstrap>? credentialBootstrapFactory = null,
-        ConnectionStateMachine? stateMachine = null)
+        ConnectionStateMachine? stateMachine = null,
+        WinRmBootstrapJanitor? bootstrapJanitor = null)
     {
         return new WinRmHandler(
             tunnelService,
@@ -302,7 +346,7 @@ public sealed class WinRmHandlerGatewayTests
             () => terminalSession,
             new WinRmPowerShellLaunchBuilder(_ => "powershell.exe"),
             credentialBootstrapFactory,
-            CreateNoOpJanitor());
+            bootstrapJanitor ?? CreateNoOpJanitor());
     }
 
     private static WinRmBootstrapJanitor CreateNoOpJanitor()
