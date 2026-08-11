@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -23,6 +25,180 @@ namespace Heimdall.App.Tests;
 
 public sealed partial class SessionCoordinatorPreMountTests
 {
+    [Fact]
+    public async Task AutoReconnect_FirstFailure_SchedulesSecondAttemptWithSecondDelay()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ManualReconnectDelayScheduler scheduler = new ManualReconnectDelayScheduler();
+        harness.Main.Session.ReconnectDelayAsync = scheduler.DelayAsync;
+        ServerProfileDto server = harness.CreateServer("SSH");
+        await harness.PersistServerAsync(server);
+        SessionTabViewModel source = AddReconnectSource(harness, server);
+        ControlledProtocolHandler firstHandler = harness.GetHandler("SSH");
+
+        RaiseAutomaticReconnect(harness, source, attempt: 1, maxAttempts: 3);
+
+        await firstHandler.Started.Task.WaitAsync(TestTimeout);
+        firstHandler.Result.SetResult(new ConnectionResult(false, "first failure", null));
+        ScheduledReconnectDelay secondDelay = await scheduler.TakeAsync();
+        Assert.Equal(TimeSpan.FromSeconds(5), secondDelay.Delay);
+
+        harness.ResetHandler("SSH");
+        ControlledProtocolHandler secondHandler = harness.GetHandler("SSH");
+        secondDelay.Release();
+        await secondHandler.Started.Task.WaitAsync(TestTimeout);
+        secondHandler.Result.SetResult(SuccessWithTerminalSession());
+
+        await WaitUntilAsync(() => harness.Main.Session.ActiveReconnectChainCount == 0);
+        Assert.Equal(1, harness.EmbeddedSessionManager.AttachSshSessionCalls);
+        Assert.Equal(0, harness.Main.Session.ActiveReconnectChainCount);
+        Assert.Equal(1, scheduler.ScheduledCount);
+    }
+
+    [Fact]
+    public async Task AutoReconnect_MaxAttemptsReached_DoesNotScheduleAnotherAttempt()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ManualReconnectDelayScheduler scheduler = new ManualReconnectDelayScheduler();
+        harness.Main.Session.ReconnectDelayAsync = scheduler.DelayAsync;
+        ServerProfileDto server = harness.CreateServer("SSH");
+        await harness.PersistServerAsync(server);
+        SessionTabViewModel source = AddReconnectSource(harness, server);
+        ControlledProtocolHandler firstHandler = harness.GetHandler("SSH");
+
+        RaiseAutomaticReconnect(harness, source, attempt: 1, maxAttempts: 2);
+
+        await firstHandler.Started.Task.WaitAsync(TestTimeout);
+        firstHandler.Result.SetResult(new ConnectionResult(false, "first failure", null));
+        ScheduledReconnectDelay secondDelay = await scheduler.TakeAsync();
+
+        harness.ResetHandler("SSH");
+        ControlledProtocolHandler secondHandler = harness.GetHandler("SSH");
+        secondDelay.Release();
+        await secondHandler.Started.Task.WaitAsync(TestTimeout);
+        secondHandler.Result.SetResult(new ConnectionResult(false, "second failure", null));
+
+        await WaitUntilAsync(() => harness.Main.Session.ActiveReconnectChainCount == 0);
+        Assert.Equal(1, scheduler.ScheduledCount);
+        Assert.Equal(0, scheduler.PendingCount);
+    }
+
+    [Fact]
+    public async Task AutoReconnect_ThreeAttempts_UsesFirstSecondAndSubsequentDelays()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ManualReconnectDelayScheduler scheduler = new ManualReconnectDelayScheduler();
+        harness.Main.Session.ReconnectDelayAsync = scheduler.DelayAsync;
+        ServerProfileDto server = harness.CreateServer("SSH");
+        await harness.PersistServerAsync(server);
+        SessionTabViewModel source = AddReconnectSource(harness, server);
+        ControlledProtocolHandler firstHandler = harness.GetHandler("SSH");
+
+        Assert.Equal(2, EmbeddedSshView.ComputeAutoReconnectDelaySeconds(null, attempt: 1));
+        RaiseAutomaticReconnect(harness, source, attempt: 1, maxAttempts: 3);
+
+        await firstHandler.Started.Task.WaitAsync(TestTimeout);
+        firstHandler.Result.SetResult(new ConnectionResult(false, "first failure", null));
+        ScheduledReconnectDelay secondDelay = await scheduler.TakeAsync();
+        Assert.Equal(TimeSpan.FromSeconds(5), secondDelay.Delay);
+
+        harness.ResetHandler("SSH");
+        ControlledProtocolHandler secondHandler = harness.GetHandler("SSH");
+        secondDelay.Release();
+        await secondHandler.Started.Task.WaitAsync(TestTimeout);
+        secondHandler.Result.SetResult(new ConnectionResult(false, "second failure", null));
+        ScheduledReconnectDelay thirdDelay = await scheduler.TakeAsync();
+        Assert.Equal(TimeSpan.FromSeconds(15), thirdDelay.Delay);
+
+        harness.ResetHandler("SSH");
+        ControlledProtocolHandler thirdHandler = harness.GetHandler("SSH");
+        thirdDelay.Release();
+        await thirdHandler.Started.Task.WaitAsync(TestTimeout);
+        thirdHandler.Result.SetResult(SuccessWithTerminalSession());
+
+        await WaitUntilAsync(() => harness.Main.Session.ActiveReconnectChainCount == 0);
+        Assert.Equal(1, harness.EmbeddedSessionManager.AttachSshSessionCalls);
+        Assert.Equal(0, harness.Main.Session.ActiveReconnectChainCount);
+        Assert.Equal(2, scheduler.ScheduledCount);
+    }
+
+    [Fact]
+    public async Task AutoReconnect_UserClosesConnectingPlaceholder_CancelsChain()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ManualReconnectDelayScheduler scheduler = new ManualReconnectDelayScheduler();
+        harness.Main.Session.ReconnectDelayAsync = scheduler.DelayAsync;
+        ServerProfileDto server = harness.CreateServer("SSH");
+        await harness.PersistServerAsync(server);
+        SessionTabViewModel source = AddReconnectSource(harness, server);
+        ControlledProtocolHandler handler = harness.GetHandler("SSH");
+
+        RaiseAutomaticReconnect(harness, source, attempt: 1, maxAttempts: 3);
+
+        CancellationToken token = await handler.Started.Task.WaitAsync(TestTimeout);
+        SessionTabViewModel placeholder = Assert.Single(harness.Main.Connection.ActiveSessions);
+        await harness.Main.Connection.CloseSessionAsync(
+            placeholder,
+            DisconnectReason.UserAction,
+            confirm: false);
+
+        await WaitUntilAsync(() => token.IsCancellationRequested);
+        await WaitUntilAsync(() => harness.Main.Session.ActiveReconnectChainCount == 0);
+        Assert.Equal(0, scheduler.ScheduledCount);
+    }
+
+    [Fact]
+    public async Task AutoReconnect_DeferredByVault_ResumesWithoutDoubleCounting()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ManualReconnectDelayScheduler scheduler = new ManualReconnectDelayScheduler();
+        harness.Main.Session.ReconnectDelayAsync = scheduler.DelayAsync;
+        ServerProfileDto server = harness.CreateServer("SSH");
+        await harness.PersistServerAsync(server);
+        SessionTabViewModel source = AddReconnectSource(harness, server);
+        ControlledProtocolHandler firstHandler = harness.GetHandler("SSH");
+        harness.Main.IsWorkspaceLocked = true;
+
+        RaiseAutomaticReconnect(harness, source, attempt: 1, maxAttempts: 2);
+
+        Assert.False(firstHandler.Started.Task.IsCompleted);
+        Assert.Contains(source, harness.Main.Connection.ActiveSessions);
+        harness.Main.IsWorkspaceLocked = false;
+        harness.Main.Session.ResumeDeferredReconnects();
+
+        await firstHandler.Started.Task.WaitAsync(TestTimeout);
+        firstHandler.Result.SetResult(new ConnectionResult(false, "first failure", null));
+        ScheduledReconnectDelay secondDelay = await scheduler.TakeAsync();
+        Assert.Equal(TimeSpan.FromSeconds(5), secondDelay.Delay);
+
+        harness.ResetHandler("SSH");
+        ControlledProtocolHandler secondHandler = harness.GetHandler("SSH");
+        secondDelay.Release();
+        await secondHandler.Started.Task.WaitAsync(TestTimeout);
+        secondHandler.Result.SetResult(SuccessWithTerminalSession());
+
+        await WaitUntilAsync(() => harness.Main.Session.ActiveReconnectChainCount == 0);
+        Assert.Equal(1, scheduler.ScheduledCount);
+    }
+
+    [Fact]
+    public void ReconnectAttemptSeed_IsAppliedToReplacementView()
+    {
+        SessionTabViewModel tab = new SessionTabViewModel
+        {
+            ServerId = "runtime-reconnect",
+            OriginalServerId = "server-ssh",
+            ConnectionType = "SSH"
+        };
+        EmbeddedSshView view = (EmbeddedSshView)System.Runtime.CompilerServices.RuntimeHelpers
+            .GetUninitializedObject(typeof(EmbeddedSshView));
+
+        EmbeddedSessionManager.QueueReconnectAttempt(tab, attempt: 2);
+        EmbeddedSessionManager.ApplyQueuedReconnectAttempt(view, tab);
+
+        Assert.Equal(2, view.AutoReconnectAttempt);
+    }
+
     [Fact]
     public async Task ReconnectSession_Ssh_RemovesOldTabBeforeNewConnect()
     {
@@ -155,6 +331,7 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         reconnectHandler.Result.SetResult(SuccessWithTerminalSession());
         await WaitUntilAsync(() => harness.EmbeddedSessionManager.AttachSshSessionCalls == 2);
+        Assert.Equal(0, harness.Main.Session.ActiveReconnectChainCount);
     }
 
     [Theory]
@@ -279,5 +456,96 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         Assert.Contains(tab, harness.Main.Connection.ActiveSessions);
         Assert.Same(sshPane, ((SplitContainerModel)tab.RootContent).First);
+    }
+
+    private static SessionTabViewModel AddReconnectSource(TestHarness harness, ServerProfileDto server)
+    {
+        SessionTabViewModel source = harness.Main.Connection.AddSession(
+            "source-runtime",
+            server.DisplayName,
+            "SSH");
+        source.OriginalServerId = server.Id;
+        return source;
+    }
+
+    private static void RaiseAutomaticReconnect(
+        TestHarness harness,
+        SessionTabViewModel source,
+        int attempt,
+        int maxAttempts)
+    {
+        Action<SessionTabViewModel, string, string> callback = Assert.IsType<Action<SessionTabViewModel, string, string>>(
+            harness.EmbeddedSessionManager.ReconnectRequestedCallback);
+        EmbeddedSessionManager.ForwardReconnectRequest(
+            source,
+            ReconnectRequestContext.Automatic(attempt, maxAttempts),
+            callback);
+    }
+
+    private sealed class ManualReconnectDelayScheduler
+    {
+        private readonly Queue<ScheduledReconnectDelay> _pending = new Queue<ScheduledReconnectDelay>();
+        private readonly SemaphoreSlim _available = new SemaphoreSlim(0);
+
+        public int ScheduledCount { get; private set; }
+
+        public int PendingCount
+        {
+            get
+            {
+                lock (_pending)
+                {
+                    return _pending.Count;
+                }
+            }
+        }
+
+        public Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            ScheduledReconnectDelay scheduled = new ScheduledReconnectDelay(delay, cancellationToken);
+            lock (_pending)
+            {
+                _pending.Enqueue(scheduled);
+                ScheduledCount++;
+            }
+
+            _available.Release();
+            return scheduled.Task;
+        }
+
+        public async Task<ScheduledReconnectDelay> TakeAsync()
+        {
+            bool available = await _available.WaitAsync(TestTimeout);
+            Assert.True(available, "Reconnect delay was not scheduled before the test timeout.");
+            lock (_pending)
+            {
+                return _pending.Dequeue();
+            }
+        }
+    }
+
+    private sealed class ScheduledReconnectDelay
+    {
+        private readonly TaskCompletionSource _completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly CancellationTokenRegistration _registration;
+
+        public ScheduledReconnectDelay(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            Delay = delay;
+            _registration = cancellationToken.Register(
+                static state => ((TaskCompletionSource)state!).TrySetCanceled(),
+                _completion);
+        }
+
+        public TimeSpan Delay { get; }
+
+        public Task Task => _completion.Task;
+
+        public void Release()
+        {
+            _registration.Dispose();
+            _completion.TrySetResult();
+        }
     }
 }

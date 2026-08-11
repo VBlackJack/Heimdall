@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -37,6 +38,8 @@ namespace Heimdall.App.Services;
 public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
 {
     internal const int DefaultRdpResizeEnableDelayMs = 10000;
+    private static readonly ConditionalWeakTable<SessionTabViewModel, PendingReconnectState>
+        PendingReconnectStates = new ConditionalWeakTable<SessionTabViewModel, PendingReconnectState>();
 
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
@@ -718,6 +721,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             SessionLogService = _sessionLogService
         };
         view.InitializeConnecting(sessionTab, displayName, BuildSshEndpointLabel(server));
+        ApplyQueuedReconnectAttempt(view, sessionTab);
 
         WireBroadcast(view);
         WireSplitRequested(view, sessionTab);
@@ -941,13 +945,89 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
 
     private void WireReconnectRequested(EmbeddedSshView view, SessionTabViewModel tab)
     {
-        view.ReconnectRequested += () =>
-            ReconnectRequestedCallback?.Invoke(
-                tab,
-                tab.ProfileLookupServerId,
-                tab.ConnectionType);
+        view.ReconnectContextRequested += context =>
+            ForwardReconnectRequest(tab, context, ReconnectRequestedCallback);
         view.CloseRequested += () => CloseRequestedCallback?.Invoke(tab);
         view.CurrentDirectoryChanged += path => FollowSftpToCurrentDirectory(tab, path);
+    }
+
+    internal static void ForwardReconnectRequest(
+        SessionTabViewModel tab,
+        ReconnectRequestContext context,
+        Action<SessionTabViewModel, string, string>? callback)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        if (callback is null)
+        {
+            return;
+        }
+
+        PendingReconnectState state = PendingReconnectStates.GetOrCreateValue(tab);
+        lock (state.SyncRoot)
+        {
+            state.Request = context;
+        }
+
+        callback(tab, tab.ProfileLookupServerId, tab.ConnectionType);
+    }
+
+    internal static ReconnectRequestContext TakeReconnectRequest(SessionTabViewModel tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        if (!PendingReconnectStates.TryGetValue(tab, out PendingReconnectState? state))
+        {
+            return ReconnectRequestContext.Manual;
+        }
+
+        lock (state.SyncRoot)
+        {
+            ReconnectRequestContext context = state.Request ?? ReconnectRequestContext.Manual;
+            state.Request = null;
+            return context;
+        }
+    }
+
+    internal static void QueueReconnectAttempt(SessionTabViewModel tab, int attempt)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        ArgumentOutOfRangeException.ThrowIfNegative(attempt);
+        PendingReconnectState state = PendingReconnectStates.GetOrCreateValue(tab);
+        lock (state.SyncRoot)
+        {
+            state.Attempt = attempt;
+        }
+    }
+
+    internal static void ApplyQueuedReconnectAttempt(
+        EmbeddedSshView view,
+        SessionTabViewModel tab)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        ArgumentNullException.ThrowIfNull(tab);
+        if (!PendingReconnectStates.TryGetValue(tab, out PendingReconnectState? state))
+        {
+            return;
+        }
+
+        lock (state.SyncRoot)
+        {
+            if (state.Attempt is not int attempt)
+            {
+                return;
+            }
+
+            state.Attempt = null;
+            view.SeedAutoReconnectAttempt(attempt);
+        }
+    }
+
+    private sealed class PendingReconnectState
+    {
+        internal object SyncRoot { get; } = new object();
+
+        internal ReconnectRequestContext? Request { get; set; }
+
+        internal int? Attempt { get; set; }
     }
 
     private static void FollowSftpToCurrentDirectory(SessionTabViewModel tab, string path)

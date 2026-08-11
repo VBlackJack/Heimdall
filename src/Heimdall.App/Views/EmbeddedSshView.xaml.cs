@@ -38,6 +38,21 @@ using AppDialogViewModels = Heimdall.App.ViewModels.Dialogs;
 
 namespace Heimdall.App.Views;
 
+internal readonly record struct ReconnectRequestContext(
+    bool IsAutomatic,
+    int Attempt,
+    int MaxAttempts)
+{
+    internal static ReconnectRequestContext Manual { get; } = new(false, 0, 0);
+
+    internal static ReconnectRequestContext Automatic(int attempt, int maxAttempts)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(attempt, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxAttempts, attempt);
+        return new ReconnectRequestContext(true, attempt, maxAttempts);
+    }
+}
+
 internal sealed class AutoReconnectTickScheduler
 {
     private long _generation;
@@ -257,6 +272,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private string? _pendingSecurityDisconnectMessage;
     private DateTimeOffset? _terminalSessionAttachedAtUtc;
     private int _autoReconnectAttempt;
+    private int _autoReconnectMaxAttempts;
     private int _autoReconnectSecondsRemaining;
 
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
@@ -301,6 +317,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// using the original server parameters.
     /// </summary>
     public event Action? ReconnectRequested;
+
+    internal event Action<ReconnectRequestContext>? ReconnectContextRequested;
 
     /// <summary>
     /// Raised when the user clicks the Close button on the disconnect overlay.
@@ -448,6 +466,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         UpdateStatus("Connected");
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
+        // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
 
         TryAutoStartSessionLog();
@@ -505,6 +524,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         UpdateStatus(connectedStatus);
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
+        // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
 
         TryAutoStartSessionLog();
@@ -803,7 +823,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         StopAutoReconnectTimer();
         Core.Logging.FileLogger.Info("EmbeddedSSH Reconnect requested by user");
-        ReconnectRequested?.Invoke();
+        RaiseReconnectRequested(ReconnectRequestContext.Manual);
     }
 
     private void OnOverlayReconnectClick(object sender, RoutedEventArgs e)
@@ -816,7 +836,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         StopAutoReconnectTimer();
         HideReconnectOverlay();
         Core.Logging.FileLogger.Info("EmbeddedSSH Reconnect requested via overlay");
-        ReconnectRequested?.Invoke();
+        RaiseReconnectRequested(ReconnectRequestContext.Manual);
     }
 
     private void OnOverlayCloseClick(object sender, RoutedEventArgs e)
@@ -872,6 +892,20 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         };
     }
 
+    internal int AutoReconnectAttempt => _autoReconnectAttempt;
+
+    internal void SeedAutoReconnectAttempt(int attempt)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(attempt);
+        _autoReconnectAttempt = attempt;
+    }
+
+    private void RaiseReconnectRequested(ReconnectRequestContext context)
+    {
+        ReconnectContextRequested?.Invoke(context);
+        ReconnectRequested?.Invoke();
+    }
+
     private void StartAutoReconnectCountdown(int delaySeconds, int attempt, int maxAttempts)
     {
         if (_disposed) return;
@@ -888,6 +922,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         HideConnectingOverlay();
 
         _autoReconnectSecondsRemaining = delaySeconds;
+        _autoReconnectMaxAttempts = maxAttempts;
         AutoReconnectMessageText.Text = string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
             L("SshAutoReconnectMessage"),
@@ -932,7 +967,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             AutoReconnectOverlay.Visibility = Visibility.Collapsed;
             Core.Logging.FileLogger.Info(
                 $"EmbeddedSSH auto-reconnect attempt {_autoReconnectAttempt} firing");
-            ReconnectRequested?.Invoke();
+            RaiseReconnectRequested(ReconnectRequestContext.Automatic(
+                _autoReconnectAttempt,
+                _autoReconnectMaxAttempts));
             return;
         }
 

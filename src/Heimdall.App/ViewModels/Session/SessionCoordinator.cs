@@ -73,7 +73,25 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private readonly IPostConnectStepResolver _postConnectStepResolver;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly Dictionary<string, ConnectingSessionCancellation> _connectingCancellations = [];
+    private readonly Dictionary<string, ReconnectChainState> _reconnectChainsBySessionId = [];
+    private readonly HashSet<ReconnectChainState> _activeReconnectChains = [];
+    private readonly AsyncLocal<ReconnectChainState?> _currentReconnectChain = new AsyncLocal<ReconnectChainState?>();
+    private readonly object _reconnectChainGate = new object();
     private bool _disposed;
+
+    internal Func<TimeSpan, CancellationToken, Task> ReconnectDelayAsync { get; set; } =
+        static (delay, cancellationToken) => Task.Delay(delay, cancellationToken);
+
+    internal int ActiveReconnectChainCount
+    {
+        get
+        {
+            lock (_reconnectChainGate)
+            {
+                return _activeReconnectChains.Count;
+            }
+        }
+    }
 
     /// <summary>
     /// Creates a new session coordinator and installs the 8 external
@@ -575,14 +593,43 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
+        ReconnectChainState? reconnectChain = _currentReconnectChain.Value;
         if (!_uiDispatcher.CheckAccess())
         {
-            InvokeOnUi(() => OnSessionStarting(
-                sessionId, originalServerId, displayName, connectionType, server, settings, cancellationSource));
+            InvokeOnUi(() => OnSessionStartingCore(
+                sessionId,
+                originalServerId,
+                displayName,
+                connectionType,
+                server,
+                settings,
+                cancellationSource,
+                reconnectChain));
             return;
         }
 
-        var existingTab = _main.Connection.ActiveSessions.FirstOrDefault(
+        OnSessionStartingCore(
+            sessionId,
+            originalServerId,
+            displayName,
+            connectionType,
+            server,
+            settings,
+            cancellationSource,
+            reconnectChain);
+    }
+
+    private void OnSessionStartingCore(
+        string sessionId,
+        string originalServerId,
+        string displayName,
+        string connectionType,
+        ServerProfileDto server,
+        AppSettings settings,
+        CancellationTokenSource cancellationSource,
+        ReconnectChainState? reconnectChain)
+    {
+        SessionTabViewModel? existingTab = _main.Connection.ActiveSessions.FirstOrDefault(
             t => string.Equals(t.ServerId, sessionId, StringComparison.Ordinal));
         if (existingTab is not null)
         {
@@ -604,6 +651,17 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         tab.OriginalServerId = originalServerId;
         tab.FailureDetails = null;
         TrackConnectingCancellation(sessionId, tab, cancellationSource);
+        if (reconnectChain is not null)
+        {
+            lock (_reconnectChainGate)
+            {
+                _reconnectChainsBySessionId[sessionId] = reconnectChain;
+            }
+
+            reconnectChain.CurrentSessionId = sessionId;
+            EmbeddedSessionManager.QueueReconnectAttempt(tab, reconnectChain.Attempt);
+        }
+
         tab.HostControl = _embeddedSessionManager.CreateConnectingSshHostControl(
             tab, displayName, server, settings);
     }
@@ -620,17 +678,42 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
-        ReleaseConnectingCancellation(sessionId);
+        bool cancellationRequested = ReleaseConnectingCancellation(sessionId);
+        ReconnectChainState? reconnectChain = RemoveReconnectChainSession(sessionId);
+        if (reconnectChain is not null)
+        {
+            reconnectChain.FailureObserved = true;
+            if (cancellationRequested)
+            {
+                reconnectChain.UserCancelled = true;
+                reconnectChain.CancellationSource.Cancel();
+            }
+        }
 
-        var tab = _main.Connection.ActiveSessions.FirstOrDefault(
+        SessionTabViewModel? tab = _main.Connection.ActiveSessions.FirstOrDefault(
             t => string.Equals(t.ServerId, sessionId, StringComparison.Ordinal));
         if (tab is null)
         {
+            if (reconnectChain is not null)
+            {
+                reconnectChain.FailureCleanupTask = Task.CompletedTask;
+            }
+
             return;
         }
 
-        _main.Connection.CloseSessionAsync(tab, DisconnectReason.FailedSession, confirm: false)
-            .SafeFireAndForget();
+        Task cleanupTask = _main.Connection.CloseSessionAsync(
+            tab,
+            DisconnectReason.FailedSession,
+            confirm: false);
+        if (reconnectChain is not null)
+        {
+            reconnectChain.FailureCleanupTask = cleanupTask;
+        }
+        else
+        {
+            cleanupTask.SafeFireAndForget();
+        }
     }
 
     /// <summary>
@@ -699,6 +782,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 _embeddedSessionManager.AttachSshSession(existingTab, session, _main.CurrentSettings);
                 existingTab.Status = _localizer["StatusConnected"];
                 CompleteReadySession(existingTab, sessionId, originalServerId, displayName, connectionType, session);
+                CompleteReconnectChainForSession(sessionId);
                 return;
             }
 
@@ -856,23 +940,28 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     // credential cannot be decrypted (CredentialProtector.Unprotect throws
     // VaultLockedException), so they are queued here and replayed after unlock
     // instead of being attempted (and failing/throwing) or wasting bounded retries.
-    private readonly List<(SessionTabViewModel Tab, string ServerId, string ConnectionType)> _deferredReconnects = new();
+    private readonly List<(
+        SessionTabViewModel Tab,
+        string ServerId,
+        string ConnectionType,
+        ReconnectRequestContext Context)> _deferredReconnects = new();
     private readonly List<(SessionTabViewModel Tab, string PaneId)> _deferredPaneReconnects = new();
 
     private void OnReconnectRequested(SessionTabViewModel tab, string serverId, string connectionType)
     {
+        ReconnectRequestContext context = EmbeddedSessionManager.TakeReconnectRequest(tab);
         if (VaultReconnectPolicy.ShouldDeferReconnect(_main.IsWorkspaceLocked))
         {
             if (!_deferredReconnects.Any(d => ReferenceEquals(d.Tab, tab)))
             {
-                _deferredReconnects.Add((tab, serverId, connectionType));
+                _deferredReconnects.Add((tab, serverId, connectionType, context));
                 FileLogger.Info("Reconnect deferred: vault workspace locked.");
             }
 
             return;
         }
 
-        OnReconnectRequestedAsync(tab, serverId, connectionType).SafeFireAndForget();
+        OnReconnectRequestedAsync(tab, serverId, connectionType, context).SafeFireAndForget();
     }
 
     private void OnReconnectPaneRequested(SessionTabViewModel tab, SessionPaneModel pane)
@@ -908,9 +997,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _deferredReconnects.Clear();
         var pendingPanes = _deferredPaneReconnects.ToList();
         _deferredPaneReconnects.Clear();
-        foreach (var (tab, serverId, connectionType) in pending)
+        foreach ((
+            SessionTabViewModel tab,
+            string serverId,
+            string connectionType,
+            ReconnectRequestContext context) in pending)
         {
-            OnReconnectRequestedAsync(tab, serverId, connectionType).SafeFireAndForget();
+            OnReconnectRequestedAsync(tab, serverId, connectionType, context).SafeFireAndForget();
         }
 
         foreach (var (tab, paneId) in pendingPanes)
@@ -1056,17 +1149,41 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
     }
 
-    private async Task OnReconnectRequestedAsync(SessionTabViewModel tab, string serverId, string connectionType)
+    private async Task OnReconnectRequestedAsync(
+        SessionTabViewModel tab,
+        string serverId,
+        string connectionType,
+        ReconnectRequestContext context)
     {
         if (string.IsNullOrEmpty(serverId))
         {
             return;
         }
 
+        ReconnectChainState? reconnectChain = null;
+        if (context.IsAutomatic)
+        {
+            reconnectChain = new ReconnectChainState(
+                tab,
+                serverId,
+                connectionType,
+                context.Attempt,
+                context.MaxAttempts);
+            lock (_reconnectChainGate)
+            {
+                _activeReconnectChains.Add(reconnectChain);
+            }
+
+            FileLogger.Info(
+                $"Auto-reconnect chain {reconnectChain.LineageId} started: " +
+                $"title='{reconnectChain.SourceTab.Title}' type={reconnectChain.ConnectionType} " +
+                $"attempt={reconnectChain.Attempt}/{reconnectChain.MaxAttempts}.");
+        }
+
         try
         {
-            var oldTabCountBefore = _main.Connection.ActiveSessions.Count;
-            var oldTabWasPresent = _main.Connection.ActiveSessions.Contains(tab);
+            int oldTabCountBefore = _main.Connection.ActiveSessions.Count;
+            bool oldTabWasPresent = _main.Connection.ActiveSessions.Contains(tab);
             FileLogger.Info(
                 $"Reconnect requested: serverId={serverId} connectionType={connectionType} " +
                 $"oldTabPresent={oldTabWasPresent} activeTabs={oldTabCountBefore}");
@@ -1077,7 +1194,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 DisconnectReason.ReconnectInitiated,
                 confirm: false);
 
-            var stillPresentAfterClose = _main.Connection.ActiveSessions.Contains(tab);
+            bool stillPresentAfterClose = _main.Connection.ActiveSessions.Contains(tab);
             FileLogger.Info(
                 $"Reconnect: post-close oldTabStillPresent={stillPresentAfterClose} " +
                 $"activeTabs={_main.Connection.ActiveSessions.Count}");
@@ -1104,31 +1221,122 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     _main.Connection.ActiveSessions.Count > 0;
             }
 
-            // Re-connect through the server list's standard connection path
-            var servers = await _configManager.LoadServersAsync();
-            var serverDto = servers.FirstOrDefault(
-                s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
+            if (reconnectChain is not null)
+            {
+                await RunReconnectAttemptAsync(reconnectChain);
+                return;
+            }
 
-            if (serverDto is null)
+            IReadOnlyList<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+            if (!servers.Any(server => string.Equals(server.Id, serverId, StringComparison.Ordinal)))
             {
                 _main.StatusText = _localizer["ErrorServerNotFound"];
                 return;
             }
 
-            // Trigger the same flow as double-clicking the server in the tree
-            var serverVm = _main.ServerList.Servers.FirstOrDefault(
-                s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
-
-            if (serverVm is not null)
-            {
-                _main.ServerList.ConnectCommand.Execute(serverVm);
-            }
+            await _main.ServerList.RestoreServerAsync(serverId, CancellationToken.None);
         }
         catch (Exception ex)
         {
             FileLogger.Error($"Reconnect failed for {serverId}", ex);
             _main.StatusText = _localizer.Format("StatusReconnectFailed", ex.Message);
+            if (reconnectChain is not null)
+            {
+                reconnectChain.FailureObserved = true;
+                await ContinueReconnectChainAfterFailureAsync(reconnectChain);
+            }
         }
+    }
+
+    private async Task RunReconnectAttemptAsync(ReconnectChainState reconnectChain)
+    {
+        if (reconnectChain.UserCancelled || reconnectChain.CancellationSource.IsCancellationRequested)
+        {
+            CompleteReconnectChain(reconnectChain);
+            return;
+        }
+
+        reconnectChain.FailureObserved = false;
+        reconnectChain.FailureCleanupTask = Task.CompletedTask;
+        _currentReconnectChain.Value = reconnectChain;
+        bool restored;
+        try
+        {
+            restored = await _main.ServerList.RestoreServerAsync(
+                reconnectChain.ServerId,
+                reconnectChain.CancellationSource.Token);
+        }
+        catch (OperationCanceledException) when (reconnectChain.CancellationSource.IsCancellationRequested)
+        {
+            reconnectChain.UserCancelled = true;
+            CompleteReconnectChain(reconnectChain);
+            return;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error(
+                $"Auto-reconnect attempt {reconnectChain.Attempt} failed for {reconnectChain.ServerId}",
+                ex);
+            reconnectChain.FailureObserved = true;
+            restored = false;
+        }
+        finally
+        {
+            _currentReconnectChain.Value = null;
+        }
+
+        if (restored)
+        {
+            CompleteReconnectChain(reconnectChain);
+            return;
+        }
+
+        await reconnectChain.FailureCleanupTask;
+        if (!reconnectChain.FailureObserved)
+        {
+            CompleteReconnectChain(reconnectChain);
+            return;
+        }
+
+        await ContinueReconnectChainAfterFailureAsync(reconnectChain);
+    }
+
+    private async Task ContinueReconnectChainAfterFailureAsync(ReconnectChainState reconnectChain)
+    {
+        if (reconnectChain.UserCancelled
+            || reconnectChain.CancellationSource.IsCancellationRequested
+            || reconnectChain.Attempt >= reconnectChain.MaxAttempts)
+        {
+            CompleteReconnectChain(reconnectChain);
+            return;
+        }
+
+        reconnectChain.Attempt++;
+        int delaySeconds = EmbeddedSshView.ComputeAutoReconnectDelaySeconds(
+            _main.CurrentSettings,
+            reconnectChain.Attempt);
+        try
+        {
+            await ReconnectDelayAsync(
+                TimeSpan.FromSeconds(delaySeconds),
+                reconnectChain.CancellationSource.Token);
+        }
+        catch (OperationCanceledException) when (reconnectChain.CancellationSource.IsCancellationRequested)
+        {
+            reconnectChain.UserCancelled = true;
+            CompleteReconnectChain(reconnectChain);
+            return;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error(
+                $"Auto-reconnect scheduler failed for chain {reconnectChain.LineageId}",
+                ex);
+            CompleteReconnectChain(reconnectChain);
+            return;
+        }
+
+        await RunReconnectAttemptAsync(reconnectChain);
     }
 
     private async Task OnReconnectAdHocRequestedAsync(
@@ -1590,11 +1798,67 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             registration);
     }
 
-    private void ReleaseConnectingCancellation(string sessionId)
+    private bool ReleaseConnectingCancellation(string sessionId)
     {
-        if (_connectingCancellations.Remove(sessionId, out var cancellation))
+        if (_connectingCancellations.Remove(sessionId, out ConnectingSessionCancellation? cancellation))
         {
+            bool cancellationRequested = cancellation.IsCancellationRequested;
             cancellation.Dispose();
+            return cancellationRequested;
+        }
+
+        return false;
+    }
+
+    private ReconnectChainState? RemoveReconnectChainSession(string sessionId)
+    {
+        lock (_reconnectChainGate)
+        {
+            if (_reconnectChainsBySessionId.Remove(sessionId, out ReconnectChainState? reconnectChain))
+            {
+                return reconnectChain;
+            }
+        }
+
+        return null;
+    }
+
+    private void CompleteReconnectChainForSession(string sessionId)
+    {
+        ReconnectChainState? reconnectChain = RemoveReconnectChainSession(sessionId);
+        if (reconnectChain is not null)
+        {
+            CompleteReconnectChain(reconnectChain);
+        }
+    }
+
+    private void CompleteReconnectChain(ReconnectChainState reconnectChain)
+    {
+        bool disposeCancellationSource = false;
+        lock (_reconnectChainGate)
+        {
+            if (reconnectChain.IsCompleted)
+            {
+                return;
+            }
+
+            reconnectChain.IsCompleted = true;
+            _activeReconnectChains.Remove(reconnectChain);
+            if (!string.IsNullOrEmpty(reconnectChain.CurrentSessionId)
+                && _reconnectChainsBySessionId.TryGetValue(
+                    reconnectChain.CurrentSessionId,
+                    out ReconnectChainState? current)
+                && ReferenceEquals(current, reconnectChain))
+            {
+                _reconnectChainsBySessionId.Remove(reconnectChain.CurrentSessionId);
+            }
+
+            disposeCancellationSource = true;
+        }
+
+        if (disposeCancellationSource)
+        {
+            reconnectChain.CancellationSource.Dispose();
         }
     }
 
@@ -1617,6 +1881,18 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
         _connectingCancellations.Clear();
 
+        lock (_reconnectChainGate)
+        {
+            foreach (ReconnectChainState reconnectChain in _activeReconnectChains)
+            {
+                reconnectChain.CancellationSource.Cancel();
+                reconnectChain.CancellationSource.Dispose();
+            }
+
+            _activeReconnectChains.Clear();
+            _reconnectChainsBySessionId.Clear();
+        }
+
         // The 8 provider/callback wire-ups on Split + EmbeddedSessionManager
         // + ConnectionService are owned by external services and are left
         // in place on shutdown — clearing them could break other teardown
@@ -1628,10 +1904,44 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         CancellationTokenSource source,
         CancellationTokenRegistration tabCloseRegistration) : IDisposable
     {
+        internal bool IsCancellationRequested => source.IsCancellationRequested;
+
         public void Dispose()
         {
             tabCloseRegistration.Dispose();
             source.Dispose();
         }
+    }
+
+    private sealed class ReconnectChainState(
+        SessionTabViewModel sourceTab,
+        string serverId,
+        string connectionType,
+        int attempt,
+        int maxAttempts)
+    {
+        internal Guid LineageId { get; } = Guid.NewGuid();
+
+        internal SessionTabViewModel SourceTab { get; } = sourceTab;
+
+        internal string ServerId { get; } = serverId;
+
+        internal string ConnectionType { get; } = connectionType;
+
+        internal int Attempt { get; set; } = attempt;
+
+        internal int MaxAttempts { get; } = maxAttempts;
+
+        internal string? CurrentSessionId { get; set; }
+
+        internal bool FailureObserved { get; set; }
+
+        internal bool UserCancelled { get; set; }
+
+        internal bool IsCompleted { get; set; }
+
+        internal Task FailureCleanupTask { get; set; } = Task.CompletedTask;
+
+        internal CancellationTokenSource CancellationSource { get; } = new CancellationTokenSource();
     }
 }
