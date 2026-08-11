@@ -714,7 +714,9 @@ public sealed class SessionTabContextMenuFactory
 
             // "Merge with..." submenu — nested per session with orientation sub-items
             var otherSessions = vm.Connection.ActiveSessions
-                .Where(s => s != session && s.HostControl is not null)
+                .Where(s => s != session
+                    && s.HostControl is not null
+                    && !string.IsNullOrWhiteSpace(s.ServerId))
                 .ToList();
 
             if (otherSessions.Count > 0)
@@ -726,8 +728,8 @@ public sealed class SessionTabContextMenuFactory
                     var sourceTab = other;
                     var sessionMenu = new MenuItem { Header = sourceTab.Title };
 
-                    // Use the profile lookup key; ServerId may be empty during connection.
-                    string mergeId = sourceTab.ProfileLookupServerId;
+                    // Merge resolution is session-scoped; profile IDs are shared by duplicate tabs.
+                    string mergeId = sourceTab.ServerId;
 
                     var mergeH = new MenuItem { Header = vm.Localize("OrientationHorizontal") };
                     mergeH.Click += (_, _) => vm.MergeExistingSession(

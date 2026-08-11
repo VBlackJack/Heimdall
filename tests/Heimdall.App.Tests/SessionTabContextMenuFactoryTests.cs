@@ -309,6 +309,89 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Fact]
+    public void SessionTabContextMenu_MergeDuplicate_UsesUniqueRuntimeSessionId()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel target = harness.Main.Connection.AddSession(
+                "runtime-target",
+                "Target",
+                "SSH");
+            target.OriginalServerId = "profile-shared";
+            target.HostControl = new Border();
+
+            SessionTabViewModel firstDuplicate = harness.Main.Connection.AddSession(
+                "runtime-first",
+                "First duplicate",
+                "SSH");
+            firstDuplicate.OriginalServerId = "profile-shared";
+            firstDuplicate.HostControl = new Border();
+
+            SessionTabViewModel selectedDuplicate = harness.Main.Connection.AddSession(
+                "runtime-selected",
+                "Selected duplicate",
+                "SSH");
+            selectedDuplicate.OriginalServerId = "profile-shared";
+            selectedDuplicate.HostControl = new Border();
+
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, target);
+            MenuItem mergeMenu = AssertMenuItem(
+                menu,
+                harness.Main.Localize("SplitMergeWith"));
+            MenuItem selectedSessionMenu = AssertMenuItem(
+                mergeMenu,
+                "Selected duplicate");
+            MenuItem horizontalItem = AssertMenuItem(
+                selectedSessionMenu,
+                harness.Main.Localize("OrientationHorizontal"));
+
+            horizontalItem.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Contains(target, harness.Main.Connection.ActiveSessions);
+            Assert.Contains(firstDuplicate, harness.Main.Connection.ActiveSessions);
+            Assert.DoesNotContain(selectedDuplicate, harness.Main.Connection.ActiveSessions);
+            Assert.True(target.IsSplit);
+            Assert.Contains(
+                SplitTreeHelper.EnumerateLeaves(target.RootContent),
+                (SessionPaneModel pane) => string.Equals(
+                    pane.ServerId,
+                    "runtime-selected",
+                    StringComparison.Ordinal));
+            Assert.DoesNotContain(
+                SplitTreeHelper.EnumerateLeaves(target.RootContent),
+                (SessionPaneModel pane) => string.Equals(
+                    pane.ServerId,
+                    "runtime-first",
+                    StringComparison.Ordinal));
+        });
+    }
+
+    [Fact]
+    public void SessionTabContextMenu_EmptyRuntimeId_DoesNotOfferMergeCandidate()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel target = harness.Main.Connection.AddSession(
+                "runtime-target",
+                "Target",
+                "SSH");
+            target.HostControl = new Border();
+
+            SessionTabViewModel emptyIdSource = harness.Main.Connection.AddSession(
+                string.Empty,
+                "Invalid source",
+                "SSH");
+            emptyIdSource.HostControl = new Border();
+
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, target);
+
+            Assert.Null(FindMenuItem(menu, harness.Main.Localize("SplitMergeWith")));
+        });
+    }
+
     private static void RunOnStaThread(Action action)
     {
         Exception? exception = null;
@@ -351,14 +434,14 @@ public sealed partial class SessionCoordinatorPreMountTests
         return factory.CreateMenu(session, vm, new NullSessionTabContextCallbacks());
     }
 
-    private static MenuItem AssertMenuItem(ContextMenu menu, string header)
+    private static MenuItem AssertMenuItem(ItemsControl menu, string header)
     {
         MenuItem? item = FindMenuItem(menu, header);
         Assert.NotNull(item);
         return item!;
     }
 
-    private static MenuItem? FindMenuItem(ContextMenu menu, string header)
+    private static MenuItem? FindMenuItem(ItemsControl menu, string header)
     {
         foreach (object rawItem in menu.Items)
         {

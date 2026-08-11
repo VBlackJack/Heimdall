@@ -910,6 +910,122 @@ public sealed class SplitServiceTests : IDisposable
     }
 
     [Fact]
+    public void MergeExistingSession_ProfileIdOnly_DoesNotResolveDuplicate()
+    {
+        SessionTabViewModel source = new();
+        source.ServerId = "runtime-source";
+        source.OriginalServerId = "profile-shared";
+        source.HostControl = new DisposableHost();
+        ISplitContent sourceRootBefore = source.RootContent;
+
+        SessionTabViewModel target = new();
+        target.ServerId = "runtime-target";
+        target.OriginalServerId = "profile-shared";
+        target.HostControl = new DisposableHost();
+        ISplitContent targetRootBefore = target.RootContent;
+
+        ObservableCollection<SessionTabViewModel> activeSessions = new() { source, target };
+        _sut.ActiveSessionsProvider = () => activeSessions;
+        string? capturedStatus = null;
+        _sut.SetStatusText = status => capturedStatus = status;
+
+        _sut.MergeExistingSession(target, "profile-shared", SplitOrientation.Vertical);
+
+        Assert.Equal("ErrorSplitSessionFailed", capturedStatus);
+        Assert.Contains(source, activeSessions);
+        Assert.Contains(target, activeSessions);
+        Assert.Same(sourceRootBefore, source.RootContent);
+        Assert.Same(targetRootBefore, target.RootContent);
+        Assert.False(target.IsSplit);
+    }
+
+    [Fact]
+    public void MergeExistingSession_EmptyRuntimeId_FailsClosed()
+    {
+        SessionTabViewModel firstEmptyIdSource = new();
+        firstEmptyIdSource.ServerId = string.Empty;
+        firstEmptyIdSource.HostControl = new DisposableHost();
+        ISplitContent firstSourceRootBefore = firstEmptyIdSource.RootContent;
+
+        SessionTabViewModel target = new();
+        target.ServerId = "runtime-target";
+        target.HostControl = new DisposableHost();
+        ISplitContent targetRootBefore = target.RootContent;
+
+        SessionTabViewModel secondEmptyIdSource = new();
+        secondEmptyIdSource.ServerId = string.Empty;
+        secondEmptyIdSource.HostControl = new DisposableHost();
+        ISplitContent secondSourceRootBefore = secondEmptyIdSource.RootContent;
+
+        ObservableCollection<SessionTabViewModel> activeSessions = new()
+        {
+            firstEmptyIdSource,
+            target,
+            secondEmptyIdSource
+        };
+        _sut.ActiveSessionsProvider = () => activeSessions;
+        string? capturedStatus = null;
+        _sut.SetStatusText = status => capturedStatus = status;
+
+        _sut.MergeExistingSession(target, string.Empty, SplitOrientation.Vertical);
+
+        Assert.Equal("ErrorSplitSessionFailed", capturedStatus);
+        Assert.Contains(firstEmptyIdSource, activeSessions);
+        Assert.Contains(target, activeSessions);
+        Assert.Contains(secondEmptyIdSource, activeSessions);
+        Assert.Same(firstSourceRootBefore, firstEmptyIdSource.RootContent);
+        Assert.Same(targetRootBefore, target.RootContent);
+        Assert.Same(secondSourceRootBefore, secondEmptyIdSource.RootContent);
+        Assert.False(target.IsSplit);
+    }
+
+    [Fact]
+    public void MergeExistingSession_RuntimeId_SelectsExactDuplicate()
+    {
+        SessionTabViewModel firstDuplicate = new();
+        firstDuplicate.ServerId = "runtime-first";
+        firstDuplicate.OriginalServerId = "profile-shared";
+        firstDuplicate.HostControl = new DisposableHost();
+
+        SessionTabViewModel target = new();
+        target.ServerId = "runtime-target";
+        target.OriginalServerId = "profile-shared";
+        target.HostControl = new DisposableHost();
+
+        SessionTabViewModel selectedDuplicate = new();
+        selectedDuplicate.ServerId = "runtime-selected";
+        selectedDuplicate.OriginalServerId = "profile-shared";
+        selectedDuplicate.HostControl = new DisposableHost();
+
+        ObservableCollection<SessionTabViewModel> activeSessions = new()
+        {
+            firstDuplicate,
+            target,
+            selectedDuplicate
+        };
+        _sut.ActiveSessionsProvider = () => activeSessions;
+
+        _sut.MergeExistingSession(target, "runtime-selected", SplitOrientation.Vertical);
+
+        Assert.Contains(firstDuplicate, activeSessions);
+        Assert.Contains(target, activeSessions);
+        Assert.DoesNotContain(selectedDuplicate, activeSessions);
+        Assert.True(target.IsSplit);
+        Assert.Contains(
+            SplitTreeHelper.EnumerateLeaves(target.RootContent),
+            (SessionPaneModel pane) => string.Equals(
+                pane.ServerId,
+                "runtime-selected",
+                StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            SplitTreeHelper.EnumerateLeaves(target.RootContent),
+            (SessionPaneModel pane) => string.Equals(
+                pane.ServerId,
+                "runtime-first",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void RestoreHostControls_MissingPane_DisposesOrphanedControl()
     {
         var session = new SessionTabViewModel

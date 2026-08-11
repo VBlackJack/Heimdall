@@ -346,9 +346,15 @@ public sealed class SplitService : ISplitService
         var activeSessions = ActiveSessionsProvider?.Invoke();
         if (activeSessions is null) return;
 
+        if (string.IsNullOrWhiteSpace(sourceSessionId))
+        {
+            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"]);
+            Core.Logging.FileLogger.Warn("Merge aborted: source session ID is empty.");
+            return;
+        }
+
         var source = activeSessions.FirstOrDefault(
-            s => string.Equals(s.ServerId, sourceSessionId, StringComparison.Ordinal)
-                 || string.Equals(s.OriginalServerId, sourceSessionId, StringComparison.Ordinal));
+            s => string.Equals(s.ServerId, sourceSessionId, StringComparison.Ordinal));
 
         // Check any leaf has a host control (not just the primary shim),
         // because in a split tab the primary pane may be disconnected while others are active.
