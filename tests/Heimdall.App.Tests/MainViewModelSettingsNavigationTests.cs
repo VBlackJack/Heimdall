@@ -54,7 +54,7 @@ public sealed class MainViewModelSettingsNavigationTests
     [Fact]
     public async Task SelectedTab_SavePending_KeepsSettingsUntilSaveSucceedsThenNavigatesOnce()
     {
-        using TestHarness harness = TestHarness.Create(MergeBehavior.DelayedSuccess);
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.DelayedSuccess);
         harness.Main.SelectedTab = "Settings";
         harness.Main.Settings.IsDirty = true;
         int aboutNavigationCount = 0;
@@ -91,9 +91,9 @@ public sealed class MainViewModelSettingsNavigationTests
     /// Ensures settings validation failure prevents the requested tab change.
     /// </summary>
     [Fact]
-    public void SelectedTab_SaveReturnsFalse_LeavesSettingsSelected()
+    public async Task SelectedTab_SaveReturnsFalse_LeavesSettingsSelected()
     {
-        using TestHarness harness = TestHarness.Create(MergeBehavior.ImmediateSuccess);
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
         harness.Main.SelectedTab = "Settings";
         harness.Main.Settings.MaxEmbeddedSessions = 0;
         int aboutNavigationCount = 0;
@@ -121,9 +121,9 @@ public sealed class MainViewModelSettingsNavigationTests
     /// Ensures the existing settings save exception path prevents the requested tab change.
     /// </summary>
     [Fact]
-    public void SelectedTab_SaveThrows_LeavesSettingsSelected()
+    public async Task SelectedTab_SaveThrows_LeavesSettingsSelected()
     {
-        using TestHarness harness = TestHarness.Create(MergeBehavior.Throw);
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.Throw);
         harness.Main.SelectedTab = "Settings";
         harness.Main.Settings.IsDirty = true;
         int aboutNavigationCount = 0;
@@ -147,6 +147,151 @@ public sealed class MainViewModelSettingsNavigationTests
         Assert.Equal(1, harness.Dialog.SavePromptCount);
     }
 
+    /// <summary>
+    /// Ensures saving a new locale reprojects a status owned by the application state machine.
+    /// </summary>
+    [Fact]
+    public async Task SelectedTab_LocaleSave_ReprojectsLocalizedApplicationStatusExactlyOnce()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        string englishStatus = harness.Main.StatusText;
+        int statusNotificationCount = 0;
+        harness.Main.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(args.PropertyName, nameof(MainViewModel.StatusText), StringComparison.Ordinal))
+            {
+                statusNotificationCount++;
+            }
+        };
+
+        await SaveFrenchLocaleAndNavigateAsync(harness);
+
+        Assert.NotEqual(englishStatus, harness.Main.StatusText);
+        Assert.Equal(harness.Localizer["StatusReady"], harness.Main.StatusText);
+        Assert.Equal(1, statusNotificationCount);
+    }
+
+    /// <summary>
+    /// Ensures the computed split drop label is invalidated exactly once after a locale save.
+    /// </summary>
+    [Fact]
+    public async Task SelectedTab_LocaleSave_NotifiesDropToMergeTextExactlyOnce()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        int dropTextNotificationCount = 0;
+        harness.Main.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(args.PropertyName, nameof(MainViewModel.DropToMergeText), StringComparison.Ordinal))
+            {
+                dropTextNotificationCount++;
+            }
+        };
+
+        await SaveFrenchLocaleAndNavigateAsync(harness);
+
+        Assert.Equal(harness.Localizer["SplitDropToMerge"], harness.Main.DropToMergeText);
+        Assert.Equal(1, dropTextNotificationCount);
+    }
+
+    /// <summary>
+    /// Ensures a transient or raw status is not replaced by an application-state label.
+    /// </summary>
+    [Fact]
+    public async Task SelectedTab_LocaleSave_PreservesTransientStatus()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        harness.Main.StatusText = "gateway refused";
+        int statusNotificationCount = 0;
+        harness.Main.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(args.PropertyName, nameof(MainViewModel.StatusText), StringComparison.Ordinal))
+            {
+                statusNotificationCount++;
+            }
+        };
+
+        await SaveFrenchLocaleAndNavigateAsync(harness);
+
+        Assert.Equal("gateway refused", harness.Main.StatusText);
+        Assert.Equal(0, statusNotificationCount);
+    }
+
+    /// <summary>
+    /// Ensures locale changes stop affecting the shell after the root view model is disposed.
+    /// </summary>
+    [Fact]
+    public async Task LocaleChanged_AfterDispose_DoesNotRefreshShellState()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        string statusBeforeDispose = harness.Main.StatusText;
+        int dropTextNotificationCount = 0;
+        harness.Main.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(args.PropertyName, nameof(MainViewModel.DropToMergeText), StringComparison.Ordinal))
+            {
+                dropTextNotificationCount++;
+            }
+        };
+        harness.Main.Dispose();
+
+        await harness.Localizer.SwitchLocaleAsync("fr");
+
+        Assert.Equal(statusBeforeDispose, harness.Main.StatusText);
+        Assert.Equal(0, dropTextNotificationCount);
+    }
+
+    /// <summary>
+    /// Ensures an off-thread locale change queues shell reprojection through the UI dispatcher.
+    /// </summary>
+    [Fact]
+    public async Task SelectedTab_LocaleSave_OffUiThreadQueuesShellRefresh()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(
+            MergeBehavior.ImmediateSuccess,
+            checkAccess: false);
+        List<Action> queuedActions = [];
+        harness.Dispatcher.InvokeAsyncActionHandler = queuedActions.Add;
+        string englishStatus = harness.Main.StatusText;
+
+        await SaveFrenchLocaleAndNavigateAsync(harness);
+
+        Assert.Equal(englishStatus, harness.Main.StatusText);
+        Assert.NotEmpty(queuedActions);
+
+        foreach (Action queuedAction in queuedActions.ToList())
+        {
+            queuedAction();
+        }
+
+        Assert.Equal(harness.Localizer["StatusReady"], harness.Main.StatusText);
+    }
+
+    private static async Task SaveFrenchLocaleAndNavigateAsync(TestHarness harness)
+    {
+        TaskCompletionSource<bool> aboutNavigated = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Main.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(
+                    args.PropertyName,
+                    nameof(MainViewModel.IsAboutTabSelected),
+                    StringComparison.Ordinal)
+                && string.Equals(harness.Main.SelectedTab, "About", StringComparison.Ordinal))
+            {
+                aboutNavigated.TrySetResult(true);
+            }
+        };
+        harness.Main.SelectedTab = "Settings";
+        harness.Main.Settings.DefaultLocale = "fr";
+        harness.Main.Settings.IsDirty = true;
+
+        harness.Main.SelectedTab = "About";
+
+        await aboutNavigated.Task.WaitAsync(TestTimeout);
+        Assert.Equal("fr", harness.Localizer.CurrentLocale);
+        Assert.Equal("About", harness.Main.SelectedTab);
+    }
+
     private enum MergeBehavior
     {
         ImmediateSuccess,
@@ -164,12 +309,16 @@ public sealed class MainViewModelSettingsNavigationTests
             MainViewModel main,
             ControlledConfigManager config,
             RecordingDialogService dialog,
+            LocalizationManager localizer,
+            FakeUiDispatcher dispatcher,
             ServiceProvider serviceProvider)
         {
             _rootPath = rootPath;
             Main = main;
             Config = config;
             Dialog = dialog;
+            Localizer = localizer;
+            Dispatcher = dispatcher;
             _serviceProvider = serviceProvider;
         }
 
@@ -179,7 +328,13 @@ public sealed class MainViewModelSettingsNavigationTests
 
         public RecordingDialogService Dialog { get; }
 
-        public static TestHarness Create(MergeBehavior mergeBehavior)
+        public LocalizationManager Localizer { get; }
+
+        public FakeUiDispatcher Dispatcher { get; }
+
+        public static async Task<TestHarness> CreateAsync(
+            MergeBehavior mergeBehavior,
+            bool checkAccess = true)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -188,8 +343,9 @@ public sealed class MainViewModelSettingsNavigationTests
             Directory.CreateDirectory(rootPath);
             ControlledConfigManager config = new(rootPath, mergeBehavior);
             LocalizationManager localizer = new();
+            await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
             RecordingDialogService dialog = new();
-            FakeUiDispatcher dispatcher = new();
+            FakeUiDispatcher dispatcher = new(checkAccess);
             HostKeyStore hostKeyStore = new();
             HostKeyTrustService hostKeyTrustService = new(hostKeyStore);
             Heimdall.App.Services.Import.KnownHostsImporter appKnownHostsImporter =
@@ -292,7 +448,14 @@ public sealed class MainViewModelSettingsNavigationTests
                 update,
                 serviceProvider);
 
-            return new TestHarness(rootPath, main, config, dialog, serviceProvider);
+            return new TestHarness(
+                rootPath,
+                main,
+                config,
+                dialog,
+                localizer,
+                dispatcher,
+                serviceProvider);
         }
 
         public void Dispose()
