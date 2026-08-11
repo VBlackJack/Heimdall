@@ -36,8 +36,8 @@ using Heimdall.Core.Updates;
 namespace Heimdall.App.UiTests.ViewModels;
 
 /// <summary>
-/// Covers the banner's primary action as the view actually consumes it: a live WPF
-/// Button bound to Update.DownloadAndInstallCommand, exactly as MainWindow.xaml binds it.
+/// Covers the banner commands as the view actually consumes them: live WPF buttons
+/// bound to the same command paths as MainWindow.xaml.
 /// Polling ICommand.CanExecute directly cannot see this, because a Button only refreshes
 /// its enabled state when the command raises CanExecuteChanged.
 ///
@@ -69,6 +69,39 @@ public sealed class UpdateBannerDownloadButtonTests
 
             Assert.True(button.IsEnabled);
         });
+    }
+
+    [StaFact]
+    public void BoundDismissButtons_DisableAndReenableWithInstallingState()
+    {
+        WpfTestHost.Invoke(() =>
+        {
+            UpdateBannerViewModel viewModel = CreateViewModel();
+            BannerHost host = new BannerHost(viewModel);
+            Button laterButton = CreateBoundButton(host, "Update.LaterCommand");
+            Button skipButton = CreateBoundButton(host, "Update.SkipVersionCommand");
+
+            RunToCompletion(viewModel.CheckOnStartupAsync(CancellationToken.None));
+            Assert.True(laterButton.IsEnabled);
+            Assert.True(skipButton.IsEnabled);
+
+            viewModel.IsInstalling = true;
+
+            Assert.False(laterButton.IsEnabled);
+            Assert.False(skipButton.IsEnabled);
+
+            viewModel.IsInstalling = false;
+
+            Assert.True(laterButton.IsEnabled);
+            Assert.True(skipButton.IsEnabled);
+        });
+    }
+
+    private static Button CreateBoundButton(BannerHost host, string commandPath)
+    {
+        Button button = new Button { DataContext = host };
+        button.SetBinding(ButtonBase.CommandProperty, new Binding(commandPath));
+        return button;
     }
 
     /// <summary>

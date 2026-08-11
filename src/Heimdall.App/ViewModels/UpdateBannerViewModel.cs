@@ -53,6 +53,8 @@ public partial class UpdateBannerViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DownloadAndInstallCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LaterCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SkipVersionCommand))]
     private bool _isInstalling;
 
     [ObservableProperty]
@@ -184,10 +186,12 @@ public partial class UpdateBannerViewModel : ObservableObject
     [RelayCommand]
     private void ViewRelease() => _browserLauncher.Open(_releaseUrl);
 
-    [RelayCommand]
+    private bool CanDismissBanner() => !IsInstalling;
+
+    [RelayCommand(CanExecute = nameof(CanDismissBanner))]
     private void Later() => IsBannerVisible = false;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanDismissBanner))]
     private async Task SkipVersionAsync()
     {
         if (_candidateVersion is { } version)
