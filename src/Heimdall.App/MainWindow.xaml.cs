@@ -3144,24 +3144,23 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         if (settings.WindowWidth > 0 && settings.WindowHeight > 0)
         {
-            // Validate that the saved position is within the virtual screen area
-            var virtualLeft = SystemParameters.VirtualScreenLeft;
-            var virtualTop = SystemParameters.VirtualScreenTop;
-            var virtualRight = virtualLeft + SystemParameters.VirtualScreenWidth;
-            var virtualBottom = virtualTop + SystemParameters.VirtualScreenHeight;
+            Rect savedBounds = new(
+                settings.WindowLeft,
+                settings.WindowTop,
+                settings.WindowWidth,
+                settings.WindowHeight);
+            DpiScale dpiScale = VisualTreeHelper.GetDpi(this);
+            IReadOnlyList<Rect> workingAreas = WindowWorkingAreaProvider.GetWorkingAreas(dpiScale);
+            Rect? restoredBounds = WindowBoundsRestorationPolicy.Resolve(
+                savedBounds,
+                workingAreas);
 
-            bool isOnScreen =
-                settings.WindowLeft + settings.WindowWidth > virtualLeft &&
-                settings.WindowLeft < virtualRight &&
-                settings.WindowTop + settings.WindowHeight > virtualTop &&
-                settings.WindowTop < virtualBottom;
-
-            if (isOnScreen)
+            if (restoredBounds is Rect bounds)
             {
-                Left = settings.WindowLeft;
-                Top = settings.WindowTop;
-                Width = settings.WindowWidth;
-                Height = settings.WindowHeight;
+                Left = bounds.Left;
+                Top = bounds.Top;
+                Width = bounds.Width;
+                Height = bounds.Height;
             }
 
             if (settings.WindowMaximized)
