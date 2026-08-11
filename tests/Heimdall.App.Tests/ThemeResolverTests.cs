@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Reflection;
+using System.Windows;
 using Heimdall.App.Services;
 using ThemeForge.Theme;
 
@@ -21,6 +23,69 @@ namespace Heimdall.App.Tests;
 
 public sealed class ThemeResolverTests
 {
+    [Fact]
+    public void CreateBridgeDictionary_FromCompiledResource_LoadsBridgeBrushes()
+    {
+        ResourceDictionary? bridge = null;
+        Exception? failure = null;
+        Thread thread = new(() =>
+        {
+            Application? application = null;
+            bool createdApplication = false;
+            try
+            {
+                application = Application.Current;
+                if (application is null)
+                {
+                    application = new Application();
+                    createdApplication = true;
+                }
+
+                bridge = HeimdallThemeService.CreateBridgeDictionary();
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+            finally
+            {
+                if (createdApplication && application is not null)
+                {
+                    application.Shutdown();
+                    application.Dispatcher.InvokeShutdown();
+                    ResetApplicationSingletonForTest(application);
+                }
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Theme bridge load timed out.");
+
+        Assert.Null(failure);
+        ResourceDictionary loadedBridge = Assert.IsType<ResourceDictionary>(bridge);
+        Assert.True(loadedBridge.Contains("BackgroundBrush"));
+        Assert.Equal(
+            "pack://application:,,,/Heimdall;component/Themes/HeimdallThemeBridge.xaml",
+            loadedBridge.Source.OriginalString);
+    }
+
+    private static void ResetApplicationSingletonForTest(Application application)
+    {
+        Assert.Same(application, Application.Current);
+        BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+        FieldInfo? appInstance = typeof(Application).GetField("_appInstance", flags);
+        FieldInfo? appCreated = typeof(Application).GetField("_appCreatedInThisAppDomain", flags);
+        FieldInfo? isShuttingDown = typeof(Application).GetField("_isShuttingDown", flags);
+        Assert.NotNull(appInstance);
+        Assert.NotNull(appCreated);
+        Assert.NotNull(isShuttingDown);
+        appInstance.SetValue(null, null);
+        appCreated.SetValue(null, false);
+        isShuttingDown.SetValue(null, false);
+        Assert.Null(Application.Current);
+    }
+
     public static IEnumerable<object[]> ThemeForgeIds()
     {
         return ThemeNames.All.Select(themeName => new object[] { themeName });
