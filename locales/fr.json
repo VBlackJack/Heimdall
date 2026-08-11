@@ -1498,6 +1498,7 @@
   "BulkEditPasswordValidationControl": "Le mot de passe ne peut pas contenir de caract\u00e8res de contr\u00f4le.",
   "BulkEditPasswordValidationMismatch": "Les mots de passe ne correspondent pas.",
   "StatusBulkPasswordUpdated": "Mot de passe modifi\u00e9 sur {0} serveur(s).",
+  "StatusBulkPasswordUpdatedWithWinRmSkipped": "Mot de passe modifi\u00e9 sur {0} serveur(s). {1} profil(s) WinRM ignor\u00e9(s), car aucun nom d'utilisateur n'est configur\u00e9.",
   "DialogTitleBulkEditGateway": "D\u00e9finir la passerelle",
   "BulkEditGatewayHeader": "D\u00e9finition du chemin de connexion pour {0} serveur(s)",
   "BulkEditGatewayChoiceLabel": "Chemin de connexion :",

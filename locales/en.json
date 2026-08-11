@@ -1498,6 +1498,7 @@
   "BulkEditPasswordValidationControl": "Password cannot contain control characters.",
   "BulkEditPasswordValidationMismatch": "Passwords do not match.",
   "StatusBulkPasswordUpdated": "Password updated on {0} server(s).",
+  "StatusBulkPasswordUpdatedWithWinRmSkipped": "Password updated on {0} server(s). Skipped {1} WinRM profile(s) because no username is configured.",
   "DialogTitleBulkEditGateway": "Set gateway",
   "BulkEditGatewayHeader": "Setting connection route on {0} server(s)",
   "BulkEditGatewayChoiceLabel": "Connection route:",

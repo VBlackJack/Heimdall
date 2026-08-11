@@ -129,7 +129,7 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(selectedItems);
 
         return NormalizeSelection(selectedItems)
-            .Count(item => SupportsBulkPassword(item.ConnectionType));
+            .Count(CanBulkEditPasswordTarget);
     }
 
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
@@ -308,11 +308,22 @@ public partial class ServerListViewModel
             return;
         }
 
-        var eligibleCount = selectedItems.Count(server => SupportsBulkPassword(server.ConnectionType));
+        int eligibleCount = selectedItems.Count(CanBulkEditPasswordTarget);
+        int skippedWinRmUsernameCount = selectedItems.Count(server =>
+            string.Equals(server.ConnectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(server.Username));
         if (eligibleCount == 0)
         {
             Core.Logging.FileLogger.Info(
                 $"BulkEditPasswordAsync skipped {selectedItems.Count} ineligible item(s).");
+            if (skippedWinRmUsernameCount > 0)
+            {
+                StatusMessageRequested?.Invoke(_localizer.Format(
+                    "StatusBulkPasswordUpdatedWithWinRmSkipped",
+                    0,
+                    skippedWinRmUsernameCount));
+            }
+
             return;
         }
 
@@ -745,6 +756,7 @@ public partial class ServerListViewModel
             .Select(server => server.Id)
             .ToHashSet(StringComparer.Ordinal);
         var updatedCount = 0;
+        int skippedWinRmUsernameCount = 0;
 
         await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
@@ -772,7 +784,15 @@ public partial class ServerListViewModel
             var updatedServers = new List<ServerItemViewModel>(eligibleServers.Count);
             foreach (var server in eligibleServers)
             {
-                if (TrySetEditablePassword(dtoMap[server.Id], encryptedPassword))
+                ServerProfileDto dto = dtoMap[server.Id];
+                if (string.Equals(dto.ConnectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
+                    && string.IsNullOrWhiteSpace(dto.WinRmUsername))
+                {
+                    skippedWinRmUsernameCount++;
+                    continue;
+                }
+
+                if (TrySetEditablePassword(dto, encryptedPassword))
                 {
                     updatedServers.Add(server);
                 }
@@ -789,8 +809,12 @@ public partial class ServerListViewModel
                 selectedIds,
                 primarySelectionId,
                 null,
-                "StatusBulkPasswordUpdated",
-                [updatedCount]);
+                skippedWinRmUsernameCount > 0
+                    ? "StatusBulkPasswordUpdatedWithWinRmSkipped"
+                    : "StatusBulkPasswordUpdated",
+                skippedWinRmUsernameCount > 0
+                    ? [updatedCount, skippedWinRmUsernameCount]
+                    : [updatedCount]);
         }
     }
 
@@ -1658,6 +1682,11 @@ public partial class ServerListViewModel
                 return true;
 
             case "WINRM":
+                if (string.IsNullOrWhiteSpace(dto.WinRmUsername))
+                {
+                    return false;
+                }
+
                 dto.WinRmPasswordEncrypted = encryptedPassword;
                 dto.WinRmIdentityMode = Core.Configuration.WinRmIdentityMode.Credential;
                 return true;
@@ -1685,6 +1714,13 @@ public partial class ServerListViewModel
     {
         return connectionType?.ToUpperInvariant() is
             "RDP" or "SSH" or "SFTP" or "FTP" or "WINRM" or "VNC";
+    }
+
+    private static bool CanBulkEditPasswordTarget(ServerItemViewModel server)
+    {
+        return SupportsBulkPassword(server.ConnectionType)
+            && (!string.Equals(server.ConnectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(server.Username));
     }
 
     private static string? NormalizeProjectForPersistence(string? projectId)

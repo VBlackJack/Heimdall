@@ -1233,6 +1233,20 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public void BulkCredentialBoundary_WinRmWithoutUsername_RejectsPasswordAndPreservesIdentity()
+    {
+        ServerProfileDto server = CreatePasswordServer("alpha", "Alpha", "ops", "WINRM");
+        server.WinRmUsername = "  ";
+        server.WinRmPasswordEncrypted = "password-before";
+
+        bool passwordAccepted = ServerListViewModel.TrySetEditablePassword(server, "password-after");
+
+        Assert.False(passwordAccepted);
+        Assert.Equal("password-before", server.WinRmPasswordEncrypted);
+        Assert.Equal(WinRmIdentityMode.CurrentUser, server.WinRmIdentityMode);
+    }
+
+    [Fact]
     public async Task ServerBulkEditUsername_BasicBulkUpdate_AllUsernamesUpdated()
     {
         var configManager = new UsernameAwareConfigManager();
@@ -1506,6 +1520,11 @@ public sealed class ServerListBulkActionTests
         await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
         ServerProfileDto alpha = CreatePasswordServer("alpha", "Alpha", "ops", connectionType);
         ServerProfileDto beta = CreatePasswordServer("beta", "Beta", "ops", connectionType);
+        if (string.Equals(connectionType, "WINRM", StringComparison.Ordinal))
+        {
+            alpha.WinRmUsername = "operator";
+            beta.WinRmUsername = "operator";
+        }
 
         await fixture.LoadServersAsync(
             fixture.ExpandGroups("ops"),
@@ -1537,6 +1556,63 @@ public sealed class ServerListBulkActionTests
                 Assert.Equal(WinRmIdentityMode.Credential, storedServer.WinRmIdentityMode);
             }
         }
+    }
+
+    [Fact]
+    public async Task BulkEditPasswordAsync_MixedWinRmUsernames_UpdatesOnlyCredentialProfilesAndReportsSkipped()
+    {
+        const string NewPassword = "new-secret";
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        ServerProfileDto credential = CreatePasswordServer("credential", "Credential", "ops", "WINRM");
+        credential.WinRmUsername = "operator";
+        ServerProfileDto currentUser = CreatePasswordServer("current", "Current", "ops", "WINRM");
+        currentUser.WinRmUsername = " ";
+
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"), credential, currentUser);
+        fixture.DialogService.NextBulkEditPasswordResult = NewPassword;
+        fixture.ViewModel.SelectSingle(fixture.ServerById("credential"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("current"));
+        Assert.Equal(1, fixture.ViewModel.GetBulkPasswordTargetCount(fixture.ViewModel.SelectedItems.ToList()));
+
+        await fixture.ViewModel.BulkEditPasswordCommand.ExecuteAsync(fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Equal(1, fixture.DialogService.BulkEditPasswordCallCount);
+        Assert.Equal(1, fixture.DialogService.LastBulkEditPasswordCount);
+        Assert.Equal(
+            "Password updated on 1 server(s). Skipped 1 WinRM profile(s) because no username is configured.",
+            fixture.LastStatusMessage);
+        Dictionary<string, ServerProfileDto> stored = (await fixture.ConfigManager.LoadServersAsync())
+            .ToDictionary(server => server.Id, StringComparer.Ordinal);
+        Assert.Equal(NewPassword, CredentialProtector.Unprotect(stored["credential"].WinRmPasswordEncrypted));
+        Assert.Equal(WinRmIdentityMode.Credential, stored["credential"].WinRmIdentityMode);
+        Assert.Null(stored["current"].WinRmPasswordEncrypted);
+        Assert.Equal(WinRmIdentityMode.CurrentUser, stored["current"].WinRmIdentityMode);
+    }
+
+    [Fact]
+    public async Task BulkEditPasswordAsync_OnlyWinRmWithoutUsername_SkipsDialogAndMutation()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        ServerProfileDto alpha = CreatePasswordServer("alpha", "Alpha", "ops", "WINRM");
+        ServerProfileDto beta = CreatePasswordServer("beta", "Beta", "ops", "WINRM");
+
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"), alpha, beta);
+        fixture.DialogService.NextBulkEditPasswordResult = "new-secret";
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        Assert.Equal(0, fixture.ViewModel.GetBulkPasswordTargetCount(fixture.ViewModel.SelectedItems.ToList()));
+
+        await fixture.ViewModel.BulkEditPasswordCommand.ExecuteAsync(fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Equal(0, fixture.DialogService.BulkEditPasswordCallCount);
+        Assert.Equal(
+            "Password updated on 0 server(s). Skipped 2 WinRM profile(s) because no username is configured.",
+            fixture.LastStatusMessage);
+        ServerProfileDto[] stored = (await fixture.ConfigManager.LoadServersAsync())
+            .OrderBy(server => server.Id, StringComparer.Ordinal)
+            .ToArray();
+        Assert.All(stored, server => Assert.Null(server.WinRmPasswordEncrypted));
+        Assert.All(stored, server => Assert.Equal(WinRmIdentityMode.CurrentUser, server.WinRmIdentityMode));
     }
 
     [Fact]
