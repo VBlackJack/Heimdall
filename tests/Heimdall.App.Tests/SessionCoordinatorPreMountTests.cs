@@ -26,6 +26,55 @@ namespace Heimdall.App.Tests;
 public sealed partial class SessionCoordinatorPreMountTests
 {
     [Fact]
+    public async Task RunConnectionPipelineAsync_ExternalSsh_DoesNotCreatePlaceholderOrLinkedCancellation()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler sshHandler = harness.GetHandler("SSH");
+        ServerProfileDto server = harness.CreateServer("SSH");
+        server.SshMode = "eXtErNaL";
+
+        Task<BulkConnectOutcome> pipeline = harness.RunPipelineAsync(server, "session-ssh-external");
+        CancellationToken connectToken = await sshHandler.Started.Task.WaitAsync(TestTimeout);
+
+        Assert.False(connectToken.CanBeCanceled);
+        Assert.Empty(harness.Main.Connection.ActiveSessions);
+        Assert.Equal(0, harness.EmbeddedSessionManager.CreateConnectingSshHostControlCalls);
+        Assert.False(pipeline.IsCompleted);
+
+        sshHandler.Result.SetResult(new ConnectionResult(true, null, null));
+        BulkConnectOutcome outcome = await pipeline.WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.Success, outcome.Status);
+        Assert.Empty(harness.Main.Connection.ActiveSessions);
+        Assert.Equal(0, harness.EmbeddedSessionManager.CreateConnectingSshHostControlCalls);
+        Assert.Null(harness.StateMachine.GetStateData("session-ssh-external"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Legacy")]
+    public async Task RunConnectionPipelineAsync_NonExternalSshMode_PreservesEmbeddedPremount(string? sshMode)
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler sshHandler = harness.GetHandler("SSH");
+        ServerProfileDto server = harness.CreateServer("SSH");
+        // Simulate a legacy profile that bypassed the current nullable annotation.
+        server.SshMode = sshMode!;
+
+        Task<BulkConnectOutcome> pipeline = harness.RunPipelineAsync(server, "session-ssh-fallback");
+        CancellationToken connectToken = await sshHandler.Started.Task.WaitAsync(TestTimeout);
+
+        Assert.True(connectToken.CanBeCanceled);
+        Assert.Single(harness.Main.Connection.ActiveSessions);
+        Assert.Equal(1, harness.EmbeddedSessionManager.CreateConnectingSshHostControlCalls);
+
+        sshHandler.Result.SetResult(SuccessWithTerminalSession());
+        BulkConnectOutcome outcome = await pipeline.WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.Success, outcome.Status);
+    }
+
+    [Fact]
     public async Task RunConnectionPipelineAsync_Ssh_MountsTabBeforeConnectCompletes()
     {
         using TestHarness harness = TestHarness.Create();

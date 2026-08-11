@@ -977,12 +977,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                     break;
 
                 case "SSH":
-                    sessionStartCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    sessionStartFired = true;
-                    SessionStarting?.Invoke(sessionId, originalId, server.DisplayName,
-                        "SSH", serverDto, settings, sessionStartCts);
+                    CancellationToken sshCancellationToken = cancellationToken;
+                    if (!string.Equals(serverDto.SshMode, "External", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sessionStartCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        sessionStartFired = true;
+                        SessionStarting?.Invoke(sessionId, originalId, server.DisplayName,
+                            "SSH", serverDto, settings, sessionStartCts);
+                        sshCancellationToken = sessionStartCts.Token;
+                    }
+
                     result = await _connectionService.ConnectSshAsync(
-                        serverDto, settings, sessionStartCts.Token);
+                        serverDto, settings, sshCancellationToken);
                     break;
 
                 case "SFTP":
