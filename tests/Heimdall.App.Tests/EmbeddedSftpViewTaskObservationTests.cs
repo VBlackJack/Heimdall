@@ -108,6 +108,36 @@ public sealed class EmbeddedSftpViewTaskObservationTests
         Assert.Contains("disconnect failed", warning, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task DisconnectBrowserAsync_ReturnsBeforeBlockingDisconnectCompletes()
+    {
+        using ManualResetEventSlim releaseDisconnect = new();
+        BlockingRemoteBrowser browser = new(releaseDisconnect);
+
+        Task disconnect = EmbeddedSftpView.DisconnectBrowserAsync(
+            browser,
+            CancellationToken.None);
+
+        await browser.DisconnectStarted.Task.WaitAsync(SignalBackstop);
+        Assert.False(disconnect.IsCompleted);
+
+        releaseDisconnect.Set();
+        await disconnect.WaitAsync(SignalBackstop);
+    }
+
+    [Fact]
+    public async Task DisconnectBrowserAsync_WhenAlreadyCancelled_DoesNotStartDisconnect()
+    {
+        BlockingRemoteBrowser browser = new(releaseDisconnect: null);
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => EmbeddedSftpView.DisconnectBrowserAsync(browser, cancellation.Token));
+
+        Assert.False(browser.DisconnectStarted.Task.IsCompleted);
+    }
+
     private sealed class BlockingRemoteBrowser(
         ManualResetEventSlim? releaseDisconnect,
         Exception? disconnectException = null) : IRemoteBrowser

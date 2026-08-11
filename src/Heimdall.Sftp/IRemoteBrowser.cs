@@ -95,4 +95,13 @@ public interface IRemoteBrowser : IDisposable
 
     /// <summary>Disconnects from the remote host.</summary>
     void Disconnect();
+
+    /// <summary>
+    /// Disconnects from the remote host without blocking the caller while a transport
+    /// operation is active.
+    /// </summary>
+    Task DisconnectAsync(CancellationToken ct = default)
+    {
+        return Task.Run(Disconnect, ct);
+    }
 }

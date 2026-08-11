@@ -1379,7 +1379,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     // Connection lifecycle
     // ------------------------------------------------------------------
 
-    private void OnDisconnectClick(object sender, RoutedEventArgs e)
+    private async void OnDisconnectClick(object sender, RoutedEventArgs e)
     {
         if (_disposed)
         {
@@ -1387,16 +1387,23 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         }
 
         Core.Logging.FileLogger.Info("EmbeddedSFTP Disconnect requested by user");
+        IRemoteBrowser? browser = _browser;
         try
         {
-            _browser?.Disconnect();
+            if (browser is not null)
+            {
+                await DisconnectBrowserAsync(browser, CancellationToken.None);
+            }
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"EmbeddedSFTP manual disconnect failed: {ex.Message}");
         }
 
-        UpdateStatus(_localizer?["SftpStatusDisconnected"] ?? "Disconnected");
+        if (!_disposed && ReferenceEquals(_browser, browser))
+        {
+            UpdateStatus(_localizer?["SftpStatusDisconnected"] ?? "Disconnected");
+        }
     }
 
     private void OnReconnectClick(object sender, RoutedEventArgs e)
@@ -1713,6 +1720,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                 }
             }
         });
+    }
+
+    internal static Task DisconnectBrowserAsync(
+        IRemoteBrowser browser,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(browser);
+        return browser.DisconnectAsync(ct);
     }
 
     private Task RefreshRemoteAsync()

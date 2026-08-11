@@ -533,22 +533,36 @@ public sealed class FtpBrowser : IRemoteBrowser
             return;
         }
 
-        var disconnected = false;
+        bool disconnected;
         _opLock.Wait();
         try
         {
-            if (_client is null)
-            {
-                return;
-            }
+            disconnected = DisconnectCore();
+        }
+        finally
+        {
+            _opLock.Release();
+        }
 
-            _client.Dispose();
-            _client = null;
-            _connected = false;
-            _host = null;
-            _username = null;
-            _port = 0;
-            disconnected = true;
+        if (disconnected)
+        {
+            Disconnected?.Invoke(null);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task DisconnectAsync(CancellationToken ct = default)
+    {
+        if (_disposed && _client is null)
+        {
+            return;
+        }
+
+        bool disconnected;
+        await _opLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            disconnected = DisconnectCore();
         }
         finally
         {
@@ -572,6 +586,22 @@ public sealed class FtpBrowser : IRemoteBrowser
         _disposed = true;
         Disconnect();
         _opLock.Dispose();
+    }
+
+    private bool DisconnectCore()
+    {
+        if (_client is null)
+        {
+            return false;
+        }
+
+        _client.Dispose();
+        _client = null;
+        _connected = false;
+        _host = null;
+        _username = null;
+        _port = 0;
+        return true;
     }
 
     internal static string NormalizePath(string path)
