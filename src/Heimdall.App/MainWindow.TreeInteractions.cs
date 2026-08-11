@@ -348,6 +348,55 @@ public partial class MainWindow
     private async void OnSessionTreeViewPreviewKeyDown(object sender, KeyEventArgs e)
     {
         ModifierKeys modifiers = Keyboard.Modifiers;
+        bool isSelectionGesture = (e.Key == Key.Space && modifiers == ModifierKeys.Control)
+            || (e.Key is Key.Up or Key.Down && modifiers == ModifierKeys.Shift);
+        if (isSelectionGesture
+            && DataContext is MainViewModel selectionViewModel
+            && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            TreeViewItem? focusedContainer = FindAncestor<TreeViewItem>(
+                Keyboard.FocusedElement as DependencyObject);
+            ServerItemViewModel? focusedServer = focusedContainer?.DataContext as ServerItemViewModel;
+            IReadOnlyList<ServerItemViewModel> visibleServers = e.Key == Key.Space
+                ? []
+                : SelectionHelpers
+                    .EnumerateVisibleLeaves(selectionViewModel.ServerList.GroupedServers)
+                    .ToList();
+            (bool handled, bool toggle, ServerItemViewModel? target) =
+                ResolveTreeKeyboardSelection(
+                    e.Key,
+                    modifiers,
+                    focusedServer,
+                    visibleServers);
+
+            TreeViewItem? targetContainer = target is null
+                ? null
+                : ReferenceEquals(target, focusedServer)
+                    ? focusedContainer
+                    : GetOrRealizeSessionTreeItem(target);
+            bool selectionHandled = ApplyTreeKeyboardSelection(
+                handled,
+                toggle,
+                target,
+                targetContainer,
+                selectionViewModel.ServerList.ToggleSelection,
+                selectionViewModel.ServerList.ExtendSelectionTo,
+                container => SynchronizeNativeTreeSelection(_treeState, container));
+
+            if (selectionHandled)
+            {
+                e.Handled = true;
+                if (target is not null && targetContainer is not null)
+                {
+                    ShowTreeSelection(
+                        selectionViewModel,
+                        selectionViewModel.ServerList.SelectedServer);
+                }
+
+                return;
+            }
+        }
+
         if (e.Key == Key.F2
             && modifiers == ModifierKeys.None
             && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
@@ -370,6 +419,105 @@ public partial class MainWindow
 
         e.Handled = true;
         await vm.ServerList.DeleteSelectedCommand.ExecuteAsync(null);
+    }
+
+    /// <summary>
+    /// Resolves a keyboard multi-selection gesture without reading global keyboard state.
+    /// </summary>
+    /// <param name="key">The key raised by the sessions tree.</param>
+    /// <param name="modifiers">The exact modifier combination for the gesture.</param>
+    /// <param name="focusedServer">The server whose container owns keyboard focus.</param>
+    /// <param name="visibleServers">The visible server leaves in display order.</param>
+    /// <returns>A handled flag, whether the action is a toggle, and the action target.</returns>
+    internal static (bool Handled, bool Toggle, ServerItemViewModel? Target)
+        ResolveTreeKeyboardSelection(
+            Key key,
+            ModifierKeys modifiers,
+            ServerItemViewModel? focusedServer,
+            IReadOnlyList<ServerItemViewModel> visibleServers)
+    {
+        if (focusedServer is null)
+        {
+            return default;
+        }
+
+        if (key == Key.Space && modifiers == ModifierKeys.Control)
+        {
+            return (true, true, focusedServer);
+        }
+
+        if (modifiers != ModifierKeys.Shift || key is not (Key.Up or Key.Down))
+        {
+            return default;
+        }
+
+        int focusedIndex = -1;
+        for (int index = 0; index < visibleServers.Count; index++)
+        {
+            if (ReferenceEquals(visibleServers[index], focusedServer))
+            {
+                focusedIndex = index;
+                break;
+            }
+        }
+
+        if (focusedIndex < 0)
+        {
+            return default;
+        }
+
+        int targetIndex = key == Key.Down
+            ? focusedIndex + 1
+            : focusedIndex - 1;
+        if (targetIndex < 0 || targetIndex >= visibleServers.Count)
+        {
+            return (true, false, null);
+        }
+
+        return (true, false, visibleServers[targetIndex]);
+    }
+
+    /// <summary>
+    /// Applies a resolved keyboard selection while consuming handled decisions fail-closed.
+    /// </summary>
+    /// <param name="handled">Whether the resolver recognized the gesture.</param>
+    /// <param name="toggle">Whether the target should be toggled instead of extended to.</param>
+    /// <param name="target">The resolved server target, or null for a boundary no-op.</param>
+    /// <param name="targetContainer">The realized native container for the target.</param>
+    /// <param name="toggleSelection">Applies a logical toggle to the target.</param>
+    /// <param name="extendSelection">Extends logical selection to the target.</param>
+    /// <param name="synchronizeNativeSelection">Synchronizes native selection with the logical state.</param>
+    /// <returns>True when the keyboard event must be consumed.</returns>
+    internal static bool ApplyTreeKeyboardSelection(
+        bool handled,
+        bool toggle,
+        ServerItemViewModel? target,
+        TreeViewItem? targetContainer,
+        Action<ServerItemViewModel> toggleSelection,
+        Action<ServerItemViewModel> extendSelection,
+        Action<TreeViewItem> synchronizeNativeSelection)
+    {
+        if (!handled)
+        {
+            return false;
+        }
+
+        if (target is null || targetContainer is null)
+        {
+            return true;
+        }
+
+        if (toggle)
+        {
+            toggleSelection(target);
+        }
+        else
+        {
+            extendSelection(target);
+        }
+
+        synchronizeNativeSelection(targetContainer);
+        return true;
     }
 
     private async void OnInlineRenameEditorPreviewKeyDown(object sender, KeyEventArgs e)
