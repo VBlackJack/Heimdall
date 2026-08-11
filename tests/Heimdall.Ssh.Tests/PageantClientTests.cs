@@ -306,6 +306,36 @@ public class PageantClientTests
         Assert.Contains("Invalid key blob length", ex.Message);
     }
 
+    [Fact]
+    public void ParseIdentitiesResponse_HugeBlobLength_RejectsBeforeAllocation()
+    {
+        byte[] response = new byte[13];
+        response[4] = 12;
+        PageantClient.WriteBigEndianUInt32(response, 5, 1);
+        PageantClient.WriteBigEndianUInt32(response, 9, (uint)int.MaxValue);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            PageantClient.ParseIdentitiesResponse(response));
+
+        Assert.Contains("key blob length", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ParseIdentitiesResponse_HugeCommentLength_RejectsBeforeDecode()
+    {
+        byte[] response = new byte[18];
+        response[4] = 12;
+        PageantClient.WriteBigEndianUInt32(response, 5, 1);
+        PageantClient.WriteBigEndianUInt32(response, 9, 1);
+        response[13] = 0;
+        PageantClient.WriteBigEndianUInt32(response, 14, (uint)int.MaxValue);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            PageantClient.ParseIdentitiesResponse(response));
+
+        Assert.Contains("comment length", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── ParseSignResponse ────────────────────────────────────────────
 
     [Fact]
@@ -354,6 +384,19 @@ public class PageantClientTests
         var ex = Assert.Throws<InvalidOperationException>(
             () => PageantClient.ParseSignResponse(ms.ToArray()));
         Assert.Contains("Invalid signature length", ex.Message);
+    }
+
+    [Fact]
+    public void ParseSignResponse_HugeSignatureLength_RejectsBeforeAllocation()
+    {
+        byte[] response = new byte[9];
+        response[4] = 14;
+        PageantClient.WriteBigEndianUInt32(response, 5, (uint)int.MaxValue);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            PageantClient.ParseSignResponse(response));
+
+        Assert.Contains("signature length", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── Test helpers ─────────────────────────────────────────────────

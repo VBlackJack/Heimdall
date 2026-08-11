@@ -344,14 +344,15 @@ public sealed class PageantClient : IPageantClient
                 throw new InvalidOperationException($"Response truncated reading key blob length at key {i}.");
             }
 
-            int blobLength = (int)ReadBigEndianUInt32(response, offset);
+            uint declaredBlobLength = ReadBigEndianUInt32(response, offset);
             offset += 4;
 
-            if (blobLength <= 0 || offset + blobLength > response.Length)
+            if (declaredBlobLength == 0 || declaredBlobLength > (uint)(response.Length - offset))
             {
-                throw new InvalidOperationException($"Invalid key blob length {blobLength} at key {i}.");
+                throw new InvalidOperationException($"Invalid key blob length {declaredBlobLength} at key {i}.");
             }
 
+            int blobLength = (int)declaredBlobLength;
             var blob = new byte[blobLength];
             Array.Copy(response, offset, blob, 0, blobLength);
             offset += blobLength;
@@ -362,14 +363,15 @@ public sealed class PageantClient : IPageantClient
                 throw new InvalidOperationException($"Response truncated reading comment length at key {i}.");
             }
 
-            int commentLength = (int)ReadBigEndianUInt32(response, offset);
+            uint declaredCommentLength = ReadBigEndianUInt32(response, offset);
             offset += 4;
 
-            if (commentLength < 0 || offset + commentLength > response.Length)
+            if (declaredCommentLength > (uint)(response.Length - offset))
             {
-                throw new InvalidOperationException($"Invalid comment length {commentLength} at key {i}.");
+                throw new InvalidOperationException($"Invalid comment length {declaredCommentLength} at key {i}.");
             }
 
+            int commentLength = (int)declaredCommentLength;
             string comment = Encoding.UTF8.GetString(response, offset, commentLength);
             offset += commentLength;
 
@@ -410,14 +412,15 @@ public sealed class PageantClient : IPageantClient
             throw new InvalidOperationException("Response too short to contain signature length.");
         }
 
-        int signatureLength = (int)ReadBigEndianUInt32(response, offset);
+        uint declaredSignatureLength = ReadBigEndianUInt32(response, offset);
         offset += 4;
 
-        if (signatureLength <= 0 || offset + signatureLength > response.Length)
+        if (declaredSignatureLength == 0 || declaredSignatureLength > (uint)(response.Length - offset))
         {
-            throw new InvalidOperationException($"Invalid signature length: {signatureLength}.");
+            throw new InvalidOperationException($"Invalid signature length: {declaredSignatureLength}.");
         }
 
+        int signatureLength = (int)declaredSignatureLength;
         var signature = new byte[signatureLength];
         Array.Copy(response, offset, signature, 0, signatureLength);
 
@@ -435,12 +438,13 @@ public sealed class PageantClient : IPageantClient
             return "unknown";
         }
 
-        int typeLength = (int)ReadBigEndianUInt32(blob, 0);
-        if (typeLength <= 0 || typeLength > blob.Length - 4)
+        uint declaredTypeLength = ReadBigEndianUInt32(blob, 0);
+        if (declaredTypeLength == 0 || declaredTypeLength > (uint)(blob.Length - 4))
         {
             return "unknown";
         }
 
+        int typeLength = (int)declaredTypeLength;
         return Encoding.ASCII.GetString(blob, 4, typeLength);
     }
 
