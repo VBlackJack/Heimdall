@@ -82,6 +82,8 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(settings);
 
+        server.RemoteServer = CanonicalizeRemoteHost(server.RemoteServer);
+
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
 
         ITerminalSession? session = null;
@@ -291,6 +293,13 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         }
 
         _tunnelService.ReleaseTunnelReference(tunnelLocalPort);
+    }
+
+    private static string CanonicalizeRemoteHost(string? remoteHost)
+    {
+        return string.IsNullOrWhiteSpace(remoteHost)
+            ? string.Empty
+            : remoteHost.Trim().TrimStart('*', '.');
     }
 
     private static ITerminalSession CreateDefaultTerminalSession()

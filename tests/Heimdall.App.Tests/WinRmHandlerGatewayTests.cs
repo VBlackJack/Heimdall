@@ -332,6 +332,37 @@ public sealed class WinRmHandlerGatewayTests
         Assert.Null(result.Warning);
     }
 
+    [Theory]
+    [InlineData(" server01.contoso.local ")]
+    [InlineData("\r\n*.server01.contoso.local\r\n")]
+    public async Task ConnectAsync_DirectProfile_CanonicalizesHostBeforeAllConsumers(string configuredHost)
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = false
+        };
+        CountingWinRmPreflight preflight = new CountingWinRmPreflight();
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+        using WinRmHandler handler = CreateHandler(tunnelService, preflight, terminalSession);
+        ServerProfileDto server = CreateDirectServer();
+        server.RemoteServer = configuredHost;
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("server01.contoso.local", server.RemoteServer);
+        Assert.Equal("server01.contoso.local", preflight.LastTcpHost);
+        Assert.Contains(
+            "-ComputerName 'server01.contoso.local'",
+            terminalSession.Arguments,
+            StringComparison.Ordinal);
+        TerminalSessionResult session = Assert.IsType<TerminalSessionResult>(result.Session);
+        Assert.Equal("server01.contoso.local", session.Endpoint);
+    }
+
     [Fact]
     public async Task ConnectAsync_DirectHttpsProfileWithSkipCertificateCheck_ReturnsWarning()
     {
