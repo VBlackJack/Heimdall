@@ -610,6 +610,44 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task ConnectedMembershipAppearance_PreservesVisibleMultiSelection()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"),
+            CreateServer("gamma", "Gamma", "ops"));
+        TransitionSshSessionToConnected(
+            fixture.StateMachine,
+            SessionIdCodec.Create("alpha"));
+        TransitionSshSessionToConnected(
+            fixture.StateMachine,
+            SessionIdCodec.Create("beta"));
+        fixture.ViewModel.ConnectedFilterEnabled = true;
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        int stableBuildCount = fixture.ViewModel.StableTreeBuildCount;
+        int initialPassCount = fixture.ViewModel.FilterPassApplicationCount;
+        int initialRefreshCount = fixture.ViewModel.ConnectedMembershipRefreshCount;
+
+        TransitionSshSessionToConnected(
+            fixture.StateMachine,
+            SessionIdCodec.Create("gamma"));
+
+        AssertVisibleServerIds(fixture.ViewModel, "alpha", "beta", "gamma");
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        Assert.Same(fixture.ServerById("beta"), fixture.ViewModel.SelectedServer);
+        Assert.Equal(
+            initialRefreshCount + 1,
+            fixture.ViewModel.ConnectedMembershipRefreshCount);
+        Assert.Equal(
+            initialPassCount + 1,
+            fixture.ViewModel.FilterPassApplicationCount);
+        Assert.Equal(stableBuildCount, fixture.ViewModel.StableTreeBuildCount);
+    }
+
+    [Fact]
     public async Task FilteredTree_HidesEmptyFolders_AndKeepsAncestorCounts()
     {
         await using var fixture = await ServerListSelectionFixture.CreateAsync();

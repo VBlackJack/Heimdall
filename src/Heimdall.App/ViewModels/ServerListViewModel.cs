@@ -2079,7 +2079,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             if (ConnectedFilterEnabled && wasConnected != isConnected)
             {
                 ConnectedMembershipRefreshCount++;
-                ApplyFilter(server.Id);
+                ApplyFilter();
             }
 
             // Record successful reach: feeds RDP-DISC-04 (palette protocol bias)
