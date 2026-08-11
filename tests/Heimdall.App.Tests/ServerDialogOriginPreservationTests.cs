@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
@@ -36,6 +37,38 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerDialogOriginPreservationTests
 {
+    [Fact]
+    public async Task ServerDialogViewModel_ExplicitDefaultSshPort_PersistsPresenceAndOverridesGroupDefault()
+    {
+        ServerDialogViewModel viewModel = new()
+        {
+            DisplayName = "Explicit SSH 22",
+            RemoteServer = "ssh.example.com",
+            ConnectionType = "SSH"
+        };
+        viewModel.SshPort = 2222;
+        viewModel.SshPort = 22;
+        ServerProfileDto dialogProfile = viewModel.ToDto();
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(dialogProfile);
+
+        await fixture.ConfigManager.SaveServersAsync([dialogProfile]);
+
+        string persistedJson = await File.ReadAllTextAsync(fixture.ConfigManager.ServersPath);
+        using JsonDocument document = JsonDocument.Parse(persistedJson);
+        JsonElement persistedProfileJson = document.RootElement.GetProperty("servers")[0];
+        Assert.True(persistedProfileJson.TryGetProperty("sshPort", out JsonElement persistedPort));
+        Assert.Equal(22, persistedPort.GetInt32());
+
+        ServerProfileDto persistedProfile = Assert.Single(
+            await fixture.ConfigManager.LoadServersAsync());
+        Assert.True(persistedProfile.HasSshPortField);
+
+        GroupDefaultsDto groupDefaults = new() { SshPort = 2222 };
+        groupDefaults.ApplyTo(persistedProfile);
+
+        Assert.Equal(22, persistedProfile.SshPort);
+    }
+
     [Fact]
     public void ServerDialogViewModel_SaveExistingProfile_PreservesOrigin()
     {
