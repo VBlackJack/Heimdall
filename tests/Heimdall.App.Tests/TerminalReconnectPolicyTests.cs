@@ -186,6 +186,128 @@ public sealed class TerminalReconnectPolicyTests
         Assert.Equal(16, EmbeddedSshView.ComputeAutoReconnectDelaySeconds(settings, 3));
     }
 
+    [Fact]
+    public void AutoReconnectTickScheduler_CurrentCallback_RunsTickExactlyOnce()
+    {
+        AutoReconnectTickScheduler scheduler = new();
+        List<Action> queuedActions = [];
+        int tickCount = 0;
+        TimerCallback callback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+
+        callback(null);
+        Assert.Single(queuedActions);
+
+        queuedActions[0]();
+
+        Assert.Equal(1, tickCount);
+    }
+
+    [Fact]
+    public void AutoReconnectTickScheduler_InvalidatedAfterQueue_DropsQueuedTick()
+    {
+        AutoReconnectTickScheduler scheduler = new();
+        List<Action> queuedActions = [];
+        int tickCount = 0;
+        TimerCallback callback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+
+        callback(null);
+        Assert.Single(queuedActions);
+
+        scheduler.Invalidate();
+        queuedActions[0]();
+
+        Assert.Equal(0, tickCount);
+    }
+
+    [Fact]
+    public void AutoReconnectTickScheduler_NewGeneration_DropsOldTickAndRunsNewTick()
+    {
+        AutoReconnectTickScheduler scheduler = new();
+        List<Action> queuedActions = [];
+        int tickCount = 0;
+        TimerCallback oldCallback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+
+        oldCallback(null);
+        scheduler.Invalidate();
+        TimerCallback currentCallback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+        currentCallback(null);
+
+        Assert.Equal(2, queuedActions.Count);
+        queuedActions[0]();
+        queuedActions[1]();
+
+        Assert.Equal(1, tickCount);
+    }
+
+    [Fact]
+    public void AutoReconnectTickScheduler_RepeatedInvalidation_DropsQueuedTick()
+    {
+        AutoReconnectTickScheduler scheduler = new();
+        List<Action> queuedActions = [];
+        int tickCount = 0;
+        TimerCallback callback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+
+        callback(null);
+        scheduler.Invalidate();
+        scheduler.Invalidate();
+        queuedActions[0]();
+
+        Assert.Equal(0, tickCount);
+    }
+
+    [Fact]
+    public void StopAutoReconnectTimer_NullTimer_InvalidatesQueuedTick()
+    {
+        AutoReconnectTickScheduler scheduler = new();
+        List<Action> queuedActions = [];
+        int tickCount = 0;
+        TimerCallback callback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+        System.Threading.Timer? timer = null;
+
+        callback(null);
+        EmbeddedSshView.StopAutoReconnectTimer(scheduler, ref timer);
+        queuedActions[0]();
+
+        Assert.Equal(0, tickCount);
+        Assert.Null(timer);
+    }
+
+    [Fact]
+    public void AutoReconnectTickScheduler_OldCallbackQueuesAfterNewStart_DropsLateTick()
+    {
+        AutoReconnectTickScheduler scheduler = new();
+        List<Action> queuedActions = [];
+        int tickCount = 0;
+        TimerCallback oldCallback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+
+        scheduler.Invalidate();
+        TimerCallback currentCallback = scheduler.CreateTimerCallback(
+            queuedActions.Add,
+            () => tickCount++);
+        oldCallback(null);
+        currentCallback(null);
+
+        Assert.Equal(2, queuedActions.Count);
+        queuedActions[0]();
+        queuedActions[1]();
+
+        Assert.Equal(1, tickCount);
+    }
+
     [Theory]
     [InlineData("TELNET")]
     [InlineData("LOCAL")]

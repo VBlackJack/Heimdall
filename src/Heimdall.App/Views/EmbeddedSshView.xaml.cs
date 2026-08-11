@@ -38,6 +38,33 @@ using AppDialogViewModels = Heimdall.App.ViewModels.Dialogs;
 
 namespace Heimdall.App.Views;
 
+internal sealed class AutoReconnectTickScheduler
+{
+    private long _generation;
+
+    internal TimerCallback CreateTimerCallback(
+        Action<Action> queueAction,
+        Action tickAction)
+    {
+        ArgumentNullException.ThrowIfNull(queueAction);
+        ArgumentNullException.ThrowIfNull(tickAction);
+
+        long generation = Interlocked.Increment(ref _generation);
+        return _ => queueAction(() =>
+        {
+            if (Volatile.Read(ref _generation) == generation)
+            {
+                tickAction();
+            }
+        });
+    }
+
+    internal void Invalidate()
+    {
+        Interlocked.Increment(ref _generation);
+    }
+}
+
 /// <summary>
 /// WPF host for an interactive SSH shell session rendered through WebView2 + xterm.js.
 /// The browser surface handles VT parsing, ANSI colors, cursor movement, and scrollback.
@@ -201,6 +228,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private SessionTabViewModel? _sessionTab;
     private System.Threading.Timer? _keepAliveTimer;
     private System.Threading.Timer? _autoReconnectTimer;
+    private readonly AutoReconnectTickScheduler _autoReconnectTickScheduler = new();
     private Action<ReadOnlyMemory<byte>>? _terminalDataHandler;
     private Action<int>? _terminalExitHandler;
     private Core.Localization.LocalizationManager? _localizer;
@@ -865,8 +893,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             },
             System.Windows.Threading.DispatcherPriority.Input);
 
+        TimerCallback timerCallback = _autoReconnectTickScheduler.CreateTimerCallback(
+            action => BeginInvokeIfAvailable(action),
+            OnAutoReconnectTick);
         _autoReconnectTimer = new System.Threading.Timer(
-            _ => BeginInvokeIfAvailable(OnAutoReconnectTick),
+            timerCallback,
             null,
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(1));
@@ -904,13 +935,18 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private void StopAutoReconnectTimer()
     {
-        if (_autoReconnectTimer is null)
-        {
-            return;
-        }
+        StopAutoReconnectTimer(_autoReconnectTickScheduler, ref _autoReconnectTimer);
+    }
 
-        _autoReconnectTimer.Dispose();
-        _autoReconnectTimer = null;
+    internal static void StopAutoReconnectTimer(
+        AutoReconnectTickScheduler scheduler,
+        ref System.Threading.Timer? timer)
+    {
+        ArgumentNullException.ThrowIfNull(scheduler);
+
+        scheduler.Invalidate();
+        System.Threading.Timer? stoppedTimer = Interlocked.Exchange(ref timer, null);
+        stoppedTimer?.Dispose();
     }
 
     private void HideConnectingOverlay()
