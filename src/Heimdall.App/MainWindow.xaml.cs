@@ -2397,35 +2397,16 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// </summary>
     private void UpdateTabVisibility(MainViewModel vm)
     {
-        var isSessions = vm.SelectedTab == "Sessions";
-        var hasSessions = vm.Connection.HasActiveSessions;
+        bool isSessions = vm.SelectedTab == "Sessions";
+        bool hasSessions = vm.Connection.HasActiveSessions;
+        bool suppressSidebar = !isSessions && hasSessions;
 
         Heimdall.Core.Logging.FileLogger.Info(
             $"UpdateTabVisibility: selectedTab={vm.SelectedTab}, isSessions={isSessions}, hasSessions={hasSessions}, sidebarHidden={_uiState.IsSidebarHidden}");
 
-        // If not on Sessions but sessions active, show sessions full-width
-        if (!isSessions && hasSessions)
-        {
-            // Hide TreeView temporarily
-            if (!_uiState.IsSidebarHidden)
-            {
-                _uiState.SavedSidebarWidth = SessionTreeColumn.ActualWidth;
-                SessionTreeColumn.MinWidth = 0;
-                SessionTreeColumn.MaxWidth = 0;
-                SessionTreeColumn.Width = new GridLength(0);
-                SplitterColumn.Width = new GridLength(0);
-            }
-        }
-        else if (isSessions && !_uiState.IsSidebarHidden)
-        {
-            // Restore TreeView
-            SessionTreeColumn.MinWidth = WindowUIState.MinSidebarWidth;
-            SessionTreeColumn.MaxWidth = WindowUIState.MaxSidebarWidth;
-            SessionTreeColumn.Width = new GridLength(_uiState.SavedSidebarWidth > 0
-                ? _uiState.SavedSidebarWidth
-                : WindowUIState.DefaultSidebarWidth);
-            SplitterColumn.Width = GridLength.Auto;
-        }
+        ApplySidebarLayout(_uiState.SetSidebarSuppressedByTab(
+            suppressSidebar,
+            SessionTreeColumn.ActualWidth));
     }
 
     // --- Command Palette event handlers ---

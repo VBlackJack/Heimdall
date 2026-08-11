@@ -22,6 +22,17 @@ using Heimdall.App.ViewModels;
 namespace Heimdall.App.Services;
 
 /// <summary>
+/// Canonical projection of the logical sidebar state onto the main-window layout.
+/// </summary>
+/// <param name="IsVisible">Whether the sidebar column and splitter are visible.</param>
+/// <param name="ShowRestoreButton">Whether the collapsed-sidebar restore button is visible.</param>
+/// <param name="Width">The normalized preferred width to restore when visible.</param>
+internal readonly record struct SidebarLayoutProjection(
+    bool IsVisible,
+    bool ShowRestoreButton,
+    double Width);
+
+/// <summary>
 /// Holds transient UI state for <c>MainWindow</c> (fullscreen, sidebar,
 /// tree scroll position) plus pure static helpers that operate on the
 /// visual tree and the <c>ServerList</c> model. Imperative code that
@@ -60,14 +71,89 @@ public sealed class WindowUIState
     /// <summary>True while the sidebar (TreeView column) is currently hidden.</summary>
     public bool IsSidebarHidden { get; set; }
 
+    /// <summary>True while the active tab temporarily suppresses the sidebar.</summary>
+    internal bool IsSidebarSuppressedByTab { get; set; }
+
     /// <summary>Last sidebar width seen before the sidebar was hidden, used to restore it.</summary>
     public double SavedSidebarWidth { get; set; } = DefaultSidebarWidth;
+
+    /// <summary>Returns the canonical sidebar layout for the current logical state.</summary>
+    internal SidebarLayoutProjection SidebarLayout
+    {
+        get
+        {
+            bool isTemporarilySuppressed = IsFullscreen || IsSidebarSuppressedByTab;
+            return new SidebarLayoutProjection(
+                IsVisible: !IsSidebarHidden && !isTemporarilySuppressed,
+                ShowRestoreButton: IsSidebarHidden && !isTemporarilySuppressed,
+                Width: NormalizeSidebarWidth(SavedSidebarWidth));
+        }
+    }
 
     /// <summary>Captured vertical scroll offset of the session TreeView.</summary>
     public double TreeScrollVerticalOffset { get; set; }
 
     /// <summary>Captured horizontal scroll offset of the session TreeView.</summary>
     public double TreeScrollHorizontalOffset { get; set; }
+
+    /// <summary>Captures visible sidebar state before entering fullscreen.</summary>
+    internal SidebarLayoutProjection EnterFullscreen(double actualSidebarWidth)
+    {
+        CaptureVisibleSidebarWidth(actualSidebarWidth);
+        IsFullscreen = true;
+        return SidebarLayout;
+    }
+
+    /// <summary>Leaves fullscreen without changing the user's sidebar preference.</summary>
+    internal SidebarLayoutProjection ExitFullscreen()
+    {
+        IsFullscreen = false;
+        return SidebarLayout;
+    }
+
+    /// <summary>Toggles the user's sidebar preference without exposing it while suppressed.</summary>
+    internal SidebarLayoutProjection ToggleSidebar(double actualSidebarWidth)
+    {
+        CaptureVisibleSidebarWidth(actualSidebarWidth);
+        IsSidebarHidden = !IsSidebarHidden;
+        return SidebarLayout;
+    }
+
+    /// <summary>Applies or clears the temporary sidebar suppression owned by tab navigation.</summary>
+    internal SidebarLayoutProjection SetSidebarSuppressedByTab(
+        bool isSuppressed,
+        double actualSidebarWidth)
+    {
+        if (isSuppressed && !IsSidebarSuppressedByTab)
+        {
+            CaptureVisibleSidebarWidth(actualSidebarWidth);
+        }
+
+        IsSidebarSuppressedByTab = isSuppressed;
+        return SidebarLayout;
+    }
+
+    private void CaptureVisibleSidebarWidth(double actualSidebarWidth)
+    {
+        if (!SidebarLayout.IsVisible
+            || !double.IsFinite(actualSidebarWidth)
+            || actualSidebarWidth <= 0d)
+        {
+            return;
+        }
+
+        SavedSidebarWidth = NormalizeSidebarWidth(actualSidebarWidth);
+    }
+
+    private static double NormalizeSidebarWidth(double width)
+    {
+        if (!double.IsFinite(width))
+        {
+            return DefaultSidebarWidth;
+        }
+
+        return Math.Clamp(width, MinSidebarWidth, MaxSidebarWidth);
+    }
 
     /// <summary>
     /// Walks the visual tree of <paramref name="parent"/> to find the first
