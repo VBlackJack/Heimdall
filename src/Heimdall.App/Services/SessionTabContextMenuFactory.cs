@@ -87,7 +87,6 @@ public sealed class SessionTabContextMenuFactory
             AppendMacroItems(menu, vm, sshView);
         }
 
-        AppendCloseAllItem(menu, session, vm);
         AppendCloseGroupItems(menu, session, vm);
 
         menu.Items.Add(new Separator());
@@ -635,19 +634,6 @@ public sealed class SessionTabContextMenuFactory
         }
         menu.Items.Add(playMenu);
         menu.Items.Add(editMenu);
-    }
-
-    // ── Close session (always present) ───────────────────────────────
-
-    private static void AppendCloseAllItem(
-        ContextMenu menu,
-        SessionTabViewModel session,
-        MainViewModel vm)
-    {
-        var closeAllItem = new MenuItem { Header = vm.Localize("SessionCloseSession") };
-        closeAllItem.Click += async (_, _) =>
-            await vm.Connection.CloseSessionAsync(session, DisconnectReason.UserAction);
-        menu.Items.Add(closeAllItem);
     }
 
     // --- Close others / Close to the right ---

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Collections.Specialized;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows.Controls;
@@ -26,6 +27,58 @@ namespace Heimdall.App.Tests;
 
 public sealed partial class SessionCoordinatorPreMountTests
 {
+    [Theory]
+    [InlineData("SSH", "SessionDisconnect")]
+    [InlineData("TOOL:PING", "SessionCloseTab")]
+    public void SessionTabContextMenu_SessionType_ExposesSingleCloseActionAndClosesOnce(
+        string connectionType,
+        string expectedHeaderKey)
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel session = CreateSession("session-id", connectionType);
+            harness.Main.Connection.ActiveSessions.Add(session);
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, session);
+            string disconnectHeader = harness.Main.Localize("SessionDisconnect");
+            string closeTabHeader = harness.Main.Localize("SessionCloseTab");
+            string closeSessionHeader = harness.Main.Localize("SessionCloseSession");
+            List<MenuItem> closeItems = menu.Items
+                .OfType<MenuItem>()
+                .Where((MenuItem item) => item.Header is string header
+                    && (string.Equals(header, disconnectHeader, StringComparison.Ordinal)
+                        || string.Equals(header, closeTabHeader, StringComparison.Ordinal)
+                        || string.Equals(header, closeSessionHeader, StringComparison.Ordinal)))
+                .ToList();
+
+            MenuItem closeItem = Assert.Single(closeItems);
+            Assert.Equal(harness.Main.Localize(expectedHeaderKey), closeItem.Header);
+
+            int removalCount = 0;
+            NotifyCollectionChangedEventHandler collectionChanged = (_, args) =>
+            {
+                if (args.Action == NotifyCollectionChangedAction.Remove
+                    && args.OldItems?.Contains(session) == true)
+                {
+                    removalCount++;
+                }
+            };
+            harness.Main.Connection.ActiveSessions.CollectionChanged += collectionChanged;
+
+            try
+            {
+                closeItem.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+            }
+            finally
+            {
+                harness.Main.Connection.ActiveSessions.CollectionChanged -= collectionChanged;
+            }
+
+            Assert.Equal(1, removalCount);
+            Assert.DoesNotContain(session, harness.Main.Connection.ActiveSessions);
+        });
+    }
+
     [Fact]
     public void SessionTabContextMenu_ResolvedProfile_AddsProfileActions()
     {
