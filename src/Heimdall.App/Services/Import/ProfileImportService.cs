@@ -44,19 +44,22 @@ public sealed class ProfileImportService(
     /// <summary>
     /// Mirrors the ConnectionService handler protocol keys. Keep in sync when adding protocol handlers.
     /// </summary>
-    internal static readonly IReadOnlySet<string> SupportedConnectionTypes =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, string> CanonicalConnectionTypes =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            "RDP",
-            "SSH",
-            "SFTP",
-            "VNC",
-            "TELNET",
-            "FTP",
-            "CITRIX",
-            "LOCAL",
-            "WINRM"
+            ["RDP"] = "RDP",
+            ["SSH"] = "SSH",
+            ["SFTP"] = "SFTP",
+            ["VNC"] = "VNC",
+            ["TELNET"] = "Telnet",
+            ["FTP"] = "FTP",
+            ["CITRIX"] = "Citrix",
+            ["LOCAL"] = "Local",
+            ["WINRM"] = "WINRM"
         };
+
+    internal static readonly IReadOnlySet<string> SupportedConnectionTypes =
+        CanonicalConnectionTypes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private readonly IConfigManager _configManager = configManager;
     private readonly LocalizationManager _localizer = localizer;
@@ -251,6 +254,7 @@ public sealed class ProfileImportService(
         for (int index = 0; index < candidates.Count; index++)
         {
             ServerProfileDto candidate = CloneProfile(candidates[index]);
+            candidate.ConnectionType = CanonicalizeConnectionType(candidate.ConnectionType);
             string proposedName = string.IsNullOrWhiteSpace(candidate.DisplayName)
                 ? _localizer["DialogImportProfileFallbackName"]
                 : candidate.DisplayName.Trim();
@@ -552,5 +556,12 @@ public sealed class ProfileImportService(
         var json = JsonSerializer.Serialize(source, ProfileJsonOptions);
         return JsonSerializer.Deserialize<ServerProfileDto>(json, ProfileJsonOptions)
             ?? throw new InvalidOperationException("Failed to clone imported profile.");
+    }
+
+    private static string CanonicalizeConnectionType(string connectionType)
+    {
+        return CanonicalConnectionTypes.TryGetValue(connectionType, out string? canonicalConnectionType)
+                ? canonicalConnectionType
+                : connectionType;
     }
 }

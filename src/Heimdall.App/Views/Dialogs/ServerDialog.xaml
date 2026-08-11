@@ -800,17 +800,8 @@
                                 </Border>
 
                                 <!-- WinRM credentials -->
-                                <Border>
-                                    <Border.Style>
-                                        <Style TargetType="Border" BasedOn="{StaticResource DialogSectionCardStyle}">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ConnectionType}" Value="WINRM">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
+                                <Border Style="{StaticResource DialogSectionCardStyle}"
+                                        Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel>
                                         <TextBlock x:Name="DlgSrv_BasicWinRmCredentialsTitle"
                                                    Text="{loc:Translate ServerDialogWinRmCredentials}"
