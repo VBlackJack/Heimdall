@@ -1507,6 +1507,7 @@
   "BulkEditGatewayInheritChoice": "Inherit the folder default",
   "StatusBulkGatewayMissingTarget": "Skipped {0} item(s): SSH gateway \"{1}\" no longer exists.",
   "StatusBulkGatewayUnsupportedSkipped": "Skipped {0} item(s): their protocols do not support SSH gateways.",
+  "StatusBulkGatewayWinRmHttpsSkipped": "Skipped {0} WinRM HTTPS profile(s): SSH gateways support WinRM over HTTP only.",
   "TreeCtxEditProject": "Edit project",
   "TreeCtxDeleteProject": "Delete project",
   "TreeCtxMoveSelected": "Move to... ({0})",

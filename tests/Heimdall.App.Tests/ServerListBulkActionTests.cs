@@ -1901,6 +1901,69 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public async Task UpdateGatewayReferences_WinRmHttps_IsSkippedWhileEligiblePeerUpdates()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-target", "Bastion"));
+        ServerProfileDto winRm = CreateServer("winrm", "WinRM HTTPS", "ops");
+        winRm.ConnectionType = "WINRM";
+        winRm.WinRmUseSsl = true;
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        await fixture.LoadServersAsync(settings, winRm, ssh);
+
+        int updatedCount = await fixture.ViewModel.UpdateGatewayReferencesAsync(
+            ["winrm", "ssh"],
+            "gw-target");
+
+        Assert.Equal(1, updatedCount);
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        ServerProfileDto storedWinRm = Assert.Single(storedServers, server => server.Id == "winrm");
+        ServerProfileDto storedSsh = Assert.Single(storedServers, server => server.Id == "ssh");
+        Assert.Null(storedWinRm.SshGatewayId);
+        Assert.False(storedWinRm.UseDirectConnection);
+        Assert.Equal("gw-target", storedSsh.SshGatewayId);
+        Assert.Equal(
+            "Skipped 1 WinRM HTTPS profile(s): SSH gateways support WinRM over HTTP only.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_InheritChoice_WinRmHttpsWithFolderGateway_RemainsDirect()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-default", "Default"));
+        settings.GroupDefaults["ops"] = new GroupDefaultsDto { SshGatewayId = "gw-default" };
+        ServerProfileDto winRm = CreateServer("winrm", "WinRM HTTPS", "ops");
+        winRm.ConnectionType = "WINRM";
+        winRm.WinRmUseSsl = true;
+        winRm.UseDirectConnection = true;
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        ssh.UseDirectConnection = true;
+        await fixture.LoadServersAsync(settings, winRm, ssh);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.InheritFolderDefault,
+            GatewayId: null);
+        fixture.ViewModel.SelectSingle(fixture.ServerById("winrm"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("ssh"));
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        ServerProfileDto storedWinRm = Assert.Single(storedServers, server => server.Id == "winrm");
+        ServerProfileDto storedSsh = Assert.Single(storedServers, server => server.Id == "ssh");
+        Assert.Null(storedWinRm.SshGatewayId);
+        Assert.True(storedWinRm.UseDirectConnection);
+        Assert.Null(storedSsh.SshGatewayId);
+        Assert.False(storedSsh.UseDirectConnection);
+        Assert.Equal(
+            "Skipped 1 WinRM HTTPS profile(s): SSH gateways support WinRM over HTTP only.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
     public async Task BulkEditGateway_IneligibleProtocols_SkippedAndReported_NotBadged()
     {
         await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
@@ -1941,12 +2004,17 @@ public sealed class ServerListBulkActionTests
         ServerProfileDto telnet = CreateServer("telnet", "Telnet", "ops");
         telnet.ConnectionType = "TELNET";
         telnet.SshGatewayId = "gw-residual";
-        await fixture.LoadServersAsync(settings, ssh, telnet);
+        ServerProfileDto winRm = CreateServer("winrm", "WinRM HTTPS", "ops");
+        winRm.ConnectionType = "WINRM";
+        winRm.WinRmUseSsl = true;
+        winRm.SshGatewayId = "gw-invalid";
+        await fixture.LoadServersAsync(settings, ssh, telnet, winRm);
         fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
             ServerBulkEditGatewayChoice.DirectConnection,
             GatewayId: null);
         fixture.ViewModel.SelectSingle(fixture.ServerById("ssh"));
         fixture.ViewModel.ToggleSelection(fixture.ServerById("telnet"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("winrm"));
 
         await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
             fixture.ViewModel.SelectedItems.ToList());

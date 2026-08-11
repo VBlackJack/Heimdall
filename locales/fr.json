@@ -1507,6 +1507,7 @@
   "BulkEditGatewayInheritChoice": "H\u00e9riter de la valeur par d\u00e9faut du dossier",
   "StatusBulkGatewayMissingTarget": "{0} \u00e9l\u00e9ment(s) ignor\u00e9(s) : la passerelle SSH \u00ab {1} \u00bb n'existe plus.",
   "StatusBulkGatewayUnsupportedSkipped": "{0} \u00e9l\u00e9ment(s) ignor\u00e9(s) : leur protocole ne prend pas en charge les passerelles SSH.",
+  "StatusBulkGatewayWinRmHttpsSkipped": "{0} profil(s) WinRM HTTPS ignor\u00e9(s) : les passerelles SSH prennent uniquement en charge WinRM via HTTP.",
   "TreeCtxEditProject": "Modifier le projet",
   "TreeCtxDeleteProject": "Supprimer le projet",
   "TreeCtxMoveSelected": "D\u00e9placer vers... ({0})",

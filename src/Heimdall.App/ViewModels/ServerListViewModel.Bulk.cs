@@ -861,6 +861,14 @@ public partial class ServerListViewModel
             return 0;
         }
 
+        AppSettings? gatewaySettings = null;
+        if (request.Choice is ServerBulkEditGatewayChoice.UseGateway
+            or ServerBulkEditGatewayChoice.InheritFolderDefault)
+        {
+            gatewaySettings = await _configManager.LoadSettingsAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
         string? canonicalTargetGatewayId = null;
         if (request.Choice == ServerBulkEditGatewayChoice.UseGateway)
         {
@@ -872,9 +880,7 @@ public partial class ServerListViewModel
                 return 0;
             }
 
-            AppSettings settings = await _configManager.LoadSettingsAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            SshGatewayDto? targetGateway = settings.SshGateways.LastOrDefault(
+            SshGatewayDto? targetGateway = gatewaySettings!.SshGateways.LastOrDefault(
                 gateway => !string.IsNullOrWhiteSpace(gateway.Id)
                            && string.Equals(gateway.Id, targetGatewayId, StringComparison.OrdinalIgnoreCase));
             if (targetGateway is null)
@@ -895,6 +901,7 @@ public partial class ServerListViewModel
         string? primarySelectionId = SelectedServer?.Id;
         var updatedCount = 0;
         var unsupportedCount = 0;
+        int unsupportedWinRmHttpsCount = 0;
 
         await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
 
@@ -902,6 +909,14 @@ public partial class ServerListViewModel
         {
             StatusMessageRequested?.Invoke(
                 _localizer.Format("StatusBulkGatewayUnsupportedSkipped", unsupportedCount));
+        }
+
+        if (unsupportedWinRmHttpsCount > 0)
+        {
+            StatusMessageRequested?.Invoke(
+                _localizer.Format(
+                    "StatusBulkGatewayWinRmHttpsSkipped",
+                    unsupportedWinRmHttpsCount));
         }
 
         if (updatedCount > 0)
@@ -947,6 +962,12 @@ public partial class ServerListViewModel
                 }
                 else if (request.Choice == ServerBulkEditGatewayChoice.InheritFolderDefault)
                 {
+                    if (IsWinRmHttps(dto) && HasInheritedGateway(dto))
+                    {
+                        unsupportedWinRmHttpsCount++;
+                        continue;
+                    }
+
                     changed = dto.SshGatewayId is not null || dto.UseDirectConnection;
                     dto.SshGatewayId = null;
                     dto.UseDirectConnection = false;
@@ -954,6 +975,11 @@ public partial class ServerListViewModel
                 else if (!ProtocolCapabilities.SupportsSshGateway(dto.ConnectionType))
                 {
                     unsupportedCount++;
+                    continue;
+                }
+                else if (IsWinRmHttps(dto))
+                {
+                    unsupportedWinRmHttpsCount++;
                     continue;
                 }
                 else
@@ -987,6 +1013,30 @@ public partial class ServerListViewModel
                 null,
                 null,
                 null);
+        }
+
+        bool HasInheritedGateway(ServerProfileDto dto)
+        {
+            if (gatewaySettings is null
+                || gatewaySettings.GroupDefaults.Count == 0
+                || string.IsNullOrWhiteSpace(dto.Group))
+            {
+                return false;
+            }
+
+            GroupDefaultsDto defaults = GroupDefaultsDto.Resolve(
+                dto.Group,
+                gatewaySettings.GroupDefaults);
+            return !string.IsNullOrWhiteSpace(defaults.SshGatewayId);
+        }
+
+        static bool IsWinRmHttps(ServerProfileDto dto)
+        {
+            return dto.WinRmUseSsl
+                   && string.Equals(
+                       dto.ConnectionType,
+                       "WINRM",
+                       StringComparison.OrdinalIgnoreCase);
         }
     }
 
