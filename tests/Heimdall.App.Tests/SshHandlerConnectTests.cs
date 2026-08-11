@@ -27,6 +27,7 @@ using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
@@ -206,6 +207,38 @@ public sealed class SshHandlerConnectTests
 
         Assert.False(result.Success);
         Assert.Equal(0, tunnelService.ReleaseCount);
+    }
+
+    [Theory]
+    [InlineData(false, SessionFailureStage.GenericFailure)]
+    [InlineData(true, SessionFailureStage.SshGateway)]
+    public async Task ConnectAsync_NetworkFailure_LocalizesMessageAndUsesActualConnectionScope(
+        bool usesTunnel,
+        SessionFailureStage expectedStage)
+    {
+        int freePort = ReserveAndReleaseLoopbackPort();
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = usesTunnel,
+            TargetHost = "127.0.0.1",
+            TargetPort = freePort
+        };
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+        using SshHandler handler = CreateHandler(tunnelService, localizer: localizer);
+        ServerProfileDto server = usesTunnel ? CreateGatewayServer() : CreateDirectServer(freePort);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        string expectedMessage = localizer.Format("ErrorSshNetworkRefused", "127.0.0.1");
+        Assert.False(result.Success);
+        Assert.Equal(expectedMessage, result.ErrorMessage);
+        Assert.NotNull(result.Failure);
+        Assert.Equal(expectedStage, result.Failure.Stage);
+        Assert.Equal(expectedMessage, result.Failure.Detail);
     }
 
     [Fact]
@@ -422,19 +455,20 @@ public sealed class SshHandlerConnectTests
         IHostKeyTrustService? hostKeyTrustService = null,
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
-        Action<string?>? deletePlinkPasswordFile = null)
+        Action<string?>? deletePlinkPasswordFile = null,
+        LocalizationManager? localizer = null)
     {
-        LocalizationManager localizer = new LocalizationManager();
+        LocalizationManager effectiveLocalizer = localizer ?? new LocalizationManager();
         IHostKeyTrustService effectiveHostKeyTrustService =
             hostKeyTrustService ?? new ThrowingHostKeyTrustService();
         return new SshHandler(
             tunnelService,
             new ConnectionStateMachine(),
-            localizer,
+            effectiveLocalizer,
             new HostKeyStore(),
             effectiveHostKeyTrustService,
             AutoAcceptHostKeyVerifier.Instance,
-            new X11ServerManager(new InMemoryConfigManager(), localizer),
+            new X11ServerManager(new InMemoryConfigManager(), effectiveLocalizer),
             new ThrowingDialogService(),
             plinkHostKeyProbe: plinkHostKeyProbe,
             plinkPasswordFileJanitor:

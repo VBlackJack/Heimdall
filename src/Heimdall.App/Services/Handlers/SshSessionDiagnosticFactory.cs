@@ -24,12 +24,14 @@ namespace Heimdall.App.Services.Handlers;
 /// </summary>
 internal static class SshSessionDiagnosticFactory
 {
-    internal static SessionDiagnostic FromClassifiedFailure(SshFailureInfo failure)
+    internal static SessionDiagnostic FromClassifiedFailure(
+        SshFailureInfo failure,
+        bool usedGateway = false)
     {
         ArgumentNullException.ThrowIfNull(failure);
 
         return new SessionDiagnostic(
-            MapStage(failure.Code),
+            MapStage(failure.Code, usedGateway),
             GetMessageKey(failure.Code, "ErrorConnectionFailed"),
             (int)failure.Code,
             failure.Message);
@@ -126,7 +128,9 @@ internal static class SshSessionDiagnosticFactory
             detail);
     }
 
-    internal static SessionFailureStage MapStage(SshFailureCode? code)
+    internal static SessionFailureStage MapStage(
+        SshFailureCode? code,
+        bool usedGateway = false)
     {
         return code switch
         {
@@ -148,7 +152,9 @@ internal static class SshSessionDiagnosticFactory
                 or SshFailureCode.NetworkTimedOut
                 or SshFailureCode.NetworkReset
                 or SshFailureCode.NetworkUnreachable
-                or SshFailureCode.ForwardingFailed
+                => usedGateway ? SessionFailureStage.SshGateway : SessionFailureStage.GenericFailure,
+
+            SshFailureCode.ForwardingFailed
                 or SshFailureCode.PortInUse
                 or SshFailureCode.TunnelBroken
                 or SshFailureCode.TunnelPortOwnedByDifferentProcess

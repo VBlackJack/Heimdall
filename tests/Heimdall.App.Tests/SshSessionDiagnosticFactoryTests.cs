@@ -84,13 +84,33 @@ public sealed class SshSessionDiagnosticFactoryTests
     [InlineData(SshFailureCode.NetworkTimedOut)]
     [InlineData(SshFailureCode.NetworkReset)]
     [InlineData(SshFailureCode.NetworkUnreachable)]
-    public void FromClassifiedFailure_ForNetworkFailures_UsesGatewayStage(SshFailureCode code)
+    public void FromClassifiedFailure_ForDirectNetworkFailures_UsesGenericStage(SshFailureCode code)
     {
         var diagnostic = SshSessionDiagnosticFactory.FromClassifiedFailure(
             new SshFailureInfo(
                 code,
                 "Network failure.",
                 true));
+
+        Assert.Equal(SessionFailureStage.GenericFailure, diagnostic.Stage);
+        Assert.Equal($"ErrorSsh{code}", diagnostic.MessageKey);
+        Assert.Equal((int)code, diagnostic.Code);
+        Assert.Equal("Network failure.", diagnostic.Detail);
+    }
+
+    [Theory]
+    [InlineData(SshFailureCode.NetworkRefused)]
+    [InlineData(SshFailureCode.NetworkTimedOut)]
+    [InlineData(SshFailureCode.NetworkReset)]
+    [InlineData(SshFailureCode.NetworkUnreachable)]
+    public void FromClassifiedFailure_ForGatewayNetworkFailures_UsesGatewayStage(SshFailureCode code)
+    {
+        SessionDiagnostic diagnostic = SshSessionDiagnosticFactory.FromClassifiedFailure(
+            new SshFailureInfo(
+                code,
+                "Network failure.",
+                true),
+            usedGateway: true);
 
         Assert.Equal(SessionFailureStage.SshGateway, diagnostic.Stage);
         Assert.Equal($"ErrorSsh{code}", diagnostic.MessageKey);

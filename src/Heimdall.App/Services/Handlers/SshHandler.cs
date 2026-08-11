@@ -251,6 +251,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             session.Dispose();
             var failure = FailureClassifier.Classify(ex, sshParams);
+            SshFailureInfo localizedFailure = LocalizeFailure(failure, targetHost);
 
             if (failure.Code is SshFailureCode.AuthRejected
                     or SshFailureCode.KeyRejected
@@ -294,17 +295,43 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     .ConfigureAwait(false);
             }
 
-            _connectionSm.SetError(server.Id, failure.Message);
+            _connectionSm.SetError(server.Id, localizedFailure.Message);
             ReleaseTunnelIfNeeded(usesTunnel, targetPort);
             return new ConnectionResult(
                 false,
-                failure.Message,
+                localizedFailure.Message,
                 null,
-                SshSessionDiagnosticFactory.FromClassifiedFailure(failure));
+                SshSessionDiagnosticFactory.FromClassifiedFailure(localizedFailure, usesTunnel));
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
         return new ConnectionResult(true, null, new SshSessionResult(session, server.SessionLoggingOverride));
+    }
+
+    private SshFailureInfo LocalizeFailure(SshFailureInfo failure, string targetHost)
+    {
+        string message = FailureClassifier.FormatMessage(
+            failure,
+            key =>
+            {
+                if (!_localizer.HasKey(key))
+                {
+                    return null;
+                }
+
+                object formatArgument = failure.Code is SshFailureCode.NetworkRefused
+                    or SshFailureCode.NetworkTimedOut
+                    or SshFailureCode.NetworkReset
+                    ? targetHost
+                    : failure.Message;
+                return _localizer.Format(key, formatArgument);
+            });
+
+        return new SshFailureInfo(
+            failure.Code,
+            message,
+            failure.IsFatal,
+            failure.OriginalException);
     }
 
     private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
