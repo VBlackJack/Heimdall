@@ -1345,6 +1345,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         };
 
         var settings = await _configManager.LoadSettingsAsync();
+        dialogVm.SshMode = settings.SshDefaultMode;
         PopulateServerDialogOptions(dialogVm, settings);
         dialogVm.Settings = settings;
 
