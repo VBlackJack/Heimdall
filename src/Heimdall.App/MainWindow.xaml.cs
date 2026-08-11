@@ -3235,6 +3235,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                         vm.Localize("ConfirmCloseAllTabsMessage"),
                         connectedSessionCount),
                     "warning"),
+                () => vm.ServerList.FlushExpandStateForCloseAsync(),
                 () => SaveWindowBoundsAsync(vm),
                 () => vm.DialogService.ShowWarning(warningTitle, warningMessage));
 

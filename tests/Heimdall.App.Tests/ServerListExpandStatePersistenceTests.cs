@@ -15,6 +15,7 @@
  */
 
 using System.Collections.Concurrent;
+using System.IO;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
@@ -111,7 +112,110 @@ public sealed partial class ServerListSelectionTests
         Assert.Equal(0, configManager.MergeSettingCallCount);
     }
 
-    private sealed class RecordingConfigManager(bool blockFirstMerge = false) : IConfigManager
+    [Fact]
+    public async Task ExpandStateCloseFlush_PendingDebouncePersistsLatestSnapshotExactlyOnce()
+    {
+        RecordingConfigManager configManager = new();
+        await using ServerListSelectionFixture fixture =
+            await ServerListSelectionFixture.CreateAsync(configManager: configManager);
+        fixture.LoadServers(
+            new AppSettings(),
+            CreateServer("alpha", "Alpha", "alpha"),
+            CreateServer("beta", "Beta", "beta"));
+
+        fixture.FolderByPath("alpha").IsExpanded = true;
+        fixture.FolderByPath("alpha").IsExpanded = false;
+        fixture.FolderByPath("beta").IsExpanded = true;
+
+        await fixture.ViewModel.FlushExpandStateForCloseAsync();
+        await Task.Delay(750);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.Equal(["beta"], Assert.Single(configManager.PersistedSnapshots));
+    }
+
+    [Fact]
+    public async Task ExpandStateCloseFlush_InFlightSaveIsDrainedWithoutDuplicateWrite()
+    {
+        RecordingConfigManager configManager = new(blockFirstMerge: true);
+        await using ServerListSelectionFixture fixture =
+            await ServerListSelectionFixture.CreateAsync(configManager: configManager);
+        fixture.LoadServers(
+            new AppSettings(),
+            CreateServer("alpha", "Alpha", "alpha"));
+
+        fixture.FolderByPath("alpha").IsExpanded = true;
+        await configManager.FirstMergeStarted.WaitAsync(ExpandStatePersistBackstop);
+
+        Task flush = fixture.ViewModel.FlushExpandStateForCloseAsync();
+
+        Assert.False(flush.IsCompleted);
+        configManager.ReleaseFirstMerge();
+        await flush;
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.Equal(["alpha"], Assert.Single(configManager.PersistedSnapshots));
+    }
+
+    [Fact]
+    public async Task ExpandStateCloseFlush_NoPendingState_DoesNotWrite()
+    {
+        RecordingConfigManager configManager = new();
+        await using ServerListSelectionFixture fixture =
+            await ServerListSelectionFixture.CreateAsync(configManager: configManager);
+        fixture.LoadServers(
+            new AppSettings(),
+            CreateServer("alpha", "Alpha", "alpha"));
+
+        await fixture.ViewModel.FlushExpandStateForCloseAsync();
+
+        Assert.Equal(0, configManager.MergeSettingCallCount);
+        Assert.Empty(configManager.PersistedSnapshots);
+    }
+
+    [Fact]
+    public async Task ExpandStateCloseFlush_PersistenceFailureIsBestEffort()
+    {
+        RecordingConfigManager configManager = new(throwOnMerge: true);
+        await using ServerListSelectionFixture fixture =
+            await ServerListSelectionFixture.CreateAsync(configManager: configManager);
+        fixture.LoadServers(
+            new AppSettings(),
+            CreateServer("alpha", "Alpha", "alpha"));
+        fixture.FolderByPath("alpha").IsExpanded = true;
+
+        await fixture.ViewModel.FlushExpandStateForCloseAsync();
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.Empty(configManager.PersistedSnapshots);
+    }
+
+    [Fact]
+    public async Task ExpandStateCloseFlush_FirstMergeFails_LatestPendingSnapshotStillPersists()
+    {
+        RecordingConfigManager configManager = new(failFirstMerge: true);
+        await using ServerListSelectionFixture fixture =
+            await ServerListSelectionFixture.CreateAsync(configManager: configManager);
+        fixture.LoadServers(
+            new AppSettings(),
+            CreateServer("alpha", "Alpha", "alpha"),
+            CreateServer("beta", "Beta", "beta"));
+
+        fixture.FolderByPath("alpha").IsExpanded = true;
+        await configManager.FirstMergeStarted.WaitAsync(ExpandStatePersistBackstop);
+        fixture.FolderByPath("alpha").IsExpanded = false;
+        fixture.FolderByPath("beta").IsExpanded = true;
+
+        await fixture.ViewModel.FlushExpandStateForCloseAsync();
+
+        Assert.Equal(2, configManager.MergeSettingCallCount);
+        Assert.Equal(["beta"], Assert.Single(configManager.PersistedSnapshots));
+        Assert.Equal(["beta"], configManager.Settings.TreeExpandedNodes);
+    }
+
+    private sealed class RecordingConfigManager(
+        bool blockFirstMerge = false,
+        bool throwOnMerge = false,
+        bool failFirstMerge = false) : IConfigManager
     {
         private readonly SemaphoreSlim _mergeLock = new(1, 1);
         private readonly TaskCompletionSource _firstMergeStarted =
@@ -180,6 +284,11 @@ public sealed partial class ServerListSelectionTests
                     {
                         await _firstMergeRelease.Task;
                     }
+                }
+
+                if (throwOnMerge || (failFirstMerge && callNumber == 1))
+                {
+                    throw new IOException("Simulated expand-state persistence failure.");
                 }
 
                 mutate(Settings);

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 
@@ -235,6 +236,102 @@ public sealed class WindowClosingFlowTests
         Assert.Equal(0, settingsSaveCount);
         Assert.Equal(1, windowStateSaveCount);
         Assert.Equal(0, warningCount);
+    }
+
+    [Fact]
+    public async Task Close_AfterConfirmations_AwaitsExpandStateFlushBeforeWindowBounds()
+    {
+        List<string> steps = [];
+        TaskCompletionSource flushStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseFlush = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<bool> closing = InvokeCloseWithExpandStateFlush(
+            connectedSessionCount: 1,
+            () =>
+            {
+                steps.Add("sessions");
+                return Task.FromResult(true);
+            },
+            async () =>
+            {
+                steps.Add("expand-state");
+                flushStarted.TrySetResult();
+                await releaseFlush.Task;
+            },
+            () =>
+            {
+                steps.Add("window-bounds");
+                return Task.CompletedTask;
+            });
+
+        await flushStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(closing.IsCompleted);
+        Assert.Equal(["sessions", "expand-state"], steps);
+
+        releaseFlush.TrySetResult();
+        Assert.True(await closing);
+        Assert.Equal(["sessions", "expand-state", "window-bounds"], steps);
+    }
+
+    [Fact]
+    public async Task Close_SessionConfirmationRefused_DoesNotFlushOrPersistBounds()
+    {
+        int expandStateFlushCount = 0;
+        int windowBoundsSaveCount = 0;
+
+        bool canClose = await InvokeCloseWithExpandStateFlush(
+            connectedSessionCount: 1,
+            () => Task.FromResult(false),
+            () =>
+            {
+                expandStateFlushCount++;
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                windowBoundsSaveCount++;
+                return Task.CompletedTask;
+            });
+
+        Assert.False(canClose);
+        Assert.Equal(0, expandStateFlushCount);
+        Assert.Equal(0, windowBoundsSaveCount);
+    }
+
+    [Fact]
+    public async Task Close_ExpandStateFlushThrows_StillPersistsBoundsAndCloses()
+    {
+        int windowBoundsSaveCount = 0;
+
+        bool canClose = await InvokeCloseWithExpandStateFlush(
+            connectedSessionCount: 0,
+            () => throw new InvalidOperationException("Session prompt must not run."),
+            () => throw new IOException("Simulated expand-state flush failure."),
+            () =>
+            {
+                windowBoundsSaveCount++;
+                return Task.CompletedTask;
+            });
+
+        Assert.True(canClose);
+        Assert.Equal(1, windowBoundsSaveCount);
+    }
+
+    private static Task<bool> InvokeCloseWithExpandStateFlush(
+        int connectedSessionCount,
+        Func<Task<bool>> promptCloseConnectedSessionsAsync,
+        Func<Task> flushExpandStateAsync,
+        Func<Task> persistWindowStateAsync)
+    {
+        return WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: false,
+            connectedSessionCount,
+            () => throw new InvalidOperationException("Settings prompt must not run."),
+            () => throw new InvalidOperationException("Settings save must not run."),
+            promptCloseConnectedSessionsAsync,
+            flushExpandStateAsync,
+            persistWindowStateAsync,
+            () => throw new InvalidOperationException("Warning must not run."));
     }
 
     private sealed class RecordingConfigManager : IConfigManager

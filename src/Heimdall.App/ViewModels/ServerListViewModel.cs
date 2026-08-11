@@ -75,9 +75,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         new(StringComparer.Ordinal);
     private AppSettings? _currentSettings;
     private readonly HashSet<string> _expandedNodes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _expandSaveSync = new();
     private ITimer? _searchFilterTimer;
     private System.Threading.Timer? _expandSaveTimer;
+    private Task _expandSaveTask = Task.CompletedTask;
+    private long _expandSaveVersion;
+    private bool _expandStateSavePending;
+    private bool _expandStateFlushInProgress;
     private int _searchFilterVersion;
+    private static readonly TimeSpan ExpandStateSaveDelay = TimeSpan.FromMilliseconds(500);
 
     [ObservableProperty]
     private ObservableCollection<ServerItemViewModel> _servers = [];
@@ -278,7 +284,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         _disposed = true;
         DetachStableTreeFolderEvents();
         _searchFilterTimer?.Dispose();
-        _expandSaveTimer?.Dispose();
+        lock (_expandSaveSync)
+        {
+            _expandSaveVersion++;
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+            _expandStateSavePending = false;
+        }
+
         _connectionSm.StateChanged -= OnConnectionStateChanged;
         if (_healthMonitor is not null)
         {
@@ -1822,35 +1835,125 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     private void ScheduleExpandStateSave()
     {
         ImmutableArray<string> expandedNodes = [.. _expandedNodes];
-        _expandSaveTimer?.Dispose();
-        _expandSaveTimer = new System.Threading.Timer(
-            _ => SaveExpandStateAsync(expandedNodes),
-            null,
-            TimeSpan.FromMilliseconds(500),
-            Timeout.InfiniteTimeSpan);
+        lock (_expandSaveSync)
+        {
+            long version = ++_expandSaveVersion;
+            _expandStateSavePending = true;
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+
+            if (_expandStateFlushInProgress)
+            {
+                return;
+            }
+
+            _expandSaveTimer = new System.Threading.Timer(
+                _ => StartExpandStateSave(version, expandedNodes),
+                null,
+                ExpandStateSaveDelay,
+                Timeout.InfiniteTimeSpan);
+        }
     }
 
-    private void SaveExpandStateAsync(ImmutableArray<string> expandedNodes)
+    private void StartExpandStateSave(long version, ImmutableArray<string> expandedNodes)
     {
-        _ = Task.Run(async () =>
+        lock (_expandSaveSync)
         {
-            try
+            if (version != _expandSaveVersion || _expandStateFlushInProgress)
             {
-                await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
+                return;
             }
-            catch (Exception ex)
+
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+            _expandStateSavePending = false;
+            _expandSaveTask = SaveExpandStateAfterAsync(_expandSaveTask, expandedNodes);
+        }
+    }
+
+    private async Task SaveExpandStateAfterAsync(
+        Task precedingSave,
+        ImmutableArray<string> expandedNodes)
+    {
+        try
+        {
+            await precedingSave.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error(
+                $"Previous tree expand-state persistence failed: {ex.Message}");
+        }
+
+        try
+        {
+            await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error(
+                $"Queued tree expand-state persistence failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Cancels the expand-state debounce, drains any active persistence callback,
+    /// and best-effort persists the latest pending snapshot before interactive close.
+    /// </summary>
+    internal async Task FlushExpandStateForCloseAsync()
+    {
+        lock (_expandSaveSync)
+        {
+            _expandStateFlushInProgress = true;
+            _expandSaveVersion++;
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+        }
+
+        while (true)
+        {
+            Task activeSave;
+            bool hasPendingSnapshot;
+            ImmutableArray<string> expandedNodes = [];
+            lock (_expandSaveSync)
             {
-                Core.Logging.FileLogger.Error($"SaveExpandStateCoreAsync failed: {ex.Message}");
+                activeSave = _expandSaveTask;
+                hasPendingSnapshot = _expandStateSavePending;
+                if (hasPendingSnapshot)
+                {
+                    expandedNodes = [.. _expandedNodes];
+                    _expandStateSavePending = false;
+                }
             }
-        });
+
+            await activeSave.ConfigureAwait(false);
+            if (hasPendingSnapshot)
+            {
+                await SaveExpandStateBestEffortAsync(expandedNodes).ConfigureAwait(false);
+            }
+
+            lock (_expandSaveSync)
+            {
+                if (!_expandStateSavePending && _expandSaveTask.IsCompleted)
+                {
+                    _expandStateFlushInProgress = false;
+                    return;
+                }
+            }
+        }
     }
 
     private async Task SaveExpandStateCoreAsync(ImmutableArray<string> expandedNodes)
     {
+        await _configManager.MergeSettingAsync(
+            settings => settings.TreeExpandedNodes = [.. expandedNodes]).ConfigureAwait(false);
+    }
+
+    private async Task SaveExpandStateBestEffortAsync(ImmutableArray<string> expandedNodes)
+    {
         try
         {
-            await _configManager.MergeSettingAsync(
-                settings => settings.TreeExpandedNodes = [.. expandedNodes]).ConfigureAwait(false);
+            await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
