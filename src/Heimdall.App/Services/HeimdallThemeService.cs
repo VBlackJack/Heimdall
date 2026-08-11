@@ -227,10 +227,17 @@ public sealed class HeimdallThemeService
 
     internal static ResourceDictionary CreateBridgeDictionary()
     {
-        return new ResourceDictionary
+        return CreateBridgeDictionary(static source => new ResourceDictionary
         {
-            Source = new Uri(BridgeDictionaryPackPath, UriKind.Absolute),
-        };
+            Source = new Uri(source, UriKind.Absolute),
+        });
+    }
+
+    internal static ResourceDictionary CreateBridgeDictionary(
+        Func<string, ResourceDictionary> dictionaryFactory)
+    {
+        ArgumentNullException.ThrowIfNull(dictionaryFactory);
+        return dictionaryFactory(BridgeDictionaryPackPath);
     }
 
     private static void RefreshHeimdallBridge(Application app)

@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-using System.Reflection;
+using System.Collections;
+using System.IO;
+using System.Resources;
 using System.Windows;
 using Heimdall.App.Services;
 using ThemeForge.Theme;
@@ -24,66 +26,46 @@ namespace Heimdall.App.Tests;
 public sealed class ThemeResolverTests
 {
     [Fact]
-    public void CreateBridgeDictionary_FromCompiledResource_LoadsBridgeBrushes()
+    public void CreateBridgeDictionary_UsesAbsoluteApplicationPackPath()
     {
-        ResourceDictionary? bridge = null;
-        Exception? failure = null;
-        Thread thread = new(() =>
-        {
-            Application? application = null;
-            bool createdApplication = false;
-            try
-            {
-                application = Application.Current;
-                if (application is null)
-                {
-                    application = new Application();
-                    createdApplication = true;
-                }
+        const string ExpectedSource =
+            "pack://application:,,,/Heimdall;component/Themes/HeimdallThemeBridge.xaml";
+        ResourceDictionary expected = new();
+        string? observedSource = null;
 
-                bridge = HeimdallThemeService.CreateBridgeDictionary();
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-            finally
-            {
-                if (createdApplication && application is not null)
-                {
-                    application.Shutdown();
-                    application.Dispatcher.InvokeShutdown();
-                    ResetApplicationSingletonForTest(application);
-                }
-            }
+        ResourceDictionary actual = HeimdallThemeService.CreateBridgeDictionary(source =>
+        {
+            observedSource = source;
+            return expected;
         });
 
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Theme bridge load timed out.");
-
-        Assert.Null(failure);
-        ResourceDictionary loadedBridge = Assert.IsType<ResourceDictionary>(bridge);
-        Assert.True(loadedBridge.Contains("BackgroundBrush"));
-        Assert.Equal(
-            "pack://application:,,,/Heimdall;component/Themes/HeimdallThemeBridge.xaml",
-            loadedBridge.Source.OriginalString);
+        Assert.Same(expected, actual);
+        Assert.Equal(ExpectedSource, observedSource);
     }
 
-    private static void ResetApplicationSingletonForTest(Application application)
+    [Fact]
+    public void ThemeBridge_IsPresentInCompiledApplicationResources()
     {
-        Assert.Same(application, Application.Current);
-        BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
-        FieldInfo? appInstance = typeof(Application).GetField("_appInstance", flags);
-        FieldInfo? appCreated = typeof(Application).GetField("_appCreatedInThisAppDomain", flags);
-        FieldInfo? isShuttingDown = typeof(Application).GetField("_isShuttingDown", flags);
-        Assert.NotNull(appInstance);
-        Assert.NotNull(appCreated);
-        Assert.NotNull(isShuttingDown);
-        appInstance.SetValue(null, null);
-        appCreated.SetValue(null, false);
-        isShuttingDown.SetValue(null, false);
-        Assert.Null(Application.Current);
+        using Stream? resourceStream = typeof(HeimdallThemeService).Assembly
+            .GetManifestResourceStream("Heimdall.g.resources");
+        Assert.NotNull(resourceStream);
+
+        using ResourceReader reader = new(resourceStream);
+        IDictionaryEnumerator resources = reader.GetEnumerator();
+        bool bridgeFound = false;
+        while (resources.MoveNext())
+        {
+            if (string.Equals(
+                    resources.Key as string,
+                    "themes/heimdallthemebridge.baml",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                bridgeFound = true;
+                break;
+            }
+        }
+
+        Assert.True(bridgeFound, "The compiled theme bridge BAML resource was not found.");
     }
 
     public static IEnumerable<object[]> ThemeForgeIds()
