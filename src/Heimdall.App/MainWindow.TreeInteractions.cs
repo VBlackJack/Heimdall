@@ -235,9 +235,10 @@ public partial class MainWindow
         var modifiers = Keyboard.Modifiers;
         if ((modifiers & ModifierKeys.Control) == ModifierKeys.Control)
         {
-            _treeState.SuppressSelectedItemSync = true;
             vm.ServerList.ToggleSelection(server);
-            treeViewItem.Focus();
+            SynchronizeNativeTreeSelection(
+                _treeState,
+                treeViewItem);
             ShowTreeSelection(vm, vm.ServerList.SelectedServer);
             e.Handled = true;
             return;
@@ -255,6 +256,36 @@ public partial class MainWindow
 
         _treeState.SuppressSelectedItemSync = false;
         vm.ServerList.SelectSingle(server);
+    }
+
+    /// <summary>
+    /// Clears native selection after a Ctrl toggle while preserving pointer focus.
+    /// </summary>
+    /// <param name="treeState">The transient TreeView interaction state.</param>
+    /// <param name="pointerContainer">The container targeted by the pointer.</param>
+    internal static void SynchronizeNativeTreeSelection(
+        TreeInteractionState treeState,
+        TreeViewItem pointerContainer)
+    {
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            pointerContainer.Focus();
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
+
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            pointerContainer.IsSelected = false;
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
     }
 
     // ── Right-click pre-selection + context menu opening ─────────────
