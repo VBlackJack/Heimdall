@@ -613,12 +613,18 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private int _externalToolTimeoutMs = 60000;
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateRdpResizeEnableDelayMsValue))]
     private int _rdpResizeEnableDelayMs = 10000;
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(1000, 60000, ErrorMessage = "RDP artifact cleanup delay must be between 1000 and 60000 ms.")]
     private int _rdpArtifactCleanupDelayMs = 10000;
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(5000, 300000, ErrorMessage = "RDP credential autofill timeout must be between 5000 and 300000 ms.")]
     private int _rdpCredentialAutofillTimeoutMs = 90000;
 
     [ObservableProperty]
@@ -2562,6 +2568,28 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     partial void OnAdvancedTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasAdvancedTabErrors));
 
+    /// <summary>
+    /// Validates the global RDP resize lockout delay while preserving zero as the explicit disable value.
+    /// </summary>
+    /// <param name="value">The configured delay in milliseconds.</param>
+    /// <param name="context">The validation context supplied by the data annotations pipeline.</param>
+    /// <returns>A validation error when the value is neither zero nor within the supported range.</returns>
+    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateRdpResizeEnableDelayMsValue(
+        int value,
+        ValidationContext context)
+    {
+        _ = context;
+
+        // Zero explicitly disables the resize lockout; 1..999 ms is too short to be meaningful.
+        if (value == 0 || value is >= 1000 and <= 60000)
+        {
+            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
+        }
+
+        return new System.ComponentModel.DataAnnotations.ValidationResult(
+            "RDP resize delay must be zero or between 1000 and 60000 ms.");
+    }
+
     private static readonly Dictionary<string, string> SettingsValidationKeyMap = new(StringComparer.Ordinal)
     {
         ["Max embedded sessions must be between 1 and 20."] = "ValidationSettingsMaxSessions",
@@ -2571,6 +2599,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ["SSH auto-reconnect attempts must be between 1 and 10."] = "ValidationSettingsSshAutoReconnectAttempts",
         ["Tunnel establishment delay must be between 0 and 30000 ms."] = "ValidationSettingsTunnelDelay",
         ["RDP connection watchdog timeout must be between 5000 and 600000 ms."] = "ValidationSettingsRdpTimeout",
+        ["RDP resize delay must be zero or between 1000 and 60000 ms."] = "ValidationSettingsRdpResizeDelay",
+        ["RDP artifact cleanup delay must be between 1000 and 60000 ms."] = "ValidationSettingsRdpArtifactCleanupDelay",
+        ["RDP credential autofill timeout must be between 5000 and 300000 ms."] = "ValidationSettingsRdpCredentialAutofillTimeout",
         ["RDP auto-reconnect maximum attempts must be between 1 and 20."] = "ValidationSettingsRdpAutoReconnectMaxAttempts",
         ["External tool timeout must be between 5000 and 600000 ms."] = "ValidationSettingsExtToolTimeout",
         ["Health check interval must be between 15 and 3600 seconds."] = "ValidationSettingsHealthCheckInterval",
@@ -2599,6 +2630,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [
         nameof(TunnelEstablishmentDelayMs),
         nameof(RdpConnectWatchdogTimeoutMs),
+        nameof(RdpResizeEnableDelayMs),
+        nameof(RdpArtifactCleanupDelayMs),
+        nameof(RdpCredentialAutofillTimeoutMs),
         nameof(RdpAutoReconnectMaxAttempts),
         nameof(ExternalToolTimeoutMs),
         nameof(SessionHealthCheckIntervalSeconds),
