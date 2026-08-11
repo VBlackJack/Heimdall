@@ -31,11 +31,88 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class TreeInteractionState
 {
+    private TreeViewItem? _dragSourceContainer;
+    private ServerItemViewModel? _dragSourceServer;
+
     /// <summary>Mouse position captured on left button down — start of a potential drag.</summary>
     public System.Windows.Point DragStartPoint { get; set; }
 
     /// <summary>True while a drag-drop operation is currently in flight.</summary>
     public bool DragInProgress { get; set; }
+
+    /// <summary>
+    /// Captures the only container and server that may become the source of the
+    /// current pointer gesture. Non-server presses deliberately leave no candidate.
+    /// </summary>
+    internal void CaptureDragCandidate(
+        System.Windows.Point startPoint,
+        TreeViewItem? pressedContainer)
+    {
+        ResetDrag();
+
+        if (pressedContainer?.DataContext is not ServerItemViewModel pressedServer)
+        {
+            return;
+        }
+
+        DragStartPoint = startPoint;
+        _dragSourceContainer = pressedContainer;
+        _dragSourceServer = pressedServer;
+    }
+
+    /// <summary>
+    /// Resolves a threshold-crossing gesture from the immutable mouse-down snapshot.
+    /// </summary>
+    internal bool TryStartDrag(
+        System.Windows.Point currentPoint,
+        bool isLeftButtonPressed,
+        bool hasDisallowedModifiers,
+        out TreeViewItem? sourceContainer,
+        out ServerItemViewModel? sourceServer)
+    {
+        sourceContainer = null;
+        sourceServer = null;
+
+        if (!isLeftButtonPressed || hasDisallowedModifiers)
+        {
+            ResetDrag();
+            return false;
+        }
+
+        if (DragInProgress)
+        {
+            return false;
+        }
+
+        Vector distance = currentPoint - DragStartPoint;
+        if (Math.Abs(distance.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(distance.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return false;
+        }
+
+        if (_dragSourceContainer is null
+            || _dragSourceServer is null
+            || !ReferenceEquals(_dragSourceContainer.DataContext, _dragSourceServer))
+        {
+            ResetDrag();
+            return false;
+        }
+
+        sourceContainer = _dragSourceContainer;
+        sourceServer = _dragSourceServer;
+        DragInProgress = true;
+        return true;
+    }
+
+    /// <summary>Clears every transient value associated with a pointer drag.</summary>
+    internal void ResetDrag()
+    {
+        DragStartPoint = default;
+        DragInProgress = false;
+        _dragSourceContainer = null;
+        _dragSourceServer = null;
+    }
 
     /// <summary>
     /// True when the next TreeView SelectedItemChanged notification should not

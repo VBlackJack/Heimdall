@@ -905,58 +905,67 @@ public partial class MainWindow
 
     private void OnTreeViewDragStart(object sender, MouseButtonEventArgs e)
     {
+        _treeState.ResetDrag();
+
         if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
         {
-            _treeState.DragInProgress = false;
             return;
         }
 
         if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
         {
-            _treeState.DragInProgress = false;
             return;
         }
 
-        _treeState.DragStartPoint = e.GetPosition(null);
-        _treeState.DragInProgress = false;
+        TreeViewItem? pressedContainer =
+            FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        _treeState.CaptureDragCandidate(e.GetPosition(null), pressedContainer);
     }
 
     private void OnTreeViewDragMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
-        {
-            _treeState.DragInProgress = false;
-            return;
-        }
-
-        if (e.LeftButton != MouseButtonState.Pressed
-            || _treeState.DragInProgress
-            || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
-        {
-            return;
-        }
-
-        var pos = e.GetPosition(null);
-        var diff = pos - _treeState.DragStartPoint;
-
-        if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
-            Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
+        bool hasDisallowedModifiers =
+            (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None;
+        if (!_treeState.TryStartDrag(
+                e.GetPosition(null),
+                e.LeftButton == MouseButtonState.Pressed,
+                hasDisallowedModifiers,
+                out TreeViewItem? sourceContainer,
+                out ServerItemViewModel? sourceServer)
+            || sourceContainer is null
+            || sourceServer is null)
         {
             return;
         }
 
-        // Find the ServerItemViewModel being dragged
-        var treeViewItem = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        ExecuteTreeDrag(
+            _treeState,
+            sourceContainer,
+            sourceServer,
+            static (container, data) =>
+                DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
+    }
 
-        if (treeViewItem?.DataContext is not ServerItemViewModel serverItem)
+    internal static void ExecuteTreeDrag(
+        TreeInteractionState treeState,
+        TreeViewItem sourceContainer,
+        ServerItemViewModel sourceServer,
+        Action<TreeViewItem, System.Windows.DataObject> executeDrag)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(sourceContainer);
+        ArgumentNullException.ThrowIfNull(sourceServer);
+        ArgumentNullException.ThrowIfNull(executeDrag);
+
+        System.Windows.DataObject data = new("HeimdallServer", sourceServer);
+        try
         {
-            return;
+            executeDrag(sourceContainer, data);
         }
-
-        _treeState.DragInProgress = true;
-        var data = new System.Windows.DataObject("HeimdallServer", serverItem);
-        DragDrop.DoDragDrop(treeViewItem, data, System.Windows.DragDropEffects.Move);
-        _treeState.DragInProgress = false;
+        finally
+        {
+            treeState.ResetDrag();
+        }
     }
 
     private void ShowTreeSelection(MainViewModel vm, ServerItemViewModel? server)
