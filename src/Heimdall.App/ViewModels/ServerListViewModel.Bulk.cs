@@ -1497,6 +1497,12 @@ public partial class ServerListViewModel
     {
         ArgumentNullException.ThrowIfNull(buildPlan);
 
+        // Settings are loaded before the mutation is persisted: a failure here must abort while
+        // nothing has been written, otherwise the servers land on disk and the view models are
+        // never reconciled against them.
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+
         BulkMutationPlan? plan = await _configManager.MutateServersAsync(dtos =>
             buildPlan(dtos));
         if (plan is null || plan.IsNoOp)
@@ -1504,7 +1510,6 @@ public partial class ServerListViewModel
             return;
         }
 
-        var settings = await _configManager.LoadSettingsAsync();
         _currentSettings = settings;
         var projectMap = BuildProjectMap(settings);
         var gatewayMap = BuildGatewayMap(settings);
