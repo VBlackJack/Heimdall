@@ -188,6 +188,48 @@ the process-wide `UnobservedTaskException` pipeline. Sudo edit sessions
 cache the `PinnedFingerprintVerifier` built at open time instead of resolving
 host-key trust again on every save.
 
+### Remote upload commit guarantees
+
+Every remote write uploads to a unique temporary path next to the destination
+first, so a truncated transfer never lands on the destination. What differs per
+protocol is the commit step, and with it the guarantee an existing destination
+receives.
+
+SFTP file upload replaces the destination atomically or not at all.
+`SftpAtomicUpload.CommitRename` first attempts the OpenSSH
+`posix-rename@openssh.com` extension, which replaces the destination in a single
+server-side operation. A failure is eligible for the plain-rename fallback only
+when `SftpBrowser.IsAtomicRenameCapabilityFailure` recognizes a capability error
+(`NotSupportedException`, or an `SftpException` carrying
+`StatusCode.OperationUnsupported`); every other failure, permission errors
+included, propagates unchanged. Once demoted, the destination is probed, and the
+fallback is refused whenever that probe does not prove the destination absent: an
+existing destination raises an `InvalidOperationException` and is left untouched,
+and a probe that itself fails is propagated rather than assumed. Heimdall
+therefore never moves, deletes, or backs up an existing SFTP destination, and no
+window exists in which the destination is temporarily missing. The uploaded
+temporary file is removed by the caller's rollback path.
+
+SFTP remote copy is a best-effort no-clobber publish, not an atomic one.
+`CopyFileViaRoundtripAsync` downloads to a local temporary file and republishes
+through `SftpAtomicUpload.CommitPublishIfAbsent`, which issues a plain rename and
+re-probes the destination only when that rename fails. The re-probe classifies
+the error message and is deliberately not part of the data path. A server whose
+rename silently overwrites the destination therefore succeeds with no exception
+and no warning. Remote copy must not be relied upon to protect an existing
+destination.
+
+FTP upload keeps the two-step replacement and is not atomic. FluentFTP exposes no
+atomic replace, so `FtpAtomicUpload.CommitRenameAsync` moves an existing
+destination to a `.bak` sibling, moves the uploaded temporary file into place,
+then deletes the backup. A failed commit restores the backup, and a failed
+restore raises an `InvalidOperationException` carrying both the commit and the
+restore error. Between the two moves the destination does not exist, so a
+concurrent reader can observe a missing file and a crash can leave the payload
+under the `.bak` sibling. Each such replacement raises a per-operation
+`RemoteOperationWarning` on the session surface; no warning is due when the
+destination is absent, because no backup move happens.
+
 ### FTP and FTPS transport notices
 
 FTP is implemented on top of FluentFTP `AsyncFtpClient`. `FtpHandler`
