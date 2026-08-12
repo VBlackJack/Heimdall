@@ -262,6 +262,42 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public async Task BulkMutation_WhenSettingsLoadFails_PersistsNothingAndLeavesStateIntact()
+    {
+        FailingSaveConfigManager configManager = new();
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            configManager: configManager);
+        await fixture.LoadServersAsync(
+            fixture.ExpandGroups("ops", "ops/source", "ops/target"),
+            CreateServer("alpha", "Alpha", "ops/source"),
+            CreateServer("beta", "Beta", "ops/source"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        int saveCountBeforeMutation = configManager.SaveServersCallCount;
+        configManager.FailOnLoadSettings = true;
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            fixture.ViewModel.MoveSelectedToGroupCommand.ExecuteAsync(
+                new BulkMoveToGroupRequest("ops/target")));
+
+        // Failing the settings load can only stop the save if the load happens first: this is the
+        // ordering oracle. With the load after the mutation, the servers would already be persisted.
+        Assert.Equal(saveCountBeforeMutation, configManager.SaveServersCallCount);
+        Assert.Equal("ops/source", fixture.ServerById("alpha").Group);
+        Assert.Equal("ops/source", fixture.ServerById("beta").Group);
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
+
+        configManager.FailOnLoadSettings = false;
+        string?[] persistedGroups = (await configManager.LoadServersAsync())
+            .OrderBy(server => server.Id, StringComparer.Ordinal)
+            .Select(server => server.Group)
+            .ToArray();
+        Assert.Equal(new string?[] { "ops/source", "ops/source" }, persistedGroups);
+    }
+
+    [Fact]
     public async Task MoveSelectedToGroupAsync_MovesToolEntriesToo()
     {
         await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
@@ -2727,6 +2763,12 @@ public sealed class ServerListBulkActionTests
 
         public bool FailOnSaveServers { get; set; }
 
+        /// <summary>
+        /// Makes the settings load fail. Because the bulk mutation loads settings before it persists
+        /// anything, this must abort the whole operation without reaching the servers file.
+        /// </summary>
+        public bool FailOnLoadSettings { get; set; }
+
         public int SaveServersCallCount { get; private set; }
 
         public Action? BeforeSaveServers { get; set; }
@@ -2741,7 +2783,15 @@ public sealed class ServerListBulkActionTests
 
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(CloneSettings(_settings));
+        public Task<AppSettings> LoadSettingsAsync()
+        {
+            if (FailOnLoadSettings)
+            {
+                throw new IOException("Simulated LoadSettingsAsync failure");
+            }
+
+            return Task.FromResult(CloneSettings(_settings));
+        }
 
         public Task SaveSettingsAsync(AppSettings settings)
         {
