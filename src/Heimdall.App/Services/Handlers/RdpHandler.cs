@@ -36,6 +36,7 @@ internal sealed class RdpHandler : IProtocolHandler
     private readonly IRdpCredentialManager _credentialManager;
     private readonly Func<string?, string?> _decryptPassword;
     private readonly RdpCredentialAutofillOperation _credentialAutofill;
+    private readonly Action<string> _deleteRdpFile;
 
     public RdpHandler(
         ITunnelService tunnelService,
@@ -45,7 +46,8 @@ internal sealed class RdpHandler : IProtocolHandler
         ICredentialGuardService? credentialGuardService = null,
         IRdpCredentialManager? credentialManager = null,
         Func<string?, string?>? decryptPassword = null,
-        RdpCredentialAutofillOperation? credentialAutofill = null)
+        RdpCredentialAutofillOperation? credentialAutofill = null,
+        Action<string>? deleteRdpFile = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -55,6 +57,7 @@ internal sealed class RdpHandler : IProtocolHandler
         _credentialManager = credentialManager ?? new RdpCredentialManager();
         _decryptPassword = decryptPassword ?? ConnectionHelpers.DecryptPassword;
         _credentialAutofill = credentialAutofill ?? Heimdall.Rdp.CredentialAutofill.WaitAndFillAsync;
+        _deleteRdpFile = deleteRdpFile ?? File.Delete;
     }
 
     public string Protocol => "RDP";
@@ -135,7 +138,8 @@ internal sealed class RdpHandler : IProtocolHandler
         string? warning = null;
         string? credentialCleanupTarget = null;
         string? credentialOwnershipMarker = null;
-        bool credentialCleanupScheduled = false;
+        string? rdpArtifactPath = null;
+        bool deferredCleanupScheduled = false;
         try
         {
             string rdpHost = targetHost;
@@ -182,6 +186,9 @@ internal sealed class RdpHandler : IProtocolHandler
             }
 
             var rdpFile = Path.Combine(Path.GetTempPath(), $"heimdall_{server.Id}_{Guid.NewGuid():N}.rdp");
+            // Take ownership of the artifact path as soon as it exists, so every early
+            // return below deletes it synchronously before ConnectAsync hands back.
+            rdpArtifactPath = rdpFile;
             var resolution = RdpProfileResolver.ResolveResolution(server, settings);
             var redirections = RdpProfileResolver.BuildRedirections(server, settings);
             if (resolution.EmitDisabledMultiMonitor)
@@ -397,7 +404,7 @@ internal sealed class RdpHandler : IProtocolHandler
                     Core.Logging.FileLogger.Warn($"RDP cleanup failed: {ex.Message}");
                 }
             }, CancellationToken.None);
-            credentialCleanupScheduled = true;
+            deferredCleanupScheduled = true;
 
             return new ConnectionResult(true, null, null, Warning: warning);
         }
@@ -421,11 +428,20 @@ internal sealed class RdpHandler : IProtocolHandler
         }
         finally
         {
-            if (!credentialCleanupScheduled &&
-                credentialCleanupTarget is not null &&
-                credentialOwnershipMarker is not null)
+            if (!deferredCleanupScheduled)
             {
-                ReleaseOwnedCredential(credentialCleanupTarget, credentialOwnershipMarker);
+                // Both helpers are non-throwing, so neither cleanup can be starved by
+                // the other and neither can mask the ConnectionResult built above.
+                if (credentialCleanupTarget is not null &&
+                    credentialOwnershipMarker is not null)
+                {
+                    ReleaseOwnedCredential(credentialCleanupTarget, credentialOwnershipMarker);
+                }
+
+                if (rdpArtifactPath is not null)
+                {
+                    DeleteRdpArtifact(rdpArtifactPath);
+                }
             }
 
             rdpPassword = null;
@@ -478,15 +494,7 @@ internal sealed class RdpHandler : IProtocolHandler
         {
         }
 
-        try
-        {
-            File.Delete(rdpFile);
-        }
-        catch (IOException ex)
-        {
-            Core.Logging.FileLogger.Warn(
-                $"RDP artifact cleanup: failed to delete temp .rdp file '{rdpFile}': {ex.Message}");
-        }
+        DeleteRdpArtifact(rdpFile);
 
         if (credentialCleanupTarget is not null && credentialOwnershipMarker is not null)
         {
@@ -494,18 +502,50 @@ internal sealed class RdpHandler : IProtocolHandler
         }
     }
 
-    private void ReleaseOwnedCredential(string credentialTarget, string ownershipMarker)
+    /// <summary>
+    /// Deletes the temporary .rdp artifact. Never throws: a failed deletion —
+    /// including <see cref="UnauthorizedAccessException"/> — must never prevent the
+    /// owned CredMan entry from being released. The .rdp file carries no secret,
+    /// and the log line records only the path and the exception message.
+    /// </summary>
+    private void DeleteRdpArtifact(string rdpFile)
     {
-        bool operationSucceeded = _credentialManager.DeleteCredential(
-            credentialTarget,
-            ownershipMarker,
-            out _,
-            out string? credentialError);
-        if (!operationSucceeded)
+        try
+        {
+            _deleteRdpFile(rdpFile);
+        }
+        catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn(
-                $"RDP CredMan cleanup failed for {credentialTarget}: {credentialError ?? "unknown error"}");
-            return;
+                $"RDP artifact cleanup: failed to delete temp .rdp file '{rdpFile}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Releases the CredMan entry Heimdall owns. Never throws: an unexpected provider
+    /// failure must neither mask the <see cref="ConnectionResult"/> nor prevent the
+    /// temporary .rdp artifact from being deleted. Only the exception type is logged —
+    /// never a username, domain, password, ownership marker or credential blob.
+    /// </summary>
+    private void ReleaseOwnedCredential(string credentialTarget, string ownershipMarker)
+    {
+        try
+        {
+            bool operationSucceeded = _credentialManager.DeleteCredential(
+                credentialTarget,
+                ownershipMarker,
+                out _,
+                out string? credentialError);
+            if (!operationSucceeded)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"RDP CredMan cleanup failed for {credentialTarget}: {credentialError ?? "unknown error"}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"RDP CredMan cleanup threw for {credentialTarget}: {ex.GetType().FullName}");
         }
     }
 }
