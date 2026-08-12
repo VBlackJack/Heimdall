@@ -89,4 +89,34 @@ public sealed class CitrixSessionEventFactoryTests
         CitrixSessionEventFactory.BuildConnected(rawHost: "  ", title: "Notepad")
             .Host.Should().Be("Notepad");
     }
+
+    [Fact]
+    public void BuildConnected_StoreFrontUrl_RemovesQueryAndFragmentButPreservesEndpoint()
+    {
+        const string rawUrl = "https://store.example:8443/path/?access_token=secret#fragment";
+
+        SessionEventRecord record = CitrixSessionEventFactory.BuildConnected(rawUrl, "Notepad");
+
+        record.Host.Should().Be("https://store.example:8443/path/");
+        record.Host.Should().NotContain("access_token");
+        record.Host.Should().NotContain("secret");
+        record.Host.Should().NotContain("fragment");
+    }
+
+    [Fact]
+    public void BuildDisconnected_StoreFrontUrl_RemovesQueryAndFragmentButPreservesEndpoint()
+    {
+        const string rawUrl = "https://store.example:8443/path/?access_token=secret#fragment";
+
+        SessionEventRecord record = CitrixSessionEventFactory.BuildDisconnected(
+            rawUrl,
+            "Notepad",
+            durationMs: 8_000,
+            endTrigger: "remote");
+
+        record.Host.Should().Be("https://store.example:8443/path/");
+        record.Host.Should().NotContain("access_token");
+        record.Host.Should().NotContain("secret");
+        record.Host.Should().NotContain("fragment");
+    }
 }

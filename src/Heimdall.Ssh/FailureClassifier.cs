@@ -16,6 +16,7 @@
 
 using System.Net.Sockets;
 using Renci.SshNet.Common;
+using Renci.SshNet.Messages.Transport;
 
 namespace Heimdall.Ssh;
 
@@ -128,6 +129,37 @@ public static class FailureClassifier
         // message inspection is a deliberate last resort. The default arm is
         // fatal, so a wording change can only make the message less precise;
         // it cannot downgrade a failure to non-fatal or success.
+        if (msg.Contains("keyboard-interactive", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(connectionParams?.Password))
+        {
+            return new SshFailureInfo(
+                SshFailureCode.KeyboardInteractiveNoPassword,
+                "Server requires keyboard-interactive authentication, but no password was provided.",
+                true,
+                ex);
+        }
+
+        // Renci.SshNet.ClientAuthentication.TryAuthenticate: none of the offered methods
+        // are supported by this client. Anchored before the generic "key" check below
+        // because "keyboard-interactive" (a common item in this message's parenthetical
+        // method list) contains the substring "key".
+        if (msg.Contains("no suitable authentication method", StringComparison.OrdinalIgnoreCase))
+            return new SshFailureInfo(SshFailureCode.NoSupportedAuth, "No supported authentication method.", true, ex);
+
+        // Renci.SshNet.ClientAuthentication.TryAuthenticate: the server-side retry ceiling
+        // for a method was reached. Anchored before the generic "key" check below for the
+        // same reason as above.
+        if (msg.Contains("attempt limit", StringComparison.OrdinalIgnoreCase))
+            return new SshFailureInfo(SshFailureCode.TooManyAuthFailures, "Too many auth failures.", true, ex);
+
+        // Renci.SshNet.ClientAuthentication.TryAuthenticate names the failing method:
+        // "Permission denied (keyboard-interactive)." No SSH key is involved, yet
+        // "keyboard-interactive" contains the substring "key". The no-password case
+        // already returned above, so reaching here means a password was configured and
+        // it is that password, supplied through keyboard-interactive, that was refused.
+        if (msg.Contains("keyboard-interactive", StringComparison.OrdinalIgnoreCase))
+            return new SshFailureInfo(SshFailureCode.PasswordRejected, "SSH password was rejected.", true, ex);
+
         if (msg.Contains("key", StringComparison.OrdinalIgnoreCase))
             return new SshFailureInfo(SshFailureCode.KeyRejected, "Server rejected the SSH key.", true, ex);
 
@@ -142,19 +174,6 @@ public static class FailureClassifier
 
         if (msg.Contains("too many", StringComparison.OrdinalIgnoreCase))
             return new SshFailureInfo(SshFailureCode.TooManyAuthFailures, "Too many auth failures.", true, ex);
-
-        // Server requires keyboard-interactive but no password was supplied.
-        // This happens when PasswordAuthentication is disabled server-side and the
-        // KeyboardInteractiveAuthenticationMethod has no response for the prompt.
-        if (msg.Contains("keyboard-interactive", StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrEmpty(connectionParams?.Password))
-        {
-            return new SshFailureInfo(
-                SshFailureCode.KeyboardInteractiveNoPassword,
-                "Server requires keyboard-interactive authentication, but no password was provided.",
-                true,
-                ex);
-        }
 
         return new SshFailureInfo(SshFailureCode.NoSupportedAuth, "No supported authentication method.", true, ex);
     }
@@ -176,9 +195,22 @@ public static class FailureClassifier
         // message inspection is a deliberate last resort. The default arm is
         // fatal, so a wording change can only make the message less precise;
         // it cannot downgrade a failure to non-fatal or success.
+        // The producer-anchored tokens below cover wrong-passphrase failures that do
+        // not contain the word "passphrase":
+        //   - Renci.SshNet.PrivateKeyFile.PuTTY.Parse: the MAC check fails when a
+        //     PuTTY-format key is decrypted with the wrong passphrase.
+        //   - Renci.SshNet.PrivateKeyFile.OpenSSH.Parse: the decrypted random check
+        //     bytes do not match when an OpenSSH key is decrypted with the wrong
+        //     passphrase.
+        //   - Renci.SshNet.PrivateKeyFile.OpenSSH.Parse: the decrypted private key section
+        //     is not a multiple of the cipher block size when decrypted with the
+        //     wrong passphrase.
         if (!string.IsNullOrWhiteSpace(connectionParams?.KeyPath)
             && !string.IsNullOrEmpty(connectionParams.KeyPassphrase)
-            && msg.Contains("passphrase", StringComparison.OrdinalIgnoreCase))
+            && (msg.Contains("passphrase", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("mac verification failed", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("random check bytes", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("multiple of the block size", StringComparison.OrdinalIgnoreCase)))
         {
             return new SshFailureInfo(
                 SshFailureCode.PassphraseRejected,
@@ -206,6 +238,33 @@ public static class FailureClassifier
         if (ex.InnerException is SocketException socketEx)
         {
             return ClassifySocketException(socketEx);
+        }
+
+        // The typed DisconnectReason is preferred over message text, since SSH.NET
+        // populates it for every server-sent disconnect and for the transport-level
+        // failures it raises itself. The text heuristic below remains only for
+        // DisconnectReason.None, where SSH.NET provides no typed granularity.
+        switch (ex.DisconnectReason)
+        {
+            case DisconnectReason.ProtocolError:
+            case DisconnectReason.ProtocolVersionNotSupported:
+            case DisconnectReason.KeyExchangeFailed:
+            case DisconnectReason.MacError:
+            case DisconnectReason.CompressionError:
+                return new SshFailureInfo(SshFailureCode.ProtocolError, "SSH protocol error.", true, ex);
+
+            case DisconnectReason.ConnectionLost:
+            case DisconnectReason.ByApplication:
+                return new SshFailureInfo(SshFailureCode.SessionDisconnected, "SSH session was disconnected.", true, ex);
+
+            case DisconnectReason.NoMoreAuthenticationMethodsAvailable:
+                return new SshFailureInfo(SshFailureCode.NoSupportedAuth, "No supported authentication method available.", true, ex);
+
+            case DisconnectReason.AuthenticationCanceledByUser:
+                return new SshFailureInfo(SshFailureCode.Cancelled, "Authentication was cancelled.", true, ex);
+
+            default:
+                break;
         }
 
         string msg = ex.Message ?? "";

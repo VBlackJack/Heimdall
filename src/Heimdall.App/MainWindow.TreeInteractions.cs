@@ -40,6 +40,7 @@ namespace Heimdall.App;
 public partial class MainWindow
 {
     private IInlineRenameNode? _inlineRenameNode;
+    private bool _inlineRenameCommitInProgress;
 
     // ── Keyboard context menu (Apps / Shift+F10) ─────────────────────
 
@@ -179,8 +180,10 @@ public partial class MainWindow
             return;
         }
 
-        var server = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.DataContext as ServerItemViewModel
-            ?? vm.ServerList.SelectedServer;
+        TreeViewItem? hitContainer = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        ServerItemViewModel? server = ResolveTreeDoubleClickServer(
+            hitContainer?.DataContext,
+            vm.ServerList.SelectedServer);
         if (server is null) return;
 
         if (server.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
@@ -197,6 +200,19 @@ public partial class MainWindow
         {
             vm.ServerList.ConnectCommand.Execute(server);
         }
+    }
+
+    /// <summary>
+    /// Resolves a double-click target only when the hit container is a server.
+    /// </summary>
+    /// <param name="hitTarget">The data context of the container under the pointer.</param>
+    /// <param name="selectedServer">The globally selected server, which must not affect hit testing.</param>
+    /// <returns>The hit server, or <see langword="null"/> for any other target.</returns>
+    internal static ServerItemViewModel? ResolveTreeDoubleClickServer(
+        object? hitTarget,
+        ServerItemViewModel? selectedServer)
+    {
+        return hitTarget as ServerItemViewModel;
     }
 
     private void OnSessionTreeViewItemPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -216,18 +232,30 @@ public partial class MainWindow
             return;
         }
 
-        var modifiers = Keyboard.Modifiers;
-        if ((modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        (bool toggle, bool extend, bool additive) = ResolveTreePointerSelection(modifiers);
+        if (additive)
         {
             _treeState.SuppressSelectedItemSync = true;
-            vm.ServerList.ToggleSelection(server);
+            vm.ServerList.AddSelectionRangeTo(server);
             treeViewItem.Focus();
             ShowTreeSelection(vm, vm.ServerList.SelectedServer);
             e.Handled = true;
             return;
         }
 
-        if ((modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+        if (toggle)
+        {
+            vm.ServerList.ToggleSelection(server);
+            SynchronizeNativeTreeSelection(
+                _treeState,
+                treeViewItem);
+            ShowTreeSelection(vm, vm.ServerList.SelectedServer);
+            e.Handled = true;
+            return;
+        }
+
+        if (extend)
         {
             _treeState.SuppressSelectedItemSync = true;
             vm.ServerList.ExtendSelectionTo(server);
@@ -239,6 +267,61 @@ public partial class MainWindow
 
         _treeState.SuppressSelectedItemSync = false;
         vm.ServerList.SelectSingle(server);
+    }
+
+    /// <summary>
+    /// Resolves pointer selection modifiers with additive range taking precedence over toggle.
+    /// </summary>
+    /// <param name="modifiers">The pointer event's keyboard modifier mask.</param>
+    /// <returns>Whether the gesture toggles, replaces with a range, or adds a range.</returns>
+    internal static (bool Toggle, bool Extend, bool Additive) ResolveTreePointerSelection(
+        ModifierKeys modifiers)
+    {
+        bool control = (modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        bool shift = (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+        if (control && shift)
+        {
+            return (false, false, true);
+        }
+
+        if (control)
+        {
+            return (true, false, false);
+        }
+
+        return shift
+            ? (false, true, false)
+            : default;
+    }
+
+    /// <summary>
+    /// Clears native selection after a Ctrl toggle while preserving pointer focus.
+    /// </summary>
+    /// <param name="treeState">The transient TreeView interaction state.</param>
+    /// <param name="pointerContainer">The container targeted by the pointer.</param>
+    internal static void SynchronizeNativeTreeSelection(
+        TreeInteractionState treeState,
+        TreeViewItem pointerContainer)
+    {
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            pointerContainer.Focus();
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
+
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            pointerContainer.IsSelected = false;
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
     }
 
     // ── Right-click pre-selection + context menu opening ─────────────
@@ -301,6 +384,55 @@ public partial class MainWindow
     private async void OnSessionTreeViewPreviewKeyDown(object sender, KeyEventArgs e)
     {
         ModifierKeys modifiers = Keyboard.Modifiers;
+        bool isSelectionGesture = (e.Key == Key.Space && modifiers == ModifierKeys.Control)
+            || (e.Key is Key.Up or Key.Down && modifiers == ModifierKeys.Shift);
+        if (isSelectionGesture
+            && DataContext is MainViewModel selectionViewModel
+            && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            TreeViewItem? focusedContainer = FindAncestor<TreeViewItem>(
+                Keyboard.FocusedElement as DependencyObject);
+            ServerItemViewModel? focusedServer = focusedContainer?.DataContext as ServerItemViewModel;
+            IReadOnlyList<ServerItemViewModel> visibleServers = e.Key == Key.Space
+                ? []
+                : SelectionHelpers
+                    .EnumerateVisibleLeaves(selectionViewModel.ServerList.GroupedServers)
+                    .ToList();
+            (bool handled, bool toggle, ServerItemViewModel? target) =
+                ResolveTreeKeyboardSelection(
+                    e.Key,
+                    modifiers,
+                    focusedServer,
+                    visibleServers);
+
+            TreeViewItem? targetContainer = target is null
+                ? null
+                : ReferenceEquals(target, focusedServer)
+                    ? focusedContainer
+                    : GetOrRealizeSessionTreeItem(target);
+            bool selectionHandled = ApplyTreeKeyboardSelection(
+                handled,
+                toggle,
+                target,
+                targetContainer,
+                selectionViewModel.ServerList.ToggleSelection,
+                selectionViewModel.ServerList.ExtendSelectionTo,
+                container => SynchronizeNativeTreeSelection(_treeState, container));
+
+            if (selectionHandled)
+            {
+                e.Handled = true;
+                if (target is not null && targetContainer is not null)
+                {
+                    ShowTreeSelection(
+                        selectionViewModel,
+                        selectionViewModel.ServerList.SelectedServer);
+                }
+
+                return;
+            }
+        }
+
         if (e.Key == Key.F2
             && modifiers == ModifierKeys.None
             && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
@@ -325,6 +457,105 @@ public partial class MainWindow
         await vm.ServerList.DeleteSelectedCommand.ExecuteAsync(null);
     }
 
+    /// <summary>
+    /// Resolves a keyboard multi-selection gesture without reading global keyboard state.
+    /// </summary>
+    /// <param name="key">The key raised by the sessions tree.</param>
+    /// <param name="modifiers">The exact modifier combination for the gesture.</param>
+    /// <param name="focusedServer">The server whose container owns keyboard focus.</param>
+    /// <param name="visibleServers">The visible server leaves in display order.</param>
+    /// <returns>A handled flag, whether the action is a toggle, and the action target.</returns>
+    internal static (bool Handled, bool Toggle, ServerItemViewModel? Target)
+        ResolveTreeKeyboardSelection(
+            Key key,
+            ModifierKeys modifiers,
+            ServerItemViewModel? focusedServer,
+            IReadOnlyList<ServerItemViewModel> visibleServers)
+    {
+        if (focusedServer is null)
+        {
+            return default;
+        }
+
+        if (key == Key.Space && modifiers == ModifierKeys.Control)
+        {
+            return (true, true, focusedServer);
+        }
+
+        if (modifiers != ModifierKeys.Shift || key is not (Key.Up or Key.Down))
+        {
+            return default;
+        }
+
+        int focusedIndex = -1;
+        for (int index = 0; index < visibleServers.Count; index++)
+        {
+            if (ReferenceEquals(visibleServers[index], focusedServer))
+            {
+                focusedIndex = index;
+                break;
+            }
+        }
+
+        if (focusedIndex < 0)
+        {
+            return default;
+        }
+
+        int targetIndex = key == Key.Down
+            ? focusedIndex + 1
+            : focusedIndex - 1;
+        if (targetIndex < 0 || targetIndex >= visibleServers.Count)
+        {
+            return (true, false, null);
+        }
+
+        return (true, false, visibleServers[targetIndex]);
+    }
+
+    /// <summary>
+    /// Applies a resolved keyboard selection while consuming handled decisions fail-closed.
+    /// </summary>
+    /// <param name="handled">Whether the resolver recognized the gesture.</param>
+    /// <param name="toggle">Whether the target should be toggled instead of extended to.</param>
+    /// <param name="target">The resolved server target, or null for a boundary no-op.</param>
+    /// <param name="targetContainer">The realized native container for the target.</param>
+    /// <param name="toggleSelection">Applies a logical toggle to the target.</param>
+    /// <param name="extendSelection">Extends logical selection to the target.</param>
+    /// <param name="synchronizeNativeSelection">Synchronizes native selection with the logical state.</param>
+    /// <returns>True when the keyboard event must be consumed.</returns>
+    internal static bool ApplyTreeKeyboardSelection(
+        bool handled,
+        bool toggle,
+        ServerItemViewModel? target,
+        TreeViewItem? targetContainer,
+        Action<ServerItemViewModel> toggleSelection,
+        Action<ServerItemViewModel> extendSelection,
+        Action<TreeViewItem> synchronizeNativeSelection)
+    {
+        if (!handled)
+        {
+            return false;
+        }
+
+        if (target is null || targetContainer is null)
+        {
+            return true;
+        }
+
+        if (toggle)
+        {
+            toggleSelection(target);
+        }
+        else
+        {
+            extendSelection(target);
+        }
+
+        synchronizeNativeSelection(targetContainer);
+        return true;
+    }
+
     private async void OnInlineRenameEditorPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (sender is not WpfTextBox editor || editor.DataContext is not IInlineRenameNode node)
@@ -345,11 +576,29 @@ public partial class MainWindow
         }
 
         e.Handled = true;
-        await CommitInlineRenameAsync(node, editor);
+        await CommitInlineRenameAsync(node, editor, restoreFocusAfterCompletion: true);
+    }
+
+    private async void OnInlineRenameEditorCommitRequested(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is not WpfTextBox editor || editor.DataContext is not IInlineRenameNode node)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await CommitInlineRenameAsync(node, editor, restoreFocusAfterCompletion: false);
     }
 
     private bool BeginSessionTreeInlineRename(object? node)
     {
+        if (_inlineRenameCommitInProgress)
+        {
+            return false;
+        }
+
         if (node is not IInlineRenameNode editableNode)
         {
             return false;
@@ -370,43 +619,50 @@ public partial class MainWindow
         return true;
     }
 
-    private async Task CommitInlineRenameAsync(IInlineRenameNode node, WpfTextBox editor)
+    private async Task CommitInlineRenameAsync(
+        IInlineRenameNode node,
+        WpfTextBox editor,
+        bool restoreFocusAfterCompletion)
     {
-        if (DataContext is not MainViewModel vm)
+        if (_inlineRenameCommitInProgress
+            || !node.IsEditing
+            || DataContext is not MainViewModel vm)
         {
             return;
         }
 
-        string requestedName = node.EditName.Trim();
-        if (requestedName.Length == 0)
-        {
-            SessionTreeInlineRename.CancelEdit(node, RestoreInlineRenameFocus);
-            return;
-        }
-
+        _inlineRenameCommitInProgress = true;
         editor.IsEnabled = false;
         try
         {
             switch (node)
             {
                 case ServerItemViewModel server:
-                    await CommitServerInlineRenameAsync(vm, server);
+                    await CommitServerInlineRenameAsync(
+                        vm,
+                        server,
+                        restoreFocusAfterCompletion);
                     break;
 
                 case FolderViewModel folder:
-                    await CommitFolderInlineRenameAsync(vm, folder);
+                    await CommitFolderInlineRenameAsync(
+                        vm,
+                        folder,
+                        restoreFocusAfterCompletion);
                     break;
             }
         }
         finally
         {
             editor.IsEnabled = true;
+            _inlineRenameCommitInProgress = false;
         }
     }
 
     private async Task CommitServerInlineRenameAsync(
         MainViewModel vm,
-        ServerItemViewModel server)
+        ServerItemViewModel server,
+        bool restoreFocusAfterCompletion)
     {
         try
         {
@@ -422,11 +678,11 @@ public partial class MainWindow
                         result.Server
                             ?? throw new InvalidOperationException(
                                 "A successful server rename must return the persisted server."));
-                    SessionTreeInlineRename.CompleteEdit(server, RestoreInlineRenameFocus);
+                    CompleteInlineRename(server, restoreFocusAfterCompletion);
                     break;
 
                 case ServerRenameStatus.NoChange:
-                    SessionTreeInlineRename.CompleteEdit(server, RestoreInlineRenameFocus);
+                    CompleteInlineRename(server, restoreFocusAfterCompletion);
                     break;
 
                 case ServerRenameStatus.InvalidName:
@@ -469,7 +725,8 @@ public partial class MainWindow
 
     private async Task CommitFolderInlineRenameAsync(
         MainViewModel vm,
-        FolderViewModel folder)
+        FolderViewModel folder,
+        bool restoreFocusAfterCompletion)
     {
         string oldPath = folder.FullPath;
         try
@@ -482,7 +739,7 @@ public partial class MainWindow
             {
                 case FolderRenameStatus.Renamed:
                     vm.ServerList.ApplyInlineFolderRename(folder, oldPath, result);
-                    SessionTreeInlineRename.CompleteEdit(folder, RestoreInlineRenameFocus);
+                    CompleteInlineRename(folder, restoreFocusAfterCompletion);
                     vm.StatusText = string.Format(
                         vm.Localize("StatusGroupRenamed"),
                         oldPath,
@@ -490,7 +747,7 @@ public partial class MainWindow
                     break;
 
                 case FolderRenameStatus.NoChange:
-                    SessionTreeInlineRename.CompleteEdit(folder, RestoreInlineRenameFocus);
+                    CompleteInlineRename(folder, restoreFocusAfterCompletion);
                     break;
 
                 case FolderRenameStatus.InvalidSegment:
@@ -522,6 +779,24 @@ public partial class MainWindow
         }
     }
 
+    private void CompleteInlineRename(
+        IInlineRenameNode node,
+        bool restoreFocusAfterCompletion)
+    {
+        Action<IInlineRenameNode> completion = restoreFocusAfterCompletion
+            ? RestoreInlineRenameFocus
+            : ReleaseInlineRename;
+        SessionTreeInlineRename.CompleteEdit(node, completion);
+    }
+
+    private void ReleaseInlineRename(IInlineRenameNode node)
+    {
+        if (ReferenceEquals(_inlineRenameNode, node))
+        {
+            _inlineRenameNode = null;
+        }
+    }
+
     private void RefocusInlineRenameEditor(IInlineRenameNode node)
     {
         _ = Dispatcher.BeginInvoke(
@@ -547,10 +822,12 @@ public partial class MainWindow
 
     private void RestoreInlineRenameFocus(IInlineRenameNode node)
     {
-        if (ReferenceEquals(_inlineRenameNode, node))
+        if (!ReferenceEquals(_inlineRenameNode, node))
         {
-            _inlineRenameNode = null;
+            return;
         }
+
+        _inlineRenameNode = null;
 
         _ = Dispatcher.BeginInvoke(
             DispatcherPriority.Input,
@@ -628,58 +905,67 @@ public partial class MainWindow
 
     private void OnTreeViewDragStart(object sender, MouseButtonEventArgs e)
     {
+        _treeState.ResetDrag();
+
         if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
         {
-            _treeState.DragInProgress = false;
             return;
         }
 
         if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
         {
-            _treeState.DragInProgress = false;
             return;
         }
 
-        _treeState.DragStartPoint = e.GetPosition(null);
-        _treeState.DragInProgress = false;
+        TreeViewItem? pressedContainer =
+            FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        _treeState.CaptureDragCandidate(e.GetPosition(null), pressedContainer);
     }
 
     private void OnTreeViewDragMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
-        {
-            _treeState.DragInProgress = false;
-            return;
-        }
-
-        if (e.LeftButton != MouseButtonState.Pressed
-            || _treeState.DragInProgress
-            || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
-        {
-            return;
-        }
-
-        var pos = e.GetPosition(null);
-        var diff = pos - _treeState.DragStartPoint;
-
-        if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
-            Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
+        bool hasDisallowedModifiers =
+            (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None;
+        if (!_treeState.TryStartDrag(
+                e.GetPosition(null),
+                e.LeftButton == MouseButtonState.Pressed,
+                hasDisallowedModifiers,
+                out TreeViewItem? sourceContainer,
+                out ServerItemViewModel? sourceServer)
+            || sourceContainer is null
+            || sourceServer is null)
         {
             return;
         }
 
-        // Find the ServerItemViewModel being dragged
-        var treeViewItem = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        ExecuteTreeDrag(
+            _treeState,
+            sourceContainer,
+            sourceServer,
+            static (container, data) =>
+                DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
+    }
 
-        if (treeViewItem?.DataContext is not ServerItemViewModel serverItem)
+    internal static void ExecuteTreeDrag(
+        TreeInteractionState treeState,
+        TreeViewItem sourceContainer,
+        ServerItemViewModel sourceServer,
+        Action<TreeViewItem, System.Windows.DataObject> executeDrag)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(sourceContainer);
+        ArgumentNullException.ThrowIfNull(sourceServer);
+        ArgumentNullException.ThrowIfNull(executeDrag);
+
+        System.Windows.DataObject data = new("HeimdallServer", sourceServer);
+        try
         {
-            return;
+            executeDrag(sourceContainer, data);
         }
-
-        _treeState.DragInProgress = true;
-        var data = new System.Windows.DataObject("HeimdallServer", serverItem);
-        DragDrop.DoDragDrop(treeViewItem, data, System.Windows.DragDropEffects.Move);
-        _treeState.DragInProgress = false;
+        finally
+        {
+            treeState.ResetDrag();
+        }
     }
 
     private void ShowTreeSelection(MainViewModel vm, ServerItemViewModel? server)

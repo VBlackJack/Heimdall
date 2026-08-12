@@ -1887,7 +1887,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.ConnectionType = connectionType;
         vm.SessionLoggingOverride = dto.SessionLoggingOverride;
         vm.VaultEntryName = dto.VaultEntryName ?? "";
-        vm.WinRmPort = dto.WinRmPort > 0
+        vm.WinRmPort = dto.HasWinRmPortField && dto.WinRmPort > 0
             ? dto.WinRmPort
             : dto.WinRmUseSsl ? DefaultPorts.WinRmHttps : DefaultPorts.WinRmHttp;
         vm.WinRmUsername = dto.WinRmUsername ?? "";
@@ -2165,12 +2165,12 @@ public partial class ServerDialogViewModel : ObservableValidator
         AvailableGateways.FirstOrDefault(gateway =>
             string.Equals(gateway.Id, SelectedGatewayId, StringComparison.Ordinal));
 
-    private static int GetDefaultEndpointPort(string connectionType)
+    private int GetDefaultEndpointPort(string connectionType)
     {
         if (string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase))
             return DefaultPorts.Rdp;
         if (string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase))
-            return DefaultPorts.WinRmHttp;
+            return WinRmUseSsl ? DefaultPorts.WinRmHttps : DefaultPorts.WinRmHttp;
         if (string.Equals(connectionType, "VNC", StringComparison.OrdinalIgnoreCase))
             return DefaultPorts.Vnc;
         if (string.Equals(connectionType, "FTP", StringComparison.OrdinalIgnoreCase))

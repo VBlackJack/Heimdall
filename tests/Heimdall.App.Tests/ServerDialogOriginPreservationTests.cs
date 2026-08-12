@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
@@ -36,6 +37,38 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerDialogOriginPreservationTests
 {
+    [Fact]
+    public async Task ServerDialogViewModel_ExplicitDefaultSshPort_PersistsPresenceAndOverridesGroupDefault()
+    {
+        ServerDialogViewModel viewModel = new()
+        {
+            DisplayName = "Explicit SSH 22",
+            RemoteServer = "ssh.example.com",
+            ConnectionType = "SSH"
+        };
+        viewModel.SshPort = 2222;
+        viewModel.SshPort = 22;
+        ServerProfileDto dialogProfile = viewModel.ToDto();
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(dialogProfile);
+
+        await fixture.ConfigManager.SaveServersAsync([dialogProfile]);
+
+        string persistedJson = await File.ReadAllTextAsync(fixture.ConfigManager.ServersPath);
+        using JsonDocument document = JsonDocument.Parse(persistedJson);
+        JsonElement persistedProfileJson = document.RootElement.GetProperty("servers")[0];
+        Assert.True(persistedProfileJson.TryGetProperty("sshPort", out JsonElement persistedPort));
+        Assert.Equal(22, persistedPort.GetInt32());
+
+        ServerProfileDto persistedProfile = Assert.Single(
+            await fixture.ConfigManager.LoadServersAsync());
+        Assert.True(persistedProfile.HasSshPortField);
+
+        GroupDefaultsDto groupDefaults = new() { SshPort = 2222 };
+        groupDefaults.ApplyTo(persistedProfile);
+
+        Assert.Equal(22, persistedProfile.SshPort);
+    }
+
     [Fact]
     public void ServerDialogViewModel_SaveExistingProfile_PreservesOrigin()
     {
@@ -131,6 +164,27 @@ public sealed class ServerDialogOriginPreservationTests
         Assert.Equal(ProfileOrigin.Manual, server.Origin);
     }
 
+    [Theory]
+    [InlineData("External")]
+    [InlineData("Embedded")]
+    public async Task ServerListViewModel_AddServer_UsesConfiguredSshDefaultMode(string configuredMode)
+    {
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(new ServerProfileDto
+        {
+            DisplayName = "New SSH server",
+            RemoteServer = "new.example.com",
+            ConnectionType = "SSH"
+        });
+        await fixture.ConfigManager.MergeSettingAsync(settings => settings.SshDefaultMode = configuredMode);
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+
+        await fixture.ViewModel.AddServerCommand.ExecuteAsync(null);
+
+        Assert.Equal(configuredMode, Assert.IsType<ServerDialogViewModel>(fixture.DialogService.LastServerDialogViewModel).SshMode);
+        ServerProfileDto persisted = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal(configuredMode, persisted.SshMode);
+    }
+
     [Fact]
     public async Task ServerListViewModel_OnConnectionStateChanged_PostsViaDispatcher()
     {
@@ -213,13 +267,15 @@ public sealed class ServerDialogOriginPreservationTests
             ConfigManager configManager,
             ServerListViewModel viewModel,
             ConnectionStateMachine stateMachine,
-            FakeUiDispatcher dispatcher)
+            FakeUiDispatcher dispatcher,
+            DialogServiceStub dialogService)
         {
             RootPath = rootPath;
             ConfigManager = configManager;
             ViewModel = viewModel;
             StateMachine = stateMachine;
             Dispatcher = dispatcher;
+            DialogService = dialogService;
         }
 
         public string RootPath { get; }
@@ -231,6 +287,8 @@ public sealed class ServerDialogOriginPreservationTests
         public ConnectionStateMachine StateMachine { get; }
 
         public FakeUiDispatcher Dispatcher { get; }
+
+        public DialogServiceStub DialogService { get; }
 
         public static async Task<ServerListFixture> CreateAsync(
             ServerProfileDto dialogServer,
@@ -268,7 +326,7 @@ public sealed class ServerDialogOriginPreservationTests
                 puttyImporter,
                 knownHostsImporter);
 
-            return new ServerListFixture(rootPath, configManager, viewModel, stateMachine, uiDispatcher);
+            return new ServerListFixture(rootPath, configManager, viewModel, stateMachine, uiDispatcher, dialogService);
         }
 
         public ValueTask DisposeAsync()
@@ -306,14 +364,14 @@ public sealed class ServerDialogOriginPreservationTests
 
     private sealed class NullTunnelService : ITunnelService
     {
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
-            return Task.FromResult((true, false, server.RemoteServer, remotePort, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)
@@ -343,6 +401,10 @@ public sealed class ServerDialogOriginPreservationTests
 
     private sealed class DialogServiceStub(ServerProfileDto dialogServer) : IDialogService
     {
+        public ServerDialogViewModel? LastServerDialogViewModel { get; private set; }
+
+        public bool ReturnSubmittedViewModel { get; set; }
+
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info") => Task.FromResult(false);
 
         public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message) => Task.FromResult<bool?>(null);
@@ -358,7 +420,13 @@ public sealed class ServerDialogOriginPreservationTests
         public Task<string?> ShowBulkEditPasswordAsync(int count, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 
         public Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null)
-            => Task.FromResult<ServerDialogResult?>(new ServerDialogResult(dialogServer, true));
+        {
+            LastServerDialogViewModel = editVm;
+            ServerProfileDto submittedServer = ReturnSubmittedViewModel && editVm is not null
+                ? editVm.ToDto()
+                : dialogServer;
+            return Task.FromResult<ServerDialogResult?>(new ServerDialogResult(submittedServer, true));
+        }
 
         public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null) => Task.FromResult<GatewayDialogResult?>(null);
 

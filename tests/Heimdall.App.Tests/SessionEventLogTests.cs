@@ -157,6 +157,35 @@ public sealed class SessionEventLogTests : IDisposable
     }
 
     [Fact]
+    public void LogEvent_CitrixConnectAndDisconnect_NeverPersistStoreFrontSecrets()
+    {
+        const string rawUrl = "https://store.example:8443/path/?access_token=secret#fragment";
+        const string safeUrl = "https://store.example:8443/path/";
+        string root = NewTempDirectory();
+        SessionEventLog log = new SessionEventLog(root, LargeCap, FlushIntervalMs);
+
+        log.LogEvent(CitrixSessionEventFactory.BuildConnected(rawUrl, "Notepad"));
+        log.LogEvent(CitrixSessionEventFactory.BuildDisconnected(
+            rawUrl,
+            "Notepad",
+            durationMs: 8_000,
+            endTrigger: "remote"));
+        log.Dispose();
+
+        List<string> lines = ReadLines(EventLogPath(root));
+        lines.Should().HaveCount(2);
+        foreach (string line in lines)
+        {
+            line.Should().NotContain("access_token");
+            line.Should().NotContain("secret");
+            line.Should().NotContain("fragment");
+
+            using JsonDocument document = JsonDocument.Parse(line);
+            document.RootElement.GetProperty("host").GetString().Should().Be(safeUrl);
+        }
+    }
+
+    [Fact]
     public void LogEvent_AppendsAcrossMultipleEventsAndSessions()
     {
         string root = NewTempDirectory();

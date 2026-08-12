@@ -68,6 +68,29 @@ internal static class VaultMigrationEngine
         }).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reconciles Citrix launch tokens that were persisted after the vault's initial
+    /// migration completed. The pass is idempotent and does not rewrite an inventory
+    /// whose Citrix tokens are already protected.
+    /// </summary>
+    public static async Task ReconcileCitrixLaunchTokensAsync(IConfigManager configManager)
+    {
+        ArgumentNullException.ThrowIfNull(configManager);
+
+        await configManager.MutateServersAsync(servers =>
+        {
+            foreach (ServerProfileDto profile in servers)
+            {
+                Apply(
+                    profile.CitrixLaunchCommandLine,
+                    value => profile.CitrixLaunchCommandLine = value,
+                    ForwardPlaintext);
+            }
+
+            return servers.Count;
+        }).ConfigureAwait(false);
+    }
+
     /// <summary>Reverse-migrate the whole confidential set (v2 -> legacy). Idempotent.</summary>
     public static async Task MigrateReverseAsync(IConfigManager configManager)
     {

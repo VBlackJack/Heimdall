@@ -117,7 +117,7 @@ internal sealed class CitrixHandler : IProtocolHandler
             }
 
             validatedStoreFrontUrl = storeFrontUri.AbsoluteUri;
-            safeStoreFrontLogValue = BuildSafeStoreFrontLogValue(storeFrontUri);
+            safeStoreFrontLogValue = CitrixStoreFrontUrlSanitizer.Sanitize(storeFrontUri);
         }
 
         _logInfo(
@@ -134,6 +134,16 @@ internal sealed class CitrixHandler : IProtocolHandler
             if (!string.IsNullOrWhiteSpace(server.CitrixLaunchCommandLine))
             {
                 mode = CitrixLaunchMode.SelfServiceCache;
+                if (settings.VaultEnabled &&
+                    !VaultSecretBlob.IsSecretBlob(server.CitrixLaunchCommandLine))
+                {
+                    _logWarning(
+                        "Citrix launch blocked: mode=SelfServiceCache unprotectedToken=true vaultEnabled=true");
+                    string message = _localizer["CitrixLaunchFailed"];
+                    _connectionSm.SetError(server.Id, message);
+                    return Task.FromResult(new ConnectionResult(false, message, null));
+                }
+
                 string launchArguments = ResolveLaunchArguments(server.CitrixLaunchCommandLine);
                 if (string.IsNullOrWhiteSpace(launchArguments))
                 {
@@ -168,9 +178,9 @@ internal sealed class CitrixHandler : IProtocolHandler
                  * boundary when the vault is enabled. ImportedProfileSanitizer covers external
                  * profile imports only; it is not the gate for the local Citrix cache flow.
                  *
-                 * Legacy configurations may still contain plaintext tokens, so this consumer
-                 * deliberately accepts either plaintext or a vault blob until a lifecycle
-                 * reconciliation migrates values persisted before the current admission gate.
+                 * Vault-disabled legacy configurations may contain plaintext tokens. When the
+                 * vault is enabled, lifecycle reconciliation protects persisted tokens and the
+                 * guard above rejects any unprotected value that still reaches this consumer.
                  */
                 var startInfo = new ProcessStartInfo
                 {
@@ -383,17 +393,6 @@ internal sealed class CitrixHandler : IProtocolHandler
 
         validatedUri = uri;
         return true;
-    }
-
-    private static string BuildSafeStoreFrontLogValue(Uri storeFrontUri)
-    {
-        int port = storeFrontUri.IsDefaultPort ? -1 : storeFrontUri.Port;
-        UriBuilder safeUri = new(
-            storeFrontUri.Scheme,
-            storeFrontUri.Host,
-            port,
-            storeFrontUri.AbsolutePath);
-        return safeUri.Uri.AbsoluteUri;
     }
 
     internal static ProcessStartInfo CreateStoreFrontStartInfo(

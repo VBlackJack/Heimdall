@@ -31,6 +31,100 @@ namespace Heimdall.App.Tests;
 public sealed class ConnectionViewModelCloseTests
 {
     [Fact]
+    public async Task CloseSessionAsync_HandedOffSecondaryLeaf_PromptsAndDeclinePreservesSession()
+    {
+        TrackingDialogService dialogService = new(false);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        SessionTabViewModel session = CreateSplitSession("Disconnected", "RemoteSessionHandedOff");
+        AddActiveSession(sut, session);
+
+        await sut.CloseSessionAsync(session, DisconnectReason.TabClose);
+
+        Assert.Equal(1, dialogService.ConfirmCallCount);
+        Assert.Contains(session, sut.ActiveSessions);
+        Assert.Equal(0, splitService.CloseAllPanesCallCount);
+    }
+
+    [Fact]
+    public async Task CloseSessionsAsync_ConnectedLikeStatuses_ReportsExactCountAndDeclinePreservesSessions()
+    {
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        TrackingDialogService dialogService = new(false);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService, localizer);
+        SessionTabViewModel handedOff = CreateSplitSession("RemoteSessionHandedOff", "Disconnected");
+        SessionTabViewModel connected = CreateSplitSession("Connected", "Disconnected");
+        SessionTabViewModel error = CreateSplitSession("Error", "Disconnected");
+        AddTabs(sut, handedOff, connected, error);
+
+        await sut.CloseSessionsAsync(
+            [handedOff, connected, error],
+            DisconnectReason.TabClose);
+
+        Assert.Equal(1, dialogService.ConfirmCallCount);
+        Assert.Equal(
+            localizer.Format("ConfirmCloseSessionGroupMessage", 3, 2),
+            dialogService.LastConfirmMessage);
+        Assert.Equal(new[] { handedOff, connected, error }, sut.ActiveSessions);
+        Assert.Equal(0, splitService.CloseAllPanesCallCount);
+    }
+
+    [Fact]
+    public async Task CloseAllSessions_HandedOffSession_PromptsAndDeclinePreservesSession()
+    {
+        TrackingDialogService dialogService = new(false);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        SessionTabViewModel session = CreateSplitSession("RemoteSessionHandedOff", "Disconnected");
+        AddActiveSession(sut, session);
+
+        await sut.CloseAllSessionsCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, dialogService.ConfirmCallCount);
+        Assert.Contains(session, sut.ActiveSessions);
+        Assert.Equal(0, splitService.CloseAllPanesCallCount);
+    }
+
+    [Theory]
+    [InlineData("Connecting")]
+    [InlineData("Disconnected")]
+    [InlineData("Error")]
+    public async Task CloseFlows_NonConnectedStatuses_DoNotPrompt(string status)
+    {
+        TrackingDialogService singleDialogService = new(true);
+        TrackingSplitService singleSplitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel singleSut = CreateViewModel(singleDialogService, singleSplitService);
+        SessionTabViewModel singleSession = CreateSplitSession(status, "Disconnected");
+        AddActiveSession(singleSut, singleSession);
+
+        await singleSut.CloseSessionAsync(singleSession, DisconnectReason.TabClose);
+
+        Assert.Equal(0, singleDialogService.ConfirmCallCount);
+
+        TrackingDialogService groupDialogService = new(true);
+        TrackingSplitService groupSplitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel groupSut = CreateViewModel(groupDialogService, groupSplitService);
+        SessionTabViewModel groupSession = CreateSplitSession(status, "Disconnected");
+        AddActiveSession(groupSut, groupSession);
+
+        await groupSut.CloseSessionsAsync([groupSession], DisconnectReason.TabClose);
+
+        Assert.Equal(0, groupDialogService.ConfirmCallCount);
+
+        TrackingDialogService allDialogService = new(true);
+        TrackingSplitService allSplitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel allSut = CreateViewModel(allDialogService, allSplitService);
+        SessionTabViewModel allSession = CreateSplitSession(status, "Disconnected");
+        AddActiveSession(allSut, allSession);
+
+        await allSut.CloseAllSessionsCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, allDialogService.ConfirmCallCount);
+    }
+
+    [Fact]
     public async Task CloseAllSessions_SplitSessionWithConnectedSecondaryLeaf_PromptsAndDeclinePreservesSession()
     {
         TrackingDialogService dialogService = new(false);
@@ -213,10 +307,13 @@ public sealed class ConnectionViewModelCloseTests
 
     private static ConnectionViewModel CreateViewModel(
         TrackingDialogService dialogService,
-        TrackingSplitService splitService)
+        TrackingSplitService splitService,
+        LocalizationManager? localizer = null)
     {
-        LocalizationManager localizer = new();
-        return new ConnectionViewModel(localizer, dialogService, splitService);
+        return new ConnectionViewModel(
+            localizer ?? new LocalizationManager(),
+            dialogService,
+            splitService);
     }
 
     private static void AddActiveSession(ConnectionViewModel viewModel, SessionTabViewModel session)
@@ -341,9 +438,12 @@ public sealed class ConnectionViewModelCloseTests
     {
         public int ConfirmCallCount { get; private set; }
 
+        public string? LastConfirmMessage { get; private set; }
+
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
         {
             ConfirmCallCount++;
+            LastConfirmMessage = message;
             return Task.FromResult(confirmResult);
         }
 

@@ -45,6 +45,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
     private readonly SensitiveFileJanitorScheduler _plinkPasswordFileJanitorScheduler;
+    private readonly Action<string?> _deletePlinkPasswordFile;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -58,7 +59,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         X11ServerManager x11ServerManager,
         IDialogService dialogService,
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
-        PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null)
+        PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
+        Action<string?>? deletePlinkPasswordFile = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -70,6 +72,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _dialogService = dialogService;
         _plinkHostKeyProbe = plinkHostKeyProbe ?? new DefaultPlinkHostKeyProbe();
         _plinkPasswordFileJanitor = plinkPasswordFileJanitor ?? new PlinkPasswordFileJanitor();
+        _deletePlinkPasswordFile = deletePlinkPasswordFile ?? DeletePlinkPasswordFile;
         _plinkPasswordFileJanitorScheduler = new SensitiveFileJanitorScheduler(
             nameof(PlinkPasswordFileJanitor),
             _plinkPasswordFileJanitor.SweepStale);
@@ -101,9 +104,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
 
         int sshPort = server.SshPort > 0 ? server.SshPort : DefaultPorts.Ssh;
-        (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) =
-            await _tunnelService.SetupTunnelIfNeededAsync(server, sshPort, settings, ct)
-                .ConfigureAwait(false);
+        TunnelSetupOutcome tunnelOutcome = await _tunnelService
+            .SetupTunnelIfNeededAsync(server, sshPort, settings, ct)
+            .ConfigureAwait(false);
+        (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) = tunnelOutcome;
 
         if (!tunnelOk)
         {
@@ -111,7 +115,9 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 false,
                 tunnelError,
                 null,
-                SshSessionDiagnosticFactory.CreateGatewayFailure(tunnelError));
+                SshSessionDiagnosticFactory.CreateGatewayFailure(
+                    tunnelError,
+                    code: tunnelOutcome.FailureCode));
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingSsh);
@@ -238,10 +244,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 SshSessionDiagnosticFactory.FromClassifiedFailure(
                     new SshFailureInfo(SshFailureCode.Cancelled, cancelledMessage, false, ex)));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            session.Dispose();
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            throw;
+        }
         catch (Exception ex)
         {
             session.Dispose();
             var failure = FailureClassifier.Classify(ex, sshParams);
+            SshFailureInfo localizedFailure = LocalizeFailure(failure, targetHost);
 
             if (failure.Code is SshFailureCode.AuthRejected
                     or SshFailureCode.KeyRejected
@@ -285,17 +298,43 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     .ConfigureAwait(false);
             }
 
-            _connectionSm.SetError(server.Id, failure.Message);
+            _connectionSm.SetError(server.Id, localizedFailure.Message);
             ReleaseTunnelIfNeeded(usesTunnel, targetPort);
             return new ConnectionResult(
                 false,
-                failure.Message,
+                localizedFailure.Message,
                 null,
-                SshSessionDiagnosticFactory.FromClassifiedFailure(failure));
+                SshSessionDiagnosticFactory.FromClassifiedFailure(localizedFailure, usesTunnel));
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
         return new ConnectionResult(true, null, new SshSessionResult(session, server.SessionLoggingOverride));
+    }
+
+    private SshFailureInfo LocalizeFailure(SshFailureInfo failure, string targetHost)
+    {
+        string message = FailureClassifier.FormatMessage(
+            failure,
+            key =>
+            {
+                if (!_localizer.HasKey(key))
+                {
+                    return null;
+                }
+
+                object formatArgument = failure.Code is SshFailureCode.NetworkRefused
+                    or SshFailureCode.NetworkTimedOut
+                    or SshFailureCode.NetworkReset
+                    ? targetHost
+                    : failure.Message;
+                return _localizer.Format(key, formatArgument);
+            });
+
+        return new SshFailureInfo(
+            failure.Code,
+            message,
+            failure.IsFatal,
+            failure.OriginalException);
     }
 
     private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
@@ -620,7 +659,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             if (!string.IsNullOrEmpty(passwordFilePath))
             {
                 string fileToDelete = passwordFilePath;
-                terminalSession.ProcessExited += _ => DeletePlinkPasswordFile(fileToDelete);
+                terminalSession.ProcessExited += _ => _deletePlinkPasswordFile(fileToDelete);
             }
 
             try
@@ -630,10 +669,16 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 Core.Logging.FileLogger.Info($"Plink SSH session started: PID={terminalSession.ProcessId}");
                 passwordFilePath = null;
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                terminalSession.Dispose();
+                _deletePlinkPasswordFile(passwordFilePath);
+                throw;
+            }
             catch (Exception ex)
             {
                 terminalSession.Dispose();
-                DeletePlinkPasswordFile(passwordFilePath);
+                _deletePlinkPasswordFile(passwordFilePath);
                 Core.Logging.FileLogger.Error("Plink SSH launch failed", ex);
                 _connectionSm.SetError(server.Id, ex.Message);
                 return new ConnectionResult(

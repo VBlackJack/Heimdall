@@ -20,7 +20,9 @@
         <conv:RemoteEntryKindToDisplayNameConverter x:Key="RemoteEntryKindToDisplayNameConverter"/>
     </UserControl.Resources>
 
-    <Grid Background="{DynamicResource BackgroundBrush}">
+    <Grid>
+        <Grid x:Name="BrowserSurface"
+              Background="{DynamicResource BackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -693,5 +695,11 @@
                            TextTrimming="CharacterEllipsis"/>
             </DockPanel>
         </Border>
+        </Grid>
+
+        <ContentControl x:Name="InlineEditorHost"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch"
+                        Visibility="Collapsed"/>
     </Grid>
 </UserControl>

@@ -32,6 +32,7 @@ public sealed class UpdateBannerViewModelTests
 {
     private const string Current = "2026.061501";
     private const string Newer = "2026.061502";
+    private static readonly TimeSpan CompletionTimeout = TimeSpan.FromSeconds(10);
 
     [Fact]
     public async Task CheckOnStartup_Disabled_DoesNotCheckOrShowBanner()
@@ -219,6 +220,42 @@ public sealed class UpdateBannerViewModelTests
     }
 
     [Fact]
+    public async Task DownloadAndInstall_WhileFlowActive_DisablesDismissActionsUntilCancelled()
+    {
+        AppSettings settings = BaseSettings();
+        StubUpdateService update = new StubUpdateService { Result = Available(Newer) };
+        FakeUpdateInstallFlow flow = new FakeUpdateInstallFlow { WaitForCancellation = true };
+        UpdateBannerViewModel viewModel = CreateViewModel(
+            settings,
+            update,
+            Current,
+            installFlow: flow,
+            dialogService: new ConfirmingDialogService(true));
+        await viewModel.CheckOnStartupAsync(CancellationToken.None);
+
+        Task installTask = viewModel.DownloadAndInstallCommand.ExecuteAsync(null);
+        await flow.RunStarted.Task.WaitAsync(CompletionTimeout);
+
+        bool laterCanExecute = viewModel.LaterCommand.CanExecute(null);
+        bool skipCanExecute = viewModel.SkipVersionCommand.CanExecute(null);
+        Assert.False(
+            laterCanExecute || skipCanExecute,
+            $"Dismiss actions must be disabled while installing. Later={laterCanExecute}, Skip={skipCanExecute}");
+        Assert.True(viewModel.DownloadAndInstallCancelCommand.CanExecute(null));
+        Assert.True(viewModel.IsBannerVisible);
+        Assert.Null(settings.UpdateSkippedVersion);
+
+        viewModel.DownloadAndInstallCancelCommand.Execute(null);
+        await installTask.WaitAsync(CompletionTimeout);
+
+        Assert.False(viewModel.IsInstalling);
+        Assert.True(viewModel.IsBannerVisible);
+        Assert.True(viewModel.LaterCommand.CanExecute(null));
+        Assert.True(viewModel.SkipVersionCommand.CanExecute(null));
+        Assert.Null(settings.UpdateSkippedVersion);
+    }
+
+    [Fact]
     public async Task DownloadAndInstall_DeclinedConfirm_DoesNotRunFlow()
     {
         var flow = new FakeUpdateInstallFlow();
@@ -351,10 +388,33 @@ public sealed class UpdateBannerViewModelTests
 
         public int RunCallCount { get; private set; }
 
-        public Task<UpdateInstallOutcome> RunAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken cancellationToken)
+        public bool WaitForCancellation { get; set; }
+
+        public TaskCompletionSource RunStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<UpdateInstallOutcome> RunAsync(
+            UpdateInfo update,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
         {
             RunCallCount++;
-            return Task.FromResult(Outcome);
+            RunStarted.TrySetResult();
+            if (!WaitForCancellation)
+            {
+                return Outcome;
+            }
+
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return UpdateInstallOutcome.Cancelled;
+            }
+
+            return Outcome;
         }
     }
 

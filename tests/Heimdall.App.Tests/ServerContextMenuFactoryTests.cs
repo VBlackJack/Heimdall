@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Windows.Controls;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
@@ -395,6 +396,119 @@ public sealed partial class SessionCoordinatorPreMountTests
                     harness.Main.Localize("TreeCtxDeleteGroup")
                 ],
                 GetTopLevelMenuShape(folderMenu));
+        });
+    }
+
+    [Fact]
+    public void FolderMenu_FilteredProjection_KeepsConnectVisibleButDeleteConfirmsCanonicalScope()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            ServerProfileDto visibleServer = harness.CreateServer("SSH");
+            visibleServer.Id = "visible-server";
+            visibleServer.DisplayName = "Visible server";
+            visibleServer.Group = "Ops";
+            ServerProfileDto nestedServer = harness.CreateServer("RDP");
+            nestedServer.Id = "nested-server";
+            nestedServer.DisplayName = "Nested server";
+            nestedServer.Group = "Ops/Child";
+            ServerProfileDto hiddenTool = harness.CreateServer("TOOL:Hosts");
+            hiddenTool.Id = "hidden-tool";
+            hiddenTool.DisplayName = "Hidden tool";
+            hiddenTool.Group = "Ops";
+            ServerProfileDto prefixSibling = harness.CreateServer("SFTP");
+            prefixSibling.Id = "prefix-sibling";
+            prefixSibling.DisplayName = "Prefix sibling";
+            prefixSibling.Group = "Ops2";
+            harness.PersistServerAsync(visibleServer).GetAwaiter().GetResult();
+            harness.PersistServerAsync(nestedServer).GetAwaiter().GetResult();
+            harness.PersistServerAsync(hiddenTool).GetAwaiter().GetResult();
+            harness.PersistServerAsync(prefixSibling).GetAwaiter().GetResult();
+            harness.Main.ConfigManager.MergeSettingAsync(settings =>
+            {
+                settings.DefaultTheme = "Vesper";
+                settings.EmptyGroups = ["Ops", "Ops/Child", "Ops2"];
+                settings.TreeExpandedNodes = ["Ops", "Ops/Child", "Ops2"];
+                settings.GroupDefaults = new Dictionary<string, GroupDefaultsDto>
+                {
+                    ["Ops"] = new() { SshUsername = "ops-default" },
+                    ["Ops/Child"] = new() { SshUsername = "child-default" },
+                    ["Ops2"] = new() { SshUsername = "prefix-default" }
+                };
+            }).GetAwaiter().GetResult();
+            AppSettings persistedSettings = harness.Main.ConfigManager
+                .LoadSettingsAsync()
+                .GetAwaiter()
+                .GetResult();
+            List<ServerProfileDto> persistedServers = harness.Main.ConfigManager
+                .LoadServersAsync()
+                .GetAwaiter()
+                .GetResult();
+            harness.Main.ServerList.LoadServers(persistedServers, persistedSettings);
+            ServerItemViewModel visibleItem = Assert.Single(
+                harness.Main.ServerList.Servers,
+                item => string.Equals(item.Id, visibleServer.Id, StringComparison.Ordinal));
+            FolderViewModel filteredFolder = new()
+            {
+                Name = "Ops",
+                FullPath = "Ops"
+            };
+            filteredFolder.Servers.Add(visibleItem);
+            ContextMenuFactory factory = new(new ExternalToolProviderService());
+            ContextMenu menu = factory.CreateTreeContextMenu(
+                filteredFolder,
+                harness.Main,
+                new RecordingContextMenuCallbacks());
+            string expectedConnectHeader = string.Format(
+                harness.Main.Localize("TreeCtxConnectAllCount"),
+                1);
+            MenuItem connectAll = AssertMenuItem(menu, expectedConnectHeader);
+            harness.DialogService.ConfirmResult = false;
+            List<(string Id, string? Group)> beforeRefusal = harness.Main.ConfigManager
+                .LoadServersAsync()
+                .GetAwaiter()
+                .GetResult()
+                .OrderBy(server => server.Id, StringComparer.Ordinal)
+                .Select(server => (server.Id, server.Group))
+                .ToList();
+            byte[] settingsBeforeRefusal = File.ReadAllBytes(
+                harness.Main.ConfigManager.SettingsPath);
+            byte[] serversBeforeRefusal = File.ReadAllBytes(
+                harness.Main.ConfigManager.ServersPath);
+
+            MenuItem deleteGroup = AssertMenuItem(
+                menu,
+                harness.Main.Localize("TreeCtxDeleteGroup"));
+            deleteGroup.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.True(connectAll.IsEnabled);
+            Assert.Equal(expectedConnectHeader, Assert.IsType<string>(connectAll.Header));
+            Assert.Equal(1, harness.DialogService.ConfirmCallCount);
+            Assert.Equal("warning", harness.DialogService.LastConfirmSeverity);
+            string confirmation = Assert.IsType<string>(harness.DialogService.LastConfirmMessage);
+            Assert.Contains("{1}", harness.Main.Localize("TreeCtxDeleteGroupConfirm"), StringComparison.Ordinal);
+            Assert.Contains("3", confirmation, StringComparison.Ordinal);
+            Assert.Equal(
+                string.Format(
+                    harness.Main.Localize("TreeCtxDeleteGroupConfirm"),
+                    filteredFolder.Name,
+                    3),
+                confirmation);
+            List<(string Id, string? Group)> afterRefusal = harness.Main.ConfigManager
+                .LoadServersAsync()
+                .GetAwaiter()
+                .GetResult()
+                .OrderBy(server => server.Id, StringComparer.Ordinal)
+                .Select(server => (server.Id, server.Group))
+                .ToList();
+            Assert.Equal(beforeRefusal, afterRefusal);
+            Assert.Equal(
+                settingsBeforeRefusal,
+                File.ReadAllBytes(harness.Main.ConfigManager.SettingsPath));
+            Assert.Equal(
+                serversBeforeRefusal,
+                File.ReadAllBytes(harness.Main.ConfigManager.ServersPath));
         });
     }
 

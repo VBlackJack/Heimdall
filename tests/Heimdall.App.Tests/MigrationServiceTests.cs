@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -193,6 +194,39 @@ public class MigrationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportFromLegacyAsync_PreservesEncryptedSshPasswordAndMacAddressExactly()
+    {
+        const string LegacySshPassword = "AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAA|opaque==";
+        const string LegacyMacAddress = "AA:bb:CC:dd:EE:fF";
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");
+        WriteLegacyFile(Path.Combine("config", "servers.json"),
+            $$"""
+            [
+              {
+                "Id": "srv-sensitive-fields",
+                "DisplayName": "Legacy SSH",
+                "RemoteServer": "10.0.0.3",
+                "ConnectionType": "SSH",
+                "SshPasswordEncrypted": "{{LegacySshPassword}}",
+                "MacAddress": "{{LegacyMacAddress}}"
+              }
+            ]
+            """);
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, result.ServersImported);
+        Assert.Empty(result.Warnings);
+
+        List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+        ServerProfileDto imported = Assert.Single(servers);
+        Assert.Equal(LegacySshPassword, imported.SshPasswordEncrypted);
+        Assert.Equal(LegacyMacAddress, imported.MacAddress);
+    }
+
+    [Fact]
     public async Task ImportFromLegacyAsync_Empty_Server_Array_Reports_Zero_Imported()
     {
         WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");
@@ -215,5 +249,93 @@ public class MigrationServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.NotNull(result.Error);
+    }
+
+    [Fact]
+    public async Task ImportFromLegacyAsync_MalformedServers_DoesNotReplaceCurrentSettings()
+    {
+        AppSettings currentSettings = new()
+        {
+            DefaultResolutionWidth = 1600,
+            DefaultLocale = "en",
+            DefaultTheme = "Slate"
+        };
+        await _configManager.SaveSettingsAsync(currentSettings);
+        byte[] originalSettingsBytes = await File.ReadAllBytesAsync(_configManager.SettingsPath);
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"),
+            """
+            {
+              "DefaultResolutionWidth": 1920,
+              "DefaultLocale": "fr",
+              "DefaultTheme": "Dracula"
+            }
+            """);
+        WriteLegacyFile(Path.Combine("config", "servers.json"), "{ not valid json");
+
+        int settingsChangedCount = 0;
+        _configManager.SettingsChanged += _ => settingsChangedCount++;
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+        byte[] persistedSettingsBytes = await File.ReadAllBytesAsync(_configManager.SettingsPath);
+        AppSettings persistedSettings = await _configManager.LoadSettingsAsync();
+
+        Assert.False(result.Success);
+        Assert.False(result.SettingsImported);
+        Assert.Equal(0, settingsChangedCount);
+        Assert.Equal(originalSettingsBytes, persistedSettingsBytes);
+        Assert.Equal(1600, persistedSettings.DefaultResolutionWidth);
+        Assert.Equal("en", persistedSettings.DefaultLocale);
+        Assert.Equal("Slate", persistedSettings.DefaultTheme);
+    }
+
+    [Fact]
+    public async Task ImportFromLegacyAsync_MixedInventoryReportsSafeRejectedProfileIdentity()
+    {
+        const string FakeSecret = "DO-NOT-DISPLAY-FAKE-SECRET";
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");
+        WriteLegacyFile(Path.Combine("config", "servers.json"),
+            $$"""
+            [
+              {
+                "Id": "valid-profile",
+                "DisplayName": "Valid profile",
+                "RemoteServer": "valid.example.test",
+                "RemotePort": 3389,
+                "ConnectionType": "RDP"
+              },
+              {
+                "Id": "rejected-profile",
+                "DisplayName": "Rejected\r\nprofile XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "RemoteServer": "rejected.example.test",
+                "RemotePort": 999999999999999999999999999999,
+                "ConnectionType": "SSH",
+                "SshPasswordEncrypted": "{{FakeSecret}}"
+              }
+            ]
+            """);
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+        List<ServerProfileDto> persistedServers = await _configManager.LoadServersAsync();
+        MigrationWarning warning = Assert.Single(result.Warnings);
+        string serializedWarning = JsonSerializer.Serialize(warning);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.ServersExamined);
+        Assert.Equal(1, result.ServersImported);
+        Assert.Equal(1, result.ServersSkipped);
+        ServerProfileDto persistedServer = Assert.Single(persistedServers);
+        Assert.Equal("valid-profile", persistedServer.Id);
+        Assert.Equal(2, warning.Index);
+        Assert.NotNull(warning.Identity);
+        Assert.StartsWith("Rejected profile", warning.Identity, StringComparison.Ordinal);
+        Assert.Equal(64, warning.Identity.Length);
+        Assert.DoesNotContain('\r', warning.Identity);
+        Assert.DoesNotContain('\n', warning.Identity);
+        Assert.Equal(MigrationWarningReason.InvalidLegacyField, warning.Reason);
+        Assert.DoesNotContain(FakeSecret, serializedWarning, StringComparison.Ordinal);
+        Assert.DoesNotContain("RemotePort", serializedWarning, StringComparison.Ordinal);
+        Assert.DoesNotContain("Int32", serializedWarning, StringComparison.OrdinalIgnoreCase);
     }
 }

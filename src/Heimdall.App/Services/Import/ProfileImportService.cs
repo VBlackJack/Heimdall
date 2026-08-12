@@ -41,22 +41,8 @@ public sealed class ProfileImportService(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    /// <summary>
-    /// Mirrors the ConnectionService handler protocol keys. Keep in sync when adding protocol handlers.
-    /// </summary>
     internal static readonly IReadOnlySet<string> SupportedConnectionTypes =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RDP",
-            "SSH",
-            "SFTP",
-            "VNC",
-            "TELNET",
-            "FTP",
-            "CITRIX",
-            "LOCAL",
-            "WINRM"
-        };
+        ConnectionTypeCatalog.CanonicalTypes;
 
     private readonly IConfigManager _configManager = configManager;
     private readonly LocalizationManager _localizer = localizer;
@@ -251,6 +237,7 @@ public sealed class ProfileImportService(
         for (int index = 0; index < candidates.Count; index++)
         {
             ServerProfileDto candidate = CloneProfile(candidates[index]);
+            candidate.ConnectionType = CanonicalizeConnectionType(candidate.ConnectionType);
             string proposedName = string.IsNullOrWhiteSpace(candidate.DisplayName)
                 ? _localizer["DialogImportProfileFallbackName"]
                 : candidate.DisplayName.Trim();
@@ -552,5 +539,10 @@ public sealed class ProfileImportService(
         var json = JsonSerializer.Serialize(source, ProfileJsonOptions);
         return JsonSerializer.Deserialize<ServerProfileDto>(json, ProfileJsonOptions)
             ?? throw new InvalidOperationException("Failed to clone imported profile.");
+    }
+
+    private static string CanonicalizeConnectionType(string connectionType)
+    {
+        return ConnectionTypeCatalog.Canonicalize(connectionType);
     }
 }

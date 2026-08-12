@@ -22,6 +22,8 @@ internal sealed class WinRmEarlyOutputDiagnostic
 {
     internal const int DefaultMaxBufferedBytes = 16 * 1024;
 
+    private const int DiagnosticContextRadius = 512;
+
     private const string NtlmLoopbackCode = "0x8009030e";
     private const string WsManInvalidResponseCode = "12152";
 
@@ -42,6 +44,11 @@ internal sealed class WinRmEarlyOutputDiagnostic
 
     public bool IsActive { get; private set; }
 
+    public void MarkUserInput()
+    {
+        IsActive = false;
+    }
+
     public string? Observe(ReadOnlySpan<byte> data)
     {
         if (!IsActive || data.IsEmpty)
@@ -61,7 +68,14 @@ internal sealed class WinRmEarlyOutputDiagnostic
         _buffer.Append(Encoding.UTF8.GetString(observedBytes));
         _bufferedBytes += observedBytes.Length;
 
-        string? localizationKey = FindDiagnosticKey(_buffer.ToString());
+        string output = _buffer.ToString();
+        if (ContainsConfirmedPowerShellPrompt(output))
+        {
+            IsActive = false;
+            return null;
+        }
+
+        string? localizationKey = FindDiagnosticKey(output);
         if (localizationKey is not null || exceedsCap)
         {
             IsActive = false;
@@ -72,7 +86,8 @@ internal sealed class WinRmEarlyOutputDiagnostic
 
     private static string? FindDiagnosticKey(string output)
     {
-        if (output.Contains(NtlmLoopbackCode, StringComparison.OrdinalIgnoreCase))
+        int ntlmCodeIndex = output.IndexOf(NtlmLoopbackCode, StringComparison.OrdinalIgnoreCase);
+        if (ntlmCodeIndex >= 0 && ContainsWinRmContextNear(output, ntlmCodeIndex))
         {
             return "ErrorWinRmNtlmLoopback";
         }
@@ -84,6 +99,33 @@ internal sealed class WinRmEarlyOutputDiagnostic
         }
 
         return null;
+    }
+
+    private static bool ContainsWinRmContextNear(string output, int diagnosticIndex)
+    {
+        int start = Math.Max(0, diagnosticIndex - DiagnosticContextRadius);
+        int end = Math.Min(output.Length, diagnosticIndex + NtlmLoopbackCode.Length + DiagnosticContextRadius);
+        string context = output[start..end];
+
+        return ContainsWsManContext(context)
+            || context.Contains("Enter-PSSession", StringComparison.OrdinalIgnoreCase)
+            || context.Contains("New-PSSession", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsConfirmedPowerShellPrompt(string output)
+    {
+        foreach (string line in output.Split('\n'))
+        {
+            string candidate = line.Trim();
+            bool hasPowerShellPrefix = candidate.StartsWith("PS ", StringComparison.OrdinalIgnoreCase)
+                || candidate.Contains("]: PS ", StringComparison.OrdinalIgnoreCase);
+            if (hasPowerShellPrefix && candidate.EndsWith('>'))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool ContainsWsManContext(string output)

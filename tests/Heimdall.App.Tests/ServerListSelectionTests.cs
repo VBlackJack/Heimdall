@@ -74,6 +74,34 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task ToggleSelection_AddMovesAnchorForNextRange()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups(
+                "ops",
+                "ops/a",
+                "ops/b",
+                "ops/c",
+                "ops/d",
+                "ops/e",
+                "ops/f"),
+            CreateServer("alpha", "Alpha", "ops/a"),
+            CreateServer("beta", "Beta", "ops/b"),
+            CreateServer("gamma", "Gamma", "ops/c"),
+            CreateServer("delta", "Delta", "ops/d"),
+            CreateServer("epsilon", "Epsilon", "ops/e"),
+            CreateServer("foxtrot", "Foxtrot", "ops/f"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("delta"));
+
+        fixture.ViewModel.ExtendSelectionTo(fixture.ServerById("foxtrot"));
+
+        AssertSelection(fixture.ViewModel, "delta", "epsilon", "foxtrot");
+        Assert.Same(fixture.ServerById("foxtrot"), fixture.ViewModel.SelectedServer);
+    }
+
+    [Fact]
     public async Task ToggleSelection_RemovingPrimaryFallsBackToLastRemaining()
     {
         await using var fixture = await ServerListSelectionFixture.CreateAsync();
@@ -145,6 +173,63 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         AssertSelection(fixture.ViewModel, "anchor", "target");
         Assert.DoesNotContain(fixture.ServerById("hidden"), fixture.ViewModel.SelectedItems);
+    }
+
+    [Fact]
+    public async Task AddSelectionRangeTo_PreservesDisjointSelectionPrimaryAndAnchor()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops", "ops/a", "ops/b", "ops/c", "ops/d", "ops/e"),
+            CreateServer("alpha", "Alpha", "ops/a"),
+            CreateServer("beta", "Beta", "ops/b"),
+            CreateServer("gamma", "Gamma", "ops/c"),
+            CreateServer("delta", "Delta", "ops/d"),
+            CreateServer("epsilon", "Epsilon", "ops/e"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("beta"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("epsilon"));
+        fixture.ViewModel.AddSelectionRangeTo(fixture.ServerById("delta"));
+
+        AssertSelection(fixture.ViewModel, "beta", "delta", "epsilon");
+        Assert.Same(fixture.ServerById("delta"), fixture.ViewModel.SelectedServer);
+
+        fixture.ViewModel.ExtendSelectionTo(fixture.ServerById("alpha"));
+
+        AssertSelection(fixture.ViewModel, "alpha", "beta", "delta", "epsilon", "gamma");
+    }
+
+    [Fact]
+    public async Task CollapseGroup_PurgesHiddenSelectionAndKeepsVisiblePrimaryAnchorAndBulkContext()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("root", "root/hidden", "root/visible"),
+            CreateServer("hidden", "Hidden", "root/hidden"),
+            CreateServer("visible-a", "Visible A", "root/visible"),
+            CreateServer("visible-b", "Visible B", "root/visible"));
+        ServerItemViewModel hidden = fixture.ServerById("hidden");
+        ServerItemViewModel visibleA = fixture.ServerById("visible-a");
+        ServerItemViewModel visibleB = fixture.ServerById("visible-b");
+        fixture.ViewModel.SelectSingle(hidden);
+        fixture.ViewModel.ToggleSelection(visibleA);
+        fixture.ViewModel.ToggleSelection(visibleB);
+
+        fixture.CollapseGroup("root/hidden");
+
+        AssertSelection(fixture.ViewModel, "visible-a", "visible-b");
+        Assert.False(hidden.IsSelected);
+        Assert.Same(visibleB, fixture.ViewModel.SelectedServer);
+        BulkSelectionContext bulkContext = Assert.IsType<BulkSelectionContext>(
+            fixture.ViewModel.CreateBulkSelectionContext());
+        Assert.Equal(
+            ["visible-a", "visible-b"],
+            bulkContext.Items.Select(item => item.Id).OrderBy(id => id, StringComparer.Ordinal));
+        Assert.Same(visibleB, bulkContext.Primary);
+
+        fixture.ViewModel.ExtendSelectionTo(visibleA);
+
+        AssertSelection(fixture.ViewModel, "visible-a", "visible-b");
+        Assert.Same(visibleA, fixture.ViewModel.SelectedServer);
     }
 
     [Fact]
@@ -521,6 +606,44 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         AssertVisibleServerIds(fixture.ViewModel, "alpha");
         Assert.Equal(1, fixture.ViewModel.ConnectedMembershipRefreshCount);
         Assert.Equal(initialPassCount + 1, fixture.ViewModel.FilterPassApplicationCount);
+        Assert.Equal(stableBuildCount, fixture.ViewModel.StableTreeBuildCount);
+    }
+
+    [Fact]
+    public async Task ConnectedMembershipAppearance_PreservesVisibleMultiSelection()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"),
+            CreateServer("gamma", "Gamma", "ops"));
+        TransitionSshSessionToConnected(
+            fixture.StateMachine,
+            SessionIdCodec.Create("alpha"));
+        TransitionSshSessionToConnected(
+            fixture.StateMachine,
+            SessionIdCodec.Create("beta"));
+        fixture.ViewModel.ConnectedFilterEnabled = true;
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        int stableBuildCount = fixture.ViewModel.StableTreeBuildCount;
+        int initialPassCount = fixture.ViewModel.FilterPassApplicationCount;
+        int initialRefreshCount = fixture.ViewModel.ConnectedMembershipRefreshCount;
+
+        TransitionSshSessionToConnected(
+            fixture.StateMachine,
+            SessionIdCodec.Create("gamma"));
+
+        AssertVisibleServerIds(fixture.ViewModel, "alpha", "beta", "gamma");
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        Assert.Same(fixture.ServerById("beta"), fixture.ViewModel.SelectedServer);
+        Assert.Equal(
+            initialRefreshCount + 1,
+            fixture.ViewModel.ConnectedMembershipRefreshCount);
+        Assert.Equal(
+            initialPassCount + 1,
+            fixture.ViewModel.FilterPassApplicationCount);
         Assert.Equal(stableBuildCount, fixture.ViewModel.StableTreeBuildCount);
     }
 
@@ -978,14 +1101,14 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
     private sealed class NullTunnelService : ITunnelService
     {
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
-            return Task.FromResult((true, false, server.RemoteServer, remotePort, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)

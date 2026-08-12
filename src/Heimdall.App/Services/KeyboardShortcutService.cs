@@ -91,11 +91,14 @@ public sealed class KeyboardShortcutService
     {
         ArgumentNullException.ThrowIfNull(e);
 
-        var modifiers = Keyboard.Modifiers;
+        return TryHandle(e.Key, Keyboard.Modifiers);
+    }
 
-        foreach (var binding in _bindings)
+    internal bool TryHandle(Key key, ModifierKeys modifiers)
+    {
+        foreach (ShortcutBinding binding in _bindings)
         {
-            if (binding.Key != e.Key)
+            if (binding.Key != key)
             {
                 continue;
             }

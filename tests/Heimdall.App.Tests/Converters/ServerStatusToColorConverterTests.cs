@@ -145,6 +145,22 @@ public sealed class ServerStatusToColorConverterTests
     }
 
     [Fact]
+    public void LaunchingWinRm_WithHealthyServer_UsesWarningBrush()
+    {
+        ServerStatusToColorConverter converter = MakeConverter(out List<string> keys);
+        HealthState up = new(HealthStatus.Up, DateTime.UtcNow, 12, null);
+
+        object result = converter.Convert(
+            ["WINRM", "LaunchingWinRm", up],
+            typeof(Brush),
+            null!,
+            CultureInfo.InvariantCulture);
+
+        Assert.Same(TaggedBrush, result);
+        Assert.Equal("WarningBrush", keys.Single());
+    }
+
+    [Fact]
     public void ProbingHealth_DisconnectedSsh_UsesWarningBrush()
     {
         var converter = MakeConverter(out var keys);

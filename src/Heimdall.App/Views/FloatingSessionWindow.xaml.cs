@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
 using Heimdall.App.Theming;
@@ -54,14 +55,12 @@ public partial class FloatingSessionWindow : Window
 
         // Re-apply localized strings when language changes at runtime
         _localizer.LocaleChanged += OnLocaleChanged;
+        _session.PropertyChanged += OnSessionPropertyChanged;
     }
 
     private void ApplySessionInfo()
     {
-        Title = string.Format(_localizer["SessionDetachTitle"], _session.Title);
-        SessionTitle.Text = _session.Title;
-        StatusText.Text = _session.Status;
-        TunnelRouteText.Text = _session.TunnelRoute;
+        ApplyWindowTitle();
         ReattachButton.Content = _localizer["SessionCtxReattach"];
         System.Windows.Automation.AutomationProperties.SetName(ReattachButton, _localizer["SessionCtxReattach"]);
 
@@ -101,10 +100,7 @@ public partial class FloatingSessionWindow : Window
         // Detach the host control from this window first (UIElement single-parent rule)
         SessionHost.Content = null;
 
-        // Re-add the session to the main window's active sessions
-        vm.Connection.ActiveSessions.Add(_session);
-        vm.Connection.ActiveSession = _session;
-        vm.Connection.HasActiveSessions = vm.Connection.ActiveSessions.Count > 0;
+        RestoreSession(vm);
 
         Heimdall.Core.Logging.FileLogger.Info(
             string.Format(_localizer["LogSessionReattached"], _session.Title));
@@ -123,9 +119,8 @@ public partial class FloatingSessionWindow : Window
                 // Detach host control from this window before ConnectionViewModel disposes it
                 SessionHost.Content = null;
 
-                // Temporarily add the session back so CloseSession can clean up state machine,
-                // tunnels, and connection history
-                vm.Connection.ActiveSessions.Add(_session);
+                // Restore the session before CloseSession prompts so a declined close keeps it visible.
+                RestoreSession(vm);
                 vm.Connection.CloseSessionCommand.Execute(_session);
             }
             else
@@ -140,15 +135,49 @@ public partial class FloatingSessionWindow : Window
             }
         }
 
+        _session.PropertyChanged -= OnSessionPropertyChanged;
         _localizer.LocaleChanged -= OnLocaleChanged;
         base.OnClosed(e);
+    }
+
+    private void RestoreSession(MainViewModel vm)
+    {
+        if (!vm.Connection.ActiveSessions.Contains(_session))
+        {
+            vm.Connection.ActiveSessions.Add(_session);
+        }
+
+        vm.Connection.ActiveSession = _session;
+        vm.Connection.HasActiveSessions = vm.Connection.ActiveSessions.Count > 0;
+    }
+
+    private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(e.PropertyName)
+            && e.PropertyName != nameof(SessionTabViewModel.Title))
+        {
+            return;
+        }
+
+        if (Dispatcher.CheckAccess())
+        {
+            ApplyWindowTitle();
+            return;
+        }
+
+        Dispatcher.BeginInvoke(new Action(ApplyWindowTitle));
+    }
+
+    private void ApplyWindowTitle()
+    {
+        Title = string.Format(_localizer["SessionDetachTitle"], _session.Title);
     }
 
     private void OnLocaleChanged(string _)
     {
         Dispatcher.Invoke(() =>
         {
-            Title = string.Format(_localizer["SessionDetachTitle"], _session.Title);
+            ApplyWindowTitle();
             ReattachButton.Content = _localizer["SessionCtxReattach"];
             System.Windows.Automation.AutomationProperties.SetName(
                 ReattachButton, _localizer["SessionCtxReattach"]);

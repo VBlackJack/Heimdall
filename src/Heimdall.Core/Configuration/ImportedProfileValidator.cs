@@ -45,6 +45,13 @@ public static class ImportedProfileValidator
         ValidateOptionalPort(errors, profile.RemoteBindPort, nameof(profile.RemoteBindPort));
         ValidateOptionalPort(errors, profile.RemoteLocalPort, nameof(profile.RemoteLocalPort));
 
+        if (!Enum.IsDefined(profile.WinRmIdentityMode))
+        {
+            errors.Add(
+                $"{nameof(profile.WinRmIdentityMode)}: unsupported value "
+                + $"'{(int)profile.WinRmIdentityMode}'.");
+        }
+
         if (string.IsNullOrWhiteSpace(profile.ConnectionType))
         {
             errors.Add($"{nameof(profile.ConnectionType)}: required.");

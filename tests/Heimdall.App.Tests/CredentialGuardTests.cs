@@ -275,7 +275,7 @@ public sealed class CredentialGuardTests
     {
         public int SetupCallCount { get; private set; }
 
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)>
+        public Task<TunnelSetupOutcome>
             SetupTunnelIfNeededAsync(
                 ServerProfileDto server,
                 int remotePort,
@@ -284,12 +284,13 @@ public sealed class CredentialGuardTests
                 bool preferDistinctLoopback = false)
         {
             SetupCallCount++;
-            return Task.FromResult((
+            return Task.FromResult(new TunnelSetupOutcome(
                 true,
                 false,
                 server.RemoteServer,
                 remotePort,
-                (string?)null));
+                (string?)null,
+                null));
         }
 
         public void UpdateSettings(AppSettings settings)

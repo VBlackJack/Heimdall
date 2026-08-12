@@ -240,7 +240,10 @@ public sealed class CitrixHandlerTests
             });
         var server = CreateCacheServer(secretBlob);
 
-        var result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+        var result = await handler.ConnectAsync(
+            server,
+            new AppSettings { VaultEnabled = true },
+            CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(secretBlob, decryptInput);
@@ -297,6 +300,46 @@ public sealed class CitrixHandlerTests
         Assert.True(result.Success);
         Assert.Equal(0, decryptCallCount);
         Assert.Equal(plaintext, launchedArguments);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_VaultEnabledWithPlaintextToken_RefusesWithoutDecryptingOrLaunching()
+    {
+        const string plaintext = "-qlaunch app=LegacyCalculator ticket=fake-secret";
+        int launchCallCount = 0;
+        int decryptCallCount = 0;
+        List<string> logs = new();
+        ConnectionStateMachine stateMachine = new();
+        CitrixHandler handler = CreateHandler(
+            _ =>
+            {
+                launchCallCount++;
+                return null;
+            },
+            _ =>
+            {
+                decryptCallCount++;
+                return "unexpected";
+            },
+            stateMachine,
+            logs.Add,
+            logs.Add);
+        ServerProfileDto server = CreateCacheServer(plaintext);
+        AppSettings settings = new() { VaultEnabled = true };
+
+        ConnectionResult result = await handler.ConnectAsync(server, settings, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixLaunchFailed", result.ErrorMessage);
+        Assert.Equal("CitrixLaunchFailed", stateMachine.GetStateData(server.Id)?.ErrorMessage);
+        Assert.Equal(0, launchCallCount);
+        Assert.Equal(0, decryptCallCount);
+        Assert.Contains(
+            logs,
+            log => log.Contains("unprotectedToken=true", StringComparison.Ordinal));
+        Assert.All(
+            logs,
+            log => Assert.DoesNotContain(plaintext, log, StringComparison.Ordinal));
     }
 
     [Fact]

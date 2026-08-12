@@ -26,14 +26,146 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security;
+using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
+using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Tests;
 
 public sealed class SshHandlerConnectTests
 {
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
+    [Fact]
+    public async Task ConnectAsync_CallerCancellation_PropagatesAndReleasesTunnel()
+    {
+        const int targetPort = 49152;
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = targetPort
+        };
+        using SshHandler handler = CreateHandler(tunnelService);
+        ServerProfileDto server = CreateGatewayServer();
+        using CancellationTokenSource cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            cancellationSource.Token));
+
+        Assert.Equal(1, tunnelService.ReleaseCount);
+        Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
+    }
+
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_CallerCancellationAtProcessStart_PropagatesAndCleansResources()
+    {
+        const int targetPort = 49153;
+        string plinkPath = Path.GetTempFileName();
+        string? deletedPasswordPath = null;
+        try
+        {
+            FakeTunnelService tunnelService = new FakeTunnelService();
+            int passwordDeleteCount = 0;
+            using CancellationTokenSource cancellationSource = new CancellationTokenSource();
+            HostKeyStore hostKeyStore = new HostKeyStore();
+            hostKeyStore.Trust(
+                "server01.contoso.local",
+                DefaultPorts.Ssh,
+                "SHA256:stored-test-fingerprint");
+            HostKeyTrustService hostKeyTrustService = new HostKeyTrustService(hostKeyStore);
+            CancelingPlinkHostKeyProbe probe = new CancelingPlinkHostKeyProbe(cancellationSource);
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                hostKeyTrustService,
+                probe,
+                deletePlinkPasswordFile: path =>
+                {
+                    ArgumentException.ThrowIfNullOrWhiteSpace(path);
+                    passwordDeleteCount++;
+                    deletedPasswordPath = path;
+                    File.Delete(path);
+                });
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshPasswordEncrypted = CredentialProtector.Protect("temporary-password");
+            AppSettings settings = new AppSettings
+            {
+                PlinkPath = plinkPath
+            };
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.ConnectSshViaPlinkAsync(
+                server,
+                settings,
+                "127.0.0.1",
+                targetPort,
+                usesTunnel: true,
+                originalFailure: null,
+                cancellationSource.Token));
+
+            Assert.True(cancellationSource.IsCancellationRequested);
+            Assert.Equal(1, probe.CallCount);
+            Assert.Equal(1, tunnelService.ReleaseCount);
+            Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
+            Assert.Equal(1, passwordDeleteCount);
+            Assert.False(string.IsNullOrWhiteSpace(deletedPasswordPath));
+            Assert.False(File.Exists(deletedPasswordPath));
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
+            {
+                File.Delete(deletedPasswordPath);
+            }
+
+            File.Delete(plinkPath);
+        }
+    }
+
+    [Fact]
+    public async Task Constructor_YoungPasswordOrphan_ReschedulesAndDeletesAtEligibility()
+    {
+        DateTime firstSweepUtc = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        TimeSpan maxAge = TimeSpan.FromMinutes(10);
+        DateTime lastWriteUtc = firstSweepUtc - TimeSpan.FromMinutes(5);
+        DateTime eligibilityUtc = lastWriteUtc + maxAge;
+        string orphanPath = Path.Combine(
+            Path.GetTempPath(),
+            $"{PlinkPasswordFileNaming.Prefix}scheduler-wiring");
+        int sweepCount = 0;
+        int utcNowCallCount = 0;
+        TaskCompletionSource<string> deleted = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        PlinkPasswordFileJanitor janitor = new PlinkPasswordFileJanitor(
+            enumerateFiles: _ =>
+            {
+                Interlocked.Increment(ref sweepCount);
+                return new string[] { orphanPath };
+            },
+            getLastWriteTimeUtc: _ => lastWriteUtc,
+            isOwnedByCurrentUser: _ => true,
+            delete: path => deleted.TrySetResult(path),
+            utcNow: () => Interlocked.Increment(ref utcNowCallCount) == 1
+                ? firstSweepUtc
+                : eligibilityUtc,
+            maxAge: maxAge);
+
+        using SshHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            plinkPasswordFileJanitor: janitor);
+
+        string deletedPath = await deleted.Task.WaitAsync(TestTimeout);
+
+        Assert.Equal(orphanPath, deletedPath);
+        Assert.Equal(2, Volatile.Read(ref sweepCount));
+        Assert.Equal(2, Volatile.Read(ref utcNowCallCount));
+    }
+
     [Fact]
     public async Task ConnectAsync_TunneledConnectFailureReleasesTunnelReference()
     {
@@ -75,6 +207,62 @@ public sealed class SshHandlerConnectTests
 
         Assert.False(result.Success);
         Assert.Equal(0, tunnelService.ReleaseCount);
+    }
+
+    [Theory]
+    [InlineData(false, SessionFailureStage.GenericFailure)]
+    [InlineData(true, SessionFailureStage.SshGateway)]
+    public async Task ConnectAsync_NetworkFailure_LocalizesMessageAndUsesActualConnectionScope(
+        bool usesTunnel,
+        SessionFailureStage expectedStage)
+    {
+        int freePort = ReserveAndReleaseLoopbackPort();
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = usesTunnel,
+            TargetHost = "127.0.0.1",
+            TargetPort = freePort
+        };
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+        using SshHandler handler = CreateHandler(tunnelService, localizer: localizer);
+        ServerProfileDto server = usesTunnel ? CreateGatewayServer() : CreateDirectServer(freePort);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        string expectedMessage = localizer.Format("ErrorSshNetworkRefused", "127.0.0.1");
+        Assert.False(result.Success);
+        Assert.Equal(expectedMessage, result.ErrorMessage);
+        Assert.NotNull(result.Failure);
+        Assert.Equal(expectedStage, result.Failure.Stage);
+        Assert.Equal(expectedMessage, result.Failure.Detail);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_TunnelSetupFailsWithCircularChainDependency_MapsToGatewayDiagnostic()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            SetupSucceeds = false,
+            SetupFailureCode = SshFailureCode.CircularChainDependency,
+            SetupErrorMessage = "Circular dependency detected in gateway chain."
+        };
+        using SshHandler handler = CreateHandler(tunnelService);
+        ServerProfileDto server = CreateGatewayServer();
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.Failure);
+        Assert.Equal(SessionFailureStage.SshGateway, result.Failure.Stage);
+        Assert.Equal("ErrorSshCircularChainDependency", result.Failure.MessageKey);
+        Assert.Equal((int)SshFailureCode.CircularChainDependency, result.Failure.Code);
     }
 
     [Fact]
@@ -289,22 +477,27 @@ public sealed class SshHandlerConnectTests
     private static SshHandler CreateHandler(
         FakeTunnelService tunnelService,
         IHostKeyTrustService? hostKeyTrustService = null,
-        IPlinkHostKeyProbe? plinkHostKeyProbe = null)
+        IPlinkHostKeyProbe? plinkHostKeyProbe = null,
+        PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
+        Action<string?>? deletePlinkPasswordFile = null,
+        LocalizationManager? localizer = null)
     {
-        LocalizationManager localizer = new LocalizationManager();
+        LocalizationManager effectiveLocalizer = localizer ?? new LocalizationManager();
         IHostKeyTrustService effectiveHostKeyTrustService =
             hostKeyTrustService ?? new ThrowingHostKeyTrustService();
         return new SshHandler(
             tunnelService,
             new ConnectionStateMachine(),
-            localizer,
+            effectiveLocalizer,
             new HostKeyStore(),
             effectiveHostKeyTrustService,
             AutoAcceptHostKeyVerifier.Instance,
-            new X11ServerManager(new InMemoryConfigManager(), localizer),
+            new X11ServerManager(new InMemoryConfigManager(), effectiveLocalizer),
             new ThrowingDialogService(),
             plinkHostKeyProbe: plinkHostKeyProbe,
-            plinkPasswordFileJanitor: CreateNoOpPlinkPasswordFileJanitor());
+            plinkPasswordFileJanitor:
+                plinkPasswordFileJanitor ?? CreateNoOpPlinkPasswordFileJanitor(),
+            deletePlinkPasswordFile: deletePlinkPasswordFile);
     }
 
     private static PlinkPasswordFileJanitor CreateNoOpPlinkPasswordFileJanitor()
@@ -410,17 +603,26 @@ public sealed class SshHandlerConnectTests
         public int TargetPort { get; init; }
         public int ReleaseCount { get; private set; }
         public int ReleasedLocalPort { get; private set; }
+        public bool SetupSucceeds { get; init; } = true;
+        public SshFailureCode? SetupFailureCode { get; init; }
+        public string? SetupErrorMessage { get; init; }
 
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
+            if (!SetupSucceeds)
+            {
+                return Task.FromResult(
+                    new TunnelSetupOutcome(false, false, string.Empty, 0, SetupErrorMessage, SetupFailureCode));
+            }
+
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
-            return Task.FromResult((true, UsesTunnel, host, port, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)
@@ -461,6 +663,25 @@ public sealed class SshHandlerConnectTests
             LastHost = host;
             LastPort = port;
             return Task.FromResult(_presentation);
+        }
+    }
+
+    private sealed class CancelingPlinkHostKeyProbe(CancellationTokenSource cancellationSource)
+        : IPlinkHostKeyProbe
+    {
+        public int CallCount { get; private set; }
+
+        public Task<PlinkHostKeyPresentation?> ProbeAsync(
+            string plinkPath,
+            string host,
+            int port,
+            string? username,
+            int timeoutMs,
+            CancellationToken ct)
+        {
+            CallCount++;
+            cancellationSource.Cancel();
+            return Task.FromResult<PlinkHostKeyPresentation?>(null);
         }
     }
 

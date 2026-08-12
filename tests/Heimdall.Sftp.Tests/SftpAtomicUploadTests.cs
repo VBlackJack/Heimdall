@@ -20,189 +20,124 @@ namespace Heimdall.Sftp.Tests;
 
 public sealed class SftpAtomicUploadTests
 {
+    private const string FinalRemotePath = "/srv/app/config.txt";
+    private const string TempRemotePath = "/srv/app/config.txt.part";
+
     [Fact]
-    public void CommitRename_UsesAtomicRenameOnly_WhenAtomicRenameSucceeds()
+    public void CommitRename_DoesNotConsultFallback_WhenAtomicRenameSucceeds()
     {
         var atomicCalls = new List<(string Temp, string Final)>();
         var plainCalls = new List<(string Temp, string Final)>();
-        var deleteCalls = new List<string>();
         var existsCalls = new List<string>();
+        int predicateCalls = 0;
 
         SftpAtomicUpload.CommitRename(
-            "/srv/app/config.txt.part",
-            "/srv/app/config.txt",
+            TempRemotePath,
+            FinalRemotePath,
             atomicRename: (temp, final) => atomicCalls.Add((temp, final)),
             plainRename: (temp, final) => plainCalls.Add((temp, final)),
             remoteExists: path =>
             {
                 existsCalls.Add(path);
-                return false;
+                return true;
             },
-            deleteRemote: path => deleteCalls.Add(path));
-
-        var atomicCall = Assert.Single(atomicCalls);
-        Assert.Equal("/srv/app/config.txt.part", atomicCall.Temp);
-        Assert.Equal("/srv/app/config.txt", atomicCall.Final);
-        Assert.Empty(plainCalls);
-        Assert.Empty(existsCalls);
-        Assert.Empty(deleteCalls);
-    }
-
-    [Fact]
-    public void CommitRename_FallsBackWithBackupAndCleanup_WhenAtomicRenameThrows()
-    {
-        var remote = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "/srv/app/config.txt",
-            "/srv/app/config.txt.part"
-        };
-        var renameCalls = new List<(string Source, string Destination)>();
-        var deleteCalls = new List<string>();
-
-        SftpAtomicUpload.CommitRename(
-            "/srv/app/config.txt.part",
-            "/srv/app/config.txt",
-            atomicRename: (_, _) => throw new InvalidOperationException("extension unavailable"),
-            plainRename: (source, destination) =>
+            canDemoteAtomicRenameFailure: _ =>
             {
-                renameCalls.Add((source, destination));
-                Assert.True(remote.Remove(source));
-                remote.Add(destination);
-            },
-            remoteExists: remote.Contains,
-            deleteRemote: path =>
-            {
-                deleteCalls.Add(path);
-                remote.Remove(path);
+                predicateCalls++;
+                return true;
             });
 
-        Assert.Equal(2, renameCalls.Count);
-        Assert.Equal("/srv/app/config.txt", renameCalls[0].Source);
-        Assert.StartsWith("/srv/app/config.txt.", renameCalls[0].Destination, StringComparison.Ordinal);
-        Assert.EndsWith(".bak", renameCalls[0].Destination, StringComparison.Ordinal);
-        Assert.Equal(("/srv/app/config.txt.part", "/srv/app/config.txt"), renameCalls[1]);
-        Assert.Equal(renameCalls[0].Destination, Assert.Single(deleteCalls));
-        Assert.Contains("/srv/app/config.txt", remote);
-        Assert.DoesNotContain("/srv/app/config.txt.part", remote);
-        Assert.DoesNotContain(renameCalls[0].Destination, remote);
+        Assert.Equal((TempRemotePath, FinalRemotePath), Assert.Single(atomicCalls));
+        Assert.Empty(existsCalls);
+        Assert.Empty(plainCalls);
+        Assert.Equal(0, predicateCalls);
     }
 
     [Fact]
-    public void CommitRename_RestoresBackup_WhenFallbackRenameFails()
+    public void CommitRename_RefusesFallbackReplacement_WhenDestinationExists()
     {
-        var remote = new HashSet<string>(StringComparer.Ordinal)
+        var remote = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            "/srv/app/config.txt",
-            "/srv/app/config.txt.part"
+            [FinalRemotePath] = "old-content",
+            [TempRemotePath] = "new-content",
         };
-        var renameCalls = new List<(string Source, string Destination)>();
+        var plainCalls = new List<(string Source, string Destination)>();
+        var existsCalls = new List<string>();
+        var atomicFailure = new NotSupportedException("posix-rename extension unavailable");
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Assert.Throws<InvalidOperationException>(() =>
             SftpAtomicUpload.CommitRename(
-                "/srv/app/config.txt.part",
-                "/srv/app/config.txt",
-                atomicRename: (_, _) => throw new InvalidOperationException("extension unavailable"),
+                TempRemotePath,
+                FinalRemotePath,
+                atomicRename: (_, _) => throw atomicFailure,
                 plainRename: (source, destination) =>
                 {
-                    renameCalls.Add((source, destination));
-                    if (source == "/srv/app/config.txt.part")
-                    {
-                        throw new InvalidOperationException("plain rename failed");
-                    }
-
-                    Assert.True(remote.Remove(source));
-                    remote.Add(destination);
+                    plainCalls.Add((source, destination));
+                    remote[destination] = remote[source];
+                    remote.Remove(source);
                 },
-                remoteExists: remote.Contains,
-                deleteRemote: path => remote.Remove(path)));
+                remoteExists: path =>
+                {
+                    existsCalls.Add(path);
+                    return remote.ContainsKey(path);
+                },
+                canDemoteAtomicRenameFailure: failure => failure is NotSupportedException));
 
-        Assert.Equal("plain rename failed", ex.Message);
-        Assert.Equal(3, renameCalls.Count);
-        string backupPath = renameCalls[0].Destination;
-        Assert.Equal(("/srv/app/config.txt", backupPath), renameCalls[0]);
-        Assert.Equal(("/srv/app/config.txt.part", "/srv/app/config.txt"), renameCalls[1]);
-        Assert.Equal((backupPath, "/srv/app/config.txt"), renameCalls[2]);
-        Assert.Contains("/srv/app/config.txt", remote);
-        Assert.Contains("/srv/app/config.txt.part", remote);
-        Assert.DoesNotContain(backupPath, remote);
+        Assert.Contains(FinalRemotePath, exception.Message, StringComparison.Ordinal);
+        Assert.Same(atomicFailure, exception.InnerException);
+        Assert.Equal(FinalRemotePath, Assert.Single(existsCalls));
+        Assert.Empty(plainCalls);
+        Assert.Equal("old-content", remote[FinalRemotePath]);
+        Assert.Equal("new-content", remote[TempRemotePath]);
+        Assert.Equal(2, remote.Count);
     }
 
     [Fact]
-    public void CommitRename_FallbackWithoutExistingFinal_RenamesTempOnly()
+    public void CommitRename_FailsClosed_WhenDestinationProbeFails()
     {
-        var remote = new HashSet<string>(StringComparer.Ordinal)
+        var plainCalls = new List<(string Source, string Destination)>();
+        var probeFailure = new IOException("stat refused");
+
+        var exception = Assert.Throws<IOException>(() =>
+            SftpAtomicUpload.CommitRename(
+                TempRemotePath,
+                FinalRemotePath,
+                atomicRename: (_, _) => throw new NotSupportedException("posix-rename extension unavailable"),
+                plainRename: (source, destination) => plainCalls.Add((source, destination)),
+                remoteExists: _ => throw probeFailure,
+                canDemoteAtomicRenameFailure: failure => failure is NotSupportedException));
+
+        Assert.Same(probeFailure, exception);
+        Assert.Empty(plainCalls);
+    }
+
+    [Fact]
+    public void CommitRename_PropagatesPlainRenameFailure_WithoutCleanup()
+    {
+        var remote = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            "/srv/app/config.txt.part"
+            [TempRemotePath] = "new-content",
         };
-        var renameCalls = new List<(string Source, string Destination)>();
+        var plainCalls = new List<(string Source, string Destination)>();
+        var renameFailure = new IOException("plain rename failed");
 
-        SftpAtomicUpload.CommitRename(
-            "/srv/app/config.txt.part",
-            "/srv/app/config.txt",
-            atomicRename: (_, _) => throw new InvalidOperationException("extension unavailable"),
-            plainRename: (source, destination) =>
-            {
-                renameCalls.Add((source, destination));
-                Assert.True(remote.Remove(source));
-                remote.Add(destination);
-            },
-            remoteExists: remote.Contains,
-            deleteRemote: path => remote.Remove(path));
+        var exception = Assert.Throws<IOException>(() =>
+            SftpAtomicUpload.CommitRename(
+                TempRemotePath,
+                FinalRemotePath,
+                atomicRename: (_, _) => throw new NotSupportedException("posix-rename extension unavailable"),
+                plainRename: (source, destination) =>
+                {
+                    plainCalls.Add((source, destination));
+                    throw renameFailure;
+                },
+                remoteExists: remote.ContainsKey,
+                canDemoteAtomicRenameFailure: failure => failure is NotSupportedException));
 
-        Assert.Equal(("/srv/app/config.txt.part", "/srv/app/config.txt"), Assert.Single(renameCalls));
-        Assert.Contains("/srv/app/config.txt", remote);
-        Assert.DoesNotContain("/srv/app/config.txt.part", remote);
-    }
-
-    [Fact]
-    public void CommitRename_RaisesNonAtomicReplacementOnce_WhenFallbackReplacesExistingTarget()
-    {
-        int warningCount = 0;
-
-        SftpAtomicUpload.CommitRename(
-            "/srv/app/config.txt.part",
-            "/srv/app/config.txt",
-            atomicRename: (_, _) => throw new InvalidOperationException("extension unavailable"),
-            plainRename: (_, _) => { },
-            remoteExists: path => path == "/srv/app/config.txt",
-            deleteRemote: _ => { },
-            onNonAtomicReplacement: () => warningCount++);
-
-        Assert.Equal(1, warningCount);
-    }
-
-    [Fact]
-    public void CommitRename_DoesNotRaiseNonAtomicReplacement_WhenAtomicRenameSucceeds()
-    {
-        int warningCount = 0;
-
-        SftpAtomicUpload.CommitRename(
-            "/srv/app/config.txt.part",
-            "/srv/app/config.txt",
-            atomicRename: (_, _) => { },
-            plainRename: (_, _) => { },
-            remoteExists: _ => true,
-            deleteRemote: _ => { },
-            onNonAtomicReplacement: () => warningCount++);
-
-        Assert.Equal(0, warningCount);
-    }
-
-    [Fact]
-    public void CommitRename_DoesNotRaiseNonAtomicReplacement_WhenFallbackTargetIsAbsent()
-    {
-        int warningCount = 0;
-
-        SftpAtomicUpload.CommitRename(
-            "/srv/app/config.txt.part",
-            "/srv/app/config.txt",
-            atomicRename: (_, _) => throw new InvalidOperationException("extension unavailable"),
-            plainRename: (_, _) => { },
-            remoteExists: _ => false,
-            deleteRemote: _ => { },
-            onNonAtomicReplacement: () => warningCount++);
-
-        Assert.Equal(0, warningCount);
+        Assert.Same(renameFailure, exception);
+        Assert.Equal((TempRemotePath, FinalRemotePath), Assert.Single(plainCalls));
+        Assert.Equal("new-content", remote[TempRemotePath]);
+        Assert.DoesNotContain(FinalRemotePath, remote.Keys);
     }
 
     [Fact]
@@ -211,16 +146,16 @@ public sealed class SftpAtomicUploadTests
         var deletedPaths = new List<string>();
 
         SftpAtomicUpload.Rollback(
-            "/srv/app/config.txt.part",
+            TempRemotePath,
             temp => deletedPaths.Add(temp));
 
-        Assert.Equal("/srv/app/config.txt.part", Assert.Single(deletedPaths));
+        Assert.Equal(TempRemotePath, Assert.Single(deletedPaths));
     }
 
     [Fact]
     public void CreateRemoteTempPath_KeepsSameRemoteDirectoryAndUsesSlashSeparators()
     {
-        string tempPath = SftpAtomicUpload.CreateRemoteTempPath("/srv/app/config.txt");
+        string tempPath = SftpAtomicUpload.CreateRemoteTempPath(FinalRemotePath);
 
         Assert.StartsWith("/srv/app/config.txt.", tempPath, StringComparison.Ordinal);
         Assert.EndsWith(".part", tempPath, StringComparison.Ordinal);

@@ -87,22 +87,20 @@ public partial class MainWindow
     private void ToggleFullscreen()
     {
         if (DataContext is not MainViewModel)
+        {
             return;
+        }
 
         if (_uiState.IsFullscreen)
         {
             // Exit fullscreen
-            _uiState.IsFullscreen = false;
+            ApplySidebarLayout(_uiState.ExitFullscreen());
             StopFullscreenChrome();
             NotifyEmbeddedViewsFullscreen(false);
 
             // Show toolbar, TreeView, status bar
             ToolbarRow.Height = new GridLength(WindowUIState.ToolbarHeight);
             StatusBarRow.Height = new GridLength(WindowUIState.StatusBarHeight);
-            SessionTreeColumn.Width = new GridLength(WindowUIState.DefaultSidebarWidth);
-            SessionTreeColumn.MinWidth = WindowUIState.MinSidebarWidth;
-            SessionTreeColumn.MaxWidth = WindowUIState.MaxSidebarWidth;
-            SplitterColumn.Width = GridLength.Auto;
 
             WindowStyle = WindowStyle.SingleBorderWindow;
             WindowState = _uiState.PreFullscreenState;
@@ -115,18 +113,14 @@ public partial class MainWindow
         else
         {
             // Enter fullscreen
-            _uiState.IsFullscreen = true;
             _uiState.PreFullscreenState = WindowState;
             _uiState.PreFullscreenWidth = ActualWidth;
             _uiState.PreFullscreenHeight = ActualHeight;
+            ApplySidebarLayout(_uiState.EnterFullscreen(SessionTreeColumn.ActualWidth));
 
             // Hide toolbar, TreeView, status bar
             ToolbarRow.Height = new GridLength(0);
             StatusBarRow.Height = new GridLength(0);
-            SessionTreeColumn.MinWidth = 0;
-            SessionTreeColumn.MaxWidth = 0;
-            SessionTreeColumn.Width = new GridLength(0);
-            SplitterColumn.Width = new GridLength(0);
 
             WindowStyle = WindowStyle.None;
             WindowState = WindowState.Maximized;
@@ -144,13 +138,7 @@ public partial class MainWindow
     private void NotifyEmbeddedViewsFullscreen(bool isFullscreen)
     {
         if (DataContext is not MainViewModel vm) return;
-        foreach (var session in vm.Connection.ActiveSessions)
-        {
-            if (session.HostControl is Views.EmbeddedRdpView rdpView)
-                rdpView.SetFullscreen(isFullscreen);
-            else if (session.HostControl is Views.EmbeddedSshView sshView)
-                sshView.Visibility = Visibility.Visible; // SSH always visible
-        }
+        EmbeddedFullscreenNotifier.Notify(vm.Connection.ActiveSessions, isFullscreen);
 
         // Hide/show entire tab strip by collapsing the TabPanel
         // Single session fullscreen = no tab bar needed
@@ -352,6 +340,14 @@ public partial class MainWindow
         FullscreenShortcutAction action = FullscreenShortcutRouter.Resolve(key, modifiers, _uiState.IsFullscreen);
         if (action == FullscreenShortcutAction.None)
         {
+            if (IsActive && LowLevelGlobalShortcutRouter.ShouldRoute(key, modifiers))
+            {
+                Dispatcher.BeginInvoke(
+                    DispatcherPriority.Input,
+                    new Action(() => _keyboardShortcutService.TryHandle(key, modifiers)));
+                return true;
+            }
+
             if (key == Key.K
                 && modifiers == ModifierKeys.Control
                 && RdpKeyboardEscapeHook.IsRegisteredRdpViewFocused())
@@ -523,25 +519,42 @@ public partial class MainWindow
 
     private void ToggleSidebar()
     {
-        if (_uiState.IsSidebarHidden)
+        ApplySidebarLayout(_uiState.ToggleSidebar(SessionTreeColumn.ActualWidth));
+    }
+
+    private void ApplySidebarLayout(SidebarLayoutProjection layout)
+    {
+        ApplySidebarLayout(
+            layout,
+            SessionTreeColumn,
+            SplitterColumn,
+            ShowSidebarButton);
+    }
+
+    internal static void ApplySidebarLayout(
+        SidebarLayoutProjection layout,
+        ColumnDefinition sessionTreeColumn,
+        ColumnDefinition splitterColumn,
+        Button showSidebarButton)
+    {
+        if (layout.IsVisible)
         {
-            _uiState.IsSidebarHidden = false;
-            SessionTreeColumn.MinWidth = WindowUIState.MinSidebarWidth;
-            SessionTreeColumn.MaxWidth = WindowUIState.MaxSidebarWidth;
-            SessionTreeColumn.Width = new GridLength(_uiState.SavedSidebarWidth);
-            SplitterColumn.Width = GridLength.Auto;
-            ShowSidebarButton.Visibility = Visibility.Collapsed;
+            sessionTreeColumn.MinWidth = WindowUIState.MinSidebarWidth;
+            sessionTreeColumn.MaxWidth = WindowUIState.MaxSidebarWidth;
+            sessionTreeColumn.Width = new GridLength(layout.Width);
+            splitterColumn.Width = GridLength.Auto;
         }
         else
         {
-            _uiState.IsSidebarHidden = true;
-            _uiState.SavedSidebarWidth = SessionTreeColumn.ActualWidth;
-            SessionTreeColumn.MinWidth = 0;
-            SessionTreeColumn.MaxWidth = 0;
-            SessionTreeColumn.Width = new GridLength(0);
-            SplitterColumn.Width = new GridLength(0);
-            ShowSidebarButton.Visibility = Visibility.Visible;
+            sessionTreeColumn.MinWidth = 0;
+            sessionTreeColumn.MaxWidth = 0;
+            sessionTreeColumn.Width = new GridLength(0);
+            splitterColumn.Width = new GridLength(0);
         }
+
+        showSidebarButton.Visibility = layout.ShowRestoreButton
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     // ── Folder expand/collapse all ───────────────────────────────────

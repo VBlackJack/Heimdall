@@ -17,12 +17,15 @@
 using System.Text;
 using System.Text.Json;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Logging;
 
 namespace Heimdall.Core.Tests;
 
+[Collection("FileLogger")]
 public sealed class ConfigManagerSchemaResilienceTests : IDisposable
 {
     private readonly string _tempDirectory;
+    private readonly string _logDirectory;
     private readonly ConfigManager _manager;
 
     public ConfigManagerSchemaResilienceTests()
@@ -30,12 +33,17 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
         _tempDirectory = Path.Combine(
             Path.GetTempPath(),
             "Heimdall.Schema.Tests." + Guid.NewGuid().ToString("N"));
+        _logDirectory = Path.Combine(_tempDirectory, "logs");
         Directory.CreateDirectory(Path.Combine(_tempDirectory, "config"));
+        FileLogger.SetEnabled(true);
+        FileLogger.Initialize(_logDirectory);
         _manager = new ConfigManager(_tempDirectory);
     }
 
     public void Dispose()
     {
+        FileLogger.Flush();
+        FileLogger.SetEnabled(true);
         try
         {
             if (Directory.Exists(_tempDirectory))
@@ -47,6 +55,140 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
         {
             // Best-effort cleanup.
         }
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_ErrorDiagnostic_IsLoggedWithoutRefusal()
+    {
+        await WriteUtf8Async(
+            _manager.SettingsPath,
+            """
+            {
+              "sshGateways": [
+                {
+                  "id": "self-parent",
+                  "name": "Self Parent",
+                  "host": "gateway.example.test",
+                  "port": 22,
+                  "user": "ops",
+                  "parentGatewayId": "self-parent"
+                }
+              ]
+            }
+            """);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        Assert.Equal("self-parent", Assert.Single(settings.SshGateways).ParentGatewayId);
+        string logContent = ReadLogContent();
+        Assert.Contains("[Error]", logContent, StringComparison.Ordinal);
+        Assert.Contains(nameof(SshGatewayDto.ParentGatewayId), logContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_FutureValues_ArePreservedAndLoggedAsWarnings()
+    {
+        await WriteUtf8Async(
+            _manager.SettingsPath,
+            """
+            {
+              "schemaVersion": 2,
+              "defaultTheme": "Blade",
+              "sshDefaultMode": "FutureMode",
+              "futureSettingsField": "preserve-me"
+            }
+            """);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        Assert.Equal("Blade", settings.DefaultTheme);
+        Assert.Equal("FutureMode", settings.SshDefaultMode);
+        Assert.Equal(
+            "preserve-me",
+            settings.ExtensionData["futureSettingsField"].GetString());
+        string logContent = ReadLogContent();
+        Assert.Contains("[Warning]", logContent, StringComparison.Ordinal);
+        Assert.Contains(nameof(AppSettings.SshDefaultMode), logContent, StringComparison.Ordinal);
+        Assert.DoesNotContain(nameof(AppSettings.DefaultTheme), logContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoadServersAsync_UnknownConnectionType_LoadsAndWarns()
+    {
+        await WriteUtf8Async(
+            _manager.ServersPath,
+            """
+            [
+              {
+                "id": "future-server",
+                "displayName": "Future Server",
+                "remoteServer": "future.example.test",
+                "connectionType": "UNKNOWN"
+              }
+            ]
+            """);
+
+        ServerProfileDto server = Assert.Single(await _manager.LoadServersAsync());
+
+        Assert.Equal("UNKNOWN", server.ConnectionType);
+        string logContent = ReadLogContent();
+        Assert.Contains("[Warning]", logContent, StringComparison.Ordinal);
+        Assert.Contains(nameof(ServerProfileDto.ConnectionType), logContent, StringComparison.Ordinal);
+        Assert.Contains("UNKNOWN", logContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_InvalidVault_IsRejectedWithoutChangingBytes()
+    {
+        await WriteUtf8Async(
+            _manager.SettingsPath,
+            """
+            {
+              "defaultTheme": "Original",
+              "vaultEnabled": true,
+              "vaultWrappedDek": ""
+            }
+            """);
+        byte[] originalBytes = await File.ReadAllBytesAsync(_manager.SettingsPath);
+        AppSettings settings = await _manager.LoadSettingsAsync();
+        settings.DefaultTheme = "Changed";
+
+        ConfigurationValidationException exception =
+            await Assert.ThrowsAsync<ConfigurationValidationException>(
+                () => _manager.SaveSettingsAsync(settings));
+
+        Assert.Contains(nameof(AppSettings.VaultEnabled), exception.Message, StringComparison.Ordinal);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(_manager.SettingsPath));
+    }
+
+    [Fact]
+    public async Task MergeSettingAsync_SelfParentGateway_IsRejectedWithoutChangingBytes()
+    {
+        await WriteUtf8Async(
+            _manager.SettingsPath,
+            """
+            {
+              "defaultTheme": "Original",
+              "sshGateways": [
+                {
+                  "id": "gateway-1",
+                  "name": "Gateway",
+                  "host": "gateway.example.test",
+                  "port": 22,
+                  "user": "ops"
+                }
+              ]
+            }
+            """);
+        byte[] originalBytes = await File.ReadAllBytesAsync(_manager.SettingsPath);
+
+        ConfigurationValidationException exception =
+            await Assert.ThrowsAsync<ConfigurationValidationException>(
+                () => _manager.MergeSettingAsync(settings =>
+                    settings.SshGateways[0].ParentGatewayId = "gateway-1"));
+
+        Assert.Contains(nameof(SshGatewayDto.ParentGatewayId), exception.Message, StringComparison.Ordinal);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(_manager.SettingsPath));
     }
 
     [Theory]
@@ -267,4 +409,11 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
 
     private static Task WriteUtf8Async(string path, string content) =>
         File.WriteAllTextAsync(path, content, new UTF8Encoding(false));
+
+    private string ReadLogContent()
+    {
+        FileLogger.Flush();
+        string logPath = Assert.Single(Directory.GetFiles(_logDirectory, "heimdall_*.log"));
+        return File.ReadAllText(logPath);
+    }
 }

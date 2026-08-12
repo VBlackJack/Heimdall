@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
@@ -32,6 +34,84 @@ namespace Heimdall.Ssh.Plink;
 /// <param name="FailureCode">Structured failure code on failure; null on success.</param>
 public sealed record PlinkTunnelResult(bool Success, string? ErrorMessage, SshFailureCode? FailureCode);
 
+internal interface IPlinkProcess : IDisposable
+{
+    event EventHandler? Exited;
+
+    int Id { get; }
+
+    bool HasExited { get; }
+
+    int ExitCode { get; }
+
+    StreamReader StandardError { get; }
+
+    bool Start();
+
+    void Kill();
+
+    bool WaitForExit(int milliseconds);
+
+    Task WaitForExitAsync(CancellationToken cancellationToken = default);
+}
+
+internal static class PlinkProcessReaper
+{
+    private static readonly ConcurrentDictionary<IPlinkProcess, byte> PendingProcesses =
+        new(ReferenceEqualityComparer.Instance);
+
+    internal static int PendingCount => PendingProcesses.Count;
+
+    internal static void Track(IPlinkProcess process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        if (!PendingProcesses.TryAdd(process, 0))
+        {
+            return;
+        }
+
+        _ = ObserveExitAsync(process);
+    }
+
+    private static async Task ObserveExitAsync(IPlinkProcess process)
+    {
+        try
+        {
+            await process.WaitForExitAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[PlinkProcessReaper] Exit observation failed for pid={TryGetProcessId(process)}: {ex.Message}");
+        }
+        finally
+        {
+            PendingProcesses.TryRemove(process, out _);
+            try
+            {
+                process.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"[PlinkProcessReaper] Process disposal failed: {ex.Message}");
+            }
+        }
+    }
+
+    private static string TryGetProcessId(IPlinkProcess process)
+    {
+        try
+        {
+            return process.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception)
+        {
+            return "unknown";
+        }
+    }
+}
+
 /// <summary>
 /// Fallback tunnel implementation using an external plink.exe process.
 /// Used when SSH.NET cannot handle the authentication method, such as
@@ -48,8 +128,9 @@ public sealed class PlinkTunnelRunner : IDisposable
     private readonly TimeSpan _portCheckInterval;
     private readonly TimeSpan _processKillGracePeriod;
     private readonly ITcpListenerOwnershipProbe _listenerOwnershipProbe;
+    private readonly Func<ProcessStartInfo, IPlinkProcess> _processFactory;
 
-    private Process? _process;
+    private IPlinkProcess? _process;
     private string? _pwFilePath;
     private Task? _drainTask;
     private CancellationTokenSource? _drainCts;
@@ -77,12 +158,22 @@ public sealed class PlinkTunnelRunner : IDisposable
     internal PlinkTunnelRunner(
         PlinkTunnelRunnerOptions options,
         ITcpListenerOwnershipProbe listenerOwnershipProbe)
+        : this(options, listenerOwnershipProbe, CreateProcess)
+    {
+    }
+
+    internal PlinkTunnelRunner(
+        PlinkTunnelRunnerOptions options,
+        ITcpListenerOwnershipProbe listenerOwnershipProbe,
+        Func<ProcessStartInfo, IPlinkProcess> processFactory)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(listenerOwnershipProbe);
+        ArgumentNullException.ThrowIfNull(processFactory);
         _portCheckInterval = TimeSpan.FromMilliseconds(options.PortCheckIntervalMs);
         _processKillGracePeriod = TimeSpan.FromMilliseconds(options.KillGracePeriodMs);
         _listenerOwnershipProbe = listenerOwnershipProbe;
+        _processFactory = processFactory;
     }
 
     /// <summary>Whether the underlying plink process is running.</summary>
@@ -158,11 +249,11 @@ public sealed class PlinkTunnelRunner : IDisposable
             return new PlinkTunnelResult(false, ex.Message, SshFailureCode.Unknown);
         }
 
-        Process? process = null;
+        IPlinkProcess? process = null;
         int expectedProcessId;
         try
         {
-            var newProcess = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+            IPlinkProcess newProcess = _processFactory(startInfo);
             process = newProcess;
             newProcess.Exited += (_, _) => LogProcessExit(newProcess, localPort);
             if (!newProcess.Start())
@@ -194,7 +285,7 @@ public sealed class PlinkTunnelRunner : IDisposable
                 while (true)
                 {
                     var proc = _process;
-                    if (proc is null || proc.HasExited || proc.StandardError is null)
+                    if (proc is null || proc.HasExited)
                     {
                         break;
                     }
@@ -279,6 +370,20 @@ public sealed class PlinkTunnelRunner : IDisposable
         }
     }
 
+    private static void LogProcessExit(IPlinkProcess process, int localPort)
+    {
+        try
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"Plink tunnel process exited (pid={process.Id}, port={localPort})");
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Debug(
+                $"[PlinkTunnelRunner] exit-log suppressed (port={localPort}): {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Stops the plink tunnel process and cleans up temporary files.
     /// Cancels the stderr drain task and joins it (with a short timeout)
@@ -314,26 +419,52 @@ public sealed class PlinkTunnelRunner : IDisposable
         _drainCts?.Dispose();
         _drainCts = null;
 
-        if (_process is not null)
+        IPlinkProcess? process = _process;
+        bool exitConfirmed = false;
+        try
         {
-            try
+            if (process is not null)
             {
-                if (!_process.HasExited)
+                if (process.HasExited)
                 {
-                    _process.Kill();
-                    _process.WaitForExit((int)_processKillGracePeriod.TotalMilliseconds);
+                    exitConfirmed = true;
+                }
+                else
+                {
+                    process.Kill();
+                    exitConfirmed = process.WaitForExit(
+                        (int)_processKillGracePeriod.TotalMilliseconds);
                 }
             }
-            catch (InvalidOperationException ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Warn($"[PlinkTunnelRunner] Stop: {ex.Message}");
-            }
-
-            _process.Dispose();
-            _process = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[PlinkTunnelRunner] Stop: {ex.Message}");
+        }
+        catch (Win32Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[PlinkTunnelRunner] Stop: {ex.Message}");
+        }
+        finally
+        {
+            CleanupPasswordFile();
         }
 
-        CleanupPasswordFile();
+        if (process is null)
+        {
+            return;
+        }
+
+        _process = null;
+        if (exitConfirmed)
+        {
+            process.Dispose();
+            return;
+        }
+
+        Heimdall.Core.Logging.FileLogger.Warn(
+            $"[PlinkTunnelRunner] Process exit was not confirmed; retaining pid={TryGetProcessId(process)} until exit.");
+        PlinkProcessReaper.Track(process);
     }
 
     public void Dispose()
@@ -345,6 +476,76 @@ public sealed class PlinkTunnelRunner : IDisposable
 
         _disposed = true;
         Stop();
+    }
+
+    private static IPlinkProcess CreateProcess(ProcessStartInfo startInfo)
+    {
+        return new SystemPlinkProcess(startInfo);
+    }
+
+    private static string TryGetProcessId(IPlinkProcess process)
+    {
+        try
+        {
+            return process.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception)
+        {
+            return "unknown";
+        }
+    }
+
+    private sealed class SystemPlinkProcess : IPlinkProcess
+    {
+        private readonly Process _inner;
+
+        public SystemPlinkProcess(ProcessStartInfo startInfo)
+        {
+            _inner = new Process
+            {
+                StartInfo = startInfo,
+                EnableRaisingEvents = true
+            };
+        }
+
+        public event EventHandler? Exited
+        {
+            add => _inner.Exited += value;
+            remove => _inner.Exited -= value;
+        }
+
+        public int Id => _inner.Id;
+
+        public bool HasExited => _inner.HasExited;
+
+        public int ExitCode => _inner.ExitCode;
+
+        public StreamReader StandardError => _inner.StandardError;
+
+        public bool Start()
+        {
+            return _inner.Start();
+        }
+
+        public void Kill()
+        {
+            _inner.Kill();
+        }
+
+        public bool WaitForExit(int milliseconds)
+        {
+            return _inner.WaitForExit(milliseconds);
+        }
+
+        public Task WaitForExitAsync(CancellationToken cancellationToken = default)
+        {
+            return _inner.WaitForExitAsync(cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            _inner.Dispose();
+        }
     }
 
     /// <summary>

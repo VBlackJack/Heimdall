@@ -87,7 +87,6 @@ public sealed class SessionTabContextMenuFactory
             AppendMacroItems(menu, vm, sshView);
         }
 
-        AppendCloseAllItem(menu, session, vm);
         AppendCloseGroupItems(menu, session, vm);
 
         menu.Items.Add(new Separator());
@@ -237,20 +236,7 @@ public sealed class SessionTabContextMenuFactory
         // Duplicate session: open a second tab for the same server while
         // keeping the current one. Distinct from "Reconnect".
         var duplicateItem = new MenuItem { Header = vm.Localize("SessionDuplicateTab") };
-        duplicateItem.Click += (_, _) =>
-        {
-            string lookupId = session.ProfileLookupServerId;
-
-            if (!string.IsNullOrEmpty(lookupId) && vm.ServerList.ConnectCommand is not null)
-            {
-                var serverVm = vm.ServerList.Servers.FirstOrDefault(
-                    s => string.Equals(s.Id, lookupId, StringComparison.Ordinal));
-                if (serverVm is not null)
-                {
-                    vm.ServerList.ConnectCommand.Execute(serverVm);
-                }
-            }
-        };
+        duplicateItem.Click += (_, _) => vm.Session.DuplicateSession(session);
         menu.Items.Add(duplicateItem);
 
         if (session.IsAdHoc && session.AdHocProfileSnapshot is not null)
@@ -650,19 +636,6 @@ public sealed class SessionTabContextMenuFactory
         menu.Items.Add(editMenu);
     }
 
-    // ── Close session (always present) ───────────────────────────────
-
-    private static void AppendCloseAllItem(
-        ContextMenu menu,
-        SessionTabViewModel session,
-        MainViewModel vm)
-    {
-        var closeAllItem = new MenuItem { Header = vm.Localize("SessionCloseSession") };
-        closeAllItem.Click += async (_, _) =>
-            await vm.Connection.CloseSessionAsync(session, DisconnectReason.UserAction);
-        menu.Items.Add(closeAllItem);
-    }
-
     // --- Close others / Close to the right ---
 
     private static void AppendCloseGroupItems(
@@ -672,32 +645,34 @@ public sealed class SessionTabContextMenuFactory
     {
         var ordered = vm.Connection.ActiveSessions;
 
+        IReadOnlyList<SessionTabViewModel> closeOthersTargets =
+            SessionsToCloseOthers(ordered.ToList(), session);
+        IReadOnlyList<SessionTabViewModel> closeRightTargets =
+            SessionsToCloseToRight(ordered.ToList(), session);
+
         var closeOthersItem = new MenuItem
         {
             Header = vm.Localize("SessionCloseOthers"),
-            IsEnabled = ordered.Count > 1
+            IsEnabled = closeOthersTargets.Count > 0
         };
         closeOthersItem.Click += async (_, _) =>
         {
-            // Snapshot before closing: ActiveSessions mutates as each tab closes.
-            foreach (var target in SessionsToCloseOthers(ordered.ToList(), session))
-            {
-                await vm.Connection.CloseSessionAsync(target, DisconnectReason.UserAction);
-            }
+            await vm.Connection.CloseSessionsAsync(
+                closeOthersTargets,
+                DisconnectReason.UserAction);
         };
         menu.Items.Add(closeOthersItem);
 
         var closeRightItem = new MenuItem
         {
             Header = vm.Localize("SessionCloseToRight"),
-            IsEnabled = SessionsToCloseToRight(ordered.ToList(), session).Count > 0
+            IsEnabled = closeRightTargets.Count > 0
         };
         closeRightItem.Click += async (_, _) =>
         {
-            foreach (var target in SessionsToCloseToRight(ordered.ToList(), session))
-            {
-                await vm.Connection.CloseSessionAsync(target, DisconnectReason.UserAction);
-            }
+            await vm.Connection.CloseSessionsAsync(
+                closeRightTargets,
+                DisconnectReason.UserAction);
         };
         menu.Items.Add(closeRightItem);
     }
@@ -727,7 +702,9 @@ public sealed class SessionTabContextMenuFactory
 
             // "Merge with..." submenu — nested per session with orientation sub-items
             var otherSessions = vm.Connection.ActiveSessions
-                .Where(s => s != session && s.HostControl is not null)
+                .Where(s => s != session
+                    && s.HostControl is not null
+                    && !string.IsNullOrWhiteSpace(s.ServerId))
                 .ToList();
 
             if (otherSessions.Count > 0)
@@ -739,8 +716,8 @@ public sealed class SessionTabContextMenuFactory
                     var sourceTab = other;
                     var sessionMenu = new MenuItem { Header = sourceTab.Title };
 
-                    // Use the profile lookup key; ServerId may be empty during connection.
-                    string mergeId = sourceTab.ProfileLookupServerId;
+                    // Merge resolution is session-scoped; profile IDs are shared by duplicate tabs.
+                    string mergeId = sourceTab.ServerId;
 
                     var mergeH = new MenuItem { Header = vm.Localize("OrientationHorizontal") };
                     mergeH.Click += (_, _) => vm.MergeExistingSession(

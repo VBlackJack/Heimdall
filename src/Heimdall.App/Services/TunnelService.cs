@@ -109,7 +109,7 @@ public sealed class TunnelService : ITunnelService
     /// Checks whether the server requires a tunnel and establishes it if needed.
     /// Returns the resolved host and port to connect to.
     /// </summary>
-    public async Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)>
+    public async Task<TunnelSetupOutcome>
         SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
@@ -119,7 +119,7 @@ public sealed class TunnelService : ITunnelService
     {
         if (server.UseDirectConnection || string.IsNullOrEmpty(server.SshGatewayId))
         {
-            return (true, false, server.RemoteServer, remotePort, null);
+            return new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, null, null);
         }
 
         bool useOsAssignedLocalPort = ShouldUseOsAssignedLocalPort(server, settings);
@@ -140,7 +140,7 @@ public sealed class TunnelService : ITunnelService
 
         if (!tunnelResult.Success)
         {
-            return (false, false, string.Empty, 0, tunnelResult.ErrorMessage);
+            return new TunnelSetupOutcome(false, false, string.Empty, 0, tunnelResult.ErrorMessage, tunnelResult.FailureCode);
         }
 
         int localPort = tunnelResult.Tunnel?.LocalPort ?? server.LocalPort;
@@ -149,7 +149,7 @@ public sealed class TunnelService : ITunnelService
         // for it so it cannot mislabel a later, unrelated disconnect.
         _forwardedPortFailures.Clear(localPort);
         var localBindHost = tunnelResult.Tunnel?.LocalBindHost ?? LoopbackBinding.DefaultHost;
-        return (true, true, localBindHost, localPort, null);
+        return new TunnelSetupOutcome(true, true, localBindHost, localPort, null, null);
     }
 
     /// <summary>
@@ -185,26 +185,29 @@ public sealed class TunnelService : ITunnelService
                 settings.SshAgentPreference);
             gatewayChainKey = BuildGatewayChainKey(chainDtos);
         }
+        catch (GatewayChainException chainEx)
+        {
+            _connectionSm.SetError(serverId, chainEx.Message);
+            return new TunnelResult(false, null, chainEx.Message, chainEx.Code);
+        }
         catch (Exception ex)
         {
             _connectionSm.SetError(serverId, ex.Message);
             return new TunnelResult(false, null, ex.Message, SshFailureCode.Unknown);
         }
 
-        IReadOnlyList<TunnelInfo> existingTunnels = _tunnelManager.GetActiveTunnels();
-        TunnelInfo? existing = FindReusableTunnel(
-            existingTunnels,
+        TunnelInfo? existing = _tunnelManager.AcquireReusableTunnel(
             gatewayChainKey,
             remoteHost,
             remotePort,
             socksProxyPort,
-            remoteBindPort);
+            remoteBindPort,
+            remoteLocalPort);
 
         if (existing is not null)
         {
             Core.Logging.FileLogger.Info(
                 $"Reusing existing tunnel on port {existing.LocalPort} for {serverId}");
-            _tunnelManager.AddReference(existing.LocalPort);
             _connectionSm.SetTunnelInfo(serverId, existing.LocalPort, 0);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.EstablishingTunnel);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
@@ -530,56 +533,6 @@ public sealed class TunnelService : ITunnelService
         }
 
         return settings.DefaultSshTunnelPort;
-    }
-
-    internal static TunnelInfo? FindReusableTunnel(
-        IReadOnlyList<TunnelInfo> activeTunnels,
-        string gatewayChainKey,
-        string remoteHost,
-        int remotePort,
-        int socksProxyPort,
-        int remoteBindPort)
-    {
-        ArgumentNullException.ThrowIfNull(activeTunnels);
-        ArgumentNullException.ThrowIfNull(gatewayChainKey);
-        ArgumentNullException.ThrowIfNull(remoteHost);
-
-        foreach (TunnelInfo tunnel in activeTunnels)
-        {
-            if (!tunnel.IsAlive)
-            {
-                continue;
-            }
-
-            if (!string.Equals(tunnel.GatewayChainKey, gatewayChainKey, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (!string.Equals(tunnel.RemoteHost, remoteHost, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (tunnel.RemotePort != remotePort)
-            {
-                continue;
-            }
-
-            if (tunnel.SocksProxyPort != socksProxyPort)
-            {
-                continue;
-            }
-
-            if (tunnel.RemoteBindPort != remoteBindPort)
-            {
-                continue;
-            }
-
-            return tunnel;
-        }
-
-        return null;
     }
 
     internal static string BuildGatewayChainKey(IReadOnlyList<SshGatewayDto> chainDtos)

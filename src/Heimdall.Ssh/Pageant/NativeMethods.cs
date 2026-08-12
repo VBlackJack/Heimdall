@@ -32,12 +32,15 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
-    [DllImport("user32.dll")]
-    internal static extern IntPtr SendMessage(
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr SendMessageTimeout(
         IntPtr hWnd,
         uint msg,
         IntPtr wParam,
-        ref COPYDATASTRUCT lParam);
+        ref COPYDATASTRUCT lParam,
+        SendMessageTimeoutFlags flags,
+        uint timeoutMilliseconds,
+        out UIntPtr result);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern SafeFileHandle CreateFileMapping(
@@ -69,6 +72,14 @@ internal static class NativeMethods
         public IntPtr dwData;
         public int cbData;
         public IntPtr lpData;
+    }
+
+    [Flags]
+    internal enum SendMessageTimeoutFlags : uint
+    {
+        Block = 0x0001,
+        AbortIfHung = 0x0002,
+        ErrorOnExit = 0x0020
     }
 
     [StructLayout(LayoutKind.Sequential)]

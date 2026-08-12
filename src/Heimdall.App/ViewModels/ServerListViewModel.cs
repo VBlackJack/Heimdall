@@ -75,9 +75,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         new(StringComparer.Ordinal);
     private AppSettings? _currentSettings;
     private readonly HashSet<string> _expandedNodes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _expandSaveSync = new();
     private ITimer? _searchFilterTimer;
     private System.Threading.Timer? _expandSaveTimer;
+    private Task _expandSaveTask = Task.CompletedTask;
+    private long _expandSaveVersion;
+    private bool _expandStateSavePending;
+    private bool _expandStateFlushInProgress;
     private int _searchFilterVersion;
+    private static readonly TimeSpan ExpandStateSaveDelay = TimeSpan.FromMilliseconds(500);
 
     [ObservableProperty]
     private ObservableCollection<ServerItemViewModel> _servers = [];
@@ -278,7 +284,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         _disposed = true;
         DetachStableTreeFolderEvents();
         _searchFilterTimer?.Dispose();
-        _expandSaveTimer?.Dispose();
+        lock (_expandSaveSync)
+        {
+            _expandSaveVersion++;
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+            _expandStateSavePending = false;
+        }
+
         _connectionSm.StateChanged -= OnConnectionStateChanged;
         if (_healthMonitor is not null)
         {
@@ -964,12 +977,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
                     break;
 
                 case "SSH":
-                    sessionStartCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    sessionStartFired = true;
-                    SessionStarting?.Invoke(sessionId, originalId, server.DisplayName,
-                        "SSH", serverDto, settings, sessionStartCts);
+                    CancellationToken sshCancellationToken = cancellationToken;
+                    if (!string.Equals(serverDto.SshMode, "External", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sessionStartCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        sessionStartFired = true;
+                        SessionStarting?.Invoke(sessionId, originalId, server.DisplayName,
+                            "SSH", serverDto, settings, sessionStartCts);
+                        sshCancellationToken = sessionStartCts.Token;
+                    }
+
                     result = await _connectionService.ConnectSshAsync(
-                        serverDto, settings, sessionStartCts.Token);
+                        serverDto, settings, sshCancellationToken);
                     break;
 
                 case "SFTP":
@@ -1326,6 +1345,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         };
 
         var settings = await _configManager.LoadSettingsAsync();
+        dialogVm.SshMode = settings.SshDefaultMode;
         PopulateServerDialogOptions(dialogVm, settings);
         dialogVm.Settings = settings;
 
@@ -1809,6 +1829,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         else
         {
             _expandedNodes.Remove(key);
+            SynchronizeSelection(null);
         }
 
         ScheduleExpandStateSave();
@@ -1821,35 +1842,125 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
     private void ScheduleExpandStateSave()
     {
         ImmutableArray<string> expandedNodes = [.. _expandedNodes];
-        _expandSaveTimer?.Dispose();
-        _expandSaveTimer = new System.Threading.Timer(
-            _ => SaveExpandStateAsync(expandedNodes),
-            null,
-            TimeSpan.FromMilliseconds(500),
-            Timeout.InfiniteTimeSpan);
+        lock (_expandSaveSync)
+        {
+            long version = ++_expandSaveVersion;
+            _expandStateSavePending = true;
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+
+            if (_expandStateFlushInProgress)
+            {
+                return;
+            }
+
+            _expandSaveTimer = new System.Threading.Timer(
+                _ => StartExpandStateSave(version, expandedNodes),
+                null,
+                ExpandStateSaveDelay,
+                Timeout.InfiniteTimeSpan);
+        }
     }
 
-    private void SaveExpandStateAsync(ImmutableArray<string> expandedNodes)
+    private void StartExpandStateSave(long version, ImmutableArray<string> expandedNodes)
     {
-        _ = Task.Run(async () =>
+        lock (_expandSaveSync)
         {
-            try
+            if (version != _expandSaveVersion || _expandStateFlushInProgress)
             {
-                await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
+                return;
             }
-            catch (Exception ex)
+
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+            _expandStateSavePending = false;
+            _expandSaveTask = SaveExpandStateAfterAsync(_expandSaveTask, expandedNodes);
+        }
+    }
+
+    private async Task SaveExpandStateAfterAsync(
+        Task precedingSave,
+        ImmutableArray<string> expandedNodes)
+    {
+        try
+        {
+            await precedingSave.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error(
+                $"Previous tree expand-state persistence failed: {ex.Message}");
+        }
+
+        try
+        {
+            await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error(
+                $"Queued tree expand-state persistence failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Cancels the expand-state debounce, drains any active persistence callback,
+    /// and best-effort persists the latest pending snapshot before interactive close.
+    /// </summary>
+    internal async Task FlushExpandStateForCloseAsync()
+    {
+        lock (_expandSaveSync)
+        {
+            _expandStateFlushInProgress = true;
+            _expandSaveVersion++;
+            _expandSaveTimer?.Dispose();
+            _expandSaveTimer = null;
+        }
+
+        while (true)
+        {
+            Task activeSave;
+            bool hasPendingSnapshot;
+            ImmutableArray<string> expandedNodes = [];
+            lock (_expandSaveSync)
             {
-                Core.Logging.FileLogger.Error($"SaveExpandStateCoreAsync failed: {ex.Message}");
+                activeSave = _expandSaveTask;
+                hasPendingSnapshot = _expandStateSavePending;
+                if (hasPendingSnapshot)
+                {
+                    expandedNodes = [.. _expandedNodes];
+                    _expandStateSavePending = false;
+                }
             }
-        });
+
+            await activeSave.ConfigureAwait(false);
+            if (hasPendingSnapshot)
+            {
+                await SaveExpandStateBestEffortAsync(expandedNodes).ConfigureAwait(false);
+            }
+
+            lock (_expandSaveSync)
+            {
+                if (!_expandStateSavePending && _expandSaveTask.IsCompleted)
+                {
+                    _expandStateFlushInProgress = false;
+                    return;
+                }
+            }
+        }
     }
 
     private async Task SaveExpandStateCoreAsync(ImmutableArray<string> expandedNodes)
     {
+        await _configManager.MergeSettingAsync(
+            settings => settings.TreeExpandedNodes = [.. expandedNodes]).ConfigureAwait(false);
+    }
+
+    private async Task SaveExpandStateBestEffortAsync(ImmutableArray<string> expandedNodes)
+    {
         try
         {
-            await _configManager.MergeSettingAsync(
-                settings => settings.TreeExpandedNodes = [.. expandedNodes]).ConfigureAwait(false);
+            await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -1892,9 +2003,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
     private void SynchronizeSelection(string? preferredSelectedServerId)
     {
+        List<ServerItemViewModel> visibleLeaves = SelectionHelpers
+            .EnumerateVisibleLeaves(GroupedServers)
+            .ToList();
+
         if (!string.IsNullOrWhiteSpace(preferredSelectedServerId))
         {
-            var preferred = Servers.FirstOrDefault(
+            ServerItemViewModel? preferred = visibleLeaves.FirstOrDefault(
                 server => string.Equals(server.Id, preferredSelectedServerId, StringComparison.Ordinal));
 
             if (preferred is not null)
@@ -1905,7 +2020,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         }
 
         var visibleSelection = SelectedItems
-            .Where(Servers.Contains)
+            .Where(visibleLeaves.Contains)
             .ToList();
 
         if (visibleSelection.Count == 0)
@@ -2074,7 +2189,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             if (ConnectedFilterEnabled && wasConnected != isConnected)
             {
                 ConnectedMembershipRefreshCount++;
-                ApplyFilter(server.Id);
+                ApplyFilter();
             }
 
             // Record successful reach: feeds RDP-DISC-04 (palette protocol bias)

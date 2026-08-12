@@ -245,6 +245,7 @@ public sealed partial class TunnelManager : IDisposable
                 remotePort,
                 socksProxyPort,
                 remoteBindPort,
+                remoteLocalPort,
                 label,
                 gatewayChainKey,
                 localBindHost);
@@ -433,6 +434,7 @@ public sealed partial class TunnelManager : IDisposable
                 remotePort,
                 socksProxyPort,
                 remoteBindPort,
+                remoteLocalPort,
                 label,
                 gatewayChainKey,
                 localBindHost);
@@ -529,6 +531,116 @@ public sealed partial class TunnelManager : IDisposable
                 s => s.Info with { IsAlive = s.IsAlive }))
             .ToList()
             .AsReadOnly();
+    }
+
+    /// <summary>
+    /// Finds an alive tunnel with the requested reuse identity and atomically
+    /// acquires one reference to the exact registered tunnel object.
+    /// </summary>
+    /// <param name="gatewayChainKey">Stable identity of the gateway chain.</param>
+    /// <param name="remoteHost">Remote host reached through the tunnel.</param>
+    /// <param name="remotePort">Remote port reached through the tunnel.</param>
+    /// <param name="socksProxyPort">SOCKS proxy port, or <c>0</c> when disabled.</param>
+    /// <param name="remoteBindPort">Remote reverse-forward bind port, or <c>0</c> when disabled.</param>
+    /// <param name="remoteLocalPort">
+    /// Requested local destination of the reverse forward. A non-positive value
+    /// means <paramref name="remoteBindPort"/> when reverse forwarding is enabled,
+    /// and is ignored when reverse forwarding is disabled.
+    /// </param>
+    /// <returns>
+    /// A snapshot of the exact tunnel whose reference was acquired, or <c>null</c>
+    /// when no alive matching tunnel remained registered throughout acquisition.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="gatewayChainKey"/> or <paramref name="remoteHost"/> is <c>null</c>.
+    /// </exception>
+    /// <remarks>
+    /// Liveness callbacks execute outside the registry lock. The method then
+    /// re-enters the lock and verifies object identity before incrementing the
+    /// reference count, preventing close/rebind ABA races.
+    /// </remarks>
+    public TunnelInfo? AcquireReusableTunnel(
+        string gatewayChainKey,
+        string remoteHost,
+        int remotePort,
+        int socksProxyPort,
+        int remoteBindPort,
+        int remoteLocalPort)
+    {
+        ArgumentNullException.ThrowIfNull(gatewayChainKey);
+        ArgumentNullException.ThrowIfNull(remoteHost);
+
+        int effectiveRemoteLocalPort = ResolveEffectiveRemoteLocalPort(
+            remoteBindPort,
+            remoteLocalPort);
+        List<ReusableTunnelCandidate> candidates = [];
+
+        lock (_registryLock)
+        {
+            foreach (TunnelSession session in _activeTunnels.Values)
+            {
+                if (MatchesReuseIdentity(
+                        session.Info,
+                        gatewayChainKey,
+                        remoteHost,
+                        remotePort,
+                        socksProxyPort,
+                        remoteBindPort,
+                        effectiveRemoteLocalPort))
+                {
+                    candidates.Add(new ReusableTunnelCandidate(
+                        session.Info,
+                        session,
+                        () => session.Client.IsConnected,
+                        IsExternal: false));
+                }
+            }
+
+            foreach (ExternalTunnelSession session in _externalTunnels.Values)
+            {
+                if (MatchesReuseIdentity(
+                        session.Info,
+                        gatewayChainKey,
+                        remoteHost,
+                        remotePort,
+                        socksProxyPort,
+                        remoteBindPort,
+                        effectiveRemoteLocalPort))
+                {
+                    candidates.Add(new ReusableTunnelCandidate(
+                        session.Info,
+                        session,
+                        () => session.IsAlive,
+                        IsExternal: true));
+                }
+            }
+        }
+
+        foreach (ReusableTunnelCandidate candidate in candidates)
+        {
+            if (!IsAliveOutsideRegistryLock(candidate))
+            {
+                continue;
+            }
+
+            lock (_registryLock)
+            {
+                bool isSameRegistration = candidate.IsExternal
+                    ? _externalTunnels.TryGetValue(candidate.Info.LocalPort, out ExternalTunnelSession? currentExternal)
+                        && ReferenceEquals(currentExternal, candidate.RegistryEntry)
+                    : _activeTunnels.TryGetValue(candidate.Info.LocalPort, out TunnelSession? currentActive)
+                        && ReferenceEquals(currentActive, candidate.RegistryEntry);
+                if (!isSameRegistration)
+                {
+                    continue;
+                }
+
+                AddReferenceUnderLock(candidate.Info.LocalPort);
+                return candidate.Info with { IsAlive = true };
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -674,6 +786,43 @@ public sealed partial class TunnelManager : IDisposable
     {
         return _activeTunnels.ContainsKey(localPort) || _externalTunnels.ContainsKey(localPort);
     }
+
+    private static bool MatchesReuseIdentity(
+        TunnelInfo tunnel,
+        string gatewayChainKey,
+        string remoteHost,
+        int remotePort,
+        int socksProxyPort,
+        int remoteBindPort,
+        int effectiveRemoteLocalPort)
+    {
+        return string.Equals(tunnel.GatewayChainKey, gatewayChainKey, StringComparison.Ordinal)
+            && string.Equals(tunnel.RemoteHost, remoteHost, StringComparison.Ordinal)
+            && tunnel.RemotePort == remotePort
+            && tunnel.SocksProxyPort == socksProxyPort
+            && tunnel.RemoteBindPort == remoteBindPort
+            && tunnel.EffectiveRemoteLocalPort == effectiveRemoteLocalPort;
+    }
+
+    private static bool IsAliveOutsideRegistryLock(ReusableTunnelCandidate candidate)
+    {
+        try
+        {
+            return candidate.IsAlive();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"[TunnelManager] Reusable tunnel liveness probe failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private readonly record struct ReusableTunnelCandidate(
+        TunnelInfo Info,
+        object RegistryEntry,
+        Func<bool> IsAlive,
+        bool IsExternal);
 
     private void AddReferenceUnderLock(int localPort)
     {

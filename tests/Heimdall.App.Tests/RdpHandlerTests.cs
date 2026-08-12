@@ -149,6 +149,7 @@ public sealed class RdpHandlerTests
         Assert.Equal("mstsc.exe did not start.", result.ErrorMessage);
         Assert.NotEqual(rawExceptionMessage, result.ErrorMessage);
         Assert.Equal(1, launcher.LaunchCalls);
+        Assert.False(File.Exists(launcher.LastRdpFilePath));
     }
 
     [Fact]
@@ -286,6 +287,218 @@ public sealed class RdpHandlerTests
         cleanupCancellation.Cancel();
         await credentialManager.DeleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
+        Assert.Equal(1, credentialManager.DeleteCalls);
+        Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_LauncherReturnsNull_DeletesRdpFileBeforeReturningAndReleasesCredentialOnce()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher();
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        RdpHandler handler = CreateHandler(launcher, credentialManager, new LocalizationManager());
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, launcher.LaunchCalls);
+        Assert.True(launcher.FileExistedAtLaunch);
+        Assert.False(File.Exists(launcher.LastRdpFilePath));
+        Assert.Equal(1, credentialManager.DeleteCalls);
+        Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_CredentialReleaseThrows_StillFailsNormallyAndDeletesRdpFile()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher();
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true,
+            DeleteException = new InvalidOperationException("credential provider failure")
+        };
+        RdpHandler handler = CreateHandler(launcher, credentialManager, new LocalizationManager());
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        try
+        {
+            ConnectionResult result = await handler.ConnectAsync(
+                server,
+                settings,
+                CancellationToken.None,
+                RdpModeOverride.ForceExternal);
+
+            Assert.False(result.Success);
+            Assert.Equal(1, launcher.LaunchCalls);
+            Assert.True(launcher.FileExistedAtLaunch);
+            Assert.False(File.Exists(launcher.LastRdpFilePath));
+            Assert.Equal(1, credentialManager.DeleteCalls);
+        }
+        finally
+        {
+            // Defensive: if the artifact survived, this test must not litter %TEMP%.
+            if (launcher.LastRdpFilePath is not null)
+            {
+                File.Delete(launcher.LastRdpFilePath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConnectAsync_LauncherThrows_DeletesRdpFileBeforeReturningAndReleasesCredentialOnce()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ExceptionToThrow = new InvalidOperationException("raw mstsc launch exception")
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        RdpHandler handler = CreateHandler(launcher, credentialManager, new LocalizationManager());
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, launcher.LaunchCalls);
+        Assert.True(launcher.FileExistedAtLaunch);
+        Assert.False(File.Exists(launcher.LastRdpFilePath));
+        Assert.Equal(1, credentialManager.DeleteCalls);
+        Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_DeferredRdpFileDeletionThrowsUnauthorized_StillReleasesCredentialOnce()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        string? attemptedDeletePath = null;
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            deleteRdpFile: (string path) =>
+            {
+                attemptedDeletePath = path;
+                throw new UnauthorizedAccessException("access to the path is denied");
+            });
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        try
+        {
+            ConnectionResult result = await handler.ConnectAsync(
+                server,
+                settings,
+                CancellationToken.None,
+                RdpModeOverride.ForceExternal);
+
+            Assert.True(result.Success);
+
+            await credentialManager.DeleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(1, credentialManager.DeleteCalls);
+            Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
+            Assert.Equal(launcher.LastRdpFilePath, attemptedDeletePath);
+        }
+        finally
+        {
+            // The injected seam never deleted anything: this test owns the artifact.
+            if (launcher.LastRdpFilePath is not null)
+            {
+                File.Delete(launcher.LastRdpFilePath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SuccessfulLaunch_DefersRdpFileDeletionThenDeletesItWithTheCredential()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        TaskCompletionSource deleteObserved =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        string? deletedPath = null;
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            deleteRdpFile: (string path) =>
+            {
+                deletedPath = path;
+                File.Delete(path);
+                deleteObserved.TrySetResult();
+            });
+        ServerProfileDto server = CreateCredentialedServer();
+        using CancellationTokenSource cleanupCancellation = new CancellationTokenSource();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            cleanupCancellation.Token,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.True(launcher.FileExistedAtLaunch);
+        Assert.True(File.Exists(launcher.LastRdpFilePath));
+        Assert.Null(deletedPath);
+        Assert.Equal(0, credentialManager.DeleteCalls);
+
+        cleanupCancellation.Cancel();
+        await deleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await credentialManager.DeleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(launcher.LastRdpFilePath, deletedPath);
+        Assert.False(File.Exists(launcher.LastRdpFilePath));
         Assert.Equal(1, credentialManager.DeleteCalls);
         Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
     }
@@ -466,7 +679,8 @@ public sealed class RdpHandlerTests
         IRdpExternalClientLauncher launcher,
         IRdpCredentialManager credentialManager,
         LocalizationManager localizer,
-        RdpCredentialAutofillOperation? credentialAutofill = null)
+        RdpCredentialAutofillOperation? credentialAutofill = null,
+        Action<string>? deleteRdpFile = null)
     {
         return new RdpHandler(
             new PassThroughTunnelService(),
@@ -475,7 +689,8 @@ public sealed class RdpHandlerTests
             launcher,
             credentialManager: credentialManager,
             decryptPassword: _ => "password",
-            credentialAutofill: credentialAutofill);
+            credentialAutofill: credentialAutofill,
+            deleteRdpFile: deleteRdpFile);
     }
 
     private static ServerProfileDto CreateServer(string rdpMode) =>
@@ -500,14 +715,14 @@ public sealed class RdpHandlerTests
 
     private sealed class PassThroughTunnelService : ITunnelService
     {
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
-            return Task.FromResult((true, false, server.RemoteServer, remotePort, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)
@@ -530,7 +745,7 @@ public sealed class RdpHandlerTests
         public int ReleasedLocalPort { get; private set; }
         public bool? LastPreferDistinctLoopback { get; private set; }
 
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
@@ -540,7 +755,7 @@ public sealed class RdpHandlerTests
             LastPreferDistinctLoopback = preferDistinctLoopback;
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
-            return Task.FromResult((true, UsesTunnel, host, port, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)
@@ -562,6 +777,8 @@ public sealed class RdpHandlerTests
 
         public string? LastRdpFilePath { get; private set; }
 
+        public bool? FileExistedAtLaunch { get; private set; }
+
         public ILaunchedRdpClientProcess? ProcessToReturn { get; init; }
 
         public Exception? ExceptionToThrow { get; init; }
@@ -570,6 +787,7 @@ public sealed class RdpHandlerTests
         {
             LaunchCalls++;
             LastRdpFilePath = rdpFilePath;
+            FileExistedAtLaunch = File.Exists(rdpFilePath);
             if (ExceptionToThrow is not null)
             {
                 throw ExceptionToThrow;
@@ -582,6 +800,8 @@ public sealed class RdpHandlerTests
     private sealed class TrackingRdpCredentialManager : IRdpCredentialManager
     {
         public bool CredentialWritten { get; init; }
+
+        public Exception? DeleteException { get; init; }
 
         public int WriteCalls { get; private set; }
 
@@ -622,6 +842,11 @@ public sealed class RdpHandlerTests
         {
             DeleteCalls++;
             LastDeleteMarker = ownershipMarker;
+            if (DeleteException is not null)
+            {
+                throw DeleteException;
+            }
+
             credentialDeleted = true;
             error = null;
             DeleteObserved.TrySetResult();

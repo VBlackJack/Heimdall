@@ -372,13 +372,13 @@ public sealed class ConnectionServiceDispatchTests
 
     private sealed class StubTunnelService : ITunnelService
     {
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
-            => Task.FromResult((true, false, server.RemoteServer ?? string.Empty, remotePort, (string?)null));
+            => Task.FromResult(new TunnelSetupOutcome(true, false, server.RemoteServer ?? string.Empty, remotePort, (string?)null, null));
 
         public void UpdateSettings(AppSettings settings)
         {

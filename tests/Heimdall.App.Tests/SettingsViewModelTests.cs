@@ -957,6 +957,62 @@ public sealed class SettingsViewModelTests
         Assert.True(viewModel.HasAdvancedTabErrors);
     }
 
+    [Theory]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), -1, "ValidationSettingsRdpResizeDelay")]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 1, "ValidationSettingsRdpResizeDelay")]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 999, "ValidationSettingsRdpResizeDelay")]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 60001, "ValidationSettingsRdpResizeDelay")]
+    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 999, "ValidationSettingsRdpArtifactCleanupDelay")]
+    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 60001, "ValidationSettingsRdpArtifactCleanupDelay")]
+    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 4999, "ValidationSettingsRdpCredentialAutofillTimeout")]
+    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 300001, "ValidationSettingsRdpCredentialAutofillTimeout")]
+    public async Task SaveAsync_InvalidAdvancedRdpTimeoutRejectsPersistenceAndUpdatesAdvancedBadge(
+        string propertyName,
+        int value,
+        string expectedValidationKey)
+    {
+        FakeConfigManager config = new FakeConfigManager();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        SetAdvancedRdpTimeout(viewModel, propertyName, value);
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Null(config.SavedSettings);
+        Assert.True(viewModel.HasValidationErrors);
+        Assert.Equal(expectedValidationKey, viewModel.ValidationSummary);
+        Assert.NotEmpty(viewModel.GetErrors(propertyName));
+        Assert.Equal(1, viewModel.AdvancedTabErrorCount);
+        Assert.True(viewModel.HasAdvancedTabErrors);
+        Assert.Equal(0, viewModel.GeneralTabErrorCount);
+        Assert.Equal(0, viewModel.TerminalTabErrorCount);
+        Assert.Equal(0, viewModel.SshTabErrorCount);
+    }
+
+    [Theory]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 0)]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 1000)]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 60000)]
+    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 1000)]
+    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 60000)]
+    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 5000)]
+    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 300000)]
+    public async Task SaveAsync_AdvancedRdpTimeoutBoundaryPersists(
+        string propertyName,
+        int value)
+    {
+        FakeConfigManager config = new FakeConfigManager();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        SetAdvancedRdpTimeout(viewModel, propertyName, value);
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        Assert.NotNull(config.SavedSettings);
+        Assert.False(viewModel.HasValidationErrors);
+        Assert.Equal(0, viewModel.AdvancedTabErrorCount);
+    }
+
     [Fact]
     public async Task Closing_WithInvalidSettings_StaysOpenAndWarns_DoesNotDiscard()
     {
@@ -1105,6 +1161,70 @@ public sealed class SettingsViewModelTests
         Assert.Equal("SettingsResetDefaultsConfirmTitle", confirm.Title);
         Assert.Equal("SettingsResetDefaultsConfirmBody", confirm.Message);
         Assert.Equal("warning", confirm.Severity);
+    }
+
+    [Fact]
+    public async Task ReofferLegacyMigrationNextStartupCommand_ClearsBothMarkersWithoutPromptingNow()
+    {
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                LegacyMigrationDeclinedOfferVersion = 2,
+                LegacyMigrationDeclinedSourceFingerprint = "ABC123",
+            },
+        };
+        FakeDialogService dialog = new();
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.True(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+
+        await viewModel.ReofferLegacyMigrationNextStartupCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, config.Settings.LegacyMigrationDeclinedOfferVersion);
+        Assert.Null(config.Settings.LegacyMigrationDeclinedSourceFingerprint);
+        Assert.False(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+        Assert.Equal(["settings"], config.PersistenceCalls);
+        Assert.Empty(dialog.ConfirmCalls);
+        (string title, string message) = Assert.Single(dialog.InfoCalls);
+        Assert.Equal("SettingsSectionLegacyMigration", title);
+        Assert.Equal("SettingsLegacyMigrationReofferScheduled", message);
+    }
+
+    [Fact]
+    public void ReofferLegacyMigrationNextStartupCommand_NoMarker_IsDisabled()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+
+        viewModel.LoadFromSettings(new AppSettings());
+
+        Assert.False(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ReofferLegacyMigrationNextStartupCommand_PersistenceFailureKeepsCommandAvailable()
+    {
+        FakeConfigManager config = new()
+        {
+            FailOnMergeSetting = true,
+            Settings = new AppSettings
+            {
+                LegacyMigrationDeclinedOfferVersion = 1,
+                LegacyMigrationDeclinedSourceFingerprint = "ABC123",
+            },
+        };
+        FakeDialogService dialog = new();
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.ReofferLegacyMigrationNextStartupCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.ReofferLegacyMigrationNextStartupCommand.CanExecute(null));
+        Assert.Empty(dialog.InfoCalls);
+        (string title, string message) = Assert.Single(dialog.ErrorCalls);
+        Assert.Equal("SettingsSectionLegacyMigration", title);
+        Assert.Equal("SettingsLegacyMigrationReofferFailed", message);
     }
 
     [Fact]
@@ -1484,6 +1604,27 @@ public sealed class SettingsViewModelTests
             HostKeySource.UserConfirmed);
 
         Assert.Empty(trustedHostKeys.Rows);
+    }
+
+    private static void SetAdvancedRdpTimeout(
+        SettingsViewModel viewModel,
+        string propertyName,
+        int value)
+    {
+        switch (propertyName)
+        {
+            case nameof(SettingsViewModel.RdpResizeEnableDelayMs):
+                viewModel.RdpResizeEnableDelayMs = value;
+                break;
+            case nameof(SettingsViewModel.RdpArtifactCleanupDelayMs):
+                viewModel.RdpArtifactCleanupDelayMs = value;
+                break;
+            case nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs):
+                viewModel.RdpCredentialAutofillTimeoutMs = value;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(propertyName), propertyName, null);
+        }
     }
 
     private static SettingsViewModel CreateViewModel(

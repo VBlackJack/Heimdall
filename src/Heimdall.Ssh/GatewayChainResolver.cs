@@ -39,7 +39,7 @@ public static class GatewayChainResolver
     /// <param name="maxDepth">Maximum allowed chain depth (default 5).</param>
     /// <returns>Ordered list from root gateway to target gateway.</returns>
     /// <exception cref="ArgumentException">Target gateway not found.</exception>
-    /// <exception cref="InvalidOperationException">Circular dependency or depth exceeded.</exception>
+    /// <exception cref="GatewayChainException">Circular dependency or depth exceeded.</exception>
     public static List<SshConnectionParams> ResolveChain(
         string targetGatewayId,
         IReadOnlyList<SshGatewayDto> allGateways,
@@ -62,7 +62,7 @@ public static class GatewayChainResolver
     /// <param name="maxDepth">Maximum allowed chain depth (default 5).</param>
     /// <returns>Ordered list from root gateway to target gateway.</returns>
     /// <exception cref="ArgumentException">Target gateway not found.</exception>
-    /// <exception cref="InvalidOperationException">Circular dependency or depth exceeded.</exception>
+    /// <exception cref="GatewayChainException">Circular dependency or depth exceeded.</exception>
     public static List<SshGatewayDto> ResolveChainDtos(
         string targetGatewayId,
         IReadOnlyList<SshGatewayDto> allGateways,
@@ -87,13 +87,15 @@ public static class GatewayChainResolver
         {
             if (!visited.Add(current.Id))
             {
-                throw new InvalidOperationException(
+                throw new GatewayChainException(
+                    SshFailureCode.CircularChainDependency,
                     $"Circular dependency detected in gateway chain: '{current.Id}' was already visited.");
             }
 
             if (chain.Count >= maxDepth)
             {
-                throw new InvalidOperationException(
+                throw new GatewayChainException(
+                    SshFailureCode.ChainDepthExceeded,
                     $"Gateway chain depth exceeds maximum of {maxDepth}. " +
                     "Check for excessively nested gateway configurations.");
             }

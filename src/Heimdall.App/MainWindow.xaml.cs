@@ -2397,35 +2397,16 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// </summary>
     private void UpdateTabVisibility(MainViewModel vm)
     {
-        var isSessions = vm.SelectedTab == "Sessions";
-        var hasSessions = vm.Connection.HasActiveSessions;
+        bool isSessions = vm.SelectedTab == "Sessions";
+        bool hasSessions = vm.Connection.HasActiveSessions;
+        bool suppressSidebar = !isSessions && hasSessions;
 
         Heimdall.Core.Logging.FileLogger.Info(
             $"UpdateTabVisibility: selectedTab={vm.SelectedTab}, isSessions={isSessions}, hasSessions={hasSessions}, sidebarHidden={_uiState.IsSidebarHidden}");
 
-        // If not on Sessions but sessions active, show sessions full-width
-        if (!isSessions && hasSessions)
-        {
-            // Hide TreeView temporarily
-            if (!_uiState.IsSidebarHidden)
-            {
-                _uiState.SavedSidebarWidth = SessionTreeColumn.ActualWidth;
-                SessionTreeColumn.MinWidth = 0;
-                SessionTreeColumn.MaxWidth = 0;
-                SessionTreeColumn.Width = new GridLength(0);
-                SplitterColumn.Width = new GridLength(0);
-            }
-        }
-        else if (isSessions && !_uiState.IsSidebarHidden)
-        {
-            // Restore TreeView
-            SessionTreeColumn.MinWidth = WindowUIState.MinSidebarWidth;
-            SessionTreeColumn.MaxWidth = WindowUIState.MaxSidebarWidth;
-            SessionTreeColumn.Width = new GridLength(_uiState.SavedSidebarWidth > 0
-                ? _uiState.SavedSidebarWidth
-                : WindowUIState.DefaultSidebarWidth);
-            SplitterColumn.Width = GridLength.Auto;
-        }
+        ApplySidebarLayout(_uiState.SetSidebarSuppressedByTab(
+            suppressSidebar,
+            SessionTreeColumn.ActualWidth));
     }
 
     // --- Command Palette event handlers ---
@@ -3142,26 +3123,30 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void RestoreWindowBounds(Heimdall.Core.Configuration.AppSettings settings)
     {
+        SidebarLayoutProjection sidebarLayout = WindowBoundsPersistence.RestoreSidebarState(
+            _uiState,
+            settings);
+        ApplySidebarLayout(sidebarLayout);
+
         if (settings.WindowWidth > 0 && settings.WindowHeight > 0)
         {
-            // Validate that the saved position is within the virtual screen area
-            var virtualLeft = SystemParameters.VirtualScreenLeft;
-            var virtualTop = SystemParameters.VirtualScreenTop;
-            var virtualRight = virtualLeft + SystemParameters.VirtualScreenWidth;
-            var virtualBottom = virtualTop + SystemParameters.VirtualScreenHeight;
+            Rect savedBounds = new(
+                settings.WindowLeft,
+                settings.WindowTop,
+                settings.WindowWidth,
+                settings.WindowHeight);
+            DpiScale dpiScale = VisualTreeHelper.GetDpi(this);
+            IReadOnlyList<Rect> workingAreas = WindowWorkingAreaProvider.GetWorkingAreas(dpiScale);
+            Rect? restoredBounds = WindowBoundsRestorationPolicy.Resolve(
+                savedBounds,
+                workingAreas);
 
-            bool isOnScreen =
-                settings.WindowLeft + settings.WindowWidth > virtualLeft &&
-                settings.WindowLeft < virtualRight &&
-                settings.WindowTop + settings.WindowHeight > virtualTop &&
-                settings.WindowTop < virtualBottom;
-
-            if (isOnScreen)
+            if (restoredBounds is Rect bounds)
             {
-                Left = settings.WindowLeft;
-                Top = settings.WindowTop;
-                Width = settings.WindowWidth;
-                Height = settings.WindowHeight;
+                Left = bounds.Left;
+                Top = bounds.Top;
+                Width = bounds.Width;
+                Height = bounds.Height;
             }
 
             if (settings.WindowMaximized)
@@ -3175,16 +3160,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         // Save Normal-state bounds even when maximized
         bool isMaximized = WindowState == WindowState.Maximized;
-        var bounds = isMaximized
+        Rect bounds = isMaximized
             ? RestoreBounds
-            : new System.Windows.Rect(Left, Top, Width, Height);
+            : new Rect(Left, Top, Width, Height);
 
-        var snapshot = new WindowBoundsSnapshot(
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
             bounds.Left,
             bounds.Top,
             bounds.Width,
             bounds.Height,
-            isMaximized);
+            isMaximized,
+            _uiState,
+            SessionTreeColumn.ActualWidth);
         return WindowBoundsPersistence.PersistAsync(vm.ConfigManager, snapshot);
     }
 
@@ -3204,6 +3191,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (e.Cancel) return;
 
         if (DataContext is not MainViewModel vm) return;
+
+        if (Application.Current is Heimdall.App.App { IsShuttingDown: true })
+        {
+            return;
+        }
 
         if (_closeConfirmed)
         {
@@ -3231,12 +3223,26 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             string warningTitle = vm.Localize("SettingsCloseSaveFailedTitle");
             string warningMessage = vm.Localize("SettingsCloseSaveFailedMessage");
+            int connectedSessionCount = vm.Connection.ActiveSessions.Count(session =>
+                Heimdall.Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
+                    .Any(pane => string.Equals(
+                        pane.Status,
+                        "Connected",
+                        StringComparison.Ordinal)));
             bool prepared = await WindowClosingFlow.TryPrepareCloseAsync(
                 vm.Settings.IsDirty,
+                connectedSessionCount,
                 () => vm.DialogService.ShowSaveDiscardCancelAsync(
                     vm.Localize("SettingsUnsavedWarningTitle"),
                     vm.Localize("SettingsUnsavedWarning")),
                 () => vm.Settings.TrySaveAsync(),
+                () => vm.DialogService.ShowConfirmAsync(
+                    vm.Localize("ConfirmCloseAllTabs"),
+                    string.Format(
+                        vm.Localize("ConfirmCloseAllTabsMessage"),
+                        connectedSessionCount),
+                    "warning"),
+                () => vm.ServerList.FlushExpandStateForCloseAsync(),
                 () => SaveWindowBoundsAsync(vm),
                 () => vm.DialogService.ShowWarning(warningTitle, warningMessage));
 

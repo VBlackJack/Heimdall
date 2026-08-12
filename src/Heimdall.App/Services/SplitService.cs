@@ -18,6 +18,7 @@ using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
+using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -139,7 +140,9 @@ public sealed class SplitService : ISplitService
         SplitOrientation orientation,
         string? paneId = null)
     {
-        var ct = GetSessionToken(session);
+        CancellationToken ct = GetSessionToken(session);
+        string? pendingPaneSessionId = null;
+        bool connectionDispatchCompleted = false;
         try
         {
             var targetPane = ResolvePaneOrPrimary(session, paneId);
@@ -176,13 +179,21 @@ public sealed class SplitService : ISplitService
                 NotifyForcedEmbeddedMode(serverDto);
             }
 
+            string paneSessionId = SessionIdCodec.Create(serverDto.Id);
+            pendingPaneSessionId = paneSessionId;
+            string paneConnectionType = serverDto.ConnectionType ?? "";
+            ServerProfileDto paneScopedServerDto = CreatePaneScopedServerProfile(
+                serverDto,
+                paneSessionId,
+                paneConnectionType);
+
             // Create loading pane and insert into tree immediately (shows loading overlay).
-            // OriginalServerId set early for proper cleanup if pane is closed during connection.
+            // Both IDs are set before connection so lifecycle cleanup remains pane-scoped.
             var newPane = new SessionPaneModel
             {
-                ServerId = "",
-                OriginalServerId = serverId,
-                ConnectionType = serverDto.ConnectionType ?? "",
+                ServerId = paneSessionId,
+                OriginalServerId = serverDto.Id,
+                ConnectionType = paneConnectionType,
                 Title = serverDto.DisplayName,
                 Status = _localizer["SplitSecondaryConnecting"],
             };
@@ -197,10 +208,18 @@ public sealed class SplitService : ISplitService
                 session.RootContent, targetPane.PaneId, container);
 
             // Async connection — can be cancelled or session can be closed while waiting
-            var result = await ConnectByProtocolAsync(serverDto, settings, ct, newPane.ConnectionType);
+            ConnectionResult result = await ConnectByProtocolAsync(
+                paneScopedServerDto,
+                settings,
+                ct,
+                newPane.ConnectionType);
+            connectionDispatchCompleted = true;
 
             if (!result.Success || result.Session is null)
             {
+                // Protocol handlers own transport rollback before returning failure.
+                // Remove only the split state key to avoid releasing a shared tunnel twice.
+                TeardownFailedConnectionState(paneSessionId);
                 session.RootContent = SplitTreeHelper.RemovePane(
                     session.RootContent, newPane.PaneId) ?? session.PrimaryPane;
 
@@ -217,7 +236,7 @@ public sealed class SplitService : ISplitService
                 || SplitTreeHelper.FindPane(session.RootContent, newPane.PaneId) is null)
             {
                 SafeDisposeSessionResult(result.Session);
-                CleanupOrphanedPane(serverId);
+                CleanupOrphanedPane(paneSessionId);
                 Core.Logging.FileLogger.Info(
                     $"Split cancelled for '{serverDto.DisplayName}' — session or pane removed during connection.");
                 return;
@@ -233,7 +252,7 @@ public sealed class SplitService : ISplitService
             catch (Exception ex)
             {
                 SafeDisposeSessionResult(result.Session);
-                CleanupOrphanedPane(serverDto.Id);
+                CleanupOrphanedPane(paneSessionId);
                 session.RootContent = SplitTreeHelper.RemovePane(
                     session.RootContent, newPane.PaneId) ?? session.PrimaryPane;
                 SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
@@ -243,7 +262,11 @@ public sealed class SplitService : ISplitService
             }
 
             newPane.HostControl = hostControl;
-            if (hostControl is EmbeddedRdpView rdpView)
+            if (hostControl is ISessionPaneOwner paneOwner)
+            {
+                paneOwner.SetOwningPane(newPane);
+            }
+            else if (hostControl is EmbeddedRdpView rdpView)
             {
                 rdpView.SetOwningPane(newPane);
             }
@@ -251,7 +274,6 @@ public sealed class SplitService : ISplitService
             {
                 sftpView.SetOwningPane(newPane);
             }
-            newPane.ServerId = serverDto.Id;
             newPane.Status = "Connected";
 
             LayoutMemory.Record(
@@ -263,11 +285,21 @@ public sealed class SplitService : ISplitService
         }
         catch (OperationCanceledException)
         {
+            if (!connectionDispatchCompleted)
+            {
+                TeardownFailedConnectionState(pendingPaneSessionId);
+            }
+
             Core.Logging.FileLogger.Info(
                 $"Split cancelled for session '{session.Title}' — tab closed during connection.");
         }
         catch (Exception ex)
         {
+            if (!connectionDispatchCompleted)
+            {
+                TeardownFailedConnectionState(pendingPaneSessionId);
+            }
+
             Core.Logging.FileLogger.Error($"Split session error: {ex.Message}", ex);
             SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
         }
@@ -346,9 +378,15 @@ public sealed class SplitService : ISplitService
         var activeSessions = ActiveSessionsProvider?.Invoke();
         if (activeSessions is null) return;
 
+        if (string.IsNullOrWhiteSpace(sourceSessionId))
+        {
+            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"]);
+            Core.Logging.FileLogger.Warn("Merge aborted: source session ID is empty.");
+            return;
+        }
+
         var source = activeSessions.FirstOrDefault(
-            s => string.Equals(s.ServerId, sourceSessionId, StringComparison.Ordinal)
-                 || string.Equals(s.OriginalServerId, sourceSessionId, StringComparison.Ordinal));
+            s => string.Equals(s.ServerId, sourceSessionId, StringComparison.Ordinal));
 
         // Check any leaf has a host control (not just the primary shim),
         // because in a split tab the primary pane may be disconnected while others are active.
@@ -662,7 +700,11 @@ public sealed class SplitService : ISplitService
             }
 
             pane.HostControl = hostControl;
-            if (hostControl is EmbeddedRdpView rdpView)
+            if (hostControl is ISessionPaneOwner paneOwner)
+            {
+                paneOwner.SetOwningPane(pane);
+            }
+            else if (hostControl is EmbeddedRdpView rdpView)
             {
                 rdpView.SetOwningPane(pane);
             }
@@ -828,6 +870,14 @@ public sealed class SplitService : ISplitService
             $"Cleaned up orphaned pane resources for server '{serverId}'.");
     }
 
+    private void TeardownFailedConnectionState(string? serverId)
+    {
+        if (!string.IsNullOrWhiteSpace(serverId))
+        {
+            _connectionSm.Teardown(serverId);
+        }
+    }
+
     // ── Close all panes (tab teardown) ─────────────────────────────
 
     /// <summary>
@@ -901,6 +951,11 @@ public sealed class SplitService : ISplitService
         string connectionType = ResolvePaneConnectionType(
             paneConnectionType,
             serverDto.ConnectionType);
+
+        if (string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase))
+        {
+            _connectionSm.TryTransition(serverDto.Id, ConnectionState.Initializing);
+        }
 
         return connectionType.ToUpperInvariant() switch
         {

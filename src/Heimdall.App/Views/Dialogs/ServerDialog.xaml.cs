@@ -31,6 +31,7 @@ public partial class ServerDialog : Window
 {
     private readonly LocalizationManager? _localizer;
     private readonly IConfigManager? _configManager;
+    private bool _suppressCredentialDirtyTracking;
 
     public ServerDialog(LocalizationManager localizer, IConfigManager configManager)
     {
@@ -92,7 +93,7 @@ public partial class ServerDialog : Window
 
         if (e.PropertyName == nameof(ServerDialogViewModel.HasSshKeyPath) && !vm.HasSshKeyPath)
         {
-            (FindName("SshKeyPassphraseBox") as System.Windows.Controls.PasswordBox)?.Clear();
+            ClearSshKeyPassphraseInput();
             return;
         }
 
@@ -140,6 +141,48 @@ public partial class ServerDialog : Window
     // Save
     // ------------------------------------------------------------------
 
+    private void OnCredentialPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressCredentialDirtyTracking
+            && DataContext is ServerDialogViewModel vm)
+        {
+            vm.IsDirty = true;
+        }
+    }
+
+    private void ClearCredentialInputs()
+    {
+        RunWithoutCredentialDirtyTracking(() =>
+        {
+            (FindName("SshPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
+            (FindName("SshKeyPassphraseBox") as System.Windows.Controls.PasswordBox)?.Clear();
+            (FindName("RdpPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
+            (FindName("VncPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
+            (FindName("FtpPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
+            (FindName("WinRmPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
+        });
+    }
+
+    private void ClearSshKeyPassphraseInput()
+    {
+        RunWithoutCredentialDirtyTracking(() =>
+            (FindName("SshKeyPassphraseBox") as System.Windows.Controls.PasswordBox)?.Clear());
+    }
+
+    private void RunWithoutCredentialDirtyTracking(Action action)
+    {
+        bool wasSuppressed = _suppressCredentialDirtyTracking;
+        _suppressCredentialDirtyTracking = true;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _suppressCredentialDirtyTracking = wasSuppressed;
+        }
+    }
+
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not ServerDialogViewModel vm)
@@ -180,12 +223,7 @@ public partial class ServerDialog : Window
             DialogResult = true;
 
             // Clear passwords from UI memory (CWE-316)
-            sshPwBox?.Clear();
-            sshKeyPassphraseBox?.Clear();
-            rdpPwBox?.Clear();
-            vncPwBox?.Clear();
-            ftpPwBox?.Clear();
-            winRmPwBox?.Clear();
+            ClearCredentialInputs();
         }
         else
         {
@@ -335,12 +373,7 @@ public partial class ServerDialog : Window
         }
 
         // Clear all password boxes from UI memory on close (CWE-316)
-        (FindName("SshPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
-        (FindName("SshKeyPassphraseBox") as System.Windows.Controls.PasswordBox)?.Clear();
-        (FindName("RdpPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
-        (FindName("VncPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
-        (FindName("FtpPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
-        (FindName("WinRmPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
+        ClearCredentialInputs();
     }
 
     private void OnBrowseSshKeyClick(object sender, RoutedEventArgs e)

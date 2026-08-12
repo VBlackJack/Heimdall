@@ -296,7 +296,7 @@
             <Grid Visibility="{Binding IsSessionsTabSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <!-- Left: TreeView panel -->
-                    <ColumnDefinition x:Name="SessionTreeColumn" Width="260" MinWidth="180" MaxWidth="500"/>
+                    <ColumnDefinition x:Name="SessionTreeColumn" Width="260" MinWidth="243" MaxWidth="500"/>
                     <!-- Splitter -->
                     <ColumnDefinition x:Name="SplitterColumn" Width="Auto"/>
                     <!-- Right: Detail / session content -->
@@ -620,6 +620,8 @@
                                                          VerticalContentAlignment="Center"
                                                          AutomationProperties.Name="{loc:Translate InlineRenameEditorA11y}"
                                                          PreviewKeyDown="OnInlineRenameEditorPreviewKeyDown"
+                                                         behaviors:InlineRenameFocusBehavior.CommitOnLostKeyboardFocus="True"
+                                                         behaviors:InlineRenameFocusBehavior.CommitRequested="OnInlineRenameEditorCommitRequested"
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
                                             <TextBlock Grid.Column="2"
@@ -695,6 +697,8 @@
                                                          VerticalContentAlignment="Center"
                                                          AutomationProperties.Name="{loc:Translate InlineRenameEditorA11y}"
                                                          PreviewKeyDown="OnInlineRenameEditorPreviewKeyDown"
+                                                         behaviors:InlineRenameFocusBehavior.CommitOnLostKeyboardFocus="True"
+                                                         behaviors:InlineRenameFocusBehavior.CommitRequested="OnInlineRenameEditorCommitRequested"
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
                                             <StackPanel Grid.Column="3"
@@ -2260,6 +2264,29 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border Padding="{StaticResource SpacingLg}"
+                                        Background="{DynamicResource CardBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource CornerRadiusLg}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Translate SettingsSectionLegacyMigration}"
+                                                   FontSize="{StaticResource FontSizeSubtitle}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="{loc:Translate SettingsLegacyMigrationReofferDescription}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="{StaticResource SpacingMd}"/>
+                                        <Button Content="{loc:Translate SettingsLegacyMigrationReofferButton}"
+                                                Command="{Binding Settings.ReofferLegacyMigrationNextStartupCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                HorizontalAlignment="Left"
+                                                AutomationProperties.Name="{loc:Translate SettingsLegacyMigrationReofferButton}"/>
+                                    </StackPanel>
+                                </Border>
+
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
@@ -3748,10 +3775,12 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 AutomationProperties.Name="{loc:Translate A11yStatusBar}">
             <DockPanel Margin="8,0">
-                <TextBlock Text="{Binding StatusText}"
+                <TextBlock Text="{Binding StatusText, NotifyOnTargetUpdated=True}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center" FontSize="{StaticResource FontSizeCaption}"
-                           AutomationProperties.LiveSetting="Polite"/>
+                           AutomationProperties.Name="{Binding StatusText}"
+                           AutomationProperties.LiveSetting="Polite"
+                           behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 <!-- Subtle F1 shortcut hint — visible when status shows default ready text -->
                 <TextBlock x:Name="Mw_StatusBarShortcutHint" Text="{loc:Translate StatusBarShortcutHint}"
                            FontSize="{StaticResource FontSizeSmallCaption}"
@@ -4508,6 +4537,15 @@
                                HorizontalAlignment="Center" TextAlignment="Center"
                                TextWrapping="Wrap"
                                Margin="0,0,0,24"/>
+
+                    <TextBlock Text="{Binding CompletionErrorText}"
+                               Visibility="{Binding CompletionErrorText, Converter={StaticResource NullToVisibilityConverter}}"
+                               Foreground="{DynamicResource ErrorTextBrush}"
+                               FontSize="{StaticResource FontSizeBody}"
+                               HorizontalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Margin="{StaticResource MarginStackItem}"
+                               AutomationProperties.LiveSetting="Assertive"/>
 
                     <!-- Navigation buttons -->
                     <DockPanel HorizontalAlignment="Stretch"

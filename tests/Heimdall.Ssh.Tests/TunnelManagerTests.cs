@@ -52,17 +52,27 @@ public class TunnelManagerTests : IDisposable
     private static TunnelInfo MakeInfo(
         int localPort,
         string server = "gw.example.com",
-        string localBindHost = LoopbackBinding.DefaultHost)
+        string localBindHost = LoopbackBinding.DefaultHost,
+        string gatewayChainKey = "",
+        string remoteHost = "target.internal",
+        int remotePort = 3389,
+        int socksProxyPort = 0,
+        int remoteBindPort = 0,
+        int effectiveRemoteLocalPort = 0)
     {
         return new TunnelInfo(
             ServerName: server,
             LocalPort: localPort,
-            RemoteHost: "target.internal",
-            RemotePort: 3389,
+            RemoteHost: remoteHost,
+            RemotePort: remotePort,
             StartedAt: DateTime.UtcNow,
             IsAlive: true)
         {
-            LocalBindHost = localBindHost
+            LocalBindHost = localBindHost,
+            GatewayChainKey = gatewayChainKey,
+            SocksProxyPort = socksProxyPort,
+            RemoteBindPort = remoteBindPort,
+            EffectiveRemoteLocalPort = effectiveRemoteLocalPort
         };
     }
 
@@ -189,6 +199,12 @@ public class TunnelManagerTests : IDisposable
 
         public int DisposeCount { get; private set; }
 
+        public bool Connected { get; set; }
+
+        public Func<bool>? ConnectionProbe { get; set; }
+
+        public override bool IsConnected => ConnectionProbe?.Invoke() ?? Connected;
+
         protected override void Dispose(bool disposing)
         {
             DisposeCount++;
@@ -206,8 +222,13 @@ public class TunnelManagerTests : IDisposable
 
     private bool RegisterFake(int localPort, IDisposable? handle = null, Func<bool>? isAlive = null)
     {
+        return RegisterFake(MakeInfo(localPort), handle, isAlive);
+    }
+
+    private bool RegisterFake(TunnelInfo info, IDisposable? handle = null, Func<bool>? isAlive = null)
+    {
         return _manager.TryRegisterExternalTunnel(
-            MakeInfo(localPort),
+            info,
             handle ?? new FakeHandle(),
             isAlive ?? (() => true));
     }
@@ -479,6 +500,188 @@ public class TunnelManagerTests : IDisposable
         Assert.Equal(1, handle.DisposeCount);
         Assert.Equal(1, closedCount);
         Assert.False(_manager.HasTunnel(10001));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_ExternalMatch_AcquiresExactlyOneReference()
+    {
+        TunnelInfo info = MakeInfo(10001, gatewayChainKey: "gw-A");
+        Assert.True(RegisterFake(info));
+
+        TunnelInfo? acquired = _manager.AcquireReusableTunnel(
+            "gw-A",
+            "target.internal",
+            3389,
+            socksProxyPort: 0,
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
+
+        Assert.NotNull(acquired);
+        Assert.Equal(10001, acquired.LocalPort);
+        Assert.False(_manager.ReleaseReference(10001));
+        Assert.True(_manager.HasTunnel(10001));
+        Assert.True(_manager.ReleaseReference(10001));
+        Assert.False(_manager.HasTunnel(10001));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_InternalMatch_AcquiresExactlyOneReference()
+    {
+        TunnelInfo info = MakeInfo(10001, gatewayChainKey: "gw-A");
+        var client = new RecordingSshClient { Connected = true };
+        var port = new RecordingForwardedPortLocal();
+        TunnelResult registered = _manager.RegisterTunnelSession(
+            new TunnelSession(client, port, info),
+            info.LocalPort,
+            info);
+        Assert.True(registered.Success);
+
+        TunnelInfo? acquired = _manager.AcquireReusableTunnel(
+            "gw-A",
+            "target.internal",
+            3389,
+            socksProxyPort: 0,
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
+
+        Assert.NotNull(acquired);
+        Assert.Equal(10001, acquired.LocalPort);
+        Assert.False(_manager.ReleaseReference(10001));
+        Assert.True(_manager.ReleaseReference(10001));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_NoMatchOrDead_DoesNotAcquireReference()
+    {
+        TunnelInfo different = MakeInfo(10001, gatewayChainKey: "gw-B");
+        TunnelInfo dead = MakeInfo(10002, gatewayChainKey: "gw-A");
+        Assert.True(RegisterFake(different));
+        Assert.True(RegisterFake(dead, isAlive: () => false));
+
+        TunnelInfo? acquired = _manager.AcquireReusableTunnel(
+            "gw-A",
+            "target.internal",
+            3389,
+            socksProxyPort: 0,
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
+
+        Assert.Null(acquired);
+        Assert.True(_manager.ReleaseReference(10001));
+        Assert.True(_manager.ReleaseReference(10002));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_LivenessException_ContinuesToNextCandidateWithoutReferenceLeak()
+    {
+        TunnelInfo throwing = MakeInfo(10001, gatewayChainKey: "gw-A");
+        TunnelInfo alive = MakeInfo(10002, gatewayChainKey: "gw-A");
+        var throwingClient = new RecordingSshClient
+        {
+            ConnectionProbe = () => throw new InvalidOperationException("probe failed")
+        };
+        TunnelResult registered = _manager.RegisterTunnelSession(
+            new TunnelSession(throwingClient, new RecordingForwardedPortLocal(), throwing),
+            throwing.LocalPort,
+            throwing);
+        Assert.True(registered.Success);
+        Assert.True(RegisterFake(alive));
+
+        TunnelInfo? acquired = _manager.AcquireReusableTunnel(
+            "gw-A",
+            "target.internal",
+            3389,
+            socksProxyPort: 0,
+            remoteBindPort: 0,
+            remoteLocalPort: 0);
+
+        Assert.NotNull(acquired);
+        Assert.Equal(10002, acquired.LocalPort);
+        throwingClient.ConnectionProbe = null;
+        Assert.True(_manager.ReleaseReference(10001));
+        Assert.False(_manager.ReleaseReference(10002));
+        Assert.True(_manager.ReleaseReference(10002));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_AbaReplacementNeverReturnsStaleCandidateOrRunsLivenessUnderLock()
+    {
+        using var livenessStarted = new ManualResetEventSlim(false);
+        using var allowLiveness = new ManualResetEventSlim(false);
+        var oldHandle = new FakeHandle();
+        TunnelInfo oldInfo = MakeInfo(10001, gatewayChainKey: "gw-A");
+        Assert.True(RegisterFake(
+            oldInfo,
+            oldHandle,
+            () =>
+            {
+                livenessStarted.Set();
+                return allowLiveness.Wait(TeardownJoinTimeout);
+            }));
+
+        TunnelInfo? acquired = null;
+        var acquire = new OffPoolRun(
+            () => acquired = _manager.AcquireReusableTunnel(
+                "gw-A",
+                "target.internal",
+                3389,
+                socksProxyPort: 0,
+                remoteBindPort: 0,
+                remoteLocalPort: 0),
+            "tunnel-acquire-aba");
+        acquire.Start();
+        Assert.True(livenessStarted.Wait(RegistryProbeTimeout));
+
+        bool replacementRegistered = false;
+        var replace = new OffPoolRun(
+            () =>
+            {
+                _manager.ForceCloseTunnel(10001);
+                replacementRegistered = RegisterFake(
+                    MakeInfo(10001, gatewayChainKey: "gw-A"));
+            },
+            "tunnel-replace-aba");
+        replace.Start();
+
+        try
+        {
+            Assert.True(
+                replace.Join(RegistryProbeTimeout),
+                "Replacement could not complete while liveness was blocked, so the callback ran under the registry lock.");
+            replace.ThrowIfFailed();
+        }
+        finally
+        {
+            allowLiveness.Set();
+            Assert.True(acquire.Join(TeardownJoinTimeout));
+            acquire.ThrowIfFailed();
+        }
+
+        Assert.True(replacementRegistered);
+        Assert.Equal(1, oldHandle.DisposeCount);
+        Assert.Null(acquired);
+        Assert.True(_manager.ReleaseReference(10001));
+    }
+
+    [Theory]
+    [InlineData(0, 9000, 0)]
+    [InlineData(2222, 0, 2222)]
+    [InlineData(2222, 2200, 2200)]
+    public void BuildTunnelInfo_NormalizesEffectiveRemoteLocalPort(
+        int remoteBindPort,
+        int remoteLocalPort,
+        int expectedEffectiveRemoteLocalPort)
+    {
+        TunnelInfo info = TunnelManager.BuildTunnelInfo(
+            "gateway",
+            localPort: 10001,
+            "target.internal",
+            remotePort: 3389,
+            socksProxyPort: 0,
+            remoteBindPort,
+            remoteLocalPort);
+
+        Assert.Equal(expectedEffectiveRemoteLocalPort, info.EffectiveRemoteLocalPort);
     }
 
     // ── CloseTunnel (with ref count) ──────────────────────────────────
@@ -798,6 +1001,76 @@ public class TunnelManagerTests : IDisposable
         Assert.False(result.Success);
         Assert.Equal(SshFailureCode.HostKeyMismatch, result.FailureCode);
         Assert.False(SshReconnectPolicy.AllowsAutoReconnect(result.FailureCode!.Value));
+    }
+
+    [Theory]
+    [InlineData(false, "Connection refused by remote host", SshFailureCode.NetworkRefused)]
+    [InlineData(true, "Connection refused by remote host", SshFailureCode.NetworkRefused)]
+    [InlineData(false, "Connection reset by peer", SshFailureCode.NetworkReset)]
+    [InlineData(true, "Connection reset by peer", SshFailureCode.NetworkReset)]
+    [InlineData(false, "SSH protocol version mismatch", SshFailureCode.ProtocolError)]
+    [InlineData(true, "SSH protocol version mismatch", SshFailureCode.ProtocolError)]
+    public void ClassifyAndBuildFailureResult_ConnectionFailure_IsIndependentOfChainShape(
+        bool isChained,
+        string message,
+        SshFailureCode expectedCode)
+    {
+        SshConnectionException exception = new(message);
+        int cleanupCalls = 0;
+
+        TunnelResult result = TunnelManager.ClassifyAndBuildFailureResult(
+            exception,
+            () => cleanupCalls++,
+            isChained);
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedCode, result.FailureCode);
+        Assert.Equal(1, cleanupCalls);
+    }
+
+    [Theory]
+    [InlineData("Port forwarding for 'gw.example.net' port '8080' failed to start.")]
+    [InlineData("PuTTY key file version 3 is not supported")]
+    public void ClassifyAndBuildFailureResult_SshExceptionContainingPortSubstring_IsNotMisclassifiedAsPortInUse(
+        string message)
+    {
+        int directCleanupCalls = 0;
+        int chainedCleanupCalls = 0;
+
+        TunnelResult directResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SshException(message),
+            () => directCleanupCalls++,
+            isChained: false);
+        TunnelResult chainedResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SshException(message),
+            () => chainedCleanupCalls++,
+            isChained: true);
+
+        Assert.NotEqual(SshFailureCode.PortInUse, directResult.FailureCode);
+        Assert.Equal(directResult.FailureCode, chainedResult.FailureCode);
+        Assert.Equal(1, directCleanupCalls);
+        Assert.Equal(1, chainedCleanupCalls);
+    }
+
+    [Fact]
+    public void ClassifyAndBuildFailureResult_SocketExceptionAddressAlreadyInUse_StillReturnsPortInUseInBothChainShapes()
+    {
+        int directCleanupCalls = 0;
+        int chainedCleanupCalls = 0;
+
+        TunnelResult directResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SocketException((int)SocketError.AddressAlreadyInUse),
+            () => directCleanupCalls++,
+            isChained: false);
+        TunnelResult chainedResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SocketException((int)SocketError.AddressAlreadyInUse),
+            () => chainedCleanupCalls++,
+            isChained: true);
+
+        Assert.Equal(SshFailureCode.PortInUse, directResult.FailureCode);
+        Assert.Equal(SshFailureCode.PortInUse, chainedResult.FailureCode);
+        Assert.Equal(1, directCleanupCalls);
+        Assert.Equal(1, chainedCleanupCalls);
     }
 
     // ── Dispose ───────────────────────────────────────────────────────

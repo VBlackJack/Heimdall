@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -29,16 +30,18 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class MigrationService
 {
+    private const int MaxWarningIdentityLength = 64;
+
     private readonly IConfigManager _configManager;
-    private readonly LocalizationManager _localizer;
 
     public MigrationService(IConfigManager configManager, LocalizationManager localizer)
     {
         ArgumentNullException.ThrowIfNull(configManager);
         ArgumentNullException.ThrowIfNull(localizer);
 
+        // Retain the constructor dependency for source compatibility; migration result
+        // localization now belongs to MigrationPresentationPolicy.
         _configManager = configManager;
-        _localizer = localizer;
     }
 
     /// <summary>
@@ -78,8 +81,25 @@ public sealed class MigrationService
 
         try
         {
-            await ImportSettingsAsync(legacyPath, result, ct);
-            await ImportServersAsync(legacyPath, result, ct);
+            AppSettings settings = await PrepareLegacySettingsAsync(legacyPath, ct);
+            List<ServerProfileDto> servers = await PrepareLegacyServersAsync(
+                legacyPath,
+                result,
+                ct);
+
+            await _configManager.SaveSettingsAsync(settings);
+            result.SettingsImported = true;
+
+            if (servers.Count > 0)
+            {
+                await _configManager.MutateServersAsync(inventory =>
+                {
+                    inventory.Clear();
+                    inventory.AddRange(servers);
+                    return servers.Count;
+                });
+            }
+
             result.Success = true;
         }
         catch (Exception ex)
@@ -90,59 +110,111 @@ public sealed class MigrationService
         return result;
     }
 
-    private async Task ImportSettingsAsync(
-        string legacyPath, MigrationResult result, CancellationToken ct)
+    private async Task<AppSettings> PrepareLegacySettingsAsync(
+        string legacyPath, CancellationToken ct)
     {
-        var legacySettingsPath = Path.Combine(
+        string legacySettingsPath = Path.Combine(
             legacyPath,
             AppConstants.BundledConfigDirectoryName,
             "settings.json");
-        var legacyJson = await File.ReadAllTextAsync(legacySettingsPath, ct);
-        var legacySettings = JsonSerializer.Deserialize<JsonElement>(legacyJson);
+        string legacyJson = await File.ReadAllTextAsync(legacySettingsPath, ct);
+        JsonElement legacySettings = JsonSerializer.Deserialize<JsonElement>(legacyJson);
 
-        var settings = await _configManager.LoadSettingsAsync();
+        AppSettings settings = await _configManager.LoadSettingsAsync();
         MapLegacySettings(legacySettings, settings);
-        await _configManager.SaveSettingsAsync(settings);
-        result.SettingsImported = true;
+        return settings;
     }
 
-    private async Task ImportServersAsync(
+    private async Task<List<ServerProfileDto>> PrepareLegacyServersAsync(
         string legacyPath, MigrationResult result, CancellationToken ct)
     {
-        var legacyServersPath = Path.Combine(
+        string legacyServersPath = Path.Combine(
             legacyPath,
             AppConstants.BundledConfigDirectoryName,
             "servers.json");
-        var legacyJson = await File.ReadAllTextAsync(legacyServersPath, ct);
-        var legacyServers = JsonSerializer.Deserialize<List<JsonElement>>(legacyJson);
+        string legacyJson = await File.ReadAllTextAsync(legacyServersPath, ct);
+        List<JsonElement>? legacyServers = JsonSerializer.Deserialize<List<JsonElement>>(legacyJson);
 
         if (legacyServers is null || legacyServers.Count == 0)
         {
-            return;
+            return [];
         }
 
-        var servers = new List<ServerProfileDto>();
-        foreach (var legacySrv in legacyServers)
+        List<ServerProfileDto> servers = [];
+        foreach (JsonElement legacyServer in legacyServers)
         {
+            result.ServersExamined++;
+            int profileIndex = result.ServersExamined;
+            string? profileIdentity = GetSafeProfileIdentity(legacyServer);
+
             try
             {
-                var server = MapLegacyServer(legacySrv);
+                ServerProfileDto server = MapLegacyServer(legacyServer);
                 servers.Add(server);
                 result.ServersImported++;
             }
             catch (Exception ex)
             {
-                result.Warnings.Add(
-                    _localizer.Format("MigrationServerFailed", ex.Message));
+                result.Warnings.Add(new MigrationWarning(
+                    profileIndex,
+                    profileIdentity,
+                    ClassifyWarningReason(ex)));
             }
         }
 
-        await _configManager.MutateServersAsync(inventory =>
+        return servers;
+    }
+
+    private static string? GetSafeProfileIdentity(JsonElement legacyServer)
+    {
+        if (legacyServer.ValueKind != JsonValueKind.Object
+            || !legacyServer.TryGetProperty("DisplayName", out JsonElement displayNameElement)
+            || displayNameElement.ValueKind != JsonValueKind.String)
         {
-            inventory.Clear();
-            inventory.AddRange(servers);
-            return servers.Count;
-        });
+            return null;
+        }
+
+        string? displayName = displayNameElement.GetString();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return null;
+        }
+
+        StringBuilder safeIdentity = new(MaxWarningIdentityLength);
+        foreach (Rune rune in displayName.Trim().EnumerateRunes())
+        {
+            bool replaceWithSpace = Rune.IsControl(rune) || Rune.IsWhiteSpace(rune);
+            if (replaceWithSpace)
+            {
+                if (safeIdentity.Length > 0 && safeIdentity[^1] != ' ')
+                {
+                    safeIdentity.Append(' ');
+                }
+
+                continue;
+            }
+
+            string runeText = rune.ToString();
+            if (safeIdentity.Length + runeText.Length > MaxWarningIdentityLength)
+            {
+                break;
+            }
+
+            safeIdentity.Append(runeText);
+        }
+
+        string identity = safeIdentity.ToString().TrimEnd();
+        return identity.Length == 0 ? null : identity;
+    }
+
+    private static MigrationWarningReason ClassifyWarningReason(Exception exception)
+    {
+        return exception is FormatException
+            or InvalidOperationException
+            or JsonException
+            or OverflowException
+            ? MigrationWarningReason.InvalidLegacyField
+            : MigrationWarningReason.UnexpectedMappingFailure;
     }
 
     // -- Settings mapping --------------------------------------------------
@@ -288,7 +360,7 @@ public sealed class MigrationService
         MapBool(legacy, "SshCompression", v => dto.SshCompression = v);
         MapBool(legacy, "SshX11Forwarding", v => dto.SshX11Forwarding = v);
         MapNullableString(legacy, "SshPasswordEncrypted",
-            v => { /* SshPasswordEncrypted not in ServerProfileDto; skip */ });
+            v => dto.SshPasswordEncrypted = v);
 
         // RDP display settings
         MapBool(legacy, "RdpAntiIdle", v => dto.RdpAntiIdle = v);
@@ -320,10 +392,7 @@ public sealed class MigrationService
 
         // Metadata
         MapNullableString(legacy, "Environment", v => dto.Environment = v);
-        MapNullableString(legacy, "MacAddress", v =>
-        {
-            /* MacAddress not in ServerProfileDto; skip gracefully */
-        });
+        MapNullableString(legacy, "MacAddress", v => dto.MacAddress = v);
 
         return dto;
     }
@@ -420,6 +489,35 @@ public sealed class MigrationResult
     /// <summary>Number of servers successfully imported.</summary>
     public int ServersImported { get; set; }
 
-    /// <summary>Non-fatal warnings for individual items that failed to import.</summary>
-    public List<string> Warnings { get; set; } = new();
+    /// <summary>Number of legacy server entries examined during migration.</summary>
+    public int ServersExamined { get; set; }
+
+    /// <summary>Number of examined server entries skipped during migration.</summary>
+    public int ServersSkipped => Warnings.Count;
+
+    /// <summary>Structured non-fatal warnings for individual items that failed to import.</summary>
+    public List<MigrationWarning> Warnings { get; set; } = new();
 }
+
+/// <summary>
+/// Classifies a non-fatal legacy profile mapping failure without retaining exception details.
+/// </summary>
+public enum MigrationWarningReason
+{
+    /// <summary>The legacy profile contains a field value that cannot be mapped safely.</summary>
+    InvalidLegacyField,
+
+    /// <summary>The legacy profile failed for an unexpected mapping reason.</summary>
+    UnexpectedMappingFailure
+}
+
+/// <summary>
+/// Identifies a skipped legacy profile without retaining raw JSON or exception messages.
+/// </summary>
+/// <param name="Index">One-based position of the profile in the legacy inventory.</param>
+/// <param name="Identity">Bounded and sanitized display name, or null when unavailable.</param>
+/// <param name="Reason">Safe classification of the mapping failure.</param>
+public sealed record MigrationWarning(
+    int Index,
+    string? Identity,
+    MigrationWarningReason Reason);

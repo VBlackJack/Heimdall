@@ -17,6 +17,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Models;
 
 namespace Heimdall.Core.Tests;
 
@@ -69,6 +70,7 @@ public class ServerProfileDtoTests
         ServerProfileDto dto = new ServerProfileDto();
 
         Assert.Equal(5985, dto.WinRmPort);
+        Assert.False(dto.HasWinRmPortField);
         Assert.False(dto.WinRmUseSsl);
         Assert.False(dto.WinRmSkipCertificateCheck);
         Assert.Equal(WinRmIdentityMode.CurrentUser, dto.WinRmIdentityMode);
@@ -209,6 +211,7 @@ public class ServerProfileDtoTests
         Assert.Equal(original.RdpDomain, deserialized.RdpDomain);
         Assert.Equal(original.ConnectionType, deserialized.ConnectionType);
         Assert.Equal(original.WinRmPort, deserialized.WinRmPort);
+        Assert.True(deserialized.HasWinRmPortField);
         Assert.Equal(original.WinRmUsername, deserialized.WinRmUsername);
         Assert.Equal(original.WinRmPasswordEncrypted, deserialized.WinRmPasswordEncrypted);
         Assert.Equal(original.WinRmUseSsl, deserialized.WinRmUseSsl);
@@ -452,6 +455,8 @@ public class ServerProfileDtoTests
         Assert.NotNull(dto);
         Assert.Equal("WINRM", dto.ConnectionType);
         Assert.True(dto.WinRmUseSsl);
+        Assert.Equal(DefaultPorts.WinRmHttps, dto.WinRmPort);
+        Assert.False(dto.HasWinRmPortField);
         Assert.False(dto.WinRmSkipCertificateCheck);
     }
 
@@ -482,6 +487,22 @@ public class ServerProfileDtoTests
         string json = JsonSerializer.Serialize(dto);
 
         Assert.Contains("\"WinRmIdentityMode\":\"Credential\"", json);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void JsonDeserialization_WinRmIdentityMode_RejectsNumericValues(int numericValue)
+    {
+        string json = $$"""
+        {
+            "ConnectionType": "WINRM",
+            "WinRmIdentityMode": {{numericValue}}
+        }
+        """;
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ServerProfileDto>(json));
     }
 
     [Fact]

@@ -52,6 +52,8 @@ public sealed class SessionFailureStageToLabelConverter : IValueConverter
             SessionFailureStage.SshPreflight => "SessionFailureStageSshPreflight",
             SessionFailureStage.SshAuth => "SessionFailureStageSshAuth",
             SessionFailureStage.SshHostKey => "SessionFailureStageSshHostKey",
+            SessionFailureStage.SshPlinkFallback => "SessionFailureStageSshPlinkFallback",
+            SessionFailureStage.SshPipeMode => "SessionFailureStageSshPipeMode",
             _ => "SessionFailureStageGeneric",
         };
     }

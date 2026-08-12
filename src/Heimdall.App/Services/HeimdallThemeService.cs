@@ -39,6 +39,8 @@ public sealed class HeimdallThemeService
     private const string DefaultTheme = ThemeForgeNames.Drakul;
     private const string DefaultAccentTint = nameof(ThemeForgeAccentTint.Default);
     private const string BridgeDictionaryPath = "Themes/HeimdallThemeBridge.xaml";
+    private const string BridgeDictionaryPackPath =
+        "pack://application:,,,/Heimdall;component/Themes/HeimdallThemeBridge.xaml";
 
     private static readonly Dictionary<string, string> ThemeForgeIds =
         ThemeForgeNames.All.ToDictionary(
@@ -223,6 +225,21 @@ public sealed class HeimdallThemeService
         }
     }
 
+    internal static ResourceDictionary CreateBridgeDictionary()
+    {
+        return CreateBridgeDictionary(static source => new ResourceDictionary
+        {
+            Source = new Uri(source, UriKind.Absolute),
+        });
+    }
+
+    internal static ResourceDictionary CreateBridgeDictionary(
+        Func<string, ResourceDictionary> dictionaryFactory)
+    {
+        ArgumentNullException.ThrowIfNull(dictionaryFactory);
+        return dictionaryFactory(BridgeDictionaryPackPath);
+    }
+
     private static void RefreshHeimdallBridge(Application app)
     {
         IList<ResourceDictionary> merged = app.Resources.MergedDictionaries;
@@ -235,8 +252,8 @@ public sealed class HeimdallThemeService
                 continue;
             }
 
-            merged.RemoveAt(i);
-            merged.Insert(i, new ResourceDictionary { Source = source });
+            ResourceDictionary replacement = CreateBridgeDictionary();
+            merged[i] = replacement;
             return;
         }
     }

@@ -143,6 +143,33 @@ public sealed class KnownHostsImportExportTests : IDisposable
         Assert.Contains(service.GetAllEntries(), item => item.HostPort.StartsWith("|1|", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("hashed.example.com", 2222)]
+    [InlineData("2001:db8::17", 2200)]
+    public void Import_HashedNonStandardPortEntry_MatchesOnlyCanonicalHostToken(string host, int port)
+    {
+        byte[] keyBlob = [0x1A, 0x1B, 0x1C];
+        string canonicalHostToken = $"[{host}]:{port}";
+        string hashedHost = CreateHashedHost(canonicalHostToken, [0x11, 0x12, 0x13, 0x14]);
+        string path = WriteKnownHosts($"{hashedHost} ssh-ed25519 {ToKey(keyBlob)}");
+        HostKeyTrustService service = CreateService().Service;
+        KnownHostsImporter importer = new(service);
+        string fingerprint = HostKeyFormats.ComputeSha256Fingerprint(keyBlob);
+
+        importer.ImportFile(path, DateTimeOffset.Parse("2026-04-24T10:15:00Z"));
+        HostKeyVerifyResult matchingResult = service.Verify(host, port, fingerprint, "ssh-ed25519");
+        HostKeyVerifyResult differentPortResult = service.Verify(host, port + 1, fingerprint, "ssh-ed25519");
+
+        Assert.True(matchingResult.Trusted);
+        Assert.False(matchingResult.FirstUse);
+        Assert.NotNull(service.GetEntry(host, port));
+        Assert.True(differentPortResult.Trusted);
+        Assert.True(differentPortResult.FirstUse);
+        Assert.Null(service.GetEntry(host, port + 1));
+        Assert.Single(service.GetAllEntries());
+        Assert.Contains(service.GetAllEntries(), item => item.HostPort.StartsWith("|1|", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void ExportFile_NewFile_WritesAllEntriesWithPublicKeys()
     {

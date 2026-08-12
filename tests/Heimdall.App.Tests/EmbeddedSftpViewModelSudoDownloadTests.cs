@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Text;
+using System.Threading.Channels;
 using Heimdall.App.ViewModels;
 
 namespace Heimdall.App.Tests;
@@ -75,39 +77,220 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
     }
 
     [Fact]
-    public void DecodeSudoBase64_RoundTripsBinaryBytes()
+    public async Task StreamSudoBase64OutputAsync_FragmentedOutput_WritesBeforeCommandCompletesAndDrainsStderr()
     {
-        byte[] expected = [0x00, 0xff, 0xfe, 0x80, 0x01, 0x7f, 0xc3, 0x28, 0x0a];
-        string encoded = Convert.ToBase64String(expected);
-
-        byte[] actual = EmbeddedSftpViewModel.DecodeSudoBase64(encoded);
-
-        Assert.Equal(expected, actual);
-    }
-
-    [Fact]
-    public void DecodeSudoBase64_ToleratesWrappedOutput()
-    {
-        byte[] expected = new byte[256];
+        byte[] expected = new byte[196_608];
         for (int index = 0; index < expected.Length; index++)
         {
-            expected[index] = (byte)index;
+            expected[index] = (byte)(index % 251);
         }
 
-        string encoded = Convert.ToBase64String(expected);
-        string wrapped = WrapEvery76Characters(encoded);
+        byte[] encoded = Encoding.ASCII.GetBytes(WrapEvery76Characters(Convert.ToBase64String(expected)));
+        byte[] standardErrorBytes = Enumerable.Repeat((byte)'e', 131_072).ToArray();
+        const int firstFragmentLength = 131_072;
+        using FragmentedReadStream standardOutput = new();
+        using FragmentedReadStream standardError = new();
+        using FirstWriteSignalStream destination = new();
+        using CancellationTokenSource commandCancellation = new();
+        TaskCompletionSource commandCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        byte[] actual = EmbeddedSftpViewModel.DecodeSudoBase64(wrapped);
+        Task<string> streamingTask = EmbeddedSftpViewModel.StreamSudoBase64OutputAsync(
+            standardOutput,
+            standardError,
+            destination,
+            commandCompletion.Task,
+            commandCancellation,
+            CancellationToken.None);
 
-        Assert.Equal(expected, actual);
+        await standardError.EnqueueAsync(standardErrorBytes);
+        standardError.Complete();
+        await standardOutput.EnqueueAsync(encoded[..firstFragmentLength]);
+        await destination.FirstWrite.WaitAsync(TimeSpan.FromSeconds(5));
+        await standardError.FirstRead.WaitAsync(TimeSpan.FromSeconds(5));
+        await standardError.EndOfStreamReached.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(commandCompletion.Task.IsCompleted);
+        Assert.Equal(standardErrorBytes.Length, standardError.TotalBytesRead);
+
+        await standardOutput.EnqueueAsync(encoded[firstFragmentLength..]);
+        standardOutput.Complete();
+        commandCompletion.SetResult();
+
+        string standardErrorText = await streamingTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(expected, destination.ToArray());
+        Assert.Equal(65_536, standardErrorText.Length);
+        Assert.All(standardErrorText, character => Assert.Equal('e', character));
+        Assert.False(commandCancellation.IsCancellationRequested);
     }
 
     [Fact]
-    public void DecodeSudoBase64_EmptyString_ReturnsEmptyArray()
+    public async Task StreamSudoBase64OutputAsync_CommandFailure_PreservesCommandFailure()
     {
-        byte[] actual = EmbeddedSftpViewModel.DecodeSudoBase64(string.Empty);
+        using FragmentedReadStream standardOutput = new();
+        using FragmentedReadStream standardError = new();
+        using MemoryStream destination = new();
+        using CancellationTokenSource commandCancellation = new();
+        TaskCompletionSource commandCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        IOException expected = new("SSH channel failed");
 
-        Assert.Empty(actual);
+        Task<string> streamingTask = EmbeddedSftpViewModel.StreamSudoBase64OutputAsync(
+            standardOutput,
+            standardError,
+            destination,
+            commandCompletion.Task,
+            commandCancellation,
+            CancellationToken.None);
+
+        commandCompletion.SetException(expected);
+
+        IOException actual = await Assert.ThrowsAsync<IOException>(() => streamingTask);
+
+        Assert.Same(expected, actual);
+        Assert.True(commandCancellation.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task CommitSudoDownloadAsync_Success_AtomicallyReplacesFinalFile()
+    {
+        string directory = CreateTestDirectory();
+        string finalPath = Path.Combine(directory, "protected.bin");
+        byte[] replacement = [0x00, 0xff, 0xfe, 0x80, 0x01, 0x7f, 0xc3, 0x28, 0x0a];
+        await File.WriteAllBytesAsync(finalPath, [0x10, 0x20, 0x30]);
+
+        try
+        {
+            using MemoryStream standardOutput = new(
+                Encoding.ASCII.GetBytes(Convert.ToBase64String(replacement)));
+            using MemoryStream standardError = new();
+            using CancellationTokenSource commandCancellation = new();
+
+            await EmbeddedSftpViewModel.CommitSudoDownloadAsync(
+                standardOutput,
+                standardError,
+                Task.CompletedTask,
+                () => 0,
+                commandCancellation,
+                finalPath,
+                CancellationToken.None);
+
+            Assert.Equal(replacement, await File.ReadAllBytesAsync(finalPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.part"));
+            Assert.False(commandCancellation.IsCancellationRequested);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CommitSudoDownloadAsync_InvalidBase64_PreservesFinalFileAndRemovesTemp()
+    {
+        string directory = CreateTestDirectory();
+        string finalPath = Path.Combine(directory, "protected.bin");
+        byte[] original = [0x10, 0x20, 0x30];
+        await File.WriteAllBytesAsync(finalPath, original);
+
+        try
+        {
+            using MemoryStream standardOutput = new(Encoding.ASCII.GetBytes("not-base64!"));
+            using MemoryStream standardError = new();
+            using CancellationTokenSource commandCancellation = new();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                EmbeddedSftpViewModel.CommitSudoDownloadAsync(
+                    standardOutput,
+                    standardError,
+                    Task.CompletedTask,
+                    () => 0,
+                    commandCancellation,
+                    finalPath,
+                    CancellationToken.None));
+
+            Assert.Equal(original, await File.ReadAllBytesAsync(finalPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.part"));
+            Assert.True(commandCancellation.IsCancellationRequested);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CommitSudoDownloadAsync_NonZeroExit_PreservesFinalFileAndRemovesTemp()
+    {
+        string directory = CreateTestDirectory();
+        string finalPath = Path.Combine(directory, "protected.bin");
+        byte[] original = [0x10, 0x20, 0x30];
+        await File.WriteAllBytesAsync(finalPath, original);
+
+        try
+        {
+            byte[] replacement = [0xaa, 0xbb, 0xcc];
+            using MemoryStream standardOutput = new(Encoding.ASCII.GetBytes(Convert.ToBase64String(replacement)));
+            using MemoryStream standardError = new(Encoding.UTF8.GetBytes("permission denied"));
+            using CancellationTokenSource commandCancellation = new();
+
+            InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                EmbeddedSftpViewModel.CommitSudoDownloadAsync(
+                    standardOutput,
+                    standardError,
+                    Task.CompletedTask,
+                    () => 17,
+                    commandCancellation,
+                    finalPath,
+                    CancellationToken.None));
+
+            Assert.Contains("exit 17", exception.Message, StringComparison.Ordinal);
+            Assert.Equal(original, await File.ReadAllBytesAsync(finalPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.part"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CommitSudoDownloadAsync_Cancellation_PreservesFinalFileAndRemovesTemp()
+    {
+        string directory = CreateTestDirectory();
+        string finalPath = Path.Combine(directory, "protected.bin");
+        byte[] original = [0x10, 0x20, 0x30];
+        await File.WriteAllBytesAsync(finalPath, original);
+
+        try
+        {
+            using FragmentedReadStream standardOutput = new();
+            using FragmentedReadStream standardError = new();
+            using CancellationTokenSource commandCancellation = new();
+            using CancellationTokenSource cancellation = new();
+            TaskCompletionSource commandCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            using CancellationTokenRegistration registration = commandCancellation.Token.Register(
+                () => commandCompletion.TrySetCanceled(commandCancellation.Token));
+
+            Task downloadTask = EmbeddedSftpViewModel.CommitSudoDownloadAsync(
+                standardOutput,
+                standardError,
+                commandCompletion.Task,
+                () => 0,
+                commandCancellation,
+                finalPath,
+                cancellation.Token);
+
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => downloadTask);
+            Assert.Equal(original, await File.ReadAllBytesAsync(finalPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.part"));
+            Assert.True(commandCancellation.IsCancellationRequested);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     private static string WrapEvery76Characters(string input)
@@ -121,5 +304,150 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
         }
 
         return builder.ToString();
+    }
+
+    private static string CreateTestDirectory()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-sftp-sudo-download-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private sealed class FirstWriteSignalStream : MemoryStream
+    {
+        private readonly TaskCompletionSource _firstWrite =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal Task FirstWrite => _firstWrite.Task;
+
+        public override async ValueTask WriteAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            _firstWrite.TrySetResult();
+            await base.WriteAsync(buffer, cancellationToken);
+        }
+
+        public override async Task WriteAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            _firstWrite.TrySetResult();
+            await base.WriteAsync(buffer, offset, count, cancellationToken);
+        }
+    }
+
+    private sealed class FragmentedReadStream : Stream
+    {
+        private readonly Channel<byte[]> _fragments = Channel.CreateUnbounded<byte[]>(
+            new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = true
+            });
+        private byte[]? _currentFragment;
+        private int _currentOffset;
+        private int _totalBytesRead;
+        private readonly TaskCompletionSource _firstRead =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _endOfStreamReached =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        internal Task FirstRead => _firstRead.Task;
+
+        internal Task EndOfStreamReached => _endOfStreamReached.Task;
+
+        internal int TotalBytesRead => Volatile.Read(ref _totalBytesRead);
+
+        internal ValueTask EnqueueAsync(byte[] fragment)
+        {
+            return _fragments.Writer.WriteAsync(fragment);
+        }
+
+        internal void Complete()
+        {
+            _fragments.Writer.TryComplete();
+        }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            while (_currentFragment is null || _currentOffset == _currentFragment.Length)
+            {
+                if (!await _fragments.Reader.WaitToReadAsync(cancellationToken))
+                {
+                    _endOfStreamReached.TrySetResult();
+                    return 0;
+                }
+
+                if (!_fragments.Reader.TryRead(out _currentFragment))
+                {
+                    continue;
+                }
+
+                _currentOffset = 0;
+            }
+
+            int count = Math.Min(buffer.Length, _currentFragment.Length - _currentOffset);
+            _currentFragment.AsMemory(_currentOffset, count).CopyTo(buffer);
+            _currentOffset += count;
+            Interlocked.Add(ref _totalBytesRead, count);
+            _firstRead.TrySetResult();
+            return count;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Complete();
+            }
+
+            base.Dispose(disposing);
+        }
     }
 }

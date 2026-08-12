@@ -18,6 +18,8 @@ using System.Windows.Controls;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
 
@@ -196,6 +198,127 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
+    public void SessionTabContextMenu_CloseOthers_ConnectedTargetsDeclined_PromptsOnceAndClosesNone()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel current = CreateSession("current", "SSH");
+            SessionTabViewModel firstConnected = CreateSession("first", "SSH");
+            firstConnected.Status = "Connected";
+            SessionTabViewModel secondConnected = CreateSession("second", "RDP");
+            secondConnected.Status = "Connected";
+            SessionTabViewModel pinnedConnected = CreateSession("pinned", "SSH");
+            pinnedConnected.Status = "Connected";
+            pinnedConnected.IsPinned = true;
+            harness.Main.Connection.ActiveSessions.Add(current);
+            harness.Main.Connection.ActiveSessions.Add(firstConnected);
+            harness.Main.Connection.ActiveSessions.Add(secondConnected);
+            harness.Main.Connection.ActiveSessions.Add(pinnedConnected);
+            harness.DialogService.ConfirmResult = false;
+
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, current);
+            MenuItem closeOthers = AssertMenuItem(
+                menu,
+                harness.Main.Localize("SessionCloseOthers"));
+
+            closeOthers.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Equal(1, harness.DialogService.ConfirmCallCount);
+            Assert.Equal(
+                harness.Main.Localize("ConfirmCloseSessionGroupTitle"),
+                harness.DialogService.LastConfirmTitle);
+            Assert.Equal(
+                harness.Main.GetLocalizer().Format("ConfirmCloseSessionGroupMessage", 2, 2),
+                harness.DialogService.LastConfirmMessage);
+            Assert.Equal("warning", harness.DialogService.LastConfirmSeverity);
+            Assert.Equal(
+                new[] { current, firstConnected, secondConnected, pinnedConnected },
+                harness.Main.Connection.ActiveSessions);
+        });
+    }
+
+    [Fact]
+    public void SessionTabContextMenu_CloseToRight_Accepted_ClosesSnapshotWithoutUnitPrompts()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel current = CreateSession("current", "SSH");
+            SessionTabViewModel connected = CreateSession("connected", "SSH");
+            connected.Status = "Connected";
+            SessionTabViewModel disconnected = CreateSession("disconnected", "RDP");
+            disconnected.Status = "Disconnected";
+            SessionTabViewModel busy = CreateSession("busy", "TOOL:PING");
+            busy.Status = "Connected";
+            busy.HostControl = new BusyToolView();
+            SessionTabViewModel pinned = CreateSession("pinned", "SSH");
+            pinned.Status = "Connected";
+            pinned.IsPinned = true;
+            SessionTabViewModel late = CreateSession("late", "SSH");
+            late.Status = "Connected";
+            harness.Main.Connection.ActiveSessions.Add(current);
+            harness.Main.Connection.ActiveSessions.Add(connected);
+            harness.Main.Connection.ActiveSessions.Add(disconnected);
+            harness.Main.Connection.ActiveSessions.Add(busy);
+            harness.Main.Connection.ActiveSessions.Add(pinned);
+            harness.DialogService.ConfirmInvoked = () =>
+            {
+                if (!harness.Main.Connection.ActiveSessions.Contains(late))
+                {
+                    harness.Main.Connection.ActiveSessions.Add(late);
+                }
+            };
+
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, current);
+            MenuItem closeRight = AssertMenuItem(
+                menu,
+                harness.Main.Localize("SessionCloseToRight"));
+
+            closeRight.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Equal(1, harness.DialogService.ConfirmCallCount);
+            Assert.Equal(
+                harness.Main.GetLocalizer().Format("ConfirmCloseSessionGroupMessage", 3, 2),
+                harness.DialogService.LastConfirmMessage);
+            Assert.Contains(current, harness.Main.Connection.ActiveSessions);
+            Assert.DoesNotContain(connected, harness.Main.Connection.ActiveSessions);
+            Assert.DoesNotContain(disconnected, harness.Main.Connection.ActiveSessions);
+            Assert.Contains(busy, harness.Main.Connection.ActiveSessions);
+            Assert.Contains(pinned, harness.Main.Connection.ActiveSessions);
+            Assert.Contains(late, harness.Main.Connection.ActiveSessions);
+        });
+    }
+
+    [Fact]
+    public void SessionTabContextMenu_CloseOthers_NoConnectedTarget_ClosesWithoutPrompt()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel current = CreateSession("current", "SSH");
+            SessionTabViewModel firstDisconnected = CreateSession("first", "SSH");
+            firstDisconnected.Status = "Disconnected";
+            SessionTabViewModel secondDisconnected = CreateSession("second", "RDP");
+            secondDisconnected.Status = "Error";
+            harness.Main.Connection.ActiveSessions.Add(current);
+            harness.Main.Connection.ActiveSessions.Add(firstDisconnected);
+            harness.Main.Connection.ActiveSessions.Add(secondDisconnected);
+            harness.DialogService.ConfirmResult = false;
+
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, current);
+            MenuItem closeOthers = AssertMenuItem(
+                menu,
+                harness.Main.Localize("SessionCloseOthers"));
+
+            closeOthers.RaiseEvent(new System.Windows.RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Equal(0, harness.DialogService.ConfirmCallCount);
+            Assert.Equal(new[] { current }, harness.Main.Connection.ActiveSessions);
+        });
+    }
+
+    [Fact]
     public void SessionTabContextMenu_ResolvedProfile_AddsRevealInTree()
     {
         RunOnStaThread(() =>
@@ -294,5 +417,18 @@ public sealed partial class SessionCoordinatorPreMountTests
             Assert.NotNull(FindMenuItem(pinned, harness.Main.Localize("SessionUnpinTab")));
             Assert.Null(FindMenuItem(pinned, harness.Main.Localize("SessionPinTab")));
         });
+    }
+
+    private sealed class BusyToolView : IToolView
+    {
+        public void Initialize(ToolContext? context, LocalizationManager? localizer)
+        {
+        }
+
+        public bool CanClose() => false;
+
+        public void Dispose()
+        {
+        }
     }
 }

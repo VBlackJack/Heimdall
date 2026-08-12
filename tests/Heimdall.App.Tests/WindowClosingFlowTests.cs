@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 
@@ -21,6 +22,76 @@ namespace Heimdall.App.Tests;
 
 public sealed class WindowClosingFlowTests
 {
+    [Fact]
+    public async Task Close_ConnectedSessions_UserDeclines_StaysOpenBeforePersistence()
+    {
+        int sessionPromptCount = 0;
+        int windowStateSaveCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: false,
+            connectedSessionCount: 2,
+            () => throw new InvalidOperationException("Settings prompt must not run."),
+            () => throw new InvalidOperationException("Settings save must not run."),
+            () =>
+            {
+                sessionPromptCount++;
+                return Task.FromResult(false);
+            },
+            () =>
+            {
+                windowStateSaveCount++;
+                return Task.CompletedTask;
+            },
+            () => throw new InvalidOperationException("Warning must not run."));
+
+        Assert.False(canClose);
+        Assert.Equal(1, sessionPromptCount);
+        Assert.Equal(0, windowStateSaveCount);
+    }
+
+    [Fact]
+    public async Task Close_DirtySettingsAndConnectedSessions_UsesDeterministicPromptOrder()
+    {
+        List<string> steps = [];
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: true,
+            connectedSessionCount: 1,
+            () =>
+            {
+                steps.Add("settings");
+                return Task.FromResult<bool?>(false);
+            },
+            () => throw new InvalidOperationException("Discard must not save settings."),
+            () =>
+            {
+                steps.Add("sessions");
+                return Task.FromResult(true);
+            },
+            () =>
+            {
+                steps.Add("window-state");
+                return Task.CompletedTask;
+            },
+            () => throw new InvalidOperationException("Warning must not run."));
+
+        Assert.True(canClose);
+        Assert.Equal(["settings", "sessions", "window-state"], steps);
+    }
+
+    [Fact]
+    public void UpdateShutdown_MarksConfirmedBeforeRequest_ExactlyOnce()
+    {
+        List<string> steps = [];
+
+        ApplicationLifecycle.RunShutdownSequence(
+            () => steps.Add("confirmed"),
+            () => steps.Add("shutdown"));
+
+        Assert.Equal(["confirmed", "shutdown"], steps);
+    }
+
     [Fact]
     public async Task Close_CleanSettings_WindowStateSaveThrows_StillCloses_NoWarning()
     {
@@ -83,18 +154,156 @@ public sealed class WindowClosingFlowTests
         Assert.Equal(0, warningCount);
     }
 
+    [Theory]
+    [InlineData(true, 0, WindowUIState.MinSidebarWidth, false, true)]
+    [InlineData(false, 1000, WindowUIState.MaxSidebarWidth, true, false)]
+    public void RestoreSidebarState_SeedsNormalizedCanonicalProjection(
+        bool isSidebarHidden,
+        int persistedWidth,
+        double expectedWidth,
+        bool expectedVisible,
+        bool expectedRestoreButton)
+    {
+        WindowUIState state = new()
+        {
+            IsSidebarHidden = !isSidebarHidden,
+            SavedSidebarWidth = WindowUIState.DefaultSidebarWidth
+        };
+        AppSettings settings = new()
+        {
+            SidebarCollapsed = isSidebarHidden,
+            SidebarWidth = persistedWidth
+        };
+
+        SidebarLayoutProjection projection = WindowBoundsPersistence.RestoreSidebarState(
+            state,
+            settings);
+
+        Assert.Equal(isSidebarHidden, state.IsSidebarHidden);
+        Assert.Equal(expectedWidth, state.SavedSidebarWidth);
+        Assert.Equal(expectedVisible, projection.IsVisible);
+        Assert.Equal(expectedRestoreButton, projection.ShowRestoreButton);
+        Assert.Equal(expectedWidth, projection.Width);
+    }
+
+    [Fact]
+    public async Task SaveWindowBounds_VisibleSidebar_PersistsActualWidthInAtomicMerge()
+    {
+        RecordingConfigManager configManager = new();
+        configManager.CurrentSettings.DefaultTheme = "Dracula";
+        WindowUIState state = new()
+        {
+            SavedSidebarWidth = 360d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: 437d);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.False(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(437, configManager.CurrentSettings.SidebarWidth);
+        Assert.Equal(800d, configManager.CurrentSettings.WindowWidth);
+        Assert.Equal("Dracula", configManager.CurrentSettings.DefaultTheme);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task SaveWindowBounds_TemporarilySuppressedSidebar_IgnoresActualWidth(
+        bool isSuppressedByTab,
+        bool isFullscreen)
+    {
+        RecordingConfigManager configManager = new();
+        WindowUIState state = new()
+        {
+            IsSidebarSuppressedByTab = isSuppressedByTab,
+            IsFullscreen = isFullscreen,
+            SavedSidebarWidth = 375d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: 437d);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.False(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(375, configManager.CurrentSettings.SidebarWidth);
+    }
+
+    [Fact]
+    public async Task SaveWindowBounds_CollapsedSidebar_PreservesPreferredWidth()
+    {
+        RecordingConfigManager configManager = new();
+        WindowUIState state = new()
+        {
+            IsSidebarHidden = true,
+            SavedSidebarWidth = 375d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: 0d);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.True(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(375, configManager.CurrentSettings.SidebarWidth);
+    }
+
+    [Fact]
+    public async Task SaveWindowBounds_VisibleSidebarWithInvalidMeasurement_PersistsSavedWidth()
+    {
+        RecordingConfigManager configManager = new();
+        WindowUIState state = new()
+        {
+            SavedSidebarWidth = 390d
+        };
+        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+            left: 10d,
+            top: 20d,
+            width: 800d,
+            height: 600d,
+            isMaximized: false,
+            state,
+            actualSidebarWidth: double.NaN);
+
+        await WindowBoundsPersistence.PersistAsync(configManager, snapshot);
+
+        Assert.Equal(1, configManager.MergeSettingCallCount);
+        Assert.False(configManager.CurrentSettings.SidebarCollapsed);
+        Assert.Equal(390, configManager.CurrentSettings.SidebarWidth);
+    }
+
     [Fact]
     public async Task SaveWindowBounds_NonFiniteOrDegenerate_DoesNotThrow_SkipsWrite()
     {
         var configManager = new RecordingConfigManager();
         WindowBoundsSnapshot[] invalidSnapshots =
         [
-            new(double.NaN, 20, 800, 600, false),
-            new(10, double.NegativeInfinity, 800, 600, false),
-            new(10, 20, double.PositiveInfinity, 600, false),
-            new(10, 20, 800, double.NaN, false),
-            new(10, 20, 0, 600, false),
-            new(10, 20, 800, -1, false)
+            new(double.NaN, 20, 800, 600, false, false, 320),
+            new(10, double.NegativeInfinity, 800, 600, false, false, 320),
+            new(10, 20, double.PositiveInfinity, 600, false, false, 320),
+            new(10, 20, 800, double.NaN, false, false, 320),
+            new(10, 20, 0, 600, false, false, 320),
+            new(10, 20, 800, -1, false, false, 320)
         ];
 
         foreach (WindowBoundsSnapshot snapshot in invalidSnapshots)
@@ -167,6 +376,102 @@ public sealed class WindowClosingFlowTests
         Assert.Equal(0, warningCount);
     }
 
+    [Fact]
+    public async Task Close_AfterConfirmations_AwaitsExpandStateFlushBeforeWindowBounds()
+    {
+        List<string> steps = [];
+        TaskCompletionSource flushStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseFlush = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<bool> closing = InvokeCloseWithExpandStateFlush(
+            connectedSessionCount: 1,
+            () =>
+            {
+                steps.Add("sessions");
+                return Task.FromResult(true);
+            },
+            async () =>
+            {
+                steps.Add("expand-state");
+                flushStarted.TrySetResult();
+                await releaseFlush.Task;
+            },
+            () =>
+            {
+                steps.Add("window-bounds");
+                return Task.CompletedTask;
+            });
+
+        await flushStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(closing.IsCompleted);
+        Assert.Equal(["sessions", "expand-state"], steps);
+
+        releaseFlush.TrySetResult();
+        Assert.True(await closing);
+        Assert.Equal(["sessions", "expand-state", "window-bounds"], steps);
+    }
+
+    [Fact]
+    public async Task Close_SessionConfirmationRefused_DoesNotFlushOrPersistBounds()
+    {
+        int expandStateFlushCount = 0;
+        int windowBoundsSaveCount = 0;
+
+        bool canClose = await InvokeCloseWithExpandStateFlush(
+            connectedSessionCount: 1,
+            () => Task.FromResult(false),
+            () =>
+            {
+                expandStateFlushCount++;
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                windowBoundsSaveCount++;
+                return Task.CompletedTask;
+            });
+
+        Assert.False(canClose);
+        Assert.Equal(0, expandStateFlushCount);
+        Assert.Equal(0, windowBoundsSaveCount);
+    }
+
+    [Fact]
+    public async Task Close_ExpandStateFlushThrows_StillPersistsBoundsAndCloses()
+    {
+        int windowBoundsSaveCount = 0;
+
+        bool canClose = await InvokeCloseWithExpandStateFlush(
+            connectedSessionCount: 0,
+            () => throw new InvalidOperationException("Session prompt must not run."),
+            () => throw new IOException("Simulated expand-state flush failure."),
+            () =>
+            {
+                windowBoundsSaveCount++;
+                return Task.CompletedTask;
+            });
+
+        Assert.True(canClose);
+        Assert.Equal(1, windowBoundsSaveCount);
+    }
+
+    private static Task<bool> InvokeCloseWithExpandStateFlush(
+        int connectedSessionCount,
+        Func<Task<bool>> promptCloseConnectedSessionsAsync,
+        Func<Task> flushExpandStateAsync,
+        Func<Task> persistWindowStateAsync)
+    {
+        return WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: false,
+            connectedSessionCount,
+            () => throw new InvalidOperationException("Settings prompt must not run."),
+            () => throw new InvalidOperationException("Settings save must not run."),
+            promptCloseConnectedSessionsAsync,
+            flushExpandStateAsync,
+            persistWindowStateAsync,
+            () => throw new InvalidOperationException("Warning must not run."));
+    }
+
     private sealed class RecordingConfigManager : IConfigManager
     {
         public string ConfigPath => "memory://config";
@@ -177,11 +482,13 @@ public sealed class WindowClosingFlowTests
 
         public int MergeSettingCallCount { get; private set; }
 
+        public AppSettings CurrentSettings { get; } = new();
+
         public event Action<AppSettings>? SettingsChanged;
 
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(new AppSettings());
+        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(CurrentSettings);
 
         public Task SaveSettingsAsync(AppSettings settings) => Task.CompletedTask;
 
@@ -195,9 +502,8 @@ public sealed class WindowClosingFlowTests
         public Task MergeSettingAsync(Action<AppSettings> mutate)
         {
             MergeSettingCallCount++;
-            var settings = new AppSettings();
-            mutate(settings);
-            SettingsChanged?.Invoke(settings);
+            mutate(CurrentSettings);
+            SettingsChanged?.Invoke(CurrentSettings);
             return Task.CompletedTask;
         }
 

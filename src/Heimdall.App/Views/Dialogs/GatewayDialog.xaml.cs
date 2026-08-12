@@ -27,6 +27,8 @@ namespace Heimdall.App.Views.Dialogs;
 /// </summary>
 public partial class GatewayDialog : Window
 {
+    private bool _suppressCredentialDirtyTracking;
+
     public GatewayDialog()
     {
         InitializeComponent();
@@ -72,12 +74,47 @@ public partial class GatewayDialog : Window
                     if (e.PropertyName == nameof(GatewayDialogViewModel.GatewayPasswordLabel))
                         System.Windows.Automation.AutomationProperties.SetName(PasswordBox, vm.GatewayPasswordLabel);
                     if (e.PropertyName == nameof(GatewayDialogViewModel.HasKeyPath) && !vm.HasKeyPath)
-                        KeyPassphraseBox.Clear();
+                        ClearKeyPassphraseInput();
                 };
             }
 
             TxtName.Focus();
         };
+    }
+
+    private void OnCredentialPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressCredentialDirtyTracking
+            && DataContext is GatewayDialogViewModel vm)
+        {
+            vm.IsDirty = true;
+        }
+    }
+
+    private void ClearCredentialInputs()
+    {
+        RunWithoutCredentialDirtyTracking(() =>
+        {
+            PasswordBox.Clear();
+            KeyPassphraseBox.Clear();
+        });
+    }
+
+    private void ClearKeyPassphraseInput()
+        => RunWithoutCredentialDirtyTracking(KeyPassphraseBox.Clear);
+
+    private void RunWithoutCredentialDirtyTracking(Action action)
+    {
+        bool wasSuppressed = _suppressCredentialDirtyTracking;
+        _suppressCredentialDirtyTracking = true;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _suppressCredentialDirtyTracking = wasSuppressed;
+        }
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
@@ -98,19 +135,22 @@ public partial class GatewayDialog : Window
             DialogResult = true;
 
             // Clear password from UI memory (CWE-316)
-            PasswordBox.Clear();
-            KeyPassphraseBox.Clear();
+            ClearCredentialInputs();
         }
     }
 
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         // Skip dirty check when the user clicked Save (DialogResult == true)
-        if (DialogResult == true) return;
+        if (DialogResult == true)
+        {
+            ClearCredentialInputs();
+            return;
+        }
+
         if (DataContext is not GatewayDialogViewModel { IsDirty: true } vm)
         {
-            PasswordBox.Clear();
-            KeyPassphraseBox.Clear();
+            ClearCredentialInputs();
             return;
         }
 
@@ -127,8 +167,7 @@ public partial class GatewayDialog : Window
             return;
         }
 
-        PasswordBox.Clear();
-        KeyPassphraseBox.Clear();
+        ClearCredentialInputs();
     }
 
     private void OnBrowseKeyClick(object sender, RoutedEventArgs e)

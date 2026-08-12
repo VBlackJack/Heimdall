@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.IO;
+using System.Net.Sockets;
 using System.Text;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -29,6 +31,155 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class WinRmHandlerGatewayTests
 {
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
+    [Fact]
+    public async Task Constructor_YoungBootstrapOrphan_ReschedulesAndDeletesAtEligibility()
+    {
+        DateTime firstSweepUtc = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        TimeSpan maxAge = TimeSpan.FromMinutes(10);
+        DateTime lastWriteUtc = firstSweepUtc - TimeSpan.FromMinutes(5);
+        DateTime eligibilityUtc = lastWriteUtc + maxAge;
+        string orphanPath = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall_winrm_scheduler_wiring.ps1");
+        int sweepCount = 0;
+        int utcNowCallCount = 0;
+        TaskCompletionSource<string> deleted = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        WinRmBootstrapJanitor janitor = new WinRmBootstrapJanitor(
+            enumerateScripts: _ =>
+            {
+                Interlocked.Increment(ref sweepCount);
+                return new string[] { orphanPath };
+            },
+            getLastWriteTimeUtc: _ => lastWriteUtc,
+            delete: path => deleted.TrySetResult(path),
+            utcNow: () => Interlocked.Increment(ref utcNowCallCount) == 1
+                ? firstSweepUtc
+                : eligibilityUtc,
+            maxAge: maxAge);
+
+        using WinRmHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            new CountingWinRmPreflight(),
+            new CapturingTerminalSession(),
+            bootstrapJanitor: janitor);
+
+        string deletedPath = await deleted.Task.WaitAsync(TestTimeout);
+
+        Assert.Equal(orphanPath, deletedPath);
+        Assert.Equal(2, Volatile.Read(ref sweepCount));
+        Assert.Equal(2, Volatile.Read(ref utcNowCallCount));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConnectAsync_ForcedTerminalClose_DeletesBootstrapWithoutProcessExit(bool killFirst)
+    {
+        string testDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall_winrm_cleanup_{Guid.NewGuid():N}");
+        string scriptPath = Path.Combine(testDirectory, "bootstrap.ps1");
+        Directory.CreateDirectory(testDirectory);
+
+        try
+        {
+            WinRmCredentialBootstrap bootstrap = new WinRmCredentialBootstrap(
+                createScriptPath: () => scriptPath,
+                writeAndProtect: (path, content) => File.WriteAllText(path, content),
+                unprotectStoredPasswordBytes: _ => Encoding.UTF8.GetBytes("secret"),
+                protectBootstrapPasswordBytes: _ => "protected-bootstrap-password");
+            CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+            using WinRmHandler handler = CreateHandler(
+                new FakeTunnelService(),
+                new CountingWinRmPreflight(),
+                terminalSession,
+                credentialBootstrapFactory: () => bootstrap);
+            ServerProfileDto server = CreateDirectServer();
+            server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+            server.WinRmUsername = "user";
+            server.WinRmPasswordEncrypted = "encrypted";
+
+            ConnectionResult result = await handler.ConnectAsync(
+                server,
+                new AppSettings(),
+                CancellationToken.None);
+            TerminalSessionResult terminalResult = Assert.IsType<TerminalSessionResult>(result.Session);
+            Assert.True(File.Exists(scriptPath));
+
+            if (killFirst)
+            {
+                terminalResult.Session.Kill();
+                Assert.False(File.Exists(scriptPath));
+            }
+
+            terminalResult.Session.Dispose();
+
+            Assert.False(File.Exists(scriptPath));
+            Assert.True(terminalSession.IsDisposed);
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ProcessExit_DeletesBootstrapAndForwardsExitEvent()
+    {
+        string testDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall_winrm_exit_{Guid.NewGuid():N}");
+        string scriptPath = Path.Combine(testDirectory, "bootstrap.ps1");
+        Directory.CreateDirectory(testDirectory);
+
+        try
+        {
+            WinRmCredentialBootstrap bootstrap = new WinRmCredentialBootstrap(
+                createScriptPath: () => scriptPath,
+                writeAndProtect: (path, content) => File.WriteAllText(path, content),
+                unprotectStoredPasswordBytes: _ => Encoding.UTF8.GetBytes("secret"),
+                protectBootstrapPasswordBytes: _ => "protected-bootstrap-password");
+            CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+            using WinRmHandler handler = CreateHandler(
+                new FakeTunnelService(),
+                new CountingWinRmPreflight(),
+                terminalSession,
+                credentialBootstrapFactory: () => bootstrap);
+            ServerProfileDto server = CreateDirectServer();
+            server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+            server.WinRmUsername = "user";
+            server.WinRmPasswordEncrypted = "encrypted";
+
+            ConnectionResult result = await handler.ConnectAsync(
+                server,
+                new AppSettings(),
+                CancellationToken.None);
+            TerminalSessionResult terminalResult = Assert.IsType<TerminalSessionResult>(result.Session);
+            int exitEventCount = 0;
+            terminalResult.Session.ProcessExited += _ => exitEventCount++;
+            Assert.True(File.Exists(scriptPath));
+
+            terminalSession.RaiseProcessExited(0);
+
+            Assert.False(File.Exists(scriptPath));
+            Assert.Equal(1, exitEventCount);
+            terminalResult.Session.Dispose();
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task ConnectAsync_TunneledProfile_LaunchesPowerShellAgainstTunnelEndpoint()
     {
@@ -51,8 +202,54 @@ public sealed class WinRmHandlerGatewayTests
         Assert.NotNull(terminalSession.Arguments);
         Assert.Contains("-ComputerName '127.0.0.1'", terminalSession.Arguments, StringComparison.Ordinal);
         Assert.Contains("-Port 55985", terminalSession.Arguments, StringComparison.Ordinal);
-        Assert.Equal(0, preflight.TcpProbeCount);
+        Assert.Equal(1, preflight.TcpProbeCount);
+        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
+        Assert.Equal(55985, preflight.LastTcpPort);
         Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_TunneledCredentialProfile_PreflightFailureStopsBeforeBootstrap()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = 55985
+        };
+        CountingWinRmPreflight preflight = new CountingWinRmPreflight
+        {
+            TcpException = new SocketException((int)SocketError.ConnectionRefused)
+        };
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+        int bootstrapFactoryCallCount = 0;
+        WinRmHandler handler = CreateHandler(
+            tunnelService,
+            preflight,
+            terminalSession,
+            () =>
+            {
+                bootstrapFactoryCallCount++;
+                return CreateTestBootstrap();
+            });
+        ServerProfileDto server = CreateGatewayServer();
+        server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+        server.WinRmUsername = @"CONTOSO\operator";
+        server.WinRmPasswordEncrypted = "encrypted";
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, preflight.TcpProbeCount);
+        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
+        Assert.Equal(55985, preflight.LastTcpPort);
+        Assert.Equal(0, bootstrapFactoryCallCount);
+        Assert.Null(terminalSession.Arguments);
+        Assert.Equal(1, tunnelService.ReleaseCount);
+        Assert.Equal(55985, tunnelService.ReleasedLocalPort);
     }
 
     [Fact]
@@ -135,6 +332,37 @@ public sealed class WinRmHandlerGatewayTests
         Assert.Null(result.Warning);
     }
 
+    [Theory]
+    [InlineData(" server01.contoso.local ")]
+    [InlineData("\r\n*.server01.contoso.local\r\n")]
+    public async Task ConnectAsync_DirectProfile_CanonicalizesHostBeforeAllConsumers(string configuredHost)
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = false
+        };
+        CountingWinRmPreflight preflight = new CountingWinRmPreflight();
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+        using WinRmHandler handler = CreateHandler(tunnelService, preflight, terminalSession);
+        ServerProfileDto server = CreateDirectServer();
+        server.RemoteServer = configuredHost;
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("server01.contoso.local", server.RemoteServer);
+        Assert.Equal("server01.contoso.local", preflight.LastTcpHost);
+        Assert.Contains(
+            "-ComputerName 'server01.contoso.local'",
+            terminalSession.Arguments,
+            StringComparison.Ordinal);
+        TerminalSessionResult session = Assert.IsType<TerminalSessionResult>(result.Session);
+        Assert.Equal("server01.contoso.local", session.Endpoint);
+    }
+
     [Fact]
     public async Task ConnectAsync_DirectHttpsProfileWithSkipCertificateCheck_ReturnsWarning()
     {
@@ -182,7 +410,7 @@ public sealed class WinRmHandlerGatewayTests
     }
 
     [Fact]
-    public async Task ConnectAsync_TunneledCredentialMode_DoesNotWarnAboutKerberosFallback()
+    public async Task ConnectAsync_TunneledCredentialMode_WarnsAboutKerberosFallback()
     {
         FakeTunnelService tunnelService = new FakeTunnelService
         {
@@ -207,7 +435,7 @@ public sealed class WinRmHandlerGatewayTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Null(result.Warning);
+        Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
         Assert.NotNull(terminalSession.Arguments);
         Assert.Contains("-File", terminalSession.Arguments, StringComparison.Ordinal);
     }
@@ -245,7 +473,8 @@ public sealed class WinRmHandlerGatewayTests
         CountingWinRmPreflight preflight,
         CapturingTerminalSession terminalSession,
         Func<WinRmCredentialBootstrap>? credentialBootstrapFactory = null,
-        ConnectionStateMachine? stateMachine = null)
+        ConnectionStateMachine? stateMachine = null,
+        WinRmBootstrapJanitor? bootstrapJanitor = null)
     {
         return new WinRmHandler(
             tunnelService,
@@ -255,7 +484,7 @@ public sealed class WinRmHandlerGatewayTests
             () => terminalSession,
             new WinRmPowerShellLaunchBuilder(_ => "powershell.exe"),
             credentialBootstrapFactory,
-            CreateNoOpJanitor());
+            bootstrapJanitor ?? CreateNoOpJanitor());
     }
 
     private static WinRmBootstrapJanitor CreateNoOpJanitor()
@@ -318,6 +547,9 @@ public sealed class WinRmHandlerGatewayTests
         public int TcpProbeCount { get; private set; }
         public int TlsProbeCount { get; private set; }
         public bool LastSkipCertValidation { get; private set; }
+        public string? LastTcpHost { get; private set; }
+        public int LastTcpPort { get; private set; }
+        public Exception? TcpException { get; init; }
 
         public WinRmPreflight Create()
         {
@@ -333,6 +565,13 @@ public sealed class WinRmHandlerGatewayTests
             CancellationToken token)
         {
             TcpProbeCount++;
+            LastTcpHost = host;
+            LastTcpPort = port;
+            if (TcpException is not null)
+            {
+                return Task.FromException(TcpException);
+            }
+
             return Task.CompletedTask;
         }
 
@@ -357,7 +596,7 @@ public sealed class WinRmHandlerGatewayTests
         public int ReleaseCount { get; private set; }
         public int ReleasedLocalPort { get; private set; }
 
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
@@ -366,7 +605,7 @@ public sealed class WinRmHandlerGatewayTests
         {
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
-            return Task.FromResult((true, UsesTunnel, host, port, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)
@@ -390,11 +629,7 @@ public sealed class WinRmHandlerGatewayTests
             remove { }
         }
 
-        public event Action<int>? ProcessExited
-        {
-            add { }
-            remove { }
-        }
+        public event Action<int>? ProcessExited;
 
         public bool IsRunning { get; private set; }
         public int? ProcessId => IsRunning ? 1234 : null;
@@ -440,6 +675,12 @@ public sealed class WinRmHandlerGatewayTests
         public void Kill()
         {
             IsRunning = false;
+        }
+
+        public void RaiseProcessExited(int exitCode)
+        {
+            IsRunning = false;
+            ProcessExited?.Invoke(exitCode);
         }
 
         public void Dispose()

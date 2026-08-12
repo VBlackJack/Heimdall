@@ -61,6 +61,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private readonly IServiceProvider _serviceProvider;
 
     private bool _disposed;
+    private bool _isSettingLocalizedApplicationStatus;
+    private string? _localizedApplicationStatusKey;
     private Action? _onConfigurationChanged;
     private Action<string, string, Core.Models.ToolContext>? _onToolSessionRequested;
     private Action<string>? _onStatusMessageRequested;
@@ -83,6 +85,14 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
     [ObservableProperty]
     private string _statusText = "";
+
+    partial void OnStatusTextChanged(string value)
+    {
+        if (!_isSettingLocalizedApplicationStatus)
+        {
+            _localizedApplicationStatusKey = null;
+        }
+    }
 
     [ObservableProperty]
     private int _serverCount;
@@ -164,7 +174,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <summary>
     /// Shows the save/discard/cancel dialog asynchronously when leaving the
     /// Settings tab with unsaved changes, then navigates to the target tab
-    /// if the user chose Save or Discard.
+    /// if the user chose Discard or the requested save completed successfully.
     /// </summary>
     private async Task HandleUnsavedSettingsGuardAsync(string targetTab)
     {
@@ -181,7 +191,11 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         if (result == true)
         {
             // Save
-            Settings.SaveCommand.Execute(null);
+            bool settingsSaved = await Settings.TrySaveAsync();
+            if (!settingsSaved)
+            {
+                return;
+            }
         }
         else
         {
@@ -366,6 +380,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _workspaceLock.LockStateChanged += OnWorkspaceLockStateChanged;
 
         _appStatus.StatusChanged += OnApplicationStatusChanged;
+        _localizer.LocaleChanged += OnLocaleChanged;
 
         // Keep _currentSettings in sync when settings are saved elsewhere
         _configManager.SettingsChanged += OnSettingsChanged;
@@ -415,7 +430,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         };
         Connection.PropertyChanged += _connectionPropertyChangedHandler;
 
-        StatusText = _localizer["StatusReady"];
+        SetLocalizedApplicationStatus("StatusReady");
     }
 
     // ── Workspace lock ───────────────────────────────────────────────────────
@@ -527,7 +542,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             await RestoreSessionSnapshotAsync(cancellationToken);
 
             // OperationScope.Dispose() handles the Ready transition
-            StatusText = _localizer["StatusReady"];
+            SetLocalizedApplicationStatus("StatusReady");
             WindowTitle = _localizer.Format("WindowTitle", ServerCount);
         }
         finally
@@ -637,8 +652,44 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private void OnApplicationStatusChanged(ApplicationStatus previous, ApplicationStatus current)
     {
         var metadata = ApplicationStatusMachine.GetMetadata(current);
-        StatusText = _localizer[metadata.DisplayKey];
+        SetLocalizedApplicationStatus(metadata.DisplayKey);
         IsBusy = !metadata.AllowsUserAction;
+    }
+
+    private void OnLocaleChanged(string locale)
+    {
+        if (!_uiDispatcher.CheckAccess())
+        {
+            _ = _uiDispatcher.InvokeAsync(RefreshLocalizedShellState);
+            return;
+        }
+
+        RefreshLocalizedShellState();
+    }
+
+    private void RefreshLocalizedShellState()
+    {
+        string? statusKey = _localizedApplicationStatusKey;
+        if (statusKey is not null)
+        {
+            SetLocalizedApplicationStatus(statusKey);
+        }
+
+        OnPropertyChanged(nameof(DropToMergeText));
+    }
+
+    private void SetLocalizedApplicationStatus(string localizationKey)
+    {
+        _isSettingLocalizedApplicationStatus = true;
+        try
+        {
+            StatusText = _localizer[localizationKey];
+            _localizedApplicationStatusKey = localizationKey;
+        }
+        finally
+        {
+            _isSettingLocalizedApplicationStatus = false;
+        }
     }
 
     /// <summary>
@@ -682,6 +733,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _disposed = true;
 
         _appStatus.StatusChanged -= OnApplicationStatusChanged;
+        _localizer.LocaleChanged -= OnLocaleChanged;
         Sidebar.Dispose();
         ToolsTab.Dispose();
         Tunnels.Dispose();

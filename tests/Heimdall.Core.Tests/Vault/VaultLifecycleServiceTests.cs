@@ -15,6 +15,7 @@
  */
 
 using System.Runtime.Versioning;
+using System.Text.Json;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
@@ -104,6 +105,23 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
         });
     }
 
+    private async Task<VaultLifecycleService> SeedCompletedVaultAsync(
+        IVaultHelloService? vaultHelloService = null)
+    {
+        await SeedLegacyVaultAsync();
+        VaultLifecycleService service = NewService(vaultHelloService);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        return service;
+    }
+
+    private async Task PersistPlaintextCitrixTokenAsync()
+    {
+        List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+        ServerProfileDto profile = Assert.Single(servers);
+        profile.CitrixLaunchCommandLine = CitrixPlaintext;
+        await _configManager.SaveServersAsync(servers);
+    }
+
     [Fact]
     public async Task EnableAsync_MigratesWholeConfidentialSetToV2()
     {
@@ -178,6 +196,87 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
         var profile = (await _configManager.LoadServersAsync())[0];
         Assert.True(VaultSecretBlob.IsSecretBlob(profile.RdpPasswordEncrypted));
         Assert.Equal("rdp-pw", CredentialProtector.Unprotect(profile.RdpPasswordEncrypted));
+    }
+
+    [Fact]
+    public async Task UnlockAsync_CompleteState_ReconcilesPersistedPlaintextCitrixToken()
+    {
+        VaultLifecycleService service = await SeedCompletedVaultAsync();
+        service.Lock();
+        await PersistPlaintextCitrixTokenAsync();
+
+        await NewService().UnlockAsync(Pw(StrongPassword));
+
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        Assert.Equal(VaultMigrationState.Complete, settings.VaultMigrationState);
+        ServerProfileDto profile = Assert.Single(await _configManager.LoadServersAsync());
+        Assert.True(VaultSecretBlob.IsSecretBlob(profile.CitrixLaunchCommandLine));
+        Assert.Equal(CitrixPlaintext, CredentialProtector.Unprotect(profile.CitrixLaunchCommandLine));
+    }
+
+    [Fact]
+    public async Task UnlockWithHelloAsync_CompleteState_ReconcilesPersistedPlaintextCitrixToken()
+    {
+        FakeVaultHelloService hello = new();
+        VaultLifecycleService service = await SeedCompletedVaultAsync(hello);
+        await service.EnrollHelloAsync();
+        service.Lock();
+        await PersistPlaintextCitrixTokenAsync();
+
+        VaultHelloUnlockResult result = await NewService(hello).UnlockWithHelloDetailedAsync();
+
+        Assert.True(result.Succeeded);
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        Assert.Equal(VaultMigrationState.Complete, settings.VaultMigrationState);
+        ServerProfileDto profile = Assert.Single(await _configManager.LoadServersAsync());
+        Assert.True(VaultSecretBlob.IsSecretBlob(profile.CitrixLaunchCommandLine));
+        Assert.Equal(CitrixPlaintext, CredentialProtector.Unprotect(profile.CitrixLaunchCommandLine));
+    }
+
+    [Fact]
+    public async Task UnlockAsync_CompleteStateWithProtectedInventory_DoesNotRewriteServerFile()
+    {
+        VaultLifecycleService service = await SeedCompletedVaultAsync();
+        service.Lock();
+        string serversPath = _configManager.ServersPath;
+        DateTime sentinelWriteTime = new(2020, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(serversPath, sentinelWriteTime);
+        DateTime writeTimeBefore = File.GetLastWriteTimeUtc(serversPath);
+        byte[] bytesBefore = await File.ReadAllBytesAsync(serversPath);
+
+        await NewService().UnlockAsync(Pw(StrongPassword));
+
+        byte[] bytesAfter = await File.ReadAllBytesAsync(serversPath);
+        Assert.Equal(bytesBefore, bytesAfter);
+        Assert.Equal(writeTimeBefore, File.GetLastWriteTimeUtc(serversPath));
+    }
+
+    [Fact]
+    public async Task UnlockAsync_WrongPassword_DoesNotReconcilePersistedPlaintextCitrixToken()
+    {
+        VaultLifecycleService service = await SeedCompletedVaultAsync();
+        service.Lock();
+        await PersistPlaintextCitrixTokenAsync();
+
+        await Assert.ThrowsAsync<VaultUnlockException>(
+            () => NewService().UnlockAsync(Pw("WrongMaster2!Pass")));
+
+        Assert.False(CredentialProtector.IsVaultUnlocked);
+        ServerProfileDto profile = Assert.Single(await _configManager.LoadServersAsync());
+        Assert.Equal(CitrixPlaintext, profile.CitrixLaunchCommandLine);
+    }
+
+    [Fact]
+    public async Task UnlockAsync_CompleteStateReconciliationFailure_RelocksVault()
+    {
+        VaultLifecycleService service = await SeedCompletedVaultAsync();
+        service.Lock();
+        await File.WriteAllTextAsync(_configManager.ServersPath, "{");
+
+        await Assert.ThrowsAnyAsync<JsonException>(
+            () => NewService().UnlockAsync(Pw(StrongPassword)));
+
+        Assert.False(CredentialProtector.IsVaultUnlocked);
     }
 
     [Fact]

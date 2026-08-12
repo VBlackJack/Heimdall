@@ -1233,6 +1233,20 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public void BulkCredentialBoundary_WinRmWithoutUsername_RejectsPasswordAndPreservesIdentity()
+    {
+        ServerProfileDto server = CreatePasswordServer("alpha", "Alpha", "ops", "WINRM");
+        server.WinRmUsername = "  ";
+        server.WinRmPasswordEncrypted = "password-before";
+
+        bool passwordAccepted = ServerListViewModel.TrySetEditablePassword(server, "password-after");
+
+        Assert.False(passwordAccepted);
+        Assert.Equal("password-before", server.WinRmPasswordEncrypted);
+        Assert.Equal(WinRmIdentityMode.CurrentUser, server.WinRmIdentityMode);
+    }
+
+    [Fact]
     public async Task ServerBulkEditUsername_BasicBulkUpdate_AllUsernamesUpdated()
     {
         var configManager = new UsernameAwareConfigManager();
@@ -1506,6 +1520,11 @@ public sealed class ServerListBulkActionTests
         await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
         ServerProfileDto alpha = CreatePasswordServer("alpha", "Alpha", "ops", connectionType);
         ServerProfileDto beta = CreatePasswordServer("beta", "Beta", "ops", connectionType);
+        if (string.Equals(connectionType, "WINRM", StringComparison.Ordinal))
+        {
+            alpha.WinRmUsername = "operator";
+            beta.WinRmUsername = "operator";
+        }
 
         await fixture.LoadServersAsync(
             fixture.ExpandGroups("ops"),
@@ -1537,6 +1556,63 @@ public sealed class ServerListBulkActionTests
                 Assert.Equal(WinRmIdentityMode.Credential, storedServer.WinRmIdentityMode);
             }
         }
+    }
+
+    [Fact]
+    public async Task BulkEditPasswordAsync_MixedWinRmUsernames_UpdatesOnlyCredentialProfilesAndReportsSkipped()
+    {
+        const string NewPassword = "new-secret";
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        ServerProfileDto credential = CreatePasswordServer("credential", "Credential", "ops", "WINRM");
+        credential.WinRmUsername = "operator";
+        ServerProfileDto currentUser = CreatePasswordServer("current", "Current", "ops", "WINRM");
+        currentUser.WinRmUsername = " ";
+
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"), credential, currentUser);
+        fixture.DialogService.NextBulkEditPasswordResult = NewPassword;
+        fixture.ViewModel.SelectSingle(fixture.ServerById("credential"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("current"));
+        Assert.Equal(1, fixture.ViewModel.GetBulkPasswordTargetCount(fixture.ViewModel.SelectedItems.ToList()));
+
+        await fixture.ViewModel.BulkEditPasswordCommand.ExecuteAsync(fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Equal(1, fixture.DialogService.BulkEditPasswordCallCount);
+        Assert.Equal(1, fixture.DialogService.LastBulkEditPasswordCount);
+        Assert.Equal(
+            "Password updated on 1 server(s). Skipped 1 WinRM profile(s) because no username is configured.",
+            fixture.LastStatusMessage);
+        Dictionary<string, ServerProfileDto> stored = (await fixture.ConfigManager.LoadServersAsync())
+            .ToDictionary(server => server.Id, StringComparer.Ordinal);
+        Assert.Equal(NewPassword, CredentialProtector.Unprotect(stored["credential"].WinRmPasswordEncrypted));
+        Assert.Equal(WinRmIdentityMode.Credential, stored["credential"].WinRmIdentityMode);
+        Assert.Null(stored["current"].WinRmPasswordEncrypted);
+        Assert.Equal(WinRmIdentityMode.CurrentUser, stored["current"].WinRmIdentityMode);
+    }
+
+    [Fact]
+    public async Task BulkEditPasswordAsync_OnlyWinRmWithoutUsername_SkipsDialogAndMutation()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        ServerProfileDto alpha = CreatePasswordServer("alpha", "Alpha", "ops", "WINRM");
+        ServerProfileDto beta = CreatePasswordServer("beta", "Beta", "ops", "WINRM");
+
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"), alpha, beta);
+        fixture.DialogService.NextBulkEditPasswordResult = "new-secret";
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+        Assert.Equal(0, fixture.ViewModel.GetBulkPasswordTargetCount(fixture.ViewModel.SelectedItems.ToList()));
+
+        await fixture.ViewModel.BulkEditPasswordCommand.ExecuteAsync(fixture.ViewModel.SelectedItems.ToList());
+
+        Assert.Equal(0, fixture.DialogService.BulkEditPasswordCallCount);
+        Assert.Equal(
+            "Password updated on 0 server(s). Skipped 2 WinRM profile(s) because no username is configured.",
+            fixture.LastStatusMessage);
+        ServerProfileDto[] stored = (await fixture.ConfigManager.LoadServersAsync())
+            .OrderBy(server => server.Id, StringComparer.Ordinal)
+            .ToArray();
+        Assert.All(stored, server => Assert.Null(server.WinRmPasswordEncrypted));
+        Assert.All(stored, server => Assert.Equal(WinRmIdentityMode.CurrentUser, server.WinRmIdentityMode));
     }
 
     [Fact]
@@ -1901,6 +1977,69 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public async Task UpdateGatewayReferences_WinRmHttps_IsSkippedWhileEligiblePeerUpdates()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-target", "Bastion"));
+        ServerProfileDto winRm = CreateServer("winrm", "WinRM HTTPS", "ops");
+        winRm.ConnectionType = "WINRM";
+        winRm.WinRmUseSsl = true;
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        await fixture.LoadServersAsync(settings, winRm, ssh);
+
+        int updatedCount = await fixture.ViewModel.UpdateGatewayReferencesAsync(
+            ["winrm", "ssh"],
+            "gw-target");
+
+        Assert.Equal(1, updatedCount);
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        ServerProfileDto storedWinRm = Assert.Single(storedServers, server => server.Id == "winrm");
+        ServerProfileDto storedSsh = Assert.Single(storedServers, server => server.Id == "ssh");
+        Assert.Null(storedWinRm.SshGatewayId);
+        Assert.False(storedWinRm.UseDirectConnection);
+        Assert.Equal("gw-target", storedSsh.SshGatewayId);
+        Assert.Equal(
+            "Skipped 1 WinRM HTTPS profile(s): SSH gateways support WinRM over HTTP only.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task BulkEditGateway_InheritChoice_WinRmHttpsWithFolderGateway_RemainsDirect()
+    {
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.SshGateways.Add(CreateGateway("gw-default", "Default"));
+        settings.GroupDefaults["ops"] = new GroupDefaultsDto { SshGatewayId = "gw-default" };
+        ServerProfileDto winRm = CreateServer("winrm", "WinRM HTTPS", "ops");
+        winRm.ConnectionType = "WINRM";
+        winRm.WinRmUseSsl = true;
+        winRm.UseDirectConnection = true;
+        ServerProfileDto ssh = CreateServer("ssh", "SSH", "ops");
+        ssh.UseDirectConnection = true;
+        await fixture.LoadServersAsync(settings, winRm, ssh);
+        fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
+            ServerBulkEditGatewayChoice.InheritFolderDefault,
+            GatewayId: null);
+        fixture.ViewModel.SelectSingle(fixture.ServerById("winrm"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("ssh"));
+
+        await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
+            fixture.ViewModel.SelectedItems.ToList());
+
+        ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync()).ToArray();
+        ServerProfileDto storedWinRm = Assert.Single(storedServers, server => server.Id == "winrm");
+        ServerProfileDto storedSsh = Assert.Single(storedServers, server => server.Id == "ssh");
+        Assert.Null(storedWinRm.SshGatewayId);
+        Assert.True(storedWinRm.UseDirectConnection);
+        Assert.Null(storedSsh.SshGatewayId);
+        Assert.False(storedSsh.UseDirectConnection);
+        Assert.Equal(
+            "Skipped 1 WinRM HTTPS profile(s): SSH gateways support WinRM over HTTP only.",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
     public async Task BulkEditGateway_IneligibleProtocols_SkippedAndReported_NotBadged()
     {
         await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
@@ -1941,12 +2080,17 @@ public sealed class ServerListBulkActionTests
         ServerProfileDto telnet = CreateServer("telnet", "Telnet", "ops");
         telnet.ConnectionType = "TELNET";
         telnet.SshGatewayId = "gw-residual";
-        await fixture.LoadServersAsync(settings, ssh, telnet);
+        ServerProfileDto winRm = CreateServer("winrm", "WinRM HTTPS", "ops");
+        winRm.ConnectionType = "WINRM";
+        winRm.WinRmUseSsl = true;
+        winRm.SshGatewayId = "gw-invalid";
+        await fixture.LoadServersAsync(settings, ssh, telnet, winRm);
         fixture.DialogService.NextBulkEditGatewayResult = new ServerBulkEditGatewayResult(
             ServerBulkEditGatewayChoice.DirectConnection,
             GatewayId: null);
         fixture.ViewModel.SelectSingle(fixture.ServerById("ssh"));
         fixture.ViewModel.ToggleSelection(fixture.ServerById("telnet"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("winrm"));
 
         await fixture.ViewModel.BulkEditGatewayCommand.ExecuteAsync(
             fixture.ViewModel.SelectedItems.ToList());
@@ -2516,14 +2660,14 @@ public sealed class ServerListBulkActionTests
 
     private sealed class NullTunnelService : ITunnelService
     {
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
-            return Task.FromResult((true, false, server.RemoteServer, remotePort, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)

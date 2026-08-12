@@ -44,6 +44,14 @@ public sealed record TunnelInfo(
     public int RemoteBindPort { get; init; }
 
     /// <summary>
+    /// Effective local destination port used by the reverse forward. This is
+    /// <c>0</c> when reverse forwarding is disabled; otherwise it is the
+    /// explicitly configured local port, or <see cref="RemoteBindPort"/> when
+    /// the local port was left at its default value.
+    /// </summary>
+    public int EffectiveRemoteLocalPort { get; init; }
+
+    /// <summary>
     /// Local IPv4 loopback address bound by the final local forward.
     /// </summary>
     public string LocalBindHost { get; init; } = LoopbackBinding.DefaultHost;

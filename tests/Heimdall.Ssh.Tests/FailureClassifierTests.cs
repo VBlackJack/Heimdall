@@ -16,6 +16,7 @@
 
 using System.Net.Sockets;
 using Renci.SshNet.Common;
+using Renci.SshNet.Messages.Transport;
 
 namespace Heimdall.Ssh.Tests;
 
@@ -74,6 +75,45 @@ public class FailureClassifierTests
     }
 
     [Fact]
+    public void Classify_AuthException_KeyboardInteractiveWithoutPassword_ReturnsDedicatedCode()
+    {
+        SshAuthenticationException exception = new(
+            "Server requires keyboard-interactive authentication.");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyboardInteractiveNoPassword, result.Code);
+        Assert.True(result.IsFatal);
+        Assert.Same(exception, result.OriginalException);
+    }
+
+    [Fact]
+    public void Classify_AuthException_KeyboardInteractiveWithPassword_DoesNotUseMissingPasswordCode()
+    {
+        SshAuthenticationException exception = new(
+            "Server requires keyboard-interactive authentication.");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        // Keyboard-interactive involves no SSH key. SshConnectionFactory.AddPasswordMethods
+        // answers every keyboard-interactive prompt with the configured password, so a
+        // denial here means that password was refused.
+        Assert.Equal(SshFailureCode.PasswordRejected, result.Code);
+        Assert.NotEqual(SshFailureCode.KeyboardInteractiveNoPassword, result.Code);
+    }
+
+    [Fact]
     public void Classify_AuthException_GenericMessage_ReturnsNoSupportedAuth()
     {
         var ex = new SshAuthenticationException("No auth methods available");
@@ -110,6 +150,159 @@ public class FailureClassifierTests
         var result = FailureClassifier.Classify(ex, connParams);
 
         Assert.Equal(SshFailureCode.PassphraseRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_NoSuitableAuthenticationMethod_ReturnsNoSupportedAuth()
+    {
+        // Renci.SshNet.ClientAuthentication.Authenticate throws this wording when none
+        // of the offered methods are supported. The "keyboard-interactive" token inside
+        // the parenthetical list must not be mistaken for a key-rejection failure. A
+        // password is configured so the keyboard-interactive-without-password guard does
+        // not intercept this case before the fix under test is reached.
+        SshAuthenticationException exception = new(
+            "No suitable authentication method found to complete authentication (keyboard-interactive,password).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.NoSupportedAuth, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_AttemptLimitReachedForKeyboardInteractive_ReturnsTooManyAuthFailures()
+    {
+        // Renci.SshNet.ClientAuthentication.Authenticate throws this wording when the
+        // server-side retry ceiling for a method is hit. The "keyboard-interactive" token
+        // inside the parenthetical must not be mistaken for a key-rejection failure. A
+        // password is configured so the keyboard-interactive-without-password guard does
+        // not intercept this case before the fix under test is reached.
+        SshAuthenticationException exception = new(
+            "Reached authentication attempt limit for method (keyboard-interactive).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.TooManyAuthFailures, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_PermissionDeniedPublicKeyPassword_WithPassword_ReturnsKeyRejected()
+    {
+        SshAuthenticationException exception = new("Permission denied (publickey,password).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_PermissionDeniedKeyboardInteractive_WithoutPassword_ReturnsKeyboardInteractiveNoPassword()
+    {
+        SshAuthenticationException exception = new("Permission denied (keyboard-interactive).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyboardInteractiveNoPassword, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_MacVerificationFailedForPuttyKeyFile_WithKeyPassphrase_ReturnsPassphraseRejected()
+    {
+        // Renci.SshNet.PuttyKeyFile constructor throws this wording when the
+        // passphrase used to decrypt a PuTTY-format key is wrong.
+        SshException exception = new("MAC verification failed for PuTTY key file");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            KeyPath = @"C:\keys\id_rsa.ppk",
+            KeyPassphrase = "wrong"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PassphraseRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_PrivateKeyBlockSizeMismatch_WithKeyPassphrase_ReturnsPassphraseRejected()
+    {
+        // Renci.SshNet.PrivateKeyFile.ParseSshCryptFile throws this wording when the
+        // decrypted key blob length is uneven, which happens with a wrong passphrase.
+        SshException exception = new("The private key section must be a multiple of the block size (8)");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            KeyPath = "/home/user/.ssh/id_rsa",
+            KeyPassphrase = "wrong"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PassphraseRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_OpenSshRandomCheckBytesMismatch_WithKeyPassphrase_ReturnsPassphraseRejected()
+    {
+        // Renci.SshNet.PrivateKeyFile.ParseOpenSshFile throws this wording when the
+        // decrypted check bytes do not match, which happens with a wrong passphrase.
+        SshException exception = new("The random check bytes of the OpenSSH key do not match (1 <-> 2).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            KeyPath = "/home/user/.ssh/id_ed25519",
+            KeyPassphrase = "wrong"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PassphraseRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_MacVerificationFailedForPuttyKeyFile_WithoutPassphraseConfigured_ReturnsKeyFileInvalid()
+    {
+        // Guard-intact check: with no KeyPath/KeyPassphrase configured, a corrupt key
+        // file message must still fall through to the generic key-file-invalid branch,
+        // not be misclassified as a passphrase rejection.
+        SshException exception = new("MAC verification failed for PuTTY key file");
+
+        SshFailureInfo result = FailureClassifier.Classify(exception);
+
+        Assert.Equal(SshFailureCode.KeyFileInvalid, result.Code);
         Assert.True(result.IsFatal);
     }
 
@@ -189,6 +382,255 @@ public class FailureClassifierTests
 
         Assert.Equal(SshFailureCode.Unknown, result.Code);
         Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonKeyExchangeFailed_ReturnsProtocolError()
+    {
+        // Renci.SshNet.Security.KeyExchange.HandleKeyExchangeInitMessage throws this
+        // wording, with DisconnectReason.KeyExchangeFailed, when no offered algorithm
+        // matches. The typed reason must win even though the message text contains
+        // none of the refused/reset/protocol tokens.
+        SshConnectionException ex = new SshConnectionException(
+            "No matching key exchange algorithm (server offers diffie-hellman-group14-sha256)",
+            DisconnectReason.KeyExchangeFailed);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.ProtocolError, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonProtocolVersionNotSupported_ReturnsProtocolError()
+    {
+        // Renci.SshNet.Session.ConnectSocket throws this wording, with
+        // DisconnectReason.ProtocolVersionNotSupported, when the server identification
+        // string reports an unsupported protocol version.
+        SshConnectionException ex = new SshConnectionException(
+            "Server version '1.99' is not supported.",
+            DisconnectReason.ProtocolVersionNotSupported);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.ProtocolError, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonProtocolError_ReturnsProtocolError()
+    {
+        // Renci.SshNet.Session.TryReadPacket throws this wording, with
+        // DisconnectReason.ProtocolError, when the declared packet length is invalid.
+        SshConnectionException ex = new SshConnectionException(
+            "Bad packet length: 5.",
+            DisconnectReason.ProtocolError);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.ProtocolError, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonMacError_ReturnsProtocolError()
+    {
+        // Renci.SshNet.Session.TryReadPacket throws this wording, with
+        // DisconnectReason.MacError, when the inbound MAC check fails.
+        SshConnectionException ex = new SshConnectionException(
+            "MAC error",
+            DisconnectReason.MacError);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.ProtocolError, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonConnectionLost_ReturnsSessionDisconnected()
+    {
+        // Renci.SshNet.Abstractions.SocketAbstraction and Renci.SshNet.Session throw
+        // this wording, with DisconnectReason.ConnectionLost, when the transport is
+        // torn down unexpectedly.
+        SshConnectionException ex = new SshConnectionException(
+            "An established connection was aborted by the server.",
+            DisconnectReason.ConnectionLost);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.SessionDisconnected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonByApplication_ReturnsSessionDisconnected()
+    {
+        // Renci.SshNet.Session.OnDisconnectReceived wraps every server-sent disconnect
+        // reason code, including ByApplication, into an SshConnectionException with this
+        // message shape.
+        SshConnectionException ex = new SshConnectionException(
+            "The connection was closed by the server: Session closed by application. (ByApplication).",
+            DisconnectReason.ByApplication);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.SessionDisconnected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonNoMoreAuthenticationMethodsAvailable_ReturnsNoSupportedAuth()
+    {
+        // Renci.SshNet.Session.OnDisconnectReceived wraps every server-sent disconnect
+        // reason code, including NoMoreAuthenticationMethodsAvailable, into an
+        // SshConnectionException with this message shape.
+        SshConnectionException ex = new SshConnectionException(
+            "The connection was closed by the server: No more authentication methods available. (NoMoreAuthenticationMethodsAvailable).",
+            DisconnectReason.NoMoreAuthenticationMethodsAvailable);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.NoSupportedAuth, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonAuthenticationCanceledByUser_ReturnsCancelled()
+    {
+        // Renci.SshNet.Session.OnDisconnectReceived wraps every server-sent disconnect
+        // reason code, including AuthenticationCanceledByUser, into an
+        // SshConnectionException with this message shape.
+        SshConnectionException ex = new SshConnectionException(
+            "The connection was closed by the server: Authentication canceled by user. (AuthenticationCanceledByUser).",
+            DisconnectReason.AuthenticationCanceledByUser);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.Cancelled, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_KeyboardInteractiveWithPasswordConfigured_ReturnsPasswordRejected()
+    {
+        // Renci.SshNet.ClientAuthentication.TryAuthenticate reports the failing method by
+        // name: "Permission denied (keyboard-interactive)." No SSH key is involved, but
+        // "keyboard-interactive" contains the substring "key". With a password configured,
+        // the password supplied through keyboard-interactive is what the server refused.
+        SshAuthenticationException exception = new SshAuthenticationException(
+            "Permission denied (keyboard-interactive).");
+        SshConnectionParams connectionParams = new SshConnectionParams
+        {
+            Host = "host",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PasswordRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_PublicKeyDenied_StillReturnsKeyRejected()
+    {
+        // Control: "Permission denied (publickey)." names the public-key method, so
+        // KeyRejected is correct and must not change.
+        SshAuthenticationException exception = new SshAuthenticationException(
+            "Permission denied (publickey).");
+        SshConnectionParams connectionParams = new SshConnectionParams
+        {
+            Host = "host",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyRejected, result.Code);
+    }
+
+    // ── Connection exception: DisconnectReason control cases ────────────
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonNone_RefusedMessage_ReturnsNetworkRefused()
+    {
+        // Control: DisconnectReason.None must keep falling through to the message-text
+        // heuristic unchanged.
+        SshConnectionException ex = new SshConnectionException(
+            "Connection refused.",
+            DisconnectReason.None);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.NetworkRefused, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonNone_ResetMessage_ReturnsNetworkReset()
+    {
+        // Control: DisconnectReason.None must keep falling through to the message-text
+        // heuristic unchanged.
+        SshConnectionException ex = new SshConnectionException(
+            "Connection reset by peer.",
+            DisconnectReason.None);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.NetworkReset, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_DisconnectReasonNone_UnrecognizedMessage_ReturnsUnknown()
+    {
+        // Control: DisconnectReason.None with no recognized token must keep falling
+        // through to Unknown, unchanged.
+        SshConnectionException ex = new SshConnectionException(
+            "Something unexpected happened",
+            DisconnectReason.None);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.Unknown, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_UnmappedDisconnectReason_RefusedMessage_FallsThroughToNetworkRefused()
+    {
+        // Control: a DisconnectReason with no dedicated mapping (HostNotAllowedToConnect)
+        // must still fall through to the message-text heuristic, proving the mapping is
+        // exhaustive-by-exclusion rather than a catch-all.
+        SshConnectionException ex = new SshConnectionException(
+            "Connection refused.",
+            DisconnectReason.HostNotAllowedToConnect);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.NetworkRefused, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_InnerSocketExceptionWithMappedDisconnectReason_SocketBranchStillWins()
+    {
+        // Control: the inner-SocketException branch is more specific and must keep
+        // winning even when the typed DisconnectReason is also mapped.
+        SocketException socketEx = new SocketException((int)SocketError.ConnectionRefused);
+        SshConnectionException ex = new SshConnectionException(
+            "Transport failed",
+            DisconnectReason.ProtocolError,
+            socketEx);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.NetworkRefused, result.Code);
+        Assert.True(result.IsFatal);
+        Assert.Same(socketEx, result.OriginalException);
     }
 
     // ── Timeout exception ──────────────────────────────────────────────

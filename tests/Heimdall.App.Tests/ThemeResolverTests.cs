@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+using System.Collections;
+using System.IO;
+using System.Resources;
+using System.Windows;
 using Heimdall.App.Services;
 using ThemeForge.Theme;
 
@@ -21,6 +25,49 @@ namespace Heimdall.App.Tests;
 
 public sealed class ThemeResolverTests
 {
+    [Fact]
+    public void CreateBridgeDictionary_UsesAbsoluteApplicationPackPath()
+    {
+        const string ExpectedSource =
+            "pack://application:,,,/Heimdall;component/Themes/HeimdallThemeBridge.xaml";
+        ResourceDictionary expected = new();
+        string? observedSource = null;
+
+        ResourceDictionary actual = HeimdallThemeService.CreateBridgeDictionary(source =>
+        {
+            observedSource = source;
+            return expected;
+        });
+
+        Assert.Same(expected, actual);
+        Assert.Equal(ExpectedSource, observedSource);
+    }
+
+    [Fact]
+    public void ThemeBridge_IsPresentInCompiledApplicationResources()
+    {
+        using Stream? resourceStream = typeof(HeimdallThemeService).Assembly
+            .GetManifestResourceStream("Heimdall.g.resources");
+        Assert.NotNull(resourceStream);
+
+        using ResourceReader reader = new(resourceStream);
+        IDictionaryEnumerator resources = reader.GetEnumerator();
+        bool bridgeFound = false;
+        while (resources.MoveNext())
+        {
+            if (string.Equals(
+                    resources.Key as string,
+                    "themes/heimdallthemebridge.baml",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                bridgeFound = true;
+                break;
+            }
+        }
+
+        Assert.True(bridgeFound, "The compiled theme bridge BAML resource was not found.");
+    }
+
     public static IEnumerable<object[]> ThemeForgeIds()
     {
         return ThemeNames.All.Select(themeName => new object[] { themeName });

@@ -38,11 +38,53 @@ using AppDialogViewModels = Heimdall.App.ViewModels.Dialogs;
 
 namespace Heimdall.App.Views;
 
+internal readonly record struct ReconnectRequestContext(
+    bool IsAutomatic,
+    int Attempt,
+    int MaxAttempts)
+{
+    internal static ReconnectRequestContext Manual { get; } = new(false, 0, 0);
+
+    internal static ReconnectRequestContext Automatic(int attempt, int maxAttempts)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(attempt, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxAttempts, attempt);
+        return new ReconnectRequestContext(true, attempt, maxAttempts);
+    }
+}
+
+internal sealed class AutoReconnectTickScheduler
+{
+    private long _generation;
+
+    internal TimerCallback CreateTimerCallback(
+        Action<Action> queueAction,
+        Action tickAction)
+    {
+        ArgumentNullException.ThrowIfNull(queueAction);
+        ArgumentNullException.ThrowIfNull(tickAction);
+
+        long generation = Interlocked.Increment(ref _generation);
+        return _ => queueAction(() =>
+        {
+            if (Volatile.Read(ref _generation) == generation)
+            {
+                tickAction();
+            }
+        });
+    }
+
+    internal void Invalidate()
+    {
+        Interlocked.Increment(ref _generation);
+    }
+}
+
 /// <summary>
 /// WPF host for an interactive SSH shell session rendered through WebView2 + xterm.js.
 /// The browser surface handles VT parsing, ANSI colors, cursor movement, and scrollback.
 /// </summary>
-public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink
+public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ISessionPaneOwner
 {
     private static readonly (string Tag, Func<string> ContentFactory, string WrapperStart, string WrapperEnd)[] InlineAssets =
     [
@@ -199,8 +241,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private SshShellSession? _session;
     private Heimdall.Terminal.ITerminalSession? _terminalSession;
     private SessionTabViewModel? _sessionTab;
+    private SessionPaneModel? _ownerPane;
     private System.Threading.Timer? _keepAliveTimer;
     private System.Threading.Timer? _autoReconnectTimer;
+    private readonly AutoReconnectTickScheduler _autoReconnectTickScheduler = new();
     private Action<ReadOnlyMemory<byte>>? _terminalDataHandler;
     private Action<int>? _terminalExitHandler;
     private Core.Localization.LocalizationManager? _localizer;
@@ -228,6 +272,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private string? _pendingSecurityDisconnectMessage;
     private DateTimeOffset? _terminalSessionAttachedAtUtc;
     private int _autoReconnectAttempt;
+    private int _autoReconnectMaxAttempts;
     private int _autoReconnectSecondsRemaining;
 
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
@@ -273,12 +318,27 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// </summary>
     public event Action? ReconnectRequested;
 
+    internal event Action<ReconnectRequestContext>? ReconnectContextRequested;
+
     /// <summary>
     /// Raised when the user clicks the Close button on the disconnect overlay.
     /// The subscriber (EmbeddedSessionManager) closes the owning session tab
     /// through the shared <c>ConnectionViewModel.CloseSessionAsync</c> path.
     /// </summary>
     public event Action? CloseRequested;
+
+    /// <summary>
+    /// Raised synchronously when the hosted terminal process exits.
+    /// </summary>
+    internal event Action? TerminalProcessExited;
+
+    internal SessionPaneModel? OwningPane => _ownerPane;
+
+    public void SetOwningPane(SessionPaneModel pane)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        _ownerPane = pane;
+    }
 
     public EmbeddedSshView()
     {
@@ -406,6 +466,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         UpdateStatus("Connected");
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
+        // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
 
         TryAutoStartSessionLog();
@@ -463,6 +524,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         UpdateStatus(connectedStatus);
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
+        // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
 
         TryAutoStartSessionLog();
@@ -761,7 +823,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         StopAutoReconnectTimer();
         Core.Logging.FileLogger.Info("EmbeddedSSH Reconnect requested by user");
-        ReconnectRequested?.Invoke();
+        RaiseReconnectRequested(ReconnectRequestContext.Manual);
     }
 
     private void OnOverlayReconnectClick(object sender, RoutedEventArgs e)
@@ -774,7 +836,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         StopAutoReconnectTimer();
         HideReconnectOverlay();
         Core.Logging.FileLogger.Info("EmbeddedSSH Reconnect requested via overlay");
-        ReconnectRequested?.Invoke();
+        RaiseReconnectRequested(ReconnectRequestContext.Manual);
     }
 
     private void OnOverlayCloseClick(object sender, RoutedEventArgs e)
@@ -830,6 +892,20 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         };
     }
 
+    internal int AutoReconnectAttempt => _autoReconnectAttempt;
+
+    internal void SeedAutoReconnectAttempt(int attempt)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(attempt);
+        _autoReconnectAttempt = attempt;
+    }
+
+    private void RaiseReconnectRequested(ReconnectRequestContext context)
+    {
+        ReconnectContextRequested?.Invoke(context);
+        ReconnectRequested?.Invoke();
+    }
+
     private void StartAutoReconnectCountdown(int delaySeconds, int attempt, int maxAttempts)
     {
         if (_disposed) return;
@@ -846,6 +922,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         HideConnectingOverlay();
 
         _autoReconnectSecondsRemaining = delaySeconds;
+        _autoReconnectMaxAttempts = maxAttempts;
         AutoReconnectMessageText.Text = string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
             L("SshAutoReconnectMessage"),
@@ -865,8 +942,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             },
             System.Windows.Threading.DispatcherPriority.Input);
 
+        TimerCallback timerCallback = _autoReconnectTickScheduler.CreateTimerCallback(
+            action => BeginInvokeIfAvailable(action),
+            OnAutoReconnectTick);
         _autoReconnectTimer = new System.Threading.Timer(
-            _ => BeginInvokeIfAvailable(OnAutoReconnectTick),
+            timerCallback,
             null,
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(1));
@@ -887,7 +967,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             AutoReconnectOverlay.Visibility = Visibility.Collapsed;
             Core.Logging.FileLogger.Info(
                 $"EmbeddedSSH auto-reconnect attempt {_autoReconnectAttempt} firing");
-            ReconnectRequested?.Invoke();
+            RaiseReconnectRequested(ReconnectRequestContext.Automatic(
+                _autoReconnectAttempt,
+                _autoReconnectMaxAttempts));
             return;
         }
 
@@ -904,13 +986,18 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private void StopAutoReconnectTimer()
     {
-        if (_autoReconnectTimer is null)
-        {
-            return;
-        }
+        StopAutoReconnectTimer(_autoReconnectTickScheduler, ref _autoReconnectTimer);
+    }
 
-        _autoReconnectTimer.Dispose();
-        _autoReconnectTimer = null;
+    internal static void StopAutoReconnectTimer(
+        AutoReconnectTickScheduler scheduler,
+        ref System.Threading.Timer? timer)
+    {
+        ArgumentNullException.ThrowIfNull(scheduler);
+
+        scheduler.Invalidate();
+        System.Threading.Timer? stoppedTimer = Interlocked.Exchange(ref timer, null);
+        stoppedTimer?.Dispose();
     }
 
     private void HideConnectingOverlay()
@@ -1509,6 +1596,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private void OnTerminalProcessExited(int exitCode)
     {
+        TerminalProcessExited?.Invoke();
+
         TimeSpan runtime = _terminalSessionAttachedAtUtc is { } attachedAt
             ? DateTimeOffset.UtcNow - attachedAt
             : TimeSpan.Zero;
@@ -1598,7 +1687,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             if (marksTerminalInput && _terminalSession is not null)
             {
-                _terminalSessionHasInput = true;
+                MarkTerminalInput();
             }
 
             _terminalSession?.Write(data);
@@ -1796,11 +1885,18 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             if (marksTerminalInput && _terminalSession is not null)
             {
-                _terminalSessionHasInput = true;
+                MarkTerminalInput();
             }
 
             _terminalSession?.Write(text);
         }
+    }
+
+    private void MarkTerminalInput()
+    {
+        _terminalSessionHasInput = true;
+        _winRmEarlyOutputDiagnostic?.MarkUserInput();
+        _winRmEarlyOutputDiagnostic = null;
     }
 
     /// <summary>Whether a macro recording is currently in progress.</summary>

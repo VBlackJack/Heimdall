@@ -145,12 +145,7 @@ public sealed class VaultLifecycleService : IDisposable
         var dek = UnwrapWithChars(masterPassword, settings.VaultWrappedDek);
         SetUnlockedDek(dek);
 
-        if (settings.VaultMigrationState == VaultMigrationState.InProgress)
-        {
-            await VaultMigrationEngine.MigrateForwardAsync(_configManager).ConfigureAwait(false);
-            await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
-                .ConfigureAwait(false);
-        }
+        await ResumeOrReconcileForwardMigrationAsync(settings).ConfigureAwait(false);
 
         await StampLastMasterUnlockAsync().ConfigureAwait(false);
     }
@@ -264,12 +259,7 @@ public sealed class VaultLifecycleService : IDisposable
 
         SetUnlockedDek(dek);
 
-        if (settings.VaultMigrationState == VaultMigrationState.InProgress)
-        {
-            await VaultMigrationEngine.MigrateForwardAsync(_configManager).ConfigureAwait(false);
-            await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
-                .ConfigureAwait(false);
-        }
+        await ResumeOrReconcileForwardMigrationAsync(settings).ConfigureAwait(false);
 
         return VaultHelloUnlockResult.Success;
     }
@@ -380,6 +370,34 @@ public sealed class VaultLifecycleService : IDisposable
         if (!ReferenceEquals(previous, dek))
         {
             previous?.Dispose();
+        }
+    }
+
+    private async Task ResumeOrReconcileForwardMigrationAsync(AppSettings settings)
+    {
+        if (settings.VaultMigrationState == VaultMigrationState.InProgress)
+        {
+            await VaultMigrationEngine.MigrateForwardAsync(_configManager).ConfigureAwait(false);
+            await _configManager.MergeSettingAsync(
+                    current => current.VaultMigrationState = VaultMigrationState.Complete)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        if (settings.VaultMigrationState != VaultMigrationState.Complete)
+        {
+            return;
+        }
+
+        try
+        {
+            await VaultMigrationEngine.ReconcileCitrixLaunchTokensAsync(_configManager)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            Lock();
+            throw;
         }
     }
 

@@ -30,7 +30,7 @@ internal static class CitrixSessionEventFactory
 
     /// <summary>Builds a connect event for the given host and application title.</summary>
     public static SessionEventRecord BuildConnected(string? rawHost, string? title)
-        => SessionEventRecord.Connected(Protocol, GraphicalSessionEventHelpers.ResolveHost(rawHost, title), title);
+        => SessionEventRecord.Connected(Protocol, ResolveEventHost(rawHost, title), title);
 
     /// <summary>
     /// Builds a disconnect event. Reason and code are null (Citrix carries no protocol reason); the
@@ -44,11 +44,17 @@ internal static class CitrixSessionEventFactory
     {
         return SessionEventRecord.Disconnected(
             Protocol,
-            GraphicalSessionEventHelpers.ResolveHost(rawHost, title),
+            ResolveEventHost(rawHost, title),
             title,
             reasonKey: null,
             reasonCode: null,
             durationMs,
             endTrigger);
+    }
+
+    private static string ResolveEventHost(string? rawHost, string? title)
+    {
+        string? sanitizedHost = CitrixStoreFrontUrlSanitizer.Sanitize(rawHost);
+        return GraphicalSessionEventHelpers.ResolveHost(sanitizedHost, title);
     }
 }

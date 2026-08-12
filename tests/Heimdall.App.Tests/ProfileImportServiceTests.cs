@@ -73,6 +73,39 @@ public sealed class ProfileImportServiceTests
         Assert.Equal("Import profiles", fixture.Dialog.LastRdpImportViewModel.DialogTitle);
     }
 
+    [Theory]
+    [InlineData("rdp", "RDP")]
+    [InlineData("ssh", "SSH")]
+    [InlineData("sftp", "SFTP")]
+    [InlineData("vnc", "VNC")]
+    [InlineData("telnet", "Telnet")]
+    [InlineData("ftp", "FTP")]
+    [InlineData("citrix", "Citrix")]
+    [InlineData("local", "Local")]
+    [InlineData("winrm", "WINRM")]
+    public async Task ImportFromPathAsync_Json_CanonicalizesConnectionTypeForDialog(
+        string importedConnectionType,
+        string expectedConnectionType)
+    {
+        using ProfileImportFixture fixture = new();
+        string path = await fixture.WriteJsonAsync("servers.json",
+        [
+            new ServerProfileDto
+            {
+                Id = "json-import",
+                DisplayName = "Imported",
+                ConnectionType = importedConnectionType,
+                RemoteServer = "host.example.com"
+            }
+        ]);
+
+        ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.True(result.HasChanges);
+        ServerProfileDto stored = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal(expectedConnectionType, stored.ConnectionType);
+    }
+
     [Fact]
     public async Task ImportFromPathAsync_JsonV2Envelope_PersistsGatewayAndKeepsReference()
     {
@@ -402,6 +435,7 @@ public sealed class ProfileImportServiceTests
             "WINRM"
         ];
 
+        Assert.Same(ConnectionTypeCatalog.CanonicalTypes, ProfileImportService.SupportedConnectionTypes);
         Assert.Equal(expected.Length, ProfileImportService.SupportedConnectionTypes.Count);
         foreach (string connectionType in expected)
         {

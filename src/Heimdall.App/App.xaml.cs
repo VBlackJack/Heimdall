@@ -956,6 +956,33 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        LegacyMigrationOffer? offer = null;
+        try
+        {
+            offer = await LegacyMigrationDecisionPolicy.CreateOfferAsync(legacyPath);
+        }
+        catch (IOException ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Error(
+                "Could not fingerprint legacy migration source; decline will not be persisted.",
+                ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Error(
+                "Could not fingerprint legacy migration source; decline will not be persisted.",
+                ex);
+        }
+
+        if (offer is not null)
+        {
+            AppSettings settings = await configManager.LoadSettingsAsync();
+            if (!LegacyMigrationDecisionPolicy.ShouldOffer(settings, offer))
+            {
+                return;
+            }
+        }
+
         var confirmed = await dialogService.ShowConfirmAsync(
             localization["MigrationTitle"],
             localization["MigrationDetectedPrompt"],
@@ -963,23 +990,42 @@ public partial class App : System.Windows.Application
 
         if (!confirmed)
         {
+            if (offer is not null)
+            {
+                try
+                {
+                    await LegacyMigrationDecisionPolicy.RecordDeclineAsync(
+                        configManager,
+                        offer);
+                }
+                catch (Exception ex)
+                {
+                    Heimdall.Core.Logging.FileLogger.Error(
+                        "Could not persist the declined legacy migration offer.",
+                        ex);
+                }
+            }
+
             return;
         }
 
-        var migrationService = new MigrationService(configManager, localization);
-        var result = await migrationService.ImportFromLegacyAsync(legacyPath);
+        MigrationService migrationService = new(configManager, localization);
+        MigrationResult result = await migrationService.ImportFromLegacyAsync(legacyPath);
+        MigrationPresentation presentation = MigrationPresentationPolicy.Create(
+            result,
+            localization);
 
-        if (result.Success)
+        if (presentation.Kind == MigrationPresentationKind.Info)
         {
             dialogService.ShowInfo(
                 localization["MigrationTitle"],
-                localization.Format("MigrationSuccess", result.ServersImported));
+                presentation.Message);
         }
         else
         {
             dialogService.ShowWarning(
                 localization["MigrationTitle"],
-                localization.Format("MigrationFailed", result.Error ?? ""));
+                presentation.Message);
         }
     }
 

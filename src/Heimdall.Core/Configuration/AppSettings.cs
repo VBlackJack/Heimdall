@@ -59,6 +59,10 @@ public sealed class AppSettings
     public string UpdateRepositoryOwner { get; set; } = "VBlackJack";
     public string UpdateRepositoryName { get; set; } = "Heimdall";
 
+    // Legacy migration offer
+    public int LegacyMigrationDeclinedOfferVersion { get; set; }
+    public string? LegacyMigrationDeclinedSourceFingerprint { get; set; }
+
     // Tunnels
     public int TunnelEstablishmentDelayMs { get; set; } = 2500;
     public int TunnelRetryDelayMs { get; set; } = 1500;

@@ -110,11 +110,15 @@ public sealed class SessionTreeInlineRenameTests
         var service = new ServerRenameService(config);
         var server = ServerItemViewModel.FromDto(CreateServer("server-1", "Original"));
         ServerItemViewModel selectedServer = server;
+        server.BeginInlineEdit();
+        server.EditName = "  Renamed  ";
 
-        ServerRenameResult result = await service.RenameAsync(server.Id, "  Renamed  ");
+        ServerRenameResult result = await service.RenameAsync(server.Id, server.EditName);
         server.UpdateFromDto(Assert.IsType<ServerProfileDto>(result.Server));
+        SessionTreeInlineRename.CompleteEdit(server, _ => { });
 
         Assert.Equal(ServerRenameStatus.Renamed, result.Status);
+        Assert.False(server.IsEditing);
         Assert.Equal("Renamed", Assert.Single(config.Servers).DisplayName);
         Assert.Equal("Renamed", server.DisplayName);
         Assert.Same(server, selectedServer);
@@ -133,14 +137,42 @@ public sealed class SessionTreeInlineRenameTests
         var server = ServerItemViewModel.FromDto(CreateServer("server-1", "Original"));
         ServerItemViewModel selectedServer = server;
         string filter = "prod";
+        server.BeginInlineEdit();
+        server.EditName = "Renamed";
 
         await Assert.ThrowsAsync<IOException>(
-            () => service.RenameAsync(server.Id, "Renamed"));
+            () => service.RenameAsync(server.Id, server.EditName));
 
+        Assert.True(server.IsEditing);
+        Assert.Equal("Renamed", server.EditName);
         Assert.Equal("Original", server.DisplayName);
         Assert.Same(server, selectedServer);
         Assert.Equal("prod", filter);
         Assert.Equal("Original", Assert.Single(config.Servers).DisplayName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task RenameServer_InvalidName_RemainsEditingWithoutPersistence(string invalidName)
+    {
+        RecordingConfigManager config = new()
+        {
+            Servers = [CreateServer("server-1", "Original")]
+        };
+        ServerItemViewModel server = ServerItemViewModel.FromDto(
+            CreateServer("server-1", "Original"));
+        server.BeginInlineEdit();
+        server.EditName = invalidName;
+
+        ServerRenameResult result = await new ServerRenameService(config)
+            .RenameAsync(server.Id, server.EditName);
+
+        Assert.Equal(ServerRenameStatus.InvalidName, result.Status);
+        Assert.True(server.IsEditing);
+        Assert.Equal(invalidName, server.EditName);
+        Assert.Equal("Original", server.DisplayName);
+        Assert.Empty(config.PersistenceCalls);
     }
 
     [Theory]

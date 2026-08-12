@@ -187,7 +187,7 @@ internal sealed class WinRmPowerShellLaunchBuilder
     internal static int ResolvePort(ServerProfileDto server)
     {
         ArgumentNullException.ThrowIfNull(server);
-        return server.WinRmPort > 0
+        return server.HasWinRmPortField && server.WinRmPort > 0
             ? server.WinRmPort
             : server.WinRmUseSsl ? DefaultPorts.WinRmHttps : DefaultPorts.WinRmHttp;
     }
@@ -227,6 +227,14 @@ internal sealed class WinRmPowerShellLaunchBuilder
                 "ErrorWinRmProfileInvalid",
                 [],
                 "Server profile is not a WinRM profile.");
+        }
+
+        if (!Enum.IsDefined(server.WinRmIdentityMode))
+        {
+            throw new WinRmConfigurationException(
+                "ErrorWinRmProfileInvalid",
+                [],
+                "WinRM identity mode is invalid.");
         }
 
         if (!IsValidHost(server.RemoteServer))

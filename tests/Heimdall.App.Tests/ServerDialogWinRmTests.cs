@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Xml.Linq;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -26,6 +27,27 @@ namespace Heimdall.App.Tests;
 public sealed class ServerDialogWinRmTests
 {
     [Fact]
+    public void WinRmCredentialsCard_UsesCaseInsensitiveViewModelVisibility()
+    {
+        XDocument document = LoadServerDialogXaml();
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement title = Assert.Single(document.Descendants(), element =>
+            string.Equals(
+                element.Attribute(x + "Name")?.Value,
+                "DlgSrv_BasicWinRmCredentialsTitle",
+                StringComparison.Ordinal));
+        XElement card = title.Ancestors().First(element => element.Name.LocalName == "Border");
+
+        Assert.Equal(
+            "{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}",
+            card.Attribute("Visibility")?.Value);
+        Assert.DoesNotContain(
+            card.Descendants(),
+            element => element.Name.LocalName == "DataTrigger"
+                && string.Equals(element.Attribute("Value")?.Value, "WINRM", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SelectProtocol_WinRm_DefaultsToHttpPort()
     {
         ServerDialogViewModel vm = new ServerDialogViewModel();
@@ -36,6 +58,23 @@ public sealed class ServerDialogWinRmTests
         Assert.Equal("WinRM", vm.ConnectionTypeDisplayName);
         Assert.Equal(DefaultPorts.WinRmHttp, vm.WinRmPort);
         Assert.Equal(DefaultPorts.WinRmHttp, vm.EndpointPort);
+    }
+
+    private static XDocument LoadServerDialogXaml()
+    {
+        string path = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "..",
+            "src",
+            "Heimdall.App",
+            "Views",
+            "Dialogs",
+            "ServerDialog.xaml"));
+        return XDocument.Load(path);
     }
 
     [Fact]
@@ -52,6 +91,23 @@ public sealed class ServerDialogWinRmTests
 
         Assert.Equal(DefaultPorts.WinRmHttp, vm.WinRmPort);
         Assert.Equal(DefaultPorts.WinRmHttp, vm.EndpointPort);
+    }
+
+    [Fact]
+    public void ReselectProtocol_WinRmSsl_RestoresHttpsDefaultPort()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel();
+        vm.SelectProtocolCommand.Execute("WINRM");
+        vm.WinRmUseSsl = true;
+        vm.BackToProtocolSelectorCommand.Execute(null);
+        vm.SelectProtocolCommand.Execute("SSH");
+        vm.BackToProtocolSelectorCommand.Execute(null);
+
+        vm.SelectProtocolCommand.Execute("WINRM");
+
+        Assert.True(vm.WinRmUseSsl);
+        Assert.Equal(DefaultPorts.WinRmHttps, vm.WinRmPort);
+        Assert.Equal(DefaultPorts.WinRmHttps, vm.EndpointPort);
     }
 
     [Fact]
