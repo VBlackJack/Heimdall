@@ -16,6 +16,7 @@
 
 using System.Net.Sockets;
 using Renci.SshNet.Common;
+using Renci.SshNet.Messages.Transport;
 
 namespace Heimdall.Ssh;
 
@@ -229,6 +230,33 @@ public static class FailureClassifier
         if (ex.InnerException is SocketException socketEx)
         {
             return ClassifySocketException(socketEx);
+        }
+
+        // The typed DisconnectReason is preferred over message text, since SSH.NET
+        // populates it for every server-sent disconnect and for the transport-level
+        // failures it raises itself. The text heuristic below remains only for
+        // DisconnectReason.None, where SSH.NET provides no typed granularity.
+        switch (ex.DisconnectReason)
+        {
+            case DisconnectReason.ProtocolError:
+            case DisconnectReason.ProtocolVersionNotSupported:
+            case DisconnectReason.KeyExchangeFailed:
+            case DisconnectReason.MacError:
+            case DisconnectReason.CompressionError:
+                return new SshFailureInfo(SshFailureCode.ProtocolError, "SSH protocol error.", true, ex);
+
+            case DisconnectReason.ConnectionLost:
+            case DisconnectReason.ByApplication:
+                return new SshFailureInfo(SshFailureCode.SessionDisconnected, "SSH session was disconnected.", true, ex);
+
+            case DisconnectReason.NoMoreAuthenticationMethodsAvailable:
+                return new SshFailureInfo(SshFailureCode.NoSupportedAuth, "No supported authentication method available.", true, ex);
+
+            case DisconnectReason.AuthenticationCanceledByUser:
+                return new SshFailureInfo(SshFailureCode.Cancelled, "Authentication was cancelled.", true, ex);
+
+            default:
+                break;
         }
 
         string msg = ex.Message ?? "";
