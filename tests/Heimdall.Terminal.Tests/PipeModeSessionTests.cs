@@ -41,7 +41,7 @@ public sealed class PipeModeSessionTests
                 "$line = Read-Host; [Console]::Out.WriteLine('PIPE-LIVE:' + $line)\"");
 
             Assert.True(
-                SpinWait.SpinUntil(() => File.Exists(signalPath), TimeSpan.FromSeconds(10)),
+                SpinWait.SpinUntil(() => File.Exists(signalPath), TerminalTestHelpers.ProcessStartupBackstop),
                 "The child process did not confirm that its bootstrap output was written.");
 
             session.DataReceived += data =>
@@ -62,7 +62,7 @@ public sealed class PipeModeSessionTests
 
             session.Write("after-replay\r\n");
 
-            await liveOutput.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await liveOutput.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
             string text;
             lock (outputLock)
             {
@@ -94,12 +94,12 @@ public sealed class PipeModeSessionTests
                 "-NoLogo -NoProfile -Command \"exit 37\"");
 
             Assert.True(
-                SpinWait.SpinUntil(() => !session.IsRunning, TimeSpan.FromSeconds(10)),
+                SpinWait.SpinUntil(() => !session.IsRunning, TerminalTestHelpers.ProcessStartupBackstop),
                 "The child process did not exit.");
 
             session.ProcessExited += exitCode => replayed.TrySetResult(exitCode);
 
-            int exitCode = await replayed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            int exitCode = await replayed.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
             Assert.Equal(37, exitCode);
         }
         finally
@@ -156,7 +156,7 @@ public sealed class PipeModeSessionTests
                     : Volatile.Read(ref observedExitCode));
             int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
                 exited.Task,
-                TimeSpan.FromSeconds(10),
+                TerminalTestHelpers.ProcessStartupBackstop,
                 timeoutContext);
             Assert.Equal(0, exitCode);
 

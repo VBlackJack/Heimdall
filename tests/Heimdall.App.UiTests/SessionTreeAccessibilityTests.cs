@@ -34,7 +34,12 @@ using WpfBinding = System.Windows.Data.Binding;
 
 namespace Heimdall.App.UiTests;
 
+// These tests drive real UI Automation through FlaUI: UIA3Automation, FromHandle on a live window
+// handle, and cross-process LiveRegionChanged event delivery. That needs an interactive desktop
+// session, which is exactly what the RequiresDesktop lane exists for, and it is contended on a CI
+// runner. The trait was missing here while every comparable class in this project carries it.
 [Collection(DesktopUiCollection.Name)]
+[Trait("Category", "RequiresDesktop")]
 public sealed class SessionTreeAccessibilityTests
 {
     [StaFact]

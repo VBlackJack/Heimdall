@@ -120,7 +120,7 @@ public sealed class TerminalSessionLifecycleTests
                 : Volatile.Read(ref observedExitCode));
         int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
             exited.Task,
-            TimeSpan.FromSeconds(10),
+            TerminalTestHelpers.ProcessStartupBackstop,
             timeoutContext);
         session.Dispose();
 
@@ -168,7 +168,7 @@ public sealed class TerminalSessionLifecycleTests
                     : Volatile.Read(ref observedExitCode));
             int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
                 exited.Task,
-                TimeSpan.FromSeconds(10),
+                TerminalTestHelpers.ProcessStartupBackstop,
                 timeoutContext);
             Assert.Equal(12, exitCode);
             session.Dispose();
