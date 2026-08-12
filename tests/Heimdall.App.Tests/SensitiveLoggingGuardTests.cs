@@ -30,6 +30,7 @@ public sealed class SensitiveLoggingGuardTests
     private const string CredentialManagerHelperPath = @"src\Heimdall.Rdp\CredentialManagerHelper.cs";
     private const string EmbeddedRdpViewPath = @"src\Heimdall.App\Views\EmbeddedRdpView.xaml.cs";
     private const string RdpHandlerPath = @"src\Heimdall.App\Services\Handlers\RdpHandler.cs";
+    private const string RdpPasswordResetPath = @"src\Heimdall.Rdp\ActiveX\RdpPasswordReset.cs";
 
     // Regime B classification: CredentialAutofill.cs performs CredUI broker enumeration under the
     // second credential-logging clause in CLAUDE.md:361. It is excluded by regime, not allowlisted.
@@ -43,6 +44,7 @@ public sealed class SensitiveLoggingGuardTests
         RdpHandlerPath,
         CitrixHandlerPath,
         EmbeddedRdpViewPath,
+        RdpPasswordResetPath,
     };
 
     private static readonly string[] CredentialVocabulary =
@@ -79,6 +81,12 @@ public sealed class SensitiveLoggingGuardTests
         { RdpHandlerPath, "RDP CredMan entry cleaned:" },
         { RdpHandlerPath, "RDP CredMan cleanup skipped for" },
         { EmbeddedRdpViewPath, "EmbeddedRDP SetCredentials called." },
+
+        // RDP-012: both historical ClearPassword diagnostics were emitted from connected-state call
+        // sites where put_ClearTextPassword always fails, so the effacement never happened. The
+        // calls and their diagnostics are removed; their absence is now the contract.
+        { EmbeddedRdpViewPath, "Embedded RDP ClearPassword failed:" },
+        { EmbeddedRdpViewPath, "EmbeddedRDP ClearPassword (login):" },
     };
 
     public static TheoryData<string, string> PermittedFailureDiagnostics => new()
@@ -86,9 +94,8 @@ public sealed class SensitiveLoggingGuardTests
         { ActiveXHostPath, "RdpActiveXHost.SetClearTextPassword: success=False" },
         { RdpHandlerPath, "Failed to store RDP credentials:" },
         { RdpHandlerPath, "RDP CredMan cleanup failed for" },
-        { EmbeddedRdpViewPath, "Embedded RDP ClearPassword failed:" },
-        { EmbeddedRdpViewPath, "EmbeddedRDP ClearPassword (login):" },
         { EmbeddedRdpViewPath, "Embedded RDP credential autofill failed:" },
+        { EmbeddedRdpViewPath, "EmbeddedRDP password reset not applied:" },
     };
 
     [Fact]
@@ -204,6 +211,96 @@ public sealed class SensitiveLoggingGuardTests
         Assert.True(
             hasRequiredWarning,
             $"Required RDP failure diagnostic is missing or no longer Warn: {relativePath} - {requiredFragment}");
+    }
+
+    [Fact]
+    public void RdpConnectedCallbacks_ContainNoNativePasswordClearing()
+    {
+        string source = ReadSource(EmbeddedRdpViewPath);
+        string[] connectedCallbackSignatures =
+        {
+            "private void OnRdpConnected()",
+            "private void OnRdpLoginComplete()",
+        };
+
+        foreach (string signature in connectedCallbackSignatures)
+        {
+            string body = ExtractMethodBody(source, signature);
+
+            Assert.DoesNotContain("ClearPassword", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("ResetPassword", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("TryResetNativePassword", body, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void RdpDisconnectedCallback_ResetsPasswordBetweenDisposedAndWatchdogGuards()
+    {
+        string body = ExtractMethodBody(
+            ReadSource(EmbeddedRdpViewPath),
+            "private void OnRdpDisconnected(int reason)");
+
+        int disposedGuardIndex = body.IndexOf("if (_disposed)", StringComparison.Ordinal);
+        int resetIndex = body.IndexOf(
+            "TryResetNativePassword(nameof(OnRdpDisconnected))",
+            StringComparison.Ordinal);
+        int watchdogGuardIndex = body.IndexOf(
+            "if (_connectAbandonedByWatchdog)",
+            StringComparison.Ordinal);
+
+        Assert.True(disposedGuardIndex >= 0, "OnRdpDisconnected no longer guards on _disposed.");
+        Assert.True(
+            resetIndex > disposedGuardIndex,
+            "The native password reset must run after the _disposed guard.");
+        Assert.True(
+            watchdogGuardIndex > resetIndex,
+            "The native password reset must run before the watchdog early return.");
+    }
+
+    [Fact]
+    public void RdpFatalErrorCallback_ResetsPasswordAfterDisposedGuard()
+    {
+        string body = ExtractMethodBody(
+            ReadSource(EmbeddedRdpViewPath),
+            "private void OnRdpFatalError(int errorCode)");
+
+        int disposedGuardIndex = body.IndexOf("if (_disposed)", StringComparison.Ordinal);
+        int resetIndex = body.IndexOf(
+            "TryResetNativePassword(nameof(OnRdpFatalError))",
+            StringComparison.Ordinal);
+
+        Assert.True(disposedGuardIndex >= 0, "OnRdpFatalError no longer guards on _disposed.");
+        Assert.True(
+            resetIndex > disposedGuardIndex,
+            "The native password reset must run after the _disposed guard.");
+    }
+
+    private static string ExtractMethodBody(string source, string signature)
+    {
+        int signatureIndex = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(signatureIndex >= 0, $"Method signature was not found: {signature}");
+
+        int openingBraceIndex = source.IndexOf('{', signatureIndex);
+        Assert.True(openingBraceIndex >= 0, $"Method opening brace was not found: {signature}");
+
+        int depth = 0;
+        for (int index = openingBraceIndex; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+            {
+                depth++;
+            }
+            else if (source[index] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[openingBraceIndex..(index + 1)];
+                }
+            }
+        }
+
+        throw new InvalidDataException($"Unbalanced method body for signature: {signature}");
     }
 
     private static int GetLineNumber(string source, int index)

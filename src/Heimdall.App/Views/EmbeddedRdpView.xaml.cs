@@ -1772,15 +1772,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             _autofillRetryContext = null;
             UpdateAutofillState(RdpAutofillState.None);
 
-            try
-            {
-                _rdpHost?.ClearPassword();
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn($"Embedded RDP ClearPassword failed: {ex.Message}");
-            }
-
             _connectedAtUtc = DateTime.UtcNow;
             EmitConnectEvent();
             _allowResolutionUpdates = false;
@@ -1889,6 +1880,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
+        // The control is no longer connected, so this is the first point where the native password
+        // reset is contractually legal. It runs before the watchdog early return on purpose: an
+        // abandoned connect attempt must clear the secret exactly like a normal disconnect.
+        TryResetNativePassword(nameof(OnRdpDisconnected));
+
         // This disconnect was triggered by the watchdog aborting the COM connect.
         // The connect-timeout error UI is already shown; run no further teardown so
         // the normal overlay/status/diagnostic path does not overwrite it. The flag
@@ -1953,6 +1949,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
+        // Guarded attempt only: the fatal error does not by itself prove the COM disconnected
+        // state, so the reset is refused unless the control confirms it. A later OnDisconnected
+        // retries the idempotent reset.
+        TryResetNativePassword(nameof(OnRdpFatalError));
+
         var fatalMessage = _localizer?.Format("RdpStatusFatalErrorDetail", errorCode)
             ?? "RdpStatusFatalErrorDetail";
         SetConnectionStateError(fatalMessage);
@@ -1975,6 +1976,34 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         });
     }
 
+    /// <summary>
+    /// Clears every password representation held by the native control, fail-closed. The helper
+    /// refuses the reset unless the COM connected state is readable and reports the disconnected
+    /// value, so the call is safe to repeat. Success is silent; every other outcome emits one
+    /// bounded warning carrying technical evidence only.
+    /// </summary>
+    /// <param name="trigger">Name of the COM callback requesting the reset.</param>
+    private void TryResetNativePassword(string trigger)
+    {
+        RdpPasswordResetResult result = RdpPasswordReset.TryReset(_rdpHost?.GetActiveXInstance());
+        if (result.IsSuccess)
+        {
+            return;
+        }
+
+        string connectedState = result.ConnectedState is int state
+            ? state.ToString(CultureInfo.InvariantCulture)
+            : "n/a";
+        string hResult = result.HResult is int code
+            ? "0x" + code.ToString("X8", CultureInfo.InvariantCulture)
+            : "n/a";
+
+        Core.Logging.FileLogger.Warn(
+            $"EmbeddedRDP password reset not applied: trigger={trigger} outcome={result.Outcome} "
+            + $"connected={connectedState} stateType={result.ObservedStateTypeName ?? "n/a"} "
+            + $"error={result.FailureTypeName ?? "n/a"} hr={hResult}");
+    }
+
     private void OnRdpLoginComplete()
     {
         Core.Logging.FileLogger.Info("EmbeddedRDP OnLoginComplete fired");
@@ -1986,9 +2015,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             {
                 TransitionPhase(RdpConnectionPhase.Loading);
             }
-
-            try { _rdpHost?.ClearPassword(); }
-            catch (Exception ex) { Core.Logging.FileLogger.Warn($"EmbeddedRDP ClearPassword (login): {ex.Message}"); }
         });
     }
 

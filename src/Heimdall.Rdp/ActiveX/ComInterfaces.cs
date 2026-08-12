@@ -37,6 +37,14 @@ public interface IMsTscNonScriptable
     void get_BinaryPassword([MarshalAs(UnmanagedType.BStr)] out string binaryPassword);
     void put_BinarySalt([MarshalAs(UnmanagedType.BStr)] string binarySalt);
     void get_BinarySalt([MarshalAs(UnmanagedType.BStr)] out string binarySalt);
+
+    /// <summary>
+    /// Resets every password representation held by the control (plaintext, portable encoded and
+    /// binary encoded). Microsoft documents this member as the final slot of the interface and
+    /// returns E_FAIL when the control is still connected, so callers must verify the connected
+    /// state immediately before invoking it.
+    /// </summary>
+    void ResetPassword();
 }
 
 /// <summary>
