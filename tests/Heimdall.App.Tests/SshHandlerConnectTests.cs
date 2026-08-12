@@ -242,6 +242,30 @@ public sealed class SshHandlerConnectTests
     }
 
     [Fact]
+    public async Task ConnectAsync_TunnelSetupFailsWithCircularChainDependency_MapsToGatewayDiagnostic()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            SetupSucceeds = false,
+            SetupFailureCode = SshFailureCode.CircularChainDependency,
+            SetupErrorMessage = "Circular dependency detected in gateway chain."
+        };
+        using SshHandler handler = CreateHandler(tunnelService);
+        ServerProfileDto server = CreateGatewayServer();
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.Failure);
+        Assert.Equal(SessionFailureStage.SshGateway, result.Failure.Stage);
+        Assert.Equal("ErrorSshCircularChainDependency", result.Failure.MessageKey);
+        Assert.Equal((int)SshFailureCode.CircularChainDependency, result.Failure.Code);
+    }
+
+    [Fact]
     public async Task ConnectAsync_ExternalModeFailureReleasesTunnelReference()
     {
         int freePort = ReserveAndReleaseLoopbackPort();
@@ -579,17 +603,26 @@ public sealed class SshHandlerConnectTests
         public int TargetPort { get; init; }
         public int ReleaseCount { get; private set; }
         public int ReleasedLocalPort { get; private set; }
+        public bool SetupSucceeds { get; init; } = true;
+        public SshFailureCode? SetupFailureCode { get; init; }
+        public string? SetupErrorMessage { get; init; }
 
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
+            if (!SetupSucceeds)
+            {
+                return Task.FromResult(
+                    new TunnelSetupOutcome(false, false, string.Empty, 0, SetupErrorMessage, SetupFailureCode));
+            }
+
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
-            return Task.FromResult((true, UsesTunnel, host, port, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)

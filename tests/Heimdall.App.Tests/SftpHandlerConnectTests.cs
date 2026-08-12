@@ -210,7 +210,7 @@ public sealed class SftpHandlerConnectTests
         public int ReleaseCount { get; private set; }
         public int ReleasedLocalPort { get; private set; }
 
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
@@ -220,7 +220,7 @@ public sealed class SftpHandlerConnectTests
             SetupCallCount++;
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
-            return Task.FromResult((true, UsesTunnel, host, port, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)

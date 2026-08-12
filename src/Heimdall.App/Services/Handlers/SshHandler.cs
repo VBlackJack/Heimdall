@@ -104,9 +104,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
 
         int sshPort = server.SshPort > 0 ? server.SshPort : DefaultPorts.Ssh;
-        (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) =
-            await _tunnelService.SetupTunnelIfNeededAsync(server, sshPort, settings, ct)
-                .ConfigureAwait(false);
+        TunnelSetupOutcome tunnelOutcome = await _tunnelService
+            .SetupTunnelIfNeededAsync(server, sshPort, settings, ct)
+            .ConfigureAwait(false);
+        (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) = tunnelOutcome;
 
         if (!tunnelOk)
         {
@@ -114,7 +115,9 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 false,
                 tunnelError,
                 null,
-                SshSessionDiagnosticFactory.CreateGatewayFailure(tunnelError));
+                SshSessionDiagnosticFactory.CreateGatewayFailure(
+                    tunnelError,
+                    code: tunnelOutcome.FailureCode));
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingSsh);

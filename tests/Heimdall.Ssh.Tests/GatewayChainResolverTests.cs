@@ -176,9 +176,10 @@ public class GatewayChainResolverTests
             new() { Id = "gw2", Host = "b.com", Port = 22, User = "u", ParentGatewayId = "gw1" }
         };
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        GatewayChainException ex = Assert.Throws<GatewayChainException>(
             () => GatewayChainResolver.ResolveChain("gw1", gateways, NoOpDecrypt));
         Assert.Contains("Circular dependency", ex.Message);
+        Assert.Equal(SshFailureCode.CircularChainDependency, ex.Code);
     }
 
     [Fact]
@@ -189,9 +190,10 @@ public class GatewayChainResolverTests
             new() { Id = "gw1", Host = "a.com", Port = 22, User = "u", ParentGatewayId = "gw1" }
         };
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        GatewayChainException ex = Assert.Throws<GatewayChainException>(
             () => GatewayChainResolver.ResolveChain("gw1", gateways, NoOpDecrypt));
         Assert.Contains("Circular dependency", ex.Message);
+        Assert.Equal(SshFailureCode.CircularChainDependency, ex.Code);
     }
 
     // ── Depth limit ─────────────────────────────────────────────────────
@@ -212,9 +214,10 @@ public class GatewayChainResolverTests
             });
         }
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        GatewayChainException ex = Assert.Throws<GatewayChainException>(
             () => GatewayChainResolver.ResolveChain("gw9", gateways, NoOpDecrypt, maxDepth: 3));
         Assert.Contains("depth exceeds maximum", ex.Message);
+        Assert.Equal(SshFailureCode.ChainDepthExceeded, ex.Code);
     }
 
     // ── Missing gateway ─────────────────────────────────────────────────

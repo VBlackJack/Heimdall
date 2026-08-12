@@ -48,9 +48,16 @@ internal static class SshSessionDiagnosticFactory
             preflight.Message);
     }
 
-    internal static SessionDiagnostic CreateGatewayFailure(string? detail, string messageKey = "ErrorConnectionFailed")
+    internal static SessionDiagnostic CreateGatewayFailure(
+        string? detail,
+        string messageKey = "ErrorConnectionFailed",
+        SshFailureCode? code = null)
     {
-        return new SessionDiagnostic(SessionFailureStage.SshGateway, messageKey, null, detail);
+        return new SessionDiagnostic(
+            SessionFailureStage.SshGateway,
+            GetMessageKey(code, messageKey),
+            code is null ? null : (int)code.Value,
+            detail);
     }
 
     internal static SessionDiagnostic CreatePreflightFailure(

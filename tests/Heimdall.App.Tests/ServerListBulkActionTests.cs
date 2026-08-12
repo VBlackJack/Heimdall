@@ -2660,14 +2660,14 @@ public sealed class ServerListBulkActionTests
 
     private sealed class NullTunnelService : ITunnelService
     {
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)> SetupTunnelIfNeededAsync(
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
             AppSettings settings,
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
-            return Task.FromResult((true, false, server.RemoteServer, remotePort, (string?)null));
+            return Task.FromResult(new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, (string?)null, null));
         }
 
         public void UpdateSettings(AppSettings settings)

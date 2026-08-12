@@ -28,7 +28,7 @@ public interface ITunnelService
     /// Checks whether the server requires a tunnel and establishes it if needed.
     /// Returns the resolved host and port to connect to.
     /// </summary>
-    Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)>
+    Task<TunnelSetupOutcome>
         SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,

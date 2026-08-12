@@ -379,7 +379,7 @@ public sealed class EmbeddedSessionManagerDisconnectTests
     {
         public List<int> ReleasedPorts { get; } = new List<int>();
 
-        public Task<(bool Success, bool UsesTunnel, string Host, int Port, string? ErrorMessage)>
+        public Task<TunnelSetupOutcome>
             SetupTunnelIfNeededAsync(
                 ServerProfileDto server,
                 int remotePort,
