@@ -152,6 +152,14 @@ public static class FailureClassifier
         if (msg.Contains("attempt limit", StringComparison.OrdinalIgnoreCase))
             return new SshFailureInfo(SshFailureCode.TooManyAuthFailures, "Too many auth failures.", true, ex);
 
+        // Renci.SshNet.ClientAuthentication.TryAuthenticate names the failing method:
+        // "Permission denied (keyboard-interactive)." No SSH key is involved, yet
+        // "keyboard-interactive" contains the substring "key". The no-password case
+        // already returned above, so reaching here means a password was configured and
+        // it is that password, supplied through keyboard-interactive, that was refused.
+        if (msg.Contains("keyboard-interactive", StringComparison.OrdinalIgnoreCase))
+            return new SshFailureInfo(SshFailureCode.PasswordRejected, "SSH password was rejected.", true, ex);
+
         if (msg.Contains("key", StringComparison.OrdinalIgnoreCase))
             return new SshFailureInfo(SshFailureCode.KeyRejected, "Server rejected the SSH key.", true, ex);
 

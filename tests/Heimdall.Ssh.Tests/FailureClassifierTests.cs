@@ -106,7 +106,10 @@ public class FailureClassifierTests
 
         SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
 
-        Assert.Equal(SshFailureCode.KeyRejected, result.Code);
+        // Keyboard-interactive involves no SSH key. SshConnectionFactory.AddPasswordMethods
+        // answers every keyboard-interactive prompt with the configured password, so a
+        // denial here means that password was refused.
+        Assert.Equal(SshFailureCode.PasswordRejected, result.Code);
         Assert.NotEqual(SshFailureCode.KeyboardInteractiveNoPassword, result.Code);
     }
 
@@ -506,6 +509,47 @@ public class FailureClassifierTests
 
         Assert.Equal(SshFailureCode.Cancelled, result.Code);
         Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_KeyboardInteractiveWithPasswordConfigured_ReturnsPasswordRejected()
+    {
+        // Renci.SshNet.ClientAuthentication.TryAuthenticate reports the failing method by
+        // name: "Permission denied (keyboard-interactive)." No SSH key is involved, but
+        // "keyboard-interactive" contains the substring "key". With a password configured,
+        // the password supplied through keyboard-interactive is what the server refused.
+        SshAuthenticationException exception = new SshAuthenticationException(
+            "Permission denied (keyboard-interactive).");
+        SshConnectionParams connectionParams = new SshConnectionParams
+        {
+            Host = "host",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PasswordRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_PublicKeyDenied_StillReturnsKeyRejected()
+    {
+        // Control: "Permission denied (publickey)." names the public-key method, so
+        // KeyRejected is correct and must not change.
+        SshAuthenticationException exception = new SshAuthenticationException(
+            "Permission denied (publickey).");
+        SshConnectionParams connectionParams = new SshConnectionParams
+        {
+            Host = "host",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyRejected, result.Code);
     }
 
     // ── Connection exception: DisconnectReason control cases ────────────
