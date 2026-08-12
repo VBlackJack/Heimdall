@@ -21,6 +21,17 @@ namespace Heimdall.Terminal.Tests;
 
 internal static class TerminalTestHelpers
 {
+    /// <summary>
+    /// Failure bound for waits gated on a freshly spawned child process, not a synchronisation
+    /// point. <see cref="ResolvePowerShellExecutable"/> selects Windows PowerShell 5.1, whose cold
+    /// start is paid on a CI runner already running eight test assemblies plus coverage
+    /// instrumentation. A measured CI timeout recorded the child still alive with
+    /// <c>receivedBytes=0</c> after ten full seconds, so ten seconds bounds the host's startup
+    /// rather than anything Heimdall promises. The value only has to outlast that startup, and it
+    /// is paid only on failure: a passing wait completes as soon as the event arrives.
+    /// </summary>
+    internal static readonly TimeSpan ProcessStartupBackstop = TimeSpan.FromSeconds(60);
+
     internal static string ResolvePowerShellExecutable()
     {
         string windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);

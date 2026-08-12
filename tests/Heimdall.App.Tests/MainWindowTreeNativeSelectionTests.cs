@@ -40,7 +40,12 @@ public sealed class MainWindowTreeNativeSelectionTests
                 MainWindow.SynchronizeNativeTreeSelection(treeState, pointerContainer);
                 DrainDispatcher(window.Dispatcher);
 
-                Assert.True(pointerContainer.IsKeyboardFocused);
+                // Logical focus, not IsKeyboardFocused: SynchronizeNativeTreeSelection calls
+                // Focus(), which always sets focus within the focus scope, while keyboard focus
+                // additionally requires the OS to have activated this window. That activation is
+                // not something the method under test controls, and it is contended when several
+                // STA tests show windows concurrently on a CI runner.
+                Assert.True(pointerContainer.IsFocused);
                 Assert.False(pointerContainer.IsSelected);
                 Assert.Null(tree.SelectedItem);
                 Assert.False(treeState.SuppressSelectedItemSync);
@@ -78,7 +83,7 @@ public sealed class MainWindowTreeNativeSelectionTests
                 MainWindow.SynchronizeNativeTreeSelection(treeState, pointerContainer);
                 DrainDispatcher(window.Dispatcher);
 
-                Assert.True(pointerContainer.IsKeyboardFocused);
+                Assert.True(pointerContainer.IsFocused);
                 Assert.False(pointerContainer.IsSelected);
                 Assert.False(logicalPrimaryContainer.IsSelected);
                 Assert.Null(tree.SelectedItem);

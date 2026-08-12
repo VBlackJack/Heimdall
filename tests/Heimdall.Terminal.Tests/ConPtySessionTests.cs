@@ -70,7 +70,7 @@ public sealed class ConPtySessionTests
                 TerminalTestHelpers.ResolvePowerShellExecutable(),
                 "-NoLogo -NoProfile");
 
-            string text = await outputObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            string text = await outputObserved.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
 
             Assert.NotEmpty(text);
             Assert.True(session.IsRunning);
@@ -128,7 +128,7 @@ public sealed class ConPtySessionTests
                 }
             };
 
-            string text = await outputObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            string text = await outputObserved.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
 
             Assert.NotEmpty(text);
         }
@@ -203,7 +203,7 @@ public sealed class ConPtySessionTests
                     : Volatile.Read(ref observedExitCode));
             int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
                 exited.Task,
-                TimeSpan.FromSeconds(10),
+                TerminalTestHelpers.ProcessStartupBackstop,
                 timeoutContext);
 
             Assert.Equal(17, exitCode);
@@ -251,7 +251,7 @@ public sealed class ConPtySessionTests
                     : Volatile.Read(ref observedExitCode));
             await WaitUntilStoppedAsync(
                 session,
-                TimeSpan.FromSeconds(10),
+                TerminalTestHelpers.ProcessStartupBackstop,
                 stoppedTimeoutContext);
 
             TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
