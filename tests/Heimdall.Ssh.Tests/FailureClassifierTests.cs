@@ -149,6 +149,159 @@ public class FailureClassifierTests
         Assert.True(result.IsFatal);
     }
 
+    [Fact]
+    public void Classify_AuthException_NoSuitableAuthenticationMethod_ReturnsNoSupportedAuth()
+    {
+        // Renci.SshNet.ClientAuthentication.Authenticate throws this wording when none
+        // of the offered methods are supported. The "keyboard-interactive" token inside
+        // the parenthetical list must not be mistaken for a key-rejection failure. A
+        // password is configured so the keyboard-interactive-without-password guard does
+        // not intercept this case before the fix under test is reached.
+        SshAuthenticationException exception = new(
+            "No suitable authentication method found to complete authentication (keyboard-interactive,password).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.NoSupportedAuth, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_AttemptLimitReachedForKeyboardInteractive_ReturnsTooManyAuthFailures()
+    {
+        // Renci.SshNet.ClientAuthentication.Authenticate throws this wording when the
+        // server-side retry ceiling for a method is hit. The "keyboard-interactive" token
+        // inside the parenthetical must not be mistaken for a key-rejection failure. A
+        // password is configured so the keyboard-interactive-without-password guard does
+        // not intercept this case before the fix under test is reached.
+        SshAuthenticationException exception = new(
+            "Reached authentication attempt limit for method (keyboard-interactive).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.TooManyAuthFailures, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_PermissionDeniedPublicKeyPassword_WithPassword_ReturnsKeyRejected()
+    {
+        SshAuthenticationException exception = new("Permission denied (publickey,password).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            Password = "secret"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_AuthException_PermissionDeniedKeyboardInteractive_WithoutPassword_ReturnsKeyboardInteractiveNoPassword()
+    {
+        SshAuthenticationException exception = new("Permission denied (keyboard-interactive).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.KeyboardInteractiveNoPassword, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_MacVerificationFailedForPuttyKeyFile_WithKeyPassphrase_ReturnsPassphraseRejected()
+    {
+        // Renci.SshNet.PuttyKeyFile constructor throws this wording when the
+        // passphrase used to decrypt a PuTTY-format key is wrong.
+        SshException exception = new("MAC verification failed for PuTTY key file");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            KeyPath = @"C:\keys\id_rsa.ppk",
+            KeyPassphrase = "wrong"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PassphraseRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_PrivateKeyBlockSizeMismatch_WithKeyPassphrase_ReturnsPassphraseRejected()
+    {
+        // Renci.SshNet.PrivateKeyFile.ParseSshCryptFile throws this wording when the
+        // decrypted key blob length is uneven, which happens with a wrong passphrase.
+        SshException exception = new("The private key section must be a multiple of the block size (8)");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            KeyPath = "/home/user/.ssh/id_rsa",
+            KeyPassphrase = "wrong"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PassphraseRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_OpenSshRandomCheckBytesMismatch_WithKeyPassphrase_ReturnsPassphraseRejected()
+    {
+        // Renci.SshNet.PrivateKeyFile.ParseOpenSshFile throws this wording when the
+        // decrypted check bytes do not match, which happens with a wrong passphrase.
+        SshException exception = new("The random check bytes of the OpenSSH key do not match (1 <-> 2).");
+        SshConnectionParams connectionParams = new()
+        {
+            Host = "example.com",
+            Username = "user",
+            KeyPath = "/home/user/.ssh/id_ed25519",
+            KeyPassphrase = "wrong"
+        };
+
+        SshFailureInfo result = FailureClassifier.Classify(exception, connectionParams);
+
+        Assert.Equal(SshFailureCode.PassphraseRejected, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_SshException_MacVerificationFailedForPuttyKeyFile_WithoutPassphraseConfigured_ReturnsKeyFileInvalid()
+    {
+        // Guard-intact check: with no KeyPath/KeyPassphrase configured, a corrupt key
+        // file message must still fall through to the generic key-file-invalid branch,
+        // not be misclassified as a passphrase rejection.
+        SshException exception = new("MAC verification failed for PuTTY key file");
+
+        SshFailureInfo result = FailureClassifier.Classify(exception);
+
+        Assert.Equal(SshFailureCode.KeyFileInvalid, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
     // ── Connection exception classification ────────────────────────────
 
     [Fact]
