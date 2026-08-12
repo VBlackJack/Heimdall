@@ -1028,6 +1028,51 @@ public class TunnelManagerTests : IDisposable
         Assert.Equal(1, cleanupCalls);
     }
 
+    [Theory]
+    [InlineData("Port forwarding for 'gw.example.net' port '8080' failed to start.")]
+    [InlineData("PuTTY key file version 3 is not supported")]
+    public void ClassifyAndBuildFailureResult_SshExceptionContainingPortSubstring_IsNotMisclassifiedAsPortInUse(
+        string message)
+    {
+        int directCleanupCalls = 0;
+        int chainedCleanupCalls = 0;
+
+        TunnelResult directResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SshException(message),
+            () => directCleanupCalls++,
+            isChained: false);
+        TunnelResult chainedResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SshException(message),
+            () => chainedCleanupCalls++,
+            isChained: true);
+
+        Assert.NotEqual(SshFailureCode.PortInUse, directResult.FailureCode);
+        Assert.Equal(directResult.FailureCode, chainedResult.FailureCode);
+        Assert.Equal(1, directCleanupCalls);
+        Assert.Equal(1, chainedCleanupCalls);
+    }
+
+    [Fact]
+    public void ClassifyAndBuildFailureResult_SocketExceptionAddressAlreadyInUse_StillReturnsPortInUseInBothChainShapes()
+    {
+        int directCleanupCalls = 0;
+        int chainedCleanupCalls = 0;
+
+        TunnelResult directResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SocketException((int)SocketError.AddressAlreadyInUse),
+            () => directCleanupCalls++,
+            isChained: false);
+        TunnelResult chainedResult = TunnelManager.ClassifyAndBuildFailureResult(
+            new SocketException((int)SocketError.AddressAlreadyInUse),
+            () => chainedCleanupCalls++,
+            isChained: true);
+
+        Assert.Equal(SshFailureCode.PortInUse, directResult.FailureCode);
+        Assert.Equal(SshFailureCode.PortInUse, chainedResult.FailureCode);
+        Assert.Equal(1, directCleanupCalls);
+        Assert.Equal(1, chainedCleanupCalls);
+    }
+
     // ── Dispose ───────────────────────────────────────────────────────
 
     [Fact]

@@ -294,11 +294,6 @@ public sealed partial class TunnelManager
                 null,
                 connectionEx.Message,
                 FailureClassifier.Classify(connectionEx).Code),
-            SshException sshEx when !isChained && sshEx.Message.Contains("port", StringComparison.OrdinalIgnoreCase) => new TunnelResult(
-                false,
-                null,
-                sshEx.Message,
-                SshFailureCode.PortInUse),
             _ => new TunnelResult(false, null, ex.Message, SshFailureCode.Unknown)
         };
     }
