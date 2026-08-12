@@ -108,29 +108,36 @@ public static class SftpAtomicUpload
     /// Replaces the final remote path with the uploaded temp path.
     /// </summary>
     /// <remarks>
-    /// Omitting <paramref name="canDemoteAtomicRenameFailure"/> preserves the historical behavior where
-    /// every atomic-rename exception enters the fallback. Omitting <paramref name="isExistingTargetRegularFile"/>
-    /// preserves the historical behavior where every existing target is eligible for replacement. Omitting
-    /// <paramref name="onNonAtomicReplacement"/> preserves the historical behavior without a warning callback.
+    /// The atomic rename is the only operation allowed to replace an existing destination. When the server
+    /// cannot perform it and <paramref name="canDemoteAtomicRenameFailure"/> accepts the failure, the plain
+    /// rename fallback runs only once the destination is proven absent: an existing destination is refused
+    /// instead of being replaced through a non-atomic sequence, and a failing existence probe is propagated
+    /// so the fallback stays closed. Omitting <paramref name="canDemoteAtomicRenameFailure"/> preserves the
+    /// historical behavior where every atomic-rename exception is eligible for the fallback.
     /// </remarks>
+    /// <param name="tempRemotePath">Uploaded temporary path to publish.</param>
+    /// <param name="finalRemotePath">Final remote destination path.</param>
+    /// <param name="atomicRename">Atomic rename operation attempted first.</param>
+    /// <param name="plainRename">Plain rename used only when the destination is absent.</param>
+    /// <param name="remoteExists">Remote existence probe consulted only after a demotable atomic failure.</param>
+    /// <param name="canDemoteAtomicRenameFailure">
+    /// Predicate deciding whether an atomic-rename failure may enter the fallback.
+    /// </param>
     public static void CommitRename(
         string tempRemotePath,
         string finalRemotePath,
         Action<string, string> atomicRename,
         Action<string, string> plainRename,
         Func<string, bool> remoteExists,
-        Action<string> deleteRemote,
-        Func<Exception, bool>? canDemoteAtomicRenameFailure = null,
-        Func<string, bool>? isExistingTargetRegularFile = null,
-        Action? onNonAtomicReplacement = null)
+        Func<Exception, bool>? canDemoteAtomicRenameFailure = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
         ArgumentNullException.ThrowIfNull(atomicRename);
         ArgumentNullException.ThrowIfNull(plainRename);
         ArgumentNullException.ThrowIfNull(remoteExists);
-        ArgumentNullException.ThrowIfNull(deleteRemote);
 
+        Exception demotedFailure;
         try
         {
             atomicRename(tempRemotePath, finalRemotePath);
@@ -148,99 +155,20 @@ public static class SftpAtomicUpload
             }
 
             Heimdall.Core.Logging.FileLogger.Warn(
-                $"SFTP atomic rename unavailable for '{finalRemotePath}', falling back to replace: {ex.Message}");
+                $"SFTP atomic rename unavailable for '{finalRemotePath}', probing the destination before "
+                + $"the plain rename fallback: {ex.Message}");
+            demotedFailure = ex;
         }
 
-        string? backupRemotePath = null;
         if (remoteExists(finalRemotePath))
         {
-            if (isExistingTargetRegularFile is not null
-                && !isExistingTargetRegularFile(finalRemotePath))
-            {
-                throw new InvalidOperationException(
-                    $"SFTP fallback replacement refused for '{finalRemotePath}' because the existing target "
-                    + "is not a regular file.");
-            }
-
-            backupRemotePath = CreateRemoteBackupPath(finalRemotePath);
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"SFTP replacement for '{finalRemotePath}' is not atomic; moving the existing target "
-                + $"to backup '{backupRemotePath}' before commit.");
-            // No warning is due when the final path is absent because no backup move opens a replacement window.
-            onNonAtomicReplacement?.Invoke();
-            plainRename(finalRemotePath, backupRemotePath);
-        }
-
-        try
-        {
-            plainRename(tempRemotePath, finalRemotePath);
-        }
-        catch (Exception renameEx)
-        {
-            RestoreBackup(finalRemotePath, backupRemotePath, plainRename, remoteExists, deleteRemote, renameEx);
-            throw;
-        }
-
-        CleanupBackup(backupRemotePath, remoteExists, deleteRemote);
-    }
-
-    private static string CreateRemoteBackupPath(string finalRemotePath)
-    {
-        return $"{finalRemotePath}.{Guid.NewGuid():N}.bak";
-    }
-
-    private static void RestoreBackup(
-        string finalRemotePath,
-        string? backupRemotePath,
-        Action<string, string> plainRename,
-        Func<string, bool> remoteExists,
-        Action<string> deleteRemote,
-        Exception renameException)
-    {
-        if (backupRemotePath is null)
-        {
-            return;
-        }
-
-        try
-        {
-            if (remoteExists(finalRemotePath))
-            {
-                deleteRemote(finalRemotePath);
-            }
-
-            plainRename(backupRemotePath, finalRemotePath);
-        }
-        catch (Exception restoreEx)
-        {
             throw new InvalidOperationException(
-                $"SFTP fallback rename failed and restoring backup '{backupRemotePath}' failed.",
-                new AggregateException(renameException, restoreEx));
-        }
-    }
-
-    private static void CleanupBackup(
-        string? backupRemotePath,
-        Func<string, bool> remoteExists,
-        Action<string> deleteRemote)
-    {
-        if (backupRemotePath is null)
-        {
-            return;
+                $"SFTP non-atomic replacement refused for '{finalRemotePath}': the destination already exists "
+                + "and the server cannot rename atomically.",
+                demotedFailure);
         }
 
-        try
-        {
-            if (remoteExists(backupRemotePath))
-            {
-                deleteRemote(backupRemotePath);
-            }
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"SFTP upload backup cleanup failed for '{backupRemotePath}': {ex.Message}");
-        }
+        plainRename(tempRemotePath, finalRemotePath);
     }
 
     /// <summary>

@@ -79,8 +79,7 @@ public sealed class SftpModePreservationTests
                     remoteFiles.Remove(source);
                 },
                 plainRename: (_, _) => throw new InvalidOperationException("Fallback was not expected."),
-                remoteExists: remoteFiles.ContainsKey,
-                deleteRemote: path => remoteFiles.Remove(path));
+                remoteExists: remoteFiles.ContainsKey);
         });
 
         Assert.False(commitCalled);

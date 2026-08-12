@@ -96,8 +96,12 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <summary>Raised during file transfers to report progress.</summary>
     public event Action<SftpTransferProgress>? TransferProgress;
 
+    // SFTP uploads either commit atomically or are refused, so this browser raises no operation warning;
+    // the event stays because IRemoteBrowser declares it and FtpBrowser does raise it.
+#pragma warning disable CS0067
     /// <inheritdoc/>
     public event Action<RemoteOperationWarning>? OperationWarningRaised;
+#pragma warning restore CS0067
 
     /// <summary>
     /// Raised when the connection is lost. The parameter contains an error
@@ -438,10 +442,7 @@ public sealed class SftpBrowser : IRemoteBrowser
                         client,
                         tempRemotePath,
                         remotePath,
-                        commitMode,
-                        targetEntry,
-                        () => OperationWarningRaised?.Invoke(
-                            RemoteOperationWarning.CreateNonAtomicReplacement(remotePath)));
+                        commitMode);
                 }, ct).ConfigureAwait(false);
             }
             catch
@@ -470,9 +471,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         SftpClient client,
         string tempRemotePath,
         string remotePath,
-        UploadCommitMode commitMode,
-        ISftpFile? targetEntry,
-        Action onNonAtomicReplacement)
+        UploadCommitMode commitMode)
     {
         if (commitMode == UploadCommitMode.PublishIfAbsent)
         {
@@ -498,16 +497,7 @@ public sealed class SftpBrowser : IRemoteBrowser
             atomicRename: (temp, final) => client.RenameFile(temp, final, isPosix: true),
             plainRename: (temp, final) => client.RenameFile(temp, final),
             remoteExists: client.Exists,
-            deleteRemote: path =>
-            {
-                if (client.Exists(path))
-                {
-                    client.DeleteFile(path);
-                }
-            },
-            canDemoteAtomicRenameFailure: IsAtomicRenameCapabilityFailure,
-            isExistingTargetRegularFile: _ => targetEntry?.IsRegularFile == true,
-            onNonAtomicReplacement: onNonAtomicReplacement);
+            canDemoteAtomicRenameFailure: IsAtomicRenameCapabilityFailure);
     }
 
     /// <summary>Creates a directory on the remote host.</summary>
