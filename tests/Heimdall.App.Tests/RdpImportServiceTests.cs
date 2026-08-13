@@ -148,6 +148,7 @@ public sealed class RdpImportServiceTests
             use multimon:i:1
             session bpp:i:24
             authentication level:i:2
+            enablecredsspsupport:i:1
             gatewayhostname:s:rdgw.example.com
             gatewayusagemethod:i:1
             audiomode:i:1
@@ -185,8 +186,92 @@ public sealed class RdpImportServiceTests
         RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
         ServerProfileDto candidate = preview.Entries[0].Candidate;
 
+        // The level drives strict server authentication only; NLA keeps its default because the
+        // file carries no enablecredsspsupport key.
         Assert.True(candidate.RdpNla);
         Assert.True(candidate.RdpStrictServerAuthentication);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_KeepsNlaEnabled_WhenCredSspIsOnAndServerAuthenticationIsNotRequired()
+    {
+        using RdpImportFixture fixture = new RdpImportFixture();
+        string path = await fixture.WriteRdpAsync(
+            "NlaWithoutServerAuth.rdp",
+            """
+            full address:s:rdp.example.com
+            authentication level:i:0
+            enablecredsspsupport:i:1
+            """
+        );
+
+        RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+        ServerProfileDto candidate = preview.Entries[0].Candidate;
+
+        // Round-trip oracle: deriving NLA from the authentication level turned this profile into
+        // NLA-disabled on re-import, a silent weakening. NLA now comes from enablecredsspsupport.
+        Assert.True(candidate.RdpNla);
+        Assert.False(candidate.RdpStrictServerAuthentication);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_KeepsNlaDefault_WhenCredSspKeyIsAbsent()
+    {
+        using RdpImportFixture fixture = new RdpImportFixture();
+        string path = await fixture.WriteRdpAsync(
+            "NoCredSspKey.rdp",
+            """
+            full address:s:rdp.example.com
+            authentication level:i:0
+            """
+        );
+
+        RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+        ServerProfileDto candidate = preview.Entries[0].Candidate;
+
+        // An absent key must not weaken the candidate implicitly.
+        Assert.True(candidate.RdpNla);
+        Assert.False(candidate.RdpStrictServerAuthentication);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_DisablesNla_WhenCredSspSupportIsExplicitlyOff()
+    {
+        using RdpImportFixture fixture = new RdpImportFixture();
+        string path = await fixture.WriteRdpAsync(
+            "CredSspOff.rdp",
+            """
+            full address:s:rdp.example.com
+            authentication level:i:1
+            enablecredsspsupport:i:0
+            """
+        );
+
+        RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+        ServerProfileDto candidate = preview.Entries[0].Candidate;
+
+        Assert.False(candidate.RdpNla);
+        Assert.True(candidate.RdpStrictServerAuthentication);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_KeepsDefaults_WhenValuesAreOutOfContract()
+    {
+        using RdpImportFixture fixture = new RdpImportFixture();
+        string path = await fixture.WriteRdpAsync(
+            "OutOfContract.rdp",
+            """
+            full address:s:rdp.example.com
+            authentication level:i:7
+            enablecredsspsupport:i:9
+            """
+        );
+
+        RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+        ServerProfileDto candidate = preview.Entries[0].Candidate;
+
+        Assert.True(candidate.RdpNla);
+        Assert.False(candidate.RdpStrictServerAuthentication);
     }
 
     [Fact]

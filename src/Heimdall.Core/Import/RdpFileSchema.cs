@@ -51,6 +51,12 @@ public sealed class RdpFileSchema
 
     public int? AuthenticationLevel { get; init; }
 
+    /// <summary>
+    /// Value of <c>enablecredsspsupport:i:</c>, the only field carrying NLA/CredSSP state.
+    /// <c>authentication level</c> describes server authentication and must never be read as NLA.
+    /// </summary>
+    public int? EnableCredSspSupport { get; init; }
+
     public string? GatewayHostname { get; init; }
 
     public int? GatewayUsageMethod { get; init; }

@@ -43,6 +43,7 @@ public static class RdpFileParser
         int? desktopHeight = null;
         int? sessionBpp = null;
         int? authenticationLevel = null;
+        int? enableCredSspSupport = null;
         string? gatewayHostname = null;
         int? gatewayUsageMethod = null;
         var hasPasswordBlob = false;
@@ -166,6 +167,10 @@ public static class RdpFileParser
                     authenticationLevel = TryParseInt(type, value, lowerKey, unknownKeys);
                     break;
 
+                case "enablecredsspsupport":
+                    enableCredSspSupport = TryParseInt(type, value, lowerKey, unknownKeys);
+                    break;
+
                 case "gatewayhostname":
                     if (IsStringType(type))
                     {
@@ -204,6 +209,7 @@ public static class RdpFileParser
             DesktopHeight = desktopHeight,
             SessionBpp = sessionBpp,
             AuthenticationLevel = authenticationLevel,
+            EnableCredSspSupport = enableCredSspSupport,
             GatewayHostname = gatewayHostname,
             GatewayUsageMethod = gatewayUsageMethod,
             HasPasswordBlob = hasPasswordBlob,
