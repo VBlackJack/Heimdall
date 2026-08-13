@@ -26,9 +26,9 @@ public sealed class SftpAtomicUploadTests
     [Fact]
     public void CommitRename_DoesNotConsultFallback_WhenAtomicRenameSucceeds()
     {
-        var atomicCalls = new List<(string Temp, string Final)>();
-        var plainCalls = new List<(string Temp, string Final)>();
-        var existsCalls = new List<string>();
+        List<(string Temp, string Final)> atomicCalls = new();
+        List<(string Temp, string Final)> plainCalls = new();
+        List<string> existsCalls = new();
         int predicateCalls = 0;
 
         SftpAtomicUpload.CommitRename(
@@ -56,16 +56,16 @@ public sealed class SftpAtomicUploadTests
     [Fact]
     public void CommitRename_RefusesFallbackReplacement_WhenDestinationExists()
     {
-        var remote = new Dictionary<string, string>(StringComparer.Ordinal)
+        Dictionary<string, string> remote = new(StringComparer.Ordinal)
         {
             [FinalRemotePath] = "old-content",
             [TempRemotePath] = "new-content",
         };
-        var plainCalls = new List<(string Source, string Destination)>();
-        var existsCalls = new List<string>();
-        var atomicFailure = new NotSupportedException("posix-rename extension unavailable");
+        List<(string Source, string Destination)> plainCalls = new();
+        List<string> existsCalls = new();
+        NotSupportedException atomicFailure = new("posix-rename extension unavailable");
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
             SftpAtomicUpload.CommitRename(
                 TempRemotePath,
                 FinalRemotePath,
@@ -95,10 +95,10 @@ public sealed class SftpAtomicUploadTests
     [Fact]
     public void CommitRename_FailsClosed_WhenDestinationProbeFails()
     {
-        var plainCalls = new List<(string Source, string Destination)>();
-        var probeFailure = new IOException("stat refused");
+        List<(string Source, string Destination)> plainCalls = new();
+        IOException probeFailure = new("stat refused");
 
-        var exception = Assert.Throws<IOException>(() =>
+        IOException exception = Assert.Throws<IOException>(() =>
             SftpAtomicUpload.CommitRename(
                 TempRemotePath,
                 FinalRemotePath,
@@ -114,14 +114,14 @@ public sealed class SftpAtomicUploadTests
     [Fact]
     public void CommitRename_PropagatesPlainRenameFailure_WithoutCleanup()
     {
-        var remote = new Dictionary<string, string>(StringComparer.Ordinal)
+        Dictionary<string, string> remote = new(StringComparer.Ordinal)
         {
             [TempRemotePath] = "new-content",
         };
-        var plainCalls = new List<(string Source, string Destination)>();
-        var renameFailure = new IOException("plain rename failed");
+        List<(string Source, string Destination)> plainCalls = new();
+        IOException renameFailure = new("plain rename failed");
 
-        var exception = Assert.Throws<IOException>(() =>
+        IOException exception = Assert.Throws<IOException>(() =>
             SftpAtomicUpload.CommitRename(
                 TempRemotePath,
                 FinalRemotePath,
@@ -143,7 +143,7 @@ public sealed class SftpAtomicUploadTests
     [Fact]
     public void Rollback_DeletesOnlyTempPath()
     {
-        var deletedPaths = new List<string>();
+        List<string> deletedPaths = new();
 
         SftpAtomicUpload.Rollback(
             TempRemotePath,

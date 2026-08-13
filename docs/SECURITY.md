@@ -195,20 +195,29 @@ first, so a truncated transfer never lands on the destination. What differs per
 protocol is the commit step, and with it the guarantee an existing destination
 receives.
 
-SFTP file upload replaces the destination atomically or not at all.
-`SftpAtomicUpload.CommitRename` first attempts the OpenSSH
+SFTP file upload replaces a destination it has observed only through an atomic
+rename. `SftpAtomicUpload.CommitRename` first attempts the OpenSSH
 `posix-rename@openssh.com` extension, which replaces the destination in a single
 server-side operation. A failure is eligible for the plain-rename fallback only
 when `SftpBrowser.IsAtomicRenameCapabilityFailure` recognizes a capability error
 (`NotSupportedException`, or an `SftpException` carrying
 `StatusCode.OperationUnsupported`); every other failure, permission errors
 included, propagates unchanged. Once demoted, the destination is probed, and the
-fallback is refused whenever that probe does not prove the destination absent: an
-existing destination raises an `InvalidOperationException` and is left untouched,
-and a probe that itself fails is propagated rather than assumed. Heimdall
-therefore never moves, deletes, or backs up an existing SFTP destination, and no
-window exists in which the destination is temporarily missing. The uploaded
-temporary file is removed by the caller's rollback path.
+fallback runs only when that probe proves the destination absent: a destination
+the probe reports as present raises an `InvalidOperationException` and is left
+untouched, and a probe that itself fails is propagated rather than assumed.
+Heimdall therefore never moves, deletes, or backs up a destination it has
+observed, and never opens a window in which such a destination is missing. The
+uploaded temporary file is removed by the caller's rollback path.
+
+That guarantee is scoped to what the probe observed, and the fallback is not
+transactional. Between a probe reporting the destination absent and the plain
+rename that follows, another writer may create that path. The rename then lands
+on a target Heimdall never saw, with whatever semantics the server applies to an
+existing destination: SFTP leaves that case to the implementation, so a server
+may refuse the rename or may overwrite silently. Only the `posix-rename` path is
+atomic with respect to such a concurrent creation. A deployment that must exclude
+that race needs a server offering the extension.
 
 SFTP remote copy is a best-effort no-clobber publish, not an atomic one.
 `CopyFileViaRoundtripAsync` downloads to a local temporary file and republishes
