@@ -220,14 +220,14 @@ public partial class MainWindow
 
         if (targetItem is not null && targetItem != draggedItem)
         {
-            // Drop on tab header → reorder
+            // Drop on tab header → reorder, confined to the dragged tab's pinned group
             var sessions = vm.Connection.ActiveSessions;
             int oldIndex = sessions.IndexOf(draggedItem);
             int newIndex = sessions.IndexOf(targetItem);
 
             if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex)
             {
-                sessions.Move(oldIndex, newIndex);
+                vm.Connection.MoveSession(draggedItem, newIndex);
             }
 
             e.Handled = true;

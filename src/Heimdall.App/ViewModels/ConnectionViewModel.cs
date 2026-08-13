@@ -117,7 +117,61 @@ public partial class ConnectionViewModel : ObservableObject
         }
 
         session.IsPinned = pinned;
+        ApplyPinnedOrdering();
+    }
 
+    /// <summary>
+    /// Moves a session towards <paramref name="targetIndex"/> while keeping the
+    /// pinned-before-unpinned invariant. The index is a request, not a command: the
+    /// re-partition that follows confines the move to the session's own group, so a drag
+    /// can never interleave pinned and unpinned tabs. No-op when the session is not in
+    /// <see cref="ActiveSessions"/>, since a drag can only target a visible tab and an
+    /// absent session means stale drag state.
+    /// </summary>
+    public void MoveSession(SessionTabViewModel session, int targetIndex)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        var currentIndex = ActiveSessions.IndexOf(session);
+        if (currentIndex < 0)
+        {
+            return;
+        }
+
+        var boundedIndex = Math.Clamp(targetIndex, 0, ActiveSessions.Count - 1);
+        if (boundedIndex != currentIndex)
+        {
+            ActiveSessions.Move(currentIndex, boundedIndex);
+        }
+
+        ApplyPinnedOrdering();
+    }
+
+    /// <summary>
+    /// Reinserts a session returning from a floating window at the boundary of the group
+    /// matching its pinned state, instead of appending at the tail where a pinned tab
+    /// would land after every unpinned one. No-op when the session is already present:
+    /// the restore path is reachable twice for a single window.
+    /// </summary>
+    public void ReintroduceSession(SessionTabViewModel session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (ActiveSessions.Contains(session))
+        {
+            return;
+        }
+
+        ActiveSessions.Add(session);
+        ApplyPinnedOrdering();
+    }
+
+    /// <summary>
+    /// Re-partitions <see cref="ActiveSessions"/> through <see cref="OrderByPinned"/> and
+    /// restores the current selection, which the reorder would otherwise drop.
+    /// </summary>
+    private void ApplyPinnedOrdering()
+    {
         var desired = OrderByPinned(ActiveSessions);
         var selected = ActiveSession;
 
@@ -150,6 +204,7 @@ public partial class ConnectionViewModel : ObservableObject
         pinned.AddRange(unpinned);
         return pinned;
     }
+
 
     [RelayCommand]
     private async Task CloseSession(SessionTabViewModel? session)
