@@ -44,6 +44,7 @@ public sealed class RdpFileParserTests
             use multimon:i:1
             session bpp:i:24
             authentication level:i:2
+            enablecredsspsupport:i:1
             gatewayhostname:s:gw.example.com
             gatewayusagemethod:i:1
             """
@@ -58,8 +59,38 @@ public sealed class RdpFileParserTests
         Assert.True(schema.UseMultiMon);
         Assert.Equal(24, schema.SessionBpp);
         Assert.Equal(2, schema.AuthenticationLevel);
+        Assert.Equal(1, schema.EnableCredSspSupport);
         Assert.Equal("gw.example.com", schema.GatewayHostname);
         Assert.Equal(1, schema.GatewayUsageMethod);
+    }
+
+    [Fact]
+    public void Parse_ReadsCredSspSupportIndependentlyOfAuthenticationLevel()
+    {
+        RdpFileSchema schema = RdpFileParser.Parse(
+            """
+            full address:s:rdp.example.com
+            authentication level:i:0
+            enablecredsspsupport:i:1
+            """
+        );
+
+        Assert.Equal(0, schema.AuthenticationLevel);
+        Assert.Equal(1, schema.EnableCredSspSupport);
+    }
+
+    [Fact]
+    public void Parse_LeavesCredSspSupportNull_WhenTheKeyIsAbsent()
+    {
+        RdpFileSchema schema = RdpFileParser.Parse(
+            """
+            full address:s:rdp.example.com
+            authentication level:i:1
+            """
+        );
+
+        Assert.Equal(1, schema.AuthenticationLevel);
+        Assert.Null(schema.EnableCredSspSupport);
     }
 
     [Fact]

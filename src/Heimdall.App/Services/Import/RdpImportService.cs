@@ -296,10 +296,19 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             candidate.RdpColorDepth = schema.SessionBpp.Value;
         }
 
-        if (schema.AuthenticationLevel.HasValue)
+        // NLA state lives in enablecredsspsupport and nowhere else. authentication level describes
+        // server authentication only, so deriving NLA from it silently disabled NLA on any profile
+        // exported with NLA enabled and server authentication not required, which writes level 0.
+        // Values outside each field's documented range leave the candidate default untouched rather
+        // than weakening it implicitly.
+        if (schema.EnableCredSspSupport is int credSspSupport && credSspSupport is 0 or 1)
         {
-            candidate.RdpNla = schema.AuthenticationLevel.Value > 0;
-            candidate.RdpStrictServerAuthentication = schema.AuthenticationLevel.Value == 1;
+            candidate.RdpNla = credSspSupport == 1;
+        }
+
+        if (schema.AuthenticationLevel is int authenticationLevel && authenticationLevel is 0 or 1 or 2)
+        {
+            candidate.RdpStrictServerAuthentication = authenticationLevel == 1;
         }
 
         if (!string.IsNullOrWhiteSpace(schema.GatewayHostname)
