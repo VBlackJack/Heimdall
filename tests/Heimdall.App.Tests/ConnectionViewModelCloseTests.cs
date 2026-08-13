@@ -294,6 +294,128 @@ public sealed class ConnectionViewModelCloseTests
 
     private static SessionTabViewModel Tab(string title) => new SessionTabViewModel { Title = title };
 
+    [Fact]
+    public void MoveSession_UnpinnedDraggedAboveThePinnedGroup_StaysBelowEveryPinnedTab()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel pinnedA = CreatePinnableSession("pinned-a", pinned: true);
+        SessionTabViewModel pinnedB = CreatePinnableSession("pinned-b", pinned: true);
+        SessionTabViewModel loose = CreatePinnableSession("loose", pinned: false);
+        AddTabs(sut, pinnedA, pinnedB, loose);
+        sut.ActiveSession = pinnedA;
+
+        sut.MoveSession(loose, 0);
+
+        Assert.Equal(new[] { pinnedA, pinnedB, loose }, sut.ActiveSessions);
+        Assert.Same(pinnedA, sut.ActiveSession);
+    }
+
+    [Fact]
+    public void MoveSession_PinnedDraggedBelowTheUnpinnedGroup_StaysAboveEveryUnpinnedTab()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel pinned = CreatePinnableSession("pinned", pinned: true);
+        SessionTabViewModel looseA = CreatePinnableSession("loose-a", pinned: false);
+        SessionTabViewModel looseB = CreatePinnableSession("loose-b", pinned: false);
+        AddTabs(sut, pinned, looseA, looseB);
+        sut.ActiveSession = looseB;
+
+        sut.MoveSession(pinned, 2);
+
+        Assert.Equal(new[] { pinned, looseA, looseB }, sut.ActiveSessions);
+        Assert.Same(looseB, sut.ActiveSession);
+    }
+
+    [Fact]
+    public void MoveSession_WithinThePinnedGroup_ReordersAndIsNotClampedAway()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel pinnedA = CreatePinnableSession("pinned-a", pinned: true);
+        SessionTabViewModel pinnedB = CreatePinnableSession("pinned-b", pinned: true);
+        SessionTabViewModel pinnedC = CreatePinnableSession("pinned-c", pinned: true);
+        SessionTabViewModel loose = CreatePinnableSession("loose", pinned: false);
+        AddTabs(sut, pinnedA, pinnedB, pinnedC, loose);
+        sut.ActiveSession = loose;
+
+        sut.MoveSession(pinnedC, 0);
+
+        Assert.Equal(new[] { pinnedC, pinnedA, pinnedB, loose }, sut.ActiveSessions);
+        Assert.Same(loose, sut.ActiveSession);
+    }
+
+    [Fact]
+    public void MoveSession_SessionAbsentFromTheCollection_IsANoOp()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel pinned = CreatePinnableSession("pinned", pinned: true);
+        SessionTabViewModel loose = CreatePinnableSession("loose", pinned: false);
+        SessionTabViewModel orphan = CreatePinnableSession("orphan", pinned: false);
+        AddTabs(sut, pinned, loose);
+        sut.ActiveSession = pinned;
+
+        sut.MoveSession(orphan, 0);
+
+        Assert.Equal(new[] { pinned, loose }, sut.ActiveSessions);
+        Assert.DoesNotContain(orphan, sut.ActiveSessions);
+        Assert.Same(pinned, sut.ActiveSession);
+    }
+
+    [Fact]
+    public void ReintroduceSession_PinnedSession_LandsAfterTheLastPinnedTab()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel pinned = CreatePinnableSession("pinned", pinned: true);
+        SessionTabViewModel looseA = CreatePinnableSession("loose-a", pinned: false);
+        SessionTabViewModel looseB = CreatePinnableSession("loose-b", pinned: false);
+        SessionTabViewModel returning = CreatePinnableSession("returning", pinned: true);
+        AddTabs(sut, pinned, looseA, looseB);
+        sut.ActiveSession = looseA;
+
+        sut.ReintroduceSession(returning);
+
+        Assert.Equal(new[] { pinned, returning, looseA, looseB }, sut.ActiveSessions);
+        Assert.Same(looseA, sut.ActiveSession);
+    }
+
+    [Fact]
+    public void ReintroduceSession_UnpinnedSession_AppendsAtTheTail()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel pinned = CreatePinnableSession("pinned", pinned: true);
+        SessionTabViewModel loose = CreatePinnableSession("loose", pinned: false);
+        SessionTabViewModel returning = CreatePinnableSession("returning", pinned: false);
+        AddTabs(sut, pinned, loose);
+        sut.ActiveSession = pinned;
+
+        sut.ReintroduceSession(returning);
+
+        Assert.Equal(new[] { pinned, loose, returning }, sut.ActiveSessions);
+        Assert.Same(pinned, sut.ActiveSession);
+    }
+
+    [Fact]
+    public void ReintroduceSession_SessionAlreadyPresent_LeavesTheCollectionUnchanged()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel pinned = CreatePinnableSession("pinned", pinned: true);
+        SessionTabViewModel looseA = CreatePinnableSession("loose-a", pinned: false);
+        SessionTabViewModel looseB = CreatePinnableSession("loose-b", pinned: false);
+        AddTabs(sut, pinned, looseA, looseB);
+        sut.ActiveSession = looseB;
+
+        sut.ReintroduceSession(looseA);
+
+        Assert.Equal(new[] { pinned, looseA, looseB }, sut.ActiveSessions);
+        Assert.Equal(3, sut.ActiveSessions.Count);
+        Assert.Same(looseB, sut.ActiveSession);
+    }
+
+    private static ConnectionViewModel CreatePinningViewModel()
+        => CreateViewModel(new TrackingDialogService(false), new TrackingSplitService());
+
+    private static SessionTabViewModel CreatePinnableSession(string title, bool pinned)
+        => new() { Title = title, IsPinned = pinned };
+
     private static void AddTabs(ConnectionViewModel viewModel, params SessionTabViewModel[] sessions)
     {
         foreach (var session in sessions)

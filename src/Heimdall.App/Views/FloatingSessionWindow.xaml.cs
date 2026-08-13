@@ -142,10 +142,9 @@ public partial class FloatingSessionWindow : Window
 
     private void RestoreSession(MainViewModel vm)
     {
-        if (!vm.Connection.ActiveSessions.Contains(_session))
-        {
-            vm.Connection.ActiveSessions.Add(_session);
-        }
+        // ReintroduceSession owns the present/absent decision and keeps a pinned session
+        // inside the pinned group instead of appending it after every unpinned tab.
+        vm.Connection.ReintroduceSession(_session);
 
         vm.Connection.ActiveSession = _session;
         vm.Connection.HasActiveSessions = vm.Connection.ActiveSessions.Count > 0;
