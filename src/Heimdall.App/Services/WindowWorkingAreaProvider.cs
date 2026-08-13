@@ -17,12 +17,13 @@
 using System.Windows;
 using Heimdall.Core.Logging;
 using DrawingRectangle = System.Drawing.Rectangle;
+using DrawingSize = System.Drawing.Size;
 using WinForms = System.Windows.Forms;
 
 namespace Heimdall.App.Services;
 
 /// <summary>
-/// Provides physical monitor working areas normalized to WPF device-independent units.
+/// Provides monitor working-area projections in physical pixels and WPF device-independent units.
 /// </summary>
 internal static class WindowWorkingAreaProvider
 {
@@ -66,5 +67,39 @@ internal static class WindowWorkingAreaProvider
             pixelBounds.Top / dpiScaleY,
             pixelBounds.Width / dpiScaleX,
             pixelBounds.Height / dpiScaleY);
+    }
+
+    /// <summary>
+    /// Projects a monitor rectangle onto its size in physical pixels, applying no
+    /// device-independent conversion. The origin is deliberately discarded: callers need
+    /// the dimensions of the area, never its position on the virtual desktop.
+    /// </summary>
+    internal static DrawingSize ToPhysicalSize(DrawingRectangle pixelBounds)
+        => new(pixelBounds.Width, pixelBounds.Height);
+
+    /// <summary>
+    /// Returns the primary screen working area in physical pixels, for callers that must
+    /// not scale it - external RDP sessions in particular, where mstsc reads the emitted
+    /// desktop size as pixels. Returns an empty size when no primary screen can be
+    /// resolved, so callers fall back to their configured default.
+    /// </summary>
+    internal static DrawingSize GetPrimaryWorkingAreaPhysicalPx()
+    {
+        try
+        {
+            WinForms.Screen? primaryScreen = WinForms.Screen.PrimaryScreen;
+            if (primaryScreen is null)
+            {
+                FileLogger.Warn("Primary working-area lookup skipped because no primary screen is available.");
+                return DrawingSize.Empty;
+            }
+
+            return ToPhysicalSize(primaryScreen.WorkingArea);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Primary working-area lookup failed: {ex.Message}");
+            return DrawingSize.Empty;
+        }
     }
 }

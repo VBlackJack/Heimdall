@@ -234,13 +234,10 @@ internal static class RdpProfileResolver
         };
     }
 
+    // Physical pixels, never device-independent units: the value is written verbatim as
+    // desktopwidth/desktopheight in the generated .rdp file, and mstsc reads it as pixels.
     private static DrawingSize GetPrimaryWorkingArea()
-    {
-        var workArea = System.Windows.SystemParameters.WorkArea;
-        return new DrawingSize(
-            (int)Math.Round(workArea.Width, MidpointRounding.AwayFromZero),
-            (int)Math.Round(workArea.Height, MidpointRounding.AwayFromZero));
-    }
+        => WindowWorkingAreaProvider.GetPrimaryWorkingAreaPhysicalPx();
 
     private static int[] ResolveSelectedMonitorIndices(
         ServerProfileDto server,
