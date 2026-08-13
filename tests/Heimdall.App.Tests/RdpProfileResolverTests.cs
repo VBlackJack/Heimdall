@@ -15,6 +15,7 @@
  */
 
 using System.Drawing;
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Rdp;
@@ -617,6 +618,57 @@ public sealed class RdpProfileResolverTests
         Assert.Equal(asGlobal.AutoReconnect, asServer.AutoReconnect);
     }
 
+    // The dimensions below are chosen so that a 1.25, 1.5 or 2.0 device-independent
+    // conversion yields a different integer in every case: an implementation that still
+    // scales cannot pass, and neither can one that always returns an empty size.
+    [Theory]
+    [InlineData(0, 0, 1920, 1080)]
+    [InlineData(0, 0, 2560, 1440)]
+    [InlineData(1920, 0, 1920, 1032)]
+    public void ToPhysicalSize_PreservesPixelDimensionsExactly(int left, int top, int width, int height)
+    {
+        Size size = WindowWorkingAreaProvider.ToPhysicalSize(new Rectangle(left, top, width, height));
+
+        Assert.Equal(width, size.Width);
+        Assert.Equal(height, size.Height);
+    }
+
+    [Fact]
+    public void ToPhysicalSize_EmptyRectangle_YieldsEmptySize()
+    {
+        Size size = WindowWorkingAreaProvider.ToPhysicalSize(Rectangle.Empty);
+
+        Assert.Equal(Size.Empty, size);
+    }
+
+    [Fact]
+    public void RdpProfileResolver_ResolvesPrimaryWorkingAreaWithoutTheWpfWorkArea()
+    {
+        string resolverPath = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Heimdall.App",
+            "Services",
+            "RdpProfileResolver.cs");
+
+        // Matched line by line on purpose: the repository stores CRLF, so an anchored
+        // multiline regex over the raw file text would silently never match and the
+        // guard would pass without measuring anything.
+        List<string> offendingLines = File.ReadLines(resolverPath)
+            .Select((text, index) => new { Text = text, Number = index + 1 })
+            .Where(line => line.Text.Contains("SystemParameters.WorkArea", StringComparison.Ordinal))
+            .Select(line => $"{line.Number}: {line.Text.Trim()}")
+            .ToList();
+
+        Assert.True(
+            offendingLines.Count == 0,
+            "The external Auto path must resolve the primary working area in physical pixels. " +
+            "SystemParameters.WorkArea is expressed in WPF device-independent units and must not " +
+            "appear in RdpProfileResolver:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, offendingLines));
+    }
+
     private static string GenerateExternalRdpContent(
         ServerProfileDto server,
         AppSettings settings,
@@ -647,5 +699,22 @@ public sealed class RdpProfileResolverTests
             SelectedMonitorIndices = resolution.SelectedMonitorIndices,
             Redirections = redirections
         });
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        string? directory = AppContext.BaseDirectory;
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory, "Heimdall.slnx")))
+            {
+                return directory;
+            }
+
+            directory = Path.GetDirectoryName(directory);
+        }
+
+        throw new DirectoryNotFoundException(
+            $"Cannot find the repository root containing Heimdall.slnx from {AppContext.BaseDirectory}.");
     }
 }
