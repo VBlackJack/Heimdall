@@ -229,7 +229,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     [Fact]
     public void InitGuard_PreventsGenerationBeforeInitialize()
     {
-        var sut = new PasswordGeneratorViewModel();
+        PasswordGeneratorViewModel sut = new(new PasswordPresetStorage(_presetsDirectoryPath));
 
         sut.Length = 16;
 
