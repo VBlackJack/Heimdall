@@ -1379,6 +1379,190 @@ public sealed class EmbeddedSftpViewModelTests
             "1000");
     }
 
+    // Ordering oracle: signal-based, no wall clock. Proves the plan does not complete while the
+    // walk is still blocked, and that the resulting operations are the expected ones.
+    [Fact]
+    public async Task PlanAndUploadEntriesAsync_GatedWalk_DoesNotCompleteBeforeTheWalkIsReleased()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv" };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+
+        TaskCompletionSource walkEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseWalk = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.LocalChildEnumerator = (_, _, _) =>
+        {
+            walkEntered.TrySetResult();
+            releaseWalk.Task.GetAwaiter().GetResult();
+            return Task.FromResult<IReadOnlyList<LocalUploadEntry>>([]);
+        };
+
+        string root = CreateTempUploadRoot();
+        try
+        {
+            Task<EmbeddedSftpViewModel.UploadPlanOutcome> pending =
+                viewModel.PlanAndUploadEntriesAsync([root], "/srv", CancellationToken.None);
+
+            await walkEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(pending.IsCompleted);
+
+            releaseWalk.SetResult();
+            EmbeddedSftpViewModel.UploadPlanOutcome outcome =
+                await pending.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.True(outcome.Completed);
+            Assert.Equal(1, browser.CreateDirectoryCallCount);
+        }
+        finally
+        {
+            releaseWalk.TrySetResult();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // Liveness watchdog: bounded, and its only two outcomes are "returned promptly" and an
+    // explicit failure. It exists so that a walk running on the calling thread fails this test
+    // instead of hanging the suite. The gate is released in the finally on every path.
+    [Fact]
+    public async Task PlanAndUploadEntriesAsync_ReturnsToTheCallerWhileTheWalkIsStillBlocked()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv" };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+
+        TaskCompletionSource walkEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseWalk = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.LocalChildEnumerator = (_, _, _) =>
+        {
+            walkEntered.TrySetResult();
+            releaseWalk.Task.GetAwaiter().GetResult();
+            return Task.FromResult<IReadOnlyList<LocalUploadEntry>>([]);
+        };
+
+        TaskCompletionSource callReturned = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<EmbeddedSftpViewModel.UploadPlanOutcome>? pending = null;
+        string root = CreateTempUploadRoot();
+        try
+        {
+            _ = Task.Run(() =>
+            {
+                pending = viewModel.PlanAndUploadEntriesAsync([root], "/srv", CancellationToken.None);
+
+                // Raised by the harness the moment the call handed back its Task. Production
+                // code carries no test hook: the returned Task is itself the signal.
+                callReturned.TrySetResult();
+            });
+
+            await walkEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Task settled = await Task.WhenAny(callReturned.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+
+            Assert.True(
+                ReferenceEquals(settled, callReturned.Task),
+                "PlanAndUploadEntriesAsync did not hand back its Task while the tree walk was still " +
+                "blocked. The walk is running on the calling thread, which is the defect this lot closes.");
+        }
+        finally
+        {
+            releaseWalk.TrySetResult();
+            if (pending is not null)
+            {
+                try
+                {
+                    await pending.WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                catch (TimeoutException)
+                {
+                    // The assertion above already reported the real failure.
+                }
+            }
+
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // Proves the token reaches the PLANNER, not merely the offload. Cancelling before the call
+    // would not discriminate: Task.Run short-circuits an already-cancelled token before its
+    // delegate runs, so the planner would never be reached whatever token it was handed. The
+    // cancellation therefore happens while the walk is in progress.
+    [Fact]
+    public async Task PlanAndUploadEntriesAsync_TokenCancelledDuringTheWalk_StopsInsteadOfPlanningTheWholeTree()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv" };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+
+        using CancellationTokenSource cts = new();
+        int enumerateCallCount = 0;
+        viewModel.LocalChildEnumerator = (localDirectory, _, _) =>
+        {
+            Interlocked.Increment(ref enumerateCallCount);
+            cts.Cancel();
+
+            // A child directory, so an unstopped walk keeps recursing instead of ending here.
+            return Task.FromResult<IReadOnlyList<LocalUploadEntry>>(
+                [new LocalUploadEntry(Path.Combine(localDirectory, "child"), "child", IsDirectory: true)]);
+        };
+
+        string root = CreateTempUploadRoot();
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => viewModel.PlanAndUploadEntriesAsync([root], "/srv", cts.Token));
+
+            Assert.Equal(1, Volatile.Read(ref enumerateCallCount));
+            Assert.Equal(0, browser.CreateDirectoryCallCount);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // Complements the test above: an already-cancelled token must be refused up front, before
+    // any filesystem work is scheduled at all.
+    [Fact]
+    public async Task PlanAndUploadEntriesAsync_AlreadyCancelledToken_DoesNotWalkTheTree()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv" };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+
+        int enumerateCallCount = 0;
+        viewModel.LocalChildEnumerator = (_, _, _) =>
+        {
+            Interlocked.Increment(ref enumerateCallCount);
+            return Task.FromResult<IReadOnlyList<LocalUploadEntry>>([]);
+        };
+
+        using CancellationTokenSource cts = new();
+        await cts.CancelAsync();
+
+        string root = CreateTempUploadRoot();
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => viewModel.PlanAndUploadEntriesAsync([root], "/srv", cts.Token));
+
+            Assert.Equal(0, Volatile.Read(ref enumerateCallCount));
+            Assert.Equal(0, browser.CreateDirectoryCallCount);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static string CreateTempUploadRoot()
+    {
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
+    }
+
     private static void SetBrowser(EmbeddedSftpViewModel viewModel, IRemoteBrowser browser)
     {
         FieldInfo? field = typeof(EmbeddedSftpViewModel).GetField(

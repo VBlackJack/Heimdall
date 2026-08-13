@@ -59,7 +59,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>Outcome of a planned upload run, including sources and destinations refused up front.</summary>
-    private readonly record struct UploadPlanOutcome(
+    internal readonly record struct UploadPlanOutcome(
         bool Completed,
         IReadOnlyList<string> SkippedUnsupportedTargets,
         IReadOnlyList<string> SkippedLocalReparsePoints);
@@ -966,6 +966,28 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// ordered operations against the (decorated, journaling) browser: <c>CreateDirectoryAsync</c> for
     /// each directory and <c>UploadFileAsync</c> for each file, keeping the sudo permission fallback.
     /// </summary>
+    /// <summary>
+    /// Enumerates the children of a local directory for the upload planner. The default is the
+    /// real filesystem walk, which is synchronous: the decision to leave the calling thread
+    /// belongs to the call site, not here, so that the offload stays in production code no
+    /// matter which enumerator is in use. Settable so a test can inject a gated or counting one.
+    /// </summary>
+    internal Func<string, ICollection<string>, CancellationToken, Task<IReadOnlyList<LocalUploadEntry>>>
+        LocalChildEnumerator
+    { get; set; } = static (localDirectory, skippedLocalReparsePoints, _) => Task.FromResult(
+        EnumerateLocalChildren(localDirectory, skippedLocalReparsePoints));
+
+    /// <summary>
+    /// Runs the upload planning and execution path with an explicit token, bypassing the
+    /// transfer coordinator. Exists so the cancellation and non-blocking contracts are
+    /// reachable from a test without driving the whole upload command.
+    /// </summary>
+    internal Task<UploadPlanOutcome> PlanAndUploadEntriesAsync(
+        IReadOnlyList<string> localPaths,
+        string targetRemoteDir,
+        CancellationToken ct)
+        => UploadPlannedEntriesAsync(localPaths, targetRemoteDir, ct);
+
     private async Task<UploadPlanOutcome> UploadPlannedEntriesAsync(
         IReadOnlyList<string> localPaths,
         string targetRemoteDir,
@@ -1005,13 +1027,19 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 skippedLocalReparsePoints);
         }
 
-        IReadOnlyList<RemoteUploadOp> ops =
-            RemoteUploadTreePlanner.Plan(
+        // The tree walk is synchronous filesystem work and can be arbitrarily slow on a network
+        // share or a spun-down drive. Run it off the calling thread so it cannot hold the UI for
+        // its whole duration; the planner itself stays pure and offloads nothing.
+        IReadOnlyList<RemoteUploadOp> ops = await Task.Run(
+            () => RemoteUploadTreePlanner.PlanAsync(
                 roots,
                 targetRemoteDir,
-                localDirectory => EnumerateLocalChildren(
+                (localDirectory, token) => LocalChildEnumerator(
                     localDirectory,
-                    skippedLocalReparsePoints));
+                    skippedLocalReparsePoints,
+                    token),
+                ct),
+            ct);
         RemoteUploadConflictInventory inventory = await BuildRemoteUploadConflictInventoryAsync(
             _browser,
             ops,
