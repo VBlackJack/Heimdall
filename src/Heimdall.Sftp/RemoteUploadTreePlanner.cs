@@ -74,11 +74,18 @@ public static class RemoteUploadTreePlanner
     /// <param name="enumerateChildren">
     /// Returns the immediate children of a local directory (by its <see cref="LocalUploadEntry.FullPath"/>).
     /// </param>
+    /// <param name="ct">Observed before every recursion step, so a deep or slow tree stays interruptible.</param>
     /// <exception cref="IOException">A directory child carries an unsafe name, or recursion exceeds <see cref="MaxUploadDepth"/>.</exception>
-    public static IReadOnlyList<RemoteUploadOp> Plan(
+    /// <exception cref="OperationCanceledException"><paramref name="ct"/> was cancelled.</exception>
+    /// <remarks>
+    /// The planner performs no offloading of its own: <paramref name="enumerateChildren"/> owns the
+    /// decision to leave the calling thread, so this unit stays pure and testable in memory.
+    /// </remarks>
+    public static async Task<IReadOnlyList<RemoteUploadOp>> PlanAsync(
         IReadOnlyList<LocalUploadEntry> roots,
         string targetRemoteDir,
-        Func<string, IReadOnlyList<LocalUploadEntry>> enumerateChildren)
+        Func<string, CancellationToken, Task<IReadOnlyList<LocalUploadEntry>>> enumerateChildren,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(roots);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetRemoteDir);
@@ -88,19 +95,23 @@ public static class RemoteUploadTreePlanner
 
         foreach (LocalUploadEntry root in roots)
         {
-            AppendEntry(root, targetRemoteDir, enumerateChildren, depth: 0, ops);
+            await AppendEntryAsync(root, targetRemoteDir, enumerateChildren, depth: 0, ops, ct);
         }
 
         return ops;
     }
 
-    private static void AppendEntry(
+    private static async Task AppendEntryAsync(
         LocalUploadEntry entry,
         string parentRemoteDir,
-        Func<string, IReadOnlyList<LocalUploadEntry>> enumerateChildren,
+        Func<string, CancellationToken, Task<IReadOnlyList<LocalUploadEntry>>> enumerateChildren,
         int depth,
-        List<RemoteUploadOp> ops)
+        List<RemoteUploadOp> ops,
+        CancellationToken ct)
     {
+        // Observed before the depth cap so a pathological tree cannot outrun cancellation.
+        ct.ThrowIfCancellationRequested();
+
         if (depth > MaxUploadDepth)
         {
             throw new IOException(
@@ -124,9 +135,9 @@ public static class RemoteUploadTreePlanner
         // Parent directory first, then its children (depth-first, pre-order).
         ops.Add(new RemoteUploadOp(RemoteUploadOpKind.MakeDirectory, entry.FullPath, remotePath));
 
-        foreach (LocalUploadEntry child in enumerateChildren(entry.FullPath))
+        foreach (LocalUploadEntry child in await enumerateChildren(entry.FullPath, ct))
         {
-            AppendEntry(child, remotePath, enumerateChildren, depth + 1, ops);
+            await AppendEntryAsync(child, remotePath, enumerateChildren, depth + 1, ops, ct);
         }
     }
 }
