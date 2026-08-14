@@ -87,9 +87,21 @@
                 Background="{DynamicResource SurfaceBrush}"
                 BorderThickness="0,0,0,1"
                 BorderBrush="{DynamicResource BorderBrush}">
-            <DockPanel Margin="8,0">
+            <!-- A Grid with a star column rather than a DockPanel: a DockPanel hands its docked
+                 child an unbounded width, so a WrapPanel inside one would measure every tab on one
+                 line and never wrap. The star column is what gives the navigation region a finite
+                 width to wrap within, which is what lets the window minimum come down. -->
+            <Grid x:Name="Mw_ToolbarLayout" Margin="8,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="Mw_ToolbarNavigationColumn" Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
                 <!-- Left: App title + navigation tabs -->
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                <WrapPanel x:Name="Mw_ToolbarNavigation"
+                           Grid.Column="0"
+                           Orientation="Horizontal"
+                           VerticalAlignment="Center">
                     <TextBlock x:Name="Mw_AppTitle" Text="{loc:Translate AppName}"
                                FontSize="{StaticResource FontSizeLarge}" FontWeight="Bold"
                                Foreground="{DynamicResource AccentBrush}"
@@ -148,10 +160,12 @@
                                  Focusable="True"
                                  Style="{DynamicResource ToolbarTabStyle}"
                                  AutomationProperties.Name="{loc:Translate A11yAboutTab}"/>
-                </StackPanel>
+                </WrapPanel>
 
-                <!-- Right: compact shortcuts -->
-                <StackPanel DockPanel.Dock="Right"
+                <!-- Right: compact shortcuts. Auto column, so the icons keep their size and the
+                     navigation region is the one that gives way as the window narrows. -->
+                <StackPanel x:Name="Mw_ToolbarShortcuts"
+                            Grid.Column="1"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
@@ -225,7 +239,7 @@
                                    HorizontalAlignment="Center"/>
                     </Button>
                 </StackPanel>
-            </DockPanel>
+            </Grid>
         </Border>
 
         <!-- Global busy indicator -->
