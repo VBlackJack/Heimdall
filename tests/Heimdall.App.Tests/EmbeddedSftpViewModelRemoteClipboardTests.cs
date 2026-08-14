@@ -438,6 +438,272 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         Assert.False(targetPane.HasClipboard);
     }
 
+    // --- Transfer coordinator ------------------------------------------------------------------
+    // A remote paste and a duplicate move bytes, so they must hold the same coordinator as an upload
+    // or a download: refused while one runs, and never cancelling it to take its place.
+    //
+    // "Not cancelled" is asserted through the holder's own work - it must still copy both of its
+    // entries after the challenger has been refused. Watching the token the browser receives would
+    // measure nothing: the callers still pass CancellationToken.None down to CopyAsync, so a
+    // captured token is always CancellationToken.None and a cancellation mutant survives it.
+
+    [Fact]
+    public async Task PasteClipboardAsync_SameEndpointWhileTransferRuns_RefusesAndLeavesRunningTransferAlive()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel targetPane = CreateReceivingPane(clipboard);
+        TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser targetBrowser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        SetBrowser(targetPane, targetBrowser);
+        SetEndpointKey(targetPane, "host=server;port=22;user=alice");
+        clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
+
+        try
+        {
+            Task running = targetPane.PasteClipboardAsync();
+            await copyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // The paste holds the coordinator, it does not merely read it.
+            Assert.True(targetPane.IsTransferInProgress);
+
+            await targetPane.PasteClipboardAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Single(targetBrowser.CopyCalls);
+            Assert.Equal("A file transfer is already in progress.", targetPane.StatusText);
+
+            releaseCopy.SetResult();
+            await running.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Both of the holder's entries were copied: the refusal did not abort it.
+            Assert.Equal(
+                ["/src/a.txt", "/src/b.txt"],
+                targetBrowser.CopyCalls.Select(call => call.Source));
+            Assert.False(targetPane.IsTransferInProgress);
+        }
+        finally
+        {
+            releaseCopy.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_CrossEndpointWhileTransferRuns_RefusesAndLeavesRunningTransferAlive()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel targetPane = CreateReceivingPane(clipboard);
+        TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser targetBrowser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        SetBrowser(targetPane, targetBrowser);
+        SetEndpointKey(targetPane, "host=server;port=22;user=alice");
+        clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
+
+        try
+        {
+            Task running = targetPane.PasteClipboardAsync();
+            await copyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Now the challenger comes from another endpoint: the download/temp/upload path, which
+            // used to replace the coordinator's token source outside its lock and cancel the copy.
+            FakeRemoteBrowser sourceBrowser = new();
+            clipboard.Set(CreateContent("host=other;port=22;user=alice", sourceBrowser));
+
+            await targetPane.PasteClipboardAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Empty(sourceBrowser.DownloadCalls);
+            Assert.Equal("A file transfer is already in progress.", targetPane.StatusText);
+
+            releaseCopy.SetResult();
+            await running.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(
+                ["/src/a.txt", "/src/b.txt"],
+                targetBrowser.CopyCalls.Select(call => call.Source));
+        }
+        finally
+        {
+            releaseCopy.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task DuplicateEntriesAsync_WhileTransferRuns_RefusesAndLeavesRunningTransferAlive()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel pane = CreateReceivingPane(clipboard);
+        TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser browser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        SetBrowser(pane, browser);
+        SetEndpointKey(pane, "host=server;port=22;user=alice");
+        clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
+
+        try
+        {
+            Task running = pane.PasteClipboardAsync();
+            await copyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            await pane.DuplicateEntriesAsync([CreateEntry("c.txt", "/dst/c.txt", isDirectory: false)])
+                .WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Single(browser.CopyCalls);
+            Assert.Equal("A file transfer is already in progress.", pane.StatusText);
+
+            releaseCopy.SetResult();
+            await running.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(
+                ["/src/a.txt", "/src/b.txt"],
+                browser.CopyCalls.Select(call => call.Source));
+        }
+        finally
+        {
+            releaseCopy.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_AfterAPasteCompletes_CanPasteAgain()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel targetPane = CreateReceivingPane(clipboard);
+        FakeRemoteBrowser targetBrowser = new();
+        SetBrowser(targetPane, targetBrowser);
+        SetEndpointKey(targetPane, "host=server;port=22;user=alice");
+        clipboard.Set(CreateContent("host=server;port=22;user=alice"));
+
+        await targetPane.PasteClipboardAsync();
+        await targetPane.PasteClipboardAsync();
+
+        // The coordinator was released by the first paste, so the second one ran.
+        Assert.Equal(2, targetBrowser.CopyCalls.Count);
+        Assert.False(targetPane.IsTransferInProgress);
+    }
+
+    [Fact]
+    public async Task DuplicateEntriesAsync_AfterADuplicateCompletes_CanDuplicateAgain()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel pane = CreateReceivingPane(clipboard);
+        FakeRemoteBrowser browser = new();
+        SetBrowser(pane, browser);
+        SftpFileInfo entry = CreateEntry("b.txt", "/dst/b.txt", isDirectory: false);
+
+        await pane.DuplicateEntriesAsync([entry]);
+        await pane.DuplicateEntriesAsync([entry]);
+
+        Assert.Equal(2, browser.CopyCalls.Count);
+        Assert.False(pane.IsTransferInProgress);
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_CancelledMidPaste_SkipsTheRemainingEntries()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel targetPane = CreateReceivingPane(clipboard);
+        TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser targetBrowser = new()
+        {
+            CopyHandler = async (_, _, _, _) =>
+            {
+                copyStarted.TrySetResult();
+                await releaseCopy.Task;
+            }
+        };
+        SetBrowser(targetPane, targetBrowser);
+        SetEndpointKey(targetPane, "host=server;port=22;user=alice");
+        clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
+
+        try
+        {
+            Task running = targetPane.PasteClipboardAsync();
+            await copyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // The token the Cancel command signals is the one the paste loop observes.
+            targetPane.CancelTransferCommand.Execute(null);
+            releaseCopy.SetResult();
+            await running.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Single(targetBrowser.CopyCalls);
+            Assert.Equal("/src/a.txt", targetBrowser.CopyCalls[0].Source);
+            Assert.False(targetPane.IsTransferInProgress);
+        }
+        finally
+        {
+            releaseCopy.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task DuplicateEntriesAsync_CancelledMidDuplicate_SkipsTheRemainingEntries()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel pane = CreateReceivingPane(clipboard);
+        TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser browser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        SetBrowser(pane, browser);
+
+        try
+        {
+            Task running = pane.DuplicateEntriesAsync(
+            [
+                CreateEntry("a.txt", "/dst/a.txt", isDirectory: false),
+                CreateEntry("b.txt", "/dst/b.txt", isDirectory: false)
+            ]);
+            await copyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            pane.CancelTransferCommand.Execute(null);
+            releaseCopy.SetResult();
+            await running.WaitAsync(TimeSpan.FromSeconds(5));
+
+            (string Source, string Destination, bool Recursive) copy = Assert.Single(browser.CopyCalls);
+            Assert.Equal("/dst/a.txt", copy.Source);
+            Assert.False(pane.IsTransferInProgress);
+        }
+        finally
+        {
+            releaseCopy.TrySetResult();
+        }
+    }
+
+    private static EmbeddedSftpViewModel CreateReceivingPane(RemoteClipboardService clipboard)
+        => new(new FakeUiDispatcher(), clipboard)
+        {
+            CurrentPath = "/dst",
+            IsConnected = true,
+            UnfilteredEntries = []
+        };
+
+    /// <summary>
+    /// A browser whose first copy blocks until released, so a test can meet a genuinely running
+    /// transfer rather than a hand-set flag.
+    /// </summary>
+    private static FakeRemoteBrowser BlockingCopyBrowser(
+        TaskCompletionSource copyStarted,
+        TaskCompletionSource releaseCopy)
+        => new()
+        {
+            CopyHandler = async (_, _, _, _) =>
+            {
+                copyStarted.TrySetResult();
+                await releaseCopy.Task;
+            }
+        };
+
+    private static SftpClipboardContent CreateTwoEntryContent(string endpointKey)
+        => new(
+            [
+                CreateEntry("a.txt", "/src/a.txt", isDirectory: false),
+                CreateEntry("b.txt", "/src/b.txt", isDirectory: false)
+            ],
+            "/src",
+            SftpClipboardMode.Copy,
+            endpointKey,
+            null);
+
     private static SftpClipboardContent CreateContent(string endpointKey, IRemoteBrowser? sourceBrowser = null)
     {
         return new SftpClipboardContent(
@@ -636,6 +902,12 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// When set, runs after the call is recorded. Lets a test hold a copy in flight so a second
+        /// operation meets a genuinely running transfer instead of a hand-set flag.
+        /// </summary>
+        public Func<string, string, bool, CancellationToken, Task>? CopyHandler { get; set; }
+
         public Task CopyAsync(
             string sourcePath,
             string destinationPath,
@@ -644,7 +916,9 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         {
             EnsureConnected();
             CopyCalls.Add((sourcePath, destinationPath, recursive));
-            return Task.CompletedTask;
+            return CopyHandler is null
+                ? Task.CompletedTask
+                : CopyHandler(sourcePath, destinationPath, recursive, ct);
         }
 
         public void Disconnect()
