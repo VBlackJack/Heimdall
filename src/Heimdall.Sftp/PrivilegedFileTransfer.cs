@@ -28,6 +28,21 @@ public static class PrivilegedFileCommands
     /// <summary>Exit status used when a privileged edit exceeds its configured size limit.</summary>
     public const int FileTooLargeExitStatus = 75;
 
+    /// <summary>
+    /// Reported when the replaced file's metadata could not be carried over to the payload.
+    /// </summary>
+    /// <remarks>
+    /// The rename never runs in that case, so the old target survives untouched. A file that loses
+    /// its ACLs, capabilities or timestamps on replacement is a security regression, not a detail
+    /// to swallow - so this refuses rather than publishing a file with weaker metadata.
+    /// <para>
+    /// 76, not 74: the no-follow read path already exits 74 for a non-regular source, and reusing
+    /// it would make two unrelated refusals indistinguishable to the caller. Kept in step with the
+    /// literal the script exits with; a test pins the two together.
+    /// </para>
+    /// </remarks>
+    public const int MetadataPreservationFailedExitStatus = 76;
+
     private const string AtomicWriteScript =
         "set -eu; umask 077; target=$1; "
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
@@ -43,9 +58,30 @@ public static class PrivilegedFileCommands
         + "printf '%s\\n' 'Refusing non-regular or symbolic-link target.' >&2; exit 73; fi; "
         + "original_owner=$(stat -c %u:%g -- original); "
         + "original_mode=$(stat -c %a -- original); preserve_metadata=1; fi; "
-        + "cat > payload; sync -f payload; "
+        + "cat > payload; "
         + "if [ \"$preserve_metadata\" -eq 1 ]; then "
-        + "chown -- \"$original_owner\" payload; chmod -- \"$original_mode\" payload; fi; "
+        + "payload_size=$(stat -c %s -- payload); "
+        // Owner and mode first, then the extended attributes - never the other way round. On Linux
+        // a chown clears the file capabilities stored in security.capability, so running it after
+        // the attribute copy would silently strip exactly what that copy just restored.
+        + "chown -- \"$original_owner\" payload; chmod -- \"$original_mode\" payload; "
+        // The preserved set is listed explicitly rather than using --preserve=all, because GNU cp
+        // does NOT fail when "all" cannot carry the extended attributes or the SELinux context: it
+        // warns and exits zero. Naming xattr makes a failure a failure. "original" is a hard link
+        // to the target, so it IS the target inode - these are the attributes the replaced file
+        // really carried, and ACLs, capabilities and the SELinux context all travel as xattrs.
+        + "if cp --attributes-only --preserve=mode,ownership,timestamps,xattr -- original payload; "
+        + "then :; else "
+        + "printf '%s\\n' 'Refusing: could not preserve the replaced file metadata.' >&2; "
+        + "exit 76; fi; "
+        // --attributes-only is documented not to touch the data, but this script cannot verify
+        // which coreutils build is on the far side, and a truncating one would publish an empty
+        // file. Measured across the copy, and refused if it moved.
+        + "if [ \"$(stat -c %s -- payload)\" != \"$payload_size\" ]; then "
+        + "printf '%s\\n' 'Refusing: the attribute copy altered the payload.' >&2; "
+        + "exit 76; fi; fi; "
+        // After the metadata, so what reaches the disk is the file as it will be published.
+        + "sync -f payload; "
         + "rm -f -- original; "
         + "if [ -L \"$target\" ]; then "
         + "printf '%s\\n' 'Refusing symbolic-link target.' >&2; exit 73; fi; "

@@ -32,7 +32,17 @@ public sealed class SudoUploadCommandsTests
         Assert.Contains("[ -L", write, StringComparison.Ordinal);
         Assert.DoesNotContain(RemoteTempPaths.Prefix, write, StringComparison.Ordinal);
         Assert.DoesNotContain("sudo tee", write, StringComparison.Ordinal);
-        Assert.DoesNotContain("cp --", write, StringComparison.Ordinal);
+
+        // This forbade "cp --" outright to keep the write atomic: copying content into place is
+        // exactly what the rename exists to avoid. Narrowed rather than dropped, because metadata
+        // preservation introduced a cp that copies NO content - every other form stays banned, so
+        // a content copy still fails here.
+        for (int index = write.IndexOf("cp --", StringComparison.Ordinal);
+             index >= 0;
+             index = write.IndexOf("cp --", index + 1, StringComparison.Ordinal))
+        {
+            Assert.StartsWith("cp --attributes-only ", write[index..], StringComparison.Ordinal);
+        }
     }
 
     [Fact]
