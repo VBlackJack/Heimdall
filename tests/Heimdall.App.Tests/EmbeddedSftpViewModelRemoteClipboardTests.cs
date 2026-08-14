@@ -443,9 +443,9 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
     // or a download: refused while one runs, and never cancelling it to take its place.
     //
     // "Not cancelled" is asserted through the holder's own work - it must still copy both of its
-    // entries after the challenger has been refused. Watching the token the browser receives would
-    // measure nothing: the callers still pass CancellationToken.None down to CopyAsync, so a
-    // captured token is always CancellationToken.None and a cancellation mutant survives it.
+    // entries after the challenger has been refused - rather than through a token captured from the
+    // browser: a token that turns out not to be the coordinator's leaves the assertion green under a
+    // cancellation mutant, which is exactly how a first draft of these tests passed vacuously.
 
     [Fact]
     public async Task PasteClipboardAsync_SameEndpointWhileTransferRuns_RefusesAndLeavesRunningTransferAlive()
@@ -662,6 +662,89 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
             (string Source, string Destination, bool Recursive) copy = Assert.Single(browser.CopyCalls);
             Assert.Equal("/dst/a.txt", copy.Source);
             Assert.False(pane.IsTransferInProgress);
+        }
+        finally
+        {
+            releaseCopy.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_CancelDuringCopy_CancelsTheTokenGivenToTheBrowser()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel targetPane = CreateReceivingPane(clipboard);
+        TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken browserToken = default;
+        FakeRemoteBrowser targetBrowser = new()
+        {
+            CopyHandler = async (_, _, _, ct) =>
+            {
+                browserToken = ct;
+                copyStarted.TrySetResult();
+                await releaseCopy.Task;
+            }
+        };
+        SetBrowser(targetPane, targetBrowser);
+        SetEndpointKey(targetPane, "host=server;port=22;user=alice");
+        clipboard.Set(CreateContent("host=server;port=22;user=alice"));
+
+        try
+        {
+            Task running = targetPane.PasteClipboardAsync();
+            await copyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.False(browserToken.IsCancellationRequested);
+
+            targetPane.CancelTransferCommand.Execute(null);
+
+            // Without this, cancelling during a server-side copy of a large tree does nothing: the
+            // browser was handed CancellationToken.None and the request never reaches the server.
+            Assert.True(browserToken.IsCancellationRequested);
+
+            releaseCopy.SetResult();
+            await running.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseCopy.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task DuplicateEntriesAsync_CancelDuringCopy_CancelsTheTokenGivenToTheBrowser()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel pane = CreateReceivingPane(clipboard);
+        TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken browserToken = default;
+        FakeRemoteBrowser browser = new()
+        {
+            CopyHandler = async (_, _, _, ct) =>
+            {
+                browserToken = ct;
+                copyStarted.TrySetResult();
+                await releaseCopy.Task;
+            }
+        };
+        SetBrowser(pane, browser);
+
+        try
+        {
+            Task running = pane.DuplicateEntriesAsync(
+                [CreateEntry("a.txt", "/dst/a.txt", isDirectory: false)]);
+            await copyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.False(browserToken.IsCancellationRequested);
+
+            pane.CancelTransferCommand.Execute(null);
+
+            Assert.True(browserToken.IsCancellationRequested);
+
+            releaseCopy.SetResult();
+            await running.WaitAsync(TimeSpan.FromSeconds(5));
         }
         finally
         {

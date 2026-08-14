@@ -704,10 +704,21 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <summary>
     /// Attempts a server-side <c>cp</c> over a short-lived SSH exec channel pinned to the host key
     /// resolved at connect time. Returns true on exit status 0; returns false (fall back to roundtrip)
-    /// when no pinned context was retained, the command exits non-zero, or the channel/transport fails.
+    /// when no pinned context was retained, the command exits non-zero, the command outruns
+    /// <see cref="ServerSideCopyCommandTimeout"/>, or the channel/transport fails.
     /// Cancellation propagates; programming errors are never swallowed.
     /// </summary>
-    private async Task<bool> TryServerSideCopyAsync(
+    /// <remarks>
+    /// The exec channel is driven by <see cref="ISftpExecCommandRunner"/>, which tears the SSH client
+    /// down on cancellation so the request reaches the running <c>cp</c>. The previous inline
+    /// implementation tested the token once before connecting and then blocked in a synchronous
+    /// <c>Execute()</c>: cancelling during the copy of a large tree had no effect at all, because a
+    /// token cannot interrupt a delegate already running inside <see cref="Task.Run(Action)"/>.
+    /// A cancelled copy must NOT fall back to the roundtrip - that would restart the very transfer
+    /// the user just cancelled - so <see cref="OperationCanceledException"/> is rethrown, and only
+    /// the timeout of an otherwise-live request degrades to the roundtrip.
+    /// </remarks>
+    internal async Task<bool> TryServerSideCopyAsync(
         string sourcePath,
         string destinationPath,
         bool recursive,
@@ -715,43 +726,52 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         SshConnectionParams? connectionParams = _connectionParams;
         PinnedFingerprintVerifier? pinnedVerifier = _pinnedHostKeyVerifier;
-        if (connectionParams is null || pinnedVerifier is null)
+        ISftpExecCommandRunner? runner = _injectedExecCommandRunner;
+        if (runner is null)
         {
-            return false;
+            if (connectionParams is null || pinnedVerifier is null)
+            {
+                return false;
+            }
+
+            runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
         }
 
+        string host = connectionParams?.Host ?? "the remote host";
         string command = ServerSideCopyCommand.Build(sourcePath, destinationPath, recursive);
-        SshClient? ssh = null;
+
+        // A generous cap on the command itself, distinct from the caller's token: reaching it means the
+        // exec channel is unproductive, not that the user asked to stop, so it degrades to the roundtrip.
+        using CancellationTokenSource commandCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        commandCts.CancelAfter(ServerSideCopyCommandTimeout);
+
         try
         {
-            ssh = SshConnectionFactory.CreateSshClient(connectionParams);
-            SshConnectionFactory.AttachPinnedHostKeyVerification(ssh, connectionParams, pinnedVerifier);
+            SftpExecResult result = await runner.ExecuteAsync(command, commandCts.Token)
+                .ConfigureAwait(false);
 
-            return await Task.Run(() =>
+            if (result.ExitStatus == SuccessfulExitStatus)
             {
-                ct.ThrowIfCancellationRequested();
-                ssh.Connect();
+                return true;
+            }
 
-                using SshCommand cmd = ssh.CreateCommand(command);
-                cmd.CommandTimeout = ServerSideCopyCommandTimeout;
-                cmd.Execute();
-
-                if (cmd.ExitStatus == 0)
-                {
-                    return true;
-                }
-
-                // Collision, EXDEV, and missing-tool failures deliberately share this correctness fallback.
-                // Parsing stderr would be server-specific and cannot make the roundtrip commit safer.
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    $"[SftpBrowser] SFTP server-side copy on {connectionParams.Host} exited {cmd.ExitStatus}; "
-                    + $"falling back to roundtrip. stderr: {cmd.Error}");
-                return false;
-            }, ct).ConfigureAwait(false);
+            // Collision, EXDEV, and missing-tool failures deliberately share this correctness fallback.
+            // Parsing stderr would be server-specific and cannot make the roundtrip commit safer.
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] SFTP server-side copy on {host} exited {result.ExitStatus}; "
+                + $"falling back to roundtrip. stderr: {result.StandardError}");
+            return false;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] SFTP server-side copy on {host} exceeded "
+                + $"{ServerSideCopyCommandTimeout.TotalMinutes:0} minutes; falling back to roundtrip.");
+            return false;
         }
         catch (HostKeyRejectedException)
         {
@@ -760,7 +780,7 @@ public sealed class SftpBrowser : IRemoteBrowser
             // closed: never proceed on the unverified channel; fall back to the roundtrip over the
             // already-pinned, already-trusted SftpClient. Host + protocol context only, no credentials.
             Heimdall.Core.Logging.FileLogger.Warn(
-                $"[SftpBrowser] host-key mismatch on server-side copy exec channel for {connectionParams.Host} "
+                $"[SftpBrowser] host-key mismatch on server-side copy exec channel for {host} "
                 + "(possible MITM); falling back to roundtrip over the trusted SFTP channel.");
             return false;
         }
@@ -771,26 +791,9 @@ public sealed class SftpBrowser : IRemoteBrowser
                 or TimeoutException)
         {
             Heimdall.Core.Logging.FileLogger.Warn(
-                $"[SftpBrowser] SFTP server-side copy unavailable on {connectionParams.Host} "
+                $"[SftpBrowser] SFTP server-side copy unavailable on {host} "
                 + $"({ex.GetType().Name}); falling back to roundtrip. {ex.Message}");
             return false;
-        }
-        finally
-        {
-            if (ssh is not null)
-            {
-                try
-                {
-                    ssh.Disconnect();
-                }
-                catch (Exception ex)
-                {
-                    Heimdall.Core.Logging.FileLogger.Debug(
-                        $"[SftpBrowser] server-side copy exec disconnect suppressed: {ex.Message}");
-                }
-
-                ssh.Dispose();
-            }
         }
     }
 
