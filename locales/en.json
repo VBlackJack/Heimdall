@@ -862,6 +862,8 @@
   "SftpStatusLoading": "Loading...",
   "SftpStatusTransferCancelled": "Transfer cancelled",
   "SftpStatusTransferringEntry": "Transferring {0} ({1}/{2})...",
+  "SftpStatusTransferProgressUpload": "\u2191 {0} \u2014 {1} / {2} ({3}%)",
+  "SftpStatusTransferProgressDownload": "\u2193 {0} \u2014 {1} / {2} ({3}%)",
   "SftpErrorSourceSessionUnavailable": "Source session no longer available.",
   "SftpStatusTransferComplete": "Transfer complete",
   "SftpStatusDownloadCompleteWithSkipped": "Downloaded {0} file(s); skipped {1} folder(s) (folders aren't supported).",

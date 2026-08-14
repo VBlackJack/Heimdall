@@ -1582,6 +1582,26 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         string transferred = FormatSize(progress.BytesTransferred);
         string total = FormatSize(progress.TotalBytes);
+
+        // One key per direction rather than a glyph placeholder: a translator sees a whole line and
+        // can reorder it, and the arrow stays with the wording it belongs to.
+        string key = progress.IsUpload
+            ? "SftpStatusTransferProgressUpload"
+            : "SftpStatusTransferProgressDownload";
+        string localized = _localizer?.Format(
+            key,
+            progress.FileName,
+            transferred,
+            total,
+            percent.ToString("F0"))
+            ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(localized))
+        {
+            TransferStatusText = localized;
+            return;
+        }
+
         string direction = progress.IsUpload ? "\u2191" : "\u2193";
         TransferStatusText = $"{direction} {progress.FileName} — {transferred} / {total} ({percent:F0}%)";
     }

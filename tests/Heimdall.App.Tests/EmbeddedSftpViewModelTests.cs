@@ -1245,7 +1245,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public void UpdateTransferProgress_UpdatesProgressValueAndStatusText()
+    public void UpdateTransferProgress_WithoutLocalizer_FallsBackToTheEnglishLine()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
@@ -1257,6 +1257,32 @@ public sealed class EmbeddedSftpViewModelTests
         string transferred = EmbeddedSftpViewModel.FormatSize(512);
         string total = EmbeddedSftpViewModel.FormatSize(1024);
         Assert.Equal($"\u2191 app.log \u2014 {transferred} / {total} (50%)", viewModel.TransferStatusText);
+    }
+
+    [Theory]
+    [InlineData(true, "SftpStatusTransferProgressUpload")]
+    [InlineData(false, "SftpStatusTransferProgressDownload")]
+    public async Task UpdateTransferProgress_WithLocalizer_BuildsTheLineFromTheCatalog(
+        bool isUpload,
+        string expectedKey)
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+        SetLocalizer(viewModel, localizer);
+        SftpTransferProgress progress = new("app.log", 512, 1024, isUpload);
+
+        viewModel.UpdateTransferProgress(progress);
+
+        string transferred = EmbeddedSftpViewModel.FormatSize(512);
+        string total = EmbeddedSftpViewModel.FormatSize(1024);
+        string expected = localizer.Format(expectedKey, "app.log", transferred, total, "50");
+
+        // The French line reads "... sur ...", so an inline "/" layout cannot satisfy this.
+        Assert.NotEqual(expectedKey, expected);
+        Assert.Equal(expected, viewModel.TransferStatusText);
+        Assert.DoesNotContain($"{transferred} / {total}", viewModel.TransferStatusText, StringComparison.Ordinal);
     }
 
     [Fact]
