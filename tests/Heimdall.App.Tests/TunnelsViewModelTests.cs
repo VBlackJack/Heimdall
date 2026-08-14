@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.Core.Configuration;
@@ -454,7 +455,7 @@ public sealed class TunnelsViewModelTests
 
     private sealed class TestTunnelsHost(AppSettings settings) : ITunnelsHost
     {
-        public ConnectionViewModel Connection { get; } = new(new LocalizationManager(), null!, null!);
+        public ConnectionViewModel Connection { get; } = new(new LocalizationManager(), null!, null!, new PaneCloseArbiter());
 
         public AppSettings Settings { get; private set; } = settings;
 

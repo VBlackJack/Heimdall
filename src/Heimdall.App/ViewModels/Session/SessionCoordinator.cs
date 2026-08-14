@@ -1100,13 +1100,19 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         var title = tab.Title;
         FileLogger.Info($"Overlay close requested: title='{title}'");
 
-        await _main.Connection.CloseSessionAsync(
+        PaneCloseResult result = await _main.Connection.CloseSessionAsync(
             tab, DisconnectReason.UserAction, confirm: false);
 
         // Defensive guard mirrors OnReconnectRequestedAsync: if the standard
         // close path failed to remove the tab from the collection for any
         // reason, force the removal so the user actually sees the tab close.
-        if (_main.Connection.ActiveSessions.Contains(tab))
+        //
+        // Gated on the outcome, and that gate is load-bearing. A tab that survives because a close
+        // guard withheld it is not the failure this block exists to paper over: forcing it out here
+        // would make the tab vanish from the UI while CloseAllPanes never ran, leaving the host
+        // undisposed, the tunnel reference unreleased and the transfer still going. A veto has to
+        // leave the tab exactly where it is.
+        if (result.IsClosed && _main.Connection.ActiveSessions.Contains(tab))
         {
             FileLogger.Warn(
                 $"Overlay close: forcing removal of orphan tab title='{title}' " +
@@ -1188,11 +1194,14 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 $"Reconnect requested: serverId={serverId} connectionType={connectionType} " +
                 $"oldTabPresent={oldTabWasPresent} activeTabs={oldTabCountBefore}");
 
-            // Close the old tab (disposes the dead session)
-            await _main.Connection.CloseSessionAsync(
+            // Close the old tab (disposes the dead session). Silent: the session being replaced is
+            // already dead, there is no live work to protect and no question worth asking - and a
+            // guard that withheld it here would strand the user between two tabs.
+            PaneCloseResult closeResult = await _main.Connection.CloseSessionAsync(
                 tab,
                 DisconnectReason.ReconnectInitiated,
-                confirm: false);
+                confirm: false,
+                CloseIntent.Silent);
 
             bool stillPresentAfterClose = _main.Connection.ActiveSessions.Contains(tab);
             FileLogger.Info(
@@ -1205,7 +1214,11 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             // connection. Production bug observed 2026-05-16: in some real
             // sessions the tab persisted after a clean CloseSessionAsync call
             // even though unit tests reproduced the removal correctly.
-            if (stillPresentAfterClose)
+            //
+            // Gated on the outcome for the same reason as the overlay path: a tab still present
+            // because a guard withheld it must stay put, host and all, rather than be forced out
+            // of the collection while its panes were never torn down.
+            if (closeResult.IsClosed && stillPresentAfterClose)
             {
                 FileLogger.Warn(
                     $"Reconnect: forcing removal of orphan tab serverId={serverId} " +
@@ -1463,7 +1476,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         if (tab.IsSplit)
         {
-            _main.ClosePane(tab, pane.PaneId, reason);
+            // A disconnect the user asked for, so the pane's guard is consulted like any other
+            // interactive close - it is not a programmatic teardown.
+            await _main.ClosePaneAsync(tab, pane.PaneId, reason);
             return;
         }
 

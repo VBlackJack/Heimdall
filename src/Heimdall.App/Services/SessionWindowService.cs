@@ -108,7 +108,16 @@ public sealed class SessionWindowService : ISessionWindowService
         SessionTabViewModel session,
         LocalizationManager localizer)
     {
-        var floatingWindow = new FloatingSessionWindow(session, localizer)
+        // The shared arbiter, read the same way this view layer already reads the dialog service.
+        // Sharing matters: a clearance obtained before detaching must still be honoured here rather
+        // than raising the same question twice. A standalone one is only a fallback for the case
+        // where no main view model is reachable at all.
+        IPaneCloseArbiter arbiter =
+            System.Windows.Application.Current?.MainWindow?.DataContext is ViewModels.MainViewModel vm
+                ? vm.CloseArbiter
+                : new PaneCloseArbiter();
+
+        var floatingWindow = new FloatingSessionWindow(session, localizer, arbiter)
         {
             Owner = null // Independent top-level window
         };

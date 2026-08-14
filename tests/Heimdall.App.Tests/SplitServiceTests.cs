@@ -72,7 +72,7 @@ public sealed class SplitServiceTests : IDisposable
             sessionManager: new FakeEmbeddedSessionManager(),
             connectionService: null!,
             _toolRegistry,
-            dialogService: null!);
+            dialogService: null!, new PaneCloseArbiter());
     }
 
     public void Dispose()
@@ -150,6 +150,122 @@ public sealed class SplitServiceTests : IDisposable
         Assert.False(token1.IsCancellationRequested);
     }
 
+    // ── Category B0: close guards, whatever the pane hosts ──────────────
+    // The guard is consulted for every pane, tool or not, and nothing is torn down while a close
+    // is withheld. These are behavioural rather than source-level on purpose: a bypass in one
+    // primitive must not be masked by the other primitive still calling the arbiter.
+
+    [Fact]
+    public void CloseAllPanes_GuardDefers_WithholdsTheCloseAndTearsNothingDown()
+    {
+        var session = new SessionTabViewModel();
+        var pane = MakePane(connectionType: "SSH");
+        var guard = new StubCloseGuard { IsBusy = true, Verdict = CloseVerdict.Defer };
+        pane.HostControl = guard;
+        session.RootContent = pane;
+
+        var result = _sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
+
+        Assert.Equal(PaneCloseOutcome.Deferred, result.Outcome);
+        Assert.Same(guard, pane.HostControl);
+    }
+
+    [Fact]
+    public void CloseAllPanes_GuardDenies_WithholdsTheCloseAndTearsNothingDown()
+    {
+        var session = new SessionTabViewModel();
+        var pane = MakePane(connectionType: "SSH");
+        var guard = new StubCloseGuard { IsBusy = true, Verdict = CloseVerdict.Deny };
+        pane.HostControl = guard;
+        session.RootContent = pane;
+
+        var result = _sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
+
+        Assert.Equal(PaneCloseOutcome.Blocked, result.Outcome);
+        Assert.Same(guard, pane.HostControl);
+    }
+
+    [Fact]
+    public void CloseAllPanes_SilentRequest_ClosesEvenThroughABusyGuard()
+    {
+        var session = new SessionTabViewModel();
+        var pane = MakePane(connectionType: "SSH");
+        pane.HostControl = new StubCloseGuard { IsBusy = true, Verdict = CloseVerdict.Deny };
+        session.RootContent = pane;
+
+        var result = _sut.CloseAllPanes(session, CloseRequest.Silent(DisconnectReason.UserAction));
+
+        // Application exit and the other programmatic teardowns must not be blockable, or a pane
+        // could keep its host alive past shutdown.
+        Assert.True(result.IsClosed);
+        Assert.Null(pane.HostControl);
+    }
+
+    [Fact]
+    public void ClosePane_GuardDefers_WithholdsTheCloseAndKeepsThePane()
+    {
+        var session = new SessionTabViewModel();
+        var first = MakePane(connectionType: "SSH", serverId: "a");
+        var second = MakePane(connectionType: "SSH", serverId: "b");
+        var guard = new StubCloseGuard { IsBusy = true, Verdict = CloseVerdict.Defer };
+        second.HostControl = guard;
+        session.RootContent = new SplitContainerModel
+        {
+            First = first,
+            Second = second,
+            Orientation = SplitOrientation.Vertical
+        };
+
+        var result = _sut.ClosePane(session, second.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
+
+        Assert.Equal(PaneCloseOutcome.Deferred, result.Outcome);
+        Assert.Same(guard, second.HostControl);
+        Assert.NotNull(Core.Models.SplitTreeHelper.FindPane(session.RootContent, second.PaneId));
+    }
+
+    [Fact]
+    public void ClosePane_GuardAllows_ClosesNormally()
+    {
+        var session = new SessionTabViewModel();
+        var first = MakePane(connectionType: "SSH", serverId: "a");
+        var second = MakePane(connectionType: "SSH", serverId: "b");
+        second.HostControl = new StubCloseGuard { IsBusy = false };
+        session.RootContent = new SplitContainerModel
+        {
+            First = first,
+            Second = second,
+            Orientation = SplitOrientation.Vertical
+        };
+
+        var result = _sut.ClosePane(session, second.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
+
+        Assert.True(result.IsClosed);
+        Assert.Null(Core.Models.SplitTreeHelper.FindPane(session.RootContent, second.PaneId));
+    }
+
+    /// <summary>
+    /// A pane content that guards its close. Not a tool, not a WPF control - which is the point:
+    /// the contract is neutral, and a pane's content is typed <c>object?</c>.
+    /// </summary>
+    private sealed class StubCloseGuard : ICloseGuard
+    {
+        public bool IsBusy { get; init; }
+
+        public CloseVerdict Verdict { get; init; } = CloseVerdict.Allow;
+
+        public CloseGuardState SampleCloseGuardState() => new(IsBusy, 1);
+
+        public CloseDecision PollClose(CloseRequest request) => Verdict switch
+        {
+            CloseVerdict.Defer => CloseDecision.Defer("StubGuardBusy", 1),
+            CloseVerdict.Deny => CloseDecision.Deny("StubGuardBusy", 1),
+            _ => CloseDecision.Allow(1)
+        };
+
+        public Task<bool> ResolveCloseAsync(CloseRequest request, CancellationToken cancellationToken)
+            => Task.FromResult(false);
+    }
+
     // ── Category B: CloseAllPanes tool-pane blocking ────────────────────
 
     [Fact]
@@ -159,9 +275,9 @@ public sealed class SplitServiceTests : IDisposable
         // Default RootContent is a single empty SessionPaneModel with
         // ServerId="" and ConnectionType="" — no server cleanup path hit.
 
-        var result = _sut.CloseAllPanes(session);
+        var result = _sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
 
-        Assert.True(result);
+        Assert.True(result.IsClosed);
     }
 
     [Fact]
@@ -173,9 +289,9 @@ public sealed class SplitServiceTests : IDisposable
         toolPane.HostControl = closableView;
         session.RootContent = toolPane;
 
-        var result = _sut.CloseAllPanes(session);
+        var result = _sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
 
-        Assert.True(result);
+        Assert.True(result.IsClosed);
         Assert.Null(toolPane.HostControl);
         Assert.True(closableView.Disposed);
     }
@@ -189,9 +305,9 @@ public sealed class SplitServiceTests : IDisposable
         toolPane.HostControl = blockingView;
         session.RootContent = toolPane;
 
-        var result = _sut.CloseAllPanes(session);
+        var result = _sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
 
-        Assert.False(result);
+        Assert.False(result.IsClosed);
         Assert.Same(blockingView, toolPane.HostControl);
         Assert.False(blockingView.Disposed);
     }
@@ -215,9 +331,9 @@ public sealed class SplitServiceTests : IDisposable
             Orientation = SplitOrientation.Vertical
         };
 
-        var result = _sut.CloseAllPanes(session);
+        var result = _sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
 
-        Assert.False(result);
+        Assert.False(result.IsClosed);
         // The blocking check runs before the disposal loop, so neither
         // host control is torn down when any tool pane is busy.
         Assert.Same(freeView, freePane.HostControl);
@@ -253,9 +369,9 @@ public sealed class SplitServiceTests : IDisposable
             }
         };
 
-        var result = _sut.CloseAllPanes(session);
+        var result = _sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
 
-        Assert.True(result);
+        Assert.True(result.IsClosed);
         Assert.Null(serverPane.HostControl);
         Assert.Null(toolPane.HostControl);
         Assert.True(serverHost.Disposed);
@@ -290,7 +406,7 @@ public sealed class SplitServiceTests : IDisposable
             }
         };
 
-        _sut.ClosePane(session, serverPane.PaneId);
+        _sut.ClosePane(session, serverPane.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
 
         Assert.Same(sibling, session.RootContent);
         Assert.Null(serverPane.HostControl);
@@ -333,7 +449,7 @@ public sealed class SplitServiceTests : IDisposable
             }
         };
 
-        _sut.ClosePane(session, sftpPane.PaneId);
+        _sut.ClosePane(session, sftpPane.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
 
         Assert.Same(sshPane, session.RootContent);
         Assert.True(sftpHost.Disposed);
@@ -362,7 +478,7 @@ public sealed class SplitServiceTests : IDisposable
         };
         var session = new SessionTabViewModel { RootContent = root };
 
-        _sut.ClosePane(session, toolPane.PaneId);
+        _sut.ClosePane(session, toolPane.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
 
         Assert.Same(root, session.RootContent);
         Assert.Same(blockingView, toolPane.HostControl);
@@ -529,9 +645,9 @@ public sealed class SplitServiceTests : IDisposable
         });
         Assert.True(_tunnelManager.HasTunnel(localPort));
 
-        bool closed = sut.CloseAllPanes(session);
+        PaneCloseResult closed = sut.CloseAllPanes(session, CloseRequest.Interactive(DisconnectReason.UserAction));
 
-        Assert.True(closed);
+        Assert.True(closed.IsClosed);
         Assert.All(connectionService.ServerIds, serverId =>
             Assert.Null(_connectionSm.GetStateData(serverId)));
         Assert.False(_tunnelManager.HasTunnel(localPort));
@@ -1448,7 +1564,8 @@ public sealed class SplitServiceTests : IDisposable
             sessionManager,
             connectionService,
             _toolRegistry,
-            dialogService: null!);
+            dialogService: null!,
+            closeArbiter: new PaneCloseArbiter());
 
     private void RegisterTrackedTunnel(string serverId, int localPort)
     {

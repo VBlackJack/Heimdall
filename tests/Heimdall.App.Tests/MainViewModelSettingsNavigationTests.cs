@@ -398,8 +398,8 @@ public sealed class MainViewModelSettingsNavigationTests
                 embeddedSessionManager,
                 connectionService,
                 toolRegistry,
-                dialog);
-            ConnectionViewModel connection = new(localizer, dialog, splitService);
+                dialog, new PaneCloseArbiter());
+            ConnectionViewModel connection = new(localizer, dialog, splitService, new PaneCloseArbiter());
             ServerListViewModel serverList = new(
                 config,
                 localizer,
@@ -446,7 +446,7 @@ public sealed class MainViewModelSettingsNavigationTests
                 connection,
                 settings,
                 update,
-                serviceProvider);
+                serviceProvider, new PaneCloseArbiter());
 
             return new TestHarness(
                 rootPath,

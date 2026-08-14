@@ -33,6 +33,7 @@ public partial class ConnectionViewModel : ObservableObject
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
     private readonly ISplitService _splitService;
+    private readonly IPaneCloseArbiter _closeArbiter;
 
     [ObservableProperty]
     private ObservableCollection<SessionTabViewModel> _activeSessions = [];
@@ -58,11 +59,13 @@ public partial class ConnectionViewModel : ObservableObject
     public ConnectionViewModel(
         LocalizationManager localizer,
         IDialogService dialogService,
-        ISplitService splitService)
+        ISplitService splitService,
+        IPaneCloseArbiter closeArbiter)
     {
         _localizer = localizer;
         _dialogService = dialogService;
         _splitService = splitService;
+        _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
 
         TrackAccessibleNames(ActiveSessions);
     }
@@ -347,14 +350,15 @@ public partial class ConnectionViewModel : ObservableObject
     private async Task CloseSession(SessionTabViewModel? session)
         => await CloseSessionAsync(session, DisconnectReason.TabClose);
 
-    public async Task CloseSessionAsync(
+    public async Task<PaneCloseResult> CloseSessionAsync(
         SessionTabViewModel? session,
         DisconnectReason reason,
-        bool confirm = true)
+        bool confirm = true,
+        CloseIntent intent = CloseIntent.Interactive)
     {
         if (session is null)
         {
-            return;
+            return PaneCloseResult.Closed;
         }
 
         // Check ALL panes in the split tree for connected status (not just the primary shim)
@@ -367,11 +371,78 @@ public partial class ConnectionViewModel : ObservableObject
             bool confirmed = await _dialogService.ShowConfirmAsync(title, message, "warning");
             if (!confirmed)
             {
-                return;
+                return PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedGeneric);
             }
         }
 
-        CloseSessionInternal(session, reason);
+        // The connected-session confirmation above stays first and separate. A guard is not a
+        // confirmation: no clearance may be issued for a close the user then declines.
+        CloseRequest request = intent == CloseIntent.Silent
+            ? CloseRequest.Silent(reason)
+            : CloseRequest.Interactive(reason);
+        try
+        {
+            return await CloseSessionWithRequestAsync(session, request);
+        }
+        finally
+        {
+            _closeArbiter.Release(request);
+        }
+    }
+
+    /// <summary>
+    /// The close cycle every path shares: poll, resolve the guards that deferred, retry once.
+    /// </summary>
+    /// <remarks>
+    /// The retry runs EXACTLY once. It can succeed without any guard changing its answer because
+    /// clearance lives in the arbiter, not in the guard - so implementers are never trusted to
+    /// "answer allow next time", and a second deferral is reported as a refusal rather than
+    /// looping. Everything awaited here happens outside the synchronous close primitive.
+    /// </remarks>
+    private async Task<PaneCloseResult> CloseSessionWithRequestAsync(
+        SessionTabViewModel session,
+        CloseRequest request)
+    {
+        PaneCloseResult result = CloseSessionInternal(session, request);
+        if (result.Outcome != PaneCloseOutcome.Deferred)
+        {
+            ReportIfBlocked(session, result);
+            return result;
+        }
+
+        IReadOnlyList<object?> hosts = LeafHosts(session);
+        if (!await _closeArbiter.ResolveAsync(request, hosts))
+        {
+            PaneCloseResult refused = PaneCloseResult.Blocked(
+                result.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric);
+            ReportIfBlocked(session, refused);
+            return refused;
+        }
+
+        result = CloseSessionInternal(session, request);
+        if (result.Outcome == PaneCloseOutcome.Deferred)
+        {
+            result = PaneCloseResult.Blocked(result.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric);
+        }
+
+        ReportIfBlocked(session, result);
+        return result;
+    }
+
+    private static IReadOnlyList<object?> LeafHosts(SessionTabViewModel session)
+        => [.. Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
+                 .Select(pane => pane.HostControl)];
+
+    private void ReportIfBlocked(SessionTabViewModel session, PaneCloseResult result)
+    {
+        if (result.Outcome != PaneCloseOutcome.Blocked || result.ReasonKey is null)
+        {
+            return;
+        }
+
+        _dialogService.ShowInfo(
+            _localizer[CloseGuardLocaleKeys.BlockedTitle],
+            _localizer.Format(result.ReasonKey, session.Title));
     }
 
     /// <summary>
@@ -411,6 +482,9 @@ public partial class ConnectionViewModel : ObservableObject
     /// Synchronously closes the exact tab whose host materialization failed, so
     /// tunnel release occurs before the connection pipeline tears down its state.
     /// </summary>
+    /// <remarks>
+    /// Silent: the host never materialized, so there is no work to protect and no user to ask.
+    /// </remarks>
     internal void CloseFailedMaterialization(SessionTabViewModel session)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -420,7 +494,7 @@ public partial class ConnectionViewModel : ObservableObject
             return;
         }
 
-        CloseSessionInternal(session, DisconnectReason.FailedSession);
+        CloseSessionInternal(session, CloseRequest.Silent(DisconnectReason.FailedSession));
     }
 
     /// <summary>
@@ -428,12 +502,17 @@ public partial class ConnectionViewModel : ObservableObject
     /// Used by <see cref="CloseAllSessions"/> to avoid multiple prompts.
     /// Delegates per-pane cleanup to <see cref="ISplitService.CloseAllPanes"/>.
     /// </summary>
-    private void CloseSessionInternal(
+    private PaneCloseResult CloseSessionInternal(
         SessionTabViewModel session,
-        DisconnectReason reason = DisconnectReason.UserAction)
+        CloseRequest request)
     {
-        if (!_splitService.CloseAllPanes(session, reason))
-            return; // Blocked by a busy tool pane
+        PaneCloseResult result = _splitService.CloseAllPanes(session, request);
+        if (!result.IsClosed)
+        {
+            // Withheld: either terminally, or pending an asynchronous decision. Either way nothing
+            // was torn down, and it is the caller's job to decide what happens next.
+            return result;
+        }
 
         ActiveSessions.Remove(session);
 
@@ -443,16 +522,22 @@ public partial class ConnectionViewModel : ObservableObject
         }
 
         HasActiveSessions = ActiveSessions.Count > 0;
+        return PaneCloseResult.Closed;
     }
 
     /// <summary>
     /// Closes all sessions without prompting. Used during application shutdown, when WPF can no longer create dialogs.
     /// </summary>
+    /// <remarks>
+    /// Silent, and this is the one place where that is unambiguously right: the application is
+    /// exiting, no dialog can be created any more, and a guard that withheld a pane here would
+    /// leave its host undisposed rather than protect anything.
+    /// </remarks>
     public void CloseAllSessionsSilently()
     {
         foreach (var session in ActiveSessions.ToList())
         {
-            CloseSessionInternal(session, DisconnectReason.UserAction);
+            CloseSessionInternal(session, CloseRequest.Silent(DisconnectReason.UserAction));
         }
     }
 
