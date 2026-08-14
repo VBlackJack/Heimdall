@@ -1838,19 +1838,20 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             StopStabilizationCountdown();
             Core.Logging.FileLogger.Info("EmbeddedRDP dynamic resolution is now enabled.");
 
-            if (_dpiChangeDroppedDuringLockout)
-            {
-                _dpiChangeDroppedDuringLockout = false;
-                Core.Logging.FileLogger.Info("EmbeddedRDP skipped queued display refresh after dropped DPI change.");
-                return;
-            }
-
             var (queuedWidth, queuedHeight) = GetDisplayDimensions();
-            if (queuedWidth > 0 && queuedHeight > 0
-                && (queuedWidth != _lastAppliedWidth || queuedHeight != _lastAppliedHeight))
+            RdpStabilizationResumeAction resumeAction = RdpStabilizationResumePolicy.Decide(
+                _dpiChangeDroppedDuringLockout,
+                queuedWidth,
+                queuedHeight,
+                _lastAppliedWidth,
+                _lastAppliedHeight);
+
+            _dpiChangeDroppedDuringLockout = false;
+
+            if (resumeAction != RdpStabilizationResumeAction.None)
             {
                 Core.Logging.FileLogger.Info(
-                    $"EmbeddedRDP applying queued resolution after stabilization: {queuedWidth}x{queuedHeight}");
+                    $"EmbeddedRDP applying resolution after stabilization ({resumeAction}): {queuedWidth}x{queuedHeight}");
                 await ApplyCurrentResolutionAsync("post-stabilization", force: true);
             }
         }
@@ -3152,6 +3153,14 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                 _manualResolutionWidth = 0;
                 _manualResolutionHeight = 0;
                 UpdateResolutionButtonState();
+
+                // Stated, not merely turned on: SmartSizing lives on the native control and
+                // survives a resolution change, so leaving a branch silent lets the previous
+                // mode leak into this one.
+                _rdpHost?.SetSmartSizing(RdpSmartSizingPolicy.ShouldEnable(
+                    ResolutionChoiceKind.MatchWindow,
+                    resolutionExceedsSurface: false));
+
                 Core.Logging.FileLogger.Info("RDP resolution set to: Fit to Window");
                 break;
 
@@ -3165,9 +3174,13 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                 _manualResolutionHeight = choice.Height;
                 UpdateResolutionButtonState();
 
-                if (IsResolutionLargerThanSurface(choice.Width, choice.Height))
+                bool exceedsSurface = IsResolutionLargerThanSurface(choice.Width, choice.Height);
+                _rdpHost?.SetSmartSizing(RdpSmartSizingPolicy.ShouldEnable(
+                    ResolutionChoiceKind.Fixed,
+                    exceedsSurface));
+
+                if (exceedsSurface)
                 {
-                    _rdpHost?.SetSmartSizing(true);
                     ShowTransientToast(_localizer?["RdpResolutionScaledToFitToast"]
                         ?? "RdpResolutionScaledToFitToast");
                 }
