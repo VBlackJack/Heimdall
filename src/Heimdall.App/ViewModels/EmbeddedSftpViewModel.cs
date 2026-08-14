@@ -374,6 +374,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             _transferCts?.Dispose();
             _transferCts = null;
             IsTransferInProgress = false;
+            _closeGuardEpoch++;
         }
 
         IsConnected = false;
@@ -403,6 +404,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Change stamp over the transfer state, written only under <c>_transferCtsGate</c>. Never read
+    /// as a quantity: the close protocol only compares it for equality across its two phases.
+    /// </summary>
+    private long _closeGuardEpoch;
+
     private TransferStartState TryBeginTransfer(out CancellationTokenSource? transferCts)
     {
         lock (_transferCtsGate)
@@ -423,6 +430,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             _transferCts = new CancellationTokenSource();
             transferCts = _transferCts;
             IsTransferInProgress = true;
+            _closeGuardEpoch++;
             return TransferStartState.Started;
         }
     }
@@ -439,6 +447,25 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             transferCts.Dispose();
             IsTransferInProgress = false;
             TransferProgressValue = 0;
+            _closeGuardEpoch++;
+        }
+    }
+
+    /// <summary>
+    /// One atomic read of the transfer state for the close protocol.
+    /// </summary>
+    /// <remarks>
+    /// Taken under the same gate as every writer, so the flag and the epoch always describe the
+    /// same instant: the protocol compares the epoch across its two phases to tell "the work
+    /// finished" from "different work started", and a torn read would make that comparison
+    /// meaningless. The epoch moves on every start and every completion, which is exactly the
+    /// change the protocol needs to see.
+    /// </remarks>
+    internal (bool IsTransferInProgress, long Epoch) SampleTransferState()
+    {
+        lock (_transferCtsGate)
+        {
+            return (IsTransferInProgress, _closeGuardEpoch);
         }
     }
 
