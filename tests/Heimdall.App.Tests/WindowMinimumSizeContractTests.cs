@@ -78,6 +78,35 @@ public sealed class WindowMinimumSizeContractTests
         Assert.Equal(OptedIn.Order(StringComparer.Ordinal), optedInFound);
     }
 
+    /// <summary>
+    /// The clamp must be computed from the captured declared minimum, never from the window's own
+    /// properties - which, after the first clamp, hold the clamped value.
+    /// </summary>
+    /// <remarks>
+    /// Asserted on the source because the window-level path cannot be driven deterministically in
+    /// this lane: it needs an STA host and real displays, and adding either would change the
+    /// project. The arithmetic itself is covered by <c>WorkingAreaMinimumBehaviorTests</c>.
+    /// </remarks>
+    [Fact]
+    public void Behavior_ResolvesFromTheCapturedMinimum_NotFromTheWindow()
+    {
+        string source = File.ReadAllText(
+            Path.Combine(AppSourceRoot(), "Behaviors", "WorkingAreaMinimumBehavior.cs"));
+
+        int applyStart = source.IndexOf("private static void Apply(Window window)", StringComparison.Ordinal);
+        Assert.True(applyStart > 0, "Apply not found.");
+
+        string apply = source[applyStart..];
+        int applyEnd = apply.IndexOf("\r\n    }", StringComparison.Ordinal);
+        Assert.True(applyEnd > 0, "End of Apply not found.");
+        apply = apply[..applyEnd];
+
+        Assert.Contains("tracker.Resolve(smallest)", apply, StringComparison.Ordinal);
+
+        // The shape that made every clamp permanent.
+        Assert.DoesNotContain("new Size(window.MinWidth", apply, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void MainWindow_OptsIntoTheClamp()
     {

@@ -75,6 +75,47 @@ public static class WorkingAreaMinimumPolicy
 }
 
 /// <summary>
+/// Remembers the minimum a window ASKED for, so a clamp can always be recomputed from it.
+/// </summary>
+/// <remarks>
+/// This exists because the clamp is not idempotent across displays. Resolving from the window's
+/// current minimum works once and then poisons itself: the clamped value becomes the declared one,
+/// and a later application on a larger working area can no longer restore what the XAML asked for.
+/// A window clamped to 800x470 on a small display stayed at 470 after being moved to a 1080-tall
+/// one. Capturing once, and resolving from that capture every time, is what makes the clamp
+/// reversible.
+/// </remarks>
+internal sealed class WorkingAreaMinimumTracker
+{
+    private Size? _declaredMinimum;
+
+    /// <summary>Whether a declared minimum has been recorded for this window.</summary>
+    internal bool HasCapture => _declaredMinimum.HasValue;
+
+    /// <summary>The minimum the window declared, before any clamping.</summary>
+    internal Size DeclaredMinimum => _declaredMinimum ?? default;
+
+    /// <summary>
+    /// Records the declared minimum, once. Later calls are ignored on purpose: after a clamp the
+    /// window's own properties hold the clamped value, so a second capture would record it as if
+    /// the XAML had asked for it.
+    /// </summary>
+    internal void Capture(Size declaredMinimum) => _declaredMinimum ??= declaredMinimum;
+
+    /// <summary>The minimum to apply for a given working area, always derived from the capture.</summary>
+    internal Size Resolve(Size workingArea)
+        => WorkingAreaMinimumPolicy.Resolve(DeclaredMinimum, workingArea);
+
+    /// <summary>Gives back the declared minimum and forgets it, so a later capture starts clean.</summary>
+    internal Size Release()
+    {
+        Size declared = DeclaredMinimum;
+        _declaredMinimum = null;
+        return declared;
+    }
+}
+
+/// <summary>
 /// Holds a window's minimum size within the working area of the display it sits on.
 /// </summary>
 /// <remarks>
@@ -98,6 +139,14 @@ public static class WorkingAreaMinimumBehavior
     public static bool GetIsEnabled(DependencyObject element)
         => (bool)element.GetValue(IsEnabledProperty);
 
+    /// <summary>Per-window capture of the declared minimum. Private: it is not a contract.</summary>
+    private static readonly DependencyProperty TrackerProperty =
+        DependencyProperty.RegisterAttached(
+            "Tracker",
+            typeof(WorkingAreaMinimumTracker),
+            typeof(WorkingAreaMinimumBehavior),
+            new PropertyMetadata(null));
+
     private static void OnIsEnabledChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
     {
         if (element is not Window window)
@@ -109,10 +158,27 @@ public static class WorkingAreaMinimumBehavior
         {
             window.SourceInitialized -= OnWindowReady;
             window.DpiChanged -= OnWindowDpiChanged;
+
+            // Give the window its declared minimum back, so disabling truly undoes the clamp and a
+            // later re-enable captures the XAML value rather than a clamped one.
+            if (window.GetValue(TrackerProperty) is WorkingAreaMinimumTracker previous && previous.HasCapture)
+            {
+                Size declared = previous.Release();
+                window.MinWidth = declared.Width;
+                window.MinHeight = declared.Height;
+            }
+
+            window.ClearValue(TrackerProperty);
         }
 
         if ((bool)e.NewValue)
         {
+            // Captured BEFORE anything is applied: once a clamp has run, the window's own
+            // properties no longer say what the XAML asked for.
+            WorkingAreaMinimumTracker tracker = new();
+            tracker.Capture(new Size(window.MinWidth, window.MinHeight));
+            window.SetValue(TrackerProperty, tracker);
+
             window.SourceInitialized += OnWindowReady;
             window.DpiChanged += OnWindowDpiChanged;
 
@@ -143,6 +209,12 @@ public static class WorkingAreaMinimumBehavior
     {
         try
         {
+            if (window.GetValue(TrackerProperty) is not WorkingAreaMinimumTracker tracker
+                || !tracker.HasCapture)
+            {
+                return;
+            }
+
             DpiScale dpi = VisualTreeHelper.GetDpi(window);
             IReadOnlyList<Rect> areas = WindowWorkingAreaProvider.GetWorkingAreas(dpi);
             if (areas.Count == 0)
@@ -157,9 +229,9 @@ public static class WorkingAreaMinimumBehavior
                 areas.Min(area => area.Width),
                 areas.Min(area => area.Height));
 
-            Size resolved = WorkingAreaMinimumPolicy.Resolve(
-                new Size(window.MinWidth, window.MinHeight),
-                smallest);
+            // From the CAPTURE, never from the window's current minimum: the latter already holds
+            // the previous clamp, so resolving from it would make every clamp permanent.
+            Size resolved = tracker.Resolve(smallest);
 
             window.MinWidth = resolved.Width;
             window.MinHeight = resolved.Height;

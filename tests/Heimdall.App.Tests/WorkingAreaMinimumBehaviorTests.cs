@@ -105,6 +105,78 @@ public sealed class WorkingAreaMinimumBehaviorTests
         Assert.Equal(unset, resolved.Height);
     }
 
+    // --- The declared minimum must survive being clamped -----------------------------------------
+    // Resolving from the window's CURRENT minimum works once and then poisons itself: the clamped
+    // value becomes the declared one, and a later application on a larger working area can no
+    // longer restore what the XAML asked for. A window clamped to 800x470 on a small display
+    // stayed at 470 after being moved to a 1080-tall one.
+
+    [Fact]
+    public void Tracker_SmallAreaThenLargeArea_RestoresTheDeclaredMinimum()
+    {
+        WorkingAreaMinimumTracker tracker = new();
+        tracker.Capture(new Size(800, 600));
+
+        Assert.Equal(new Size(800, 470), tracker.Resolve(new Size(911, 470)));
+
+        // The window moved to a display that can supply the whole declared minimum.
+        Assert.Equal(new Size(800, 600), tracker.Resolve(new Size(1920, 1080)));
+    }
+
+    [Fact]
+    public void Tracker_RepeatedApplicationOnTheSameArea_IsStable()
+    {
+        WorkingAreaMinimumTracker tracker = new();
+        tracker.Capture(new Size(800, 600));
+
+        Size first = tracker.Resolve(new Size(911, 470));
+        Size second = tracker.Resolve(new Size(911, 470));
+        Size third = tracker.Resolve(new Size(911, 470));
+
+        // The behavior re-applies on every DPI change; repetition must not ratchet downwards.
+        Assert.Equal(new Size(800, 470), first);
+        Assert.Equal(first, second);
+        Assert.Equal(second, third);
+    }
+
+    [Fact]
+    public void Tracker_ReleaseAfterAClamp_GivesBackTheDeclaredMinimum()
+    {
+        WorkingAreaMinimumTracker tracker = new();
+        tracker.Capture(new Size(800, 600));
+        tracker.Resolve(new Size(911, 470));
+
+        Assert.Equal(new Size(800, 600), tracker.Release());
+        Assert.False(tracker.HasCapture);
+    }
+
+    [Fact]
+    public void Tracker_SecondCapture_DoesNotOverwriteTheDeclaredMinimum()
+    {
+        WorkingAreaMinimumTracker tracker = new();
+        tracker.Capture(new Size(800, 600));
+        tracker.Resolve(new Size(911, 470));
+
+        // What a re-activation would offer after a clamp: the window's own, already-clamped value.
+        tracker.Capture(new Size(800, 470));
+
+        Assert.Equal(new Size(800, 600), tracker.DeclaredMinimum);
+        Assert.Equal(new Size(800, 600), tracker.Resolve(new Size(1920, 1080)));
+    }
+
+    [Fact]
+    public void Tracker_CaptureAfterRelease_RecordsTheNewValue()
+    {
+        WorkingAreaMinimumTracker tracker = new();
+        tracker.Capture(new Size(800, 600));
+        tracker.Release();
+
+        // Releasing restored the declared minimum on the window, so a fresh capture is correct.
+        tracker.Capture(new Size(640, 480));
+
+        Assert.Equal(new Size(640, 480), tracker.DeclaredMinimum);
+    }
+
     [Fact]
     public void Resolve_IsIdempotent()
     {
