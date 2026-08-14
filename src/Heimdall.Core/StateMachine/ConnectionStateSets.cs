@@ -35,9 +35,48 @@ public static class ConnectionStateSets
             ConnectionState.RemoteSessionHandedOff
         }.ToFrozenSet();
 
+    /// <summary>
+    /// States in which the connection state is the meaningful status, so a live reachability
+    /// verdict must not be surfaced in its place.
+    /// </summary>
+    /// <remarks>
+    /// This is the text-side statement of the priority the sidebar dot already applies: the dot
+    /// falls back to the health palette only on the default branch, so an <c>Error</c> or a
+    /// transitional state colours the dot from the state while the accessible name used to read
+    /// out the health verdict - the two disagreed exactly here, and a screen reader got the
+    /// opposite of what a sighted user saw.
+    /// </remarks>
+    public static FrozenSet<ConnectionState> OverridesHealth { get; } =
+        new[]
+        {
+            ConnectionState.Connected,
+            ConnectionState.LaunchedExternalClient,
+            ConnectionState.RemoteSessionHandedOff,
+            ConnectionState.Error,
+            ConnectionState.Initializing,
+            ConnectionState.ValidatingConfig,
+            ConnectionState.EstablishingTunnel,
+            ConnectionState.TunnelEstablished,
+            ConnectionState.LaunchingRdp,
+            ConnectionState.LaunchingSsh,
+            ConnectionState.LaunchingSftp,
+            ConnectionState.LaunchingLocal,
+            ConnectionState.LaunchingVnc,
+            ConnectionState.LaunchingFtp,
+            ConnectionState.LaunchingTelnet,
+            ConnectionState.LaunchingCitrix,
+            ConnectionState.LaunchingWinRm,
+            ConnectionState.Disconnecting
+        }.ToFrozenSet();
+
     public static bool IsConnected(ConnectionState state) => Connected.Contains(state);
 
     public static bool IsConnected(string? state) =>
         Enum.TryParse(state, ignoreCase: true, out ConnectionState parsed)
         && Connected.Contains(parsed);
+
+    /// <summary>Whether the connection state, rather than the health verdict, is the status to report.</summary>
+    public static bool StateOverridesHealth(string? state) =>
+        Enum.TryParse(state, ignoreCase: true, out ConnectionState parsed)
+        && OverridesHealth.Contains(parsed);
 }

@@ -208,11 +208,25 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
 
     public string SidebarDisplayName => SidebarDisplayNameFormatter.Format(DisplayName) ?? "";
 
+    /// <summary>
+    /// Spoken description of the row. Its status half follows the SAME priority as the sidebar
+    /// dot - connection state first, health only where the dot itself falls back to health.
+    /// </summary>
+    /// <remarks>
+    /// It used to key off <see cref="IsActiveSession"/>, which is a strictly narrower set: an
+    /// <c>Error</c> or any transitional state left the dot coloured from the state while this
+    /// name read out the reachability verdict, so the two contradicted each other precisely where
+    /// a user most needs the status. <c>ServerStatusToColorConverter</c> is deliberately left
+    /// untouched; its own priority is the correct behaviour, and a coherence test pins the two
+    /// together so neither can drift alone.
+    /// </remarks>
     public string AccessibleName => Format(
         "SessionTreeServerAccessibleName",
         DisplayName,
         ConnectionType.ToUpperInvariant(),
-        IsActiveSession ? ConnectionStateDisplayName : HealthTooltipText);
+        ConnectionStateSets.StateOverridesHealth(ConnectionState)
+            ? ConnectionStateDisplayName
+            : HealthTooltipText);
 
     public string ConnectionTypeBadge => ConnectionType.ToUpperInvariant() switch
     {

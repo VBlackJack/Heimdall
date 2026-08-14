@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
+using System.Windows.Media;
+using Heimdall.App.Converters;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using Heimdall.Core.SessionHealth;
+using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.Tests;
 
@@ -395,6 +400,103 @@ public sealed class ServerItemViewModelLocalizationTests
         }
 
         return dto;
+    }
+
+    // --- Sidebar dot / accessible name coherence ------------------------------------------------
+    // The dot and the spoken name must report the same thing. They used to diverge: the dot falls
+    // back to the health palette only on its default branch, while the accessible name keyed off
+    // IsActiveSession - a strictly narrower set - so an Error or any transitional state coloured
+    // the dot from the state and read out the reachability verdict instead.
+
+    [Theory]
+    [MemberData(nameof(AllConnectionStates))]
+    public void OverridesHealth_MatchesTheBrushPriorityOfTheSidebarDot(ConnectionState state)
+    {
+        // Unknown health is what makes the two branches observable: it is the ONLY input for which
+        // the converter answers TextDisabledBrush, and it answers it only from the health branch.
+        // Every state branch resolves Success/Info/Warning/Error, and the type fallback resolves
+        // Border/Info/Success/Warning - so the key alone tells which branch ran.
+        string? requestedKey = null;
+        ServerStatusToColorConverter converter = new(key =>
+        {
+            requestedKey = key;
+            return null;
+        });
+
+        converter.Convert(
+            ["SSH", state.ToString(), HealthState.Initial],
+            typeof(Brush),
+            null!,
+            CultureInfo.InvariantCulture);
+
+        bool dotUsedHealth = requestedKey == "TextDisabledBrush";
+
+        Assert.Equal(!dotUsedHealth, ConnectionStateSets.StateOverridesHealth(state.ToString()));
+    }
+
+    [Theory]
+    [InlineData("Error")]
+    [InlineData("Initializing")]
+    [InlineData("EstablishingTunnel")]
+    [InlineData("LaunchingSsh")]
+    [InlineData("Disconnecting")]
+    public async Task AccessibleName_StateThatColoursTheDot_ReportsTheStateNotTheHealth(string state)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            localizer: localizer);
+        viewModel.HealthState = new HealthState(HealthStatus.Up, DateTime.UtcNow, 12, null);
+        viewModel.ConnectionState = state;
+
+        // None of these is an "active session", which is precisely why the old rule got them wrong.
+        Assert.False(viewModel.IsActiveSession);
+        Assert.NotEqual(viewModel.HealthTooltipText, viewModel.ConnectionStateDisplayName);
+        Assert.Contains(viewModel.ConnectionStateDisplayName, viewModel.AccessibleName, StringComparison.Ordinal);
+        Assert.DoesNotContain(viewModel.HealthTooltipText, viewModel.AccessibleName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AccessibleName_DisconnectedWhereTheDotReadsHealth_ReportsTheHealth()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            localizer: localizer);
+        viewModel.HealthState = new HealthState(HealthStatus.Down, DateTime.UtcNow, null, "refused");
+        viewModel.ConnectionState = "Disconnected";
+
+        Assert.NotEqual(viewModel.HealthTooltipText, viewModel.ConnectionStateDisplayName);
+        Assert.Contains(viewModel.HealthTooltipText, viewModel.AccessibleName, StringComparison.Ordinal);
+        Assert.DoesNotContain(viewModel.ConnectionStateDisplayName, viewModel.AccessibleName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AccessibleName_HealthChangeWhileStateOverrides_DoesNotChangeTheSpokenStatus()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            localizer: localizer);
+        viewModel.ConnectionState = "Error";
+        viewModel.HealthState = new HealthState(HealthStatus.Up, DateTime.UtcNow, 12, null);
+        string before = viewModel.AccessibleName;
+
+        viewModel.HealthState = new HealthState(HealthStatus.Down, DateTime.UtcNow, null, "timeout");
+
+        // The dot stays red for Error whatever the probe says; the spoken name must not drift off it.
+        Assert.Equal(before, viewModel.AccessibleName);
+    }
+
+    public static TheoryData<ConnectionState> AllConnectionStates()
+    {
+        TheoryData<ConnectionState> data = [];
+        foreach (ConnectionState state in Enum.GetValues<ConnectionState>())
+        {
+            data.Add(state);
+        }
+
+        return data;
     }
 
     private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
