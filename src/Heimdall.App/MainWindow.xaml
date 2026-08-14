@@ -12,6 +12,7 @@
         xmlns:theming="clr-namespace:Heimdall.App.Theming"
         xmlns:tunnels="clr-namespace:Heimdall.App.ViewModels.Tunnels"
         xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+        xmlns:controls="clr-namespace:Heimdall.App.Controls"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="{Binding WindowTitle}"
@@ -561,8 +562,9 @@
                                 </Border>
 
                                 <!-- Hierarchical TreeView (fills remaining space) -->
-                                <TreeView x:Name="SessionTreeView"
+                                <controls:SessionTreeView x:Name="SessionTreeView"
                                   ItemsSource="{Binding ServerList.GroupedServers}"
+                                  SelectionHost="{Binding ServerList}"
                                   Style="{DynamicResource ThemedTreeViewStyle}"
                                   Padding="8,4,0,0"
                                   AllowDrop="True"
@@ -943,7 +945,7 @@
                                 </Style>
                             </TreeView.ItemContainerStyle>
 
-                                </TreeView>
+                                </controls:SessionTreeView>
                             </DockPanel>
 
                             <!-- ============ TOOLS TAB CONTENT ============ -->

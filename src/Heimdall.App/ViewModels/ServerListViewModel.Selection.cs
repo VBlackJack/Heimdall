@@ -16,10 +16,11 @@
 
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using Heimdall.App.Controls;
 
 namespace Heimdall.App.ViewModels;
 
-public partial class ServerListViewModel
+public partial class ServerListViewModel : ISessionTreeSelectionHost
 {
     private bool _suppressSelectedServerSync;
     private ServerItemViewModel? _selectionAnchor;
@@ -42,6 +43,39 @@ public partial class ServerListViewModel
         MoveSelectedToProjectCommand.NotifyCanExecuteChanged();
         MoveSelectedToGroupCommand.NotifyCanExecuteChanged();
         BulkEditGatewayCommand.NotifyCanExecuteChanged();
+    }
+
+    // --- ISessionTreeSelectionHost -------------------------------------------------------------
+    // The session tree's automation peers read selection from here rather than from the native
+    // TreeViewItem.IsSelected flag, which the tree clears on purpose. Items that are not servers
+    // (group and folder rows) are never selected, so they answer false and ignore the mutators
+    // instead of throwing - an automation client is allowed to ask about any row it can see.
+
+    bool ISessionTreeSelectionHost.IsItemSelected(object? item)
+        => item is ServerItemViewModel server && SelectedItems.Contains(server);
+
+    void ISessionTreeSelectionHost.SelectOnlyItem(object? item)
+    {
+        if (item is ServerItemViewModel server)
+        {
+            SelectSingle(server);
+        }
+    }
+
+    void ISessionTreeSelectionHost.AddItemToSelection(object? item)
+    {
+        if (item is ServerItemViewModel server && !SelectedItems.Contains(server))
+        {
+            ToggleSelection(server);
+        }
+    }
+
+    void ISessionTreeSelectionHost.RemoveItemFromSelection(object? item)
+    {
+        if (item is ServerItemViewModel server && SelectedItems.Contains(server))
+        {
+            ToggleSelection(server);
+        }
     }
 
     public void SelectSingle(ServerItemViewModel? item)
