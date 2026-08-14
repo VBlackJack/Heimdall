@@ -87,9 +87,6 @@ public sealed class EmbeddedSftpCloseGuard : ICloseGuard
 
         // A save in flight is refused outright rather than confirmed. Tearing the pane down mid-save
         // would leave a half-written file on the server, and no answer the user could give would
-        // make that acceptable - so this one is terminal, not a question.
-        // A save in flight is refused outright rather than confirmed. Tearing the pane down mid-save
-        // would leave a half-written file on the server, and no answer the user could give would
         // make that acceptable - so this one is terminal, and it has to be tested first.
         if (snapshot.IsEditorSaveInProgress)
         {
