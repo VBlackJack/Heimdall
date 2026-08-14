@@ -175,7 +175,7 @@ public static class WorkingAreaMinimumBehavior
         {
             // The tracker is created here but deliberately left EMPTY. This callback fires the
             // moment the XAML parser sets IsEnabled, which is part-way through the attribute list:
-            // in every dialog wired so far, IsEnabled precedes the root MinHeight, so capturing now
+            // in some opted-in windows IsEnabled precedes the root MinHeight, so capturing now
             // would record a height of 0 and the first clamp would then write that 0 back over the
             // value the parser was about to apply. Capturing lazily, on first use, makes the
             // attribute order irrelevant - it must never become a contract.
@@ -216,9 +216,6 @@ public static class WorkingAreaMinimumBehavior
                 return;
             }
 
-            // First use is where the declared minimum is read, because it is the earliest moment at
-            // which the whole attribute list has been applied. Capture is idempotent, so every
-            // later Apply keeps the first reading rather than the previous clamp.
             // First use is where the declared minimum is read, because it is the earliest moment at
             // which the whole attribute list has been applied. Capture is idempotent, so every
             // later Apply keeps the first reading rather than the previous clamp.

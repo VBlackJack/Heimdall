@@ -17,6 +17,7 @@
 using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace Heimdall.App.Tests;
 
@@ -142,32 +143,101 @@ public sealed class WindowMinimumSizeContractTests
     }
 
     /// <summary>
-    /// Freezes the premise that exposed the defect: real windows do declare their minimum height
-    /// AFTER the opt-in. If every window were reordered, the guards above would still hold while
-    /// silently protecting nothing, so this records that the hazard is live.
+    /// Freezes the premise that exposed the defect: some opted-in windows declare their root
+    /// minimum height AFTER the opt-in, so the capture cannot be taken when the opt-in is set.
     /// </summary>
+    /// <remarks>
+    /// Only the <c>Window</c> element's own attributes count. A descendant control's
+    /// <c>MinHeight</c> has nothing to do with <c>window.MinHeight</c>, and a document-wide text
+    /// search lets those descendants answer in the root's place: two opted-in dialogs have no root
+    /// <c>MinHeight</c> at all, so a text scan reported them as exposing the premise when they do
+    /// not. The synthetic control below is what keeps that confusion out.
+    /// </remarks>
     [Fact]
-    public void AtLeastOneOptedInWindow_DeclaresItsMinHeightAfterTheOptIn()
+    public void AtLeastOneOptedInWindow_DeclaresItsRootMinHeightAfterTheOptIn()
     {
-        int optInBeforeMinHeight = 0;
-
-        foreach ((string file, _) in FindAtRiskWindows())
-        {
-            string xaml = ReadXaml(file);
-            int optIn = xaml.IndexOf(
-                "WorkingAreaMinimumBehavior.IsEnabled=\"True\"",
-                StringComparison.Ordinal);
-            int minHeight = xaml.IndexOf("MinHeight=\"", StringComparison.Ordinal);
-
-            if (optIn >= 0 && minHeight > optIn)
-            {
-                optInBeforeMinHeight++;
-            }
-        }
+        string[] exposing =
+        [
+            .. FindAtRiskWindows()
+                .Where(window => RootDeclaresMinHeightAfterOptIn(ReadXaml(window.File)))
+                .Select(window => Path.GetFileName(window.File))
+                .Order(StringComparer.Ordinal)
+        ];
 
         Assert.True(
-            optInBeforeMinHeight > 0,
-            "No window declares its minimum height after the opt-in, so the lazy capture is no longer load-bearing.");
+            exposing.Length > 0,
+            "No window declares its root minimum height after the opt-in, so the lazy capture is no longer load-bearing.");
+    }
+
+    /// <summary>
+    /// The negative control: a descendant's <c>MinHeight</c> must not stand in for the root's.
+    /// </summary>
+    /// <remarks>
+    /// This is the assertion the previous text-based oracle could not make. It scanned the whole
+    /// document, so this shape - opt-in on the root, no root minimum, a child that has one - read
+    /// as "the premise holds" when the root exposes nothing at all.
+    /// </remarks>
+    [Fact]
+    public void RootScan_IgnoresADescendantMinHeight()
+    {
+        const string Xaml = """
+            <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+                    MinWidth="700"
+                    behaviors:WorkingAreaMinimumBehavior.IsEnabled="True">
+              <Grid MinHeight="420"/>
+            </Window>
+            """;
+
+        Assert.False(RootDeclaresMinHeightAfterOptIn(Xaml));
+    }
+
+    [Fact]
+    public void RootScan_SeesARootMinHeightAfterTheOptIn()
+    {
+        const string Xaml = """
+            <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+                    MinWidth="700"
+                    behaviors:WorkingAreaMinimumBehavior.IsEnabled="True"
+                    MinHeight="420">
+              <Grid/>
+            </Window>
+            """;
+
+        Assert.True(RootDeclaresMinHeightAfterOptIn(Xaml));
+    }
+
+    [Fact]
+    public void RootScan_SeesARootMinHeightBeforeTheOptIn()
+    {
+        const string Xaml = """
+            <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+                    MinHeight="420"
+                    behaviors:WorkingAreaMinimumBehavior.IsEnabled="True">
+              <Grid/>
+            </Window>
+            """;
+
+        Assert.False(RootDeclaresMinHeightAfterOptIn(Xaml));
+    }
+
+    /// <summary>
+    /// Whether the root <c>Window</c> declares <c>MinHeight</c> after the opt-in, reading the root
+    /// element's own attributes in document order and nothing else.
+    /// </summary>
+    private static bool RootDeclaresMinHeightAfterOptIn(string xaml)
+    {
+        XElement root = XDocument.Parse(xaml).Root
+            ?? throw new InvalidOperationException("XAML has no root element.");
+
+        List<string> attributes = [.. root.Attributes().Select(attribute => attribute.Name.LocalName)];
+
+        int optIn = attributes.IndexOf("WorkingAreaMinimumBehavior.IsEnabled");
+        int minHeight = attributes.IndexOf("MinHeight");
+
+        return optIn >= 0 && minHeight > optIn;
     }
 
     private static string ReadBehaviourSource()
