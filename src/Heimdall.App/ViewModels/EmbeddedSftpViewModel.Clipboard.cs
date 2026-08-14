@@ -141,6 +141,26 @@ public sealed partial class EmbeddedSftpViewModel
     private void RefuseConcurrentTransfer() => UpdateStatus(
         _localizer?["SftpTransferInProgress"] ?? "A file transfer is already in progress.");
 
+    /// <summary>Progress line shown while a clipboard entry is being transferred.</summary>
+    private string TransferringEntryStatus(string entryName, int position, int total)
+        => _localizer?.Format(
+            "SftpStatusTransferringEntry",
+            entryName,
+            position.ToString(),
+            total.ToString())
+            ?? $"Transferring {entryName} ({position}/{total})...";
+
+    /// <summary>
+    /// Status shown when the pane holding the cut or copied entries is gone.
+    /// </summary>
+    /// <remarks>
+    /// The matching <see cref="SourceSessionUnavailableException"/> keeps an English message: it is
+    /// caught and converted to this status before anything reaches the user, so its own text is
+    /// developer-facing only, like every other exception message in this assembly.
+    /// </remarks>
+    private string SourceSessionUnavailableStatus()
+        => _localizer?["SftpErrorSourceSessionUnavailable"] ?? "Source session no longer available.";
+
     private async Task PasteSameEndpointClipboardAsync(SftpClipboardContent clipboard, CancellationToken ct)
     {
         if (_browser is null)
@@ -287,7 +307,7 @@ public sealed partial class EmbeddedSftpViewModel
         IRemoteBrowser? sourceBrowser = clipboard.SourceBrowser;
         if (!IsSourceBrowserAvailable(sourceBrowser))
         {
-            await RunOnUiAsync(() => SetErrorStatus("Source session no longer available."))
+            await RunOnUiAsync(() => SetErrorStatus(SourceSessionUnavailableStatus()))
                 .ConfigureAwait(false);
             return;
         }
@@ -327,7 +347,7 @@ public sealed partial class EmbeddedSftpViewModel
                 string targetName = BuildNonCollidingName(existingNames, entry.Name);
                 SftpFileInfo plannedRoot = entry with { Name = targetName };
 
-                TransferStatusText = $"Transferring {entry.Name} ({index + 1}/{totalEntries})...";
+                TransferStatusText = TransferringEntryStatus(entry.Name, index + 1, totalEntries);
                 RemoteTransferPlan plan = await TransferCrossEndpointRootAsync(
                     sourceBrowser,
                     plannedRoot,
@@ -417,7 +437,7 @@ public sealed partial class EmbeddedSftpViewModel
         }
         catch (SourceSessionUnavailableException)
         {
-            await RunOnUiAsync(() => SetErrorStatus("Source session no longer available."))
+            await RunOnUiAsync(() => SetErrorStatus(SourceSessionUnavailableStatus()))
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -476,7 +496,7 @@ public sealed partial class EmbeddedSftpViewModel
 
             transferredFiles++;
             string fileName = Path.GetFileName(op.SourceRemotePath);
-            TransferStatusText = $"Transferring {fileName} ({transferredFiles}/{totalFiles})...";
+            TransferStatusText = TransferringEntryStatus(fileName, transferredFiles, totalFiles);
             await TransferCrossEndpointFileAsync(sourceBrowser, op, ct).ConfigureAwait(false);
         }
 
