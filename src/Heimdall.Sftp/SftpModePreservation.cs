@@ -66,4 +66,108 @@ public static class SftpModePreservation
     {
         return permissions & PermissionModeMask;
     }
+
+    /// <summary>
+    /// The mode a temporary upload carries while its content is being written: owner read and
+    /// write, nothing else, every special bit cleared.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately NOT the target's mode. A target of 0644 would leave the staged content
+    /// world-readable for the whole duration of the copy, which is exactly the window this staging
+    /// exists to close - the point is that nobody but the owner can read the bytes until the file
+    /// is published.
+    /// </remarks>
+    internal const uint StagingMode = OwnerReadBit | OwnerWriteBit;
+
+    /// <summary>
+    /// Everything the staged upload needs from the remote file system, as delegates, so the order
+    /// it performs them in can be observed without a server.
+    /// </summary>
+    /// <param name="CreateEmptyTemp">Creates or truncates the temporary file, leaving it empty.</param>
+    /// <param name="ReadTempMode">Reads the temporary file's current permission bits.</param>
+    /// <param name="ApplyTempMode">Sets the temporary file's permission bits.</param>
+    /// <param name="OpenTempForWrite">Opens the temporary file for writing.</param>
+    /// <param name="ReadTargetModeAfterUpload">
+    /// Re-reads the destination without following symlinks and validates its type, returning its
+    /// complete mode, or null when no regular file is there to inherit from. Throwing here refuses
+    /// the commit, which is how the existing type validation keeps its effect.
+    /// </param>
+    /// <param name="ApplyPublicationMode">Applies the mode the file will carry once published.</param>
+    /// <param name="Commit">Publishes the temporary file over the destination.</param>
+    internal sealed record StagedUploadOperations(
+        Action CreateEmptyTemp,
+        Func<uint> ReadTempMode,
+        Action<uint> ApplyTempMode,
+        Func<Stream> OpenTempForWrite,
+        Func<uint?> ReadTargetModeAfterUpload,
+        Action<uint> ApplyPublicationMode,
+        Action Commit);
+
+    /// <summary>
+    /// Uploads through a temporary file that is private for the whole time it holds content.
+    /// </summary>
+    /// <remarks>
+    /// The order is the contract. The temporary is created empty, its server-assigned mode is
+    /// captured, it is tightened to <see cref="StagingMode"/>, and that tightening is READ BACK
+    /// before a single byte is written - a server that silently ignores the chmod must stop the
+    /// upload, not receive the content anyway. The remote stream is closed before the publication
+    /// mode is applied and before the commit, so nothing is published while a write may still be
+    /// buffered.
+    /// <para>
+    /// The published mode is the destination's own when it is being replaced, and the mode the
+    /// server originally assigned when the file is new - never <see cref="StagingMode"/>, which
+    /// would quietly make every newly uploaded file owner-only.
+    /// </para>
+    /// </remarks>
+    internal static void RunStagedUpload(
+        StagedUploadOperations operations,
+        Stream source,
+        Action<long> reportProgress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operations);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(reportProgress);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        operations.CreateEmptyTemp();
+
+        // Captured before the file is tightened: it is the only record of what the server would
+        // have given a brand-new file, and a new upload has to end up with exactly that.
+        uint serverAssignedMode = GetMode(operations.ReadTempMode());
+
+        operations.ApplyTempMode(StagingMode);
+
+        uint stagedMode = GetMode(operations.ReadTempMode());
+        if (stagedMode != StagingMode)
+        {
+            throw new IOException(
+                "Refusing to stage the upload: the temporary file reports mode "
+                + $"0{Convert.ToString(stagedMode, 8)} instead of 0{Convert.ToString(StagingMode, 8)}, "
+                + "so its contents would not be private while copying.");
+        }
+
+        long written = 0;
+        using (Stream destination = operations.OpenTempForWrite())
+        {
+            byte[] buffer = new byte[81920];
+            int read;
+            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                destination.Write(buffer, 0, read);
+                written += read;
+
+                // Cumulative, and never ahead of what has actually reached the stream.
+                reportProgress(written);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            destination.Flush();
+        }
+
+        uint? targetMode = operations.ReadTargetModeAfterUpload();
+        operations.ApplyPublicationMode(targetMode is { } existing ? GetMode(existing) : serverAssignedMode);
+        operations.Commit();
+    }
 }

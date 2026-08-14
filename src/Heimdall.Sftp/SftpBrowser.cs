@@ -417,32 +417,61 @@ public sealed class SftpBrowser : IRemoteBrowser
 
                 await Task.Run(() =>
                 {
-                    ct.ThrowIfCancellationRequested();
-                    client.UploadFile(inputStream, tempRemotePath, bytesTransferred =>
-                    {
-                        if (ct.IsCancellationRequested)
-                        {
-                            return;
-                        }
+                    // The staged upload replaces SftpClient.UploadFile, which created the temporary
+                    // AND filled it in one call: its content therefore sat under the server's
+                    // default mode - typically world-readable - for the whole copy. Creating the
+                    // file empty first lets it be tightened to owner-only before any byte lands.
+                    SftpModePreservation.RunStagedUpload(
+                        new SftpModePreservation.StagedUploadOperations(
+                            CreateEmptyTemp: () => client.Create(tempRemotePath).Dispose(),
+                            ReadTempMode: () => GetPermissionMode(client.GetAttributes(tempRemotePath)),
+                            ApplyTempMode: mode =>
+                            {
+                                SftpFileAttributes attributes = client.GetAttributes(tempRemotePath);
+                                ApplyPermissionMode(attributes, mode);
+                                client.SetAttributes(tempRemotePath, attributes);
+                            },
+                            OpenTempForWrite: () => client.OpenWrite(tempRemotePath),
+                            ReadTargetModeAfterUpload: () =>
+                            {
+                                ISftpFile? targetEntry = TryGetEntryWithoutFollowingTarget(client, remotePath);
+                                RemoteEntryKind? targetKind = targetEntry is null
+                                    ? null
+                                    : GetRemoteEntryKind(targetEntry);
+                                SftpAtomicUpload.EnsureUploadTargetSupported(remotePath, targetKind);
 
-                        TransferProgress?.Invoke(new SftpTransferProgress(
+                                return targetEntry is { IsRegularFile: true }
+                                    ? GetPermissionMode(targetEntry.Attributes)
+                                    : null;
+                            },
+                            // Routed through the existing apply-and-verify helper, so a mode that
+                            // cannot be set still refuses the commit rather than publishing a file
+                            // with the wrong permissions.
+                            ApplyPublicationMode: mode =>
+                            {
+                                SftpFileAttributes attributes = client.GetAttributes(tempRemotePath);
+                                ApplyUploadModeBeforeCommit(
+                                    remotePath,
+                                    mode,
+                                    GetPermissionMode(attributes),
+                                    modeToApply =>
+                                    {
+                                        ApplyPermissionMode(attributes, modeToApply);
+                                        client.SetAttributes(tempRemotePath, attributes);
+                                    });
+                            },
+                            Commit: () => CommitUploadedTemp(
+                                client,
+                                tempRemotePath,
+                                remotePath,
+                                commitMode)),
+                        inputStream,
+                        written => TransferProgress?.Invoke(new SftpTransferProgress(
                             fileName,
-                            (long)bytesTransferred,
+                            written,
                             totalBytes,
-                            IsUpload: true));
-                    });
-                    ct.ThrowIfCancellationRequested();
-                    ISftpFile? targetEntry = TryGetEntryWithoutFollowingTarget(client, remotePath);
-                    RemoteEntryKind? targetKind = targetEntry is null
-                        ? null
-                        : GetRemoteEntryKind(targetEntry);
-                    SftpAtomicUpload.EnsureUploadTargetSupported(remotePath, targetKind);
-                    PreserveUploadModeBeforeCommit(client, tempRemotePath, remotePath, targetEntry);
-                    CommitUploadedTemp(
-                        client,
-                        tempRemotePath,
-                        remotePath,
-                        commitMode);
+                            IsUpload: true)),
+                        ct);
                 }, ct).ConfigureAwait(false);
             }
             catch
@@ -966,33 +995,6 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         return exception is NotSupportedException
             or Renci.SshNet.Common.SftpException { StatusCode: StatusCode.OperationUnsupported };
-    }
-
-    private static void PreserveUploadModeBeforeCommit(
-        SftpClient client,
-        string tempRemotePath,
-        string finalRemotePath,
-        ISftpFile? targetEntry)
-    {
-        if (targetEntry is null || !targetEntry.IsRegularFile)
-        {
-            return;
-        }
-
-        SftpFileAttributes targetAttributes = targetEntry.Attributes;
-        SftpFileAttributes tempAttributes = client.GetAttributes(tempRemotePath);
-        uint targetPermissions = GetPermissionMode(targetAttributes);
-        uint tempPermissions = GetPermissionMode(tempAttributes);
-
-        ApplyUploadModeBeforeCommit(
-            finalRemotePath,
-            targetPermissions,
-            tempPermissions,
-            modeToApply =>
-            {
-                ApplyPermissionMode(tempAttributes, modeToApply);
-                client.SetAttributes(tempRemotePath, tempAttributes);
-            });
     }
 
     internal static void ApplyUploadModeBeforeCommit(
