@@ -108,9 +108,15 @@ public enum CitrixLaunchMode
 /// <summary>
 /// Wraps a Citrix Workspace process handle for session lifecycle management.
 /// </summary>
+/// <param name="PreLaunchWindows">
+/// Visible top-level windows captured immediately BEFORE the launcher process was started. The
+/// view uses it to tell the new session window from a pre-existing one; taking it after the launch
+/// would race single sign-on and a warm cache, which can surface the session window first.
+/// </param>
 public sealed record CitrixSessionResult(
     Process? Process,
     string? StoreFrontUrl = null,
     string? AppName = null,
     CitrixLaunchMode Mode = CitrixLaunchMode.Unknown,
-    bool? SessionLoggingOverride = null) : ISessionResult;
+    bool? SessionLoggingOverride = null,
+    IReadOnlySet<nint>? PreLaunchWindows = null) : ISessionResult;
