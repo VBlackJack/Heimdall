@@ -39,13 +39,28 @@ public sealed class WindowMinimumSizeContractTests
     private const double AtRiskMinimumWidth = 620;
 
     /// <summary>
-    /// Windows wired to the clamp so far. It grows with the window-population lot; a window added
-    /// to the codebase above the threshold shows up as a red test rather than as a silent gap.
+    /// Every window wired to the clamp. A window added to the codebase above the threshold shows
+    /// up as a red test rather than as a silent gap, and removing an opt-in is equally visible.
     /// </summary>
-    private static readonly string[] OptedIn = ["MainWindow.xaml"];
+    private static readonly string[] OptedIn =
+    [
+        "CommandLibraryPickerDialog.xaml",
+        "FileConflictDialog.xaml",
+        "FtpsCertificatePromptDialog.xaml",
+        "GatewayOverviewDialog.xaml",
+        "HostKeyPromptDialog.xaml",
+        "ImportKnownHostsConflictDialog.xaml",
+        "ImportKnownHostsDialog.xaml",
+        "ImportSessionsPreviewDialog.xaml",
+        "MacroEditorDialog.xaml",
+        "MainWindow.xaml",
+        "RdpImportDialog.xaml",
+        "ToolPickerDialog.xaml",
+        "TrustedHostKeyDetailsDialog.xaml"
+    ];
 
     [Fact]
-    public void EveryAtRiskWindow_IsEitherOptedInOrKnownPending()
+    public void EveryAtRiskWindow_OptsIntoTheClamp()
     {
         IReadOnlyList<(string File, double MinWidth)> atRisk = FindAtRiskWindows();
 
