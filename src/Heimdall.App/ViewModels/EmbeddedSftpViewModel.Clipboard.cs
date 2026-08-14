@@ -87,6 +87,12 @@ public sealed partial class EmbeddedSftpViewModel
     /// in the clipboard. Every destination name is resolved to be collision-free, so nothing is ever
     /// overwritten. A cut entry that would resolve to its own path (same directory, same name) is skipped.
     /// </summary>
+    /// <remarks>
+    /// A remote paste moves bytes, so it holds the transfer coordinator for its whole duration: it is
+    /// refused while another transfer runs instead of racing it, and its cancellation token is the one
+    /// the Cancel command signals. The gate sits here rather than in each branch so both the
+    /// same-endpoint and the cross-endpoint path are covered by a single acquire/release pair.
+    /// </remarks>
     public async Task PasteClipboardAsync()
     {
         if (_disposed || _browser is null)
@@ -100,16 +106,42 @@ public sealed partial class EmbeddedSftpViewModel
             return;
         }
 
-        if (IsClipboardForCurrentEndpoint(clipboard))
+        TransferStartState startState = TryBeginTransfer(out CancellationTokenSource? transferCts);
+        if (startState == TransferStartState.Busy)
         {
-            await PasteSameEndpointClipboardAsync(clipboard).ConfigureAwait(false);
+            await RunOnUiAsync(RefuseConcurrentTransfer).ConfigureAwait(false);
             return;
         }
 
-        await PasteCrossEndpointClipboardAsync(clipboard).ConfigureAwait(false);
+        if (startState != TransferStartState.Started || transferCts is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (IsClipboardForCurrentEndpoint(clipboard))
+            {
+                await PasteSameEndpointClipboardAsync(clipboard, transferCts.Token).ConfigureAwait(false);
+                return;
+            }
+
+            await PasteCrossEndpointClipboardAsync(clipboard, transferCts.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteTransfer(transferCts);
+        }
     }
 
-    private async Task PasteSameEndpointClipboardAsync(SftpClipboardContent clipboard)
+    /// <summary>
+    /// Reports that a concurrent transfer blocks the operation. Refusing is deliberate: silently
+    /// cancelling the running transfer would destroy work the user never asked to abandon.
+    /// </summary>
+    private void RefuseConcurrentTransfer() => UpdateStatus(
+        _localizer?["SftpTransferInProgress"] ?? "A file transfer is already in progress.");
+
+    private async Task PasteSameEndpointClipboardAsync(SftpClipboardContent clipboard, CancellationToken ct)
     {
         if (_browser is null)
         {
@@ -149,6 +181,10 @@ public sealed partial class EmbeddedSftpViewModel
         {
             foreach (SftpFileInfo entry in clipboard.Entries)
             {
+                // Entry granularity is all this layer can offer: interrupting the server-side copy of
+                // a single entry belongs to the browser, which does not take a token yet.
+                ct.ThrowIfCancellationRequested();
+
                 if (entry.Kind is not (RemoteEntryKind.File or RemoteEntryKind.Directory))
                 {
                     skippedUnsupportedPaths.Add(entry.FullPath);
@@ -241,7 +277,7 @@ public sealed partial class EmbeddedSftpViewModel
         }
     }
 
-    private async Task PasteCrossEndpointClipboardAsync(SftpClipboardContent clipboard)
+    private async Task PasteCrossEndpointClipboardAsync(SftpClipboardContent clipboard, CancellationToken ct)
     {
         if (_browser is null)
         {
@@ -256,13 +292,7 @@ public sealed partial class EmbeddedSftpViewModel
             return;
         }
 
-        _transferCts?.Cancel();
-        _transferCts?.Dispose();
-        _transferCts = new CancellationTokenSource();
-        CancellationToken ct = _transferCts.Token;
-
         TransferProgressValue = 0;
-        IsTransferInProgress = true;
 
         bool cut = clipboard.Mode == SftpClipboardMode.Cut;
         bool cutSourceNotDeleted = false;
@@ -416,8 +446,6 @@ public sealed partial class EmbeddedSftpViewModel
         finally
         {
             sourceBrowser.TransferProgress -= sourceProgress;
-            IsTransferInProgress = false;
-            TransferProgressValue = 0;
         }
     }
 
@@ -615,6 +643,10 @@ public sealed partial class EmbeddedSftpViewModel
     /// Duplicates each entry into the current directory under a collision-free "(copy)" name. Never
     /// overwrites; the clipboard is not involved.
     /// </summary>
+    /// <remarks>
+    /// Duplicating copies bytes on the server, so it holds the transfer coordinator like any other
+    /// transfer: refused while one is running, never cancelling it.
+    /// </remarks>
     public async Task DuplicateEntriesAsync(IReadOnlyList<SftpFileInfo> entries)
     {
         if (entries.Count == 0 || _disposed || _browser is null)
@@ -622,6 +654,19 @@ public sealed partial class EmbeddedSftpViewModel
             return;
         }
 
+        TransferStartState startState = TryBeginTransfer(out CancellationTokenSource? transferCts);
+        if (startState == TransferStartState.Busy)
+        {
+            await RunOnUiAsync(RefuseConcurrentTransfer).ConfigureAwait(false);
+            return;
+        }
+
+        if (startState != TransferStartState.Started || transferCts is null)
+        {
+            return;
+        }
+
+        CancellationToken ct = transferCts.Token;
         string targetDirectory = CurrentPath;
         var existingNames = new HashSet<string>(
             UnfilteredEntries.Select(entry => entry.Name),
@@ -632,6 +677,8 @@ public sealed partial class EmbeddedSftpViewModel
         {
             foreach (SftpFileInfo entry in entries)
             {
+                ct.ThrowIfCancellationRequested();
+
                 if (entry.Kind is not (RemoteEntryKind.File or RemoteEntryKind.Directory))
                 {
                     skippedUnsupportedPaths.Add(entry.FullPath);
@@ -667,6 +714,10 @@ public sealed partial class EmbeddedSftpViewModel
         catch (Exception ex)
         {
             await RunOnUiAsync(() => SetTransferError(ex));
+        }
+        finally
+        {
+            CompleteTransfer(transferCts);
         }
     }
 
