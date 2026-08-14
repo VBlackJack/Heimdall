@@ -18,6 +18,7 @@ using System.IO;
 using System.Reflection;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.Core.Localization;
 using Heimdall.Sftp;
 
 namespace Heimdall.App.Tests;
@@ -352,11 +353,13 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         FakeRemoteBrowser targetBrowser = new();
         SetBrowser(targetPane, targetBrowser);
         SetEndpointKey(targetPane, "host=b;port=22;user=bob");
+        LocalizationManager localizer = await CreateLocalizerAsync("fr");
+        SetLocalizer(targetPane, localizer);
         clipboard.Set(CreateContent("host=a;port=22;user=alice", sourceBrowser));
 
         await targetPane.PasteClipboardAsync();
 
-        Assert.Equal("Source session no longer available.", targetPane.StatusText);
+        AssertLocalized(localizer, "SftpErrorSourceSessionUnavailable", targetPane.StatusText);
         Assert.Empty(targetBrowser.UploadCalls);
     }
 
@@ -374,11 +377,13 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         FakeRemoteBrowser targetBrowser = new();
         SetBrowser(targetPane, targetBrowser);
         SetEndpointKey(targetPane, "host=b;port=22;user=bob");
+        LocalizationManager localizer = await CreateLocalizerAsync("fr");
+        SetLocalizer(targetPane, localizer);
         clipboard.Set(CreateContent("host=a;port=22;user=alice", sourceBrowser));
 
         await targetPane.PasteClipboardAsync();
 
-        Assert.Equal("Source session no longer available.", targetPane.StatusText);
+        AssertLocalized(localizer, "SftpErrorSourceSessionUnavailable", targetPane.StatusText);
         Assert.Empty(targetBrowser.UploadCalls);
     }
 
@@ -400,8 +405,33 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
 
         await targetPane.PasteClipboardAsync();
 
+        // A destination that went away is a transfer failure, not a missing SOURCE session: the two
+        // diagnoses must not collapse into one another.
         Assert.Equal("SftpStatusTransferFailed", targetPane.StatusText);
-        Assert.NotEqual("Source session no longer available.", targetPane.StatusText);
+        Assert.NotEqual("SftpErrorSourceSessionUnavailable", targetPane.StatusText);
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_CrossEndpointProgress_ReportsALocalizedTransferLine()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel targetPane = CreateReceivingPane(clipboard);
+        FakeRemoteBrowser sourceBrowser = new();
+        FakeRemoteBrowser targetBrowser = new();
+        SetBrowser(targetPane, targetBrowser);
+        SetEndpointKey(targetPane, "host=b;port=22;user=bob");
+        LocalizationManager localizer = await CreateLocalizerAsync("fr");
+        SetLocalizer(targetPane, localizer);
+        clipboard.Set(CreateContent("host=a;port=22;user=alice", sourceBrowser));
+
+        await targetPane.PasteClipboardAsync();
+
+        // The progress line is built from the catalog, so it carries the entry name and its rank.
+        Assert.Equal(
+            localizer.Format("SftpStatusTransferringEntry", "a.txt", "1", "1"),
+            targetPane.TransferStatusText);
+        Assert.Contains("a.txt", targetPane.TransferStatusText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Transferring", targetPane.TransferStatusText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -817,6 +847,38 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         field!.SetValue(viewModel, browser);
+    }
+
+    private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+        return localizer;
+    }
+
+    private static void SetLocalizer(EmbeddedSftpViewModel viewModel, LocalizationManager localizer)
+    {
+        FieldInfo? field = typeof(EmbeddedSftpViewModel).GetField(
+            "_localizer",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(viewModel, localizer);
+    }
+
+    /// <summary>
+    /// Asserts a status came from the catalog under <paramref name="localizer"/>. The guard on the
+    /// English text is what makes it discriminating: without it, a status still hardcoded in the
+    /// view model would satisfy the comparison whenever the two catalogs happen to agree.
+    /// </summary>
+    private static void AssertLocalized(
+        LocalizationManager localizer,
+        string key,
+        string actualStatus)
+    {
+        string expected = localizer[key];
+        Assert.NotEqual(key, expected);
+        Assert.NotEqual("Source session no longer available.", expected);
+        Assert.Equal(expected, actualStatus);
     }
 
     private static void SetEndpointKey(EmbeddedSftpViewModel viewModel, string endpointKey)
