@@ -90,21 +90,118 @@ public sealed class WindowMinimumSizeContractTests
     [Fact]
     public void Behavior_ResolvesFromTheCapturedMinimum_NotFromTheWindow()
     {
-        string source = File.ReadAllText(
-            Path.Combine(AppSourceRoot(), "Behaviors", "WorkingAreaMinimumBehavior.cs"));
-
-        int applyStart = source.IndexOf("private static void Apply(Window window)", StringComparison.Ordinal);
-        Assert.True(applyStart > 0, "Apply not found.");
-
-        string apply = source[applyStart..];
-        int applyEnd = apply.IndexOf("\r\n    }", StringComparison.Ordinal);
-        Assert.True(applyEnd > 0, "End of Apply not found.");
-        apply = apply[..applyEnd];
+        string apply = ExtractApply(ReadBehaviourSource());
 
         Assert.Contains("tracker.Resolve(smallest)", apply, StringComparison.Ordinal);
 
-        // The shape that made every clamp permanent.
-        Assert.DoesNotContain("new Size(window.MinWidth", apply, StringComparison.Ordinal);
+        // The shape that made every clamp permanent. Reading the window is legitimate for the
+        // capture; what is forbidden is RESOLVING from it, because after the first clamp those
+        // properties hold the clamped value rather than the declared one.
+        Assert.DoesNotContain("Resolve(new Size(window.", apply, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "WorkingAreaMinimumPolicy.Resolve(",
+            apply,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The declared minimum must be read on first use, not when the opt-in is set.
+    /// </summary>
+    /// <remarks>
+    /// <c>OnIsEnabledChanged</c> fires part-way through the XAML attribute list. Capturing there
+    /// records whatever the parser has applied so far - and in every dialog wired to the clamp the
+    /// opt-in precedes the root <c>MinHeight</c>, so the capture would read 0 and the first clamp
+    /// would write that 0 back over the height the parser was about to set. Capturing lazily makes
+    /// the attribute order irrelevant, which is the point: it must never become a contract.
+    /// </remarks>
+    [Fact]
+    public void Behavior_CapturesOnFirstUse_NotWhenTheOptInIsSet()
+    {
+        string source = ReadBehaviourSource();
+
+        string activation = ExtractBlock(source, "if ((bool)e.NewValue)");
+        Assert.DoesNotContain("Capture(", activation, StringComparison.Ordinal);
+
+        string apply = ExtractApply(source);
+        Assert.Contains("tracker.Capture(", apply, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Behavior_CapturesBeforeItResolves()
+    {
+        string apply = ExtractApply(ReadBehaviourSource());
+
+        int capture = apply.IndexOf("tracker.Capture(", StringComparison.Ordinal);
+        int resolve = apply.IndexOf("tracker.Resolve(", StringComparison.Ordinal);
+
+        Assert.True(capture > 0, "Apply does not capture.");
+        Assert.True(resolve > 0, "Apply does not resolve.");
+        Assert.True(
+            capture < resolve,
+            "Apply resolves before it captures, so the first clamp would run on an empty capture.");
+    }
+
+    /// <summary>
+    /// Freezes the premise that exposed the defect: real windows do declare their minimum height
+    /// AFTER the opt-in. If every window were reordered, the guards above would still hold while
+    /// silently protecting nothing, so this records that the hazard is live.
+    /// </summary>
+    [Fact]
+    public void AtLeastOneOptedInWindow_DeclaresItsMinHeightAfterTheOptIn()
+    {
+        int optInBeforeMinHeight = 0;
+
+        foreach ((string file, _) in FindAtRiskWindows())
+        {
+            string xaml = ReadXaml(file);
+            int optIn = xaml.IndexOf(
+                "WorkingAreaMinimumBehavior.IsEnabled=\"True\"",
+                StringComparison.Ordinal);
+            int minHeight = xaml.IndexOf("MinHeight=\"", StringComparison.Ordinal);
+
+            if (optIn >= 0 && minHeight > optIn)
+            {
+                optInBeforeMinHeight++;
+            }
+        }
+
+        Assert.True(
+            optInBeforeMinHeight > 0,
+            "No window declares its minimum height after the opt-in, so the lazy capture is no longer load-bearing.");
+    }
+
+    private static string ReadBehaviourSource()
+        => File.ReadAllText(Path.Combine(AppSourceRoot(), "Behaviors", "WorkingAreaMinimumBehavior.cs"));
+
+    private static string ExtractApply(string source) => ExtractBlock(source, "private static void Apply(Window window)");
+
+    /// <summary>The braced block that follows a marker, by brace matching.</summary>
+    private static string ExtractBlock(string source, string marker)
+    {
+        int start = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start > 0, $"Marker not found: {marker}");
+
+        int open = source.IndexOf('{', start);
+        Assert.True(open > 0, $"Block not found after: {marker}");
+
+        int depth = 0;
+        for (int i = open; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+            {
+                depth++;
+            }
+            else if (source[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[open..(i + 1)];
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Unbalanced braces after: {marker}");
     }
 
     [Fact]

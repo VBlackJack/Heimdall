@@ -173,11 +173,13 @@ public static class WorkingAreaMinimumBehavior
 
         if ((bool)e.NewValue)
         {
-            // Captured BEFORE anything is applied: once a clamp has run, the window's own
-            // properties no longer say what the XAML asked for.
-            WorkingAreaMinimumTracker tracker = new();
-            tracker.Capture(new Size(window.MinWidth, window.MinHeight));
-            window.SetValue(TrackerProperty, tracker);
+            // The tracker is created here but deliberately left EMPTY. This callback fires the
+            // moment the XAML parser sets IsEnabled, which is part-way through the attribute list:
+            // in every dialog wired so far, IsEnabled precedes the root MinHeight, so capturing now
+            // would record a height of 0 and the first clamp would then write that 0 back over the
+            // value the parser was about to apply. Capturing lazily, on first use, makes the
+            // attribute order irrelevant - it must never become a contract.
+            window.SetValue(TrackerProperty, new WorkingAreaMinimumTracker());
 
             window.SourceInitialized += OnWindowReady;
             window.DpiChanged += OnWindowDpiChanged;
@@ -209,11 +211,18 @@ public static class WorkingAreaMinimumBehavior
     {
         try
         {
-            if (window.GetValue(TrackerProperty) is not WorkingAreaMinimumTracker tracker
-                || !tracker.HasCapture)
+            if (window.GetValue(TrackerProperty) is not WorkingAreaMinimumTracker tracker)
             {
                 return;
             }
+
+            // First use is where the declared minimum is read, because it is the earliest moment at
+            // which the whole attribute list has been applied. Capture is idempotent, so every
+            // later Apply keeps the first reading rather than the previous clamp.
+            // First use is where the declared minimum is read, because it is the earliest moment at
+            // which the whole attribute list has been applied. Capture is idempotent, so every
+            // later Apply keeps the first reading rather than the previous clamp.
+            tracker.Capture(new Size(window.MinWidth, window.MinHeight));
 
             DpiScale dpi = VisualTreeHelper.GetDpi(window);
             IReadOnlyList<Rect> areas = WindowWorkingAreaProvider.GetWorkingAreas(dpi);
