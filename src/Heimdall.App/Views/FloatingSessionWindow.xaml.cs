@@ -17,6 +17,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
+using Heimdall.App.Services;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Localization;
@@ -31,7 +32,11 @@ public partial class FloatingSessionWindow : Window
 {
     private readonly SessionTabViewModel _session;
     private readonly LocalizationManager _localizer;
+    private readonly IPaneCloseArbiter _closeArbiter;
     private bool _reattached;
+
+    /// <summary>Set once the guards have cleared this window, so the re-issued close goes through.</summary>
+    private bool _closeGranted;
 
     /// <summary>
     /// Gets the hosted session tab view model.
@@ -40,13 +45,16 @@ public partial class FloatingSessionWindow : Window
 
     public FloatingSessionWindow(
         SessionTabViewModel session,
-        LocalizationManager localizer)
+        LocalizationManager localizer,
+        IPaneCloseArbiter closeArbiter)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(localizer);
+        ArgumentNullException.ThrowIfNull(closeArbiter);
 
         _session = session;
         _localizer = localizer;
+        _closeArbiter = closeArbiter;
 
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
@@ -106,6 +114,79 @@ public partial class FloatingSessionWindow : Window
             string.Format(_localizer["LogSessionReattached"], _session.Title));
 
         Close();
+    }
+
+    /// <summary>
+    /// Asks the hosted content's close guard before letting the window go.
+    /// </summary>
+    /// <remarks>
+    /// The decision may need to ask the user, and no answer can be awaited from inside
+    /// <c>OnClosing</c>, so the close is cancelled synchronously here and re-issued later if the
+    /// guards clear it. Nothing is torn down on this path - <see cref="OnClosed"/> keeps doing that
+    /// - which is why an unguarded window is waved straight through.
+    /// </remarks>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+
+        if (_closeGranted || _reattached || e.Cancel || _session.HostControl is not ICloseGuard)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        _ = ResumeCloseAsync();
+    }
+
+    /// <summary>Runs the close protocol, then re-issues the close if it was granted.</summary>
+    private async Task ResumeCloseAsync()
+    {
+        CloseRequest request = CloseRequest.Interactive(DisconnectReason.TabClose);
+        object?[] hosts = [_session.HostControl];
+        try
+        {
+            CloseDecision decision = _closeArbiter.Poll(request, hosts);
+
+            if (decision.Verdict == CloseVerdict.Defer)
+            {
+                if (!await _closeArbiter.ResolveAsync(request, hosts))
+                {
+                    ReportBlocked(decision.ReasonKey);
+                    return;
+                }
+
+                // The retry, exactly once. A second deferral is reported, never looped on.
+                decision = _closeArbiter.Poll(request, hosts);
+            }
+
+            if (decision.Verdict != CloseVerdict.Allow)
+            {
+                ReportBlocked(decision.ReasonKey);
+                return;
+            }
+
+            _closeGranted = true;
+
+            // Never Close() on this stack. The confirmation returns an already-completed task, so
+            // the await above can resume synchronously inside OnClosing, and closing a window from
+            // its own OnClosing throws from Window.VerifyNotClosing - on every floating window, not
+            // just guarded ones.
+            _ = Dispatcher.BeginInvoke(Close);
+        }
+        finally
+        {
+            _closeArbiter.Release(request);
+        }
+    }
+
+    private void ReportBlocked(string? reasonKey)
+    {
+        if (Application.Current?.MainWindow?.DataContext is MainViewModel vm)
+        {
+            vm.DialogService.ShowInfo(
+                _localizer[CloseGuardLocaleKeys.BlockedTitle],
+                _localizer.Format(reasonKey ?? CloseGuardLocaleKeys.BlockedGeneric, _session.Title));
+        }
     }
 
     protected override void OnClosed(EventArgs e)

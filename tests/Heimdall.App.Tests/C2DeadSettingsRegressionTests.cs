@@ -38,7 +38,8 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
     {
         var dialog = DispatchProxy.Create<IDialogService, TrackingDialogProxy>();
         var split = DispatchProxy.Create<ISplitService, TrackingSplitProxy>();
-        var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split);
+        var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split,
+            new PaneCloseArbiter());
         var existing = viewModel.AddSession("existing", "Existing", "RDP");
         existing.HostControl = new object();
 
@@ -64,7 +65,8 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
     {
         var dialog = DispatchProxy.Create<IDialogService, TrackingDialogProxy>();
         var split = DispatchProxy.Create<ISplitService, TrackingSplitProxy>();
-        var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split);
+        var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split,
+            new PaneCloseArbiter());
         var existing = viewModel.AddSession("existing", "Existing", "RDP");
         existing.HostControl = new object();
 
@@ -83,7 +85,8 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
     {
         var dialog = DispatchProxy.Create<IDialogService, TrackingDialogProxy>();
         var split = DispatchProxy.Create<ISplitService, TrackingSplitProxy>();
-        var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split);
+        var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split,
+            new PaneCloseArbiter());
         var existing = viewModel.AddSession("existing", "Existing", "RDP");
         existing.HostControl = new object();
 

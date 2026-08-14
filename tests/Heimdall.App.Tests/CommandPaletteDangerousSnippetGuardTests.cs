@@ -154,9 +154,9 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 embeddedSessionManager,
                 connectionService,
                 toolRegistry,
-                dialogService);
+                dialogService, new PaneCloseArbiter());
             FakeUiDispatcher dispatcher = new();
-            ConnectionViewModel connection = new(localizer, dialogService, splitService);
+            ConnectionViewModel connection = new(localizer, dialogService, splitService, new PaneCloseArbiter());
             ServerListViewModel serverList = new(
                 configManager,
                 localizer,
@@ -213,7 +213,7 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 connection,
                 settings,
                 null!,
-                CommandLibraryTestHelpers.CreateResolverServiceProvider());
+                CommandLibraryTestHelpers.CreateResolverServiceProvider(), new PaneCloseArbiter());
 
             return new PaletteHarness(rootPath, main, dialogService, embeddedSessionManager, order);
         }

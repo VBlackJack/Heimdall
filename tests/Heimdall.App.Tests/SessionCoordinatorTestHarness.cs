@@ -141,9 +141,9 @@ public sealed partial class SessionCoordinatorPreMountTests
                 embeddedSessionManager,
                 connectionService,
                 toolRegistry,
-                dialogService);
+                dialogService, new PaneCloseArbiter());
             FakeUiDispatcher dispatcher = new(checkAccess);
-            ConnectionViewModel connection = new ConnectionViewModel(localizer, dialogService, splitService);
+            ConnectionViewModel connection = new ConnectionViewModel(localizer, dialogService, splitService, new PaneCloseArbiter());
             ServerListViewModel serverList = new ServerListViewModel(
                 configManager,
                 localizer,
@@ -191,7 +191,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 connection,
                 settings,
                 null!,
-                new ServiceCollection().BuildServiceProvider());
+                new ServiceCollection().BuildServiceProvider(), new PaneCloseArbiter());
 
             return new TestHarness(
                 rootPath,

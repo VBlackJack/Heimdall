@@ -189,7 +189,8 @@ public partial class SessionPaneControl : UserControl
             return;
         }
 
-        vm.ClosePane(session, _model.PaneId);
+        // A user gesture, so Interactive: the pane's guard may ask before anything is torn down.
+        _ = vm.ClosePaneAsync(session, _model.PaneId);
     }
 
     private void ApplyLocalization()

@@ -49,7 +49,7 @@ public sealed class FloatingSessionWindowLifecycleTests
                 TunnelRoute = InitialTunnelRoute,
                 HostControl = new Border()
             };
-            FloatingSessionWindow window = new(session, WpfTestHost.Localizer);
+            FloatingSessionWindow window = new(session, WpfTestHost.Localizer, new PaneCloseArbiter());
             TextBlock sessionTitle = Assert.IsType<TextBlock>(window.FindName("SessionTitle"));
             TextBlock statusText = Assert.IsType<TextBlock>(window.FindName("StatusText"));
             TextBlock tunnelRouteText = Assert.IsType<TextBlock>(window.FindName("TunnelRouteText"));
@@ -92,7 +92,8 @@ public sealed class FloatingSessionWindowLifecycleTests
             ConnectionViewModel connection = new(
                 WpfTestHost.Localizer,
                 dialogService,
-                splitService);
+                splitService,
+                new PaneCloseArbiter());
             MainViewModel main = CreateMainViewModel(connection);
             Window mainWindow = new()
             {
@@ -107,7 +108,7 @@ public sealed class FloatingSessionWindowLifecycleTests
                 Status = "Connected",
                 HostControl = hostControl
             };
-            FloatingSessionWindow window = new(session, WpfTestHost.Localizer);
+            FloatingSessionWindow window = new(session, WpfTestHost.Localizer, new PaneCloseArbiter());
 
             try
             {
@@ -141,7 +142,8 @@ public sealed class FloatingSessionWindowLifecycleTests
             ConnectionViewModel connection = new(
                 WpfTestHost.Localizer,
                 dialogService,
-                splitService);
+                splitService,
+                new PaneCloseArbiter());
             MainViewModel main = CreateMainViewModel(connection);
             Window mainWindow = new()
             {
@@ -154,7 +156,7 @@ public sealed class FloatingSessionWindowLifecycleTests
                 ConnectionType = "SSH",
                 HostControl = new Border()
             };
-            FloatingSessionWindow window = new(session, WpfTestHost.Localizer);
+            FloatingSessionWindow window = new(session, WpfTestHost.Localizer, new PaneCloseArbiter());
             connection.ActiveSessions.Add(session);
 
             try

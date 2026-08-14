@@ -43,6 +43,7 @@ public sealed class SplitService : ISplitService
     private readonly IConnectionService _connectionService;
     private readonly ToolRegistry _toolRegistry;
     private readonly IDialogService _dialogService;
+    private readonly IPaneCloseArbiter _closeArbiter;
 
     /// <summary>
     /// Per-session cancellation tokens. Cancelled when a session tab is closed
@@ -70,7 +71,8 @@ public sealed class SplitService : ISplitService
         IEmbeddedSessionManager sessionManager,
         IConnectionService connectionService,
         ToolRegistry toolRegistry,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IPaneCloseArbiter closeArbiter)
     {
         _configManager = configManager;
         _localizer = localizer;
@@ -80,6 +82,7 @@ public sealed class SplitService : ISplitService
         _connectionService = connectionService;
         _toolRegistry = toolRegistry;
         _dialogService = dialogService;
+        _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
 
         LayoutMemory = new SplitLayoutMemory(configManager.ConfigPath);
     }
@@ -514,17 +517,33 @@ public sealed class SplitService : ISplitService
     /// Closes a specific pane in the split tree. Releases tunnel, tears down state tracking,
     /// disconnects/disposes the host, detaches it, and promotes the sibling.
     /// </summary>
-    public void ClosePane(
+    public PaneCloseResult ClosePane(
         SessionTabViewModel session,
         string paneId,
-        DisconnectReason reason = DisconnectReason.UserAction)
+        CloseRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var pane = SplitTreeHelper.FindPane(session.RootContent, paneId);
         if (pane is null)
         {
             Core.Logging.FileLogger.Info(
                 $"ClosePane: pane '{paneId}' not found — already removed or double-close.");
-            return;
+            return PaneCloseResult.Closed;
+        }
+
+        // The guard runs before anything is torn down, and before the tool check: a pane may be
+        // guarded whether or not it is a tool, and nothing may be dismantled for a close that is
+        // about to be withheld.
+        CloseDecision decision = _closeArbiter.Poll(request, [pane.HostControl]);
+        if (decision.Verdict != CloseVerdict.Allow)
+        {
+            Core.Logging.FileLogger.Info(
+                $"ClosePane withheld: pane '{pane.Title}' reports {decision.Verdict}.");
+            string reasonKey = decision.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric;
+            return decision.Verdict == CloseVerdict.Defer
+                ? PaneCloseResult.Deferred(reasonKey)
+                : PaneCloseResult.Blocked(reasonKey);
         }
 
         var isToolPane = pane.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase);
@@ -535,7 +554,7 @@ public sealed class SplitService : ISplitService
             {
                 Core.Logging.FileLogger.Info(
                     $"ClosePane blocked: tool '{pane.Title}' reports CanClose()=false.");
-                return;
+                return PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedTool);
             }
         }
         else if (!string.IsNullOrEmpty(pane.ServerId))
@@ -550,11 +569,12 @@ public sealed class SplitService : ISplitService
             _connectionSm.Teardown(pane.ServerId);
         }
 
-        DisconnectPaneHost(pane, reason);
+        DisconnectPaneHost(pane, request.Reason);
         pane.HostControl = null;
 
         var newRoot = SplitTreeHelper.RemovePane(session.RootContent, paneId);
         session.RootContent = newRoot ?? new SessionPaneModel();
+        return PaneCloseResult.Closed;
     }
 
     // ── Reconnect pane (async) ───────────────────────────────────────
@@ -885,11 +905,27 @@ public sealed class SplitService : ISplitService
     /// records disconnect history, and disposes host controls. Returns false if a busy
     /// tool pane blocked the close.
     /// </summary>
-    public bool CloseAllPanes(
+    public PaneCloseResult CloseAllPanes(
         SessionTabViewModel session,
-        DisconnectReason reason = DisconnectReason.UserAction)
+        CloseRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var leaves = SplitTreeHelper.EnumerateLeaves(session.RootContent).ToList();
+
+        // Every pane is asked before anything is torn down, and both checks sit ahead of
+        // CancelSession: a session must never be left half dismantled by a refusal that arrived
+        // after the first pane was already gone.
+        CloseDecision decision = _closeArbiter.Poll(request, [.. leaves.Select(pane => pane.HostControl)]);
+        if (decision.Verdict != CloseVerdict.Allow)
+        {
+            Core.Logging.FileLogger.Info(
+                $"CloseAllPanes withheld for '{session.Title}': {decision.Verdict}.");
+            string reasonKey = decision.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric;
+            return decision.Verdict == CloseVerdict.Defer
+                ? PaneCloseResult.Deferred(reasonKey)
+                : PaneCloseResult.Blocked(reasonKey);
+        }
 
         // Check CanClose for all tool panes before proceeding (any busy tool blocks the close)
         foreach (var pane in leaves)
@@ -898,7 +934,7 @@ public sealed class SplitService : ISplitService
                 && pane.HostControl is IToolView toolView
                 && !toolView.CanClose())
             {
-                return false;
+                return PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedTool);
             }
         }
 
@@ -920,11 +956,11 @@ public sealed class SplitService : ISplitService
                 _connectionSm.Teardown(pane.ServerId);
             }
 
-            DisconnectPaneHost(pane, reason);
+            DisconnectPaneHost(pane, request.Reason);
             pane.HostControl = null;
         }
 
-        return true;
+        return PaneCloseResult.Closed;
     }
 
     // ── Private helpers ──────────────────────────────────────────────

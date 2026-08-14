@@ -66,12 +66,24 @@ public interface ISplitService
         string? targetPaneId = null);
 
     /// <summary>
-    /// Closes a single pane inside the split tree.
+    /// Closes a single pane inside the split tree, unless a close guard withholds it.
     /// </summary>
-    void ClosePane(
+    /// <remarks>
+    /// Synchronous, and deliberately stays so. A guard whose answer needs a prompt reports
+    /// <see cref="PaneCloseOutcome.Deferred"/>; the caller then drives
+    /// <see cref="IPaneCloseArbiter.ResolveAsync"/> from its own asynchronous context and calls
+    /// back here exactly once. Nothing awaitable ever crosses this boundary, so there is nothing a
+    /// caller could block on and no route to the classic dispatcher deadlock.
+    /// <para>
+    /// The <paramref name="request"/> is required rather than defaulted: a bare
+    /// <c>void</c>-to-<see cref="PaneCloseResult"/> widening would compile unchanged at every call
+    /// site and ship a new class of silently ignored veto.
+    /// </para>
+    /// </remarks>
+    PaneCloseResult ClosePane(
         SessionTabViewModel session,
         string paneId,
-        DisconnectReason reason = DisconnectReason.UserAction);
+        CloseRequest request);
 
     /// <summary>
     /// Reconnects the session represented by a specific pane.
@@ -94,9 +106,14 @@ public interface ISplitService
     void CleanupOrphanedPane(string serverId);
 
     /// <summary>
-    /// Closes all panes for a session. Returns false when a tool pane blocks closure.
+    /// Closes every pane of a session, unless a close guard withholds one of them.
     /// </summary>
-    bool CloseAllPanes(
+    /// <remarks>
+    /// Same synchronous contract as <see cref="ClosePane"/>: a deferred outcome means the caller
+    /// must resolve the guards asynchronously and call back once. Nothing is torn down unless the
+    /// whole session may close, so a refusal never leaves a session half dismantled.
+    /// </remarks>
+    PaneCloseResult CloseAllPanes(
         SessionTabViewModel session,
-        DisconnectReason reason = DisconnectReason.UserAction);
+        CloseRequest request);
 }

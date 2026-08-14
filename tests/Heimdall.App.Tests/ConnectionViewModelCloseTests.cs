@@ -602,12 +602,14 @@ public sealed class ConnectionViewModelCloseTests
     private static ConnectionViewModel CreateViewModel(
         TrackingDialogService dialogService,
         TrackingSplitService splitService,
-        LocalizationManager? localizer = null)
+        LocalizationManager? localizer = null,
+        IPaneCloseArbiter? closeArbiter = null)
     {
         return new ConnectionViewModel(
             localizer ?? new LocalizationManager(),
             dialogService,
-            splitService);
+            splitService,
+            closeArbiter ?? new PaneCloseArbiter());
     }
 
     private static void AddActiveSession(ConnectionViewModel viewModel, SessionTabViewModel session)
@@ -690,10 +692,10 @@ public sealed class ConnectionViewModelCloseTests
             throw new NotSupportedException();
         }
 
-        public void ClosePane(
+        public PaneCloseResult ClosePane(
             SessionTabViewModel session,
             string paneId,
-            DisconnectReason reason = DisconnectReason.UserAction)
+            CloseRequest request)
         {
             throw new NotSupportedException();
         }
@@ -718,13 +720,28 @@ public sealed class ConnectionViewModelCloseTests
             throw new NotSupportedException();
         }
 
-        public bool CloseAllPanes(
+        /// <summary>Records the request too, so a test can tell an interactive close from a silent one.</summary>
+        public CloseRequest? LastRequest { get; private set; }
+
+        /// <summary>When set, the double reports this instead of the plain closed/blocked pair.</summary>
+        public PaneCloseResult? CloseAllPanesOverride { get; set; }
+
+        public PaneCloseResult CloseAllPanes(
             SessionTabViewModel session,
-            DisconnectReason reason = DisconnectReason.UserAction)
+            CloseRequest request)
         {
             CloseAllPanesCallCount++;
             LastClosedSession = session;
-            return CloseAllPanesResult;
+            LastRequest = request;
+
+            if (CloseAllPanesOverride is { } forced)
+            {
+                return forced;
+            }
+
+            return CloseAllPanesResult
+                ? PaneCloseResult.Closed
+                : PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedTool);
         }
     }
 

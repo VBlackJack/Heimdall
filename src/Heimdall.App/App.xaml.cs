@@ -610,6 +610,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IEmbeddedSessionManager, EmbeddedSessionManager>();
         services.AddSingleton<EmbeddedSessionManager>(sp =>
             (EmbeddedSessionManager)sp.GetRequiredService<IEmbeddedSessionManager>());
+        // Registered before the split service that consumes it. One instance for the whole app:
+        // clearance obtained in a gesture must be visible to every close path that gesture reaches.
+        services.AddSingleton<IPaneCloseArbiter, PaneCloseArbiter>();
         services.AddSingleton<ISplitService, SplitService>();
         services.AddSingleton<SplitService>(sp =>
             (SplitService)sp.GetRequiredService<ISplitService>());
