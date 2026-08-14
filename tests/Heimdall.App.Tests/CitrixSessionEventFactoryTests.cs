@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using FluentAssertions;
 using Heimdall.App.Services;
 
@@ -118,5 +119,94 @@ public sealed class CitrixSessionEventFactoryTests
         record.Host.Should().NotContain("access_token");
         record.Host.Should().NotContain("secret");
         record.Host.Should().NotContain("fragment");
+    }
+
+    /// <summary>
+    /// Source-level guard, not a behavioural one: <c>EmbedWindow</c> needs an STA thread and a live
+    /// Citrix window, so the ordering cannot be exercised from a unit test. It is asserted on the
+    /// text of the view instead.
+    /// </summary>
+    /// <remarks>
+    /// The contract is that Connected is emitted only once the embedding is verified. Emitting it
+    /// before the verdict is not merely early: <c>EmitConnect</c> is idempotent, so a later
+    /// fallback can no longer emit it and the session log permanently records an embed that failed.
+    /// </remarks>
+    [Fact]
+    public void EmbedWindow_EmitsConnectedOnlyAfterTheEmbeddingVerdict()
+    {
+        List<string> body = ReadEmbedWindowBody();
+
+        int verdictLine = body.FindIndex(line => line.Contains("CitrixEmbedVerification.Verify(", StringComparison.Ordinal));
+        int failureReturnLine = body.FindIndex(line => line.Contains("ShowExternalFallback();", StringComparison.Ordinal));
+        List<int> emitLines = body
+            .Select((line, index) => (line, index))
+            .Where(entry => entry.line.Contains("EmitConnect();", StringComparison.Ordinal))
+            .Select(entry => entry.index)
+            .ToList();
+
+        verdictLine.Should().BeGreaterThan(-1, "the embedding verdict must be computed inside EmbedWindow");
+        failureReturnLine.Should().BeGreaterThan(verdictLine, "the failure branch must follow the verdict");
+        emitLines.Should().ContainSingle("Connected must be emitted from exactly one place in EmbedWindow");
+        emitLines[0].Should().BeGreaterThan(
+            failureReturnLine,
+            "Connected must be emitted only on the success path, after the failure branch has returned");
+    }
+
+    /// <summary>
+    /// Lines of the <c>EmbedWindow</c> method body, matched line by line: the repository stores
+    /// CRLF, so an anchored multiline regex over the raw text would silently never match and the
+    /// guard would pass without measuring anything.
+    /// </summary>
+    private static List<string> ReadEmbedWindowBody()
+    {
+        string viewPath = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Heimdall.App",
+            "Views",
+            "EmbeddedCitrixView.xaml.cs");
+
+        string[] lines = File.ReadAllLines(viewPath);
+        int start = Array.FindIndex(lines, line => line.Contains("private void EmbedWindow(", StringComparison.Ordinal));
+        start.Should().BeGreaterThan(-1, "EmbedWindow must exist in the Citrix view");
+
+        List<string> body = [];
+        int depth = 0;
+        bool opened = false;
+
+        for (int index = start; index < lines.Length; index++)
+        {
+            body.Add(lines[index]);
+            depth += lines[index].Count(character => character == '{');
+            depth -= lines[index].Count(character => character == '}');
+
+            if (!opened && depth > 0)
+            {
+                opened = true;
+            }
+            else if (opened && depth == 0)
+            {
+                break;
+            }
+        }
+
+        return body;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        string? directory = AppContext.BaseDirectory;
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory, "Heimdall.slnx")))
+            {
+                return directory;
+            }
+
+            directory = Path.GetDirectoryName(directory);
+        }
+
+        throw new DirectoryNotFoundException(
+            $"Cannot find the repository root containing Heimdall.slnx from {AppContext.BaseDirectory}.");
     }
 }
