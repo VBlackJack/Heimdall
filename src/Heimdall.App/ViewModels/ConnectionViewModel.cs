@@ -532,6 +532,10 @@ public partial class ConnectionViewModel : ObservableObject
     /// Silent, and this is the one place where that is unambiguously right: the application is
     /// exiting, no dialog can be created any more, and a guard that withheld a pane here would
     /// leave its host undisposed rather than protect anything.
+    /// <para>
+    /// Reserved for application exit. The Close All command is a user gesture and drives the
+    /// interactive path instead - a guard exists precisely to be consulted there.
+    /// </para>
     /// </remarks>
     public void CloseAllSessionsSilently()
     {
@@ -560,7 +564,16 @@ public partial class ConnectionViewModel : ObservableObject
             }
         }
 
-        CloseAllSessionsSilently();
+        // A user gesture, so every session goes through the interactive driver and its guards. The
+        // group confirmation above settles "do you want to close these"; it says nothing about work
+        // in flight, which is what a guard is for. Routing this through the silent path would have
+        // torn down a running transfer without ever asking.
+        foreach (SessionTabViewModel session in ActiveSessions.ToList())
+        {
+            // A session that refuses does not stop the others, matching what this command did
+            // before guards existed: it closed everything it could.
+            await CloseSessionAsync(session, DisconnectReason.UserAction, confirm: false);
+        }
     }
 
     [RelayCommand]

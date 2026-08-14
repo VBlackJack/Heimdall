@@ -599,6 +599,114 @@ public sealed class ConnectionViewModelCloseTests
         viewModel.HasActiveSessions = sessions.Length > 0;
     }
 
+    // --- Which intent each producer emits -------------------------------------------------------
+    // Read from the request the split service actually received. A count of CloseIntent.Silent
+    // occurrences is invariant under a PERMUTATION of intents, which is exactly how a user gesture
+    // ended up on the silent path: only the observed request discriminates that.
+
+    [Fact]
+    public async Task CloseAllSessionsCommand_Accepted_ClosesEverySessionInteractively()
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        AddTabs(sut, CreateSplitSession("Connected", "Disconnected"), CreateSplitSession("Connected", "Disconnected"));
+
+        await sut.CloseAllSessionsCommand.ExecuteAsync(null);
+
+        // The group confirmation settles "close these"; it says nothing about work in flight, which
+        // is what a guard is for - so every session still goes through the interactive path.
+        Assert.Equal(2, splitService.Requests.Count);
+        Assert.All(splitService.Requests, request => Assert.Equal(CloseIntent.Interactive, request.Intent));
+        Assert.Empty(sut.ActiveSessions);
+    }
+
+    [Fact]
+    public async Task CloseAllSessionsCommand_GuardWithholdsOneSession_KeepsItAndReportsTheRefusal()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService, localizer);
+        SessionTabViewModel refused = CreateSplitSession("Connected", "Disconnected");
+        SessionTabViewModel closing = CreateSplitSession("Connected", "Disconnected");
+        refused.Title = "keep-me";
+        closing.Title = "let-me-go";
+
+        // Read from the session rather than assumed: Title delegates to the primary pane, so a
+        // literal set in an object initializer before RootContent would be silently discarded.
+        splitService.BlockSessionTitled = refused.Title;
+        AddTabs(sut, refused, closing);
+
+        await sut.CloseAllSessionsCommand.ExecuteAsync(null);
+
+        // A refusal stops that session and nothing else: the command still closes what it can.
+        Assert.Contains(refused, sut.ActiveSessions);
+        Assert.DoesNotContain(closing, sut.ActiveSessions);
+        Assert.Equal(localizer[CloseGuardLocaleKeys.BlockedTitle], dialogService.LastInfoTitle);
+        Assert.Equal(
+            localizer.Format(CloseGuardLocaleKeys.BlockedGeneric, refused.Title),
+            dialogService.LastInfoMessage);
+    }
+
+    [Fact]
+    public async Task CloseSessionAsync_TabClose_IsInteractive()
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        SessionTabViewModel session = CreateSplitSession("Disconnected", "Disconnected");
+        AddActiveSession(sut, session);
+
+        await sut.CloseSessionAsync(session, DisconnectReason.TabClose);
+
+        Assert.Equal(CloseIntent.Interactive, Assert.Single(splitService.Requests).Intent);
+    }
+
+    [Fact]
+    public async Task CloseSessionsAsync_ContextMenuGroup_IsInteractive()
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        SessionTabViewModel first = CreateSplitSession("Disconnected", "Disconnected");
+        SessionTabViewModel second = CreateSplitSession("Disconnected", "Disconnected");
+        AddTabs(sut, first, second);
+
+        await sut.CloseSessionsAsync([first, second], DisconnectReason.TabClose);
+
+        Assert.Equal(2, splitService.Requests.Count);
+        Assert.All(splitService.Requests, request => Assert.Equal(CloseIntent.Interactive, request.Intent));
+    }
+
+    [Fact]
+    public void CloseFailedMaterialization_IsSilent()
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        SessionTabViewModel session = CreateSplitSession("Error", "Disconnected");
+        AddActiveSession(sut, session);
+
+        sut.CloseFailedMaterialization(session);
+
+        Assert.Equal(CloseIntent.Silent, Assert.Single(splitService.Requests).Intent);
+    }
+
+    [Fact]
+    public void CloseAllSessionsSilently_IsSilent()
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        AddActiveSession(sut, CreateSplitSession("Connected", "Disconnected"));
+
+        sut.CloseAllSessionsSilently();
+
+        Assert.Equal(CloseIntent.Silent, Assert.Single(splitService.Requests).Intent);
+    }
+
     private static ConnectionViewModel CreateViewModel(
         TrackingDialogService dialogService,
         TrackingSplitService splitService,
@@ -723,6 +831,12 @@ public sealed class ConnectionViewModelCloseTests
         /// <summary>Records the request too, so a test can tell an interactive close from a silent one.</summary>
         public CloseRequest? LastRequest { get; private set; }
 
+        /// <summary>Every request received, in order - a per-session command emits several.</summary>
+        public List<CloseRequest> Requests { get; } = [];
+
+        /// <summary>When set, the session with this title is withheld and the others are not.</summary>
+        public string? BlockSessionTitled { get; set; }
+
         /// <summary>When set, the double reports this instead of the plain closed/blocked pair.</summary>
         public PaneCloseResult? CloseAllPanesOverride { get; set; }
 
@@ -733,6 +847,12 @@ public sealed class ConnectionViewModelCloseTests
             CloseAllPanesCallCount++;
             LastClosedSession = session;
             LastRequest = request;
+            Requests.Add(request);
+
+            if (string.Equals(session.Title, BlockSessionTitled, StringComparison.Ordinal))
+            {
+                return PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedGeneric);
+            }
 
             if (CloseAllPanesOverride is { } forced)
             {
@@ -874,9 +994,15 @@ public sealed class ConnectionViewModelCloseTests
             throw new NotSupportedException();
         }
 
+        /// <summary>Records the localized refusal a withheld close surfaces.</summary>
+        public string? LastInfoTitle { get; private set; }
+
+        public string? LastInfoMessage { get; private set; }
+
         public void ShowInfo(string title, string message)
         {
-            throw new NotSupportedException();
+            LastInfoTitle = title;
+            LastInfoMessage = message;
         }
 
         public void ShowWarning(string title, string message)
