@@ -270,7 +270,12 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         // one. Tracking window handles (not just PIDs) also captures apps that open inside
         // an already-running ICA session (Citrix session sharing), where no new process
         // appears and a PID-only scan would never see the window.
-        HashSet<IntPtr> preLaunchWindows = SnapshotVisibleWindows();
+        // Prefer the baseline the handler captured BEFORE starting the launcher. Falling back to a
+        // snapshot taken here reintroduces the race this lot closes, so it only covers a session
+        // result that carries none - a path no production launcher takes.
+        HashSet<IntPtr> preLaunchWindows = _session?.PreLaunchWindows is { } captured
+            ? [.. captured]
+            : SnapshotVisibleWindows();
         Core.Logging.FileLogger.Info($"Citrix: {preLaunchWindows.Count} visible window(s) before launch");
 
         bool extendedMessageShown = false;

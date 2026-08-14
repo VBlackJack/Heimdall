@@ -428,12 +428,66 @@ public sealed class CitrixHandlerTests
         });
     }
 
+    // RDP-020: the whole finding is an ORDERING one - the baseline used to be taken by the view,
+    // after the launcher had started, so single sign-on or a warm cache could surface the session
+    // window first and have it classified as pre-existing for the entire detection window.
+    [Fact]
+    public async Task ConnectAsync_CapturesTheVisibleWindowBaselineBeforeStartingTheLauncher()
+    {
+        List<string> sequence = [];
+        IReadOnlySet<nint> baseline = new HashSet<nint> { 0x111, 0x222 };
+
+        CitrixHandler handler = CreateHandler(
+            startInfo =>
+            {
+                _ = startInfo;
+                sequence.Add("start");
+                return null;
+            },
+            static stored => stored,
+            capturePreLaunchWindows: () =>
+            {
+                sequence.Add("capture");
+                return baseline;
+            });
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCacheServer("-qlaunch app=Calculator"),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(new[] { "capture", "start" }, sequence);
+
+        CitrixSessionResult session = Assert.IsType<CitrixSessionResult>(result.Session);
+        Assert.Equal(baseline, session.PreLaunchWindows);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_CarriesTheBaselineEvenWhenTheLauncherReturnsNoProcess()
+    {
+        IReadOnlySet<nint> baseline = new HashSet<nint> { 0x333 };
+        CitrixHandler handler = CreateHandler(
+            static _ => null,
+            static stored => stored,
+            capturePreLaunchWindows: () => baseline);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCacheServer("-qlaunch app=Calculator"),
+            new AppSettings(),
+            CancellationToken.None);
+
+        CitrixSessionResult session = Assert.IsType<CitrixSessionResult>(result.Session);
+        Assert.Equal(baseline, session.PreLaunchWindows);
+    }
+
     private static CitrixHandler CreateHandler(
         Func<ProcessStartInfo, Process?> startProcess,
         Func<string, string?> unprotectSecret,
         ConnectionStateMachine? stateMachine = null,
         Action<string>? logInfo = null,
-        Action<string>? logWarning = null) =>
+        Action<string>? logWarning = null,
+        Func<IReadOnlySet<nint>>? capturePreLaunchWindows = null) =>
         new(
             stateMachine ?? new ConnectionStateMachine(),
             new LocalizationManager(),
@@ -442,7 +496,8 @@ public sealed class CitrixHandlerTests
             static () => "SelfService.exe",
             logInfo ?? (static _ => { }),
             logWarning ?? (static _ => { }),
-            static () => "storebrowse.exe");
+            static () => "storebrowse.exe",
+            capturePreLaunchWindows);
 
     private static ServerProfileDto CreateCacheServer(string launchCommandLine) =>
         new()

@@ -39,6 +39,12 @@ internal sealed class CitrixHandler : IProtocolHandler
     private readonly Action<string> _logInfo;
     private readonly Action<string> _logWarning;
 
+    /// <summary>
+    /// Baseline of visible windows, taken before the launcher starts. Injectable so a test can
+    /// prove the capture happens before the process start rather than after it.
+    /// </summary>
+    private readonly Func<IReadOnlySet<nint>> _capturePreLaunchWindows;
+
     public CitrixHandler(
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer)
@@ -61,8 +67,10 @@ internal sealed class CitrixHandler : IProtocolHandler
         Func<string?> resolveSelfServicePath,
         Action<string> logInfo,
         Action<string> logWarning,
-        Func<string?>? resolveCitrixLauncher = null)
+        Func<string?>? resolveCitrixLauncher = null,
+        Func<IReadOnlySet<nint>>? capturePreLaunchWindows = null)
     {
+        _capturePreLaunchWindows = capturePreLaunchWindows ?? VisibleWindowSnapshot.Capture;
         ArgumentNullException.ThrowIfNull(connectionSm);
         ArgumentNullException.ThrowIfNull(localizer);
         ArgumentNullException.ThrowIfNull(startProcess);
@@ -129,6 +137,13 @@ internal sealed class CitrixHandler : IProtocolHandler
         var mode = CitrixLaunchMode.Unknown;
         string? resultStoreFrontUrl = null;
         string? resultAppName = null;
+
+        // Captured before any launch path runs, and carried to the view in the session result.
+        // Taking it after the process has started races single sign-on and a warm cache, which can
+        // surface the session window first: it would then be classified as pre-existing for the
+        // whole detection window and the embedded capture would fail on an embeddable session.
+        IReadOnlySet<nint> preLaunchWindows = _capturePreLaunchWindows();
+
         try
         {
             if (!string.IsNullOrWhiteSpace(server.CitrixLaunchCommandLine))
@@ -250,7 +265,8 @@ internal sealed class CitrixHandler : IProtocolHandler
                     resultStoreFrontUrl,
                     resultAppName,
                     mode,
-                    server.SessionLoggingOverride)));
+                    server.SessionLoggingOverride,
+                    PreLaunchWindows: preLaunchWindows)));
         }
         catch (VaultLockedException)
         {
