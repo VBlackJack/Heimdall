@@ -156,6 +156,70 @@ public sealed class PaneCloseArbiterTests
     }
 
     [Fact]
+    public async Task ResolveAsync_NewWorkStartedDURINGThePrompt_RefusesOnTheRetry()
+    {
+        PaneCloseArbiter arbiter = new();
+        TaskCompletionSource<bool> prompt = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeCloseGuard guard = new()
+        {
+            IsBusy = true,
+            Epoch = 1,
+            PollVerdict = CloseVerdict.Defer,
+            ResolveGate = prompt
+        };
+        CloseRequest request = InteractiveRequest();
+
+        Assert.Equal(CloseVerdict.Defer, arbiter.Poll(request, [guard]).Verdict);
+        Task<bool> resolving = arbiter.ResolveAsync(request, [guard]);
+
+        // The state moves WHILE the dialog is up - the realistic shape, and the one the earlier
+        // test missed by moving the epoch only after ResolveAsync had already returned. The user
+        // is consenting to abandoning epoch 1; by the time they answer, epoch 2 is what is running.
+        guard.Epoch = 2;
+
+        prompt.SetResult(true);
+        Assert.True(await resolving);
+
+        CloseDecision retry = arbiter.Poll(request, [guard]);
+
+        // The grant names epoch 1, so it cannot match epoch 2, and the consent is refused as stale.
+        // Granting the epoch re-read after the prompt would name epoch 2, match, and wave the close
+        // through on a consent that was given about entirely different work.
+        Assert.Equal(CloseVerdict.Deny, retry.Verdict);
+        Assert.Equal(CloseGuardLocaleKeys.BlockedStale, retry.ReasonKey);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_WorkFinishedDURINGThePrompt_StillCloses()
+    {
+        PaneCloseArbiter arbiter = new();
+        TaskCompletionSource<bool> prompt = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeCloseGuard guard = new()
+        {
+            IsBusy = true,
+            Epoch = 1,
+            PollVerdict = CloseVerdict.Defer,
+            ResolveGate = prompt
+        };
+        CloseRequest request = InteractiveRequest();
+
+        arbiter.Poll(request, [guard]);
+        Task<bool> resolving = arbiter.ResolveAsync(request, [guard]);
+
+        // The transfer completed while the dialog was up, which necessarily moved the epoch too.
+        guard.IsBusy = false;
+        guard.Epoch = 2;
+
+        prompt.SetResult(true);
+        Assert.True(await resolving);
+
+        // The not-busy fast path is tested before the grant, so a stale grant is irrelevant here:
+        // there is nothing left to protect. Without that ordering, finishing the work would refuse
+        // a close that had just become perfectly safe.
+        Assert.Equal(CloseVerdict.Allow, arbiter.Poll(request, [guard]).Verdict);
+    }
+
+    [Fact]
     public async Task ResolveAsync_NewWorkStartedWhileConfirming_RefusesRatherThanHonourStaleConsent()
     {
         PaneCloseArbiter arbiter = new();

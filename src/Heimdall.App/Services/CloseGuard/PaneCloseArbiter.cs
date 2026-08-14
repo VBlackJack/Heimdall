@@ -27,10 +27,18 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
     private readonly Queue<Guid> _grantOrder = new();
 
     /// <summary>
-    /// Guards that deferred during the last <see cref="Poll"/> for a request. Resolution consults
-    /// only this set, so a guard that answered allow is never handed to its async continuation.
+    /// Guards that deferred during the last <see cref="Poll"/> for a request, each with the epoch
+    /// its decision was taken against. Resolution consults only this set, so a guard that answered
+    /// allow is never handed to its async continuation.
     /// </summary>
-    private readonly Dictionary<Guid, List<ICloseGuard>> _deferred = [];
+    /// <remarks>
+    /// The epoch is carried here rather than re-sampled after the prompt, and that is the whole
+    /// point of recording it. Re-sampling would read the state the user was NOT asked about: if new
+    /// work started while the dialog was up, the fresh epoch matches that new work, the grant lines
+    /// up with it, and the stale-consent refusal can never fire - the close would be waved through
+    /// on a consent that was given about something else.
+    /// </remarks>
+    private readonly Dictionary<Guid, List<DeferredGuard>> _deferred = [];
 
     /// <summary>
     /// In-flight resolutions keyed by guard rather than by request: a second click on the close
@@ -50,7 +58,7 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             return CloseDecision.Allow(0);
         }
 
-        List<ICloseGuard> deferredNow = [];
+        List<DeferredGuard> deferredNow = [];
         CloseDecision worst = CloseDecision.Allow(0);
 
         foreach (object? host in hosts)
@@ -70,7 +78,7 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             {
                 Core.Logging.FileLogger.Warn(
                     $"CloseGuard SampleCloseGuardState threw; deferring. {ex.Message}");
-                deferredNow.Add(guard);
+                deferredNow.Add(new DeferredGuard(guard, 0));
                 worst = CloseDecision.Defer(CloseGuardLocaleKeys.BlockedGeneric, 0);
                 continue;
             }
@@ -101,7 +109,7 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             {
                 // A re-entrant poll raised by a modal's nested pump, or a second click on the close
                 // button. Defer without polling the guard again and without a second dialog.
-                deferredNow.Add(guard);
+                deferredNow.Add(new DeferredGuard(guard, state.Epoch));
                 worst = CloseDecision.Defer(
                     _inFlightReason.GetValueOrDefault(guard, CloseGuardLocaleKeys.BlockedGeneric),
                     state.Epoch);
@@ -130,7 +138,9 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
 
             if (decision.Verdict == CloseVerdict.Defer)
             {
-                deferredNow.Add(guard);
+                // The decision's own epoch, not the sample's: the guard stamped what it actually
+                // decided against, and that is the epoch the eventual consent will be about.
+                deferredNow.Add(new DeferredGuard(guard, decision.Epoch));
                 _inFlightReason[guard] = decision.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric;
                 worst = decision;
             }
@@ -150,12 +160,12 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             return true;
         }
 
-        if (!_deferred.TryGetValue(request.RequestId, out List<ICloseGuard>? pending))
+        if (!_deferred.TryGetValue(request.RequestId, out List<DeferredGuard>? pending))
         {
             return true;
         }
 
-        foreach (ICloseGuard guard in pending)
+        foreach ((ICloseGuard guard, long decidedEpoch) in pending)
         {
             if (WasGranted(request, guard))
             {
@@ -172,19 +182,13 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
                 return false;
             }
 
-            long epoch;
-            try
-            {
-                epoch = guard.SampleCloseGuardState().Epoch;
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn(
-                    $"CloseGuard SampleCloseGuardState threw after consent; refusing. {ex.Message}");
-                return false;
-            }
-
-            Grant(request, guard, epoch);
+            // The epoch the user was asked about, never a fresh sample. Re-sampling here would
+            // record the state that exists AFTER the prompt: if new work started while the dialog
+            // was up, the grant would match that new work and the stale-consent refusal on the
+            // retry could never fire, waving the close through on a consent given about something
+            // else. Anything that changed during the prompt must be caught by the retry, and it
+            // only can be if the grant still names the old epoch.
+            Grant(request, guard, decidedEpoch);
         }
 
         return true;
@@ -270,4 +274,7 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
 
         set[guard] = epoch;
     }
+
+    /// <summary>A guard that deferred, and the epoch its decision was taken against.</summary>
+    private readonly record struct DeferredGuard(ICloseGuard Guard, long Epoch);
 }
