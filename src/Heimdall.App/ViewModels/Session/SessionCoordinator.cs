@@ -702,10 +702,14 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
+        // Silent: this is the placeholder tab of a session that never materialized. There is no
+        // host, therefore no work to protect and nobody to ask - and a guard withholding it would
+        // strand a dead placeholder in the tab strip.
         Task cleanupTask = _main.Connection.CloseSessionAsync(
             tab,
             DisconnectReason.FailedSession,
-            confirm: false);
+            confirm: false,
+            CloseIntent.Silent);
         if (reconnectChain is not null)
         {
             reconnectChain.FailureCleanupTask = cleanupTask;
@@ -1361,10 +1365,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         {
             AppSettings settings = await _configManager.LoadSettingsAsync();
 
+            // Silent, aligned with the standard reconnect: the session being replaced is already
+            // dead, and a guard withholding it would strand the user between two tabs.
             await _main.Connection.CloseSessionAsync(
                 tab,
                 DisconnectReason.ReconnectInitiated,
-                confirm: false);
+                confirm: false,
+                CloseIntent.Silent);
 
             await ConnectAdHocProfileAsync(snapshot, runtimeProfile, settings);
         }

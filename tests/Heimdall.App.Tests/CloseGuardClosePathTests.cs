@@ -148,32 +148,43 @@ public sealed class CloseGuardClosePathTests
         => Assert.Contains(expected, ReadAppSource(relativePath), StringComparison.Ordinal);
 
     /// <summary>
-    /// Silent intent is reserved for genuinely programmatic teardown. Each site is listed so that
-    /// adding a new bypass is a deliberate edit to this test rather than a silent widening.
+    /// <c>CloseAllSessionsSilently</c> bypasses every guard, so nothing but application exit may
+    /// call it. The Close All command is a user gesture and must drive the interactive path.
     /// </summary>
+    /// <remarks>
+    /// A counting oracle cannot cover this. Swapping two intents leaves any total unchanged, which
+    /// is exactly how a user gesture ended up on the silent path in the first place - so the
+    /// intent each producer actually emits is asserted from the observed request instead, in
+    /// <see cref="CloseIntentProducerTests"/>.
+    /// </remarks>
     [Fact]
-    public void SilentIntent_IsUsedOnlyWhereNoUserCouldAnswer()
+    public void CloseAllSessionsSilently_IsCalledOnlyFromApplicationExit()
     {
         string[] sources =
         [
             ReadAppSource("ViewModels/ConnectionViewModel.cs"),
-            ReadAppSource("ViewModels/Session/SessionCoordinator.cs"),
             ReadAppSource("ViewModels/MainViewModel.cs"),
+            ReadAppSource("ViewModels/Session/SessionCoordinator.cs"),
             ReadAppSource("Views/FloatingSessionWindow.xaml.cs"),
             ReadAppSource("Views/SessionPaneControl.xaml.cs")
         ];
 
-        int silentSites = sources.Sum(source =>
-            Regex.Matches(source, @"CloseRequest\.Silent\(|CloseIntent\.Silent\b").Count);
+        foreach (string source in sources)
+        {
+            // The declaration is not a call. Only invocations are forbidden here.
+            string withoutDeclaration = source.Replace(
+                "public void CloseAllSessionsSilently()",
+                "public void <declaration>()",
+                StringComparison.Ordinal);
 
-        // Measured, not guessed. Seven occurrences across four genuine bypasses:
-        //   - ConnectionViewModel: the intent test and its CloseRequest.Silent in CloseSessionAsync,
-        //     plus failed materialization and application exit;
-        //   - SessionCoordinator: the reconnect teardown of an already-dead session;
-        //   - MainViewModel: the intent test and its CloseRequest.Silent in ClosePaneAsync.
-        // A user gesture reaching this count would mean a bypass was widened, which is exactly
-        // what this assertion is here to make visible.
-        Assert.Equal(7, silentSites);
+            Assert.DoesNotContain("CloseAllSessionsSilently()", withoutDeclaration, StringComparison.Ordinal);
+        }
+
+        Assert.Contains(
+            "public void CloseAllSessionsSilently()",
+            ReadAppSource("ViewModels/ConnectionViewModel.cs"),
+            StringComparison.Ordinal);
+        Assert.Contains("CloseAllSessionsSilently()", ReadAppSource("App.xaml.cs"), StringComparison.Ordinal);
     }
 
     private static string ReadAppSource(string relativePath)

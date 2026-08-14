@@ -509,11 +509,23 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             });
     }
 
+    /// <summary>
+    /// Tears every session down because the workspace locked.
+    /// </summary>
+    /// <remarks>
+    /// Silent: a lock must actually lock. Prompting would leave a dialog on a workspace the user
+    /// just secured, and a guard withholding a session would leave it open and connected behind
+    /// the lock screen - the opposite of what locking is for.
+    /// </remarks>
     private void DisconnectAllSessionsForLock()
     {
         foreach (var tab in Connection.ActiveSessions.ToList())
         {
-            Connection.CloseSessionAsync(tab, DisconnectReason.UserAction, confirm: false)
+            Connection.CloseSessionAsync(
+                tab,
+                DisconnectReason.UserAction,
+                confirm: false,
+                CloseIntent.Silent)
                 .SafeFireAndForget();
         }
     }
