@@ -410,6 +410,178 @@ public sealed class ConnectionViewModelCloseTests
         Assert.Same(looseB, sut.ActiveSession);
     }
 
+    [Fact]
+    public void AccessibleName_TwoTabsOfTheSameProfile_AreDisambiguated()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first, second);
+
+        Assert.NotEqual(first.AccessibleName, second.AccessibleName);
+        Assert.Contains(first.DisplayTitle, first.AccessibleName, StringComparison.Ordinal);
+        Assert.Contains(second.DisplayTitle, second.AccessibleName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AccessibleName_UniqueTitle_StaysEqualToTheDisplayTitle()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel only = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel other = CreatePinnableSession("srv02", pinned: false);
+        AddTabs(sut, only, other);
+
+        Assert.Equal(only.DisplayTitle, only.AccessibleName);
+        Assert.Equal(other.DisplayTitle, other.AccessibleName);
+    }
+
+    [Fact]
+    public void AccessibleName_ClosingOneOfTwoCollidingTabs_RestoresThePlainNameOfTheSurvivor()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first, second);
+
+        sut.ActiveSessions.Remove(second);
+
+        Assert.Equal(first.DisplayTitle, first.AccessibleName);
+    }
+
+    [Fact]
+    public void AccessibleName_ThreeCollidingTabs_YieldThreeDistinctNames()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel third = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first, second, third);
+
+        string[] names = [first.AccessibleName, second.AccessibleName, third.AccessibleName];
+
+        Assert.Equal(3, names.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
+    public void AccessibleName_RenamingATabOutOfCollision_RestoresBothPlainNames()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first, second);
+
+        second.Title = "srv02";
+
+        Assert.Equal(first.DisplayTitle, first.AccessibleName);
+        Assert.Equal(second.DisplayTitle, second.AccessibleName);
+    }
+
+    // Direct mutation from outside ConnectionViewModel: the shape used by
+    // SessionWindowService, MainViewModel and SessionCoordinator, which never call a
+    // ConnectionViewModel method. A per-method hook would miss every one of them.
+    [Fact]
+    public void AccessibleName_DirectRemoveFromOutside_StillRefreshesTheRemainingNames()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first, second);
+        Assert.NotEqual(first.DisplayTitle, first.AccessibleName);
+
+        sut.ActiveSessions.Remove(second);
+
+        Assert.Equal(first.DisplayTitle, first.AccessibleName);
+        Assert.Equal(1, sut.TrackedAccessibleNameSubscriptionCount);
+    }
+
+    [Fact]
+    public void AccessibleName_DirectAddFromOutside_StillRefreshesTheNames()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first);
+        Assert.Equal(first.DisplayTitle, first.AccessibleName);
+
+        SessionTabViewModel returning = CreatePinnableSession("srv01", pinned: false);
+        sut.ActiveSessions.Add(returning);
+
+        Assert.NotEqual(first.AccessibleName, returning.AccessibleName);
+        Assert.Equal(2, sut.TrackedAccessibleNameSubscriptionCount);
+    }
+
+    [Fact]
+    public void AccessibleName_AfterReorder_OrdinalsFollowTheCurrentVisualOrder()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first, second);
+
+        // Absolute values, not a comparison between the two names: a mutant that reverses the
+        // assignment order consistently would keep any relative property intact, so only tying
+        // the ordinal to the index discriminates.
+        Assert.Equal("srv01 (1)", first.AccessibleName);
+        Assert.Equal("srv01 (2)", second.AccessibleName);
+
+        // Pinning moves the second tab ahead of the first, so the ordinals must swap with them.
+        sut.SetPinned(second, pinned: true);
+
+        Assert.Same(second, sut.ActiveSessions[0]);
+        Assert.Equal("srv01 (1)", second.AccessibleName);
+        Assert.Equal("srv01 (2)", first.AccessibleName);
+    }
+
+    [Fact]
+    public void AccessibleName_AfterRemove_MutatingTheRemovedSessionDoesNotAffectTheSurvivors()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel kept = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel removed = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, kept, removed);
+
+        sut.ActiveSessions.Remove(removed);
+        string keptNameAfterRemoval = kept.AccessibleName;
+        removed.Title = "srv01";
+
+        Assert.Equal(keptNameAfterRemoval, kept.AccessibleName);
+        Assert.Equal(1, sut.TrackedAccessibleNameSubscriptionCount);
+    }
+
+    // Primary Reset assertion. Clear() raises Reset with OldItems == null, so a handler that
+    // unsubscribes only from e.OldItems leaks every session and passes every other test here.
+    // The registry count is the only observable that discriminates: on an emptied collection a
+    // leaked handler recomputes nothing and changes nothing.
+    [Fact]
+    public void AccessibleName_AfterClear_TheSubscriptionRegistryIsEmpty()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel third = CreatePinnableSession("srv02", pinned: true);
+        AddTabs(sut, first, second, third);
+        Assert.Equal(3, sut.TrackedAccessibleNameSubscriptionCount);
+
+        sut.ActiveSessions.Clear();
+
+        Assert.Equal(0, sut.TrackedAccessibleNameSubscriptionCount);
+    }
+
+    // Secondary control for the same case, kept deliberately: it passes whether or not the
+    // handler leaked, so it is evidence of no crash, never proof of unsubscription.
+    [Fact]
+    public void AccessibleName_AfterClear_MutatingAClearedSessionThrowsNothing()
+    {
+        ConnectionViewModel sut = CreatePinningViewModel();
+        SessionTabViewModel first = CreatePinnableSession("srv01", pinned: false);
+        SessionTabViewModel second = CreatePinnableSession("srv01", pinned: false);
+        AddTabs(sut, first, second);
+
+        sut.ActiveSessions.Clear();
+        first.Title = "renamed-after-clear";
+
+        Assert.Empty(sut.ActiveSessions);
+    }
+
     private static ConnectionViewModel CreatePinningViewModel()
         => CreateViewModel(new TrackingDialogService(false), new TrackingSplitService());
 

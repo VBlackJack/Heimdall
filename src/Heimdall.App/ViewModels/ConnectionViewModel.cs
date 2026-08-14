@@ -15,6 +15,8 @@
  */
 
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
@@ -41,6 +43,18 @@ public partial class ConnectionViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasActiveSessions;
 
+    /// <summary>
+    /// Sessions whose <see cref="INotifyPropertyChanged.PropertyChanged"/> we are attached to.
+    /// Kept explicitly because <see cref="NotifyCollectionChangedAction.Reset"/> carries
+    /// <c>OldItems == null</c>: on a <c>Clear()</c> there is no departing-item list to
+    /// unsubscribe from, so per-action bookkeeping would leak every session at once.
+    /// </summary>
+    private readonly HashSet<SessionTabViewModel> _accessibleNameSubscriptions = [];
+
+    private ObservableCollection<SessionTabViewModel>? _trackedSessions;
+
+    private bool _refreshingAccessibleNames;
+
     public ConnectionViewModel(
         LocalizationManager localizer,
         IDialogService dialogService,
@@ -49,6 +63,129 @@ public partial class ConnectionViewModel : ObservableObject
         _localizer = localizer;
         _dialogService = dialogService;
         _splitService = splitService;
+
+        TrackAccessibleNames(ActiveSessions);
+    }
+
+    /// <summary>Number of sessions currently subscribed to for accessible-name refreshes.</summary>
+    /// <remarks>
+    /// Exposed for tests only. A leaked subscription has no observable effect on an emptied
+    /// collection - the orphaned handler recomputes nothing and changes nothing - so this count
+    /// is the only signal that discriminates a correct unsubscribe from a missing one.
+    /// </remarks>
+    internal int TrackedAccessibleNameSubscriptionCount => _accessibleNameSubscriptions.Count;
+
+    partial void OnActiveSessionsChanged(ObservableCollection<SessionTabViewModel> value)
+        => TrackAccessibleNames(value);
+
+    private void TrackAccessibleNames(ObservableCollection<SessionTabViewModel>? sessions)
+    {
+        if (ReferenceEquals(_trackedSessions, sessions))
+        {
+            return;
+        }
+
+        if (_trackedSessions is not null)
+        {
+            _trackedSessions.CollectionChanged -= OnTrackedSessionsChanged;
+        }
+
+        _trackedSessions = sessions;
+
+        if (_trackedSessions is not null)
+        {
+            _trackedSessions.CollectionChanged += OnTrackedSessionsChanged;
+        }
+
+        ReconcileAccessibleNameSubscriptions();
+    }
+
+    // Every mutation path funnels through here, including the four that live outside this class
+    // (SessionWindowService, MainViewModel and the two in SessionCoordinator) and never call a
+    // ConnectionViewModel method. Hooking the collection is what covers them.
+    private void OnTrackedSessionsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => ReconcileAccessibleNameSubscriptions();
+
+    /// <summary>
+    /// Brings the subscription set back in line with the collection - subscribe to what is
+    /// present and unsubscribed, unsubscribe from what is subscribed and absent - then refreshes
+    /// the names. Reconciliation rather than per-action bookkeeping, so that Reset is handled
+    /// like every other action.
+    /// </summary>
+    private void ReconcileAccessibleNameSubscriptions()
+    {
+        HashSet<SessionTabViewModel> current = _trackedSessions is null
+            ? []
+            : [.. _trackedSessions];
+
+        foreach (SessionTabViewModel departed in _accessibleNameSubscriptions.Where(session => !current.Contains(session)).ToList())
+        {
+            departed.PropertyChanged -= OnTrackedSessionPropertyChanged;
+            _accessibleNameSubscriptions.Remove(departed);
+        }
+
+        foreach (SessionTabViewModel arrived in current.Where(session => !_accessibleNameSubscriptions.Contains(session)))
+        {
+            arrived.PropertyChanged += OnTrackedSessionPropertyChanged;
+            _accessibleNameSubscriptions.Add(arrived);
+        }
+
+        RefreshAccessibleNames();
+    }
+
+    private void OnTrackedSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is null
+            or nameof(SessionTabViewModel.Title)
+            or nameof(SessionTabViewModel.CustomTitle)
+            or nameof(SessionTabViewModel.RdpModeOverrideSuffix)
+            or nameof(SessionTabViewModel.DisplayTitle))
+        {
+            RefreshAccessibleNames();
+        }
+    }
+
+    /// <summary>
+    /// Gives every tab an announced name, adding an ordinal only where the displayed title
+    /// collides. The ordinal is the rank in the CURRENT order of the collection, not creation
+    /// order: pinning reorders the tabs, and the announced number must match what the user would
+    /// count on screen. No translatable word is introduced.
+    /// </summary>
+    private void RefreshAccessibleNames()
+    {
+        if (_trackedSessions is null || _refreshingAccessibleNames)
+        {
+            return;
+        }
+
+        _refreshingAccessibleNames = true;
+        try
+        {
+            Dictionary<string, int> occurrences = new(StringComparer.Ordinal);
+            foreach (SessionTabViewModel session in _trackedSessions)
+            {
+                occurrences[session.DisplayTitle] = occurrences.GetValueOrDefault(session.DisplayTitle) + 1;
+            }
+
+            Dictionary<string, int> assigned = new(StringComparer.Ordinal);
+            foreach (SessionTabViewModel session in _trackedSessions)
+            {
+                string title = session.DisplayTitle;
+                if (occurrences[title] <= 1)
+                {
+                    session.AccessibleName = title;
+                    continue;
+                }
+
+                int ordinal = assigned.GetValueOrDefault(title) + 1;
+                assigned[title] = ordinal;
+                session.AccessibleName = $"{title} ({ordinal})";
+            }
+        }
+        finally
+        {
+            _refreshingAccessibleNames = false;
+        }
     }
 
     /// <summary>

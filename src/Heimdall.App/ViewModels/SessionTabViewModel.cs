@@ -60,6 +60,15 @@ public partial class SessionTabViewModel : ObservableObject
     private string _rdpModeOverrideSuffix = string.Empty;
 
     /// <summary>
+    /// Name announced by assistive technology for this tab. Assigned by
+    /// <see cref="ConnectionViewModel"/>, the only owner able to see the sibling tabs and
+    /// therefore to tell two sessions of the same profile apart: <see cref="DisplayTitle"/>
+    /// alone is identical for both by construction, so a screen reader would hear one tab.
+    /// </summary>
+    [ObservableProperty]
+    private string _accessibleName = string.Empty;
+
+    /// <summary>
     /// User-supplied custom tab title. When non-blank it overrides the auto title
     /// (and suppresses the RDP mode suffix). Session-lifetime only; never persisted.
     /// </summary>

@@ -1166,7 +1166,7 @@
                                 <Style TargetType="{x:Type TabItem}"
                                        BasedOn="{StaticResource ThemedTabItemStyle}">
                                     <Setter Property="AutomationProperties.Name"
-                                            Value="{Binding DisplayTitle}"/>
+                                            Value="{Binding AccessibleName}"/>
                                 </Style>
                             </TabControl.ItemContainerStyle>
                             <TabControl.ItemTemplate>
