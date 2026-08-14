@@ -35,6 +35,7 @@ using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Tests;
 
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class SshHandlerConnectTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
