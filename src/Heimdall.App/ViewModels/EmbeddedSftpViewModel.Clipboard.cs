@@ -203,12 +203,12 @@ public sealed partial class EmbeddedSftpViewModel
                         continue;
                     }
 
-                    await _browser.RenameAsync(entry.FullPath, destination);
+                    await _browser.RenameAsync(entry.FullPath, destination, ct);
                     processedCutSources.Add(entry.FullPath);
                 }
                 else
                 {
-                    await _browser.CopyAsync(entry.FullPath, destination, entry.IsDirectory);
+                    await _browser.CopyAsync(entry.FullPath, destination, entry.IsDirectory, ct);
                 }
 
                 existingNames.Add(targetName);
@@ -688,7 +688,7 @@ public sealed partial class EmbeddedSftpViewModel
                 string targetName = BuildNonCollidingName(existingNames, entry.Name);
                 string destination = CombineRemotePath(targetDirectory, targetName);
 
-                await _browser.CopyAsync(entry.FullPath, destination, entry.IsDirectory);
+                await _browser.CopyAsync(entry.FullPath, destination, entry.IsDirectory, ct);
 
                 existingNames.Add(targetName);
             }
