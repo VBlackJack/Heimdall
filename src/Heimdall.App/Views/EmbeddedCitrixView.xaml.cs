@@ -114,13 +114,18 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hWnd);
 
-    [DllImport("user32.dll")]
+    // SetLastError only on the three calls whose error code is captured and inspected:
+    // for the two style calls a zero return is otherwise indistinguishable from success.
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
 
     [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, uint dwNewLong);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern uint GetWindowLong(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll")]
@@ -606,14 +611,46 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             _hostPanel.Resize += (_, _) => ResizeCapturedWindow();
             FormsHost.Child = _hostPanel;
 
-            // Strip popup/caption styles and make it a child window
-            var style = GetWindowLong(hwnd, GwlStyle);
+            // Strip popup/caption styles and make it a child window. Each inspected call clears
+            // the last error first and captures it immediately after, before any other managed
+            // call can overwrite it - a zero return is ambiguous for both style calls.
+            Marshal.SetLastSystemError(0);
+            var readStyle = GetWindowLong(hwnd, GwlStyle);
+            int readStyleLastError = Marshal.GetLastPInvokeError();
+
+            var style = readStyle;
             style &= ~(WsPopup | WsCaption | WsThickframe);
             style |= WsChild;
-            SetWindowLong(hwnd, GwlStyle, style);
+
+            Marshal.SetLastSystemError(0);
+            int applyStyleResult = SetWindowLong(hwnd, GwlStyle, style);
+            int applyStyleLastError = Marshal.GetLastPInvokeError();
 
             // Reparent into our panel
-            SetParent(hwnd, _hostPanel.Handle);
+            Marshal.SetLastSystemError(0);
+            IntPtr previousParent = SetParent(hwnd, _hostPanel.Handle);
+
+            CitrixEmbedVerdict verdict = CitrixEmbedVerification.Verify(
+                readStyle,
+                readStyleLastError,
+                applyStyleResult,
+                applyStyleLastError,
+                previousParent,
+                GetParent(hwnd),
+                _hostPanel.Handle);
+
+            if (!verdict.Succeeded)
+            {
+                // A Win32 failure raises no managed exception, so the catch below never sees it.
+                // Fall back exactly as that catch does, and leave the Connected event to
+                // ShowExternalFallback, for which external mode is a legitimate outcome.
+                Core.Logging.FileLogger.Warn(
+                    $"Citrix: window embedding failed at {verdict.Failure}; falling back to external mode.");
+                _embedded = false;
+                ShowExternalFallback();
+                return;
+            }
+
             _capturedHwnd = hwnd;
             _embedded = true;
             EmitConnect();
@@ -632,7 +669,9 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         }
         catch (Exception ex)
         {
-            Core.Logging.FileLogger.Warn($"Citrix: SetParent failed: {ex.Message}");
+            // Managed failures only. A Win32 call that fails by return code raises nothing and is
+            // handled by the verdict above, so this message must not blame SetParent for them.
+            Core.Logging.FileLogger.Warn($"Citrix: window embedding threw: {ex.Message}");
             // Fall back to external mode
             _embedded = false;
             ShowExternalFallback();
