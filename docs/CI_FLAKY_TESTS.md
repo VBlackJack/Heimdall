@@ -146,16 +146,21 @@ gh run view <run-id> --log | grep TERMINAL_WAIT_OVER_LEGACY_BOUND
   old bound. Read it only under that condition. In a run killed by the job
   timeout the absence proves nothing, because the wait that was still blocked is
   exactly the one that never got to publish.
-- Lines with `outcome=completed`: the stall is still there and the wider bound
-  is absorbing it. The run is green and the problem is not fixed.
+- Lines with `outcome=completed`: a wait crossed the former boundary and the
+  wider bound absorbed it. The run is green, and that green is not evidence the
+  cause is gone. It is also not proof that the same wait would have failed under
+  the former implementation.
 - Lines with `outcome=unfinished`: the wait ended without its event; the
   accompanying `TimeoutException` carries the full process snapshot.
 
-### First measured distribution, run 31896183632
+### First observations, run 31896183632
 
-The instrumentation reported on its first CI run. Four waits outlived the old
-bound, all of them `outcome=completed`, so all four would have been failures
-under the original 10-second bound:
+The first CI run reported four completed waits above the former 10-second
+observation threshold. This proves that the 60-second backstop can still absorb
+waits which cross the former boundary. It does not replay the
+completion-versus-timeout race of the former `WaitAsync(10 seconds)`, so it
+cannot establish that every observation would have failed under that
+implementation.
 
 | caller | awaited | elapsedMs |
 |---|---|---|
@@ -164,11 +169,29 @@ under the original 10-second bound:
 | `ProcessExited_SubscriberAddedAfterFastExit_ReplaysExitCode` | `SessionStopped` | 10547.798 |
 | `Write_InputReachesProcessStdin` | `ProcessExited` | 10564.036 |
 
-Widening the bound did not remove the stall, it absorbed it. Note also how
-tightly the four cluster, within 524 ms of each other just above 10 seconds,
-across four tests and three different awaited events. That is the shape of a
-fixed timer rather than of diffuse runner slowness, but one run is one sample:
-the hypothesis is worth testing against further runs, not stating as the cause.
+Only waits above the threshold are reported. This threshold-filtered sample of
+four observations is therefore insufficient to distinguish a fixed timer,
+scheduling delay, output buffering, or resource contention.
+
+The one further fact worth recording is that these four occurred with
+`System.Threading.ThreadPool.MinThreads` at 64.
+
+### Do not reconstruct events from GitHub Actions line timestamps
+
+The timestamp on a workflow log line dates the capture and multiplexing of
+standard output, not the call that produced the text. In this very run a
+`TERMINAL_WAIT` marker appears concatenated into a line of
+`TwinShell.Infrastructure.Tests` output, which shows directly that line
+boundaries and line times are not those of the emitting call.
+
+Nothing may be derived from those timestamps: not start instants, not
+simultaneous endings, not episodes separated by mechanism, not a contended
+resource, and not a named synchronization context as a probable cause. An
+earlier reading of this page did exactly that and was wrong.
+
+A future pass that wants to analyse overlap must first emit monotonic start and
+end instants at the source, with the process id and a sequence identifier, and
+read those.
 
 `TerminalWaitInstrumentationGuardTests` refuses any new wait that reaches the
 backstop constant directly, because instrumentation that is bypassed measures
