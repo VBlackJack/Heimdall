@@ -920,9 +920,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     {
         if (session is null || !session.IsSplit) return;
 
-        var secondaryPane = session.RootContent is SplitContainerModel c
-            ? Core.Models.SplitTreeHelper.FirstLeaf(c.Second)
-            : null;
+        SessionPaneModel? secondaryPane = session.SecondaryPaneOrNull;
         if (secondaryPane is not null)
         {
             await ClosePaneAsync(session, secondaryPane.PaneId);
@@ -1004,9 +1002,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     {
         if (session is null || !session.IsSplit) return;
 
-        var secondaryPane = session.RootContent is SplitContainerModel c
-            ? Core.Models.SplitTreeHelper.FirstLeaf(c.Second)
-            : null;
+        SessionPaneModel? secondaryPane = session.SecondaryPaneOrNull;
         if (secondaryPane is not null)
         {
             await ReconnectPaneAsync(session, secondaryPane.PaneId);
