@@ -25,6 +25,7 @@ using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Scheduled;
 using Heimdall.App.ViewModels.Session;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Sidebar;
 using Heimdall.App.ViewModels.ToolsTab;
 using Heimdall.App.ViewModels.Tunnels;
@@ -119,16 +120,16 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private int _themeRevision;
 
     [ObservableProperty]
-    private string _selectedTab = "Sessions";
+    private string _selectedTab = ShellTab.Sessions;
 
     [ObservableProperty]
     private SessionTabViewModel? _dragDisplaySession;
 
-    private string _previousTab = "Sessions";
+    private string _previousTab = ShellTab.Sessions;
     private bool _suppressTabChangeGuard;
 
     /// <summary>True when the Sessions tab is selected.</summary>
-    public bool IsSessionsTabSelected => string.Equals(SelectedTab, "Sessions", StringComparison.Ordinal);
+    public bool IsSessionsTabSelected => string.Equals(SelectedTab, ShellTab.Sessions, StringComparison.Ordinal);
 
     /// <summary>
     /// Session currently rendered in the main content area. During a tab drag,
@@ -138,19 +139,19 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     public SessionTabViewModel? DisplayedSession => DragDisplaySession ?? Connection.ActiveSession;
 
     /// <summary>True when the Tunnels tab is selected.</summary>
-    public bool IsTunnelsTabSelected => string.Equals(SelectedTab, "Tunnels", StringComparison.Ordinal);
+    public bool IsTunnelsTabSelected => string.Equals(SelectedTab, ShellTab.Tunnels, StringComparison.Ordinal);
 
     /// <summary>True when the Scheduled tab is selected.</summary>
-    public bool IsScheduledTabSelected => string.Equals(SelectedTab, "Scheduled", StringComparison.Ordinal);
+    public bool IsScheduledTabSelected => string.Equals(SelectedTab, ShellTab.Scheduled, StringComparison.Ordinal);
 
     /// <summary>True when the Settings tab is selected.</summary>
-    public bool IsSettingsTabSelected => string.Equals(SelectedTab, "Settings", StringComparison.Ordinal);
+    public bool IsSettingsTabSelected => string.Equals(SelectedTab, ShellTab.Settings, StringComparison.Ordinal);
 
     /// <summary>True when the Tools tab is selected.</summary>
-    public bool IsToolsTabSelected => string.Equals(SelectedTab, "Tools", StringComparison.Ordinal);
+    public bool IsToolsTabSelected => string.Equals(SelectedTab, ShellTab.Tools, StringComparison.Ordinal);
 
     /// <summary>True when the About tab is selected.</summary>
-    public bool IsAboutTabSelected => string.Equals(SelectedTab, "About", StringComparison.Ordinal);
+    public bool IsAboutTabSelected => string.Equals(SelectedTab, ShellTab.About, StringComparison.Ordinal);
 
     partial void OnSelectedTabChanged(string value)
     {
@@ -160,13 +161,16 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // Revert immediately and handle the dialog asynchronously to avoid
         // blocking the WPF dispatcher (the previous .GetAwaiter().GetResult()
         // pattern caused deadlocks when the dialog posted back to the UI thread).
-        if (!_suppressTabChangeGuard
-            && string.Equals(_previousTab, "Settings", StringComparison.Ordinal)
-            && !string.Equals(value, "Settings", StringComparison.Ordinal)
-            && Settings.IsDirty)
+        ShellTabNavigationDecision decision = ShellTabNavigation.Decide(
+            _previousTab,
+            value,
+            Settings.IsDirty,
+            _suppressTabChangeGuard);
+
+        if (decision == ShellTabNavigationDecision.PromptBeforeLeavingSettings)
         {
             _suppressTabChangeGuard = true;
-            SelectedTab = "Settings";
+            SelectedTab = ShellTab.Settings;
             _suppressTabChangeGuard = false;
             HandleUnsavedSettingsGuardAsync(value).SafeFireAndForget();
             return;
