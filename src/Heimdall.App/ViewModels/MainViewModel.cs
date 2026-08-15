@@ -289,12 +289,11 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <summary>Session lifecycle hub: broadcast, reconnect, SFTP auto-open, workspace restore.</summary>
     public SessionCoordinator Session { get; }
 
-    /// <summary>Recently used tool IDs (most recent first, max 5).</summary>
-    private readonly List<string> _recentToolIds = new();
-    private const int MaxRecentTools = 5;
+    /// <summary>Recently used tool IDs (most recent first, bounded).</summary>
+    private readonly RecentToolList _recentTools = new();
 
     /// <summary>Returns the current list of recently used tool IDs.</summary>
-    internal IReadOnlyList<string> RecentToolIds => _recentToolIds;
+    internal IReadOnlyList<string> RecentToolIds => _recentTools.Ids;
 
     /// <summary>Returns the favorite tool IDs from persisted settings.</summary>
     internal List<string> FavoriteToolIds => _currentSettings?.FavoriteToolIds ?? [];
@@ -1055,13 +1054,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <summary>
     /// Tracks a tool ID as recently used for the palette's "recent tools" section.
     /// </summary>
-    public void TrackRecentTool(string toolId)
-    {
-        _recentToolIds.Remove(toolId);
-        _recentToolIds.Insert(0, toolId);
-        while (_recentToolIds.Count > MaxRecentTools)
-            _recentToolIds.RemoveAt(_recentToolIds.Count - 1);
-    }
+    public void TrackRecentTool(string toolId) => _recentTools.Track(toolId);
 
     public string Localize(string key)
     {
