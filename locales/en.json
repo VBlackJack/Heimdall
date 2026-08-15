@@ -970,6 +970,7 @@
   "ErrorSecureExportLegacyNoChecksum": "Legacy secure export missing checksum",
   "ErrorSecureExportMalformed": "Malformed secure export: missing EncryptedData, InitVector, or Salt",
   "ErrorSecureExportMissingMac": "Malformed secure export: missing MAC authentication tag",
+  "ErrorSftpReplaceRefusedExecUnavailable": "Replacement refused: Heimdall has no trusted command channel to this server, so it cannot check what security metadata '{0}' carries before overwriting it. Reconnect over SSH so the host key is pinned, or use a privileged transfer.",
   "ErrorSftpReplaceRefusedCapabilities": "Replacement refused: '{0}' carries file capabilities, and restoring them requires privileges this session does not have. Replacing it would silently drop them. Use a privileged transfer, or clear the capabilities on the server first.",
   "ErrorSftpReplaceRefusedSecurityXattrs": "Replacement refused: '{0}' carries security-namespace extended attributes, which cannot be written back without privileges. Replacing it would silently drop them. Use a privileged transfer, or clear those attributes on the server first.",
   "ErrorSftpReplaceRefusedAcl": "Replacement refused: '{0}' carries an access control list beyond its permission bits, which this session cannot reproduce exactly. Replacing it would loosen or tighten access. Use a privileged transfer, or remove the extra entries on the server first.",
