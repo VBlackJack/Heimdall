@@ -56,8 +56,8 @@
       },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Transitive",
-        "resolved": "10.0.10",
-        "contentHash": "BKt0SQgq2lq3ESE68jkeLwv95ypANrPDtkTOIFGcnhg2aRUeUUBDrQlkVDZctrg1WenVcvn5P5XZnuYI7q6rFQ=="
+        "resolved": "10.0.11",
+        "contentHash": "PNoxCTPb+Tlux+GJyq4c89ddYdpioVSqfGx8pqOF6shCSKwUNNctXhQtRkCICjbJmGrJJsW8NY52kVYO/b8mlQ=="
       },
       "heimdall.core": {
         "type": "Project",
@@ -65,7 +65,7 @@
           "CommunityToolkit.Mvvm": "[8.4.0, )",
           "Konscious.Security.Cryptography.Argon2": "[1.3.1, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
-          "System.Security.Cryptography.ProtectedData": "[10.0.10, )"
+          "System.Security.Cryptography.ProtectedData": "[10.0.11, )"
         }
       },
       "heimdall.ssh": {
