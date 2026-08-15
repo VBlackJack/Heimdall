@@ -24,6 +24,9 @@ public sealed record RemoteOperationWarning
 {
     private const string NonAtomicReplacementWarningKey = "WarnRemoteReplacementNonAtomic";
 
+    private const string FtpExistingTargetReplacedWarningKey =
+        "WarnFtpReplacementNonAtomicMetadataNotPreserved";
+
     private RemoteOperationWarning(string warningKey, string remotePath)
     {
         WarningKey = warningKey;
@@ -42,5 +45,28 @@ public sealed record RemoteOperationWarning
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
 
         return new RemoteOperationWarning(NonAtomicReplacementWarningKey, remotePath);
+    }
+
+    /// <summary>
+    /// Creates the single warning raised once an FTP or FTPS upload has replaced an existing
+    /// destination.
+    /// </summary>
+    /// <remarks>
+    /// One warning, not two. The FTP replacement is non-atomic AND it publishes a freshly uploaded
+    /// file, so the destination comes back carrying whatever owner, mode and timestamps the server
+    /// assigns to a new upload: the replaced file's ownership, permissions, timestamps, ACLs,
+    /// extended attributes and capabilities are gone. FTP exposes no command that would restore
+    /// them, so the localized message states that loss rather than implying a preservation that
+    /// never happens.
+    /// <para>
+    /// Deliberately distinct from <see cref="CreateNonAtomicReplacement"/>, which stays the plain
+    /// atomicity notice and claims nothing about metadata.
+    /// </para>
+    /// </remarks>
+    public static RemoteOperationWarning CreateFtpExistingTargetReplaced(string remotePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        return new RemoteOperationWarning(FtpExistingTargetReplacedWarningKey, remotePath);
     }
 }
