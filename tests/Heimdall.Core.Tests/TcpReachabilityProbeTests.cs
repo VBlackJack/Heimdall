@@ -55,14 +55,17 @@ public class TcpReachabilityProbeTests
         // construction rather than merely improbable.
         using Socket reservation = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
-        // Set before Bind: the option is rejected on an already-bound socket, and it is what
-        // stops a competing socket from claiming the endpoint with ReuseAddress.
+        // Set before Bind, because the option is rejected on an already-bound socket. It is an
+        // explicit declaration that this endpoint is not to be shared, NOT the mechanism that was
+        // measured to refuse the challengers below: see AssertEndpointCannotBeTakenWhileReserved.
         reservation.ExclusiveAddressUse = true;
         reservation.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         int port = ((IPEndPoint)reservation.LocalEndPoint!).Port;
 
-        // Deliberately no Listen call. A bound socket with no listener accepts nothing, so the
-        // endpoint is closed to connections while still being owned by this test.
+        // Deliberately no Listen call, and that is the load-bearing line. A bound socket with no
+        // listener accepts nothing, so the endpoint is owned by this test and closed to
+        // connections at the same time. Adding Listen makes the probe report reachable, which is
+        // also what proves this test measures the endpoint it reserved and not some other port.
         AssertEndpointCannotBeTakenWhileReserved(port);
 
         var result = await TcpReachabilityProbe.ProbeAsync("127.0.0.1", port, 1000);
@@ -71,19 +74,24 @@ public class TcpReachabilityProbeTests
         Assert.Equal(-1.0, result.LatencyMs);
         Assert.False(string.IsNullOrEmpty(result.Error));
 
+        // Re-checked AFTER the probe returned, not only before it. This is what says the
+        // reservation covered the whole measurement: had the port been released beforehand, as
+        // the old release-then-probe shape did, this bind would succeed.
+        AssertEndpointCannotBeTakenWhileReserved(port);
+
         // The reservation has to outlive the measurement, not merely precede it. Disposal is
         // scoped to the end of the method; this pins the socket against an early collection.
         GC.KeepAlive(reservation);
     }
 
     /// <summary>
-    /// Proves the reservation is exclusive for as long as it is held, which is the property the
-    /// closed-port probe depends on: no other socket can be listening on that endpoint.
+    /// Proves the endpoint cannot be taken for as long as the reservation is held, which is the
+    /// property the closed-port probe depends on: nothing else can be listening on it.
     /// </summary>
     /// <remarks>
     /// Asserting that a bind throws, rather than sampling the probe repeatedly, is what makes
-    /// this non-probabilistic. If the reservation ever stopped being exclusive, these binds would
-    /// succeed and say so immediately instead of leaving a rare failure for CI to find.
+    /// this non-probabilistic. If the endpoint ever stopped being held, these binds would succeed
+    /// and say so immediately instead of leaving a rare failure for CI to find.
     /// </remarks>
     private static void AssertEndpointCannotBeTakenWhileReserved(int port)
     {
@@ -91,9 +99,11 @@ public class TcpReachabilityProbeTests
         using Socket plainChallenger = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         AssertBindIsRefused(plainChallenger, port);
 
-        // The competitor ExclusiveAddressUse exists to defeat. Without that option this bind can
-        // take the endpoint out from under the reservation on Windows, and the probe would then
-        // be measuring a port this test no longer owns.
+        // A competitor that opts into address reuse. Measured on Windows with .NET 10: this bind
+        // is refused whether or not the reservation set ExclusiveAddressUse, because Windows only
+        // permits the takeover when the OWNER of the endpoint also opted into reuse. The claim
+        // that ExclusiveAddressUse is what defeats this challenger was checked and is false here,
+        // so it is not made: removing the option leaves both assertions below green.
         using Socket reuseChallenger = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         reuseChallenger.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         AssertBindIsRefused(reuseChallenger, port);
@@ -104,9 +114,10 @@ public class TcpReachabilityProbeTests
         SocketException refusal = Assert.Throws<SocketException>(
             () => challenger.Bind(new IPEndPoint(IPAddress.Loopback, port)));
 
-        // Which of the two arrives is the platform's business: Windows answers AccessDenied to a
-        // ReuseAddress bind against an exclusively held endpoint and AddressAlreadyInUse to a
-        // plain one. Naming both keeps an unrelated socket failure from passing as proof.
+        // Both codes were measured on Windows with .NET 10, not assumed: a plain bind against the
+        // held endpoint answers AddressAlreadyInUse (10048) and a ReuseAddress bind answers
+        // AccessDenied (10013). Naming both keeps an unrelated socket failure from passing as
+        // proof, without over-fitting the assertion to one platform's choice between them.
         Assert.Contains(
             refusal.SocketErrorCode,
             new[] { SocketError.AddressAlreadyInUse, SocketError.AccessDenied });
