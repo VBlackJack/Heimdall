@@ -164,6 +164,7 @@
                         TabIndex="4"
                         Content="{loc:Translate ToolBase64BtnDecode}"
                         Click="OnDecodeClick"
+                        IsEnabled="{Binding IsDecodeEnabled}"
                         AutomationProperties.Name="{loc:Translate ToolBase64BtnDecode}"
                         Style="{DynamicResource SecondaryButtonStyle}"
                         Padding="{StaticResource PaddingButtonPrimary}"

@@ -25,6 +25,71 @@ namespace Heimdall.App.Tests;
 public sealed class Base64ToolViewModelTests
 {
     [Fact]
+    public async Task DecodeCommand_SecondExecuteAsyncWhileRunning_DoesNotReenterTheBody()
+    {
+        GatedBase64ToolService service = new();
+        Base64ToolViewModel vm = new(service) { InputText = "aGVsbG8=" };
+
+        Task first = vm.DecodeCommand.ExecuteAsync(null);
+        await service.FirstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // ExecuteAsync deliberately does not consult CanExecute, and the decode button is wired
+        // to a Click handler that calls it directly, so this is exactly what a second click does.
+        Assert.False(vm.DecodeCommand.CanExecute(null));
+        Task second = vm.DecodeCommand.ExecuteAsync(null);
+
+        service.Release();
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+
+        // Entry count, not just the final output: the two runs decode the same input, so
+        // comparing results cannot tell one execution from two.
+        Assert.Equal(1, service.DecodeEntryCount);
+        Assert.False(service.FirstTokenWasCancelled);
+        Assert.Equal("hello", vm.OutputText);
+    }
+
+    [Fact]
+    public async Task EncodeCommand_SecondExecuteAsyncWhileRunning_DoesNotReenterTheBody()
+    {
+        GatedBase64ToolService service = new();
+        Base64ToolViewModel vm = new(service) { InputText = "hello" };
+
+        Task first = vm.EncodeCommand.ExecuteAsync(null);
+        await service.FirstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // The encode button is gated by IsEnabled, but the Ctrl+Enter shortcut calls
+        // ExecuteAsync directly and no binding gates a keyboard accelerator.
+        Task second = vm.EncodeCommand.ExecuteAsync(null);
+
+        service.Release();
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, service.EncodeEntryCount);
+        Assert.False(service.FirstTokenWasCancelled);
+    }
+
+    [Fact]
+    public async Task IsDecodeEnabled_IsFalseWhileRunningAndTrueAgainAfterwards()
+    {
+        GatedBase64ToolService service = new();
+        Base64ToolViewModel vm = new(service) { InputText = "aGVsbG8=" };
+
+        Assert.True(vm.IsDecodeEnabled);
+
+        Task first = vm.DecodeCommand.ExecuteAsync(null);
+        await service.FirstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // The button binds this, so a value that stayed true would leave it clickable and
+        // announce an action that is not actually available.
+        Assert.False(vm.IsDecodeEnabled);
+
+        service.Release();
+        await first.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(vm.IsDecodeEnabled);
+    }
+
+    [Fact]
     public async Task PrefillInput_EncodesImmediately()
     {
         var vm = new Base64ToolViewModel(new FakeBase64ToolService());
@@ -255,6 +320,59 @@ public sealed class Base64ToolViewModelTests
         var manager = new LocalizationManager();
         await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
         return manager;
+    }
+
+    /// <summary>
+    /// Holds a codec call open so a second invocation can be attempted while the first is still
+    /// in flight, and counts how many times the body was actually entered.
+    /// </summary>
+    private sealed class GatedBase64ToolService : IBase64ToolService
+    {
+        private readonly TaskCompletionSource _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private CancellationToken _firstToken;
+
+        public TaskCompletionSource FirstEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DecodeEntryCount { get; private set; }
+
+        public int EncodeEntryCount { get; private set; }
+
+        public bool FirstTokenWasCancelled => _firstToken.IsCancellationRequested;
+
+        public void Release() => _release.TrySetResult();
+
+        public async Task<byte[]> DecodeAsync(string base64, bool urlSafe, CancellationToken ct)
+        {
+            if (++DecodeEntryCount == 1)
+            {
+                _firstToken = ct;
+                FirstEntered.TrySetResult();
+            }
+
+            await _release.Task.ConfigureAwait(false);
+            return Heimdall.Core.Codecs.Base64Codec.Decode(base64, urlSafe);
+        }
+
+        public async Task<string> EncodeAsync(byte[] data, bool urlSafe, CancellationToken ct)
+        {
+            if (++EncodeEntryCount == 1)
+            {
+                _firstToken = ct;
+                FirstEntered.TrySetResult();
+            }
+
+            await _release.Task.ConfigureAwait(false);
+            return Heimdall.Core.Codecs.Base64Codec.Encode(data, urlSafe);
+        }
+
+        public Task<FileLoadOutcome> LoadFileAsync(string path, long maxBytes, CancellationToken ct)
+            => Task.FromResult(new FileLoadOutcome(true, [1], "data.bin", FileLoadError.None));
+
+        public Task SaveFileAsync(string path, byte[] data, CancellationToken ct)
+            => Task.CompletedTask;
     }
 
     private sealed class FakeBase64ToolService : IBase64ToolService
