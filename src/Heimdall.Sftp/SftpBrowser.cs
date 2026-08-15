@@ -469,22 +469,19 @@ public sealed class SftpBrowser : IRemoteBrowser
                             ApplyPublicationAttributes: desired =>
                             {
                                 SftpFileAttributes attributes = client.GetAttributes(tempRemotePath);
-                                // Null means a creation: there is no destination whose stamps
-                                // could be inherited, so the file keeps the ones the write gave it.
-                                if (desired.LastWriteTimeUtc is { } writeTime
-                                    && desired.LastAccessTimeUtc is { } accessTime)
-                                {
-                                    attributes.LastAccessTimeUtc = accessTime;
-                                    attributes.LastWriteTimeUtc = writeTime;
-                                }
-
-                                ApplyUploadModeBeforeCommit(
+                                ApplyPublicationAttributesBeforeCommit(
                                     remotePath,
-                                    desired.Mode,
+                                    desired,
                                     GetPermissionMode(attributes),
-                                    modeToApply =>
+                                    (modeToApply, accessTime, writeTime) =>
                                     {
                                         ApplyPermissionMode(attributes, modeToApply);
+                                        if (accessTime is { } atime && writeTime is { } mtime)
+                                        {
+                                            attributes.LastAccessTimeUtc = atime;
+                                            attributes.LastWriteTimeUtc = mtime;
+                                        }
+
                                         client.SetAttributes(tempRemotePath, attributes);
                                     });
                             },
@@ -1091,6 +1088,57 @@ public sealed class SftpBrowser : IRemoteBrowser
     {
         return exception is NotSupportedException
             or Renci.SshNet.Common.SftpException { StatusCode: StatusCode.OperationUnsupported };
+    }
+
+    /// <summary>
+    /// Applies the mode and, for a replacement, the destination's timestamps to the staged file in
+    /// exactly one write.
+    /// </summary>
+    /// <remarks>
+    /// The timestamps must NOT ride inside <see cref="ApplyUploadModeBeforeCommit"/>'s callback.
+    /// That helper returns without calling back when the target mode already equals the temporary
+    /// mode, which is not a rare case: the staging mode is owner read/write, so replacing any 0600
+    /// file matched exactly, no write was emitted, and the read-back then refused a commit that was
+    /// perfectly legitimate.
+    /// <para>
+    /// A replacement therefore writes unconditionally, mode and both stamps together, so there is
+    /// never a moment where the file carries the new mode and the old stamps. A creation keeps the
+    /// previous mode-only policy untouched, including its skip when nothing needs changing: there
+    /// is no destination whose timestamps could be inherited.
+    /// </para>
+    /// </remarks>
+    internal static void ApplyPublicationAttributesBeforeCommit(
+        string finalRemotePath,
+        SftpModePreservation.SftpPublicationAttributes desired,
+        uint tempPermissions,
+        Action<uint, DateTime?, DateTime?> applyAll)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
+        ArgumentNullException.ThrowIfNull(applyAll);
+
+        if (desired.LastAccessTimeUtc is not { } accessTime
+            || desired.LastWriteTimeUtc is not { } writeTime)
+        {
+            ApplyUploadModeBeforeCommit(
+                finalRemotePath,
+                desired.Mode,
+                tempPermissions,
+                mode => applyAll(mode, null, null));
+            return;
+        }
+
+        try
+        {
+            applyAll(desired.Mode, accessTime, writeTime);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"SFTP metadata preservation failed for '{finalRemotePath}': target mode "
+                + $"{FormatPermissionMode(desired.Mode)} with write time {writeTime:O} could not be "
+                + "applied to the staged file; commit refused because exact preservation is required.",
+                ex);
+        }
     }
 
     internal static void ApplyUploadModeBeforeCommit(
