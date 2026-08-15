@@ -33,6 +33,7 @@ using Heimdall.App.Services;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Onboarding;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -576,7 +577,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         try
         {
             if (!await CheckUnsavedSettingsAsync()) { TabSettings.IsChecked = true; return; }
-            SwitchToTab("Sessions");
+            SwitchToTab(ShellTab.Sessions);
         }
         catch (Exception ex) { Core.Logging.FileLogger.Error($"Tab switch failed: {ex.Message}"); }
     }
@@ -586,7 +587,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         try
         {
             if (!await CheckUnsavedSettingsAsync()) { TabSettings.IsChecked = true; return; }
-            SwitchToTab("Tunnels");
+            SwitchToTab(ShellTab.Tunnels);
         }
         catch (Exception ex) { Core.Logging.FileLogger.Error($"Tab switch failed: {ex.Message}"); }
     }
@@ -596,20 +597,20 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         try
         {
             if (!await CheckUnsavedSettingsAsync()) { TabSettings.IsChecked = true; return; }
-            SwitchToTab("Scheduled");
+            SwitchToTab(ShellTab.Scheduled);
         }
         catch (Exception ex) { Core.Logging.FileLogger.Error($"Tab switch failed: {ex.Message}"); }
     }
 
     private void OnSettingsTabChecked(object sender, RoutedEventArgs e)
     {
-        SwitchToTab("Settings");
+        SwitchToTab(ShellTab.Settings);
     }
 
     private void OnNavigateToGatewaySettings(object sender, RoutedEventArgs e)
     {
         TabSettings.IsChecked = true;
-        SwitchToTab("Settings");
+        SwitchToTab(ShellTab.Settings);
         Mw_SettingsSubTabControl.SelectedItem = Mw_SettingsTabSsh;
     }
 
@@ -620,7 +621,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private async Task<bool> CheckUnsavedSettingsAsync()
     {
         if (DataContext is not MainViewModel vm) return true;
-        if (vm.SelectedTab != "Settings") return true;
+        if (vm.SelectedTab != ShellTab.Settings) return true;
         if (!vm.Settings.IsDirty) return true;
 
         var discard = await vm.DialogService.ShowConfirmAsync(
@@ -720,7 +721,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         try
         {
             if (!await CheckUnsavedSettingsAsync()) { TabSettings.IsChecked = true; return; }
-            SwitchToTab("Tools");
+            SwitchToTab(ShellTab.Tools);
             if (DataContext is MainViewModel vm)
             {
                 vm.ToolsTab.RefreshHeaderText();
@@ -732,7 +733,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void OnAboutTabChecked(object sender, RoutedEventArgs e)
     {
-        SwitchToTab("About");
+        SwitchToTab(ShellTab.About);
     }
 
     private void SwitchToTab(string tabName)
@@ -749,7 +750,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
 
         // Save TreeView scroll position when leaving Sessions tab
-        if (vm.IsSessionsTabSelected && !string.Equals(tabName, "Sessions", StringComparison.Ordinal))
+        if (vm.IsSessionsTabSelected && !string.Equals(tabName, ShellTab.Sessions, StringComparison.Ordinal))
         {
             SaveTreeViewScrollPosition();
         }
@@ -761,7 +762,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         UpdateTabVisibility(vm);
 
         // Restore TreeView scroll position when returning to Sessions tab
-        if (string.Equals(tabName, "Sessions", StringComparison.Ordinal))
+        if (string.Equals(tabName, ShellTab.Sessions, StringComparison.Ordinal))
         {
             RestoreTreeViewScrollPosition();
         }
@@ -1668,7 +1669,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         // Match the full-page Tools tab: make sure the session panel is visible
         // before opening the tool tab. Tab-strip navigation stays in the view.
         TabSessions.IsChecked = true;
-        SwitchToTab("Sessions");
+        SwitchToTab(ShellTab.Sessions);
 
         await vm.Sidebar.LaunchToolAsync(item);
     }
@@ -1718,7 +1719,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         if (DataContext is not MainViewModel vm) return;
         TabSessions.IsChecked = true;
-        SwitchToTab("Sessions");
+        SwitchToTab(ShellTab.Sessions);
         vm.ToolsTab.LaunchToolCommand.Execute(descriptor);
     }
 
@@ -1745,11 +1746,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             case 0: // Step 1 done → navigate to Sessions tab
                 TabSessions.IsChecked = true;
-                SwitchToTab("Sessions");
+                SwitchToTab(ShellTab.Sessions);
                 break;
             case 1: // Step 2 done → navigate to Settings tab
                 TabSettings.IsChecked = true;
-                SwitchToTab("Settings");
+                SwitchToTab(ShellTab.Settings);
                 break;
                 // Step 3 (index 2): sidebar switch happens in OnOnboardingCompleted
                 // once persistence has succeeded.
@@ -2397,7 +2398,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// </summary>
     private void UpdateTabVisibility(MainViewModel vm)
     {
-        bool isSessions = vm.SelectedTab == "Sessions";
+        bool isSessions = vm.SelectedTab == ShellTab.Sessions;
         bool hasSessions = vm.Connection.HasActiveSessions;
         bool suppressSidebar = !isSessions && hasSessions;
 
@@ -3359,7 +3360,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         Dispatcher.BeginInvoke(() =>
         {
             if (DataContext is not MainViewModel vm) return;
-            if (!string.Equals(vm.SelectedTab, "Tools", StringComparison.Ordinal)) return;
+            if (!string.Equals(vm.SelectedTab, ShellTab.Tools, StringComparison.Ordinal)) return;
 
             // Re-render the cards so brushes reflect the new theme.
             vm.ToolsTab.InvalidateSections();
