@@ -70,7 +70,9 @@ public sealed class ConPtySessionTests
                 TerminalTestHelpers.ResolvePowerShellExecutable(),
                 "-NoLogo -NoProfile");
 
-            string text = await outputObserved.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
+            string text = await TerminalTestHelpers.AwaitProcessEventAsync(
+                outputObserved.Task,
+                "DataReceived");
 
             Assert.NotEmpty(text);
             Assert.True(session.IsRunning);
@@ -128,7 +130,9 @@ public sealed class ConPtySessionTests
                 }
             };
 
-            string text = await outputObserved.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
+            string text = await TerminalTestHelpers.AwaitProcessEventAsync(
+                outputObserved.Task,
+                "DataReceivedReplay");
 
             Assert.NotEmpty(text);
         }
@@ -201,9 +205,8 @@ public sealed class ConPtySessionTests
                 () => Volatile.Read(ref observedExitCode) == int.MinValue
                     ? null
                     : Volatile.Read(ref observedExitCode));
-            int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+            int exitCode = await TerminalTestHelpers.AwaitProcessEventAsync(
                 exited.Task,
-                TerminalTestHelpers.ProcessStartupBackstop,
                 timeoutContext);
 
             Assert.Equal(17, exitCode);
@@ -249,10 +252,7 @@ public sealed class ConPtySessionTests
                 () => Volatile.Read(ref observedExitCode) == int.MinValue
                     ? null
                     : Volatile.Read(ref observedExitCode));
-            await WaitUntilStoppedAsync(
-                session,
-                TerminalTestHelpers.ProcessStartupBackstop,
-                stoppedTimeoutContext);
+            await WaitUntilStoppedAsync(session, stoppedTimeoutContext);
 
             TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
             session.ProcessExited += exitCode =>
@@ -345,25 +345,18 @@ public sealed class ConPtySessionTests
 
     private static async Task WaitUntilStoppedAsync(
         ConPtySession session,
-        TimeSpan timeout,
-        TerminalTimeoutContext timeoutContext)
+        TerminalTimeoutContext timeoutContext,
+        [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            if (!session.IsRunning)
-            {
-                return;
-            }
+        bool stopped = await TerminalTestHelpers.PollUntilProcessEventAsync(
+            () => !session.IsRunning,
+            timeoutContext.AwaitedEvent,
+            caller);
 
-            await Task.Delay(50);
-        }
-
-        bool isRunning = session.IsRunning;
-        string? message = isRunning
-            ? TerminalTimeoutDiagnostics.CreateMessage(timeoutContext, elapsed.Elapsed)
-            : null;
-        Assert.False(isRunning, message);
+        string? message = stopped
+            ? null
+            : TerminalTimeoutDiagnostics.CreateMessage(timeoutContext, elapsed.Elapsed);
+        Assert.True(stopped, message);
     }
 }

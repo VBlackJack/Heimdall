@@ -111,6 +111,48 @@ Prefer this route when the cause is the test's own scheduling assumptions
 rather than genuine environment latency: a tag hides the test, a rewrite keeps
 the coverage in the blocking lane.
 
+## Reading terminal wait latency in a CI log
+
+`tests/Heimdall.Terminal.Tests` bounds its child-process waits with a shared
+60-second backstop. That value was raised from 10 seconds after a run timed out
+with the child still alive and `receivedBytes=0`. Raising it stopped the
+timeouts, and stopped the evidence with them: a wait that used to fail at 10
+seconds now completes at 45 and the run is green with no trace. A green run
+under the wider bound therefore cannot distinguish "the stall is gone" from
+"the same stall now finishes inside the wider bound".
+
+Every wait bounded by that backstop is routed through
+`TerminalWaitObservation`, which publishes one line to standard output as soon
+as the wait outlives 10 seconds, **including when the wait succeeds**:
+
+```
+TERMINAL_WAIT_OVER_LEGACY_BOUND caller=Write_InputReachesProcessStdin awaited=ProcessExited elapsedMs=12500.000 legacyBoundMs=10000.000 outcome=completed
+```
+
+Console output from a passing test reaches the `dotnet test --verbosity normal`
+log, so these lines accumulate in the workflow log with no collector and no
+artifact upload. To read a run:
+
+```bash
+gh run view <run-id> --log | grep TERMINAL_WAIT_OVER_LEGACY_BOUND
+```
+
+- No lines across several runs: no wait outlived the old bound, which is the
+  only evidence that supports calling the stall gone.
+- Lines with `outcome=completed`: the stall is still there and the wider bound
+  is absorbing it. The run is green and the problem is not fixed.
+- Lines with `outcome=unfinished`: the wait failed; the accompanying
+  `TimeoutException` carries the full process snapshot.
+
+`TerminalWaitInstrumentationGuardTests` refuses any new wait that reaches the
+backstop constant directly, because instrumentation that is bypassed measures
+nothing while the suite stays green either way. Use
+`TerminalTestHelpers.AwaitProcessEventAsync`, `SpinUntilProcessEvent` or
+`PollUntilProcessEventAsync`.
+
+This is measurement, not a fix. It exists so the cause can be found from the
+real distribution instead of guessed at.
+
 ## Running locally
 
 `Test.bat` and `dotnet test Heimdall.slnx` (without filter) run the full

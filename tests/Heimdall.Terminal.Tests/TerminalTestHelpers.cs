@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.CompilerServices;
 
 namespace Heimdall.Terminal.Tests;
 
@@ -26,11 +27,126 @@ internal static class TerminalTestHelpers
     /// point. <see cref="ResolvePowerShellExecutable"/> selects Windows PowerShell 5.1, whose cold
     /// start is paid on a CI runner already running eight test assemblies plus coverage
     /// instrumentation. A measured CI timeout recorded the child still alive with
-    /// <c>receivedBytes=0</c> after ten full seconds, so ten seconds bounds the host's startup
-    /// rather than anything Heimdall promises. The value only has to outlast that startup, and it
-    /// is paid only on failure: a passing wait completes as soon as the event arrives.
+    /// <c>receivedBytes=0</c> after ten full seconds, so the bound covers the host's startup rather
+    /// than anything Heimdall promises. It is paid only on failure: a passing wait completes as
+    /// soon as the event arrives.
     /// </summary>
+    /// <remarks>
+    /// Widening it to sixty seconds stopped the timeouts and stopped the evidence with them. Do
+    /// not read a green run as a cure: every wait bounded by this value is routed through
+    /// <see cref="TerminalWaitObservation"/>, which reports the ones that still outlive the old ten
+    /// second bound even when they end up succeeding. That report, not the absence of failures, is
+    /// what says whether the stall is gone.
+    /// </remarks>
     internal static readonly TimeSpan ProcessStartupBackstop = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// How often a polled wait re-tests its condition. Small enough that the elapsed time it
+    /// publishes is dominated by the event, not by the polling grain.
+    /// </summary>
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>
+    /// Awaits an event from a freshly spawned child process under the shared backstop, publishing
+    /// how long it took whenever that outlives the legacy bound.
+    /// </summary>
+    /// <param name="publish">
+    /// Sink override. Present so an oracle can prove this helper really reaches the observation:
+    /// routing that is only established by reading the code is routing nothing checks.
+    /// </param>
+    /// <param name="readElapsed">Elapsed-time override, so that oracle need not block for ten seconds.</param>
+    internal static Task<T> AwaitProcessEventAsync<T>(
+        Task<T> awaited,
+        string awaitedEvent,
+        [CallerMemberName] string caller = "",
+        Action<string>? publish = null,
+        Func<TimeSpan>? readElapsed = null)
+    {
+        return TerminalWaitObservation.ObserveAsync(
+            caller,
+            awaitedEvent,
+            () => awaited.WaitAsync(ProcessStartupBackstop),
+            publish,
+            readElapsed);
+    }
+
+    /// <summary>
+    /// Same wait, for the call sites that carry a <see cref="TerminalTimeoutContext"/> and want the
+    /// full snapshot in the failure message.
+    /// </summary>
+    internal static Task<T> AwaitProcessEventAsync<T>(
+        Task<T> awaited,
+        TerminalTimeoutContext context,
+        [CallerMemberName] string caller = "",
+        Action<string>? publish = null,
+        Func<TimeSpan>? readElapsed = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        return TerminalTimeoutDiagnostics.WaitAsync(
+            awaited,
+            ProcessStartupBackstop,
+            context,
+            caller,
+            publish,
+            readElapsed);
+    }
+
+    /// <summary>
+    /// Spins until the condition holds or the backstop expires, publishing how long it took.
+    /// </summary>
+    internal static bool SpinUntilProcessEvent(
+        Func<bool> condition,
+        string awaitedEvent,
+        [CallerMemberName] string caller = "",
+        Action<string>? publish = null,
+        Func<TimeSpan>? readElapsed = null)
+    {
+        return TerminalWaitObservation.ObserveSpin(
+            caller,
+            awaitedEvent,
+            () => SpinWait.SpinUntil(condition, ProcessStartupBackstop),
+            publish,
+            readElapsed);
+    }
+
+    /// <summary>
+    /// Polls asynchronously until the condition holds or the backstop expires, publishing how long
+    /// it took. Returns whether the condition was ever observed to hold.
+    /// </summary>
+    internal static Task<bool> PollUntilProcessEventAsync(
+        Func<bool> condition,
+        string awaitedEvent,
+        [CallerMemberName] string caller = "",
+        Action<string>? publish = null,
+        Func<TimeSpan>? readElapsed = null)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+
+        return TerminalWaitObservation.ObservePollAsync(
+            caller,
+            awaitedEvent,
+            async () =>
+            {
+                DateTimeOffset deadline = DateTimeOffset.UtcNow + ProcessStartupBackstop;
+                while (DateTimeOffset.UtcNow < deadline)
+                {
+                    if (condition())
+                    {
+                        return true;
+                    }
+
+                    await Task.Delay(PollInterval).ConfigureAwait(false);
+                }
+
+                // Re-tested once past the deadline: the loop can exit on a scheduling delay that
+                // landed after the condition became true, and reporting that as unfinished would
+                // manufacture the very signal this instrumentation exists to measure.
+                return condition();
+            },
+            publish,
+            readElapsed);
+    }
 
     internal static string ResolvePowerShellExecutable()
     {

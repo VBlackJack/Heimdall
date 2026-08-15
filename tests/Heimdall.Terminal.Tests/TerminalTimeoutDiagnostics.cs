@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace Heimdall.Terminal.Tests;
 
@@ -38,13 +39,24 @@ internal static class TerminalTimeoutDiagnostics
     internal static async Task<T> WaitAsync<T>(
         Task<T> task,
         TimeSpan timeout,
-        TerminalTimeoutContext context)
+        TerminalTimeoutContext context,
+        [CallerMemberName] string caller = "",
+        Action<string>? publish = null,
+        Func<TimeSpan>? readElapsed = null)
     {
         Stopwatch elapsed = Stopwatch.StartNew();
 
         try
         {
-            return await task.WaitAsync(timeout);
+            // Routed through the observation so a wait that survives the widened bound is reported
+            // as well: the rich snapshot below only ever describes the waits that failed, and the
+            // ones that merely took forty seconds are exactly what used to leave no trace.
+            return await TerminalWaitObservation.ObserveAsync(
+                caller,
+                context.AwaitedEvent,
+                () => task.WaitAsync(timeout),
+                publish,
+                readElapsed);
         }
         catch (TimeoutException exception)
         {
