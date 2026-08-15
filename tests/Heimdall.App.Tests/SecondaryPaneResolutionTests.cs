@@ -130,6 +130,23 @@ public sealed class SecondaryPaneResolutionTests
             SecondaryResolutionScanner.Count("SplitTreeHelper.FirstLeaf(  c.Second )"));
     }
 
+    [Fact]
+    public void TheScannerCountsEveryResolution_NotJustWhetherOneExists()
+    {
+        // Two definitions inside a single file. The sweep aggregates counts rather than files
+        // precisely because of this shape: an earlier revision added one entry per file and then
+        // asserted one entry, so a second definition beside the first passed unseen.
+        const string twoInOneFile =
+            "internal SessionPaneModel? SecondaryPaneOrNull =>\r\n"
+            + "    RootContent is SplitContainerModel c ? SplitTreeHelper.FirstLeaf(c.Second) : null;\r\n"
+            + "\r\n"
+            + "private SessionPaneModel? OtherSecondary =>\r\n"
+            + "    RootContent is SplitContainerModel d ? SplitTreeHelper.FirstLeaf(\r\n"
+            + "        d.Second) : null;";
+
+        Assert.Equal(2, SecondaryResolutionScanner.Count(twoInOneFile));
+    }
+
     [Theory]
     [InlineData("SplitTreeHelper.FirstLeaf(sourceContent)")]
     [InlineData("SplitTreeHelper.FirstLeaf(RootContent) ?? _emptyPane")]
@@ -155,7 +172,11 @@ public sealed class SecondaryPaneResolutionTests
 
         Assert.NotEmpty(sources);
 
-        List<string> recomputations = [];
+        // The invariant is on the TOTAL number of resolutions, not on the number of files holding
+        // one. Counting files lets a second definition sit beside the first in the same file and
+        // still report a single entry, which is exactly what an earlier revision of this test did.
+        int totalRecompositions = 0;
+        List<string> perFile = [];
         foreach (string source in sources)
         {
             // Whole file, not line by line: the resolution can be recomposed across a line break
@@ -163,19 +184,20 @@ public sealed class SecondaryPaneResolutionTests
             int count = SecondaryResolutionScanner.Count(File.ReadAllText(source));
             if (count > 0)
             {
-                recomputations.Add(
+                totalRecompositions += count;
+                perFile.Add(
                     $"  {Path.GetRelativePath(root, source).Replace(Path.DirectorySeparatorChar, '/')}"
                     + $" ({count})");
             }
         }
 
         Assert.True(
-            recomputations.Count == 1,
-            "The secondary pane must be resolved in exactly one place, and every consumer must ask "
-            + "for it there:"
+            totalRecompositions == 1,
+            $"The secondary pane must be resolved exactly once across src/, found {totalRecompositions}. "
+            + "Every consumer must ask SessionTabViewModel.SecondaryPaneOrNull instead:"
             + Environment.NewLine
-            + string.Join(Environment.NewLine, recomputations));
-        Assert.Contains("SessionTabViewModel.cs", recomputations[0], StringComparison.Ordinal);
+            + string.Join(Environment.NewLine, perFile));
+        Assert.Contains("SessionTabViewModel.cs", Assert.Single(perFile), StringComparison.Ordinal);
     }
 
     private static SessionPaneModel Pane(string paneId, string? title = null)
