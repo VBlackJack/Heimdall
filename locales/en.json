@@ -2012,6 +2012,7 @@
   "WarnUploadTargetsSkippedUnsupported": "Skipped {0} upload(s): the destination already exists and is not a regular file. See the log for details.",
   "WarnUploadSourcesSkippedReparsePoints": "Skipped {0} local link(s) encountered inside the selected upload tree. See the log for details.",
   "WarnRemoteReplacementNonAtomic": "Destination '{0}' was replaced without an atomic guarantee.",
+  "WarnFtpReplacementNonAtomicMetadataNotPreserved": "Destination '{0}' was replaced without an atomic guarantee, and Heimdall did not preserve the replaced file's owner, permissions, timestamps, ACLs, extended attributes or capabilities.",
   "WarnRdpFileAclFailed": "The temporary .rdp file could not be locked down with a restricted ACL. It contains the host and username, but no password; the session was still launched.",
   "ErrorTelnetConnectionFailed": "Telnet connection failed: {0}",
   "ErrorWinRmInvalidConfiguration": "The WinRM configuration is invalid.",

@@ -351,8 +351,8 @@ public sealed class FtpBrowser : IRemoteBrowser
                         client.MoveFile(source, destination, FtpRemoteExists.Skip, token),
                     (path, token) => client.DeleteFile(path, token),
                     ct,
-                    onNonAtomicReplacement: () => OperationWarningRaised?.Invoke(
-                        RemoteOperationWarning.CreateNonAtomicReplacement(remotePath)))
+                    onExistingTargetReplaced: () => OperationWarningRaised?.Invoke(
+                        RemoteOperationWarning.CreateFtpExistingTargetReplaced(remotePath)))
                     .ConfigureAwait(false);
             }
             catch

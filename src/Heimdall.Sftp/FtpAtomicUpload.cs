@@ -27,6 +27,13 @@ public static class FtpAtomicUpload
     /// Replaces the final remote path with the uploaded temp path while preserving an existing target
     /// through a recoverable backup move.
     /// </summary>
+    /// <param name="onExistingTargetReplaced">
+    /// Raised exactly once, and only once an existing destination has actually been replaced: after
+    /// the commit move succeeded, and never when the destination was absent, when the backup move
+    /// failed, or when the commit failed and the backup was restored. The callback reports a
+    /// completed fact, so it is non-blocking by contract - an exception thrown by a subscriber is
+    /// logged and contained, never allowed to fail a replacement that already succeeded.
+    /// </param>
     public static async Task CommitRenameAsync(
         string tempRemotePath,
         string finalRemotePath,
@@ -34,7 +41,7 @@ public static class FtpAtomicUpload
         Func<string, string, CancellationToken, Task<bool>> moveRemoteAsync,
         Func<string, CancellationToken, Task> deleteRemoteAsync,
         CancellationToken ct = default,
-        Action? onNonAtomicReplacement = null)
+        Action? onExistingTargetReplaced = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
@@ -49,8 +56,6 @@ public static class FtpAtomicUpload
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"FTP replacement for '{finalRemotePath}' is not atomic; moving the existing target "
                 + $"to backup '{backupRemotePath}' before commit.");
-            // No warning is due when the final path is absent because no backup move opens a replacement window.
-            onNonAtomicReplacement?.Invoke();
             bool backupMoved = await moveRemoteAsync(finalRemotePath, backupRemotePath, ct)
                 .ConfigureAwait(false);
             if (!backupMoved)
@@ -82,8 +87,44 @@ public static class FtpAtomicUpload
             throw;
         }
 
+        // Only here is the replacement a fact. Anything earlier would announce a destruction that
+        // a failed backup move never started, or that a failed commit has just undone.
+        if (backupRemotePath is not null)
+        {
+            RaiseExistingTargetReplaced(onExistingTargetReplaced, finalRemotePath);
+        }
+
         await CleanupBackupAsync(backupRemotePath, remoteExistsAsync, deleteRemoteAsync)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Invokes the replacement notification without ever letting a subscriber alter the outcome.
+    /// </summary>
+    /// <remarks>
+    /// The destination already holds the new content when this runs. Propagating a subscriber's
+    /// exception would report a successful replacement as a failure, and in
+    /// <c>FtpBrowser.UploadFileAsync</c> it would additionally trigger the temp-file rollback for
+    /// an upload that has just been published, so it is logged and contained instead.
+    /// </remarks>
+    private static void RaiseExistingTargetReplaced(
+        Action? onExistingTargetReplaced,
+        string finalRemotePath)
+    {
+        if (onExistingTargetReplaced is null)
+        {
+            return;
+        }
+
+        try
+        {
+            onExistingTargetReplaced();
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"FTP replacement warning subscriber threw for '{finalRemotePath}': {ex.Message}");
+        }
     }
 
     private static string CreateRemoteBackupPath(string finalRemotePath)
