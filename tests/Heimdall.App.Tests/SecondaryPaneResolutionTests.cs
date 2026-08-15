@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text.RegularExpressions;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Models;
 
@@ -115,6 +116,34 @@ public sealed class SecondaryPaneResolutionTests
     }
 
     [Fact]
+    public void TheScannerFindsARecompositionSplitAcrossLines()
+    {
+        // The reason the scan is not line-by-line. An earlier revision required both tokens on one
+        // line, so this exact shape walked straight past it and the repo-wide claim was false.
+        Assert.Equal(
+            1,
+            SecondaryResolutionScanner.Count(
+                "var pane = SplitTreeHelper.FirstLeaf(\r\n            container.Second);"));
+
+        Assert.Equal(
+            1,
+            SecondaryResolutionScanner.Count("SplitTreeHelper.FirstLeaf(  c.Second )"));
+    }
+
+    [Theory]
+    [InlineData("SplitTreeHelper.FirstLeaf(sourceContent)")]
+    [InlineData("SplitTreeHelper.FirstLeaf(RootContent) ?? _emptyPane")]
+    [InlineData("var a = SplitTreeHelper.FirstLeaf(x);\r\nvar b = container.Second;")]
+    public void TheScannerIgnoresFirstLeafOverAnArbitrarySubtree(string source)
+    {
+        // FirstLeaf over some other subtree is a different question and stays allowed - the two
+        // SplitService call sites and the PRIMARY pane resolution both look like this. The last
+        // case matters most: two unrelated statements must not combine into a false positive, so
+        // the match is bounded inside the argument list.
+        Assert.Equal(0, SecondaryResolutionScanner.Count(source));
+    }
+
+    [Fact]
     public void TheResolutionIsDeclaredExactlyOnce()
     {
         string root = FindRepositoryRoot();
@@ -129,18 +158,14 @@ public sealed class SecondaryPaneResolutionTests
         List<string> recomputations = [];
         foreach (string source in sources)
         {
-            string[] lines = File.ReadAllLines(source);
-            for (int index = 0; index < lines.Length; index++)
+            // Whole file, not line by line: the resolution can be recomposed across a line break
+            // and stay exactly as much of a second definition as the one-line form.
+            int count = SecondaryResolutionScanner.Count(File.ReadAllText(source));
+            if (count > 0)
             {
-                // FirstLeaf over an arbitrary subtree is a different question and stays allowed;
-                // only "the first leaf of a Second" is this definition.
-                if (lines[index].Contains("FirstLeaf(", StringComparison.Ordinal)
-                    && lines[index].Contains(".Second", StringComparison.Ordinal))
-                {
-                    recomputations.Add(
-                        $"  {Path.GetRelativePath(root, source).Replace(Path.DirectorySeparatorChar, '/')}"
-                        + $":{index + 1} - {lines[index].Trim()}");
-                }
+                recomputations.Add(
+                    $"  {Path.GetRelativePath(root, source).Replace(Path.DirectorySeparatorChar, '/')}"
+                    + $" ({count})");
             }
         }
 
@@ -156,6 +181,37 @@ public sealed class SecondaryPaneResolutionTests
     private static SessionPaneModel Pane(string paneId, string? title = null)
     {
         return new SessionPaneModel { PaneId = paneId, Title = title ?? paneId };
+    }
+
+    /// <summary>
+    /// Finds every place that resolves the first leaf of a <c>Second</c> subtree.
+    /// </summary>
+    /// <remarks>
+    /// Extracted so the detection can be tested on synthetic input instead of only on the tree it
+    /// polices. Its first revision compared line by line, which a call recomposed across a line
+    /// break walked straight past - so the sweep reported one declaration while a second could sit
+    /// beside it unseen.
+    /// </remarks>
+    internal static class SecondaryResolutionScanner
+    {
+        /// <summary>
+        /// <c>FirstLeaf(</c> whose argument mentions <c>.Second</c>, over any amount of
+        /// whitespace including newlines.
+        /// </summary>
+        /// <remarks>
+        /// <c>[^()]*?</c> keeps the match inside one argument list, so two unrelated statements -
+        /// a <c>FirstLeaf</c> here and a <c>.Second</c> further down - cannot combine into a false
+        /// positive.
+        /// </remarks>
+        private static readonly Regex Recomposition = new(
+            @"FirstLeaf\s*\(\s*[^()]*?\.Second\b",
+            RegexOptions.CultureInvariant | RegexOptions.Singleline);
+
+        internal static int Count(string content)
+        {
+            ArgumentNullException.ThrowIfNull(content);
+            return Recomposition.Matches(content).Count;
+        }
     }
 
     private static string ExtractMethodBody(string source, string methodName)
