@@ -2264,14 +2264,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
             // Tool views with DataGrid context menus (NetworkCartography, PortScanner, etc.)
             var dataGrid = FindAncestor<System.Windows.Controls.DataGrid>(clickSource);
-            if (dataGrid is not null && session.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
+            if (dataGrid is not null && ConnectionTypeCatalog.IsToolConnectionType(session.ConnectionType))
             {
                 return; // Let the tool's own ContextMenuOpening handler take over
             }
 
             // Tool views with TreeView context menus (e.g. NotesToolView)
             var treeView = FindAncestor<System.Windows.Controls.TreeView>(clickSource);
-            if (treeView is not null && session.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
+            if (treeView is not null && ConnectionTypeCatalog.IsToolConnectionType(session.ConnectionType))
             {
                 return;
             }

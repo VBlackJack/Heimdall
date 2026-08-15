@@ -18,6 +18,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Converters;
 
@@ -57,7 +58,7 @@ public sealed class ConnectionTypeToBrushConverter : IValueConverter, IMultiValu
         string typeStr = value?.ToString()?.ToUpperInvariant() ?? string.Empty;
 
         string resourceKey;
-        if (typeStr.StartsWith("TOOL:", StringComparison.Ordinal))
+        if (ConnectionTypeCatalog.IsToolConnectionType(typeStr))
         {
             resourceKey = "ToolBadgeBrush";
         }

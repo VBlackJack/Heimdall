@@ -21,7 +21,8 @@ namespace Heimdall.Core.Configuration;
 /// </summary>
 public static class ConnectionTypeCatalog
 {
-    private const string ToolPrefix = "TOOL:";
+    /// <summary>The marker a connection type carries when its tab hosts a tool.</summary>
+    public const string ToolPrefix = "TOOL:";
 
     private static readonly IReadOnlyDictionary<string, string> CanonicalMappings =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -50,7 +51,7 @@ public static class ConnectionTypeCatalog
     public static bool IsKnown(string? connectionType)
     {
         return !string.IsNullOrWhiteSpace(connectionType)
-            && (CanonicalMappings.ContainsKey(connectionType) || IsTool(connectionType));
+            && (CanonicalMappings.ContainsKey(connectionType) || IsNamedTool(connectionType));
     }
 
     /// <summary>
@@ -71,13 +72,48 @@ public static class ConnectionTypeCatalog
     {
         return !string.Equals(connectionType, "Local", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(connectionType, "Citrix", StringComparison.OrdinalIgnoreCase)
-            && !IsTool(connectionType);
+            && !IsNamedTool(connectionType);
     }
 
-    private static bool IsTool(string? connectionType)
+    /// <summary>
+    /// Returns whether a connection type marks a tab that hosts a tool rather than a connection.
+    /// </summary>
+    /// <remarks>
+    /// A bare prefix test, deliberately: this answers "is this tab a tool tab", and a value of
+    /// exactly <see cref="ToolPrefix"/> names no tool but is certainly not a connection either.
+    /// It is therefore WIDER than <see cref="IsNamedTool"/>, which additionally requires an
+    /// identifier and answers the different question of whether the value is a usable type. The
+    /// two are not interchangeable and swapping one for the other changes behaviour silently.
+    /// </remarks>
+    public static bool IsToolConnectionType(string? connectionType)
     {
         return connectionType is not null
-            && connectionType.StartsWith(ToolPrefix, StringComparison.OrdinalIgnoreCase)
-            && connectionType.Length > ToolPrefix.Length;
+            && connectionType.StartsWith(ToolPrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns the tool identifier behind a tool connection type, or the value unchanged when it
+    /// carries no prefix.
+    /// </summary>
+    public static string StripToolPrefix(string connectionType)
+    {
+        ArgumentNullException.ThrowIfNull(connectionType);
+
+        return IsToolConnectionType(connectionType)
+            ? connectionType[ToolPrefix.Length..]
+            : connectionType;
+    }
+
+    /// <summary>
+    /// Whether the value names an actual tool, prefix AND identifier.
+    /// </summary>
+    /// <remarks>
+    /// Stricter than <see cref="IsToolConnectionType"/> on purpose: this one decides whether a
+    /// persisted type is usable, so a prefix with nothing behind it is not.
+    /// </remarks>
+    private static bool IsNamedTool(string? connectionType)
+    {
+        return IsToolConnectionType(connectionType)
+            && connectionType!.Length > ToolPrefix.Length;
     }
 }

@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.Services.SessionSnapshot;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.ViewModels.Shell;
 
@@ -30,17 +31,6 @@ namespace Heimdall.App.ViewModels.Shell;
 public static class SessionSnapshotProjection
 {
     /// <summary>
-    /// Marks a session tab that hosts a tool rather than a connection.
-    /// </summary>
-    /// <remarks>
-    /// Spelled here rather than shared: the same literal appears across the application with two
-    /// different comparison modes, and converging them is a change of its own rather than
-    /// something to slip into an extraction. This site keeps the comparison the shell already
-    /// used.
-    /// </remarks>
-    internal const string ToolConnectionTypePrefix = "TOOL:";
-
-    /// <summary>
     /// Projects the sessions worth restoring, most-recently-ordered last.
     /// </summary>
     public static IReadOnlyList<SessionSnapshotEntry> FromSessions(
@@ -51,9 +41,7 @@ public static class SessionSnapshotProjection
         return sessions
             .Where(session => !string.IsNullOrWhiteSpace(session.OriginalServerId))
             .Where(session => !string.IsNullOrWhiteSpace(session.ConnectionType))
-            .Where(session => !session.ConnectionType.StartsWith(
-                ToolConnectionTypePrefix,
-                StringComparison.OrdinalIgnoreCase))
+            .Where(session => !ConnectionTypeCatalog.IsToolConnectionType(session.ConnectionType))
 
             // Numbered AFTER filtering, so the order is a gapless sequence over what is actually
             // stored. The restore path sorts on it, so what has to hold is the relative sequence;

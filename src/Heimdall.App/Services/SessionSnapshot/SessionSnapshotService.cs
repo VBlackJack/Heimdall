@@ -177,7 +177,7 @@ public sealed class SessionSnapshotService(IConfigManager configManager) : ISess
             return false;
         }
 
-        return !entry.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase);
+        return !ConnectionTypeCatalog.IsToolConnectionType(entry.ConnectionType);
     }
 
     private static void TryDeleteTempFile(string tempPath)

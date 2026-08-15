@@ -61,8 +61,7 @@ public sealed class ContextMenuFactory
         return target switch
         {
             BulkSelectionContext bulk => CreateBulkSelectionContextMenu(vm, bulk),
-            ServerItemViewModel server when server.ConnectionType?.StartsWith(
-                "TOOL:", StringComparison.OrdinalIgnoreCase) == true
+            ServerItemViewModel server when ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType)
                 => CreateToolContextMenu(vm, server, callbacks),
             ServerItemViewModel server => CreateServerContextMenu(vm, server, callbacks),
             FolderViewModel folder => CreateFolderContextMenu(vm, folder, callbacks),
@@ -383,7 +382,7 @@ public sealed class ContextMenuFactory
         var openItem = new MenuItem { Header = vm.Localize("TreeCtxOpenToolInTab") };
         openItem.Click += (_, _) =>
         {
-            var toolId = tool.ConnectionType!["TOOL:".Length..];
+            var toolId = ConnectionTypeCatalog.StripToolPrefix(tool.ConnectionType!);
             vm.TrackRecentTool(toolId.ToUpperInvariant());
             var context = new Core.Models.ToolContext(
                 TargetHost: tool.RemoteServer,

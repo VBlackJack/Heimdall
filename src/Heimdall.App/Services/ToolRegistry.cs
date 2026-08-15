@@ -15,6 +15,7 @@
  */
 
 using System.Collections.Frozen;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services;
@@ -374,9 +375,7 @@ public sealed class ToolRegistry
     }
 
     private static string StripPrefix(string toolId)
-        => toolId.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase)
-            ? toolId["TOOL:".Length..]
-            : toolId;
+        => ConnectionTypeCatalog.StripToolPrefix(toolId);
 
     private static ToolEntry Entry(
         string id,

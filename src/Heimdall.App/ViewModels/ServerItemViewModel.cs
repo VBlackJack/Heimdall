@@ -239,7 +239,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         "TELNET" => "TEL",
         "CITRIX" => "CTX",
         "LOCAL" => "SH",
-        _ when ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) => "TOOL",
+        _ when ConnectionTypeCatalog.IsToolConnectionType(ConnectionType) => "TOOL",
         _ => ConnectionType.ToUpperInvariant()
     };
 

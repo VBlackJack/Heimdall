@@ -434,7 +434,7 @@ public sealed class SplitService : ISplitService
         // Check CanClose for tool panes in the source tree (busy tool blocks the merge)
         foreach (var leaf in SplitTreeHelper.EnumerateLeaves(source.RootContent))
         {
-            if (leaf.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase)
+            if (ConnectionTypeCatalog.IsToolConnectionType(leaf.ConnectionType)
                 && leaf.HostControl is IToolView toolView
                 && !toolView.CanClose())
             {
@@ -546,7 +546,7 @@ public sealed class SplitService : ISplitService
                 : PaneCloseResult.Blocked(reasonKey);
         }
 
-        var isToolPane = pane.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase);
+        var isToolPane = ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType);
 
         if (isToolPane)
         {
@@ -930,7 +930,7 @@ public sealed class SplitService : ISplitService
         // Check CanClose for all tool panes before proceeding (any busy tool blocks the close)
         foreach (var pane in leaves)
         {
-            if (pane.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase)
+            if (ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType)
                 && pane.HostControl is IToolView toolView
                 && !toolView.CanClose())
             {
@@ -942,7 +942,7 @@ public sealed class SplitService : ISplitService
 
         foreach (var pane in leaves)
         {
-            if (!pane.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase)
+            if (!ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType)
                 && !string.IsNullOrEmpty(pane.ServerId))
             {
                 string historyId = pane.ProfileLookupServerId;
