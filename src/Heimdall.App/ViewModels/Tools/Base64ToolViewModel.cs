@@ -57,6 +57,16 @@ public sealed partial class Base64ToolViewModel : ObservableObject, IDisposable
 
     public bool IsEncodeEnabled => !_isExecuting;
 
+    /// <summary>
+    /// Whether the decode entry point accepts a new run.
+    /// </summary>
+    /// <remarks>
+    /// The decode button binds this instead of a command, because its Click handler has work to
+    /// do after the command completes. Without it the button stayed enabled for the whole decode
+    /// and told the user an operation was available while one was already running.
+    /// </remarks>
+    public bool IsDecodeEnabled => CanExecuteAction();
+
     public void Initialize(LocalizationManager? localizer)
     {
         if (ReferenceEquals(_localizer, localizer))
@@ -165,7 +175,11 @@ public sealed partial class Base64ToolViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteAction))]
     private async Task EncodeAsync()
     {
-        if (_disposed)
+        // Re-checked here, not only through CanExecute. AsyncRelayCommand.ExecuteAsync invokes
+        // the delegate without consulting CanExecute, and the view calls ExecuteAsync directly
+        // from the Ctrl+Enter shortcut, so the declared "not while another run is in flight"
+        // contract only holds if the body enforces it too.
+        if (!CanExecuteAction())
         {
             return;
         }
@@ -187,7 +201,11 @@ public sealed partial class Base64ToolViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteAction))]
     private async Task DecodeAsync()
     {
-        if (_disposed)
+        // Same reason as EncodeAsync, and it matters more here: the decode button is wired to a
+        // Click handler on purpose, because a file-mode decode opens a save dialog afterwards.
+        // A Click handler cannot be gated by the command, so without this the button stayed live
+        // for the whole decode and a second click re-entered the body and cancelled the first.
+        if (!CanExecuteAction())
         {
             return;
         }
@@ -297,6 +315,7 @@ public sealed partial class Base64ToolViewModel : ObservableObject, IDisposable
         _cts = new CancellationTokenSource();
         _isExecuting = true;
         OnPropertyChanged(nameof(IsEncodeEnabled));
+        OnPropertyChanged(nameof(IsDecodeEnabled));
         EncodeCommand.NotifyCanExecuteChanged();
         DecodeCommand.NotifyCanExecuteChanged();
         return _cts;
@@ -310,6 +329,7 @@ public sealed partial class Base64ToolViewModel : ObservableObject, IDisposable
             _cts = null;
             _isExecuting = false;
             OnPropertyChanged(nameof(IsEncodeEnabled));
+            OnPropertyChanged(nameof(IsDecodeEnabled));
             EncodeCommand.NotifyCanExecuteChanged();
             DecodeCommand.NotifyCanExecuteChanged();
         }
