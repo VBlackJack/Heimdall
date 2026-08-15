@@ -174,6 +174,8 @@ public sealed class SftpMetadataPreflightTests
     [InlineData(SftpMetadataPreflight.AclStatus, SftpMetadataPreflightVerdict.AclPresent)]
     [InlineData(SftpMetadataPreflight.ToolingStatus, SftpMetadataPreflightVerdict.ToolingUnavailable)]
     [InlineData(SftpMetadataPreflight.UnreadableStatus, SftpMetadataPreflightVerdict.MetadataUnreadable)]
+    [InlineData(SftpMetadataPreflight.ExtendedAttributeStatus, SftpMetadataPreflightVerdict.ExtendedAttributesPresent)]
+    [InlineData(SftpMetadataPreflight.OwnershipStatus, SftpMetadataPreflightVerdict.OwnershipNotReproducible)]
     public void Classify_MapsEachDocumentedStatus(int status, SftpMetadataPreflightVerdict expected)
     {
         Assert.Equal(expected, SftpMetadataPreflight.Classify(status));

@@ -441,7 +441,7 @@ public sealed class SftpBrowser : IRemoteBrowser
                                 client.SetAttributes(tempRemotePath, attributes);
                             },
                             OpenTempForWrite: () => client.OpenWrite(tempRemotePath),
-                            ReadTargetModeAfterUpload: () =>
+                            ReadTargetAttributesAfterUpload: () =>
                             {
                                 ISftpFile? targetEntry = TryGetEntryWithoutFollowingTarget(client, remotePath);
                                 RemoteEntryKind? targetKind = targetEntry is null
@@ -449,25 +449,52 @@ public sealed class SftpBrowser : IRemoteBrowser
                                     : GetRemoteEntryKind(targetEntry);
                                 SftpAtomicUpload.EnsureUploadTargetSupported(remotePath, targetKind);
 
-                                return targetEntry is { IsRegularFile: true }
-                                    ? GetPermissionMode(targetEntry.Attributes)
-                                    : null;
+                                if (targetEntry is not { IsRegularFile: true })
+                                {
+                                    return null;
+                                }
+
+                                // The destination's own stamps, taken here and nowhere else. Read
+                                // from the temporary they would simply be the upload's own clock.
+                                SftpFileAttributes targetAttributes = targetEntry.Attributes;
+                                return new SftpModePreservation.SftpPublicationAttributes(
+                                    GetPermissionMode(targetAttributes),
+                                    targetAttributes.LastAccessTimeUtc,
+                                    targetAttributes.LastWriteTimeUtc);
                             },
-                            // Routed through the existing apply-and-verify helper, so a mode that
-                            // cannot be set still refuses the commit rather than publishing a file
-                            // with the wrong permissions.
-                            ApplyPublicationMode: mode =>
+                            // Mode still routed through the existing helper, so a mode that cannot
+                            // be set refuses the commit rather than publishing wrong permissions.
+                            // Timestamps ride the same SetAttributes call: one round trip, and no
+                            // window in which the file carries the new mode but the old stamps.
+                            ApplyPublicationAttributes: desired =>
                             {
                                 SftpFileAttributes attributes = client.GetAttributes(tempRemotePath);
+                                // Null means a creation: there is no destination whose stamps
+                                // could be inherited, so the file keeps the ones the write gave it.
+                                if (desired.LastWriteTimeUtc is { } writeTime
+                                    && desired.LastAccessTimeUtc is { } accessTime)
+                                {
+                                    attributes.LastAccessTimeUtc = accessTime;
+                                    attributes.LastWriteTimeUtc = writeTime;
+                                }
+
                                 ApplyUploadModeBeforeCommit(
                                     remotePath,
-                                    mode,
+                                    desired.Mode,
                                     GetPermissionMode(attributes),
                                     modeToApply =>
                                     {
                                         ApplyPermissionMode(attributes, modeToApply);
                                         client.SetAttributes(tempRemotePath, attributes);
                                     });
+                            },
+                            ReadTempAttributesAfterApply: () =>
+                            {
+                                SftpFileAttributes applied = client.GetAttributes(tempRemotePath);
+                                return new SftpModePreservation.SftpPublicationAttributes(
+                                    GetPermissionMode(applied),
+                                    applied.LastAccessTimeUtc,
+                                    applied.LastWriteTimeUtc);
                             },
                             Commit: () =>
                             {

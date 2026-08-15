@@ -49,9 +49,127 @@ public sealed class SftpModePreservationTests
                 "Dispose",
                 "ReadTarget",
                 "ApplyPublicationMode:0x1a4",
+
+                // Creation: no destination existed, so no timestamps are inherited. Dating a new
+                // file from a target that was never there would be invention, not preservation.
+                "ApplyStamps:a=none,w=none",
                 "Commit"
             ],
             recorder.Log);
+    }
+
+    [Fact]
+    public void RunStagedUpload_Replacement_AppliesTheTargetsModeAndTimestampsBeforeCommit()
+    {
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: 0x1ED)
+        {
+            // Deliberately different from each other, so swapping them is visible. Equal stamps
+            // would make an atime/mtime inversion undetectable.
+            TargetAccessTimeUtc = new DateTime(2021, 3, 4, 5, 6, 7, DateTimeKind.Utc),
+            TargetWriteTimeUtc = new DateTime(2022, 8, 9, 10, 11, 12, DateTimeKind.Utc),
+        };
+
+        SftpModePreservation.RunStagedUpload(
+            recorder.Operations,
+            new MemoryStream([1, 2, 3]),
+            recorder.Progress.Add,
+            CancellationToken.None);
+
+        Assert.Equal(0x1EDu, recorder.PublishedMode);
+        Assert.Equal(recorder.TargetAccessTimeUtc, recorder.PublishedAccessTimeUtc);
+        Assert.Equal(recorder.TargetWriteTimeUtc, recorder.PublishedWriteTimeUtc);
+
+        // Order is the contract: the stream is flushed and closed, the destination is read, the
+        // attributes are applied, they are read back, and only then is the file published.
+        Assert.Equal(
+            [
+                "Flush",
+                "Dispose",
+                "ReadTarget",
+                "ApplyPublicationMode:0x1ed",
+                "ApplyStamps:a=2021-03-04T05:06:07.0000000Z,w=2022-08-09T10:11:12.0000000Z",
+                "ReadBack",
+                "Commit"
+            ],
+            recorder.Log.SkipWhile(entry => entry != "Flush").ToArray());
+    }
+
+    [Fact]
+    public void RunStagedUpload_Replacement_RefusesTheCommitWhenTheReadBackDisagrees()
+    {
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: 0x1ED)
+        {
+            // A server that silently ignores the timestamp write: it accepts the call and leaves
+            // the file dated now. Reporting success there would claim a preservation that did not
+            // happen, which is the whole reason the read-back exists.
+            ReadBackWriteTimeUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        };
+
+        IOException exception = Assert.Throws<IOException>(() =>
+            SftpModePreservation.RunStagedUpload(
+                recorder.Operations,
+                new MemoryStream([1, 2, 3]),
+                recorder.Progress.Add,
+                CancellationToken.None));
+
+        Assert.Contains("would not preserve", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Commit", recorder.Log);
+    }
+
+    [Fact]
+    public void RunStagedUpload_Replacement_RefusesTheCommitWhenTheAccessTimeAloneDisagrees()
+    {
+        // Checked separately from the write time: a read-back oracle that only compared mtime
+        // would accept an atime that was never applied.
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: 0x1ED)
+        {
+            ReadBackAccessTimeUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        };
+
+        Assert.Throws<IOException>(() =>
+            SftpModePreservation.RunStagedUpload(
+                recorder.Operations,
+                new MemoryStream([1, 2, 3]),
+                recorder.Progress.Add,
+                CancellationToken.None));
+
+        Assert.DoesNotContain("Commit", recorder.Log);
+    }
+
+    [Fact]
+    public void RunStagedUpload_Replacement_PropagatesAnApplyFailureAndDoesNotCommit()
+    {
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: 0x1ED)
+        {
+            ApplyPublicationThrows = true,
+        };
+
+        Assert.Throws<IOException>(() =>
+            SftpModePreservation.RunStagedUpload(
+                recorder.Operations,
+                new MemoryStream([1, 2, 3]),
+                recorder.Progress.Add,
+                CancellationToken.None));
+
+        Assert.DoesNotContain("Commit", recorder.Log);
+    }
+
+    [Fact]
+    public void RunStagedUpload_Creation_InheritsNoTimestamps()
+    {
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: null);
+
+        SftpModePreservation.RunStagedUpload(
+            recorder.Operations,
+            new MemoryStream([1, 2, 3]),
+            recorder.Progress.Add,
+            CancellationToken.None);
+
+        // No destination existed, so there is nothing to restore and nothing to verify.
+        Assert.Null(recorder.PublishedAccessTimeUtc);
+        Assert.Null(recorder.PublishedWriteTimeUtc);
+        Assert.DoesNotContain("ReadBack", recorder.Log);
+        Assert.Contains("Commit", recorder.Log);
     }
 
     [Fact]
@@ -266,17 +384,56 @@ public sealed class SftpModePreservationTests
                 Log.Add("Open");
                 return new RecordingStream(this);
             },
-            ReadTargetModeAfterUpload: () =>
+            ReadTargetAttributesAfterUpload: () =>
             {
                 Log.Add("ReadTarget");
-                return _targetMode;
+                return _targetMode is { } mode
+                    ? new SftpModePreservation.SftpPublicationAttributes(
+                        mode,
+                        TargetAccessTimeUtc,
+                        TargetWriteTimeUtc)
+                    : null;
             },
-            ApplyPublicationMode: mode =>
+            ApplyPublicationAttributes: desired =>
             {
-                Log.Add($"ApplyPublicationMode:0x{mode:x}");
-                PublishedMode = mode;
+                Log.Add($"ApplyPublicationMode:0x{desired.Mode:x}");
+                Log.Add($"ApplyStamps:a={Stamp(desired.LastAccessTimeUtc)},w={Stamp(desired.LastWriteTimeUtc)}");
+                PublishedMode = desired.Mode;
+                PublishedAccessTimeUtc = desired.LastAccessTimeUtc;
+                PublishedWriteTimeUtc = desired.LastWriteTimeUtc;
+                if (ApplyPublicationThrows)
+                {
+                    throw new IOException("utimes refused");
+                }
+            },
+            ReadTempAttributesAfterApply: () =>
+            {
+                Log.Add("ReadBack");
+                return new SftpModePreservation.SftpPublicationAttributes(
+                    ReadBackMode ?? PublishedMode ?? 0,
+                    ReadBackAccessTimeUtc ?? PublishedAccessTimeUtc,
+                    ReadBackWriteTimeUtc ?? PublishedWriteTimeUtc);
             },
             Commit: () => Log.Add("Commit"));
+
+        private static string Stamp(DateTime? value) =>
+            value is { } v ? v.ToString("O", System.Globalization.CultureInfo.InvariantCulture) : "none";
+
+        public DateTime TargetAccessTimeUtc { get; set; } = new(2021, 3, 4, 5, 6, 7, DateTimeKind.Utc);
+
+        public DateTime TargetWriteTimeUtc { get; set; } = new(2022, 8, 9, 10, 11, 12, DateTimeKind.Utc);
+
+        public bool ApplyPublicationThrows { get; set; }
+
+        public uint? ReadBackMode { get; set; }
+
+        public DateTime? ReadBackAccessTimeUtc { get; set; }
+
+        public DateTime? ReadBackWriteTimeUtc { get; set; }
+
+        public DateTime? PublishedAccessTimeUtc { get; private set; }
+
+        public DateTime? PublishedWriteTimeUtc { get; private set; }
 
         private sealed class RecordingStream(StagedUploadRecorder owner) : Stream
         {
