@@ -22,6 +22,7 @@ using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels;
+using Heimdall.Core.Configuration;
 using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Heimdall.App;
@@ -147,7 +148,7 @@ public partial class MainWindow
     /// </summary>
     private void UpdateToolDetailPanel(MainViewModel vm, string connectionType)
     {
-        var toolId = connectionType["TOOL:".Length..];
+        var toolId = ConnectionTypeCatalog.StripToolPrefix(connectionType);
         var desc = ToolRegistry.GetById(toolId);
         if (desc is null) return;
 
@@ -186,9 +187,9 @@ public partial class MainWindow
             vm.ServerList.SelectedServer);
         if (server is null) return;
 
-        if (server.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
+        if (ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType))
         {
-            var toolId = server.ConnectionType["TOOL:".Length..];
+            var toolId = ConnectionTypeCatalog.StripToolPrefix(server.ConnectionType);
             vm.TrackRecentTool(toolId.ToUpperInvariant());
             var context = new Core.Models.ToolContext(
                 TargetHost: server.RemoteServer,
@@ -979,7 +980,7 @@ public partial class MainWindow
 
         WarmDns(server);
 
-        var isTool = server.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true;
+        var isTool = ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType);
         if (isTool)
         {
             SessionDetailPanel.Visibility = Visibility.Collapsed;

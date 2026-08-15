@@ -1765,7 +1765,7 @@ public partial class ServerListViewModel
 
     private static bool IsToolConnectionType(string? connectionType)
     {
-        return connectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true;
+        return ConnectionTypeCatalog.IsToolConnectionType(connectionType);
     }
 
     private sealed record BulkMutationPlan(

@@ -20,6 +20,7 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.StateMachine;
 
@@ -206,7 +207,7 @@ public partial class ConnectionViewModel : ObservableObject
         int currentEmbeddedSessions = ActiveSessions
             .SelectMany(session => Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent))
             .Count(pane => pane.HostControl is not null
-                && !pane.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase));
+                && !ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType));
 
         if (currentEmbeddedSessions >= maxEmbeddedSessions)
         {

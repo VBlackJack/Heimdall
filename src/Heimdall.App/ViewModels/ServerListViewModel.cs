@@ -830,13 +830,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
             var originalId = serverDto.Id;
 
             // Tool entries bypass the connection pipeline entirely
-            if (serverDto.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
+            if (ConnectionTypeCatalog.IsToolConnectionType(serverDto.ConnectionType))
             {
                 serverDto.Id = originalId;
                 _connectionSm.TryTransition(sessionId, Core.Models.ConnectionState.Initializing);
                 try
                 {
-                    var toolId = serverDto.ConnectionType["TOOL:".Length..];
+                    var toolId = ConnectionTypeCatalog.StripToolPrefix(serverDto.ConnectionType);
                     var context = new Core.Models.ToolContext(
                         TargetHost: serverDto.RemoteServer,
                         TargetPort: serverDto.RemotePort > 0 ? serverDto.RemotePort : null,
@@ -1463,7 +1463,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
         }
 
         // Tools use a simplified edit flow (name + host) instead of the full ServerDialog
-        if (serverDto.ConnectionType?.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase) == true)
+        if (ConnectionTypeCatalog.IsToolConnectionType(serverDto.ConnectionType))
         {
             var newName = await _dialogService.ShowInputAsync(
                 _localizer["AddToolDialogTitle"],

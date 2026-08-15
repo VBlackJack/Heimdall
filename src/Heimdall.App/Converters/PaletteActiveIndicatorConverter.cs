@@ -18,6 +18,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Converters;
 
@@ -53,7 +54,7 @@ public sealed class PaletteActiveIndicatorConverter : IMultiValueConverter
 
     private static Brush ResolveBadgeBrush(string connectionType)
     {
-        string resourceKey = connectionType.StartsWith("TOOL:", StringComparison.Ordinal)
+        string resourceKey = ConnectionTypeCatalog.IsToolConnectionType(connectionType)
             ? "ToolBadgeBrush"
             : connectionType switch
             {

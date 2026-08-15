@@ -21,6 +21,7 @@ using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views;
 using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
 
@@ -67,8 +68,7 @@ public sealed class SessionTabContextMenuFactory
         ArgumentNullException.ThrowIfNull(callbacks);
 
         var menu = new ContextMenu();
-        var isToolTab = session.ConnectionType?.StartsWith(
-            "TOOL:", StringComparison.OrdinalIgnoreCase) == true;
+        var isToolTab = ConnectionTypeCatalog.IsToolConnectionType(session.ConnectionType);
 
         AppendCloseItem(menu, session, vm, isToolTab);
         AppendTitleAndPinItems(menu, session, vm);
