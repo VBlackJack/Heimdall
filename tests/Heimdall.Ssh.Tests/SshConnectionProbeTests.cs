@@ -28,7 +28,10 @@ public sealed class SshConnectionProbeTests
     [Fact]
     public async Task ProbeAsync_ClosedPort_ReturnsNetworkFailure()
     {
-        var port = GetClosedLoopbackPort();
+        // The port is held closed for the whole probe rather than released before it. Nothing can
+        // accept on an endpoint this test owns and never listens on, so a success is impossible
+        // by construction instead of merely unlikely.
+        using Socket reservation = ReserveClosedLoopbackPort(out int port);
 
         var result = await SshConnectionProbe.ProbeAsync("127.0.0.1", port, ClosedPortProbeTimeoutMs);
 
@@ -40,6 +43,28 @@ public sealed class SshConnectionProbeTests
             result.MessageKey == SshConnectionProbe.MessageKeyConnectionRefused
                 || result.MessageKey == SshConnectionProbe.MessageKeyConnectionTimedOut,
             $"Expected a network failure message key, got {result.MessageKey}.");
+
+        // Checked AFTER the probe returned, deliberately. The contract above is permissive by
+        // design - refused OR timed out - so it cannot tell a closed port from an open silent
+        // one and cannot police the reservation. This can: if the port had been released before
+        // the probe, as the old helper did, the competing bind below would succeed.
+        AssertEndpointIsStillHeld(port);
+        GC.KeepAlive(reservation);
+    }
+
+    /// <summary>
+    /// Asserts that nothing else can take the endpoint, which is what makes the probe above a
+    /// measurement of a genuinely closed port rather than of whatever claimed the port next.
+    /// </summary>
+    private static void AssertEndpointIsStillHeld(int port)
+    {
+        using Socket challenger = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        SocketException refusal = Assert.Throws<SocketException>(
+            () => challenger.Bind(new IPEndPoint(IPAddress.Loopback, port)));
+
+        Assert.Contains(
+            refusal.SocketErrorCode,
+            new[] { SocketError.AddressAlreadyInUse, SocketError.AccessDenied });
     }
 
     [Fact]
@@ -119,13 +144,38 @@ public sealed class SshConnectionProbeTests
         Assert.Empty(result.MessageArguments);
     }
 
-    private static int GetClosedLoopbackPort()
+    /// <summary>
+    /// Reserves a loopback port and keeps it closed to connections for as long as the returned
+    /// socket is alive.
+    /// </summary>
+    /// <remarks>
+    /// This used to return a bare <see cref="int"/> after starting and stopping a listener, which
+    /// is a time-of-check/time-of-use hole: from the moment the listener stops, the ephemeral port
+    /// belongs to whichever socket on the machine asks for one next, and the probe then measures
+    /// whatever took it. The caller holds this socket across the probe instead, so a reachable
+    /// result is impossible by construction rather than merely improbable.
+    /// <para>
+    /// The socket is bound and never listened on: that is what keeps the endpoint owned by the
+    /// test and closed to connections at the same time. <see cref="Socket.ExclusiveAddressUse"/>
+    /// is set as an explicit declaration that the endpoint is not to be shared; on Windows a
+    /// competing bind is refused with or without it.
+    /// </para>
+    /// </remarks>
+    private static Socket ReserveClosedLoopbackPort(out int port)
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
+        Socket reservation = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            reservation.ExclusiveAddressUse = true;
+            reservation.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            port = ((IPEndPoint)reservation.LocalEndPoint!).Port;
+            return reservation;
+        }
+        catch
+        {
+            reservation.Dispose();
+            throw;
+        }
     }
 
     private static (int Port, Task ServerTask) StartSingleResponseServer(string response)
