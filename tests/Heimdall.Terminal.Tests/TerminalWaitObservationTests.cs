@@ -143,6 +143,32 @@ public sealed class TerminalWaitObservationTests
     }
 
     [Fact]
+    public async Task ObserveAsync_WhileTheWaitIsStillPending_PublishesNothing()
+    {
+        List<string> published = [];
+        TaskCompletionSource<int> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<int> observed = TerminalWaitObservation.ObserveAsync(
+            "SomeTest",
+            "ProcessExited",
+            () => pending.Task,
+            published.Add,
+            () => OverBound);
+
+        // Deterministic, not a timing window: ObserveAsync runs synchronously up to its first
+        // await, and the awaited task is still pending, so the finally cannot have run. This is the
+        // property the documentation rests on - a line marks a wait that has ENDED, so a wait still
+        // blocked when the job is killed publishes nothing at all, and an empty log only carries
+        // meaning for a run that reached the end of its test step.
+        Assert.Empty(published);
+
+        pending.SetResult(1);
+        Assert.Equal(1, await observed);
+
+        Assert.Single(published);
+    }
+
+    [Fact]
     public async Task ObserveAsync_AFastWait_PublishesNothing()
     {
         List<string> published = [];

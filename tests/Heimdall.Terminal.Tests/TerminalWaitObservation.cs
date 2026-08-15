@@ -46,10 +46,16 @@ internal enum TerminalWaitOutcome
 /// answered before the flake family can be called closed.
 /// <para>
 /// This closes that gap. Every instrumented wait is measured, and one greppable line is published
-/// as soon as it outlives <see cref="LegacyBound"/> - INCLUDING when the wait succeeds, which is
-/// the entire point. Console output from a PASSING test reaches the
+/// when the wait ENDS having outlived <see cref="LegacyBound"/> - including when it ends by
+/// succeeding, which is the entire point. Console output from a PASSING test reaches the
 /// <c>dotnet test --verbosity normal</c> log; that was measured on this repository rather than
 /// assumed, so the lines accumulate in CI without a collector or an artifact upload.
+/// </para>
+/// <para>
+/// Publication happens from a <c>finally</c>, so a line marks a wait that has finished, not the
+/// moment the threshold was crossed. A wait still blocked when the job is killed therefore
+/// publishes nothing at all, and an absence of lines only carries meaning for a run that reached
+/// the end of its test step.
 /// </para>
 /// <para>
 /// Nothing here changes a bound or fails a test. It only makes the distribution visible, so the

@@ -122,12 +122,17 @@ under the wider bound therefore cannot distinguish "the stall is gone" from
 "the same stall now finishes inside the wider bound".
 
 Every wait bounded by that backstop is routed through
-`TerminalWaitObservation`, which publishes one line to standard output as soon
-as the wait outlives 10 seconds, **including when the wait succeeds**:
+`TerminalWaitObservation`, which publishes one line to standard output when a
+wait **ends** having outlived 10 seconds, **including when it ends by
+succeeding**:
 
 ```
 TERMINAL_WAIT_OVER_LEGACY_BOUND caller=Write_InputReachesProcessStdin awaited=ProcessExited elapsedMs=12500.000 legacyBoundMs=10000.000 outcome=completed
 ```
+
+The line is emitted from a `finally`, so it marks a wait that has finished, not
+the moment the threshold was crossed. A wait still blocked when the job is
+killed publishes nothing at all.
 
 Console output from a passing test reaches the `dotnet test --verbosity normal`
 log, so these lines accumulate in the workflow log with no collector and no
@@ -137,12 +142,33 @@ artifact upload. To read a run:
 gh run view <run-id> --log | grep TERMINAL_WAIT_OVER_LEGACY_BOUND
 ```
 
-- No lines across several runs: no wait outlived the old bound, which is the
-  only evidence that supports calling the stall gone.
+- No lines, **in a run whose test step reached its end**: no wait outlived the
+  old bound. Read it only under that condition. In a run killed by the job
+  timeout the absence proves nothing, because the wait that was still blocked is
+  exactly the one that never got to publish.
 - Lines with `outcome=completed`: the stall is still there and the wider bound
   is absorbing it. The run is green and the problem is not fixed.
-- Lines with `outcome=unfinished`: the wait failed; the accompanying
-  `TimeoutException` carries the full process snapshot.
+- Lines with `outcome=unfinished`: the wait ended without its event; the
+  accompanying `TimeoutException` carries the full process snapshot.
+
+### First measured distribution, run 31896183632
+
+The instrumentation reported on its first CI run. Four waits outlived the old
+bound, all of them `outcome=completed`, so all four would have been failures
+under the original 10-second bound:
+
+| caller | awaited | elapsedMs |
+|---|---|---|
+| `ProcessExited_ProcessEndsWithoutConsoleOutput_RaisesExitCode` | `ProcessExited` | 10040.230 |
+| `PipeModeSession_DataReceivedSubscriberException_DoesNotStopReadLoop` | `ProcessExited` | 10390.218 |
+| `ProcessExited_SubscriberAddedAfterFastExit_ReplaysExitCode` | `SessionStopped` | 10547.798 |
+| `Write_InputReachesProcessStdin` | `ProcessExited` | 10564.036 |
+
+Widening the bound did not remove the stall, it absorbed it. Note also how
+tightly the four cluster, within 524 ms of each other just above 10 seconds,
+across four tests and three different awaited events. That is the shape of a
+fixed timer rather than of diffuse runner slowness, but one run is one sample:
+the hypothesis is worth testing against further runs, not stating as the cause.
 
 `TerminalWaitInstrumentationGuardTests` refuses any new wait that reaches the
 backstop constant directly, because instrumentation that is bypassed measures
