@@ -45,8 +45,8 @@ public sealed class SftpMetadataPreflightTests
         // The whole point of the probe: "getcap is not installed" is not "this file has no
         // capabilities". Each availability test must exit on the tooling status, never fall
         // through to the success path.
-        Assert.Equal(3, CountOccurrences(command, "command -v"));
-        Assert.Equal(3, CountOccurrences(command, $"exit {SftpMetadataPreflight.ToolingStatus}; fi"));
+        Assert.Equal(5, CountOccurrences(command, "command -v"));
+        Assert.Equal(4, CountOccurrences(command, $"exit {SftpMetadataPreflight.ToolingStatus}; fi"));
     }
 
     [Fact]
@@ -94,6 +94,39 @@ public sealed class SftpMetadataPreflightTests
         // empty-valued security.* attribute returned exit 0.
         Assert.DoesNotContain("--only-values", command, StringComparison.Ordinal);
         Assert.Contains("security.*)", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_DetectsExtendedAttributesInEveryNamespace()
+    {
+        string command = SftpMetadataPreflight.Build("/srv/app/agent");
+
+        // The unprivileged replacement writes a new inode and reproduces NO extended attribute,
+        // so a plain user.comment is lost exactly like a security label. Matching '^security\.'
+        // let that one through: measured against the previous shape, a target carrying only
+        // user.comment returned exit 0 = Proceed. '-m -' is what lists every namespace, because
+        // getfattr defaults to the user namespace alone.
+        Assert.Contains("getfattr --absolute-names -m - --", command, StringComparison.Ordinal);
+        Assert.DoesNotContain(@"-m '^security\.'", command, StringComparison.Ordinal);
+
+        // Reported separately, so a user.* attribute is never described as a security label.
+        Assert.Contains("security.*) sec_found=1", command, StringComparison.Ordinal);
+        Assert.Contains("*) xattr_found=1", command, StringComparison.Ordinal);
+        Assert.Contains($"exit {SftpMetadataPreflight.ExtendedAttributeStatus}", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_RefusesADestinationOwnedBySomebodyElse()
+    {
+        string command = SftpMetadataPreflight.Build("/srv/app/agent");
+
+        // A replacement creates a new inode owned by the connecting account, and handing it back
+        // needs CAP_CHOWN. Timestamps are deliberately absent from this probe: the owner CAN
+        // restore mtime and atime, so they are an implementation gap, not an unreproducible class.
+        Assert.Contains("stat -c %u --", command, StringComparison.Ordinal);
+        Assert.Contains("id -u", command, StringComparison.Ordinal);
+        Assert.Contains($"exit {SftpMetadataPreflight.OwnershipStatus}", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("touch ", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -149,7 +182,6 @@ public sealed class SftpMetadataPreflightTests
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
-    [InlineData(16)]
     [InlineData(127)]
     [InlineData(137)]
     [InlineData(-1)]
