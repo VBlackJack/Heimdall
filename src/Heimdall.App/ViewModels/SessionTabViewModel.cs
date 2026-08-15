@@ -351,7 +351,22 @@ public partial class SessionTabViewModel : ObservableObject
     // These target the SECOND leaf (if any) for backward compatibility
     // with code that references the "secondary" pane directly.
 
-    private SessionPaneModel? SecondaryPaneOrNull =>
+    /// <summary>
+    /// The first leaf of the root split's secondary subtree, or <see langword="null"/> when the
+    /// session is not split.
+    /// </summary>
+    /// <remarks>
+    /// The single answer to "which pane is the secondary one". It already backed every secondary
+    /// shim property below; it is internal so the four places that used to recompute the same
+    /// expression - the two shell commands, and detach and unsplit in
+    /// <c>SessionWindowService</c> - resolve it here instead. A second resolver would have been a
+    /// second definition of which pane the user means.
+    /// <para>
+    /// Depth matters: <c>FirstLeaf</c> descends through the secondary subtree, so a nested split
+    /// on that side resolves to the leaf a user would point at rather than to the container.
+    /// </para>
+    /// </remarks>
+    internal SessionPaneModel? SecondaryPaneOrNull =>
         RootContent is SplitContainerModel c
             ? SplitTreeHelper.FirstLeaf(c.Second)
             : null;

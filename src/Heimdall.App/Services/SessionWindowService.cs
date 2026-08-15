@@ -135,9 +135,8 @@ public sealed class SessionWindowService : ISessionWindowService
         ArgumentNullException.ThrowIfNull(vm);
 
         if (!session.IsSplit) return;
-        if (session.RootContent is not SplitContainerModel rootContainer) return;
 
-        var secondaryPane = SplitTreeHelper.FirstLeaf(rootContainer.Second);
+        SessionPaneModel? secondaryPane = session.SecondaryPaneOrNull;
         if (secondaryPane is not null && secondaryPane.HostControl is not null)
         {
             DetachPaneToFloatingWindow(session, secondaryPane.PaneId, vm);
@@ -173,9 +172,8 @@ public sealed class SessionWindowService : ISessionWindowService
         ArgumentNullException.ThrowIfNull(vm);
 
         if (!session.IsSplit) return;
-        if (session.RootContent is not SplitContainerModel rootContainer) return;
 
-        var secondaryPane = SplitTreeHelper.FirstLeaf(rootContainer.Second);
+        SessionPaneModel? secondaryPane = session.SecondaryPaneOrNull;
         if (secondaryPane is not null)
         {
             DetachPaneToTab(session, secondaryPane.PaneId, vm);
