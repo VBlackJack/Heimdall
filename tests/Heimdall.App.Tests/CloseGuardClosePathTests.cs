@@ -142,7 +142,11 @@ public sealed class CloseGuardClosePathTests
     [Theory]
     [InlineData("Services/SplitService.cs", "_closeArbiter.Poll(request")]
     [InlineData("ViewModels/ConnectionViewModel.cs", "_closeArbiter.ResolveAsync(request")]
-    [InlineData("ViewModels/MainViewModel.cs", "_closeArbiter.ResolveAsync(request")]
+
+    // The pane path moved out of MainViewModel into the coordinator; the invariant follows the
+    // code rather than being relaxed. MainViewModel is now only its facade, and
+    // PaneCloseCoordinatorTests exercises the protocol itself against a recording arbiter.
+    [InlineData("Services/CloseGuard/PaneCloseCoordinator.cs", "_arbiter.ResolveAsync(request")]
     [InlineData("Views/FloatingSessionWindow.xaml.cs", "_closeArbiter.ResolveAsync(request")]
     public void ClosePaths_ConsultTheArbiter(string relativePath, string expected)
         => Assert.Contains(expected, ReadAppSource(relativePath), StringComparison.Ordinal);
@@ -160,31 +164,52 @@ public sealed class CloseGuardClosePathTests
     [Fact]
     public void CloseAllSessionsSilently_IsCalledOnlyFromApplicationExit()
     {
-        string[] sources =
-        [
-            ReadAppSource("ViewModels/ConnectionViewModel.cs"),
-            ReadAppSource("ViewModels/MainViewModel.cs"),
-            ReadAppSource("ViewModels/Session/SessionCoordinator.cs"),
-            ReadAppSource("Views/FloatingSessionWindow.xaml.cs"),
-            ReadAppSource("Views/SessionPaneControl.xaml.cs")
-        ];
+        // Every source under src/Heimdall.App, not a named list. A list can only refuse the callers
+        // someone already thought of, so a sixth file was free to call this and stay invisible -
+        // which is the whole failure mode, given the method bypasses every guard.
+        string appRoot = Path.Combine(FindRepositoryRoot(), "src", "Heimdall.App");
+        string[] sources = Directory.GetFiles(appRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(path, appRoot))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
 
-        foreach (string source in sources)
+        Assert.True(sources.Length > 100, $"Only {sources.Length} sources scanned.");
+
+        List<string> callers = [];
+        foreach (string path in sources)
         {
             // The declaration is not a call. Only invocations are forbidden here.
-            string withoutDeclaration = source.Replace(
+            string withoutDeclaration = File.ReadAllText(path).Replace(
                 "public void CloseAllSessionsSilently()",
                 "public void <declaration>()",
                 StringComparison.Ordinal);
 
-            Assert.DoesNotContain("CloseAllSessionsSilently()", withoutDeclaration, StringComparison.Ordinal);
+            if (withoutDeclaration.Contains("CloseAllSessionsSilently()", StringComparison.Ordinal))
+            {
+                callers.Add(
+                    Path.GetRelativePath(appRoot, path).Replace(Path.DirectorySeparatorChar, '/'));
+            }
         }
 
+        Assert.True(
+            callers.Count == 1 && callers[0] == "App.xaml.cs",
+            "CloseAllSessionsSilently bypasses every guard, so application exit is its only allowed "
+            + "caller. Found: " + string.Join(", ", callers));
+
+        // Non-vacuity from both ends: the declaration sits where it is believed to, and the one
+        // permitted call really exists.
         Assert.Contains(
             "public void CloseAllSessionsSilently()",
             ReadAppSource("ViewModels/ConnectionViewModel.cs"),
             StringComparison.Ordinal);
         Assert.Contains("CloseAllSessionsSilently()", ReadAppSource("App.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    private static bool IsBuildOutput(string path, string root)
+    {
+        string relative = Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
+        return relative.StartsWith("bin/", StringComparison.Ordinal)
+            || relative.StartsWith("obj/", StringComparison.Ordinal);
     }
 
     private static string ReadAppSource(string relativePath)
