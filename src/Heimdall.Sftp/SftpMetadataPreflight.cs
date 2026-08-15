@@ -44,6 +44,12 @@ public enum SftpMetadataPreflightVerdict
 
     /// <summary>No trusted exec channel was available to characterise the destination.</summary>
     ExecUnavailable,
+
+    /// <summary>The destination carries extended attributes outside the security namespace.</summary>
+    ExtendedAttributesPresent,
+
+    /// <summary>The destination belongs to another user, and chown to them needs CAP_CHOWN.</summary>
+    OwnershipNotReproducible,
 }
 
 /// <summary>
@@ -84,6 +90,12 @@ public static class SftpMetadataPreflight
 
     /// <summary>Metadata is present but could not be read.</summary>
     public const int UnreadableStatus = 15;
+
+    /// <summary>Destination carries extended attributes outside the security namespace.</summary>
+    public const int ExtendedAttributeStatus = 16;
+
+    /// <summary>Destination is owned by another user.</summary>
+    public const int OwnershipStatus = 17;
 
     /// <summary>
     /// Builds the probe for one destination path.
@@ -128,11 +140,30 @@ public static class SftpMetadataPreflight
                 // never values: an attribute that exists with an empty value is still an attribute
                 // this session cannot write back, and reading it by value would report it absent.
                 + "if command -v getfattr >/dev/null 2>&1; then "
-                + $"sec_raw=$(getfattr --absolute-names -m '^security\\.' -- {path} 2>/dev/null) "
+                + $"xattr_raw=$(getfattr --absolute-names -m - -- {path} 2>/dev/null) "
                 + $"|| {{ IFS=$oldifs; set +f; exit {UnreadableStatus}; }}; "
-                + "sec_found=0; "
-                + "for line in $sec_raw; do case \"$line\" in security.*) sec_found=1 ;; esac; done; "
+                + "sec_found=0; xattr_found=0; "
+                + "for line in $xattr_raw; do case \"$line\" in "
+                + "''|'#'*) ;; "
+                + "security.*) sec_found=1 ;; "
+                + "*) xattr_found=1 ;; "
+                + "esac; done; "
                 + $"if [ \"$sec_found\" -eq 1 ]; then IFS=$oldifs; set +f; exit {SecurityXattrStatus}; fi; "
+                + $"if [ \"$xattr_found\" -eq 1 ]; then IFS=$oldifs; set +f; exit {ExtendedAttributeStatus}; fi; "
+                + $"else IFS=$oldifs; set +f; exit {ToolingStatus}; fi; "
+
+                // Ownership. A replacement creates a new inode owned by the connecting user, and
+                // handing it back to another owner needs CAP_CHOWN, so a destination belonging to
+                // somebody else cannot be reproduced. Timestamps are deliberately NOT refused
+                // here: the owner can restore mtime and atime, so they are an implementation gap
+                // rather than something this session is unable to reproduce.
+                + "if command -v stat >/dev/null 2>&1 && command -v id >/dev/null 2>&1; then "
+                + $"owner_uid=$(stat -c %u -- {path} 2>/dev/null) "
+                + $"|| {{ IFS=$oldifs; set +f; exit {UnreadableStatus}; }}; "
+                + $"self_uid=$(id -u 2>/dev/null) || {{ IFS=$oldifs; set +f; exit {UnreadableStatus}; }}; "
+                + "if [ -z \"$owner_uid\" ] || [ -z \"$self_uid\" ]; then "
+                + $"IFS=$oldifs; set +f; exit {UnreadableStatus}; fi; "
+                + $"if [ \"$owner_uid\" != \"$self_uid\" ]; then IFS=$oldifs; set +f; exit {OwnershipStatus}; fi; "
                 + $"else IFS=$oldifs; set +f; exit {ToolingStatus}; fi; "
 
                 // An ACL beyond the base entries cannot be reproduced by mode bits alone. The
@@ -177,6 +208,8 @@ public static class SftpMetadataPreflight
             AclStatus => SftpMetadataPreflightVerdict.AclPresent,
             ToolingStatus => SftpMetadataPreflightVerdict.ToolingUnavailable,
             UnreadableStatus => SftpMetadataPreflightVerdict.MetadataUnreadable,
+            ExtendedAttributeStatus => SftpMetadataPreflightVerdict.ExtendedAttributesPresent,
+            OwnershipStatus => SftpMetadataPreflightVerdict.OwnershipNotReproducible,
             _ => SftpMetadataPreflightVerdict.MetadataUnreadable,
         };
     }
@@ -208,6 +241,8 @@ public static class SftpMetadataPreflight
             SftpMetadataPreflightVerdict.ToolingUnavailable => "ErrorSftpReplaceRefusedTooling",
             SftpMetadataPreflightVerdict.MetadataUnreadable => "ErrorSftpReplaceRefusedUnreadable",
             SftpMetadataPreflightVerdict.ExecUnavailable => "ErrorSftpReplaceRefusedExecUnavailable",
+            SftpMetadataPreflightVerdict.ExtendedAttributesPresent => "ErrorSftpReplaceRefusedExtendedAttributes",
+            SftpMetadataPreflightVerdict.OwnershipNotReproducible => "ErrorSftpReplaceRefusedOwnership",
             _ => throw new ArgumentOutOfRangeException(
                 nameof(verdict),
                 verdict,
