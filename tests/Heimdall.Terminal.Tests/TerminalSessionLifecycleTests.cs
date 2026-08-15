@@ -118,9 +118,8 @@ public sealed class TerminalSessionLifecycleTests
             () => Volatile.Read(ref observedExitCode) == int.MinValue
                 ? null
                 : Volatile.Read(ref observedExitCode));
-        int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+        int exitCode = await TerminalTestHelpers.AwaitProcessEventAsync(
             exited.Task,
-            TerminalTestHelpers.ProcessStartupBackstop,
             timeoutContext);
         session.Dispose();
 
@@ -166,9 +165,8 @@ public sealed class TerminalSessionLifecycleTests
                 () => Volatile.Read(ref observedExitCode) == int.MinValue
                     ? null
                     : Volatile.Read(ref observedExitCode));
-            int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+            int exitCode = await TerminalTestHelpers.AwaitProcessEventAsync(
                 exited.Task,
-                TerminalTestHelpers.ProcessStartupBackstop,
                 timeoutContext);
             Assert.Equal(12, exitCode);
             session.Dispose();

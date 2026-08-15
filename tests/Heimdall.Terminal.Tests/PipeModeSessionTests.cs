@@ -41,7 +41,9 @@ public sealed class PipeModeSessionTests
                 "$line = Read-Host; [Console]::Out.WriteLine('PIPE-LIVE:' + $line)\"");
 
             Assert.True(
-                SpinWait.SpinUntil(() => File.Exists(signalPath), TerminalTestHelpers.ProcessStartupBackstop),
+                TerminalTestHelpers.SpinUntilProcessEvent(
+                    () => File.Exists(signalPath),
+                    "BootstrapSignalFile"),
                 "The child process did not confirm that its bootstrap output was written.");
 
             session.DataReceived += data =>
@@ -62,7 +64,7 @@ public sealed class PipeModeSessionTests
 
             session.Write("after-replay\r\n");
 
-            await liveOutput.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
+            await TerminalTestHelpers.AwaitProcessEventAsync(liveOutput.Task, "LiveOutput");
             string text;
             lock (outputLock)
             {
@@ -94,12 +96,16 @@ public sealed class PipeModeSessionTests
                 "-NoLogo -NoProfile -Command \"exit 37\"");
 
             Assert.True(
-                SpinWait.SpinUntil(() => !session.IsRunning, TerminalTestHelpers.ProcessStartupBackstop),
+                TerminalTestHelpers.SpinUntilProcessEvent(
+                    () => !session.IsRunning,
+                    "SessionStopped"),
                 "The child process did not exit.");
 
             session.ProcessExited += exitCode => replayed.TrySetResult(exitCode);
 
-            int exitCode = await replayed.Task.WaitAsync(TerminalTestHelpers.ProcessStartupBackstop);
+            int exitCode = await TerminalTestHelpers.AwaitProcessEventAsync(
+                replayed.Task,
+                "ProcessExitedReplay");
             Assert.Equal(37, exitCode);
         }
         finally
@@ -154,9 +160,8 @@ public sealed class PipeModeSessionTests
                 () => Volatile.Read(ref observedExitCode) == int.MinValue
                     ? null
                     : Volatile.Read(ref observedExitCode));
-            int exitCode = await TerminalTimeoutDiagnostics.WaitAsync(
+            int exitCode = await TerminalTestHelpers.AwaitProcessEventAsync(
                 exited.Task,
-                TerminalTestHelpers.ProcessStartupBackstop,
                 timeoutContext);
             Assert.Equal(0, exitCode);
 
