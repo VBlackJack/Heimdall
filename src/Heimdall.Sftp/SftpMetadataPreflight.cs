@@ -36,7 +36,7 @@ public enum SftpMetadataPreflightVerdict
     /// <summary>The destination carries an ACL beyond the base permission bits.</summary>
     AclPresent,
 
-    /// <summary>A tool needed to read or reproduce the metadata is missing on the server.</summary>
+    /// <summary>Any tool the probe needs to read the metadata is missing on the server.</summary>
     ToolingUnavailable,
 
     /// <summary>The metadata could not be read, so it cannot be shown to be reproducible.</summary>

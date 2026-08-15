@@ -87,21 +87,37 @@ public static class SftpModePreservation
     /// <param name="ReadTempMode">Reads the temporary file's current permission bits.</param>
     /// <param name="ApplyTempMode">Sets the temporary file's permission bits.</param>
     /// <param name="OpenTempForWrite">Opens the temporary file for writing.</param>
-    /// <param name="ReadTargetModeAfterUpload">
-    /// Re-reads the destination without following symlinks and validates its type, returning its
-    /// complete mode, or null when no regular file is there to inherit from. Throwing here refuses
-    /// the commit, which is how the existing type validation keeps its effect.
+    /// <param name="ReadTargetAttributesAfterUpload">
+    /// Re-reads the destination without following symlinks and validates its type, returning the
+    /// mode and timestamps it currently carries, or null when no regular file is there to inherit
+    /// from. Throwing here refuses the commit, which is how the existing type validation keeps its
+    /// effect.
     /// </param>
-    /// <param name="ApplyPublicationMode">Applies the mode the file will carry once published.</param>
+    /// <param name="ApplyPublicationAttributes">Applies the mode and timestamps to the temporary file.</param>
+    /// <param name="ReadTempAttributesAfterApply">Re-reads the temporary file to confirm what landed.</param>
     /// <param name="Commit">Publishes the temporary file over the destination.</param>
     internal sealed record StagedUploadOperations(
         Action CreateEmptyTemp,
         Func<uint> ReadTempMode,
         Action<uint> ApplyTempMode,
         Func<Stream> OpenTempForWrite,
-        Func<uint?> ReadTargetModeAfterUpload,
-        Action<uint> ApplyPublicationMode,
+        Func<SftpPublicationAttributes?> ReadTargetAttributesAfterUpload,
+        Action<SftpPublicationAttributes> ApplyPublicationAttributes,
+        Func<SftpPublicationAttributes> ReadTempAttributesAfterApply,
         Action Commit);
+
+    /// <summary>
+    /// The mode and timestamps a published file must end up carrying.
+    /// </summary>
+    /// <remarks>
+    /// UTC on both ends, deliberately. SSH.NET exposes a local-time and a UTC property for each
+    /// stamp; reading one while writing the other shifts every timestamp by the client's offset,
+    /// which is the kind of corruption that only surfaces on a machine in another zone.
+    /// </remarks>
+    internal readonly record struct SftpPublicationAttributes(
+        uint Mode,
+        DateTime? LastAccessTimeUtc,
+        DateTime? LastWriteTimeUtc);
 
     /// <summary>
     /// Uploads through a temporary file that is private for the whole time it holds content.
@@ -166,8 +182,42 @@ public static class SftpModePreservation
             destination.Flush();
         }
 
-        uint? targetMode = operations.ReadTargetModeAfterUpload();
-        operations.ApplyPublicationMode(targetMode is { } existing ? GetMode(existing) : serverAssignedMode);
+        // Read after the stream is closed, so the destination is observed as late as the protocol
+        // allows and the values used are the target's own, never the temporary's.
+        SftpPublicationAttributes? target = operations.ReadTargetAttributesAfterUpload();
+        if (target is not { } existing)
+        {
+            // Creation. There is nothing to inherit, so the file keeps the mode the server gave a
+            // new file and whatever timestamps the write produced; inventing a target's stamps
+            // here would date a file that never existed.
+            operations.ApplyPublicationAttributes(new SftpPublicationAttributes(
+                serverAssignedMode,
+                LastAccessTimeUtc: null,
+                LastWriteTimeUtc: null));
+            operations.Commit();
+            return;
+        }
+
+        SftpPublicationAttributes desired = existing with { Mode = GetMode(existing.Mode) };
+        operations.ApplyPublicationAttributes(desired);
+
+        // Read back what actually landed. A server may silently ignore a timestamp write, and a
+        // replacement that reports success while leaving the file dated today has not preserved
+        // anything. The commit is refused rather than published on an unverified claim.
+        SftpPublicationAttributes applied = operations.ReadTempAttributesAfterApply();
+        if (GetMode(applied.Mode) != desired.Mode
+            || applied.LastWriteTimeUtc != desired.LastWriteTimeUtc
+            || applied.LastAccessTimeUtc != desired.LastAccessTimeUtc)
+        {
+            throw new IOException(
+                "Refusing to publish the upload: the staged file reports mode "
+                + $"0{Convert.ToString(GetMode(applied.Mode), 8)} with write time "
+                + $"{applied.LastWriteTimeUtc:O} and access time {applied.LastAccessTimeUtc:O}, "
+                + $"but the destination carried mode 0{Convert.ToString(desired.Mode, 8)} with "
+                + $"write time {desired.LastWriteTimeUtc:O} and access time "
+                + $"{desired.LastAccessTimeUtc:O}, so the replacement would not preserve them.");
+        }
+
         operations.Commit();
     }
 }

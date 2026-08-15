@@ -49,6 +49,8 @@ public sealed class SftpBrowserMetadataPreflightWiringTests
     [InlineData(SftpMetadataPreflight.AclStatus, SftpMetadataPreflightVerdict.AclPresent)]
     [InlineData(SftpMetadataPreflight.ToolingStatus, SftpMetadataPreflightVerdict.ToolingUnavailable)]
     [InlineData(SftpMetadataPreflight.UnreadableStatus, SftpMetadataPreflightVerdict.MetadataUnreadable)]
+    [InlineData(SftpMetadataPreflight.ExtendedAttributeStatus, SftpMetadataPreflightVerdict.ExtendedAttributesPresent)]
+    [InlineData(SftpMetadataPreflight.OwnershipStatus, SftpMetadataPreflightVerdict.OwnershipNotReproducible)]
     [InlineData(42, SftpMetadataPreflightVerdict.MetadataUnreadable)]
     public async Task Replacement_IsRefused_ForEveryVerdictThatCannotBeReproduced(
         int exitStatus,
