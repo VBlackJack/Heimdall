@@ -12,6 +12,166 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-15: Remote transfer integrity, session closing and window layout (v2026.081501)
+
+The largest release of the cycle: a dependency security update, the remote file
+transfer paths reworked so a replacement can no longer damage a destination
+silently, a single close-confirmation contract across every way a session can be
+closed, and window minimums that stop dialogs from opening larger than the screen.
+
+### Security
+
+- **SSH.NET updated to 2026.0.0** (`0a480cee`). Closes advisory
+  GHSA-q939-rpr3-3284, a high-severity issue affecting the 2025.1.0 release that
+  shipped in v2026.081000. Consequence worth naming: restoring the v2026.081000
+  tag now fails the dependency audit, which is the intended behaviour.
+- **A Citrix launch token that is not vault-protected is rejected** (`9425fd15`,
+  `819982a3`). Plaintext tokens are refused rather than accepted, and tokens
+  already persisted are reconciled against the vault state.
+- **StoreFront session events are redacted** (`ff4ce12f`).
+- **Pageant requests are bounded and their fields validated** (`eeb16399`,
+  `1be51780`). A malformed or oversized agent response can no longer drive an
+  unbounded read.
+- **External RDP artifacts are always cleaned up** (`66089c65`) and the native
+  password is reset after disconnect (`0b253ee5`).
+
+### Fixed - remote file transfers (SFTP, FTP)
+
+- **A replacement that cannot be performed safely is refused rather than
+  performed badly** (`16978424`). Where the destination could previously be
+  swapped for an upload whose permissions did not match, the commit is now
+  refused. Related: an upload must land with the exact mode of the file it
+  replaces (`710493d0`).
+- **A staged upload stays private while it holds content** (`27cc6b72`). The
+  temporary file is created empty, tightened to owner-only, and that tightening
+  is read back before the first byte is written; a server that ignores the
+  request stops the upload instead of receiving the content anyway. The published
+  file keeps the destination's own mode, or the server's default when the file is
+  new.
+- **A privileged replacement preserves the replaced file's extended metadata**
+  (`15cf8bf4`). Ownership, mode, timestamps and extended attributes are carried
+  across explicitly, and the operation fails closed if they cannot be.
+- **FTP now states what it does not preserve** (`dc9b06dd`). Replacing an
+  existing file over FTP or FTPS raises a single warning covering both the
+  missing atomicity guarantee and the loss of the previous file's owner,
+  permissions, timestamps, ACLs, extended attributes and capabilities. The
+  warning is raised only after the replacement has actually happened, so a failed
+  backup move or a restored commit no longer reports a loss that did not occur.
+- **Sudo downloads are streamed** (`8932a282`) instead of being held in memory,
+  and inline editor downloads are bounded (`5801cce4`).
+- **The inline editor keeps its file's encoding and ownership** (`4d95cf5b`,
+  `04c1b1f1`), and a revisioned save is awaited before the editor moves on
+  (`6da4a11b`).
+- **Remote paste and duplicate go through the transfer coordinator**
+  (`ccfd66cb`), the server-side copy fast path can be cancelled (`e77c2381`), and
+  a recursive upload plan is built asynchronously and can be cancelled
+  (`5e6eea53`).
+- **FTP disconnects no longer block the UI** (`9f51c8e6`).
+
+### Fixed - closing sessions
+
+- **Every close path asks the same question** (`3dcf3e40`, `7cfa548a`,
+  `e412a5de`, `b18ca9b8`, `4b274ae9`). Closing a tab, closing others, closing to
+  the right, closing a split pane and closing the window all run through one
+  close-guard contract, so a session with a transfer in flight or an unsaved
+  remote editor is no longer torn down without asking. Consent is tied to the
+  work that was actually running when the question was asked: work started while
+  the prompt was open is re-examined instead of being covered by a stale answer.
+- **A grouped close asks once, not once per tab** (`9d0848a3`), the duplicate
+  close action is gone (`e77f0b2c`), and exiting with connected sessions is
+  confirmed (`5336a617`).
+- **Declining a floating window close restores it** (`725f7737`), and duplicate
+  tabs for the same session are merged (`674ee695`).
+
+### Fixed - window and toolbar layout
+
+- **Dialogs no longer demand more room than the screen has** (`c8dfd907`,
+  `f2850c19`, `9cfe8bd0`, `94f8b014`). Window minimums are held within the
+  display's working area. The clamp is reversible, so restoring a window on a
+  larger display gives its full declared minimum back, and the declared value is
+  captured on first use rather than at opt-in, which previously depended on the
+  order of attributes in the layout.
+- **The main toolbar wraps as the window narrows** (`b12193cd`).
+- **The sidebar keeps its state across fullscreen** (`546006d2`, `a665c502`) and
+  honours its action minimum (`80ac28b3`).
+- **Restored window bounds are checked against real monitors** (`44f1e63e`).
+
+### Fixed - session tree
+
+- **Keyboard multi-selection** (`33c4b213`, `ee8f8d4e`, `b5dd5de3`) and its
+  exposure to assistive technology (`a8810ef7`).
+- **Selection survives a refresh of connected servers** (`58c82c1c`), hidden
+  selections are purged on collapse (`71a03100`), and native selection is cleared
+  after a Ctrl toggle (`e9fe2fc9`).
+- **Deleting a filtered group discloses what it will remove** (`e1b3b169`),
+  deleted folder metadata is purged (`ba4a5a95`), and expansion state is flushed
+  on close (`9c115c2f`).
+- **Inline rename commits on focus loss** (`212a3b98`) and a double click on a
+  non-server row does nothing (`935d58d3`).
+
+### Fixed - WinRM, SSH and terminals
+
+- **WinRM session materialization is transactional** (`8c23fc0c`) with split
+  state isolated and initialized (`d6df9db1`, `d25b1c1e`), exited terminal
+  sessions cleaned up (`20ba88e7`) and bootstrap cleaned on a forced close
+  (`fbb8df99`).
+- **WinRM refuses configurations that cannot work**: an HTTPS gateway assignment
+  (`2b3addbd`), an invalid identity mode (`682cde51`), a password bulk without a
+  username (`b48b4b22`); implicit TLS ports are resolved (`356d6cea`), the target
+  host is canonicalized (`bf137219`) and tunneled endpoints are preflighted
+  (`0924dfae`).
+- **SSH failure reporting says what actually failed** (`a3cfd921`, `6e50ebab`,
+  `95c34b0b`, `59aa34fd`, `8916a2e0`, `80cd619a`, `f503b018`, `4b5b6442`). A
+  keyboard-interactive denial is no longer reported as a rejected key, and a port
+  substring no longer reads as "port in use".
+- **Reusable tunnels are acquired atomically** (`9b2cfe80`), queued reconnect
+  ticks are invalidated (`305f0e85`), reconnect attempts are chained
+  (`c97ae3bd`), and Plink processes are retained until exit (`ded1246a`).
+- **Explicit default ports are preserved** (`260a9263`) and hashed known-hosts
+  entries match on custom ports (`7a30b586`).
+
+### Fixed - accessibility, localization and import
+
+- **Duplicate session tabs get distinguishable accessible names** (`3f8e3016`),
+  the server accessible name follows the sidebar dot priority (`0e23e440`), and
+  global status changes are announced (`882cbba3`).
+- **Clipboard transfer statuses and the transfer progress line are localized**
+  (`08983ba4`, `abe1dcd8`), the shell status text refreshes on locale change
+  (`35dd6d5c`), and 52 orphan locale keys are removed with a prefix guard
+  (`f8a571e0`).
+- **Legacy profile migration preserves fields, preflights the configuration and
+  reports what it skipped** (`d1c4ce08`, `350024ec`, `493e5480`); a declined
+  offer is persisted (`0d22ab2e`). Imported connection types are canonicalized
+  (`4e6a7862`) and NLA is preserved on RDP import (`bdbb12e4`).
+
+### Fixed - RDP and Citrix display
+
+- **External RDP auto sizing uses physical pixels** (`f60422b9`), so a display
+  scaled above 100 % no longer receives a session sized in logical units.
+- **Dropped DPI changes are replayed and SmartSizing is stated on every
+  resolution choice** (`d7ec559b`).
+- **A Citrix session is announced as connected only after the Win32 embedding is
+  verified** (`b0448bd3`), with the visible-window baseline captured before the
+  launcher starts (`1f56ea7d`).
+
+### Added
+
+- **Cross-cutting close-guard contract** (`src/Heimdall.App/Services/CloseGuard/`)
+  with a pane close arbiter, usable by any tool or protocol view without either
+  depending on the other.
+
+### Notes
+
+- Test suite: to 9188 blocking tests, 0 skipped. The figure at v2026.081000 was
+  not re-measured: restoring that tag now fails the dependency audit because of
+  the SSH.NET advisory this release closes, and the audit gate was not bypassed
+  to obtain a number.
+- CI informational lanes at the release commit: `CIUnstable` 26 of 26 passing;
+  `RequiresDesktop` 104 of 105, the remaining failure being a UI Automation test
+  that needs an interactive Windows desktop.
+- v2026.080901 and v2026.081000 shipped without an entry in this file. That gap
+  is not filled here; this entry covers v2026.081000 to the release commit.
+
 ## 2026-08-09: Windows credential ownership and credential-free logs (v2026.080900)
 
 ### Fixed

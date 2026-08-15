@@ -235,9 +235,24 @@ then deletes the backup. A failed commit restores the backup, and a failed
 restore raises an `InvalidOperationException` carrying both the commit and the
 restore error. Between the two moves the destination does not exist, so a
 concurrent reader can observe a missing file and a crash can leave the payload
-under the `.bak` sibling. Each such replacement raises a per-operation
-`RemoteOperationWarning` on the session surface; no warning is due when the
-destination is absent, because no backup move happens.
+under the `.bak` sibling.
+
+FTP replacement also preserves none of the replaced file's metadata. What lands
+at the destination is a freshly uploaded file, carrying whatever owner, mode and
+timestamps the server assigns a new upload, so the previous file's ownership,
+permissions, timestamps, ACLs, extended attributes and capabilities are gone.
+FTP exposes no command that would restore them, and Heimdall does not simulate a
+preservation it cannot perform. A destination whose access is governed by its own
+mode or ACL must not be replaced over FTP; use SFTP, whose replacement path
+preserves the complete permission mode and refuses the commit when it cannot.
+
+Both facts are reported together. A successful replacement of an existing
+destination raises exactly one per-operation `RemoteOperationWarning` on the
+session surface, naming the missing atomicity guarantee and the metadata loss in
+a single message. It is raised only once the commit move has succeeded: no
+warning is due when the destination was absent, when the backup move failed, or
+when the commit failed and the backup was restored, because in those cases
+nothing was replaced.
 
 ### FTP and FTPS transport notices
 
