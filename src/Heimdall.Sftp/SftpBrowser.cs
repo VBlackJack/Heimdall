@@ -398,6 +398,15 @@ public sealed class SftpBrowser : IRemoteBrowser
         string fileName = Path.GetFileName(localPath);
         FileInfo fileInfo = LocalUploadSource.GetRequiredRegularFile(localPath);
         long totalBytes = fileInfo.Length;
+
+        // Before the temporary path is even chosen, let alone created. A replacement that cannot
+        // put back what it removes must not begin: refusing after the upload would make the
+        // operator pay for a transfer that was never allowed to land.
+        if (commitMode == UploadCommitMode.ReplaceExisting)
+        {
+            await EnsureReplacementPreservesMetadataAsync(remotePath, ct).ConfigureAwait(false);
+        }
+
         string tempRemotePath = SftpAtomicUpload.CreateRemoteTempPath(remotePath);
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
@@ -460,11 +469,27 @@ public sealed class SftpBrowser : IRemoteBrowser
                                         client.SetAttributes(tempRemotePath, attributes);
                                     });
                             },
-                            Commit: () => CommitUploadedTemp(
-                                client,
-                                tempRemotePath,
-                                remotePath,
-                                commitMode)),
+                            Commit: () =>
+                            {
+                                // Second characterisation, immediately before publication. The
+                                // first one is stale by now: a long upload leaves a window in
+                                // which the destination can acquire an ACL, a security attribute
+                                // or a capability, and publishing on the strength of the earlier
+                                // verdict would authorise destroying metadata that did not exist
+                                // when it was taken.
+                                if (commitMode == UploadCommitMode.ReplaceExisting)
+                                {
+                                    EnsureReplacementPreservesMetadataAsync(remotePath, ct)
+                                        .GetAwaiter()
+                                        .GetResult();
+                                }
+
+                                CommitUploadedTemp(
+                                    client,
+                                    tempRemotePath,
+                                    remotePath,
+                                    commitMode);
+                            }),
                         inputStream,
                         written => TransferProgress?.Invoke(new SftpTransferProgress(
                             fileName,
@@ -493,6 +518,50 @@ public sealed class SftpBrowser : IRemoteBrowser
         finally
         {
             _clientLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Refuses the replacement unless the destination's security metadata can be reproduced.
+    /// </summary>
+    /// <remarks>
+    /// Fail-closed at every step. No trusted exec channel means the question cannot be asked, and
+    /// an unasked question is a refusal, not a pass; it carries its own reason rather than the
+    /// tooling one, which specifically claims getcap, getfattr or getfacl is missing from the
+    /// server and would misdiagnose an unavailable route.
+    /// <para>
+    /// The remote command's standard error is deliberately not propagated to the caller: it is
+    /// unlocalized and may quote server-side paths the operator cannot act on. The verdict alone
+    /// crosses the boundary, as a localization key.
+    /// </para>
+    /// </remarks>
+    internal async Task EnsureReplacementPreservesMetadataAsync(string remotePath, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        ISftpExecCommandRunner? runner = _injectedExecCommandRunner;
+        if (runner is null)
+        {
+            SshConnectionParams? connectionParams = _connectionParams;
+            PinnedFingerprintVerifier? pinnedVerifier = _pinnedHostKeyVerifier;
+            if (connectionParams is null || pinnedVerifier is null)
+            {
+                throw new SftpMetadataPreservationException(
+                    SftpMetadataPreflightVerdict.ExecUnavailable,
+                    remotePath);
+            }
+
+            runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
+        }
+
+        SftpExecResult result = await runner
+            .ExecuteAsync(SftpMetadataPreflight.Build(remotePath), ct)
+            .ConfigureAwait(false);
+
+        SftpMetadataPreflightVerdict verdict = SftpMetadataPreflight.Classify(result.ExitStatus);
+        if (!SftpMetadataPreflight.AllowsReplacement(verdict))
+        {
+            throw new SftpMetadataPreservationException(verdict, remotePath);
         }
     }
 

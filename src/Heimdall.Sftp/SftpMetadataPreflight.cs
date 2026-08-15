@@ -41,6 +41,9 @@ public enum SftpMetadataPreflightVerdict
 
     /// <summary>The metadata could not be read, so it cannot be shown to be reproducible.</summary>
     MetadataUnreadable,
+
+    /// <summary>No trusted exec channel was available to characterise the destination.</summary>
+    ExecUnavailable,
 }
 
 /// <summary>
@@ -204,6 +207,7 @@ public static class SftpMetadataPreflight
             SftpMetadataPreflightVerdict.AclPresent => "ErrorSftpReplaceRefusedAcl",
             SftpMetadataPreflightVerdict.ToolingUnavailable => "ErrorSftpReplaceRefusedTooling",
             SftpMetadataPreflightVerdict.MetadataUnreadable => "ErrorSftpReplaceRefusedUnreadable",
+            SftpMetadataPreflightVerdict.ExecUnavailable => "ErrorSftpReplaceRefusedExecUnavailable",
             _ => throw new ArgumentOutOfRangeException(
                 nameof(verdict),
                 verdict,
