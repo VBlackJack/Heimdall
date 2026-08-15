@@ -189,9 +189,11 @@ closed, and window minimums that stop dialogs from opening larger than the scree
   not re-measured: restoring that tag now fails the dependency audit because of
   the SSH.NET advisory this release closes, and the audit gate was not bypassed
   to obtain a number.
-- CI informational lanes at the release commit: `CIUnstable` 26 of 26 passing;
-  `RequiresDesktop` 104 of 105, the remaining failure being a UI Automation test
-  that needs an interactive Windows desktop.
+- Informational lanes are non-blocking. On candidate PR #111, `CIUnstable`
+  measured 25 of 26, with `TextDiffSmokeTests.HelpButton_TogglesHelpPanel`
+  failing; `RequiresDesktop` measured 104 of 105, with the known session-tree UI
+  Automation failure. These are measurements of that run, not guarantees for
+  later commits.
 
 ## 2026-08-10: Gateway validation failures stop the connection (v2026.081000)
 
