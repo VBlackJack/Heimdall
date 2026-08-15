@@ -22,8 +22,9 @@ namespace Heimdall.Core.Security;
 
 /// <summary>
 /// Validates user inputs against predefined security patterns to prevent
-/// injection attacks (CWE-78 prevention). All patterns are compiled regexes
-/// for optimal performance.
+/// injection attacks (CWE-78 prevention). Every pattern runs on the
+/// non-backtracking engine, so a match is bounded by the input length rather
+/// than by a wall-clock deadline.
 /// </summary>
 public static class InputValidator
 {
@@ -40,38 +41,38 @@ public static class InputValidator
     private const int MaxDnsLabelLength = 63;
 
     /// <summary>
-    /// Pre-compiled validation patterns indexed by name.
+    /// Validation patterns indexed by name, all built on the non-backtracking engine.
     /// </summary>
     private static readonly FrozenDictionary<string, Regex> ValidationPatterns =
         new Dictionary<string, Regex>(StringComparer.OrdinalIgnoreCase)
         {
             // FQDN or hostname: alphanumeric, dots, hyphens
-            ["SshGateway"] = CompilePattern(@"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$"),
+            ["SshGateway"] = BuildPattern(@"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$"),
 
             // SSH username: alphanumeric, underscore, hyphen, dot, at, backslash
-            ["SshUser"] = CompilePattern(@"^[a-zA-Z0-9._@\\-]+$"),
+            ["SshUser"] = BuildPattern(@"^[a-zA-Z0-9._@\\-]+$"),
 
             // RDP username: user, DOMAIN\user, or user@domain.com
-            ["Username"] = CompilePattern(@"^[a-zA-Z0-9_\-\.]+([\\@][a-zA-Z0-9_\-\.]+)?$"),
+            ["Username"] = BuildPattern(@"^[a-zA-Z0-9_\-\.]+([\\@][a-zA-Z0-9_\-\.]+)?$"),
 
             // TunnelTarget: hostname:port format
-            ["TunnelTarget"] = CompilePattern(@"^[a-zA-Z0-9\.\-]+:\d{1,5}$"),
+            ["TunnelTarget"] = BuildPattern(@"^[a-zA-Z0-9\.\-]+:\d{1,5}$"),
 
             // IP Address (IPv4)
-            ["IPv4"] = CompilePattern(
+            ["IPv4"] = BuildPattern(
                 @"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"),
 
             // Hostname: alphanumeric with dots and hyphens
-            ["Hostname"] = CompilePattern(@"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$"),
+            ["Hostname"] = BuildPattern(@"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$"),
 
             // Address: IP or hostname
-            ["Address"] = CompilePattern(
+            ["Address"] = BuildPattern(
                 @"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^[a-zA-Z][a-zA-Z0-9\-]*(\.[a-zA-Z0-9][a-zA-Z0-9\-]*)*$"),
 
             // Port numbers (used for LocalPort, RemotePort, etc.)
-            ["LocalPort"] = CompilePattern(@"^\d{1,5}$"),
-            ["RemotePort"] = CompilePattern(@"^\d{1,5}$"),
-            ["Port"] = CompilePattern(@"^\d{1,5}$"),
+            ["LocalPort"] = BuildPattern(@"^\d{1,5}$"),
+            ["RemotePort"] = BuildPattern(@"^\d{1,5}$"),
+            ["Port"] = BuildPattern(@"^\d{1,5}$"),
         }.ToFrozenDictionary();
 
     /// <summary>
@@ -87,10 +88,9 @@ public static class InputValidator
         }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Compiled regex for detecting invalid DNS sequences.
+    /// Character sequences that are never valid inside a DNS name.
     /// </summary>
-    private static readonly Regex InvalidDnsSequence =
-        new(@"(\.\.|\.-|-\.)", RegexOptions.Compiled);
+    private static readonly string[] InvalidDnsSequences = ["..", ".-", "-."];
 
     /// <summary>
     /// Validate a value against a named security pattern.
@@ -111,23 +111,24 @@ public static class InputValidator
         if (!ValidationPatterns.TryGetValue(patternName, out Regex? regex))
             return false;
 
-        try
-        {
-            if (!regex!.IsMatch(trimmed))
-                return false;
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            // Fail closed: a pathological input that trips the ReDoS guard is rejected, never thrown.
+        bool dnsValidated = DnsValidatedPatterns.Contains(patternName);
+
+        // Bounded BEFORE the match, not after. The bound is the RFC FQDN limit the DNS rules
+        // enforce anyway, hoisted so an oversized value is refused without being handed to the
+        // engine at all. This is the ONLY length check: a second copy after the match would make
+        // removing this one invisible, which is exactly how a bound stops being load-bearing.
+        if (dnsValidated && trimmed.Length > MaxFqdnLength)
             return false;
-        }
+
+        // No try/catch: the patterns carry Regex.InfiniteMatchTimeout, so there is no deadline
+        // left to trip. Rejection now comes from the input failing to match, never from how busy
+        // the machine was while it was being matched.
+        if (!regex!.IsMatch(trimmed))
+            return false;
 
         // Additional DNS validation for hostname-type patterns
-        if (DnsValidatedPatterns.Contains(patternName))
-        {
-            if (!ValidateDns(trimmed))
-                return false;
-        }
+        if (dnsValidated && !ValidateDns(trimmed))
+            return false;
 
         return true;
     }
@@ -164,18 +165,22 @@ public static class InputValidator
     }
 
     /// <summary>
-    /// Additional DNS validation that the base regex patterns cannot express cleanly:
-    /// consecutive dots/hyphens, label length limits, total FQDN length.
+    /// Additional DNS validation that the base patterns cannot express cleanly:
+    /// consecutive dots/hyphens and label length limits.
     /// </summary>
+    /// <remarks>
+    /// The total FQDN length is deliberately NOT re-checked here. It is enforced by
+    /// <see cref="Validate"/> before the match, and duplicating it would leave that pre-match
+    /// bound with no observable effect.
+    /// </remarks>
     private static bool ValidateDns(string value)
     {
-        // Check total length (max 255 for FQDN)
-        if (value.Length > MaxFqdnLength)
-            return false;
-
-        // Check for consecutive dots or hyphens (invalid DNS)
-        if (InvalidDnsSequence.IsMatch(value))
-            return false;
+        // Deterministic scan rather than a pattern: three fixed substrings need no engine.
+        foreach (string invalid in InvalidDnsSequences)
+        {
+            if (value.Contains(invalid, StringComparison.Ordinal))
+                return false;
+        }
 
         // Check individual label lengths and edge constraints
         string[] labels = value.Split('.');
@@ -336,10 +341,52 @@ public static class InputValidator
     }
 
     /// <summary>
-    /// Compile a regex pattern with timeout protection against ReDoS.
+    /// Builds a validation pattern on the non-backtracking engine, with no match deadline.
     /// </summary>
-    private static Regex CompilePattern(string pattern)
+    /// <remarks>
+    /// The engine is the safety property here, not a performance choice. A backtracking engine
+    /// needs a wall-clock deadline to bound catastrophic backtracking, and a deadline is decided
+    /// by the scheduler: on a loaded machine the budget can elapse while matching a perfectly
+    /// ordinary hostname, and the caller then sees a valid value refused for a reason that has
+    /// nothing to do with the value. <see cref="RegexOptions.NonBacktracking"/> matches in time
+    /// linear in the input length with no backtracking to run away, so the deadline is not what
+    /// keeps the match bounded any more and is removed rather than merely widened.
+    /// <para>
+    /// Pathological input is still rejected, by failing to match rather than by running out of
+    /// time. Do not add <see cref="RegexOptions.Compiled"/> here: the two are accepted together
+    /// but the compiled backtracking engine is then bypassed, so the flag would only misdescribe
+    /// what runs.
+    /// </para>
+    /// </remarks>
+    private static Regex BuildPattern(string pattern)
     {
-        return new Regex(pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(250));
+        return new Regex(pattern, RegexOptions.NonBacktracking, Regex.InfiniteMatchTimeout);
+    }
+
+    /// <summary>
+    /// Returns the options a named pattern was built with, or <see langword="null"/> when the
+    /// pattern name is unknown.
+    /// </summary>
+    /// <remarks>
+    /// Exposed so the engine choice can be asserted directly as a policy. The alternative would
+    /// be to infer it from how long a match takes, which is the very kind of timing dependency
+    /// this class was changed to stop relying on.
+    /// </remarks>
+    public static RegexOptions? GetPatternOptions(string patternName)
+    {
+        return ValidationPatterns.TryGetValue(patternName, out Regex? regex)
+            ? regex!.Options
+            : null;
+    }
+
+    /// <summary>
+    /// Returns the match timeout a named pattern was built with, or <see langword="null"/> when
+    /// the pattern name is unknown. Expected to be <see cref="Regex.InfiniteMatchTimeout"/>.
+    /// </summary>
+    public static TimeSpan? GetPatternMatchTimeout(string patternName)
+    {
+        return ValidationPatterns.TryGetValue(patternName, out Regex? regex)
+            ? regex!.MatchTimeout
+            : null;
     }
 }
