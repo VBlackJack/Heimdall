@@ -46,7 +46,7 @@ public sealed class SftpMetadataPreflightTests
         // capabilities". Each availability test must exit on the tooling status, never fall
         // through to the success path.
         Assert.Equal(3, CountOccurrences(command, "command -v"));
-        Assert.Equal(3, CountOccurrences(command, $"else exit {SftpMetadataPreflight.ToolingStatus}; fi"));
+        Assert.Equal(3, CountOccurrences(command, $"exit {SftpMetadataPreflight.ToolingStatus}; fi"));
     }
 
     [Fact]
@@ -63,6 +63,66 @@ public sealed class SftpMetadataPreflightTests
 
         // Not vacuous: the path really is embedded, it is simply embedded quoted.
         Assert.Contains(".bin", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_CapturesGetfaclOutputBeforeFilteringIt()
+    {
+        string command = SftpMetadataPreflight.Build("/srv/app/agent");
+
+        // A POSIX pipeline reports only the LAST command's status. Piping getfacl straight into a
+        // filter meant a failed read produced no input, the filter exited "no match", and the
+        // outer tolerance swallowed it - a file whose ACL could not be read looked exactly like a
+        // file with no ACL. Measured against the previous shape: getfacl failing returned exit 0.
+        Assert.Contains("acl_raw=$(getfacl", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("getfacl -cE -- ", command, StringComparison.Ordinal);
+
+        // Nothing may absorb a read failure into success.
+        Assert.DoesNotContain("|| true", command, StringComparison.Ordinal);
+
+        // The capture must be guarded by the unreadable exit, not by tolerance.
+        Assert.Contains($"exit {SftpMetadataPreflight.UnreadableStatus}", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_DetectsSecurityAttributesByNameNotByValue()
+    {
+        string command = SftpMetadataPreflight.Build("/srv/app/agent");
+
+        // An attribute that exists with an empty value is still an attribute this session cannot
+        // write back. Reading values reported it absent; measured against the previous shape, an
+        // empty-valued security.* attribute returned exit 0.
+        Assert.DoesNotContain("--only-values", command, StringComparison.Ordinal);
+        Assert.Contains("security.*)", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_DoesNotDelegateFilteringToAnExternalTool()
+    {
+        string command = SftpMetadataPreflight.Build("/srv/app/agent");
+
+        // Filtering through grep put a fourth tool in the trusted path whose absence would fail
+        // the pipeline and, once absorbed, read as "no extended entries". The shell's own case
+        // builtin cannot be missing, so there is nothing left to check for.
+        Assert.DoesNotContain("grep", command, StringComparison.Ordinal);
+        Assert.Contains("case \"$line\" in", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_SplitsLinesWithoutEmittingAControlCharacter()
+    {
+        string command = SftpMetadataPreflight.Build("/srv/app/agent");
+
+        // PathEscaper refuses control characters, so the script cannot carry a literal newline and
+        // a here-document is unavailable. The separator is built at run time instead.
+        Assert.DoesNotContain('\n', command);
+        Assert.DoesNotContain('\r', command);
+        Assert.Contains("IFS=$(printf", command, StringComparison.Ordinal);
+        Assert.Contains(@"\nx", command, StringComparison.Ordinal);
+
+        // Word splitting also globs; an ACL entry containing '*' must not expand to filenames.
+        Assert.Contains("set -f", command, StringComparison.Ordinal);
+        Assert.Contains("set +f", command, StringComparison.Ordinal);
     }
 
     [Fact]

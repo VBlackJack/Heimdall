@@ -115,22 +115,43 @@ public static class SftpMetadataPreflight
                 + $"if [ -n \"$caps\" ]; then exit {CapabilitiesStatus}; fi; "
                 + $"else exit {ToolingStatus}; fi; "
 
-                // The security namespace is privileged; listing it is not.
+                // Line-splitting without a literal newline: PathEscaper refuses control characters,
+                // so the script cannot contain one and a here-document is unavailable. Command
+                // substitution strips trailing newlines, hence the sacrificial 'x'. Globbing is
+                // disabled while splitting so an entry containing '*' cannot expand to filenames.
+                + "oldifs=$IFS; IFS=$(printf '\\nx'); IFS=${IFS%x}; set -f; "
+
+                // The security namespace is privileged; listing it is not. NAMES are inspected,
+                // never values: an attribute that exists with an empty value is still an attribute
+                // this session cannot write back, and reading it by value would report it absent.
                 + "if command -v getfattr >/dev/null 2>&1; then "
-                + $"sec=$(getfattr --absolute-names -m '^security\\.' --only-values -d -- {path} 2>/dev/null "
-                + $"|| getfattr --absolute-names -m '^security\\.' -- {path} 2>/dev/null) || exit {UnreadableStatus}; "
-                + $"if [ -n \"$sec\" ]; then exit {SecurityXattrStatus}; fi; "
-                + $"else exit {ToolingStatus}; fi; "
+                + $"sec_raw=$(getfattr --absolute-names -m '^security\\.' -- {path} 2>/dev/null) "
+                + $"|| {{ IFS=$oldifs; set +f; exit {UnreadableStatus}; }}; "
+                + "sec_found=0; "
+                + "for line in $sec_raw; do case \"$line\" in security.*) sec_found=1 ;; esac; done; "
+                + $"if [ \"$sec_found\" -eq 1 ]; then IFS=$oldifs; set +f; exit {SecurityXattrStatus}; fi; "
+                + $"else IFS=$oldifs; set +f; exit {ToolingStatus}; fi; "
 
-                // An ACL beyond the base entries cannot be reproduced by mode bits alone.
+                // An ACL beyond the base entries cannot be reproduced by mode bits alone. The
+                // output is captured on its own so a getfacl failure is seen; the previous shape
+                // piped it straight into a filter, and a POSIX pipeline reports only the LAST
+                // command's status, so a failed read looked exactly like a clean file.
                 + "if command -v getfacl >/dev/null 2>&1; then "
-                + $"acl=$(getfacl -cE -- {path} 2>/dev/null "
-                + "| grep -Ev '^(user|group|other)::' | grep -v '^$') "
-                + $"|| true; "
-                + $"if [ -n \"$acl\" ]; then exit {AclStatus}; fi; "
-                + $"else exit {ToolingStatus}; fi; "
+                + $"acl_raw=$(getfacl -c -- {path} 2>/dev/null) "
+                + $"|| {{ IFS=$oldifs; set +f; exit {UnreadableStatus}; }}; "
+                + "acl_found=0; "
 
-                + "exit 0");
+                // Filtering in the shell's own case builtin rather than through grep: an absent
+                // grep would fail the pipeline and, absorbed, read as "no extended entries".
+                // A mask entry counts, because it only exists when an extended ACL does.
+                + "for line in $acl_raw; do case \"$line\" in "
+                + "''|'#'*|user::*|group::*|other::*) ;; "
+                + "*) acl_found=1 ;; "
+                + "esac; done; "
+                + $"if [ \"$acl_found\" -eq 1 ]; then IFS=$oldifs; set +f; exit {AclStatus}; fi; "
+                + $"else IFS=$oldifs; set +f; exit {ToolingStatus}; fi; "
+
+                + "IFS=$oldifs; set +f; exit 0");
     }
 
     /// <summary>
