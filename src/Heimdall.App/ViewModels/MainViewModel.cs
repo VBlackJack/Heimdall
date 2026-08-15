@@ -19,6 +19,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Extensions;
 using Heimdall.App.Services;
+using Heimdall.App.Services.CloseGuard;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels.CommandPalette;
@@ -76,6 +77,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
     /// <summary>Owns the close protocol's bookkeeping; shared by every close path.</summary>
     private readonly IPaneCloseArbiter _closeArbiter;
+
+    /// <summary>Runs the close protocol for a single pane; see <see cref="PaneCloseCoordinator"/>.</summary>
+    private readonly PaneCloseCoordinator _paneCloseCoordinator;
 
     /// <summary>
     /// The one arbiter every close path shares, so a clearance obtained in one gesture is honoured
@@ -366,6 +370,14 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _serviceProvider = serviceProvider;
         ToolRegistry = toolRegistry;
         Split = splitService;
+
+        // Built from the SAME arbiter instance every other close path uses: a clearance obtained in
+        // one gesture has to be honoured wherever that gesture continues.
+        _paneCloseCoordinator = new PaneCloseCoordinator(
+            splitService.ClosePane,
+            _closeArbiter,
+            dialogService,
+            localizer);
         ServerList = serverList;
         Connection = connection;
         Settings = settings;
@@ -931,71 +943,15 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// Closes one pane, honouring its close guard.
     /// </summary>
     /// <remarks>
-    /// Asynchronous because a guard may need to ask the user, and the answer must be awaited
-    /// somewhere outside the synchronous close primitive. The same poll / resolve / retry-once
-    /// cycle as the session paths, so all five close paths share one contract.
+    /// The protocol itself lives in <see cref="PaneCloseCoordinator"/>, beside the arbiter it
+    /// negotiates with. This stays as the shell's entry point because the views call it.
     /// </remarks>
-    public async Task<PaneCloseResult> ClosePaneAsync(
+    public Task<PaneCloseResult> ClosePaneAsync(
         SessionTabViewModel session,
         string paneId,
         DisconnectReason reason = DisconnectReason.UserAction,
         CloseIntent intent = CloseIntent.Interactive)
-    {
-        CloseRequest request = intent == CloseIntent.Silent
-            ? CloseRequest.Silent(reason)
-            : CloseRequest.Interactive(reason);
-        try
-        {
-            return await ClosePaneCoreAsync(session, paneId, request);
-        }
-        finally
-        {
-            _closeArbiter.Release(request);
-        }
-    }
-
-    private async Task<PaneCloseResult> ClosePaneCoreAsync(
-        SessionTabViewModel session,
-        string paneId,
-        CloseRequest request)
-    {
-        PaneCloseResult result = Split.ClosePane(session, paneId, request);
-        if (result.Outcome != PaneCloseOutcome.Deferred)
-        {
-            ReportIfPaneBlocked(session, result);
-            return result;
-        }
-
-        object?[] hosts = [Core.Models.SplitTreeHelper.FindPane(session.RootContent, paneId)?.HostControl];
-        if (!await _closeArbiter.ResolveAsync(request, hosts))
-        {
-            PaneCloseResult refused = PaneCloseResult.Blocked(
-                result.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric);
-            ReportIfPaneBlocked(session, refused);
-            return refused;
-        }
-
-        result = Split.ClosePane(session, paneId, request);
-        if (result.Outcome == PaneCloseOutcome.Deferred)
-        {
-            result = PaneCloseResult.Blocked(result.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric);
-        }
-
-        ReportIfPaneBlocked(session, result);
-        return result;
-    }
-
-    private void ReportIfPaneBlocked(SessionTabViewModel session, PaneCloseResult result)
-    {
-        if (result.Outcome != PaneCloseOutcome.Blocked || result.ReasonKey is null)
-        {
-            return;
-        }
-
-        _dialogService.ShowInfo(
-            _localizer[CloseGuardLocaleKeys.BlockedTitle],
-            _localizer.Format(result.ReasonKey, session.Title));
-    }
+        => _paneCloseCoordinator.ClosePaneAsync(session, paneId, reason, intent);
 
     [RelayCommand]
     private async Task ReconnectSecondaryAsync(SessionTabViewModel? session)
