@@ -582,19 +582,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// Tool tabs are intentionally excluded.
     /// </summary>
     public IReadOnlyList<SessionSnapshotEntry> GetSessionSnapshotEntries()
-    {
-        return Connection.ActiveSessions
-            .Where(session => !string.IsNullOrWhiteSpace(session.OriginalServerId))
-            .Where(session => !string.IsNullOrWhiteSpace(session.ConnectionType))
-            .Where(session => !session.ConnectionType.StartsWith("TOOL:", StringComparison.OrdinalIgnoreCase))
-            .Select((session, order) => new SessionSnapshotEntry
-            {
-                ServerId = session.OriginalServerId,
-                ConnectionType = session.ConnectionType,
-                Order = order
-            })
-            .ToList();
-    }
+        => SessionSnapshotProjection.FromSessions(Connection.ActiveSessions);
 
     private async Task RestoreSessionSnapshotAsync(CancellationToken cancellationToken)
     {
