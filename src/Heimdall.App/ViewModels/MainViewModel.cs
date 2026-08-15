@@ -308,20 +308,19 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     {
         if (_currentSettings is null) return;
 
-        var id = toolId.ToUpperInvariant();
-        var removed = _currentSettings.FavoriteToolIds.RemoveAll(
-            favoriteId => string.Equals(favoriteId, id, StringComparison.OrdinalIgnoreCase)) > 0;
-        if (!removed)
-        {
-            _currentSettings.FavoriteToolIds.Add(id);
-        }
+        FavoriteToolToggle toggle = FavoriteToolSet.Toggle(_currentSettings.FavoriteToolIds, toolId);
 
+        // Persisted before anything in memory changes. MergeSettingAsync reloads from disk, writes,
+        // and only then raises SettingsChanged, which is what replaces _currentSettings with the
+        // stored clone. Editing the live list first - as this did - left every surface that reads
+        // FavoriteToolIds describing a toggle that had not reached disk, and kept describing it
+        // when the write failed.
         await _configManager.MergeSettingAsync(
-            s => s.FavoriteToolIds = new List<string>(_currentSettings.FavoriteToolIds));
+            s => s.FavoriteToolIds = new List<string>(toggle.Favorites));
 
         Heimdall.Core.Logging.FileLogger.Debug(
-            $"Favorite tools updated: {id} => {(removed ? "removed" : "added")}");
-        FavoritesChanged?.Invoke(id);
+            $"Favorite tools updated: {toggle.NormalizedId} => {(toggle.Added ? "added" : "removed")}");
+        FavoritesChanged?.Invoke(toggle.NormalizedId);
     }
 
     public MainViewModel(
