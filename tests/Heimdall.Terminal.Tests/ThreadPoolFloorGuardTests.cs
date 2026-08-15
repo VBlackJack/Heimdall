@@ -20,14 +20,13 @@ namespace Heimdall.Terminal.Tests;
 /// Fails when the thread-pool floor declared for the test assemblies does not reach this process.
 /// </summary>
 /// <remarks>
-/// <c>tests/Directory.Build.props</c> sets <c>ThreadPoolMinThreads</c>. It arrives here only
-/// through a generated runtime configuration, which no source file shows, and only while that
-/// props file keeps importing its parent: a nested <c>Directory.Build.props</c> REPLACES the one
-/// above it instead of merging with it. Drop the import and the floor disappears with nothing in
-/// the tree looking any different.
+/// <c>tests/Directory.Build.props</c> declares <c>ThreadPoolMinThreads</c> directly. The SDK
+/// carries that property into the generated runtime configuration; this test verifies the
+/// effective value in the running process rather than merely rereading its source declaration. A
+/// future project-level <c>Directory.Build.props</c> could shadow the tests-level file unless it
+/// imports its parent, but no deeper file exists today.
 /// <para>
-/// So the value is read from the running process rather than from the file that declares it, and
-/// the expected number is duplicated below on purpose. A test that read the figure from the same
+/// The expected number is duplicated below on purpose. A test that read the figure from the same
 /// place that supplies it could never notice it failing to arrive.
 /// </para>
 /// <para>
@@ -52,6 +51,6 @@ public sealed class ThreadPoolFloorGuardTests
             $"tests/Directory.Build.props declares a ThreadPoolMinThreads floor of "
             + $"{DeclaredMinimumWorkerThreads}, but this process runs with {workerThreads} minimum "
             + "worker threads. The property is not reaching the generated runtime configuration; "
-            + "check that the nested Directory.Build.props still imports its parent.");
+            + "inspect the evaluated MSBuild properties and any nearer Directory.Build.props.");
     }
 }
