@@ -25,6 +25,20 @@ closed, and window minimums that stop dialogs from opening larger than the scree
   GHSA-q939-rpr3-3284, a high-severity issue affecting the 2025.1.0 release that
   shipped in v2026.081000. Consequence worth naming: restoring the v2026.081000
   tag now fails the dependency audit, which is the intended behaviour.
+- **`System.Security.Cryptography.ProtectedData` updated to 10.0.11**
+  (`b6361cd3`). The package is a direct reference of `Heimdall.Core` and a
+  transitive one of eight other projects, so all nine consumer lock files were
+  regenerated with it; updating Core's alone fails `restore --locked-mode` with
+  `NU1004`.
+- **A valid host name can no longer be refused because the machine was busy**
+  (`45f89c7f`). Every validation pattern ran on a backtracking engine with a
+  250 ms match deadline, and a deadline that elapses was treated as "invalid".
+  On a loaded machine that rejects perfectly ordinary input: CI was observed
+  refusing `gateway.example.com`. The patterns now run on the non-backtracking
+  engine with no deadline at all, which bounds a match by the length of the
+  input instead of by how busy the machine is. Injection-shaped values,
+  over-long labels and over-long names are refused exactly as before, by not
+  matching rather than by running out of time.
 - **A Citrix launch token that is not vault-protected is rejected** (`9425fd15`,
   `819982a3`). Plaintext tokens are refused rather than accepted, and tokens
   already persisted are reconciled against the vault state.
@@ -160,17 +174,67 @@ closed, and window minimums that stop dialogs from opening larger than the scree
   with a pane close arbiter, usable by any tool or protocol view without either
   depending on the other.
 
+### Internal
+
+- **Two probe tests no longer measure a port they have released** (`ff8ce89d`,
+  `540a817a`). Both obtained a "closed" port by binding a listener and stopping
+  it, after which the port belongs to whatever asks for one next; one of them
+  was observed reporting a port as reachable for that reason. The port is now
+  held, bound and never listened on, for the whole probe, and both tests
+  re-assert it is still held after the probe returns.
+
 ### Notes
 
-- Test suite: to 9188 blocking tests, 0 skipped. The figure at v2026.081000 was
+- Test suite: to 9206 blocking tests, 0 skipped. The figure at v2026.081000 was
   not re-measured: restoring that tag now fails the dependency audit because of
   the SSH.NET advisory this release closes, and the audit gate was not bypassed
   to obtain a number.
 - CI informational lanes at the release commit: `CIUnstable` 26 of 26 passing;
   `RequiresDesktop` 104 of 105, the remaining failure being a UI Automation test
   that needs an interactive Windows desktop.
-- v2026.080901 and v2026.081000 shipped without an entry in this file. That gap
-  is not filled here; this entry covers v2026.081000 to the release commit.
+
+## 2026-08-10: Gateway validation failures stop the connection (v2026.081000)
+
+Recorded after the fact from `docs/release-notes/v2026.081000.md`. No test-suite
+figure is given: it was not measured at the time and cannot be measured now,
+because restoring that tag fails the dependency audit closed by v2026.081501.
+
+### Fixed
+
+- **A profile whose RD Gateway name fails validation no longer falls back to a
+  direct connection.** Heimdall stops the connection instead of generating a
+  session file with no gateway, and says so in the session status bar. Embedded
+  sessions were already protected; the external path was not. Consequence: a
+  profile with an invalid gateway that appeared to work will now fail, which
+  exposes a connection that was not going through the expected gateway.
+- **The gateway verification diagnostic names the settings that diverge**
+  instead of reporting a difference without locating it. This separates cases
+  that are not handled the same way: a gateway name rewritten by group policy
+  and a credential source imposed by the system.
+
+## 2026-08-09: Attested tunnels, gateways and temp-file cleanup (v2026.080901)
+
+Recorded after the fact from `docs/release-notes/v2026.080901.md`. No test-suite
+figure is given: it was not measured at the time.
+
+### Fixed
+
+- **An SSH tunnel is only reported as established once its local port is proven
+  to belong to the Plink process just launched**, matched by exact process id.
+  If the port is held by another process, if nothing is listening, or if the
+  system cannot decide, the tunnel is stopped rather than presented as up.
+  Consequence: the configured path must point directly at `plink.exe`; a script
+  or intermediate launcher cannot be attested and is refused.
+- **A declared RD Gateway is verified before use**: presence, write, read-back
+  and comparison. Any one of those failing stops the connection. Without it a
+  silent failure could let the session go straight to the target with no
+  gateway.
+- **Cleanup of secret-bearing temporary files is rescheduled while any file
+  remains** (Plink password file, WinRM bootstrap script), instead of stopping
+  after a single sweep. A file not yet eligible for deletion on the first pass
+  is picked up on the next.
+- **The last log lines revealing the state of a credential operation on the
+  embedded RDP path are removed**, with a guard test against reintroduction.
 
 ## 2026-08-09: Windows credential ownership and credential-free logs (v2026.080900)
 
