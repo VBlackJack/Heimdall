@@ -82,7 +82,6 @@
     "rdpConfirmReconnectOnResize": false,
     "enableSessionPersistence": false,
     "maxEmbeddedSessions": 10,
-    "embeddedRdpTimeoutMs": 30000,
     "embeddedIdleTimeoutMs": 0,
     "sftpBrowserEnabled": true,
     "sftpAutoOpenOnSsh": true,

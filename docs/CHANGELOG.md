@@ -427,10 +427,18 @@ addressed, 2 removed by product decision.**
   `AppSettings`, `SettingsViewModel`, `MigrationService` and in some cases
   `SchemaValidator`, with no consumer at the point of use. They are now applied at
   `SessionCoordinator.cs:595,707`, `TunnelService.cs:341` and
-  `EmbeddedRdpView.xaml.cs:1534`. The legacy `EmbeddedRdpTimeoutMs` key survives only as
-  a migration mapping onto `RdpConnectWatchdogTimeoutMs` (`MigrationService.cs:217`), so
-  an existing configuration keeps its value (`9a5145f8`, RDP-008, RDP-009, UXG-002,
-  UXG-003).
+  `EmbeddedRdpView.xaml.cs:1534`. The legacy `EmbeddedRdpTimeoutMs` key survived only as
+  a migration mapping onto `RdpConnectWatchdogTimeoutMs` (`9a5145f8`, RDP-008, RDP-009,
+  UXG-002, UXG-003).
+
+  Correction to the sentence above. Current .NET settings and legacy PowerShell imports are
+  two distinct migration paths, and that mapping existed on one of them only: it lives inside
+  the PowerShell importer, which a `settings.json` written by an earlier .NET build never
+  enters. So only a configuration imported from the PowerShell version kept its value, while
+  a current settings file kept a key nothing reads. `ConfigManager` now migrates the legacy
+  key when it loads the current settings file, the canonical key wins whenever both are
+  present, and the recognized legacy key is dropped on the next save. The shipped
+  `settings.default.json` no longer declares it.
 - The RDP resolution preset editor bound to `Settings.RdpResolutionPresetItems`, a
   collection that did not exist - the inner `TextBox` elements bound to items of nothing.
   Replaced by a real multi-line `RdpResolutionPresetsText` property with a reset command
