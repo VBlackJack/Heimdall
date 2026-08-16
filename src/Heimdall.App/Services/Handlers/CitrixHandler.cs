@@ -30,6 +30,23 @@ namespace Heimdall.App.Services.Handlers;
 /// </summary>
 internal sealed class CitrixHandler : IProtocolHandler
 {
+    // Launcher file names Heimdall has a documented grammar for. Anything else is refused rather
+    // than driven on a guess: the two executables take different, non-interchangeable commands.
+    private const string StoreBrowseExecutableName = "storebrowse.exe";
+    private const string SelfServiceExecutableName = "SelfService.exe";
+
+    // storebrowse commands. The documentation defines these as two DISTINCT commands, so exactly
+    // one is ever emitted - passing both is not a richer invocation, it is a malformed one.
+    // https://docs.citrix.com/en-us/citrix-workspace-app-for-windows/store-browse.html
+    private const string StoreBrowseNonSsoCommand = "-L";
+    private const string StoreBrowseSsoCommand = "-S";
+
+    // SelfService.exe reaches the same store through its own storebrowse sub-command, which the
+    // documentation describes for the single sign-on case only.
+    // https://docs.citrix.com/en-us/citrix-workspace-app-for-windows/storebrowse-for-workspace.html
+    private const string SelfServiceStoreBrowseCommand = "storebrowse";
+    private const string SelfServiceSsoFlag = "-q";
+
     private readonly ConnectionStateMachine _connectionSm;
     private readonly LocalizationManager _localizer;
     private readonly Func<ProcessStartInfo, Process?> _startProcess;
@@ -233,16 +250,29 @@ internal sealed class CitrixHandler : IProtocolHandler
                 string? launcher = _resolveCitrixLauncher();
                 if (launcher is null)
                 {
-                    var msg = _localizer["CitrixWorkspaceNotFound"];
+                    string msg = _localizer["CitrixWorkspaceNotFound"];
                     _connectionSm.SetError(server.Id, msg);
                     return Task.FromResult(new ConnectionResult(false, msg, null));
                 }
 
-                var startInfo = CreateStoreFrontStartInfo(
-                    launcher,
-                    server.CitrixAppName,
-                    validatedStoreFrontUrl,
-                    server.CitrixUseSso);
+                // Refused BEFORE the launch rather than driven on a guess: an executable with no
+                // documented grammar, and SelfService.exe without single sign-on, have no
+                // invocation Heimdall can form. Starting the process anyway would hand the wrong
+                // command line to a real launcher.
+                if (!TryCreateStoreFrontStartInfo(
+                        launcher,
+                        server.CitrixAppName,
+                        validatedStoreFrontUrl,
+                        server.CitrixUseSso,
+                        out ProcessStartInfo? startInfo)
+                    || startInfo is null)
+                {
+                    _logWarning(
+                        $"Citrix launch blocked: mode=StoreFront launcher={Path.GetFileName(launcher)} sso={server.CitrixUseSso} unsupportedLauncherGrammar=true");
+                    string msg = _localizer["CitrixLaunchFailed"];
+                    _connectionSm.SetError(server.Id, msg);
+                    return Task.FromResult(new ConnectionResult(false, msg, null));
+                }
 
                 _logInfo(
                     $"Citrix launch (StoreFront): launcher={launcher} app={server.CitrixAppName} store={safeStoreFrontLogValue} sso={server.CitrixUseSso}");
@@ -325,7 +355,9 @@ internal sealed class CitrixHandler : IProtocolHandler
         string programFilesX86,
         string programFiles)
     {
-        // storebrowse.exe is preferred for StoreFront launches (-L / -S). On Citrix Workspace
+        // storebrowse.exe is preferred for StoreFront launches (-L or -S, never both; see
+        // TryCreateStoreFrontStartInfo, which drives each executable by its own grammar and
+        // refuses the combinations that have none). On Citrix Workspace
         // App 2507+ it ships under "ICA Client\AuthManager"; older layouts kept it directly in
         // "ICA Client". SelfService.exe lives under "ICA Client\SelfServicePlugin" on current
         // builds. Probe the modern subfolders first, then the legacy flat layout.
@@ -411,37 +443,107 @@ internal sealed class CitrixHandler : IProtocolHandler
         return true;
     }
 
-    internal static ProcessStartInfo CreateStoreFrontStartInfo(
+    /// <summary>
+    /// Builds the StoreFront invocation for the launcher that was actually resolved.
+    /// </summary>
+    /// <remarks>
+    /// The grammar is chosen from the executable, never assumed: <c>storebrowse.exe</c> and
+    /// <c>SelfService.exe</c> take different commands, and a resolver that falls back from one to
+    /// the other would otherwise hand the wrong command line to a real launcher.
+    /// <para>
+    /// Returns false, rather than throwing or guessing, for the two combinations that have no
+    /// documented invocation: <c>SelfService.exe</c> without single sign-on, and any executable
+    /// this class has no grammar for. The caller refuses the launch on that answer.
+    /// </para>
+    /// </remarks>
+    /// <param name="startInfo">The invocation to start, or null when this returns false.</param>
+    /// <returns>True when a documented invocation exists for this launcher and SSO combination.</returns>
+    internal static bool TryCreateStoreFrontStartInfo(
         string launcher,
         string appName,
         string storeFrontUrl,
-        bool useSso)
+        bool useSso,
+        out ProcessStartInfo? startInfo)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(launcher);
         ArgumentException.ThrowIfNullOrWhiteSpace(appName);
 
-        if (!TryValidateStoreFrontUrl(storeFrontUrl, out var validatedStoreFrontUrl))
+        startInfo = null;
+
+        if (!TryValidateStoreFrontUrl(storeFrontUrl, out string validatedStoreFrontUrl))
         {
             throw new ArgumentException(
                 "StoreFront URL must be an absolute HTTP or HTTPS URI.",
                 nameof(storeFrontUrl));
         }
 
-        var startInfo = new ProcessStartInfo
+        CitrixLauncherGrammar grammar = ResolveLauncherGrammar(launcher);
+        if (grammar == CitrixLauncherGrammar.Unsupported)
+        {
+            return false;
+        }
+
+        if (grammar == CitrixLauncherGrammar.SelfService && !useSso)
+        {
+            return false;
+        }
+
+        ProcessStartInfo created = new()
         {
             FileName = launcher,
             UseShellExecute = false,
             CreateNoWindow = true
         };
 
-        startInfo.ArgumentList.Add("-L");
-        if (useSso)
+        if (grammar == CitrixLauncherGrammar.StoreBrowse)
         {
-            startInfo.ArgumentList.Add("-S");
+            // Exactly one command, never both.
+            created.ArgumentList.Add(useSso ? StoreBrowseSsoCommand : StoreBrowseNonSsoCommand);
+        }
+        else
+        {
+            created.ArgumentList.Add(SelfServiceStoreBrowseCommand);
+            created.ArgumentList.Add(SelfServiceSsoFlag);
         }
 
-        startInfo.ArgumentList.Add(appName);
-        startInfo.ArgumentList.Add(validatedStoreFrontUrl);
-        return startInfo;
+        // Separate entries, so a space or a quote in either survives to the launcher intact.
+        created.ArgumentList.Add(appName);
+        created.ArgumentList.Add(validatedStoreFrontUrl);
+        startInfo = created;
+        return true;
+    }
+
+    /// <summary>
+    /// Classifies the resolved launcher by file name, case-insensitively, so a full path and a
+    /// bare executable name are recognized alike.
+    /// </summary>
+    private static CitrixLauncherGrammar ResolveLauncherGrammar(string launcher)
+    {
+        string fileName = Path.GetFileName(launcher);
+
+        if (string.Equals(fileName, StoreBrowseExecutableName, StringComparison.OrdinalIgnoreCase))
+        {
+            return CitrixLauncherGrammar.StoreBrowse;
+        }
+
+        if (string.Equals(fileName, SelfServiceExecutableName, StringComparison.OrdinalIgnoreCase))
+        {
+            return CitrixLauncherGrammar.SelfService;
+        }
+
+        return CitrixLauncherGrammar.Unsupported;
+    }
+
+    /// <summary>Which documented command line the resolved executable expects.</summary>
+    private enum CitrixLauncherGrammar
+    {
+        /// <summary>No documented grammar. The launch is refused rather than guessed.</summary>
+        Unsupported = 0,
+
+        /// <summary><c>storebrowse.exe</c>: one of two distinct commands, never both.</summary>
+        StoreBrowse = 1,
+
+        /// <summary><c>SelfService.exe</c>: its own storebrowse sub-command, documented SSO-only.</summary>
+        SelfService = 2,
     }
 }

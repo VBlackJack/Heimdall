@@ -67,41 +67,224 @@ public sealed class CitrixHandlerTests
         Assert.Equal(string.Empty, validatedUrl);
     }
 
+    // RDP-005. The invocation used to be built without ever looking at the executable: "-L"
+    // unconditionally, plus "-S" when SSO was on. That is wrong twice over - the two commands are
+    // documented as distinct and are never combined, and SelfService.exe was handed storebrowse's
+    // command line whenever the resolver fell through to it. The tests below pin one grammar per
+    // executable, and the two refusals that replace the guess.
     [Fact]
-    public void CreateStoreFrontStartInfo_UsesArgumentListAndPreservesQuotedAppNameToken()
+    public void TryCreateStoreFrontStartInfo_StoreBrowseWithSso_EmitsTheLaunchCommandAlone()
     {
-        var appName = "Calculator \"Admin\" Tool";
-        var storeFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/";
+        const string appName = "Calculator \"Admin\" Tool";
+        const string storeFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/";
+        const string launcher = @"C:\Program Files (x86)\Citrix\ICA Client\storebrowse.exe";
 
-        var startInfo = CitrixHandler.CreateStoreFrontStartInfo(
-            @"C:\Program Files (x86)\Citrix\ICA Client\storebrowse.exe",
+        bool created = CitrixHandler.TryCreateStoreFrontStartInfo(
+            launcher,
             appName,
             storeFrontUrl,
-            useSso: true);
+            useSso: true,
+            out ProcessStartInfo? startInfo);
 
-        Assert.Equal(@"C:\Program Files (x86)\Citrix\ICA Client\storebrowse.exe", startInfo.FileName);
+        Assert.True(created);
+        Assert.NotNull(startInfo);
+        Assert.Equal(launcher, startInfo.FileName);
         Assert.False(startInfo.UseShellExecute);
-        Assert.Equal(4, startInfo.ArgumentList.Count);
-        Assert.Equal("-L", startInfo.ArgumentList[0]);
-        Assert.Equal("-S", startInfo.ArgumentList[1]);
-        Assert.Equal(appName, startInfo.ArgumentList[2]);
-        Assert.Equal(storeFrontUrl, startInfo.ArgumentList[3]);
+        Assert.Equal(3, startInfo.ArgumentList.Count);
+        Assert.Equal("-S", startInfo.ArgumentList[0]);
+        // The whole defect in one assertion: the list command must not ride along.
+        Assert.DoesNotContain("-L", startInfo.ArgumentList);
+        // Application and URL stay separate entries, so a space or a quote survives intact.
+        Assert.Equal(appName, startInfo.ArgumentList[1]);
+        Assert.Equal(storeFrontUrl, startInfo.ArgumentList[2]);
         Assert.Equal(string.Empty, startInfo.Arguments);
     }
 
     [Fact]
-    public void CreateStoreFrontStartInfo_WithoutSso_OmitsSessionLaunchFlag()
+    public void TryCreateStoreFrontStartInfo_StoreBrowseWithoutSso_EmitsTheListCommandAlone()
     {
-        var startInfo = CitrixHandler.CreateStoreFrontStartInfo(
+        const string storeFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/";
+
+        bool created = CitrixHandler.TryCreateStoreFrontStartInfo(
             "storebrowse.exe",
             "Calculator",
-            "https://citrix.example.com/Citrix/StoreWeb/",
-            useSso: false);
+            storeFrontUrl,
+            useSso: false,
+            out ProcessStartInfo? startInfo);
 
+        Assert.True(created);
+        Assert.NotNull(startInfo);
         Assert.Equal(3, startInfo.ArgumentList.Count);
         Assert.Equal("-L", startInfo.ArgumentList[0]);
+        Assert.DoesNotContain("-S", startInfo.ArgumentList);
         Assert.Equal("Calculator", startInfo.ArgumentList[1]);
-        Assert.Equal("https://citrix.example.com/Citrix/StoreWeb/", startInfo.ArgumentList[2]);
+        Assert.Equal(storeFrontUrl, startInfo.ArgumentList[2]);
+    }
+
+    [Fact]
+    public void TryCreateStoreFrontStartInfo_SelfServiceWithSso_EmitsItsOwnStoreBrowseSubCommand()
+    {
+        const string appName = "Calculator \"Admin\" Tool";
+        const string storeFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/";
+        const string launcher =
+            @"C:\Program Files (x86)\Citrix\ICA Client\SelfServicePlugin\SelfService.exe";
+
+        bool created = CitrixHandler.TryCreateStoreFrontStartInfo(
+            launcher,
+            appName,
+            storeFrontUrl,
+            useSso: true,
+            out ProcessStartInfo? startInfo);
+
+        Assert.True(created);
+        Assert.NotNull(startInfo);
+        Assert.Equal(launcher, startInfo.FileName);
+        Assert.Equal(4, startInfo.ArgumentList.Count);
+        Assert.Equal("storebrowse", startInfo.ArgumentList[0]);
+        Assert.Equal("-q", startInfo.ArgumentList[1]);
+        // Neither storebrowse.exe command belongs on this executable.
+        Assert.DoesNotContain("-L", startInfo.ArgumentList);
+        Assert.DoesNotContain("-S", startInfo.ArgumentList);
+        Assert.Equal(appName, startInfo.ArgumentList[2]);
+        Assert.Equal(storeFrontUrl, startInfo.ArgumentList[3]);
+    }
+
+    [Fact]
+    public void TryCreateStoreFrontStartInfo_SelfServiceWithoutSso_RefusesRatherThanGuessing()
+    {
+        // The documented sub-command covers single sign-on only, so there is no invocation to form.
+        bool created = CitrixHandler.TryCreateStoreFrontStartInfo(
+            @"C:\Program Files (x86)\Citrix\ICA Client\SelfServicePlugin\SelfService.exe",
+            "Calculator",
+            "https://citrix.example.com/Citrix/StoreWeb/",
+            useSso: false,
+            out ProcessStartInfo? startInfo);
+
+        Assert.False(created);
+        Assert.Null(startInfo);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TryCreateStoreFrontStartInfo_UnknownExecutable_RefusesInsteadOfAssumingStoreBrowse(
+        bool useSso)
+    {
+        bool created = CitrixHandler.TryCreateStoreFrontStartInfo(
+            @"C:\Program Files (x86)\Citrix\ICA Client\wfica32.exe",
+            "Calculator",
+            "https://citrix.example.com/Citrix/StoreWeb/",
+            useSso,
+            out ProcessStartInfo? startInfo);
+
+        Assert.False(created);
+        Assert.Null(startInfo);
+    }
+
+    [Theory]
+    [InlineData("STOREBROWSE.EXE", "-S")]
+    [InlineData(@"C:\Citrix\StoreBrowse.Exe", "-S")]
+    [InlineData("selfservice.exe", "storebrowse")]
+    [InlineData(@"C:\Citrix\SELFSERVICE.EXE", "storebrowse")]
+    public void TryCreateStoreFrontStartInfo_MatchesTheFileNameCaseInsensitively(
+        string launcher,
+        string expectedFirstArgument)
+    {
+        bool created = CitrixHandler.TryCreateStoreFrontStartInfo(
+            launcher,
+            "Calculator",
+            "https://citrix.example.com/Citrix/StoreWeb/",
+            useSso: true,
+            out ProcessStartInfo? startInfo);
+
+        Assert.True(created);
+        Assert.NotNull(startInfo);
+        Assert.Equal(expectedFirstArgument, startInfo.ArgumentList[0]);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SelfServiceLauncherWithoutSso_RefusesBeforeStartingTheProcess()
+    {
+        int launchCallCount = 0;
+        List<string> logs = [];
+        ConnectionStateMachine stateMachine = new();
+        CitrixHandler handler = CreateHandler(
+            _ =>
+            {
+                launchCallCount++;
+                return null;
+            },
+            static stored => stored,
+            stateMachine,
+            logs.Add,
+            logs.Add,
+            resolveCitrixLauncher: static () =>
+                @"C:\Program Files (x86)\Citrix\ICA Client\SelfServicePlugin\SelfService.exe");
+        ServerProfileDto server = CreateStoreFrontServer(useSso: false);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixLaunchFailed", result.ErrorMessage);
+        Assert.Equal("CitrixLaunchFailed", stateMachine.GetStateData(server.Id)?.ErrorMessage);
+        Assert.Equal(0, launchCallCount);
+        Assert.Null(result.Session);
+        Assert.Contains(
+            logs,
+            log => log.Contains("unsupportedLauncherGrammar=true", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_UnknownLauncher_RefusesBeforeStartingTheProcess()
+    {
+        int launchCallCount = 0;
+        CitrixHandler handler = CreateHandler(
+            _ =>
+            {
+                launchCallCount++;
+                return null;
+            },
+            static stored => stored,
+            resolveCitrixLauncher: static () => @"C:\Citrix\wfica32.exe");
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateStoreFrontServer(useSso: true),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixLaunchFailed", result.ErrorMessage);
+        Assert.Equal(0, launchCallCount);
+        Assert.Null(result.Session);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SelfServiceLauncherWithSso_LaunchesWithItsOwnGrammar()
+    {
+        ProcessStartInfo? launchedStartInfo = null;
+        CitrixHandler handler = CreateHandler(
+            startInfo =>
+            {
+                launchedStartInfo = startInfo;
+                return null;
+            },
+            static stored => stored,
+            resolveCitrixLauncher: static () =>
+                @"C:\Program Files (x86)\Citrix\ICA Client\SelfServicePlugin\SelfService.exe");
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateStoreFrontServer(useSso: true),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(launchedStartInfo);
+        Assert.Equal(
+            new[] { "storebrowse", "-q", "Calculator", "https://citrix.example.com/Citrix/StoreWeb/" },
+            launchedStartInfo.ArgumentList);
     }
 
     [Fact]
@@ -487,7 +670,8 @@ public sealed class CitrixHandlerTests
         ConnectionStateMachine? stateMachine = null,
         Action<string>? logInfo = null,
         Action<string>? logWarning = null,
-        Func<IReadOnlySet<nint>>? capturePreLaunchWindows = null) =>
+        Func<IReadOnlySet<nint>>? capturePreLaunchWindows = null,
+        Func<string?>? resolveCitrixLauncher = null) =>
         new(
             stateMachine ?? new ConnectionStateMachine(),
             new LocalizationManager(),
@@ -496,8 +680,18 @@ public sealed class CitrixHandlerTests
             static () => "SelfService.exe",
             logInfo ?? (static _ => { }),
             logWarning ?? (static _ => { }),
-            static () => "storebrowse.exe",
+            resolveCitrixLauncher ?? (static () => "storebrowse.exe"),
             capturePreLaunchWindows);
+
+    private static ServerProfileDto CreateStoreFrontServer(bool useSso) =>
+        new()
+        {
+            Id = "srv-citrix-storefront",
+            DisplayName = "Citrix StoreFront test",
+            CitrixAppName = "Calculator",
+            CitrixStoreFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/",
+            CitrixUseSso = useSso
+        };
 
     private static ServerProfileDto CreateCacheServer(string launchCommandLine) =>
         new()
