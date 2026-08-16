@@ -74,6 +74,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             FakeEmbeddedSessionManager embeddedSessionManager,
             ConnectionStateMachine stateMachine,
             TunnelManager tunnelManager,
+            RecordingPaneCloseArbiter closeArbiter,
             IReadOnlyDictionary<string, ControlledProtocolHandler> handlers)
         {
             _rootPath = rootPath;
@@ -83,6 +84,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             EmbeddedSessionManager = embeddedSessionManager;
             StateMachine = stateMachine;
             TunnelManager = tunnelManager;
+            CloseArbiter = closeArbiter;
             Handlers = handlers;
         }
 
@@ -97,6 +99,14 @@ public sealed partial class SessionCoordinatorPreMountTests
         public ConnectionStateMachine StateMachine { get; }
 
         public TunnelManager TunnelManager { get; }
+
+        /// <summary>
+        /// The one arbiter shared by SplitService, ConnectionViewModel and MainViewModel, exactly
+        /// as production shares it. Three separate instances - which this harness used to build -
+        /// let a grant issued on one path go unseen by the next, so the requests observed here
+        /// would not be the requests the shell actually negotiates.
+        /// </summary>
+        internal RecordingPaneCloseArbiter CloseArbiter { get; }
 
         private IReadOnlyDictionary<string, ControlledProtocolHandler> Handlers { get; }
 
@@ -133,6 +143,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 localizer,
                 new FakeTunnelService(),
                 handlers.Values);
+            RecordingPaneCloseArbiter closeArbiter = new();
             SplitService splitService = new SplitService(
                 configManager,
                 localizer,
@@ -141,9 +152,9 @@ public sealed partial class SessionCoordinatorPreMountTests
                 embeddedSessionManager,
                 connectionService,
                 toolRegistry,
-                dialogService, new PaneCloseArbiter());
+                dialogService, closeArbiter);
             FakeUiDispatcher dispatcher = new(checkAccess);
-            ConnectionViewModel connection = new ConnectionViewModel(localizer, dialogService, splitService, new PaneCloseArbiter());
+            ConnectionViewModel connection = new ConnectionViewModel(localizer, dialogService, splitService, closeArbiter);
             ServerListViewModel serverList = new ServerListViewModel(
                 configManager,
                 localizer,
@@ -191,7 +202,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 connection,
                 settings,
                 null!,
-                new ServiceCollection().BuildServiceProvider(), new PaneCloseArbiter());
+                new ServiceCollection().BuildServiceProvider(), closeArbiter);
 
             return new TestHarness(
                 rootPath,
@@ -201,6 +212,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 embeddedSessionManager,
                 connectionStateMachine,
                 tunnelManager,
+                closeArbiter,
                 handlers);
         }
 
@@ -715,5 +727,43 @@ public sealed partial class SessionCoordinatorPreMountTests
         public void ShowWarning(string title, string message)
         {
         }
+    }
+
+    /// <summary>
+    /// Records every request handed to the arbiter, and decides nothing itself.
+    /// </summary>
+    /// <remarks>
+    /// A decorator over the real <see cref="PaneCloseArbiter"/>, not a replacement for it. A
+    /// recorder that answered allow on its own would let these tests observe requests flowing
+    /// through a decision-maker the application does not use, so the guard protocol under
+    /// observation would not be the one that ships.
+    /// <para>
+    /// It records the poll only: that is the one observation the close-intent oracles read, and a
+    /// list nothing asserts on is a list that will drift. Counting Silent against Interactive
+    /// would be useless anyway - swapping two producers' intents leaves every total unchanged,
+    /// which is exactly how a user gesture reached the silent path in the first place.
+    /// </para>
+    /// </remarks>
+    private sealed class RecordingPaneCloseArbiter : IPaneCloseArbiter
+    {
+        private readonly PaneCloseArbiter _inner = new();
+        private readonly List<CloseRequest> _polled = [];
+
+        /// <summary>Requests handed to <see cref="Poll"/>, in order.</summary>
+        public IReadOnlyList<CloseRequest> Polled => _polled;
+
+        /// <summary>Drops the observations, so one harness can drive several gestures.</summary>
+        public void Reset() => _polled.Clear();
+
+        public CloseDecision Poll(CloseRequest request, IReadOnlyList<object?> hosts)
+        {
+            _polled.Add(request);
+            return _inner.Poll(request, hosts);
+        }
+
+        public Task<bool> ResolveAsync(CloseRequest request, IReadOnlyList<object?> hosts)
+            => _inner.ResolveAsync(request, hosts);
+
+        public void Release(CloseRequest request) => _inner.Release(request);
     }
 }
