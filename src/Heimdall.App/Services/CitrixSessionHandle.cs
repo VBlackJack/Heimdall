@@ -245,6 +245,47 @@ internal sealed class CitrixSessionHandle : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Whether the currently embedded window should still be reported as live.
+    /// </summary>
+    /// <remarks>
+    /// Fail-closed by construction, and the reason it is a function rather than a ternary at the
+    /// call site. There are exactly two ways to be alive: a validated handle for this very window,
+    /// or the Workspace sign-in shell, which has no owning ICA process to validate and whose
+    /// existence is therefore all there is to read. Everything else - most importantly a window
+    /// that was embedded after its adoption was refused - is dead, because the only evidence left
+    /// for it would be bare window existence, which says nothing about the session.
+    /// </remarks>
+    /// <param name="handle">The adopted session, or null when adoption never succeeded.</param>
+    /// <param name="capturedHwnd">The window currently embedded.</param>
+    /// <param name="authHwnd">The embedded sign-in shell, or zero when none is embedded.</param>
+    /// <param name="isWindow">Window-existence probe, used only for the sign-in shell.</param>
+    internal static bool IsEmbeddedWindowAlive(
+        CitrixSessionHandle? handle,
+        IntPtr capturedHwnd,
+        IntPtr authHwnd,
+        Func<IntPtr, bool> isWindow)
+    {
+        ArgumentNullException.ThrowIfNull(isWindow);
+
+        if (capturedHwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (handle is not null && handle.Hwnd == capturedHwnd)
+        {
+            return handle.IsAlive;
+        }
+
+        if (authHwnd != IntPtr.Zero && capturedHwnd == authHwnd)
+        {
+            return isWindow(capturedHwnd);
+        }
+
+        return false;
+    }
+
     /// <summary>True for the Workspace sign-in shell, which is never an application session.</summary>
     internal static bool IsWorkspaceShellWindowClass(string? windowClassName)
         => windowClassName is not null

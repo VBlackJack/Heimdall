@@ -69,6 +69,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     // are driven from here. A null handle means there is no session to drive, never a reason to
     // fall back to the launcher.
     private CitrixSessionHandle? _sessionHandle;
+
+    // The Workspace sign-in window, when one has been embedded. It is not a session and has no
+    // owning ICA process to validate, so it is the only window whose liveness is its existence.
+    private IntPtr _authHwnd;
     private SessionTabViewModel? _sessionTab;
     private LocalizationManager? _localizer;
     private IDialogService? _dialogService;
@@ -306,16 +310,32 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             CitrixSessionWindow bestWindow = FindNewSessionWindow(preLaunchWindows);
             if (bestWindow.IsResolved)
             {
-                _captureInProgress = false;
                 Core.Logging.FileLogger.Info(
                     $"Citrix: capturing session window hwnd=0x{bestWindow.Hwnd.ToInt64():X} ownerPid={bestWindow.OwnerProcessId}");
-                await Dispatcher.InvokeAsync(() =>
+
+                // Adoption gates the embed. A window whose owning process cannot be validated is
+                // not a session we can drive, so it is not embedded either: embedding it would
+                // leave a pane with no handle, and the only liveness left to read would be the
+                // bare window existence this lot exists to stop trusting.
+                bool adopted = await Dispatcher.InvokeAsync(() =>
                 {
+                    if (!AdoptSessionWindow(bestWindow))
+                    {
+                        return false;
+                    }
+
+                    _captureInProgress = false;
                     CaptureLoadingPanel.Visibility = Visibility.Collapsed;
-                    AdoptSessionWindow(bestWindow);
                     EmbedWindow(bestWindow.Hwnd);
-                });
-                return;
+                    return true;
+                }).Task;
+
+                if (adopted)
+                {
+                    return;
+                }
+
+                // Refused: keep polling rather than settling for a window we cannot validate.
             }
         }
 
@@ -338,6 +358,11 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             await Dispatcher.InvokeAsync(() =>
             {
                 CaptureLoadingText.Text = _localizer?["CitrixAuthSignInHint"] ?? "Sign in to Citrix…";
+
+                // Recorded before embedding: the sign-in shell is the ONE window embedded without
+                // a session handle, and naming it here is what keeps the existence-only liveness
+                // check confined to it.
+                _authHwnd = authHwnd;
                 EmbedWindow(authHwnd);
             });
 
@@ -581,15 +606,26 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
 
             Core.Logging.FileLogger.Info(
                 $"Citrix: post-auth session window hwnd=0x{sessionWindow.Hwnd.ToInt64():X} ownerPid={sessionWindow.OwnerProcessId} appeared; swapping out auth window");
-            await Dispatcher.InvokeAsync(() =>
+
+            // Adopt BEFORE releasing anything. If the window cannot be validated, the sign-in
+            // window stays embedded and the watch keeps running: handing it back for a session we
+            // could neither drive nor report would leave the pane with nothing at all.
+            bool swapped = await Dispatcher.InvokeAsync(() =>
             {
-                // Hand the sign-in window back to Citrix, then embed the app session. The handle is
-                // adopted here and never for the sign-in window embedded before it.
+                if (!AdoptSessionWindow(sessionWindow))
+                {
+                    return false;
+                }
+
                 ReleaseEmbeddedWindow();
-                AdoptSessionWindow(sessionWindow);
                 EmbedWindow(sessionWindow.Hwnd);
-            });
-            return;
+                return true;
+            }).Task;
+
+            if (swapped)
+            {
+                return;
+            }
         }
 
         Core.Logging.FileLogger.Info(
@@ -719,7 +755,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     /// Adopts a captured window as this view's session. Only ever called with a window that came
     /// from the session scan, never with the Workspace sign-in window.
     /// </summary>
-    private void AdoptSessionWindow(CitrixSessionWindow window)
+    /// <returns>True when the window was adopted. False means there is no session to embed.</returns>
+    private bool AdoptSessionWindow(CitrixSessionWindow window)
     {
         _sessionHandle?.Dispose();
         _sessionHandle = null;
@@ -731,11 +768,12 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
                 out CitrixSessionHandle? handle))
         {
             _sessionHandle = handle;
-            return;
+            return true;
         }
 
         Core.Logging.FileLogger.Warn(
             $"Citrix: refused session handle for hwnd=0x{window.Hwnd.ToInt64():X} ownerPid={window.OwnerProcessId}");
+        return false;
     }
 
     private static string ReadWindowClassName(IntPtr hwnd)
@@ -864,12 +902,14 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     {
         if (_embedded && _capturedHwnd != IntPtr.Zero)
         {
-            // Embedded mode keeps its window-based semantics, but asks the handle so a recycled
-            // window handle cannot report a session that has actually gone. The sign-in window is
-            // embedded without a handle, so it falls back to the window check alone.
-            bool windowAlive = _sessionHandle is { } embeddedHandle && embeddedHandle.Hwnd == _capturedHwnd
-                ? embeddedHandle.IsAlive
-                : IsWindow(_capturedHwnd);
+            // Embedded mode keeps its window-based semantics, but the decision is fail-closed and
+            // lives in the handle: a validated handle answers for the session, the sign-in shell
+            // answers by existence alone, and nothing else is reported alive.
+            bool windowAlive = CitrixSessionHandle.IsEmbeddedWindowAlive(
+                _sessionHandle,
+                _capturedHwnd,
+                _authHwnd,
+                IsWindow);
             if (!windowAlive)
             {
                 EmitDisconnect("remote");
@@ -956,6 +996,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         }
 
         _capturedHwnd = IntPtr.Zero;
+        _authHwnd = IntPtr.Zero;
         _embedded = false;
     }
 

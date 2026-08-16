@@ -250,6 +250,120 @@ public sealed class CitrixSessionHandleTests
         Assert.False(handle.IsAlive);
     }
 
+    [Fact]
+    public void EmbeddedHealth_AdoptionRefusedForARealSessionWindow_ReadsDead()
+    {
+        // The failure this rule exists for. A session window was found - so an HWND and an owner
+        // PID were both resolved - but adoption refused it, so there is no handle. The window
+        // itself still exists, and reading that existence would report a live session backed by
+        // nothing: no owning process, no owner revalidation. Fail closed instead.
+        bool alive = CitrixSessionHandle.IsEmbeddedWindowAlive(
+            handle: null,
+            capturedHwnd: SessionHwnd,
+            authHwnd: IntPtr.Zero,
+            isWindow: _ => true);
+
+        Assert.False(alive);
+    }
+
+    [Fact]
+    public void EmbeddedHealth_SignInShell_IsTheOnlyWindowJudgedByExistenceAlone()
+    {
+        // The shell is embedded on purpose during authentication and has no owning ICA process to
+        // validate, so its existence is all there is to read - and only for it.
+        IntPtr authHwnd = 0x77;
+
+        Assert.True(CitrixSessionHandle.IsEmbeddedWindowAlive(null, authHwnd, authHwnd, _ => true));
+        Assert.False(CitrixSessionHandle.IsEmbeddedWindowAlive(null, authHwnd, authHwnd, _ => false));
+    }
+
+    [Fact]
+    public void EmbeddedHealth_HandleForADifferentWindow_ReadsDead()
+    {
+        // A stale handle must not vouch for whatever happens to be embedded now.
+        FakeSessionProcess process = new(OwnerPid);
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process);
+
+        Assert.True(handle.IsAlive);
+        Assert.False(CitrixSessionHandle.IsEmbeddedWindowAlive(handle, 0x99, IntPtr.Zero, _ => true));
+    }
+
+    [Fact]
+    public void EmbeddedHealth_ValidatedHandleForThisWindow_DefersToTheHandle()
+    {
+        FakeSessionProcess process = new(OwnerPid);
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process);
+
+        // The probe says the window is gone and the handle says the session is live: the handle
+        // wins, which is what "defers to the handle" means. The handle's own liveness rules,
+        // recycling included, are pinned by the IsAlive oracles above and deliberately not
+        // re-observed here, so a regression there points at one line rather than several.
+        Assert.True(CitrixSessionHandle.IsEmbeddedWindowAlive(
+            handle, SessionHwnd, IntPtr.Zero, _ => false));
+    }
+
+    [Fact]
+    public void EmbeddedHealth_NothingEmbedded_ReadsDead()
+        => Assert.False(CitrixSessionHandle.IsEmbeddedWindowAlive(
+            null, IntPtr.Zero, IntPtr.Zero, _ => true));
+
+    /// <summary>
+    /// A refused adoption must stop the embed, not merely be logged.
+    /// </summary>
+    /// <remarks>
+    /// The health rule above closes the reporting half of the defect; this closes the other half.
+    /// Both capture paths must gate <c>EmbedWindow</c> on the adoption, and the post-auth path must
+    /// additionally adopt before releasing the sign-in window, or a refusal would hand that window
+    /// back for a session it could not drive.
+    /// </remarks>
+    [Fact]
+    public void CaptureAndPostAuthPaths_EmbedOnlyAfterASuccessfulAdoption()
+    {
+        string source = ReadAppSource("Views/EmbeddedCitrixView.xaml.cs");
+
+        foreach (string signature in new[]
+        {
+            "private async Task TryCaptureWindowAsync(",
+            "private async Task WatchForSessionAfterAuthAsync("
+        })
+        {
+            string body = ExtractMethodBody(source, signature);
+
+            int adoptionGuard = body.IndexOf("if (!AdoptSessionWindow(", StringComparison.Ordinal);
+            Assert.True(adoptionGuard >= 0, $"No adoption guard in {signature}");
+
+            // Every session embed in these bodies sits after that guard. The sign-in embed is the
+            // one exception and is asserted separately below.
+            foreach (int embedIndex in IndexesOf(body, "EmbedWindow("))
+            {
+                bool isSignInEmbed = body.LastIndexOf(
+                    "_authHwnd = authHwnd;",
+                    embedIndex,
+                    StringComparison.Ordinal) >= 0
+                    && body[..embedIndex].Contains("_authHwnd = authHwnd;", StringComparison.Ordinal);
+
+                Assert.True(
+                    isSignInEmbed || embedIndex > adoptionGuard,
+                    $"Unguarded EmbedWindow at offset {embedIndex} in {signature}");
+            }
+        }
+
+        // Adoption precedes the release in the post-auth swap.
+        string postAuth = ExtractMethodBody(source, "private async Task WatchForSessionAfterAuthAsync(");
+        Assert.True(
+            postAuth.IndexOf("if (!AdoptSessionWindow(", StringComparison.Ordinal)
+                < postAuth.IndexOf("ReleaseEmbeddedWindow();", StringComparison.Ordinal),
+            "The sign-in window is released before the replacement session is adopted.");
+
+        // And the fail-closed health decision is the one the view asks.
+        Assert.Contains(
+            "bool windowAlive = CitrixSessionHandle.IsEmbeddedWindowAlive(",
+            source,
+            StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// The four lifecycle paths, pinned as a source invariant.
     /// </summary>
@@ -338,6 +452,16 @@ public sealed class CitrixSessionHandleTests
 
         Assert.Fail($"Unbalanced braces while reading the body of: {signature}");
         return string.Empty;
+    }
+
+    private static IEnumerable<int> IndexesOf(string haystack, string needle)
+    {
+        int index = haystack.IndexOf(needle, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            yield return index;
+            index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal);
+        }
     }
 
     private static string ReadAppSource(string relativePath)
