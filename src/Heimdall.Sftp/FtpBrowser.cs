@@ -851,12 +851,23 @@ public sealed class FtpBrowser : IRemoteBrowser
             Group: group);
     }
 
-    private static FtpConfig CreateConfig(bool passiveMode, bool useSsl)
+    /// <summary>
+    /// Builds the FluentFTP configuration for a connection attempt.
+    /// </summary>
+    /// <remarks>
+    /// Revocation checking is enabled with encryption rather than unconditionally: FluentFTP maps
+    /// it onto the TLS chain policy, so turning it on for a plaintext connection would configure a
+    /// check that never runs. Without it the chain is built with
+    /// <c>X509RevocationMode.NoCheck</c>, so <c>X509ChainStatusFlags.Revoked</c> can never reach
+    /// the pinned-certificate guard and its non-overridable check is unreachable in practice.
+    /// </remarks>
+    internal static FtpConfig CreateConfig(bool passiveMode, bool useSsl)
     {
         return new FtpConfig
         {
             EncryptionMode = useSsl ? FtpEncryptionMode.Explicit : FtpEncryptionMode.None,
             DataConnectionEncryption = useSsl,
+            ValidateCertificateRevocation = useSsl,
             DataConnectionType = passiveMode
                 ? FtpDataConnectionType.AutoPassive
                 : FtpDataConnectionType.AutoActive,
