@@ -43,6 +43,17 @@ public sealed class ConfigManager : IConfigManager
 
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
+    /// <summary>
+    /// Canonical settings property that carries the embedded RDP connect watchdog timeout.
+    /// </summary>
+    private const string RdpConnectWatchdogTimeoutKey = "rdpConnectWatchdogTimeoutMs";
+
+    /// <summary>
+    /// Legacy settings property superseded by <see cref="RdpConnectWatchdogTimeoutKey"/>.
+    /// No runtime consumer reads it; it is only recognized to carry an existing value forward.
+    /// </summary>
+    private const string LegacyEmbeddedRdpTimeoutKey = "embeddedRdpTimeoutMs";
+
     private readonly string _installPath;
     private readonly string _dataPath;
     private readonly string _configPath;
@@ -490,6 +501,7 @@ public sealed class ConfigManager : IConfigManager
             settings.SchemaVersion,
             AppSettings.CurrentSchemaVersion,
             requireSupportedSchemaForWrite);
+        MigrateLegacyRdpTimeoutKey(json, settings);
         NormalizeTrustedHostKeys(settings);
         List<ValidationDiagnostic> diagnostics = [.. SchemaValidator.DiagnoseSettingsLoad(settings).Diagnostics];
         for (int index = 0; index < settings.SshGateways.Count; index++)
@@ -542,6 +554,84 @@ public sealed class ConfigManager : IConfigManager
             {
                 destination[key] = value.Clone();
             }
+        }
+    }
+
+    /// <summary>
+    /// Carries the legacy embedded RDP timeout of the current .NET settings document onto the
+    /// canonical watchdog property. This load path is distinct from the legacy PowerShell import,
+    /// which maps the same key inside its own importer: a settings.json written by a previous
+    /// .NET build never goes through that importer and would otherwise keep an unread value.
+    /// The canonical key always wins, so the legacy key only supplies a value when the canonical
+    /// key is absent from the document. Presence is read from the JSON document itself, and
+    /// case-insensitively, because a deserialized default value is indistinguishable from an
+    /// absent property. A recognized legacy key is dropped from the extension data so a later
+    /// normal save stops re-emitting a setting no consumer reads; unrelated extension data, and a
+    /// legacy key whose value is not an integer, are left untouched.
+    /// </summary>
+    /// <param name="json">Raw content of the settings document being loaded.</param>
+    /// <param name="settings">Deserialized settings, migrated in place.</param>
+    private static void MigrateLegacyRdpTimeoutKey(string json, AppSettings settings)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        bool hasCanonicalKey = false;
+        bool hasLegacyTimeout = false;
+        int legacyTimeoutMs = 0;
+        foreach (JsonProperty property in document.RootElement.EnumerateObject())
+        {
+            if (IsPropertyNamed(property, RdpConnectWatchdogTimeoutKey))
+            {
+                hasCanonicalKey = true;
+            }
+            else if (IsPropertyNamed(property, LegacyEmbeddedRdpTimeoutKey)
+                && property.Value.ValueKind == JsonValueKind.Number
+                && property.Value.TryGetInt32(out int parsedTimeoutMs))
+            {
+                hasLegacyTimeout = true;
+                legacyTimeoutMs = parsedTimeoutMs;
+            }
+        }
+
+        if (!hasLegacyTimeout)
+        {
+            return;
+        }
+
+        if (!hasCanonicalKey)
+        {
+            settings.RdpConnectWatchdogTimeoutMs = legacyTimeoutMs;
+        }
+
+        RemoveExtensionDataKeys(settings.ExtensionData, LegacyEmbeddedRdpTimeoutKey);
+    }
+
+    private static bool IsPropertyNamed(JsonProperty property, string propertyName) =>
+        string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Removes every case-insensitive match of a property name from an extension data bag.
+    /// The bag compares its keys with ordinal semantics and keeps the casing found on disk,
+    /// so a single ordinal removal would miss a document that spells the key differently.
+    /// </summary>
+    /// <param name="extensionData">Extension data bag to prune in place.</param>
+    /// <param name="propertyName">Property name to remove, in any casing.</param>
+    private static void RemoveExtensionDataKeys(
+        IDictionary<string, JsonElement> extensionData,
+        string propertyName)
+    {
+        List<string> matchingKeys =
+        [
+            .. extensionData.Keys.Where(key =>
+                string.Equals(key, propertyName, StringComparison.OrdinalIgnoreCase))
+        ];
+        foreach (string matchingKey in matchingKeys)
+        {
+            extensionData.Remove(matchingKey);
         }
     }
 

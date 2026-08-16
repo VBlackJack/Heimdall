@@ -571,6 +571,127 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal("SHA256:legacy", loaded.TrustedHostKeys["legacy.example.com:22"]);
     }
 
+    // ── Legacy embedded RDP timeout migration (current .NET settings.json) ──
+    // These oracles go through ConfigManager.LoadSettingsAsync, the path a settings.json
+    // written by a previous .NET build actually takes. The PowerShell importer maps the same
+    // key on its own path and is covered by its own test.
+
+    [Theory]
+    [InlineData("embeddedRdpTimeoutMs")]
+    [InlineData("EmbeddedRdpTimeoutMs")]
+    public async Task LoadSettingsAsync_LegacyRdpTimeoutOnly_MigratesOntoConnectWatchdogTimeout(
+        string legacyPropertyName)
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDir, "config"));
+        await File.WriteAllTextAsync(
+            _manager.SettingsPath,
+            $$"""
+            {
+              "{{legacyPropertyName}}": 30000
+            }
+            """,
+            new UTF8Encoding(false));
+
+        AppSettings loaded = await _manager.LoadSettingsAsync();
+
+        Assert.Equal(30000, loaded.RdpConnectWatchdogTimeoutMs);
+        Assert.DoesNotContain(
+            loaded.ExtensionData.Keys,
+            key => string.Equals(key, "embeddedRdpTimeoutMs", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_BothRdpTimeoutKeys_CanonicalWinsOverLegacy()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDir, "config"));
+        await File.WriteAllTextAsync(
+            _manager.SettingsPath,
+            """
+            {
+              "rdpConnectWatchdogTimeoutMs": 20000,
+              "embeddedRdpTimeoutMs": 30000
+            }
+            """,
+            new UTF8Encoding(false));
+
+        AppSettings loaded = await _manager.LoadSettingsAsync();
+
+        Assert.Equal(20000, loaded.RdpConnectWatchdogTimeoutMs);
+
+        await _manager.SaveSettingsAsync(loaded);
+
+        using JsonDocument persisted =
+            JsonDocument.Parse(await File.ReadAllTextAsync(_manager.SettingsPath));
+        Assert.Equal(
+            20000,
+            persisted.RootElement.GetProperty("rdpConnectWatchdogTimeoutMs").GetInt32());
+        Assert.False(HasPropertyIgnoreCase(persisted.RootElement, "embeddedRdpTimeoutMs"));
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_AfterLegacyRdpTimeoutMigration_DropsLegacyKey()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDir, "config"));
+        await File.WriteAllTextAsync(
+            _manager.SettingsPath,
+            """
+            {
+              "embeddedRdpTimeoutMs": 30000
+            }
+            """,
+            new UTF8Encoding(false));
+
+        AppSettings loaded = await _manager.LoadSettingsAsync();
+        await _manager.SaveSettingsAsync(loaded);
+
+        using JsonDocument persisted =
+            JsonDocument.Parse(await File.ReadAllTextAsync(_manager.SettingsPath));
+        Assert.Equal(
+            30000,
+            persisted.RootElement.GetProperty("rdpConnectWatchdogTimeoutMs").GetInt32());
+        Assert.False(HasPropertyIgnoreCase(persisted.RootElement, "embeddedRdpTimeoutMs"));
+    }
+
+    [Fact]
+    public async Task LegacyRdpTimeoutMigration_PreservesUnrelatedExtensionData()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDir, "config"));
+        await File.WriteAllTextAsync(
+            _manager.SettingsPath,
+            """
+            {
+              "embeddedRdpTimeoutMs": 30000,
+              "futureSettingsField": "preserve-me"
+            }
+            """,
+            new UTF8Encoding(false));
+
+        AppSettings loaded = await _manager.LoadSettingsAsync();
+        Assert.Equal("preserve-me", loaded.ExtensionData["futureSettingsField"].GetString());
+
+        await _manager.SaveSettingsAsync(loaded);
+
+        using JsonDocument persisted =
+            JsonDocument.Parse(await File.ReadAllTextAsync(_manager.SettingsPath));
+        Assert.Equal(
+            "preserve-me",
+            persisted.RootElement.GetProperty("futureSettingsField").GetString());
+        Assert.False(HasPropertyIgnoreCase(persisted.RootElement, "embeddedRdpTimeoutMs"));
+    }
+
+    private static bool HasPropertyIgnoreCase(JsonElement root, string propertyName)
+    {
+        foreach (JsonProperty property in root.EnumerateObject())
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     [Fact]
     public async Task MergeHostKeyAsync_WritesV2AndPreservesLegacyView()
     {
