@@ -62,6 +62,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     private const int SwMaximize = 3;
 
     private CitrixSessionResult? _session;
+
+    // The session's real lifecycle handle: the ICA window and the process that owns it. The
+    // launcher in _session.Process is NOT the session - it exits once Workspace has taken the
+    // request, and on a shared session it never owned the window - so front, health and terminate
+    // are driven from here. A null handle means there is no session to drive, never a reason to
+    // fall back to the launcher.
+    private CitrixSessionHandle? _sessionHandle;
     private SessionTabViewModel? _sessionTab;
     private LocalizationManager? _localizer;
     private IDialogService? _dialogService;
@@ -296,16 +303,17 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
                 });
             }
 
-            IntPtr bestHwnd = FindNewSessionWindow(preLaunchWindows);
-            if (bestHwnd != IntPtr.Zero)
+            CitrixSessionWindow bestWindow = FindNewSessionWindow(preLaunchWindows);
+            if (bestWindow.IsResolved)
             {
                 _captureInProgress = false;
                 Core.Logging.FileLogger.Info(
-                    $"Citrix: capturing session window hwnd=0x{bestHwnd.ToInt64():X}");
+                    $"Citrix: capturing session window hwnd=0x{bestWindow.Hwnd.ToInt64():X} ownerPid={bestWindow.OwnerProcessId}");
                 await Dispatcher.InvokeAsync(() =>
                 {
                     CaptureLoadingPanel.Visibility = Visibility.Collapsed;
-                    EmbedWindow(bestHwnd);
+                    AdoptSessionWindow(bestWindow);
+                    EmbedWindow(bestWindow.Hwnd);
                 });
                 return;
             }
@@ -466,7 +474,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     /// (class "HwndWrapper[SelfService;...]"), which is never the app session.
     /// Returns IntPtr.Zero if no session window is present yet.
     /// </summary>
-    private static IntPtr FindNewSessionWindow(HashSet<IntPtr> preLaunchWindows)
+    private static CitrixSessionWindow FindNewSessionWindow(HashSet<IntPtr> preLaunchWindows)
     {
         // The session window must belong to a live Citrix process.
         HashSet<int> citrixPids = new();
@@ -478,9 +486,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             }
         }
 
-        if (citrixPids.Count == 0) return IntPtr.Zero;
+        if (citrixPids.Count == 0) return default;
 
         IntPtr bestHwnd = IntPtr.Zero;
+        int bestOwnerPid = 0;
         int bestArea = 0;
 
         EnumWindows((hwnd, _) =>
@@ -499,7 +508,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             string cName = className.ToString();
 
             // The Workspace shell / sign-in window is not a published-app session.
-            if (cName.StartsWith("HwndWrapper[SelfService", StringComparison.OrdinalIgnoreCase))
+            if (CitrixSessionHandle.IsWorkspaceShellWindowClass(cName))
                 return true;
 
             // Accept Citrix session windows by class name (seamless windows have no title),
@@ -523,12 +532,16 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             {
                 bestArea = area;
                 bestHwnd = hwnd;
+
+                // Keep the owner alongside the handle. Re-deriving it later would read whoever owns
+                // the window at that later instant, which is exactly the identity this lot pins.
+                bestOwnerPid = (int)pid;
             }
 
             return true;
         }, IntPtr.Zero);
 
-        return bestHwnd;
+        return new CitrixSessionWindow(bestHwnd, bestOwnerPid);
     }
 
     /// <summary>Snapshots the handles of all currently-visible top-level windows.</summary>
@@ -562,17 +575,19 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             await Task.Delay(WindowCapturePollIntervalMs, cancellationToken);
             if (_disposed) return;
 
-            IntPtr sessionHwnd = FindNewSessionWindow(preLaunchWindows);
-            if (sessionHwnd == IntPtr.Zero || sessionHwnd == authHwnd) continue;
-            if (!IsWindow(sessionHwnd)) continue;
+            CitrixSessionWindow sessionWindow = FindNewSessionWindow(preLaunchWindows);
+            if (!sessionWindow.IsResolved || sessionWindow.Hwnd == authHwnd) continue;
+            if (!IsWindow(sessionWindow.Hwnd)) continue;
 
             Core.Logging.FileLogger.Info(
-                $"Citrix: post-auth session window hwnd=0x{sessionHwnd.ToInt64():X} appeared; swapping out auth window");
+                $"Citrix: post-auth session window hwnd=0x{sessionWindow.Hwnd.ToInt64():X} ownerPid={sessionWindow.OwnerProcessId} appeared; swapping out auth window");
             await Dispatcher.InvokeAsync(() =>
             {
-                // Hand the sign-in window back to Citrix, then embed the app session.
+                // Hand the sign-in window back to Citrix, then embed the app session. The handle is
+                // adopted here and never for the sign-in window embedded before it.
                 ReleaseEmbeddedWindow();
-                EmbedWindow(sessionHwnd);
+                AdoptSessionWindow(sessionWindow);
+                EmbedWindow(sessionWindow.Hwnd);
             });
             return;
         }
@@ -700,15 +715,47 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         catch (Exception ex) { Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] resize: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// Adopts a captured window as this view's session. Only ever called with a window that came
+    /// from the session scan, never with the Workspace sign-in window.
+    /// </summary>
+    private void AdoptSessionWindow(CitrixSessionWindow window)
+    {
+        _sessionHandle?.Dispose();
+        _sessionHandle = null;
+
+        if (CitrixSessionHandle.TryCreate(
+                window,
+                ReadWindowClassName(window.Hwnd),
+                CitrixSessionEnvironment.Default,
+                out CitrixSessionHandle? handle))
+        {
+            _sessionHandle = handle;
+            return;
+        }
+
+        Core.Logging.FileLogger.Warn(
+            $"Citrix: refused session handle for hwnd=0x{window.Hwnd.ToInt64():X} ownerPid={window.OwnerProcessId}");
+    }
+
+    private static string ReadWindowClassName(IntPtr hwnd)
+    {
+        StringBuilder className = new(WindowClassNameCapacity);
+        GetClassName(hwnd, className, WindowClassNameCapacity);
+        return className.ToString();
+    }
+
     private void OnBringToFrontClick(object sender, RoutedEventArgs e)
     {
-        if (_session?.Process is null || _session.Process.HasExited) return;
+        // The real ICA window, never the launcher's main window: the launcher usually has none,
+        // and when it does it is the wrong window to raise.
+        if (_sessionHandle?.TryGetSessionWindow(out IntPtr hWnd) != true || hWnd == IntPtr.Zero)
+        {
+            return;
+        }
 
         try
         {
-            var hWnd = _session.Process.MainWindowHandle;
-            if (hWnd == IntPtr.Zero) return;
-
             if (IsIconic(hWnd))
                 ShowWindow(hWnd, SwRestore);
 
@@ -735,11 +782,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
 
     private async void OnTerminateClick(object sender, RoutedEventArgs e)
     {
-        if (_session?.Process is null || _session.Process.HasExited) return;
+        // Nothing to terminate without a live session handle, and the launcher is never the
+        // fallback: killing it would leave the session the user can see running.
+        if (_sessionHandle?.IsAlive != true) return;
 
         if (_dialogService is not null && _localizer is not null)
         {
-            var confirmed = await _dialogService.ShowConfirmAsync(
+            bool confirmed = await _dialogService.ShowConfirmAsync(
                 _localizer["CitrixConfirmTerminateTitle"],
                 _localizer["CitrixConfirmTerminateMessage"],
                 "warning");
@@ -751,11 +800,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
 
         EmitDisconnect("user");
 
-        if (_session?.Process is not null && !_session.Process.HasExited)
-        {
-            try { _session.Process.Kill(); }
-            catch (InvalidOperationException ex) { Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] terminate process: {ex.Message}"); }
-        }
+        _sessionHandle?.Terminate();
 
         UpdateStatus(false);
     }
@@ -819,8 +864,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     {
         if (_embedded && _capturedHwnd != IntPtr.Zero)
         {
-            // In embedded mode — only check if the captured window still exists
-            if (!IsWindow(_capturedHwnd))
+            // Embedded mode keeps its window-based semantics, but asks the handle so a recycled
+            // window handle cannot report a session that has actually gone. The sign-in window is
+            // embedded without a handle, so it falls back to the window check alone.
+            bool windowAlive = _sessionHandle is { } embeddedHandle && embeddedHandle.Hwnd == _capturedHwnd
+                ? embeddedHandle.IsAlive
+                : IsWindow(_capturedHwnd);
+            if (!windowAlive)
             {
                 EmitDisconnect("remote");
                 _embedded = false;
@@ -840,8 +890,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             return;
         }
 
-        // External mode (capture timed out) — monitor the last known process
-        bool alive = _session?.Process is not null && !_session.Process.HasExited;
+        // External mode — the session handle is the only source of liveness. The launcher is not
+        // consulted: it exits as soon as Workspace takes the request, so reading it reported a
+        // dead session for a running one, and a live one for a launcher that merely lingered.
+        bool alive = _sessionHandle?.IsAlive == true;
         if (!alive)
         {
             // The latch collapses this every-3s "dead" re-fire to a single Disconnected.
@@ -860,8 +912,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             StatusTextBlock.Text = _embedded
                 ? (_localizer?["CitrixStatusEmbedded"] ?? "Embedded")
                 : (_localizer?["CitrixStatusConnected"] ?? "Connected");
-            SessionInfoText.Text = _session?.Process?.Id > 0
-                ? $"PID: {_session.Process.Id}"
+            // The ICA owner, not the launcher: showing the launcher's id named a process the user
+            // cannot act on and which is usually already gone.
+            SessionInfoText.Text = _sessionHandle is { OwnerProcessId: > 0 } liveHandle
+                ? $"PID: {liveHandle.OwnerProcessId}"
                 : string.Empty;
             TerminateButton.IsEnabled = true;
             BringToFrontButton.IsEnabled = !_embedded;
@@ -931,11 +985,11 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         catch (Exception ex) { Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] FormsHost cleanup: {ex.Message}"); }
         _hostPanel?.Dispose();
 
-        if (_session?.Process is not null && !_session.Process.HasExited)
-        {
-            try { _session.Process.Kill(); }
-            catch (InvalidOperationException ex) { Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] dispose process kill: {ex.Message}"); }
-        }
+        // End the ICA session, then release its process object. The launcher is only released:
+        // terminating it would not end the session, and it is routinely already gone.
+        _sessionHandle?.Terminate();
+        _sessionHandle?.Dispose();
+        _sessionHandle = null;
 
         _session?.Process?.Dispose();
     }
