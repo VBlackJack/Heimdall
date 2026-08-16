@@ -286,6 +286,19 @@ internal sealed class CitrixSessionHandle : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Whether falling back to external mode is a connected outcome.
+    /// </summary>
+    /// <remarks>
+    /// External mode means "the session runs in its own window", which presupposes a session. Two
+    /// of the three ways into that fallback - the capture timeout and the user cancelling the
+    /// search - arrive having adopted nothing, and reporting those as connected would fabricate
+    /// exactly the liveness this type exists to stop inferring. Only a Win32 embedding failure
+    /// arrives with a live handle, and that one genuinely is a connected session that simply could
+    /// not be reparented.
+    /// </remarks>
+    internal static bool IsExternalModeConnected(CitrixSessionHandle? handle) => handle?.IsAlive == true;
+
     /// <summary>True for the Workspace sign-in shell, which is never an application session.</summary>
     internal static bool IsWorkspaceShellWindowClass(string? windowClassName)
         => windowClassName is not null

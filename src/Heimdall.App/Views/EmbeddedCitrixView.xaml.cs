@@ -646,12 +646,25 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         CaptureLoadingPanel.Visibility = Visibility.Collapsed;
         EmbeddedContainer.Visibility = Visibility.Collapsed;
         InfoPanel.Visibility = Visibility.Visible;
+
+        // External mode is only a "connected" outcome when there is a session to be external
+        // about. The capture timeout and the cancel button both arrive here having adopted
+        // nothing: showing a live pane and emitting Connected for them would fabricate the very
+        // liveness this lot stopped inferring from the launcher, and the health tick would then
+        // contradict it three seconds later. A Win32 embedding failure is the one path that
+        // arrives with a live handle, and it keeps the connected external mode.
+        bool connected = CitrixSessionHandle.IsExternalModeConnected(_sessionHandle);
+        if (!connected)
+        {
+            BringToFrontButton.Visibility = Visibility.Collapsed;
+            UpdateStatus(false);
+            return;
+        }
+
         BringToFrontButton.Visibility = Visibility.Visible;
         StatusTextBlock.Text = _localizer?["CitrixStatusExternal"] ?? "External window";
 
-        // External mode is a valid "connected" outcome (the session runs in its own window). This is
-        // also reached from EmbedWindow's failure path; EmitConnect is idempotent, so a prior embed
-        // success is not double-counted.
+        // EmitConnect is idempotent, so a prior embed success is not double-counted.
         EmitConnect();
     }
 

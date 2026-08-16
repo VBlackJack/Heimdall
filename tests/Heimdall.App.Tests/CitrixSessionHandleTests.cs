@@ -309,6 +309,31 @@ public sealed class CitrixSessionHandleTests
         => Assert.False(CitrixSessionHandle.IsEmbeddedWindowAlive(
             null, IntPtr.Zero, IntPtr.Zero, _ => true));
 
+    [Fact]
+    public void ExternalMode_WithoutAnAdoptedSession_IsNotAConnectedOutcome()
+    {
+        // Reached by the capture timeout and by the user cancelling the search. Nothing was
+        // adopted, so there is no session to be "external" about: reporting connected here would
+        // fabricate liveness, and the health tick would contradict it on the next poll.
+        Assert.False(CitrixSessionHandle.IsExternalModeConnected(null));
+    }
+
+    [Fact]
+    public void ExternalMode_WithALiveSessionAfterAFailedEmbed_StaysConnected()
+    {
+        // The one path that arrives with a handle: the session exists and is running, Win32 simply
+        // refused to reparent its window. That is a genuine connected session in its own window.
+        FakeSessionProcess process = new(OwnerPid);
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process);
+
+        Assert.True(CitrixSessionHandle.IsExternalModeConnected(handle));
+
+        // And it stops being connected exactly when the session does.
+        process.HasExited = true;
+        Assert.False(CitrixSessionHandle.IsExternalModeConnected(handle));
+    }
+
     /// <summary>
     /// A refused adoption must stop the embed, not merely be logged.
     /// </summary>
@@ -362,6 +387,37 @@ public sealed class CitrixSessionHandleTests
             "bool windowAlive = CitrixSessionHandle.IsEmbeddedWindowAlive(",
             source,
             StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The external fallback must not announce a connection it has no session for.
+    /// </summary>
+    /// <remarks>
+    /// The gate and the emission both live in a WPF method, so the ordering between them is pinned
+    /// here: an emission that stopped being gated would otherwise still satisfy every behavioural
+    /// test, because <c>EmitConnect</c> cannot be observed from this project.
+    /// </remarks>
+    [Fact]
+    public void ExternalFallback_EmitsConnectedOnlyBehindTheSessionGate()
+    {
+        string body = ExtractMethodBody(
+            ReadAppSource("Views/EmbeddedCitrixView.xaml.cs"),
+            "private void ShowExternalFallback()");
+
+        int gate = body.IndexOf(
+            "bool connected = CitrixSessionHandle.IsExternalModeConnected(_sessionHandle);",
+            StringComparison.Ordinal);
+        int refusal = body.IndexOf("if (!connected)", StringComparison.Ordinal);
+        int emission = body.IndexOf("EmitConnect();", StringComparison.Ordinal);
+
+        // Asserted present before being ordered: a missing gate yields -1, which would otherwise
+        // compare as "before" the emission and let the defect through.
+        Assert.True(gate >= 0, "The external fallback does not consult the session handle.");
+        Assert.True(refusal > gate, "The external fallback does not refuse a session-less outcome.");
+        Assert.True(emission > refusal, "Connected is emitted before the session gate.");
+
+        // The session-less branch reports disconnected rather than an external window.
+        Assert.Contains("UpdateStatus(false);", body, StringComparison.Ordinal);
     }
 
     /// <summary>
