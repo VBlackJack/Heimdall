@@ -73,7 +73,7 @@ public sealed class CitrixHandlerTests
     // command line whenever the resolver fell through to it. The tests below pin one grammar per
     // executable, and the two refusals that replace the guess.
     [Fact]
-    public void TryCreateStoreFrontStartInfo_StoreBrowseWithSso_EmitsTheLaunchCommandAlone()
+    public void TryCreateStoreFrontStartInfo_StoreBrowseWithSso_EmitsTheSessionLaunchCommandAlone()
     {
         const string appName = "Calculator \"Admin\" Tool";
         const string storeFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/";
@@ -92,7 +92,8 @@ public sealed class CitrixHandlerTests
         Assert.False(startInfo.UseShellExecute);
         Assert.Equal(3, startInfo.ArgumentList.Count);
         Assert.Equal("-S", startInfo.ArgumentList[0]);
-        // The whole defect in one assertion: the list command must not ride along.
+        // The whole defect in one assertion: -S is sessionlaunch, and the alternative command
+        // -L launch must not ride along with it.
         Assert.DoesNotContain("-L", startInfo.ArgumentList);
         // Application and URL stay separate entries, so a space or a quote survives intact.
         Assert.Equal(appName, startInfo.ArgumentList[1]);
@@ -101,7 +102,7 @@ public sealed class CitrixHandlerTests
     }
 
     [Fact]
-    public void TryCreateStoreFrontStartInfo_StoreBrowseWithoutSso_EmitsTheListCommandAlone()
+    public void TryCreateStoreFrontStartInfo_StoreBrowseWithoutSso_EmitsTheLaunchCommandAlone()
     {
         const string storeFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/";
 
