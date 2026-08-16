@@ -24,12 +24,16 @@ namespace Heimdall.App.Tests;
 /// a full <c>MainViewModel</c> or <c>SessionCoordinator</c>.
 /// </summary>
 /// <remarks>
-/// A count of <c>CloseIntent.Silent</c> occurrences was the original oracle and it was worthless:
-/// totalling them is invariant under a PERMUTATION of intents, so it stayed green while a user
-/// gesture ran silently and a vault lock could be blocked by a dialog. These assertions name the
-/// argument at each call site instead, which a permutation cannot survive. The producers that ARE
-/// reachable have behavioural oracles reading the observed request in
-/// <c>ConnectionViewModelCloseTests</c>.
+/// What is left here is only what cannot be driven.
+/// <list type="bullet">
+/// <item>The four SessionCoordinator producers are covered behaviourally in
+/// <c>SessionCoordinatorPreMountTests</c>, from the request the arbiter is handed.</item>
+/// <item>The ConnectionViewModel producers, already reachable on their own, are covered in
+/// <c>ConnectionViewModelCloseTests</c>.</item>
+/// <item>MainViewModel's lock teardown and the two WPF producers below stay SOURCE-SCANNED.
+/// Code-behind needs a real window, so a scan is what is available - and a scan cannot tell an
+/// argument from a comment, nor say which branch ran.</item>
+/// </list>
 /// </remarks>
 public sealed class CloseIntentProducerTests
 {
@@ -54,10 +58,14 @@ public sealed class CloseIntentProducerTests
         Assert.Equal(expectedSamples, guard.SampleCount);
     }
 
+    /// <remarks>
+    /// Only the shell's own lock teardown is scanned here. OnSessionStartFailed and
+    /// OnReconnectAdHocRequestedAsync are proven behaviourally in
+    /// <see cref="SessionCoordinatorPreMountTests"/>, from the request the arbiter is handed, so a
+    /// scan of their bodies would add nothing a permutation could not survive.
+    /// </remarks>
     [Theory]
     [InlineData("ViewModels/MainViewModel.cs", "DisconnectAllSessionsForLock")]
-    [InlineData("ViewModels/Session/SessionCoordinator.cs", "OnSessionStartFailed")]
-    [InlineData("ViewModels/Session/SessionCoordinator.cs", "OnReconnectAdHocRequestedAsync")]
     public void ProgrammaticTeardown_PassesSilentExplicitly(string relativePath, string methodName)
     {
         string body = ExtractMethodBody(ReadAppSource(relativePath), methodName);
@@ -79,9 +87,13 @@ public sealed class CloseIntentProducerTests
     /// The gestures a user actually performs must keep their guards. Naming them one by one is the
     /// point: a permutation that silenced any of these is what this whole file exists to catch.
     /// </summary>
+    /// <remarks>
+    /// The two remaining entries are WPF code-behind, which is not reachable without a real
+    /// window, so they stay source-scanned and are reported as such. OnCloseRequestedAsync and
+    /// OnDisconnectRequestedAsync - the latter on BOTH its split and unsplit branches - are proven
+    /// behaviourally in <see cref="SessionCoordinatorPreMountTests"/>.
+    /// </remarks>
     [Theory]
-    [InlineData("ViewModels/Session/SessionCoordinator.cs", "OnCloseRequestedAsync")]
-    [InlineData("ViewModels/Session/SessionCoordinator.cs", "OnDisconnectRequestedAsync")]
     [InlineData("Views/SessionPaneControl.xaml.cs", "OnClosePaneClick")]
     [InlineData("Views/FloatingSessionWindow.xaml.cs", "ResumeCloseAsync")]
     public void UserGestures_NeverPassSilent(string relativePath, string methodName)
