@@ -184,6 +184,80 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
         }).Task.Unwrap();
     }
 
+    /// <summary>
+    /// The junction the guard exists for: the object a close path actually hands to the arbiter is
+    /// the pane's <c>HostControl</c>, so the guard is only reachable if THAT object implements
+    /// <see cref="ICloseGuard"/>.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately built out of production parts end to end - the real view, the real overlay
+    /// path, the real editor, the real arbiter - because a guard tested through a stand-in and a
+    /// host tested without one both stay green either side of a junction that neither crosses.
+    /// </remarks>
+    [Fact]
+    public async Task MountedSftpPane_DirtyInlineEditor_ProvidesCloseGuardAndDefersArbiter()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(async () =>
+        {
+            BlockingUploadRemoteBrowser browser = new();
+            (EmbeddedSftpView owner, SessionPaneModel pane) = CreateInitializedOwner(browser);
+            try
+            {
+                PaneCloseArbiter arbiter = new();
+                ContentControl inlineEditorHost = Assert.IsType<ContentControl>(
+                    owner.FindName("InlineEditorHost"));
+
+                // A pane with nothing in flight closes without a question.
+                Assert.Equal(
+                    CloseVerdict.Allow,
+                    arbiter.Poll(InteractiveRequest(), [pane.HostControl]).Verdict);
+
+                await InvokeEditFile(owner, CreateRemoteFile(size: 7));
+
+                // The overlay is up, and the pane's host is still the SFTP view rather than the
+                // editor: the editor never takes pane ownership, so the guard has to live here.
+                EmbeddedEditorView inlineEditor = Assert.IsType<EmbeddedEditorView>(
+                    GetActiveInlineEditor(owner));
+                Assert.Same(inlineEditor, inlineEditorHost.Content);
+                Assert.Equal(Visibility.Visible, inlineEditorHost.Visibility);
+                Assert.Same(owner, pane.HostControl);
+
+                ICloseGuard closeGuard = Assert.IsAssignableFrom<ICloseGuard>(pane.HostControl);
+                CloseGuardState cleanState = closeGuard.SampleCloseGuardState();
+                Assert.False(cleanState.IsBusy);
+
+                // An editor holding no edits is still nothing to protect.
+                Assert.Equal(
+                    CloseVerdict.Allow,
+                    arbiter.Poll(InteractiveRequest(), [pane.HostControl]).Verdict);
+
+                EmbeddedEditorViewModel editorViewModel =
+                    Assert.IsType<EmbeddedEditorViewModel>(inlineEditor.DataContext);
+                editorViewModel.NotifyTextChanged();
+                Assert.True(editorViewModel.IsModified);
+
+                // The stamp has to move with the unsaved text, or a consent given while the editor
+                // was clean would still match once it is dirty.
+                CloseGuardState dirtyState = closeGuard.SampleCloseGuardState();
+                Assert.True(dirtyState.IsBusy);
+                Assert.NotEqual(cleanState.Epoch, dirtyState.Epoch);
+
+                CloseDecision decision = arbiter.Poll(InteractiveRequest(), [pane.HostControl]);
+
+                Assert.Equal(CloseVerdict.Defer, decision.Verdict);
+                Assert.Equal(SftpCloseGuardLocaleKeys.EditorDirtyMessage, decision.ReasonKey);
+                Assert.Same(owner, pane.HostControl);
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }).Task.Unwrap();
+    }
+
+    private static CloseRequest InteractiveRequest()
+        => CloseRequest.Interactive(DisconnectReason.TabClose);
+
     private static CancellationTokenSource GetInlineEditorCancellation(EmbeddedSftpView owner)
     {
         FieldInfo? field = typeof(EmbeddedSftpView).GetField(

@@ -47,8 +47,15 @@ namespace Heimdall.App.Views;
 /// it without transferring pane ownership); the bookmarks overflow <c>ContextMenu</c> built in
 /// code; and session lifecycle — browser/editor creation, reconnect requests,
 /// the health-check timer, and the browser/editor event relays into the ViewModel.
+/// <para>
+/// It is also the pane's <see cref="ICloseGuard"/>. The interface is implemented here rather than
+/// by a wrapper because this instance is what every close path hands to the arbiter as
+/// <c>SessionPaneModel.HostControl</c>, including while the inline editor overlay is up. The
+/// policy itself stays in <see cref="EmbeddedSftpCloseGuard"/>; this class only reads its own
+/// state into it and forwards the three members.
+/// </para>
 /// </remarks>
-public partial class EmbeddedSftpView : UserControl, IDisposable
+public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 {
     private const long MaxInlineEditFileBytes = 16L * 1024 * 1024;
 
@@ -58,9 +65,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     // overflow menu. First estimate — tune against split-pane screenshots.
     private const double ToolbarCompactThresholdPx = 780;
 
+    // Severity hint for the close confirmation: losing an in-flight transfer or unsaved edits is a
+    // warning-grade question rather than an informational one.
+    private const string CloseGuardConfirmSeverity = "warning";
+
     private static readonly TimeSpan SftpOperationTimeout = TimeSpan.FromSeconds(30);
     private readonly EmbeddedSftpViewModel _viewModel;
     private readonly IHostKeyVerifier _hostKeyVerifier;
+    private readonly EmbeddedSftpCloseGuard _closeGuard;
 
     private IRemoteBrowser? _browser;
     // The decorated browser (LoggingRemoteBrowser when wired) used for the inline editor's own
@@ -73,6 +85,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private SessionTabViewModel? _sessionTab;
     private SessionPaneModel? _ownerPane;
     private LocalizationManager? _localizer;
+    private IDialogService? _dialogService;
     private SshConnectionParams? _sshParams;
     private Heimdall.Ssh.HostKeyStore _hostKeyStore = null!;
     private readonly HashSet<string> _activeEditTempDirs =
@@ -86,6 +99,20 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
     private bool _disposed;
     private bool _inlineEditorSaveInProgress;
     private bool _toolbarCompact;
+
+    /// <summary>
+    /// Last unsaved-text flag folded into <see cref="_closeGuardEpoch"/>. Held so the stamp only
+    /// moves on a real transition of that flag.
+    /// </summary>
+    private bool _closeGuardEditorDirty;
+
+    /// <summary>
+    /// Change stamp over the two protected states this view owns, the inline editor's save-in-flight
+    /// flag and its unsaved text. Only ever increases, and is added to the ViewModel's transfer
+    /// stamp so the close protocol sees a change whichever of the three moved. Written only on the
+    /// UI thread, which is also the only thread the protocol samples from.
+    /// </summary>
+    private long _closeGuardEpoch;
 
     /// <summary>
     /// Optional shared operations-log sink. When set, transfer operations are recorded through a
@@ -171,6 +198,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
 
         _hostKeyVerifier = hostKeyVerifier;
         _viewModel = new EmbeddedSftpViewModel(uiDispatcher, remoteClipboard);
+
+        // Built here rather than at InitializeSession so a pane is guarded for its whole lifetime:
+        // the delegates read the fields below when the arbiter calls them, not now.
+        _closeGuard = new EmbeddedSftpCloseGuard(
+            SampleCloseGuardSnapshot,
+            ConfirmCloseAsync,
+            DescribeClosePane);
         InitializeComponent();
         DataContext = _viewModel;
     }
@@ -195,6 +229,12 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         _activeInlineEditor = editorView;
         _activeInlineEditorTempPath = tempPath;
         _inlineEditorCancellation = new CancellationTokenSource();
+        if (editorView.DataContext is EmbeddedEditorViewModel editorViewModel)
+        {
+            editorViewModel.PropertyChanged += OnInlineEditorPropertyChanged;
+        }
+
+        RefreshCloseGuardEditorDirty();
         BrowserSurface.Visibility = Visibility.Collapsed;
         InlineEditorHost.Content = editorView;
         InlineEditorHost.Visibility = Visibility.Visible;
@@ -224,12 +264,18 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         cancellation?.Cancel();
         cancellation?.Dispose();
 
+        if (_activeInlineEditor?.DataContext is EmbeddedEditorViewModel editorViewModel)
+        {
+            editorViewModel.PropertyChanged -= OnInlineEditorPropertyChanged;
+        }
+
         InlineEditorHost.Content = null;
         InlineEditorHost.Visibility = Visibility.Collapsed;
         BrowserSurface.Visibility = _disposed ? Visibility.Collapsed : Visibility.Visible;
         AllowDrop = !_disposed;
         _activeInlineEditor = null;
         _activeInlineEditorTempPath = null;
+        RefreshCloseGuardEditorDirty();
     }
 
     private static T ResolveRequiredService<T>()
@@ -278,6 +324,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         _viewModel.RenameFollowsSymlinkTarget = browser is SftpBrowser;
         _sessionTab = sessionTab;
         _localizer = localizer;
+        _dialogService = dialogService;
         _sshParams = sshParams;
         _hostKeyStore = hostKeyStore;
 
@@ -449,6 +496,150 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
         }
 
         Core.Logging.FileLogger.Info("EmbeddedSFTP Dispose completed");
+    }
+
+    // ------------------------------------------------------------------
+    // Close guard
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Non-blocking sample of what this pane protects, as the close protocol's first phase needs it.
+    /// </summary>
+    public CloseGuardState SampleCloseGuardState()
+    {
+        return _closeGuard.SampleCloseGuardState();
+    }
+
+    /// <summary>
+    /// Synchronous close poll. The verdict is the guard's, not this view's: what an SFTP pane
+    /// refuses, asks about, or lets through is decided in <see cref="EmbeddedSftpCloseGuard"/>.
+    /// </summary>
+    public CloseDecision PollClose(CloseRequest request)
+    {
+        return _closeGuard.PollClose(request);
+    }
+
+    /// <summary>
+    /// Asynchronous continuation for a poll that deferred. Never cancels a transfer: the teardown
+    /// that follows a granted close cancels anyway, and the user may still abandon this close.
+    /// </summary>
+    public Task<bool> ResolveCloseAsync(CloseRequest request, CancellationToken cancellationToken)
+    {
+        return _closeGuard.ResolveCloseAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// One read of the three states this pane protects, stamped so the protocol can tell "the work
+    /// finished" from "different work started".
+    /// </summary>
+    /// <remarks>
+    /// The stamp adds two counters that only ever increase: the ViewModel's transfer stamp, taken
+    /// under the same gate as its writers, and this view's own stamp, bumped on every
+    /// save-in-flight and unsaved-text transition. Any change to either therefore strictly
+    /// increases the sum, so it never returns to a value a consent was already granted against.
+    /// </remarks>
+    private SftpCloseGuardSnapshot SampleCloseGuardSnapshot()
+    {
+        (bool isTransferInProgress, long transferEpoch) = _viewModel.SampleTransferState();
+
+        return new SftpCloseGuardSnapshot(
+            isTransferInProgress,
+            _inlineEditorSaveInProgress,
+            HasUnsavedInlineEditorChanges(),
+            transferEpoch + _closeGuardEpoch);
+    }
+
+    /// <summary>
+    /// Raises the guard's confirmation, filling the message template with the pane label so the
+    /// user can tell which pane is being asked about when several are closing at once.
+    /// </summary>
+    /// <remarks>
+    /// Consents when the session was never initialized: there is then neither a localizer nor a
+    /// dialog service, so no question could be put to anyone, and nothing has been started that a
+    /// refusal would protect.
+    /// </remarks>
+    private Task<bool> ConfirmCloseAsync(string titleKey, string messageKey)
+    {
+        LocalizationManager? localizer = _localizer;
+        IDialogService? dialogService = _dialogService;
+        if (localizer is null || dialogService is null)
+        {
+            return Task.FromResult(true);
+        }
+
+        return dialogService.ShowConfirmAsync(
+            localizer[titleKey],
+            localizer.Format(messageKey, DescribeClosePane()),
+            CloseGuardConfirmSeverity);
+    }
+
+    /// <summary>The pane's own header label, interpolated into the guard's messages.</summary>
+    private string DescribeClosePane()
+    {
+        string headerTitle = SessionTitleText.Text;
+        if (!string.IsNullOrWhiteSpace(headerTitle))
+        {
+            return headerTitle;
+        }
+
+        return _ownerPane?.Title ?? string.Empty;
+    }
+
+    private bool HasUnsavedInlineEditorChanges()
+    {
+        return _activeInlineEditor?.DataContext is EmbeddedEditorViewModel editorViewModel
+            && editorViewModel.IsModified;
+    }
+
+    /// <summary>
+    /// Records whether the inline editor is writing back to the server, moving the close-guard
+    /// stamp on each transition so a consent given before a save started cannot outlive it.
+    /// </summary>
+    private void SetInlineEditorSaveInProgress(bool inProgress)
+    {
+        if (_inlineEditorSaveInProgress == inProgress)
+        {
+            return;
+        }
+
+        _inlineEditorSaveInProgress = inProgress;
+        _closeGuardEpoch++;
+    }
+
+    /// <summary>
+    /// Folds the editor's unsaved-text flag into the close-guard stamp. Called when the overlay is
+    /// attached or detached, and whenever the editor reports the flag changed.
+    /// </summary>
+    /// <remarks>
+    /// Only a real transition moves the stamp. Bumping on every notification would invalidate a
+    /// consent the user gave about a state that never changed, which the arbiter reads as new work
+    /// and terminally refuses.
+    /// </remarks>
+    private void RefreshCloseGuardEditorDirty()
+    {
+        bool hasUnsavedChanges = HasUnsavedInlineEditorChanges();
+        if (hasUnsavedChanges == _closeGuardEditorDirty)
+        {
+            return;
+        }
+
+        _closeGuardEditorDirty = hasUnsavedChanges;
+        _closeGuardEpoch++;
+    }
+
+    private void OnInlineEditorPropertyChanged(
+        object? sender,
+        System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        // An empty or null name means every property changed, so it has to refresh too.
+        if (string.IsNullOrEmpty(e.PropertyName)
+            || string.Equals(
+                e.PropertyName,
+                nameof(EmbeddedEditorViewModel.IsModified),
+                StringComparison.Ordinal))
+        {
+            RefreshCloseGuardEditorDirty();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1102,7 +1293,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                         return false;
                     }
 
-                    _inlineEditorSaveInProgress = true;
+                    SetInlineEditorSaveInProgress(true);
                     try
                     {
                         try
@@ -1204,7 +1395,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable
                     }
                     finally
                     {
-                        _inlineEditorSaveInProgress = false;
+                        SetInlineEditorSaveInProgress(false);
                         if (_disposed)
                         {
                             CleanupEditTempDir(tempPath);
