@@ -279,24 +279,68 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Equal([localPath], skippedPaths);
     }
 
+    // A root is refused on the same fail-closed rule as a child. The existence probes follow
+    // links, so accepting a selected link uploaded the target's content from outside the
+    // selection. These two oracles previously asserted the opposite and were inverted.
     [Fact]
-    public void ClassifyLocalUploadRoot_FileLinkReportedByFileExists_IsAccepted()
+    public void ClassifyLocalUploadRoot_FileLinkReportedByFileExists_IsRefused()
     {
         const string selectedLink = @"C:\source\selected-link.txt";
+        List<string> skippedPaths = [];
 
         LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadRoot(
             selectedLink,
             directoryExists: false,
-            fileExists: true);
+            fileExists: true,
+            FileAttributes.ReparsePoint,
+            skippedPaths);
 
-        Assert.NotNull(entry);
-        Assert.False(entry!.IsDirectory);
-        Assert.Equal(selectedLink, entry.FullPath);
-        Assert.Equal("selected-link.txt", entry.Name);
+        Assert.Null(entry);
+        Assert.Equal([selectedLink], skippedPaths);
     }
 
     [Fact]
-    public async Task UploadEntriesAsync_RootDirectoryLink_RemainsTraversable()
+    public void ClassifyLocalUploadRoot_RegularFile_IsStillAccepted()
+    {
+        const string selectedFile = @"C:\source\regular.txt";
+        List<string> skippedPaths = [];
+
+        LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadRoot(
+            selectedFile,
+            directoryExists: false,
+            fileExists: true,
+            FileAttributes.Normal,
+            skippedPaths);
+
+        Assert.NotNull(entry);
+        Assert.False(entry!.IsDirectory);
+        Assert.Equal(selectedFile, entry.FullPath);
+        Assert.Equal("regular.txt", entry.Name);
+        Assert.Empty(skippedPaths);
+    }
+
+    // A source deleted between the existence probe and the classification stays an ignored
+    // disappearance. It must not be counted as a refused link, which would surface a warning
+    // for a path the user never selected as a link.
+    [Fact]
+    public void ClassifyLocalUploadRoot_VanishedSource_IsIgnoredWithoutBeingCounted()
+    {
+        const string vanished = @"C:\source\deleted-between-probes.txt";
+        List<string> skippedPaths = [];
+
+        LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadRoot(
+            vanished,
+            directoryExists: false,
+            fileExists: false,
+            FileAttributes.ReparsePoint,
+            skippedPaths);
+
+        Assert.Null(entry);
+        Assert.Empty(skippedPaths);
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_RootDirectoryLink_IsRefusedAndNothingIsTransferred()
     {
         using TempDirectory temp = new();
         string targetDirectory = Path.Combine(temp.Path, "target-directory");
@@ -315,12 +359,11 @@ public sealed class EmbeddedSftpUploadConflictTests
             await viewModel.UploadEntriesAsync([selectedLink], "/dst");
 
             Assert.Equal(0, presenter.CallCount);
-            Assert.Contains("/dst/selected-link", browser.CreateDirectoryCalls);
-            Assert.Collection(
-                browser.UploadCalls,
-                call => Assert.Equal(
-                    (Path.Combine(selectedLink, "child.txt"), "/dst/selected-link/child.txt"),
-                    call));
+            Assert.Empty(browser.UploadCalls);
+            Assert.Empty(browser.CreateDirectoryCalls);
+            Assert.Equal(
+                "Skipped 1 local link(s), selected as upload sources or found inside the selected tree. See the log for details.",
+                viewModel.StatusText);
         }
         finally
         {
@@ -364,7 +407,7 @@ public sealed class EmbeddedSftpUploadConflictTests
                 call => call.RemotePath.StartsWith("/dst/source/directory-link", StringComparison.Ordinal));
             Assert.DoesNotContain("/dst/source/directory-link", browser.CreateDirectoryCalls);
             Assert.Equal(
-                "Skipped 1 local link(s) encountered inside the selected upload tree. See the log for details.",
+                "Skipped 1 local link(s), selected as upload sources or found inside the selected tree. See the log for details.",
                 viewModel.StatusText);
         }
         finally

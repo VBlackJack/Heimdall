@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-17: A selected link is no longer followed out of the upload selection
+
+- **An upload root that is a link is refused instead of followed** (SFTP-015). The upload
+  planner decided a selected path's type with `Directory.Exists` / `File.Exists`, and both
+  follow reparse points. A junction or symbolic link chosen as an upload source was therefore
+  walked, and the content of its *target* was uploaded even though that target lies outside the
+  selection. A selected file link uploaded the target's bytes the same way.
+
+  Reparse roots are now refused before entering the plan, on the same fail-closed rule already
+  applied to reparse points found inside a selected tree: the path joins the skipped-links
+  count, the refusal is logged, and nothing is created or transferred remotely. Symbolic links,
+  junctions, mount points and other reparse tags are treated alike; no tag-level discrimination
+  is introduced. This deliberately reverses the earlier split, under which a link selected as a
+  root was accepted and only links found among the children were rejected.
+
+  A source deleted between the existence probe and the classification is unchanged: it stays an
+  ignored disappearance and is not counted as a refused link.
+
+  The skipped-links warning described only links "inside the selected upload tree", which is not
+  true of a refused root. Both locales now cover links selected as upload sources as well as
+  links found inside the selection.
+
+  Two consequences are stated rather than left to be discovered. A reparse point is not only a
+  link: Windows sets the same attribute on Files-On-Demand placeholders and deduplicated files,
+  so a dehydrated cloud file picked as an upload source is now refused and counted among the
+  skipped links. And the local *paste* planner keeps its own root exemption, so a root link is
+  still traversed there; that asymmetry is deliberate scope, left to a separate lot rather than
+  changed here, and it is now the only place the old root policy survives.
+
 ## 2026-08-15: Remote transfer integrity, session closing and window layout (v2026.081501)
 
 The largest release of the cycle: a dependency security update, the remote file
@@ -309,6 +338,12 @@ figure is given: it was not measured at the time.
   The selected root itself may still be a link, matching the local paste policy. Skipped entries
   are reported through one aggregated, non-blocking warning after the browser refresh.
   Closes SFTP-015.
+
+  Correction to the two sentences above. The root exemption was itself the open half of
+  SFTP-015, so that entry did not close the finding: a link selected as the root stayed
+  traversable, and the upload still left the selection through it. The exemption is removed in
+  the 2026-08-17 entry, which also ends the claimed alignment with the local paste policy. The
+  paste planner keeps its own root exemption for now.
 - **Local paste refuses the source tree as destination** (`db7ccd8a`). Pasting a folder into
   itself or one of its descendants is refused per root with one aggregated dialog; the remaining
   pasted roots proceed. The containment check is lexical and case-insensitive, aligned with the

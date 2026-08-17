@@ -2018,7 +2018,7 @@
   "WarnFtpsDataChannelIdentityBadge": "FTPS data-channel identity is not verified",
   "WarnRemoteEntriesSkippedUnsupported": "Skipped {0} entries that are neither files nor directories. See the log for details.",
   "WarnUploadTargetsSkippedUnsupported": "Skipped {0} upload(s): the destination already exists and is not a regular file. See the log for details.",
-  "WarnUploadSourcesSkippedReparsePoints": "Skipped {0} local link(s) encountered inside the selected upload tree. See the log for details.",
+  "WarnUploadSourcesSkippedReparsePoints": "Skipped {0} local link(s), selected as upload sources or found inside the selected tree. See the log for details.",
   "WarnRemoteReplacementNonAtomic": "Destination '{0}' was replaced without an atomic guarantee.",
   "WarnFtpReplacementNonAtomicMetadataNotPreserved": "Destination '{0}' was replaced without an atomic guarantee, and Heimdall did not preserve the replaced file's owner, permissions, timestamps, ACLs, extended attributes or capabilities.",
   "WarnRdpFileAclFailed": "The temporary .rdp file could not be locked down with a restricted ACL. It contains the host and username, but no password; the session was still launched.",

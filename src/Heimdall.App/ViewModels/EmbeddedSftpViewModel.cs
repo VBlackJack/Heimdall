@@ -950,7 +950,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 string warning = _localizer?.Format(
                     "WarnUploadSourcesSkippedReparsePoints",
                     outcome.SkippedLocalReparsePoints.Count)
-                    ?? $"Skipped {outcome.SkippedLocalReparsePoints.Count} local link(s) encountered inside the selected upload tree. See the log for details.";
+                    ?? $"Skipped {outcome.SkippedLocalReparsePoints.Count} local link(s), selected as upload sources or found inside the selected tree. See the log for details.";
                 pendingOperationWarnings.Add(warning);
             }
         }
@@ -1036,10 +1036,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             bool isDirectory = Directory.Exists(path);
             bool isFile = !isDirectory && File.Exists(path);
-            LocalUploadEntry? root = ClassifyLocalUploadRoot(path, isDirectory, isFile);
+            LocalUploadEntry? root = ClassifyLocalUploadRoot(
+                path,
+                isDirectory,
+                isFile,
+                TryReadLocalRootAttributes(path),
+                skippedLocalReparsePoints);
             if (root is null)
             {
                 // Skip paths that no longer exist; a drop can race a delete on the source side.
+                // A refused reparse root also lands here, already counted and logged.
                 continue;
             }
 
@@ -1342,20 +1348,67 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Accepts an explicitly selected upload root based on the existing following existence probes.
+    /// Rejects an explicitly selected upload root that is a reparse point, applying the same
+    /// fail-closed rule as <see cref="ClassifyLocalUploadChild"/>. The existence probes follow
+    /// links, so a junction or symbolic link selected as a root would otherwise be walked and
+    /// its target's content uploaded from outside the selection.
     /// </summary>
+    /// <remarks>
+    /// The existence check runs first on purpose. A source that disappeared between the probe
+    /// and this call stays an ignored disappearance rather than a reported refusal, so the
+    /// pre-existing race is preserved and never surfaces as a spurious warning.
+    /// </remarks>
     internal static LocalUploadEntry? ClassifyLocalUploadRoot(
         string localPath,
         bool directoryExists,
-        bool fileExists)
+        bool fileExists,
+        FileAttributes attributes,
+        ICollection<string> skippedLocalReparsePoints)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+        ArgumentNullException.ThrowIfNull(skippedLocalReparsePoints);
+
         if (!directoryExists && !fileExists)
         {
             return null;
         }
 
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            skippedLocalReparsePoints.Add(localPath);
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP refused local reparse point root '{localPath}' during upload planning.");
+            return null;
+        }
+
         return ToLocalUploadEntry(localPath, directoryExists);
+    }
+
+    /// <summary>
+    /// Reads the attributes of a selected upload root without letting a vanished source raise.
+    /// </summary>
+    /// <remarks>
+    /// The source can be deleted between the existence probe and this read. Returning no
+    /// attributes keeps such a path on the behaviour it already had instead of introducing a
+    /// new error, and the reparse guard simply does not fire for a path that is no longer there.
+    /// The other swallowed failures behave the same way by construction: the existence probes
+    /// and this read resolve through the same underlying attribute query, so a path this read
+    /// cannot see is one the probes could not see either, and the existence gate refuses it
+    /// first. Returning no attributes is therefore never the deciding step for a live path.
+    /// </remarks>
+    private static FileAttributes TryReadLocalRootAttributes(string localPath)
+    {
+        try
+        {
+            return File.GetAttributes(localPath);
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            return default;
+        }
     }
 
     /// <summary>
