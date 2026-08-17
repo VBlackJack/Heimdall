@@ -26,6 +26,60 @@ public sealed class SftpModePreservationTests
     // oracles pin the order that closes that window; order is the whole contract here, so the fake
     // records every operation rather than only its outcome.
 
+    // The staging reservation is the whole no-clobber guarantee, so the mode the orchestration
+    // actually requests is asserted, not the constant it is supposed to come from. A test that reads
+    // the constant proves the declaration and stays green when the real call site is changed.
+    [Fact]
+    public void RunStagedUpload_OpensTheStagingPathExclusively_WithTheModeItActuallyRequests()
+    {
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: null);
+
+        SftpModePreservation.RunStagedUpload(
+            recorder.Operations,
+            new MemoryStream([1, 2, 3]),
+            recorder.Progress.Add,
+            CancellationToken.None);
+
+        Assert.Equal(FileMode.CreateNew, recorder.RequestedStagingFileMode);
+        Assert.Equal(FileAccess.Write, recorder.RequestedStagingFileAccess);
+    }
+
+    // Exactly one open: a create-then-reopen pair would discard the handle that proved exclusivity
+    // and re-resolve the path by name, so the reservation would say nothing about what the writes
+    // landed in.
+    [Fact]
+    public void RunStagedUpload_ReservesTheStagingPathExactlyOnce()
+    {
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: null);
+
+        SftpModePreservation.RunStagedUpload(
+            recorder.Operations,
+            new MemoryStream([1, 2, 3]),
+            recorder.Progress.Add,
+            CancellationToken.None);
+
+        Assert.Single(recorder.Log, entry => entry.StartsWith("OpenExclusive:", StringComparison.Ordinal));
+    }
+
+    // A staging path another party already created must stop the upload before any byte is written.
+    [Fact]
+    public void RunStagedUpload_StagingPathAlreadyExists_WritesNothingAndPropagates()
+    {
+        StagedUploadRecorder recorder = new(serverAssignedMode: 0x1A4, targetMode: null)
+        {
+            StagingPathAlreadyExists = true,
+        };
+
+        Assert.Throws<IOException>(() => SftpModePreservation.RunStagedUpload(
+            recorder.Operations,
+            new MemoryStream([1, 2, 3]),
+            recorder.Progress.Add,
+            CancellationToken.None));
+
+        Assert.Equal(0, recorder.BytesWritten);
+        Assert.DoesNotContain("Commit", recorder.Log);
+    }
+
     [Fact]
     public void RunStagedUpload_PerformsItsOperationsInTheContractedOrder()
     {
@@ -39,11 +93,13 @@ public sealed class SftpModePreservationTests
 
         Assert.Equal(
             [
-                "Create",
+                // The exclusive reservation comes first and its handle is held for the whole upload,
+                // so the mode work happens on a file this upload provably created. The tightening and
+                // its read-back still precede the first byte.
+                "OpenExclusive:CreateNew:Write",
                 "ReadMode",
                 "ApplyTempMode:0x180",
                 "ReadMode",
-                "Open",
                 "Write:3",
                 "Flush",
                 "Dispose",
@@ -317,6 +373,128 @@ public sealed class SftpModePreservationTests
         Assert.DoesNotContain("client.UploadFile(", source, StringComparison.Ordinal);
     }
 
+    // The recorder oracles prove what the orchestration REQUESTS. They cannot see what the wiring
+    // lambda does with that request: hardcoding a mode inside the lambda leaves every recorder oracle
+    // green. This oracle is therefore bounded to the lambda itself, because a global assertion over
+    // SftpBrowser.cs would let a second, correct client.Open elsewhere mask the dangerous one.
+    [Fact]
+    public void SftpBrowser_StagingWiring_ForwardsTheRequestedModeAndHardcodesNothing()
+    {
+        string lambda = ExtractStagingOpenLambda();
+
+        // Exactly one open, and it opens the staging path with the mode and access it was handed.
+        Assert.Equal(1, CountOccurrences(lambda, "client.Open("));
+        Assert.Contains("client.Open(tempRemotePath, mode, access)", lambda, StringComparison.Ordinal);
+
+        // No mode may be named inside the lambda: naming one is how the forwarded value gets
+        // discarded while the constant and the orchestration still read correctly.
+        Assert.DoesNotContain("FileMode.", lambda, StringComparison.Ordinal);
+
+        // And no reopen or truncating create may return through this seam.
+        Assert.DoesNotContain("client.OpenWrite(", lambda, StringComparison.Ordinal);
+        Assert.DoesNotContain("client.Create(", lambda, StringComparison.Ordinal);
+    }
+
+    // Ownership is what allows a cleanup by name. It must be acquired from the open having returned,
+    // never asserted in advance, and the rollback must be unreachable without it.
+    [Fact]
+    public void SftpBrowser_StagingOwnership_IsAcquiredOnlyAfterTheOpenReturns()
+    {
+        string lambda = ExtractStagingOpenLambda();
+        int openIndex = lambda.IndexOf("client.Open(", StringComparison.Ordinal);
+        int ownedIndex = lambda.IndexOf("stagingOwned = true", StringComparison.Ordinal);
+
+        Assert.True(openIndex >= 0, "the staging open must remain in the wiring lambda");
+        Assert.True(ownedIndex >= 0, "ownership must be recorded in the wiring lambda");
+        Assert.True(
+            openIndex < ownedIndex,
+            "ownership must be recorded only after the exclusive open has returned");
+
+        // The lambda must not be able to claim ownership without having opened: the open's result is
+        // assigned first, then ownership, then that result is returned.
+        Assert.Contains("Stream stagingStream = client.Open(", lambda, StringComparison.Ordinal);
+
+        string upload = ExtractPrivateUploadFileAsync();
+        int guardIndex = upload.IndexOf("if (stagingOwned)", StringComparison.Ordinal);
+        Assert.True(guardIndex >= 0, "the rollback must stay gated on ownership");
+
+        // Nesting, not ordering. An index comparison only shows the guard's text comes first, which
+        // an empty guard followed by an unguarded rollback would also satisfy. The cleanup has to be
+        // inside the guard's own block, so the block is extracted and searched.
+        string guardedBlock = ExtractBracedBlock(upload, guardIndex);
+        Assert.Contains("SftpAtomicUpload.Rollback(", guardedBlock, StringComparison.Ordinal);
+        Assert.Contains("client.DeleteFile(", guardedBlock, StringComparison.Ordinal);
+
+        // And there must be no second, unguarded copy of either outside that block.
+        Assert.Equal(1, CountOccurrences(upload, "SftpAtomicUpload.Rollback("));
+        Assert.Equal(1, CountOccurrences(upload, "client.DeleteFile("));
+    }
+
+    /// <summary>
+    /// Returns the body of the private staged <c>UploadFileAsync</c> overload, so an assertion cannot
+    /// be satisfied by an unrelated part of the file.
+    /// </summary>
+    private static string ExtractPrivateUploadFileAsync()
+    {
+        string source = ReadSftpSource("SftpBrowser.cs");
+        const string Signature = "private async Task UploadFileAsync(";
+        int start = source.IndexOf(Signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, "the private staged UploadFileAsync overload was not found");
+
+        return ExtractBracedBlock(source, start);
+    }
+
+    /// <summary>
+    /// Returns just the <c>OpenTempExclusive</c> lambda from the staged upload wiring.
+    /// </summary>
+    private static string ExtractStagingOpenLambda()
+    {
+        string upload = ExtractPrivateUploadFileAsync();
+        const string Marker = "OpenTempExclusive:";
+        int start = upload.IndexOf(Marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "the OpenTempExclusive wiring was not found in UploadFileAsync");
+
+        return ExtractBracedBlock(upload, start);
+    }
+
+    private static string ExtractBracedBlock(string source, int start)
+    {
+        int depth = 0;
+        bool opened = false;
+        for (int index = start; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+            {
+                depth++;
+                opened = true;
+            }
+            else if (source[index] == '}')
+            {
+                depth--;
+                if (opened && depth == 0)
+                {
+                    return source[start..(index + 1)];
+                }
+            }
+        }
+
+        Assert.Fail("unbalanced braces while extracting the block");
+        return string.Empty;
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        int count = 0;
+        int index = haystack.IndexOf(needle, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            count++;
+            index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal);
+        }
+
+        return count;
+    }
+
     private static string ReadSftpSource(string fileName)
     {
         string? directory = AppContext.BaseDirectory;
@@ -361,8 +539,33 @@ public sealed class SftpModePreservationTests
 
         public Action<int>? OnWrite { get; init; }
 
+        /// <summary>The file mode the orchestration actually asked the staging open for.</summary>
+        public FileMode? RequestedStagingFileMode { get; private set; }
+
+        /// <summary>The file access the orchestration actually asked the staging open for.</summary>
+        public FileAccess? RequestedStagingFileAccess { get; private set; }
+
+        /// <summary>
+        /// When set, the staging open throws as a server would when the path already exists.
+        /// </summary>
+        public bool StagingPathAlreadyExists { get; init; }
+
         public SftpModePreservation.StagedUploadOperations Operations => new(
-            CreateEmptyTemp: () => Log.Add("Create"),
+            OpenTempExclusive: (mode, access) =>
+            {
+                RequestedStagingFileMode = mode;
+                RequestedStagingFileAccess = access;
+                Log.Add($"OpenExclusive:{mode}:{access}");
+
+                // A server honouring CREAT|EXCL refuses the open outright; SSH.NET surfaces that as a
+                // plain SftpException, so the fake reproduces the shape rather than a bespoke type.
+                if (StagingPathAlreadyExists)
+                {
+                    throw new IOException("staging path already exists");
+                }
+
+                return new RecordingStream(this);
+            },
             ReadTempMode: () =>
             {
                 Log.Add("ReadMode");
@@ -378,11 +581,6 @@ public sealed class SftpModePreservationTests
 
                 _currentTempMode = mode;
                 _stagingChmodApplied = true;
-            },
-            OpenTempForWrite: () =>
-            {
-                Log.Add("Open");
-                return new RecordingStream(this);
             },
             ReadTargetAttributesAfterUpload: () =>
             {

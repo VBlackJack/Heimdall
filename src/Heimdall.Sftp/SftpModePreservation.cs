@@ -80,13 +80,30 @@ public static class SftpModePreservation
     internal const uint StagingMode = OwnerReadBit | OwnerWriteBit;
 
     /// <summary>
+    /// The only file mode the staging open may be performed with.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="FileMode.CreateNew"/> maps to the SFTP flags <c>SSH_FXF_CREAT | SSH_FXF_EXCL</c>,
+    /// so the server refuses the open when the path already exists. Anything that can create *or*
+    /// open, such as <see cref="FileMode.Create"/> or <see cref="FileMode.OpenOrCreate"/>, silently
+    /// adopts or truncates a staging file somebody else made, which is the failure this whole staging
+    /// design exists to prevent. The value is passed to the open seam as an argument, so the mode
+    /// actually requested is observable and cannot drift from this declaration unnoticed.
+    /// </remarks>
+    internal const FileMode ExclusiveStagingFileMode = FileMode.CreateNew;
+
+    /// <summary>
     /// Everything the staged upload needs from the remote file system, as delegates, so the order
     /// it performs them in can be observed without a server.
     /// </summary>
-    /// <param name="CreateEmptyTemp">Creates or truncates the temporary file, leaving it empty.</param>
+    /// <param name="OpenTempExclusive">
+    /// Reserves the temporary file and returns the stream the bytes are written through. One call,
+    /// one handle: a separate create-then-reopen pair would discard the handle that proved
+    /// exclusivity and re-resolve the path by name, so the reservation would guarantee nothing about
+    /// what the writes land in. Receives the mode and access to use so a test can capture them.
+    /// </param>
     /// <param name="ReadTempMode">Reads the temporary file's current permission bits.</param>
     /// <param name="ApplyTempMode">Sets the temporary file's permission bits.</param>
-    /// <param name="OpenTempForWrite">Opens the temporary file for writing.</param>
     /// <param name="ReadTargetAttributesAfterUpload">
     /// Re-reads the destination without following symlinks and validates its type, returning the
     /// mode and timestamps it currently carries, or null when no regular file is there to inherit
@@ -97,10 +114,9 @@ public static class SftpModePreservation
     /// <param name="ReadTempAttributesAfterApply">Re-reads the temporary file to confirm what landed.</param>
     /// <param name="Commit">Publishes the temporary file over the destination.</param>
     internal sealed record StagedUploadOperations(
-        Action CreateEmptyTemp,
+        Func<FileMode, FileAccess, Stream> OpenTempExclusive,
         Func<uint> ReadTempMode,
         Action<uint> ApplyTempMode,
-        Func<Stream> OpenTempForWrite,
         Func<SftpPublicationAttributes?> ReadTargetAttributesAfterUpload,
         Action<SftpPublicationAttributes> ApplyPublicationAttributes,
         Func<SftpPublicationAttributes> ReadTempAttributesAfterApply,
@@ -146,26 +162,36 @@ public static class SftpModePreservation
         ArgumentNullException.ThrowIfNull(reportProgress);
 
         cancellationToken.ThrowIfCancellationRequested();
-        operations.CreateEmptyTemp();
 
-        // Captured before the file is tightened: it is the only record of what the server would
-        // have given a brand-new file, and a new upload has to end up with exactly that.
-        uint serverAssignedMode = GetMode(operations.ReadTempMode());
-
-        operations.ApplyTempMode(StagingMode);
-
-        uint stagedMode = GetMode(operations.ReadTempMode());
-        if (stagedMode != StagingMode)
-        {
-            throw new IOException(
-                "Refusing to stage the upload: the temporary file reports mode "
-                + $"0{Convert.ToString(stagedMode, 8)} instead of 0{Convert.ToString(StagingMode, 8)}, "
-                + "so its contents would not be private while copying.");
-        }
-
+        // One exclusive open, and the handle it returns is the handle the bytes go through. The mode
+        // travels as an argument rather than being baked into the wiring so a test can capture what
+        // was actually requested: CreateNew is the whole guarantee, and a staging path that another
+        // party already created must make this throw instead of being truncated into.
+        uint serverAssignedMode;
         long written = 0;
-        using (Stream destination = operations.OpenTempForWrite())
+        using (Stream destination = operations.OpenTempExclusive(
+            ExclusiveStagingFileMode,
+            FileAccess.Write))
         {
+            // Captured before the file is tightened: it is the only record of what the server would
+            // have given a brand-new file, and a new upload has to end up with exactly that.
+            serverAssignedMode = GetMode(operations.ReadTempMode());
+
+            operations.ApplyTempMode(StagingMode);
+
+            // Read back before the first byte, so no content exists while the file is still readable
+            // by anyone the server's default mode allowed. The read-back is by path: the handle-level
+            // route (FSTAT/FSETSTAT) is unreachable because SSH.NET keeps its sftp session internal.
+            // It therefore proves the name carries 0600, not that this handle's inode does.
+            uint stagedMode = GetMode(operations.ReadTempMode());
+            if (stagedMode != StagingMode)
+            {
+                throw new IOException(
+                    "Refusing to stage the upload: the temporary file reports mode "
+                    + $"0{Convert.ToString(stagedMode, 8)} instead of 0{Convert.ToString(StagingMode, 8)}, "
+                    + "so its contents would not be private while copying.");
+            }
+
             byte[] buffer = new byte[81920];
             int read;
             while ((read = source.Read(buffer, 0, buffer.Length)) > 0)

@@ -864,6 +864,7 @@
   "SftpStatusTransferringEntry": "Transfert de {0} ({1}/{2})...",
   "SftpStatusTransferProgressUpload": "\u2191 {0} \u2014 {1} sur {2} ({3} %)",
   "SftpStatusTransferProgressDownload": "\u2193 {0} \u2014 {1} sur {2} ({3} %)",
+  "SftpErrorPasteNoClobberUnsupported": "Collage impossible dans cette session : la destination ne peut pas garantir qu'aucun fichier existant ne sera remplac\u00e9.",
   "SftpErrorSourceSessionUnavailable": "La session source n'est plus disponible.",
   "SftpStatusTransferComplete": "Transfert termin\u00e9",
   "SftpStatusDownloadCompleteWithSkipped": "{0} fichier(s) t\u00e9l\u00e9charg\u00e9(s) ; {1} dossier(s) ignor\u00e9(s) (les dossiers ne sont pas pris en charge).",

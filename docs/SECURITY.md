@@ -364,6 +364,74 @@ assignments, token / bearer assignments to end-of-line, and `-pw` / `-pwfile`
 flags so an unexpected stderr echo from plink cannot leak credentials into
 the application log.
 
+### Cross-endpoint clipboard paste
+
+A paste between two different remote endpoints downloads each source file and puts it on the
+destination server. Every node it creates there, file and directory alike, goes through an
+**exclusive** primitive: a file is staged and then published with a hard link, a directory is
+reserved with `mkdir` without `-p`. Both fail when something already occupies the name, and it is
+the server that decides, not the client.
+
+A transport that cannot offer such a primitive does not paste. FTP has no commit-time operation
+that fails when the destination exists (everything reduces to a client-side existence check
+followed by a rename), so it declines the capability and a cross-endpoint paste into it is refused
+**before** any directory is created and before any byte is sent.
+
+That early refusal is decided per transport, not per session. An SFTP session that advertises the
+capability but cannot reach its pinned exec channel refuses later, at the first node it tries to
+publish: a source file may already have been fetched to a local temporary by then. Nothing is
+created or replaced on the destination in that case, and the temporary is removed; what is lost is
+the transfer effort, not data.
+
+Reaching that refusal depends on the two panes being recognised as different endpoints, so the
+clipboard's endpoint identity is resolved through a dedicated seam that decorators carry, not by
+testing the browser's concrete type. A type test answers about the wrapper as soon as the
+operations-log decorator is in place, which would give every FTP pane the same empty key and make
+two *different* FTP servers look like one endpoint. Distinct FTP endpoints are therefore identified
+through the decorator, and a paste between them takes the cross-endpoint path and meets the gate.
+
+An endpoint identity that cannot be determined at all is never treated as a match either. Two
+unknown identities are two servers nobody could name, so the paste is routed to the cross-endpoint
+path and either publishes exclusively or is refused. Losing endpoint metadata can degrade the
+experience; it cannot silently reopen an overwrite.
+
+This closes the cross-endpoint bypass. It does not change the contract of operations that are
+genuinely same-endpoint: a rename or copy within one server behaves as it always has.
+
+Directory listings are read live from the destination rather than from what the pane last
+displayed, but they are used **only** to pick a name that is not already taken. A listing is not
+the authority for anything: it is already out of date the moment it returns. The guarantee comes
+from the exclusive reservation of each node, never from a prior probe.
+
+Neither a collision, nor a cancellation, nor an unconfirmed result ever authorises deleting the
+source of a cut. A cancellation in particular is not proof that nothing landed: a link or a
+directory creation can take effect just before the answer is lost. Heimdall asks for the destination
+to be reloaded, and when the session and the listing are still available the refreshed state is what
+you see; a refresh that fails changes nothing about the verdict. The source is kept and the clipboard
+entry is kept either way, because a failed reload never turns an unconfirmed outcome into a success
+and never authorises deleting the source.
+
+Atomicity is per node, not transactional across a tree. A paste interrupted partway can leave a
+partial tree on the destination. This is deliberate: recursively cleaning up a directory the paste
+created could delete entries another party added inside it in the meantime.
+
+#### What this does not protect against
+
+The protection targets **accidental concurrency**: two panes, a stale view, a colleague writing in
+the same directory at the same time.
+
+It does not establish the provenance of the published content against a malicious actor who has
+write permission in the same directory. Staging paths are named, and an attacker able to substitute
+the staging entry between two by-name operations can have content published that this client did
+not write. Cleanup by name shares that boundary. Nothing here should be read as a defence against a
+party who can already write where you are writing.
+
+The tests cover the contract, the wiring and the generated commands. **No real SFTP server is
+exercised anywhere in the suite.** In particular, whether a remote `ln` or `mkdir` accepts `--` as
+an end-of-options marker is a property of that server's utilities, not something demonstrated here
+and not a universal guarantee. A utility that rejects these forms makes the command fail, and the
+caller refuses: there is no fallback to a primitive that could replace the destination.
+
 ## Security testing
 
 - Unit tests for TOFU verification:

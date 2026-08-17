@@ -30,11 +30,334 @@ namespace Heimdall.Sftp;
 /// <see cref="CancellationToken"/> is honoured at operation boundaries and by
 /// cancellation-aware file streams during transfers.
 /// </remarks>
-public sealed class SftpBrowser : IRemoteBrowser
+public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRemoteNoClobberCapability
 {
+    /// <inheritdoc/>
+    /// <remarks>
+    /// SFTP carries the capability because it has an exclusive publish: a temporary reserved with
+    /// <c>CREAT|EXCL</c> and a hard link that fails when the destination name exists.
+    /// </remarks>
+    public IRemoteNoClobberPublisher? NoClobberPublisher => this;
+
+    /// <inheritdoc/>
+    public async Task PublishFileIfAbsentAsync(
+        string localPath,
+        string remotePath,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        // Resolved once, before a temporary path is chosen let alone created, and then carried through
+        // to the commit. Without an exclusive publish nothing may reach the server: a staging file
+        // written and abandoned would be a mutation performed for an operation that was never going to
+        // be allowed to complete. Resolving again at commit time would defeat the check, because the
+        // context can be dropped by a disconnect in between.
+        ISftpExecCommandRunner runner = ResolveNoClobberExecRunner(remotePath);
+
+        await UploadFileAsync(
+            localPath,
+            remotePath,
+            UploadCommitMode.PublishByExclusiveLink,
+            ct,
+            runner).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public async Task CreateDirectoryExclusiveAsync(string remotePath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        ISftpExecCommandRunner runner = ResolveNoClobberExecRunner(remotePath);
+        string command = ServerSideNoClobberPublishCommand.BuildDirectoryReservation(remotePath);
+
+        using CancellationTokenSource commandCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        commandCts.CancelAfter(ServerSideCopyCommandTimeout);
+
+        SftpExecResult result;
+        try
+        {
+            result = await runner.ExecuteAsync(command, commandCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HostKeyRejectedException hostKeyRejected)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            string refusal = DescribeHostKeyRefusal(hostKeyRejected);
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] {refusal} on the no-clobber directory reservation exec channel; "
+                + "refusing the reservation.");
+
+            throw new RemoteNoClobberPublishUnavailableException(
+                remotePath,
+                $"the exec channel host key was refused: {refusal}",
+                hostKeyRejected);
+        }
+        catch (Exception ex) when (ex is Renci.SshNet.Common.SshException
+            or System.Net.Sockets.SocketException
+            or IOException
+            or TimeoutException
+            or ObjectDisposedException
+            or OperationCanceledException)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            LogNoClobberFailure("no-clobber directory reservation", ex);
+
+            throw new RemoteNoClobberPublishUnavailableException(
+                remotePath,
+                $"the reservation outcome could not be confirmed ({ex.GetType().Name})",
+                ex);
+        }
+
+        if (result.ExitStatus == SuccessfulExitStatus)
+        {
+            return;
+        }
+
+        await _clientLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            throw ClassifyFailedPublication(GetConnectedClient(), remotePath, result.ExitStatus, ct);
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Publishes an exclusively-reserved temporary onto a destination that must not exist, by hard
+    /// link, and classifies a failure as a collision or as an unavailable primitive.
+    /// </summary>
+    /// <remarks>
+    /// The link is the authority. The destination probe that follows a non-zero status exists only to
+    /// say <em>why</em> the link failed; it never authorises a publication, because a probe answers
+    /// about the past and the link answers about now.
+    /// <para>
+    /// A cancellation stays a cancellation. The exec runner tears the SSH client down to cancel, which
+    /// arrives as an <see cref="Renci.SshNet.Common.SshException"/> rather than an
+    /// <see cref="OperationCanceledException"/>, so the caller's token is re-checked before anything is
+    /// classified as a refusal.
+    /// </para>
+    /// <para>
+    /// An ambiguous outcome, where the link may have succeeded but the answer was lost, is reported as
+    /// unavailable rather than as success. A cut must not treat it as a completed transfer, and neither
+    /// the destination nor the source is ever removed on this path.
+    /// </para>
+    /// </remarks>
+    private async Task PublishByExclusiveLink(
+        SftpClient client,
+        ISftpExecCommandRunner runner,
+        string stagingRemotePath,
+        string remotePath,
+        CancellationToken ct)
+    {
+        string command = ServerSideNoClobberPublishCommand.BuildFilePublish(
+            stagingRemotePath,
+            remotePath);
+
+        using CancellationTokenSource commandCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        commandCts.CancelAfter(ServerSideCopyCommandTimeout);
+
+        SftpExecResult result;
+        try
+        {
+            result = await runner.ExecuteAsync(command, commandCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HostKeyRejectedException hostKeyRejected)
+        {
+            // Derives straight from Exception, so it escapes the transport filter below and would
+            // otherwise leave this method raw. A mismatch on a freshly opened exec channel is a
+            // security event and is logged as one, with host and protocol context only.
+            ct.ThrowIfCancellationRequested();
+
+            string refusal = DescribeHostKeyRefusal(hostKeyRejected);
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] {refusal} on the no-clobber publish exec channel; "
+                + "refusing the publication.");
+
+            throw new RemoteNoClobberPublishUnavailableException(
+                remotePath,
+                $"the exec channel host key was refused: {refusal}",
+                hostKeyRejected);
+        }
+        catch (Exception ex) when (ex is Renci.SshNet.Common.SshException
+            or System.Net.Sockets.SocketException
+            or IOException
+            or TimeoutException
+            or ObjectDisposedException
+            or OperationCanceledException)
+        {
+            // The runner cancels by tearing the client down, which surfaces here rather than at the
+            // cancellation filter above. Reconcile before classifying, or a cancel is reported as a
+            // server that cannot publish safely.
+            ct.ThrowIfCancellationRequested();
+
+            LogNoClobberFailure("no-clobber file publication", ex);
+
+            throw new RemoteNoClobberPublishUnavailableException(
+                remotePath,
+                $"the publish outcome could not be confirmed ({ex.GetType().Name})",
+                ex);
+        }
+
+        if (result.ExitStatus == SuccessfulExitStatus)
+        {
+            return;
+        }
+
+        throw ClassifyFailedPublication(client, remotePath, result.ExitStatus, ct);
+    }
+
+    /// <summary>
+    /// Turns a non-zero publish status into a collision or an unavailable-primitive refusal, and never
+    /// into a success.
+    /// </summary>
+    /// <remarks>
+    /// The probe is wrapped because it is itself remote work that can fail. A probe failure leaves the
+    /// reason unknown, which is an unconfirmed outcome, not a collision and certainly not a success.
+    /// </remarks>
+    private Exception ClassifyFailedPublication(
+        SftpClient client,
+        string remotePath,
+        int exitStatus,
+        CancellationToken ct)
+    {
+        // A cancellation that arrived while the command was running must not be reported as a
+        // collision: the caller withdrew, and nothing about the destination was established.
+        ct.ThrowIfCancellationRequested();
+
+        try
+        {
+            bool destinationExists = TryGetEntryWithoutFollowingTarget(client, remotePath) is not null;
+
+            // Checked again after the probe returned. A cancellation concurrent with the probe would
+            // otherwise be converted into a definite verdict about the destination.
+            ct.ThrowIfCancellationRequested();
+
+            return destinationExists
+                ? new RemoteDestinationExistsException(remotePath)
+                : new RemoteNoClobberPublishUnavailableException(
+                    remotePath,
+                    $"the publish command exited {exitStatus}");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception probeFailure) when (probeFailure is Renci.SshNet.Common.SshException
+            or System.Net.Sockets.SocketException
+            or IOException
+            or TimeoutException
+            or ObjectDisposedException
+            or OperationCanceledException)
+        {
+            // Only plausible remote failures. Catching everything would turn a NullReference or an
+            // ArgumentException, which are defects in this code, into a network refusal and hide them.
+            ct.ThrowIfCancellationRequested();
+
+            LogNoClobberFailure(
+                "no-clobber destination classification probe",
+                probeFailure,
+                $"Publish command exit status {exitStatus}.");
+
+            return new RemoteNoClobberPublishUnavailableException(
+                remotePath,
+                $"the publish command exited {exitStatus} and the destination could not be examined "
+                + $"({probeFailure.GetType().Name})",
+                probeFailure);
+        }
+    }
+
+    /// <summary>
+    /// Returns the non-sensitive telemetry describing why an exec channel's host key was refused.
+    /// </summary>
+    /// <remarks>
+    /// A mismatch and a refused first use are different events. Only a mismatch indicates a key that
+    /// changed under us, which is the interception signal; a first-use rejection means trust was never
+    /// established and nothing suggests an attacker. Neither message carries a fingerprint or any
+    /// credential.
+    /// </remarks>
+    private static string DescribeHostKeyRefusal(HostKeyRejectedException hostKeyRejected)
+        => hostKeyRejected.IsMismatch
+            ? $"host-key mismatch (possible MITM) for SFTP {hostKeyRejected.Host}:{hostKeyRejected.Port}"
+            : "host-key rejection: the key was not trusted on first use for SFTP "
+                + $"{hostKeyRejected.Host}:{hostKeyRejected.Port}";
+
+    /// <summary>
+    /// Emits one warning for a remote failure on the no-clobber path.
+    /// </summary>
+    /// <remarks>
+    /// Enough to locate the failure without disclosing anything about the payload: the operation, the
+    /// exception type, the protocol, and the endpoint when it is known. Never the remote path, a
+    /// fingerprint, a credential, or file content.
+    /// </remarks>
+    /// <param name="operation">Short name of the failing step.</param>
+    /// <param name="failure">Observed failure.</param>
+    /// <param name="detail">Optional extra non-sensitive detail, such as an exit status.</param>
+    private void LogNoClobberFailure(string operation, Exception failure, string? detail = null)
+    {
+        SshConnectionParams? connectionParams = _connectionParams;
+        string endpoint = connectionParams is null
+            ? "an unknown endpoint"
+            : $"{connectionParams.Host}:{connectionParams.Port}";
+        string suffix = detail is null ? string.Empty : $" {detail}";
+
+        Heimdall.Core.Logging.FileLogger.Warn(
+            $"[SftpBrowser] {operation} failed over SFTP to {endpoint} "
+            + $"({failure.GetType().Name}).{suffix}");
+    }
+
+    /// <summary>
+    /// Resolves the pinned exec runner, refusing before any staging path is created when none exists.
+    /// </summary>
+    private ISftpExecCommandRunner ResolveNoClobberExecRunner(string remotePath)
+    {
+        ISftpExecCommandRunner? runner = _injectedExecCommandRunner;
+        if (runner is not null)
+        {
+            return runner;
+        }
+
+        SshConnectionParams? connectionParams = _connectionParams;
+        PinnedFingerprintVerifier? pinnedVerifier = _pinnedHostKeyVerifier;
+        if (connectionParams is null || pinnedVerifier is null)
+        {
+            throw new RemoteNoClobberPublishUnavailableException(
+                remotePath,
+                "no pinned connection context was retained for an exec channel");
+        }
+
+        return new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
+    }
+
+    /// <summary>
+    /// Selects which commit the upload core performs.
+    /// </summary>
+    /// <remarks>
+    /// Private on purpose: the commit strategy is chosen by this class alone, and no caller, inside or
+    /// outside the assembly, may select one. The guard oracles reach the invalid pairs by reflecting
+    /// over the upload core's own parameter type, so keeping this hidden costs them nothing.
+    /// </remarks>
     private enum UploadCommitMode
     {
         ReplaceExisting,
+
+        /// <summary>
+        /// Publish by linking the exclusively-reserved temporary onto a destination that must not
+        /// exist. Never routed through the replacing commit: the link is the only commit, and a
+        /// rename is not a substitute for it.
+        /// </summary>
+        PublishByExclusiveLink,
     }
 
     private static readonly TimeSpan DefaultDisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
@@ -390,10 +713,31 @@ public sealed class SftpBrowser : IRemoteBrowser
         string localPath,
         string remotePath,
         UploadCommitMode commitMode,
-        CancellationToken ct)
+        CancellationToken ct,
+        ISftpExecCommandRunner? noClobberRunner = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        // Before the temporary path is chosen, before the lock, and before anything is opened either
+        // locally or remotely. Validating at commit time would refuse only after a staging file had
+        // been created and its bytes written, which is a mutation performed for a publication that was
+        // never going to be attempted.
+        //
+        // The equivalence is enforced in BOTH directions on purpose. A one-directional guard would
+        // still accept a replacing mode carrying a publish runner, so changing a single token here
+        // from PublishByExclusiveLink to ReplaceExisting would skip every no-clobber branch, let the
+        // existing destination's metadata be copied, and reach the replacing commit. Requiring the
+        // two to agree makes that mutation refuse instead of silently replacing.
+        bool publishesByLink = commitMode == UploadCommitMode.PublishByExclusiveLink;
+        if (publishesByLink != (noClobberRunner is not null))
+        {
+            throw new RemoteNoClobberPublishUnavailableException(
+                remotePath,
+                publishesByLink
+                    ? "no publish runner was supplied to the no-clobber upload"
+                    : "a publish runner was supplied to a replacing upload");
+        }
 
         string fileName = Path.GetFileName(localPath);
         FileInfo fileInfo = LocalUploadSource.GetRequiredRegularFile(localPath);
@@ -408,6 +752,10 @@ public sealed class SftpBrowser : IRemoteBrowser
         }
 
         string tempRemotePath = SftpAtomicUpload.CreateRemoteTempPath(remotePath);
+
+        // Set only once the exclusive open has returned, and read by the rollback path so a cleanup
+        // by name can never remove a staging file this upload did not create.
+        bool stagingOwned = false;
 
         await _clientLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -432,7 +780,16 @@ public sealed class SftpBrowser : IRemoteBrowser
                     // file empty first lets it be tightened to owner-only before any byte lands.
                     SftpModePreservation.RunStagedUpload(
                         new SftpModePreservation.StagedUploadOperations(
-                            CreateEmptyTemp: () => client.Create(tempRemotePath).Dispose(),
+                            OpenTempExclusive: (mode, access) =>
+                            {
+                                Stream stagingStream = client.Open(tempRemotePath, mode, access);
+
+                                // Ownership is established by the exclusive open returning, and only
+                                // then. Rollback deletes by name, so cleaning up a staging path we
+                                // did not create would delete somebody else's file.
+                                stagingOwned = true;
+                                return stagingStream;
+                            },
                             ReadTempMode: () => GetPermissionMode(client.GetAttributes(tempRemotePath)),
                             ApplyTempMode: mode =>
                             {
@@ -440,9 +797,17 @@ public sealed class SftpBrowser : IRemoteBrowser
                                 ApplyPermissionMode(attributes, mode);
                                 client.SetAttributes(tempRemotePath, attributes);
                             },
-                            OpenTempForWrite: () => client.OpenWrite(tempRemotePath),
                             ReadTargetAttributesAfterUpload: () =>
                             {
+                                // The no-clobber path is a creation or a refusal, never a
+                                // replacement, so a destination that already exists must not have its
+                                // metadata copied onto the staging file. Reporting no target keeps the
+                                // creation semantics; the link, not this probe, decides the collision.
+                                if (commitMode == UploadCommitMode.PublishByExclusiveLink)
+                                {
+                                    return null;
+                                }
+
                                 ISftpFile? targetEntry = TryGetEntryWithoutFollowingTarget(client, remotePath);
                                 RemoteEntryKind? targetKind = targetEntry is null
                                     ? null
@@ -508,6 +873,28 @@ public sealed class SftpBrowser : IRemoteBrowser
                                         .GetResult();
                                 }
 
+                                // The no-clobber path commits by linking the temporary this upload
+                                // reserved. It must never reach the replacing commit: a rename can
+                                // overwrite the destination, which is the whole thing being avoided.
+                                if (commitMode == UploadCommitMode.PublishByExclusiveLink)
+                                {
+                                    // The runner resolved before staging, carried here. Resolving a
+                                    // fresh one at this point would reintroduce the very window the
+                                    // pre-resolution exists to close.
+                                    PublishByExclusiveLink(
+                                            client,
+                                            noClobberRunner
+                                                ?? throw new RemoteNoClobberPublishUnavailableException(
+                                                    remotePath,
+                                                    "no publish runner was carried to the commit"),
+                                            tempRemotePath,
+                                            remotePath,
+                                            ct)
+                                        .GetAwaiter()
+                                        .GetResult();
+                                    return;
+                                }
+
                                 CommitUploadedTemp(
                                     client,
                                     tempRemotePath,
@@ -525,17 +912,25 @@ public sealed class SftpBrowser : IRemoteBrowser
             }
             catch
             {
-                await Task.Run(
-                        () => SftpAtomicUpload.Rollback(
-                            tempRemotePath,
-                            temp =>
-                            {
-                                if (client.Exists(temp))
+                // Only a staging path this upload reserved may be removed. A failure before the
+                // exclusive open, a cancellation for instance, leaves nothing of ours to clean and
+                // must not delete a path of that name that somebody else owns. The final destination
+                // and the source are never touched here.
+                if (stagingOwned)
+                {
+                    await Task.Run(
+                            () => SftpAtomicUpload.Rollback(
+                                tempRemotePath,
+                                temp =>
                                 {
-                                    client.DeleteFile(temp);
-                                }
-                            }))
-                    .ConfigureAwait(false);
+                                    if (client.Exists(temp))
+                                    {
+                                        client.DeleteFile(temp);
+                                    }
+                                }))
+                        .ConfigureAwait(false);
+                }
+
                 throw;
             }
         }
