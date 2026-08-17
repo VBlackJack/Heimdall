@@ -228,6 +228,18 @@ rename silently overwrites the destination therefore succeeds with no exception
 and no warning. Remote copy must not be relied upon to protect an existing
 destination.
 
+FTP remote copy is refused, not attempted. The copy contract is that an existing
+destination is never overwritten, and FTP cannot honour it: every publish this
+client offers reduces to a client-side existence check followed by a plain rename,
+and RFC 959 says nothing about what a rename onto an existing destination does, so
+a server that silently overwrites is conformant. Previously the FTP copy ran
+through the ordinary upload, whose commit replaces an existing destination and
+reports success, so any missed pre-check became silent data loss. `CopyAsync` on
+the FTP browser now always throws and the user is told to copy over SFTP, whose
+`SSH_FXP_RENAME` is specified to fail when the target already exists. FTP cut and
+move make no such promise and still issue a plain rename, so they may overwrite
+silently: do not rely on a move to preserve an existing destination either.
+
 FTP upload keeps the two-step replacement and is not atomic. FluentFTP exposes no
 atomic replace, so `FtpAtomicUpload.CommitRenameAsync` moves an existing
 destination to a `.bak` sibling, moves the uploaded temporary file into place,

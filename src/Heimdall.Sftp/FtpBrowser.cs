@@ -436,10 +436,25 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Copies files by roundtrip (remote download to a local temp, then remote upload) under the
-    /// existing per-operation lock; FTP has no server-side copy command. The copy is not atomic.
+    /// Always refuses. The copy contract requires that an existing destination is never
+    /// overwritten, and FTP cannot honour it: every publish available in this client reduces to a
+    /// client-side existence check followed by a plain rename, and RFC 959 says nothing about what
+    /// a rename onto an existing destination does. A server that silently overwrites is
+    /// conformant, so a destination created after the check would be destroyed.
+    /// <para>
+    /// Refusing is deliberate rather than best-effort. The previous implementation copied by
+    /// roundtrip through the ordinary upload, whose commit replaces an existing destination and
+    /// reports success, so any missed pre-check became silent data loss. SFTP keeps the feature
+    /// because <c>SSH_FXP_RENAME</c> is specified to fail when the target exists, which is a
+    /// guarantee this protocol does not provide.
+    /// </para>
+    /// <para>
+    /// Uploading is unaffected: it never promised to preserve an existing destination and still
+    /// replaces one when the user asks for it.
+    /// </para>
     /// </remarks>
-    public async Task CopyAsync(
+    /// <exception cref="RemoteCopyUnsupportedException">Always thrown.</exception>
+    public Task CopyAsync(
         string sourcePath,
         string destinationPath,
         bool recursive,
@@ -448,15 +463,7 @@ public sealed class FtpBrowser : IRemoteBrowser
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        RemoteCopyOps ops = new RemoteCopyOps(
-            DestinationExistsAsync: RemoteExistsAsync,
-            SourceIsDirectoryAsync: RemoteIsDirectoryAsync,
-            ListChildNamesAsync: ListChildNamesAsync,
-            CopyFileAsync: CopyFileViaRoundtripAsync,
-            CreateDirectoryAsync: CreateDirectoryAsync);
-
-        await RemoteCopyPlanner.CopyAsync(sourcePath, destinationPath, recursive, ops, ct)
-            .ConfigureAwait(false);
+        throw new RemoteCopyUnsupportedException(sourcePath, destinationPath, "FTP");
     }
 
     private async Task<bool> RemoteExistsAsync(string path, CancellationToken ct)
@@ -506,23 +513,6 @@ public sealed class FtpBrowser : IRemoteBrowser
         }
 
         return names;
-    }
-
-    private async Task CopyFileViaRoundtripAsync(
-        string sourcePath,
-        string destinationPath,
-        CancellationToken ct)
-    {
-        string localTemp = RemoteCopyLocalTemp.Create();
-        try
-        {
-            await DownloadFileAsync(sourcePath, localTemp, ct).ConfigureAwait(false);
-            await UploadFileAsync(localTemp, destinationPath, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            RemoteCopyLocalTemp.TryDelete(localTemp);
-        }
     }
 
     /// <inheritdoc/>

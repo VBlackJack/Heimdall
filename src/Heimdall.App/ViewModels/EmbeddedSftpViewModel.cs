@@ -840,6 +840,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return L10n("SftpErrorRemoteUploadTargetNotRegularFile");
         }
 
+        if (ex is RemoteCopyUnsupportedException)
+        {
+            return L10n("SftpErrorFtpCopyRefusedNoNoClobberCommit");
+        }
+
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSFTP transfer failed [{ex.GetType().Name}]: {ex.Message}");
         return L10n("SftpStatusTransferFailed");

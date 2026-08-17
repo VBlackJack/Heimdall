@@ -1300,6 +1300,24 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.DoesNotContain(rawMessage, message, StringComparison.Ordinal);
     }
 
+    // The refusal must reach the user as its own reason. Throwing an untyped IOException would
+    // still satisfy the transport contract while degrading this message to the generic failure,
+    // which tells the user nothing about why the copy was refused or what to use instead.
+    [Fact]
+    public async Task DescribeTransferError_RemoteCopyUnsupported_ReturnsTheRefusalReason()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+
+        string message = viewModel.DescribeTransferError(
+            new RemoteCopyUnsupportedException("/src/file.txt", "/dst/file.txt", "FTP"));
+
+        Assert.Equal(localizer["SftpErrorFtpCopyRefusedNoNoClobberCommit"], message);
+        Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
+    }
+
     [Theory]
     [InlineData(nameof(SudoFailureKind.PasswordUnavailable), "ErrorSudoPasswordUnavailable")]
     [InlineData(nameof(SudoFailureKind.PasswordRejected), "ErrorSudoPasswordRejected")]

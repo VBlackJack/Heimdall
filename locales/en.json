@@ -869,6 +869,7 @@
   "SftpStatusDownloadCompleteWithSkipped": "Downloaded {0} file(s); skipped {1} folder(s) (folders aren't supported).",
   "SftpStatusDownloadNoFilesFoldersSkipped": "No files downloaded \u2014 folders aren't supported.",
   "SftpStatusTransferFailed": "Transfer failed.",
+  "SftpErrorFtpCopyRefusedNoNoClobberCommit": "Copy refused: FTP cannot publish a file without risking an existing destination. Use SFTP to copy on the server.",
   "SftpErrorSudoEditFileTooLarge": "Sudo edit refused: the remote file is {0}, which exceeds the {1} limit.",
   "SftpErrorLocalUploadFileMissing": "Local upload file was not found.",
   "SftpErrorLocalUploadNotRegularFile": "Local upload source must be a file, not a folder.",
