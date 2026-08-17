@@ -22,7 +22,7 @@ namespace Heimdall.Sftp.Tests;
 /// The server-side <c>cp</c> fast path used to test its token once and then block in a synchronous
 /// <c>Execute()</c>, so cancelling the copy of a large tree had no effect: the request never reached
 /// the running command. These tests pin the two properties that fix requires - the token travels to
-/// the exec channel, and a cancelled copy fails rather than silently restarting as a roundtrip.
+/// the exec channel, and a cancelled copy raises a cancellation rather than a refusal.
 /// </summary>
 public sealed class SftpServerSideCopyCancellationTests
 {
@@ -42,7 +42,7 @@ public sealed class SftpServerSideCopyCancellationTests
         using SftpBrowser browser = new(runner);
         using CancellationTokenSource cts = new();
 
-        Task<bool> copy = browser.TryServerSideCopyAsync(
+        Task<ServerSideCopyOutcome> copy = browser.TryServerSideCopyAsync(
             SourcePath,
             DestinationPath,
             recursive: true,
@@ -73,7 +73,7 @@ public sealed class SftpServerSideCopyCancellationTests
         using SftpBrowser browser = new(runner);
         using CancellationTokenSource cts = new();
 
-        Task<bool> copy = browser.TryServerSideCopyAsync(
+        Task<ServerSideCopyOutcome> copy = browser.TryServerSideCopyAsync(
             SourcePath,
             DestinationPath,
             recursive: true,
@@ -91,7 +91,7 @@ public sealed class SftpServerSideCopyCancellationTests
     }
 
     [Fact]
-    public async Task TryServerSideCopyAsync_ExecTimesOutWhileCallerStillWants_FallsBackToRoundtrip()
+    public async Task TryServerSideCopyAsync_ExecTimesOutWhileCallerStillWants_ReportsCommandTimedOut()
     {
         // A command that outruns its own cap surfaces as a cancellation the CALLER never asked for.
         FakeExecCommandRunner runner = new(
@@ -99,13 +99,14 @@ public sealed class SftpServerSideCopyCancellationTests
         using SftpBrowser browser = new(runner);
         using CancellationTokenSource cts = new();
 
-        bool serverSideSucceeded = await browser.TryServerSideCopyAsync(
+        ServerSideCopyOutcome outcome = await browser.TryServerSideCopyAsync(
             SourcePath,
             DestinationPath,
             recursive: true,
             cts.Token);
 
-        Assert.False(serverSideSucceeded);
+        Assert.Equal(ServerSideCopyOutcome.CommandTimedOut, outcome);
+        // The discriminant between an internal timeout and a user cancellation: the caller never asked.
         Assert.False(cts.IsCancellationRequested);
     }
 
@@ -116,13 +117,13 @@ public sealed class SftpServerSideCopyCancellationTests
             static (_, _) => Task.FromResult(new SftpExecResult(0, string.Empty)));
         using SftpBrowser browser = new(runner);
 
-        bool serverSideSucceeded = await browser.TryServerSideCopyAsync(
+        ServerSideCopyOutcome outcome = await browser.TryServerSideCopyAsync(
             SourcePath,
             DestinationPath,
             recursive: true,
             CancellationToken.None);
 
-        Assert.True(serverSideSucceeded);
+        Assert.Equal(ServerSideCopyOutcome.Succeeded, outcome);
         Assert.Equal(1, runner.CallCount);
         Assert.Equal(
             ServerSideCopyCommand.Build(SourcePath, DestinationPath, recursive: true),
@@ -130,35 +131,73 @@ public sealed class SftpServerSideCopyCancellationTests
     }
 
     [Fact]
-    public async Task TryServerSideCopyAsync_NonZeroExitStatus_FallsBackToRoundtrip()
+    public async Task TryServerSideCopyAsync_NonZeroExitStatus_ReportsNonZeroExit()
     {
         FakeExecCommandRunner runner = new(
             static (_, _) => Task.FromResult(new SftpExecResult(1, "cp: cannot stat")));
         using SftpBrowser browser = new(runner);
 
-        bool serverSideSucceeded = await browser.TryServerSideCopyAsync(
+        ServerSideCopyOutcome outcome = await browser.TryServerSideCopyAsync(
             SourcePath,
             DestinationPath,
             recursive: true,
             CancellationToken.None);
 
-        Assert.False(serverSideSucceeded);
+        Assert.Equal(ServerSideCopyOutcome.NonZeroExit, outcome);
     }
 
     [Fact]
-    public async Task TryServerSideCopyAsync_NoPinnedContextAndNoInjectedRunner_FallsBackWithoutOpeningAChannel()
+    public async Task TryServerSideCopyAsync_NoPinnedContextAndNoInjectedRunner_ReportsNoPinnedContext()
     {
-        // Fail closed: without a retained pinned context there is no channel to trust, so the copy
-        // degrades to the roundtrip over the already-verified SFTP client rather than reconnecting.
+        // Fail closed: without a retained pinned context there is no channel to trust, and no second
+        // route reserves the destination exclusively, so the caller refuses the copy outright.
         using SftpBrowser browser = new();
 
-        bool serverSideSucceeded = await browser.TryServerSideCopyAsync(
+        ServerSideCopyOutcome outcome = await browser.TryServerSideCopyAsync(
             SourcePath,
             DestinationPath,
             recursive: true,
             CancellationToken.None);
 
-        Assert.False(serverSideSucceeded);
+        Assert.Equal(ServerSideCopyOutcome.NoPinnedContext, outcome);
+    }
+
+    // A user cancellation must never be reported as "the server cannot copy safely". The runner tears
+    // the SSH client down to cancel, which surfaces as an SshException rather than an
+    // OperationCanceledException, so the transport handler has to reconcile against the caller's token.
+    [Fact]
+    public async Task TryServerSideCopyAsync_TransportFailsBecauseTheCallerCancelled_PropagatesCancellation()
+    {
+        using CancellationTokenSource cts = new();
+        FakeExecCommandRunner runner = new((_, _) =>
+        {
+            cts.Cancel();
+            throw new Renci.SshNet.Common.SshConnectionException("client torn down to cancel");
+        });
+        using SftpBrowser browser = new(runner);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => browser.TryServerSideCopyAsync(
+                SourcePath,
+                DestinationPath,
+                recursive: true,
+                cts.Token));
+    }
+
+    [Fact]
+    public async Task TryServerSideCopyAsync_TransportFailsWithoutCancellation_ReportsTransportFailed()
+    {
+        FakeExecCommandRunner runner = new(
+            static (_, _) => throw new Renci.SshNet.Common.SshConnectionException("channel lost"));
+        using SftpBrowser browser = new(runner);
+
+        ServerSideCopyOutcome outcome = await browser.TryServerSideCopyAsync(
+            SourcePath,
+            DestinationPath,
+            recursive: true,
+            CancellationToken.None);
+
+        Assert.Equal(ServerSideCopyOutcome.TransportFailed, outcome);
     }
 
     private sealed class FakeExecCommandRunner : ISftpExecCommandRunner

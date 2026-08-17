@@ -840,9 +840,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return L10n("SftpErrorRemoteUploadTargetNotRegularFile");
         }
 
-        if (ex is RemoteCopyUnsupportedException)
+        // Two different refusals, two different reasons. FTP has no safe publish at all; SFTP has one
+        // but could not reach it. Collapsing them would tell an SFTP user to switch to SFTP.
+        if (ex is RemoteCopyUnsupportedException copyRefusal)
         {
-            return L10n("SftpErrorFtpCopyRefusedNoNoClobberCommit");
+            return copyRefusal.Outcome is null
+                ? L10n("SftpErrorFtpCopyRefusedNoNoClobberCommit")
+                : L10n("SftpErrorSftpCopyRefusedServerSideUnavailable");
         }
 
         Core.Logging.FileLogger.Warn(

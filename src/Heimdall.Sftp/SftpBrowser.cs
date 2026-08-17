@@ -35,7 +35,6 @@ public sealed class SftpBrowser : IRemoteBrowser
     private enum UploadCommitMode
     {
         ReplaceExisting,
-        PublishIfAbsent,
     }
 
     private static readonly TimeSpan DefaultDisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
@@ -57,7 +56,8 @@ public sealed class SftpBrowser : IRemoteBrowser
     private PinnedFingerprintVerifier? _pinnedHostKeyVerifier;
 
     // Generous bound on a server-side cp; a server-local copy is fast, but a large tree may take a
-    // while. On timeout the copy falls back to the roundtrip path rather than failing.
+    // while. Reaching the bound refuses the copy: an unproductive exec channel is not a reason to
+    // publish the destination some other, unguaranteed way.
     private static readonly TimeSpan ServerSideCopyCommandTimeout = TimeSpan.FromMinutes(10);
 
     public SftpBrowser()
@@ -595,19 +595,6 @@ public sealed class SftpBrowser : IRemoteBrowser
         string remotePath,
         UploadCommitMode commitMode)
     {
-        if (commitMode == UploadCommitMode.PublishIfAbsent)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"[SftpBrowser] publish-if-absent for '{remotePath}' relies on plain SFTP rename semantics; "
-                + "a residual collision window may remain on some servers or filesystems.");
-            SftpAtomicUpload.CommitPublishIfAbsent(
-                tempRemotePath,
-                remotePath,
-                plainRename: (temp, final) => client.RenameFile(temp, final),
-                remoteExists: client.Exists);
-            return;
-        }
-
         if (commitMode != UploadCommitMode.ReplaceExisting)
         {
             throw new ArgumentOutOfRangeException(nameof(commitMode), commitMode, null);
@@ -770,12 +757,27 @@ public sealed class SftpBrowser : IRemoteBrowser
     /// <param name="recursive">When the source is a directory, copies it and its contents recursively.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <remarks>
-    /// Prefers a server-side <c>cp</c> over a pinned SSH exec channel: instant, no client bandwidth, and
-    /// it preserves POSIX mode/timestamps (<c>cp -p</c>/<c>cp -a</c>). Falls back to the download-to-temp
-    /// + re-upload roundtrip when the exec channel is unavailable, the command fails, or no pinned
-    /// connection context was retained. The roundtrip remains the correctness backstop. Neither path is
-    /// atomic.
+    /// Performs the copy with a server-side command over a pinned SSH exec channel: instant, no client
+    /// bandwidth, and it preserves POSIX mode/timestamps (<c>cp -p</c>/<c>cp -a</c>). That command is
+    /// also what makes the no-overwrite contract real, because it reserves the destination exclusively
+    /// (a hard link for a file, <c>mkdir</c> without <c>-p</c> for a directory root) and fails if it
+    /// already exists.
+    /// <para>
+    /// When that command is unavailable the copy is <b>refused</b>, not attempted another way. There
+    /// used to be a download-to-temp and re-upload fallback, published through a plain rename; a server
+    /// whose rename silently overwrites the destination made it succeed with no exception and no
+    /// warning, so the documented no-overwrite contract was not honoured on that path. Refusing keeps
+    /// the promise instead of degrading it.
+    /// </para>
+    /// <para>
+    /// Cancelling stays a cancellation: it raises <see cref="OperationCanceledException"/> and is never
+    /// reported as a refusal, because the user stopping a copy and the server being unable to perform
+    /// one safely are different outcomes.
+    /// </para>
     /// </remarks>
+    /// <exception cref="RemoteCopyUnsupportedException">
+    /// The server-side command could not be used, so no safe copy is possible.
+    /// </exception>
     public async Task CopyAsync(
         string sourcePath,
         string destinationPath,
@@ -785,9 +787,17 @@ public sealed class SftpBrowser : IRemoteBrowser
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        // No-overwrite + source-type/recursive validation runs up front so the fast (server-side) and
-        // slow (roundtrip) paths share identical semantics. The roundtrip planner re-checks these
-        // defensively; the destination still does not exist at that point, so the re-probe is harmless.
+        // Containment first, before any probe and before any server command. This guard used to live
+        // in the roundtrip planner, which a successful server-side copy already bypassed; with the
+        // roundtrip gone it would have disappeared entirely, leaving a directory copied into its own
+        // subtree to the server's discretion.
+        if (RemoteCopyPathGuard.IsSameOrDescendantPath(sourcePath, destinationPath))
+        {
+            throw new IOException(
+                "Refused to copy: the destination is the source or lies inside it: " +
+                $"{sourcePath} -> {destinationPath}");
+        }
+
         if (await RemoteExistsAsync(destinationPath, ct).ConfigureAwait(false))
         {
             throw new IOException($"Refused to copy: destination already exists: {destinationPath}");
@@ -799,48 +809,41 @@ public sealed class SftpBrowser : IRemoteBrowser
             throw new IOException("Source is a directory; set recursive=true.");
         }
 
-        if (await TryServerSideCopyAsync(sourcePath, destinationPath, recursive, ct).ConfigureAwait(false))
+        ServerSideCopyOutcome outcome = await TryServerSideCopyAsync(
+            sourcePath,
+            destinationPath,
+            recursive,
+            ct).ConfigureAwait(false);
+        if (outcome == ServerSideCopyOutcome.Succeeded)
         {
             return;
         }
 
-        await RunRoundtripCopyAsync(sourcePath, destinationPath, recursive, ct).ConfigureAwait(false);
-    }
-
-    private Task RunRoundtripCopyAsync(
-        string sourcePath,
-        string destinationPath,
-        bool recursive,
-        CancellationToken ct)
-    {
-        var ops = new RemoteCopyOps(
-            DestinationExistsAsync: RemoteExistsAsync,
-            SourceIsDirectoryAsync: RemoteIsDirectoryAsync,
-            ListChildNamesAsync: ListChildNamesAsync,
-            CopyFileAsync: CopyFileViaRoundtripAsync,
-            CreateDirectoryAsync: CreateDirectoryAsync);
-
-        return RemoteCopyPlanner.CopyAsync(sourcePath, destinationPath, recursive, ops, ct);
+        // Thrown here on purpose, outside TryServerSideCopyAsync. That method catches IOException to
+        // decline, and this refusal IS an IOException, so constructing it inside would let the decline
+        // filter swallow it and silently restore the old fall-through behaviour.
+        throw new RemoteCopyUnsupportedException(sourcePath, destinationPath, outcome);
     }
 
     /// <summary>
-    /// Attempts a server-side <c>cp</c> over a short-lived SSH exec channel pinned to the host key
-    /// resolved at connect time. Returns true on exit status 0; returns false (fall back to roundtrip)
-    /// when no pinned context was retained, the command exits non-zero, the command outruns
-    /// <see cref="ServerSideCopyCommandTimeout"/>, or the channel/transport fails.
-    /// Cancellation propagates; programming errors are never swallowed.
+    /// Attempts the server-side copy command over a short-lived SSH exec channel pinned to the host key
+    /// resolved at connect time, and reports which outcome occurred.
     /// </summary>
     /// <remarks>
+    /// The result is a named outcome rather than a boolean because the caller has to tell a decline
+    /// apart from a transport failure: both used to collapse into <c>false</c>, which was adequate only
+    /// while every non-success degraded to the same fallback. Cancellation is not among the outcomes;
+    /// it leaves as <see cref="OperationCanceledException"/>.
+    /// <para>
     /// The exec channel is driven by <see cref="ISftpExecCommandRunner"/>, which tears the SSH client
-    /// down on cancellation so the request reaches the running <c>cp</c>. The previous inline
-    /// implementation tested the token once before connecting and then blocked in a synchronous
-    /// <c>Execute()</c>: cancelling during the copy of a large tree had no effect at all, because a
-    /// token cannot interrupt a delegate already running inside <see cref="Task.Run(Action)"/>.
-    /// A cancelled copy must NOT fall back to the roundtrip - that would restart the very transfer
-    /// the user just cancelled - so <see cref="OperationCanceledException"/> is rethrown, and only
-    /// the timeout of an otherwise-live request degrades to the roundtrip.
+    /// down on cancellation so the request reaches the running command. Tearing the client down surfaces
+    /// as an <see cref="Renci.SshNet.Common.SshException"/>, not as an
+    /// <see cref="OperationCanceledException"/>, so the transport handler re-checks the caller's token
+    /// before classifying: without that, a user pressing cancel would be told the server cannot copy
+    /// safely, which is not what happened.
+    /// </para>
     /// </remarks>
-    internal async Task<bool> TryServerSideCopyAsync(
+    internal async Task<ServerSideCopyOutcome> TryServerSideCopyAsync(
         string sourcePath,
         string destinationPath,
         bool recursive,
@@ -853,7 +856,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         {
             if (connectionParams is null || pinnedVerifier is null)
             {
-                return false;
+                return ServerSideCopyOutcome.NoPinnedContext;
             }
 
             runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
@@ -863,7 +866,7 @@ public sealed class SftpBrowser : IRemoteBrowser
         string command = ServerSideCopyCommand.Build(sourcePath, destinationPath, recursive);
 
         // A generous cap on the command itself, distinct from the caller's token: reaching it means the
-        // exec channel is unproductive, not that the user asked to stop, so it degrades to the roundtrip.
+        // exec channel is unproductive, not that the user asked to stop.
         using CancellationTokenSource commandCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         commandCts.CancelAfter(ServerSideCopyCommandTimeout);
 
@@ -874,15 +877,16 @@ public sealed class SftpBrowser : IRemoteBrowser
 
             if (result.ExitStatus == SuccessfulExitStatus)
             {
-                return true;
+                return ServerSideCopyOutcome.Succeeded;
             }
 
-            // Collision, EXDEV, and missing-tool failures deliberately share this correctness fallback.
-            // Parsing stderr would be server-specific and cannot make the roundtrip commit safer.
+            // Collision, EXDEV and missing-tool failures share one outcome on purpose. Parsing stderr
+            // would be server-specific, and every one of them means the same thing to the caller: the
+            // exclusive reservation did not happen, so no safe copy took place.
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[SftpBrowser] SFTP server-side copy on {host} exited {result.ExitStatus}; "
-                + $"falling back to roundtrip. stderr: {result.StandardError}");
-            return false;
+                + $"refusing the copy. stderr: {result.StandardError}");
+            return ServerSideCopyOutcome.NonZeroExit;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -892,19 +896,18 @@ public sealed class SftpBrowser : IRemoteBrowser
         {
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[SftpBrowser] SFTP server-side copy on {host} exceeded "
-                + $"{ServerSideCopyCommandTimeout.TotalMinutes:0} minutes; falling back to roundtrip.");
-            return false;
+                + $"{ServerSideCopyCommandTimeout.TotalMinutes:0} minutes; refusing the copy.");
+            return ServerSideCopyOutcome.CommandTimedOut;
         }
         catch (HostKeyRejectedException)
         {
             // A host-key mismatch on the freshly-opened exec connection is a potential MITM signal, so it
-            // gets its own explicit log line rather than being lumped in with routine failures. Fail
-            // closed: never proceed on the unverified channel; fall back to the roundtrip over the
-            // already-pinned, already-trusted SftpClient. Host + protocol context only, no credentials.
+            // gets its own explicit log line rather than being lumped in with routine failures. Host and
+            // protocol context only, no credentials.
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[SftpBrowser] host-key mismatch on server-side copy exec channel for {host} "
-                + "(possible MITM); falling back to roundtrip over the trusted SFTP channel.");
-            return false;
+                + "(possible MITM); refusing the copy.");
+            return ServerSideCopyOutcome.HostKeyRejected;
         }
         catch (Exception ex) when (
             ex is Renci.SshNet.Common.SshException
@@ -912,10 +915,15 @@ public sealed class SftpBrowser : IRemoteBrowser
                 or IOException
                 or TimeoutException)
         {
+            // The runner tears the SSH client down to cancel, and that surfaces here as an SshException
+            // rather than as an OperationCanceledException. Reconcile against the caller's token before
+            // classifying, or a cancelled copy would be reported as a server that cannot copy safely.
+            ct.ThrowIfCancellationRequested();
+
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[SftpBrowser] SFTP server-side copy unavailable on {host} "
-                + $"({ex.GetType().Name}); falling back to roundtrip. {ex.Message}");
-            return false;
+                + $"({ex.GetType().Name}); refusing the copy. {ex.Message}");
+            return ServerSideCopyOutcome.TransportFailed;
         }
     }
 
@@ -965,28 +973,6 @@ public sealed class SftpBrowser : IRemoteBrowser
         }
 
         return names;
-    }
-
-    private async Task CopyFileViaRoundtripAsync(
-        string sourcePath,
-        string destinationPath,
-        CancellationToken ct)
-    {
-        string localTemp = RemoteCopyLocalTemp.Create();
-        try
-        {
-            await DownloadFileAsync(sourcePath, localTemp, ct).ConfigureAwait(false);
-            await UploadFileAsync(
-                    localTemp,
-                    destinationPath,
-                    UploadCommitMode.PublishIfAbsent,
-                    ct)
-                .ConfigureAwait(false);
-        }
-        finally
-        {
-            RemoteCopyLocalTemp.TryDelete(localTemp);
-        }
     }
 
     /// <summary>Disconnects from the remote host and releases the SFTP client.</summary>

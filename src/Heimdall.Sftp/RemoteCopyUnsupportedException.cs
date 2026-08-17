@@ -17,6 +17,35 @@
 namespace Heimdall.Sftp;
 
 /// <summary>
+/// Why a server-side copy attempt did or did not produce a safe copy.
+/// </summary>
+/// <remarks>
+/// Named rather than boolean because the caller must tell a decline apart from a transport failure.
+/// Cancellation is deliberately absent: it is not an outcome of the attempt but the caller
+/// withdrawing, and it leaves as <see cref="OperationCanceledException"/>.
+/// </remarks>
+public enum ServerSideCopyOutcome
+{
+    /// <summary>The server copied and reserved the destination exclusively.</summary>
+    Succeeded,
+
+    /// <summary>No pinned connection context was retained, so no verifiable channel could be opened.</summary>
+    NoPinnedContext,
+
+    /// <summary>The command ran and failed: a collision, a cross-device link, or a missing tool.</summary>
+    NonZeroExit,
+
+    /// <summary>The command outran its own cap while the caller was still waiting.</summary>
+    CommandTimedOut,
+
+    /// <summary>The freshly opened exec channel presented an unexpected host key.</summary>
+    HostKeyRejected,
+
+    /// <summary>The channel, or the transport underneath it, failed.</summary>
+    TransportFailed,
+}
+
+/// <summary>
 /// Represents a remote copy refused because the transport cannot publish a destination without
 /// risking an existing one.
 /// </summary>
@@ -47,6 +76,32 @@ public sealed class RemoteCopyUnsupportedException : IOException
         Transport = transport;
     }
 
+    /// <summary>
+    /// Initializes a new instance for an SFTP copy whose safe server-side path was unavailable.
+    /// </summary>
+    /// <remarks>
+    /// A distinct reason from the protocol-level one above. SFTP does have a commit that fails on an
+    /// existing destination; what failed here is reaching it, so saying "the protocol offers no such
+    /// commit" would be factually wrong for this transport.
+    /// </remarks>
+    /// <param name="sourcePath">Requested copy source.</param>
+    /// <param name="destinationPath">Requested copy destination.</param>
+    /// <param name="outcome">Outcome that denied the safe path; must not be a success.</param>
+    public RemoteCopyUnsupportedException(
+        string sourcePath,
+        string destinationPath,
+        ServerSideCopyOutcome outcome)
+        : base(
+            $"SFTP cannot copy '{sourcePath}' to '{destinationPath}' safely: the server-side copy " +
+            $"was not performed ({outcome}), and no other route reserves the destination " +
+            "exclusively.")
+    {
+        SourcePath = sourcePath;
+        DestinationPath = destinationPath;
+        Transport = "SFTP";
+        Outcome = outcome;
+    }
+
     /// <summary>Gets the requested copy source.</summary>
     public string SourcePath { get; }
 
@@ -55,4 +110,10 @@ public sealed class RemoteCopyUnsupportedException : IOException
 
     /// <summary>Gets the transport that cannot guarantee an untouched destination.</summary>
     public string Transport { get; }
+
+    /// <summary>
+    /// Gets the server-side outcome that denied the safe path, or <c>null</c> when the transport
+    /// offers no safe commit at all rather than having failed to reach one.
+    /// </summary>
+    public ServerSideCopyOutcome? Outcome { get; }
 }
