@@ -20,8 +20,9 @@ namespace Heimdall.Sftp;
 
 /// <summary>
 /// Transport primitives the <see cref="RemoteCopyPlanner"/> drives to perform a non-overwriting,
-/// recursive remote copy. Each delegate is supplied by a concrete browser (SFTP or FTP) and wraps a
-/// single locked transport call, so the planner itself stays pure and free of any I/O or locking.
+/// recursive remote copy. Each delegate is supplied by a browser whose transport can actually
+/// guarantee that, and wraps a single locked transport call, so the planner itself stays pure and
+/// free of any I/O or locking. FTP supplies none: it refuses the copy instead.
 /// </summary>
 /// <param name="DestinationExistsAsync">Returns whether the destination path already exists.</param>
 /// <param name="SourceIsDirectoryAsync">Returns whether the source path is a directory.</param>
@@ -36,8 +37,8 @@ internal sealed record RemoteCopyOps(
     Func<string, CancellationToken, Task> CreateDirectoryAsync);
 
 /// <summary>
-/// Pure orchestrator for a same-server remote copy. Encodes the copy contract shared by
-/// <see cref="SftpBrowser"/> and <see cref="FtpBrowser"/>: never overwrite an existing destination,
+/// Pure orchestrator for a same-server remote copy. Encodes the copy contract of
+/// <see cref="SftpBrowser"/>: never overwrite an existing destination,
 /// require <c>recursive</c> for directory sources, and fan a directory copy out child by child. All
 /// transport work is delegated through <see cref="RemoteCopyOps"/>, so this type performs no I/O and
 /// is fully unit-testable with in-memory fakes (mirrors <see cref="SftpAtomicUpload"/>).

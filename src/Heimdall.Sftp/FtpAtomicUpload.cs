@@ -19,8 +19,14 @@ using System.IO;
 namespace Heimdall.Sftp;
 
 /// <summary>
-/// Coordinates FTP temp-path uploads and non-destructive replacement without depending on a live server.
+/// Coordinates FTP temp-path uploads and recoverable replacement without depending on a live server.
 /// </summary>
+/// <remarks>
+/// Recoverable, not non-destructive: an existing destination is moved aside, replaced, and its
+/// backup deleted once the commit succeeds. The backup exists so a failed commit can be undone,
+/// not so the previous file survives a successful one. Replacement is intentional here; the copy
+/// path, which must never overwrite, cannot be built on this and refuses instead.
+/// </remarks>
 public static class FtpAtomicUpload
 {
     /// <summary>

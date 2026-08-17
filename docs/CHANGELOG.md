@@ -12,6 +12,34 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-17: FTP no longer offers a copy it cannot make safe
+
+- **Copying on the server is refused over FTP** (SFTP-013). The copy contract is that an existing
+  destination is never overwritten. FTP cannot honour it: every publish FluentFTP offers reduces to
+  a client-side existence check followed by a plain rename, and RFC 959 says nothing about what a
+  rename onto an existing destination does, so a server that silently overwrites is conformant.
+
+  Until now the FTP copy ran through the ordinary upload, whose commit moves an existing
+  destination aside, replaces it and reports success. The planner's single pre-check was the only
+  thing between a concurrent creation and data loss, so any way that check could miss (a race, a
+  stale listing, a server whose existence probe false-negatives) became a silently destroyed file.
+  `FtpBrowser.CopyAsync` now always refuses, with a localized reason pointing at SFTP, whose
+  `SSH_FXP_RENAME` is specified to fail when the target exists.
+
+  Refusing was chosen over mirroring the SFTP publish on top of a check-then-rename, because that
+  would have named a method after a guarantee the protocol does not provide.
+
+  Uploading over FTP is unchanged and still replaces an existing destination when asked: it never
+  promised otherwise, and the user chooses replacement explicitly. FTP cut and move also still
+  issue a plain rename and may overwrite; that exposure is now documented rather than left implied
+  to be safe.
+
+  Corrections to earlier entries that promised more than the code delivered. The 2026-08-03 claim
+  that "a copy can no longer overwrite a destination that appeared between check and write" held
+  for SFTP only. The 2026-06-29 entry announcing a "no-overwrite `CopyAsync`" with a "recursive
+  roundtrip for FTP" was never true of the FTP half. The interface contract, the planner
+  documentation, `README.md` and `docs/SECURITY.md` are corrected in this release.
+
 ## 2026-08-17: A selected link is no longer followed out of the upload selection
 
 - **An upload root that is a link is refused instead of followed** (SFTP-015). The upload

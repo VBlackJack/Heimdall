@@ -90,6 +90,9 @@ public interface IRemoteBrowser : IDisposable
     /// Copies a remote file or directory to another path on the SAME server.
     /// <paramref name="recursive"/> applies when the source is a directory.
     /// Implementations must NOT overwrite: if <paramref name="destinationPath"/> already exists, throw <see cref="System.IO.IOException"/>.
+    /// An implementation whose transport cannot honour that, because the protocol offers no commit
+    /// that fails when the destination already exists, must refuse the copy outright rather than
+    /// perform a best-effort one. That refusal is also an <see cref="System.IO.IOException"/>.
     /// </summary>
     Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default);
 

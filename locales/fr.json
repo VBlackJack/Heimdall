@@ -869,6 +869,7 @@
   "SftpStatusDownloadCompleteWithSkipped": "{0} fichier(s) t\u00e9l\u00e9charg\u00e9(s) ; {1} dossier(s) ignor\u00e9(s) (les dossiers ne sont pas pris en charge).",
   "SftpStatusDownloadNoFilesFoldersSkipped": "Aucun fichier t\u00e9l\u00e9charg\u00e9 \u2014 les dossiers ne sont pas pris en charge.",
   "SftpStatusTransferFailed": "\u00c9chec du transfert.",
+  "SftpErrorFtpCopyRefusedNoNoClobberCommit": "Copie refus\u00e9e : FTP ne peut pas publier un fichier sans risquer d'\u00e9craser une destination existante. Utilisez SFTP pour copier sur le serveur.",
   "SftpErrorSudoEditFileTooLarge": "\u00c9dition sudo refus\u00e9e : le fichier distant fait {0}, ce qui d\u00e9passe la limite de {1}.",
   "SftpErrorLocalUploadFileMissing": "Le fichier local \u00e0 envoyer est introuvable.",
   "SftpErrorLocalUploadNotRegularFile": "La source locale \u00e0 envoyer doit \u00eatre un fichier, pas un dossier.",

@@ -98,7 +98,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - **Full sudo fallback** on all operations: upload (`sudo tee`), download (`sudo cat`), edit, chmod, rename, delete, mkdir - triggered only on typed permission-denied exceptions
 - Sudo edit sessions cache the pinned host-key verifier, detect mid-edit host-key rotation, track upload tasks, and clean temporary files even when the privileged write fails
 - Drag-and-drop upload and download
-- **Cut / Copy / Paste / Duplicate** with non-destructive collision handling; server-side copy (host-key-pinned) with a roundtrip fallback, journaled as a single operation
+- **Cut / Copy / Paste / Duplicate** with non-destructive collision handling on SFTP; server-side copy (host-key-pinned) with a roundtrip fallback, journaled as a single operation. Copying on the server is refused over FTP, which offers no publish that fails when the destination already exists
 - **Recursive folder upload** and drop-into-folder targeting
 - **Cross-pane paste** between two file browsers, same server or across servers
 - **Paste from Explorer**: upload files/folders from the Windows clipboard (CF_HDROP) into the current directory
