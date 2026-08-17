@@ -1036,11 +1036,19 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             bool isDirectory = Directory.Exists(path);
             bool isFile = !isDirectory && File.Exists(path);
+            // Read attributes only for a path a probe reported present. A path both probes call
+            // absent is never uploaded, so its type cannot matter, while the probes swallow the
+            // access and malformed-path errors that the attribute read raises. Reading it
+            // unconditionally would let such a path abort the whole drop instead of being
+            // skipped on its own.
+            FileAttributes? attributes = isDirectory || isFile
+                ? ReadLocalRootAttributesOrNullIfMissing(path, File.GetAttributes)
+                : null;
             LocalUploadEntry? root = ClassifyLocalUploadRoot(
                 path,
                 isDirectory,
                 isFile,
-                TryReadLocalRootAttributes(path),
+                attributes,
                 skippedLocalReparsePoints);
             if (root is null)
             {
@@ -1357,12 +1365,20 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// The existence check runs first on purpose. A source that disappeared between the probe
     /// and this call stays an ignored disappearance rather than a reported refusal, so the
     /// pre-existing race is preserved and never surfaces as a spurious warning.
+    /// <para>
+    /// Absent attributes mean the type could not be determined, which is not the same as
+    /// "not a link". An existence probe that succeeded and an attribute read that did not can
+    /// disagree, because the two observations happen at different instants. Producing an entry
+    /// on an undetermined type would let a link be walked whenever the read lost that race, so
+    /// uncertainty refuses the root instead. The path is not reported among the refused links:
+    /// nothing established that it was one.
+    /// </para>
     /// </remarks>
     internal static LocalUploadEntry? ClassifyLocalUploadRoot(
         string localPath,
         bool directoryExists,
         bool fileExists,
-        FileAttributes attributes,
+        FileAttributes? attributes,
         ICollection<string> skippedLocalReparsePoints)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
@@ -1373,7 +1389,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return null;
         }
 
-        if ((attributes & FileAttributes.ReparsePoint) != 0)
+        if (attributes is null)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP did not upload local root '{localPath}': its type was not " +
+                "established, most often because the source was removed after the existence " +
+                "probe. Containment cannot be guaranteed on an undetermined type.");
+            return null;
+        }
+
+        if ((attributes.Value & FileAttributes.ReparsePoint) != 0)
         {
             skippedLocalReparsePoints.Add(localPath);
             Core.Logging.FileLogger.Warn(
@@ -1385,29 +1410,39 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Reads the attributes of a selected upload root without letting a vanished source raise.
+    /// Reads the attributes of a selected upload root, reporting a vanished source as no
+    /// attributes and letting every other failure reach the existing error path.
     /// </summary>
     /// <remarks>
-    /// The source can be deleted between the existence probe and this read. Returning no
-    /// attributes keeps such a path on the behaviour it already had instead of introducing a
-    /// new error, and the reparse guard simply does not fire for a path that is no longer there.
-    /// The other swallowed failures behave the same way by construction: the existence probes
-    /// and this read resolve through the same underlying attribute query, so a path this read
-    /// cannot see is one the probes could not see either, and the existence gate refuses it
-    /// first. Returning no attributes is therefore never the deciding step for a live path.
+    /// Only a disappearance is swallowed, and only because a drop can race a delete on the
+    /// source side. A denied or failing read is a different thing: it leaves the type unknown
+    /// while the path may well still be there, so it must not be quietly downgraded to
+    /// "no attributes" and it must not be turned into "not a link" either. Those failures
+    /// propagate to the caller's existing error handling instead.
     /// </remarks>
-    private static FileAttributes TryReadLocalRootAttributes(string localPath)
+    /// <param name="localPath">Selected upload root.</param>
+    /// <param name="readAttributes">
+    /// Attribute reader. Required rather than defaulted so a test drives the same code path
+    /// production uses, with no bypass around it.
+    /// </param>
+    internal static FileAttributes? ReadLocalRootAttributesOrNullIfMissing(
+        string localPath,
+        Func<string, FileAttributes> readAttributes)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+        ArgumentNullException.ThrowIfNull(readAttributes);
+
         try
         {
-            return File.GetAttributes(localPath);
+            return readAttributes(localPath);
         }
-        catch (Exception ex) when (ex is IOException
-            or UnauthorizedAccessException
-            or ArgumentException
-            or NotSupportedException)
+        catch (FileNotFoundException)
         {
-            return default;
+            return null;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return null;
         }
     }
 

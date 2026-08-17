@@ -319,6 +319,103 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Empty(skippedPaths);
     }
 
+    // An existence probe that succeeded and an attribute read that did not can disagree: the two
+    // observations happen at different instants. An undetermined type must refuse the root rather
+    // than be read as "not a link", or a link is walked whenever the read loses that race.
+    [Fact]
+    public void ClassifyLocalUploadRoot_ExistingRootWithUnreadableAttributes_IsRefusedUncounted()
+    {
+        const string selectedRoot = @"C:\source\type-unknown";
+        List<string> skippedPaths = [];
+
+        LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadRoot(
+            selectedRoot,
+            directoryExists: true,
+            fileExists: false,
+            attributes: null,
+            skippedPaths);
+
+        Assert.Null(entry);
+        Assert.Empty(skippedPaths);
+    }
+
+    [Fact]
+    public void ClassifyLocalUploadRoot_ExistingFileRootWithUnreadableAttributes_IsRefusedUncounted()
+    {
+        const string selectedRoot = @"C:\source\type-unknown.txt";
+        List<string> skippedPaths = [];
+
+        LocalUploadEntry? entry = EmbeddedSftpViewModel.ClassifyLocalUploadRoot(
+            selectedRoot,
+            directoryExists: false,
+            fileExists: true,
+            attributes: null,
+            skippedPaths);
+
+        Assert.Null(entry);
+        Assert.Empty(skippedPaths);
+    }
+
+    // A path both probes report absent is never uploaded, so its type cannot matter. The probes
+    // swallow the access and malformed-path errors the attribute read raises, so reading it for
+    // such a path would abort the whole drop instead of skipping that path alone.
+    [Fact]
+    public async Task UploadEntriesAsync_UnreadableAbsentPath_DoesNotAbortTheRestOfTheBatch()
+    {
+        using TempDirectory temp = new();
+        string validFile = Path.Combine(temp.Path, "regular.txt");
+        await File.WriteAllTextAsync(validFile, "payload");
+        const string malformedPath = @"C:\a|b";
+
+        RecordingRemoteBrowser browser = new();
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.UploadEntriesAsync([validFile, malformedPath], "/dst");
+
+        Assert.Equal(0, presenter.CallCount);
+        Assert.Contains((validFile, "/dst/regular.txt"), browser.UploadCalls);
+    }
+
+    [Theory]
+    [InlineData(typeof(FileNotFoundException))]
+    [InlineData(typeof(DirectoryNotFoundException))]
+    public void ReadLocalRootAttributesOrNullIfMissing_VanishedSource_ReportsNoAttributes(Type exceptionType)
+    {
+        FileAttributes? attributes = EmbeddedSftpViewModel.ReadLocalRootAttributesOrNullIfMissing(
+            @"C:\source\vanished",
+            _ => throw (Exception)Activator.CreateInstance(exceptionType)!);
+
+        Assert.Null(attributes);
+    }
+
+    // A denied or failing read leaves the type unknown while the path may still be there. It must
+    // reach the existing error path instead of being downgraded to "no attributes".
+    [Theory]
+    [InlineData(typeof(UnauthorizedAccessException))]
+    [InlineData(typeof(IOException))]
+    [InlineData(typeof(NotSupportedException))]
+    [InlineData(typeof(ArgumentException))]
+    public void ReadLocalRootAttributesOrNullIfMissing_UndeterminedType_Propagates(Type exceptionType)
+    {
+        Assert.Throws(
+            exceptionType,
+            () => EmbeddedSftpViewModel.ReadLocalRootAttributesOrNullIfMissing(
+                @"C:\source\denied",
+                _ => throw (Exception)Activator.CreateInstance(exceptionType)!));
+    }
+
+    [Fact]
+    public void ReadLocalRootAttributesOrNullIfMissing_ReadableSource_ReturnsTheAttributes()
+    {
+        FileAttributes? attributes = EmbeddedSftpViewModel.ReadLocalRootAttributesOrNullIfMissing(
+            @"C:\source\link",
+            _ => FileAttributes.Directory | FileAttributes.ReparsePoint);
+
+        Assert.Equal(FileAttributes.Directory | FileAttributes.ReparsePoint, attributes);
+    }
+
     // A source deleted between the existence probe and the classification stays an ignored
     // disappearance. It must not be counted as a refused link, which would surface a warning
     // for a path the user never selected as a link.
