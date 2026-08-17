@@ -14,278 +14,50 @@
  * limitations under the License.
  */
 
-using System.IO;
-using Heimdall.Sftp;
-
 namespace Heimdall.Sftp.Tests;
 
 /// <summary>
-/// Unit tests for the pure <see cref="RemoteCopyPlanner"/> orchestration: non-overwrite protection,
-/// the directory-requires-recursive rule, file-vs-directory dispatch, recursive fan-out, and
-/// child-name validation. Transport is faked entirely in memory through <see cref="RemoteCopyOps"/>.
+/// Guards the remote-copy containment rule that outlived the client-side copy planner.
 /// </summary>
-public sealed class RemoteCopyPlannerTests
+/// <remarks>
+/// These oracles used to run against the planner's tree walk. That walk is gone: neither transport
+/// can publish a file without risking an existing destination, so FTP refuses and SFTP requires its
+/// server-side exclusive reservation. The containment rule was enforced only inside the walk, which a
+/// successful server-side copy already bypassed, so it is now applied by the caller before any command
+/// runs and is exercised here directly.
+/// </remarks>
+public sealed class RemoteCopyPathGuardTests
 {
-    [Fact]
-    public async Task CopyAsync_DestinationExists_ThrowsIOExceptionAndCopiesNothing()
+    [Theory]
+    // Destination is the source.
+    [InlineData("/srv/data", "/srv/data")]
+    // Trailing separators must not change the verdict on either side.
+    [InlineData("/srv/data/", "/srv/data")]
+    [InlineData("/srv/data", "/srv/data/")]
+    // Destination sits inside the source, at any depth.
+    [InlineData("/srv/data", "/srv/data/sub")]
+    [InlineData("/srv/data", "/srv/data/sub/deeper")]
+    [InlineData("/srv/data/", "/srv/data/sub")]
+    // The remote root contains every destination.
+    [InlineData("/", "/srv/data")]
+    public void IsSameOrDescendantPath_SameOrInside_IsRefused(string source, string destination)
     {
-        FakeRemoteTree tree = new FakeRemoteTree();
-        tree.ExistingDestinations.Add("/srv/dst.txt");
-
-        await Assert.ThrowsAsync<IOException>(() =>
-            RemoteCopyPlanner.CopyAsync("/srv/src.txt", "/srv/dst.txt", recursive: false, tree.BuildOps()));
-
-        Assert.Empty(tree.CopiedFiles);
-        Assert.Empty(tree.CreatedDirectories);
+        Assert.True(RemoteCopyPathGuard.IsSameOrDescendantPath(source, destination));
     }
 
-    [Fact]
-    public async Task CopyAsync_DestinationEqualsSource_ThrowsIOExceptionAndCopiesNothing()
+    [Theory]
+    // A sibling that merely shares a textual prefix is NOT inside the source. Without the trailing
+    // separator in the comparison this pair would be wrongly refused, so it is the discriminating
+    // case for the guard's implementation.
+    [InlineData("/srv/data", "/srv/database")]
+    [InlineData("/srv/data", "/srv/data-backup")]
+    [InlineData("/srv/data/", "/srv/database")]
+    // Unrelated trees, and a destination that is an ancestor rather than a descendant.
+    [InlineData("/srv/data", "/srv/other")]
+    [InlineData("/srv/data/sub", "/srv/data")]
+    [InlineData("/srv/data/sub", "/srv/data/other")]
+    public void IsSameOrDescendantPath_OutsideTheSource_IsAllowed(string source, string destination)
     {
-        FakeRemoteTree tree = new FakeRemoteTree();
-
-        await Assert.ThrowsAsync<IOException>(() =>
-            RemoteCopyPlanner.CopyAsync("/srv/data", "/srv/data", recursive: true, tree.BuildOps()));
-
-        Assert.Empty(tree.CopiedFiles);
-        Assert.Empty(tree.CreatedDirectories);
-    }
-
-    [Fact]
-    public async Task CopyAsync_DestinationIsDescendantOfSource_ThrowsIOExceptionAndCopiesNothing()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-        tree.Directories.Add("/srv/data");
-
-        await Assert.ThrowsAsync<IOException>(() =>
-            RemoteCopyPlanner.CopyAsync(
-                "/srv/data",
-                "/srv/data/backup",
-                recursive: true,
-                tree.BuildOps()));
-
-        Assert.Empty(tree.CopiedFiles);
-        Assert.Empty(tree.CreatedDirectories);
-    }
-
-    [Fact]
-    public async Task CopyAsync_DestinationSharesPrefixButIsNotDescendant_Succeeds()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-
-        await RemoteCopyPlanner.CopyAsync(
-            "/srv/data",
-            "/srv/database",
-            recursive: false,
-            tree.BuildOps());
-
-        Assert.Equal(
-            ("/srv/data", "/srv/database"),
-            Assert.Single(tree.CopiedFiles));
-        Assert.Empty(tree.CreatedDirectories);
-    }
-
-    [Fact]
-    public async Task CopyAsync_DestinationIsAncestorOfSource_Succeeds()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-
-        await RemoteCopyPlanner.CopyAsync(
-            "/srv/data/sub",
-            "/srv/out",
-            recursive: false,
-            tree.BuildOps());
-
-        Assert.Equal(
-            ("/srv/data/sub", "/srv/out"),
-            Assert.Single(tree.CopiedFiles));
-        Assert.Empty(tree.CreatedDirectories);
-    }
-
-    [Fact]
-    public async Task CopyAsync_SourceHasTrailingSlashAndDestinationIsDescendant_ThrowsIOException()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-        tree.Directories.Add("/srv/data/");
-
-        await Assert.ThrowsAsync<IOException>(() =>
-            RemoteCopyPlanner.CopyAsync(
-                "/srv/data/",
-                "/srv/data/backup",
-                recursive: true,
-                tree.BuildOps()));
-
-        Assert.Empty(tree.CopiedFiles);
-        Assert.Empty(tree.CreatedDirectories);
-    }
-
-    [Fact]
-    public void IsSameOrDescendantPath_RootSource_RejectsEveryDestination()
-    {
-        Assert.True(RemoteCopyPlanner.IsSameOrDescendantPath("/", "/srv/data"));
-        Assert.True(RemoteCopyPlanner.IsSameOrDescendantPath("/", "/"));
-        Assert.True(RemoteCopyPlanner.IsSameOrDescendantPath("/", "/a/b/c"));
-    }
-
-    [Fact]
-    public async Task CopyAsync_DirectorySourceWithoutRecursive_ThrowsIOException()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-        tree.Directories.Add("/srv/data");
-
-        await Assert.ThrowsAsync<IOException>(() =>
-            RemoteCopyPlanner.CopyAsync("/srv/data", "/srv/data-copy", recursive: false, tree.BuildOps()));
-
-        Assert.Empty(tree.CopiedFiles);
-        Assert.Empty(tree.CreatedDirectories);
-    }
-
-    [Fact]
-    public async Task CopyAsync_FileSource_CopiesSingleFileWithoutCreatingDirectory()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-
-        await RemoteCopyPlanner.CopyAsync("/srv/a.txt", "/srv/b.txt", recursive: false, tree.BuildOps());
-
-        (string Source, string Destination) copied = Assert.Single(tree.CopiedFiles);
-        Assert.Equal(("/srv/a.txt", "/srv/b.txt"), copied);
-        Assert.Empty(tree.CreatedDirectories);
-    }
-
-    [Fact]
-    public async Task CopyAsync_DirectoryRecursive_CreatesDestinationTreeAndCopiesFiles()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-        tree.Directories.Add("/srv/data");
-        tree.Directories.Add("/srv/data/sub");
-        tree.Children["/srv/data"] = ["file1.txt", "sub"];
-        tree.Children["/srv/data/sub"] = ["file2.txt"];
-
-        await RemoteCopyPlanner.CopyAsync("/srv/data", "/srv/copy", recursive: true, tree.BuildOps());
-
-        Assert.Equal(["/srv/copy", "/srv/copy/sub"], tree.CreatedDirectories);
-        Assert.Contains(("/srv/data/file1.txt", "/srv/copy/file1.txt"), tree.CopiedFiles);
-        Assert.Contains(("/srv/data/sub/file2.txt", "/srv/copy/sub/file2.txt"), tree.CopiedFiles);
-        Assert.Equal(2, tree.CopiedFiles.Count);
-    }
-
-    [Fact]
-    public async Task CopyAsync_UnsafeChildName_ThrowsIOException()
-    {
-        FakeRemoteTree tree = new FakeRemoteTree();
-        tree.Directories.Add("/srv/data");
-        tree.Children["/srv/data"] = ["../escape"];
-
-        await Assert.ThrowsAsync<IOException>(() =>
-            RemoteCopyPlanner.CopyAsync("/srv/data", "/srv/copy", recursive: true, tree.BuildOps()));
-    }
-
-    [Fact]
-    public void JoinRemote_TrimsTrailingSlashAndUsesForwardSlash()
-    {
-        Assert.Equal("/srv/data/file.txt", RemoteCopyPlanner.JoinRemote("/srv/data/", "file.txt"));
-        Assert.Equal("/srv/data/file.txt", RemoteCopyPlanner.JoinRemote("/srv/data", "file.txt"));
-    }
-
-    [Fact]
-    public void SftpBrowserRoundtripFileCopy_UsesPublishIfAbsentCommitMode()
-    {
-        string source = File.ReadAllText(Path.Combine(
-            FindRepoRoot(),
-            "src",
-            "Heimdall.Sftp",
-            "SftpBrowser.cs"));
-        string roundtripMethod = ExtractMethod(source, "private async Task CopyFileViaRoundtripAsync(");
-        string commitMethod = ExtractMethod(source, "private static void CommitUploadedTemp(");
-        int publishBranchStart = commitMethod.IndexOf(
-            "if (commitMode == UploadCommitMode.PublishIfAbsent)",
-            StringComparison.Ordinal);
-        int replaceBranchStart = commitMethod.IndexOf(
-            "if (commitMode != UploadCommitMode.ReplaceExisting)",
-            StringComparison.Ordinal);
-
-        Assert.True(publishBranchStart >= 0);
-        Assert.True(replaceBranchStart > publishBranchStart);
-
-        string publishBranch = commitMethod[publishBranchStart..replaceBranchStart];
-
-        Assert.Contains("UploadCommitMode.PublishIfAbsent", roundtripMethod, StringComparison.Ordinal);
-        Assert.DoesNotContain("UploadCommitMode.ReplaceExisting", roundtripMethod, StringComparison.Ordinal);
-        Assert.Contains("SftpAtomicUpload.CommitPublishIfAbsent(", publishBranch, StringComparison.Ordinal);
-        Assert.DoesNotContain("SftpAtomicUpload.CommitRename(", publishBranch, StringComparison.Ordinal);
-    }
-
-    private static string ExtractMethod(string source, string signature)
-    {
-        int methodStart = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(methodStart >= 0, $"Method signature was not found: {signature}");
-
-        int openingBrace = source.IndexOf('{', methodStart);
-        Assert.True(openingBrace >= 0, $"Method opening brace was not found: {signature}");
-
-        int depth = 0;
-        for (int index = openingBrace; index < source.Length; index++)
-        {
-            if (source[index] == '{')
-            {
-                depth++;
-            }
-            else if (source[index] == '}')
-            {
-                depth--;
-                if (depth == 0)
-                {
-                    return source[methodStart..(index + 1)];
-                }
-            }
-        }
-
-        throw new InvalidOperationException($"Method closing brace was not found: {signature}");
-    }
-
-    private static string FindRepoRoot()
-    {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Repository root was not found.");
-    }
-
-    private sealed class FakeRemoteTree
-    {
-        public HashSet<string> ExistingDestinations { get; } = new HashSet<string>(StringComparer.Ordinal);
-
-        public HashSet<string> Directories { get; } = new HashSet<string>(StringComparer.Ordinal);
-
-        public Dictionary<string, List<string>> Children { get; } =
-            new Dictionary<string, List<string>>(StringComparer.Ordinal);
-
-        public List<(string Source, string Destination)> CopiedFiles { get; } = [];
-
-        public List<string> CreatedDirectories { get; } = [];
-
-        public RemoteCopyOps BuildOps() => new RemoteCopyOps(
-            DestinationExistsAsync: (path, _) => Task.FromResult(ExistingDestinations.Contains(path)),
-            SourceIsDirectoryAsync: (path, _) => Task.FromResult(Directories.Contains(path)),
-            ListChildNamesAsync: (path, _) => Task.FromResult<IReadOnlyList<string>>(
-                Children.TryGetValue(path, out List<string>? names) ? names : []),
-            CopyFileAsync: (source, destination, _) =>
-            {
-                CopiedFiles.Add((source, destination));
-                return Task.CompletedTask;
-            },
-            CreateDirectoryAsync: (path, _) =>
-            {
-                CreatedDirectories.Add(path);
-                return Task.CompletedTask;
-            });
+        Assert.False(RemoteCopyPathGuard.IsSameOrDescendantPath(source, destination));
     }
 }

@@ -1318,6 +1318,47 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
     }
 
+    // The SFTP refusal has its own reason: the protocol does offer a safe commit, this server just did
+    // not perform it. Reusing the FTP message would tell an SFTP user to switch to SFTP.
+    [Theory]
+    [InlineData(nameof(ServerSideCopyOutcome.NoPinnedContext))]
+    [InlineData(nameof(ServerSideCopyOutcome.NonZeroExit))]
+    [InlineData(nameof(ServerSideCopyOutcome.CommandTimedOut))]
+    [InlineData(nameof(ServerSideCopyOutcome.HostKeyRejected))]
+    [InlineData(nameof(ServerSideCopyOutcome.TransportFailed))]
+    public async Task DescribeTransferError_SftpCopyRefused_ReturnsTheSftpReasonNotTheFtpOne(
+        string outcomeName)
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+        ServerSideCopyOutcome outcome = Enum.Parse<ServerSideCopyOutcome>(outcomeName);
+
+        string message = viewModel.DescribeTransferError(
+            new RemoteCopyUnsupportedException("/srv/a", "/srv/b", outcome));
+
+        Assert.Equal(localizer["SftpErrorSftpCopyRefusedServerSideUnavailable"], message);
+        Assert.NotEqual(localizer["SftpErrorFtpCopyRefusedNoNoClobberCommit"], message);
+        Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
+    }
+
+    [Fact]
+    public async Task DescribeTransferError_SftpAndFtpRefusals_AreLocalizedDistinctly()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+
+        string ftpMessage = viewModel.DescribeTransferError(
+            new RemoteCopyUnsupportedException("/srv/a", "/srv/b", "FTP"));
+        string sftpMessage = viewModel.DescribeTransferError(
+            new RemoteCopyUnsupportedException("/srv/a", "/srv/b", ServerSideCopyOutcome.NonZeroExit));
+
+        Assert.NotEqual(ftpMessage, sftpMessage);
+    }
+
     [Theory]
     [InlineData(nameof(SudoFailureKind.PasswordUnavailable), "ErrorSudoPasswordUnavailable")]
     [InlineData(nameof(SudoFailureKind.PasswordRejected), "ErrorSudoPasswordRejected")]

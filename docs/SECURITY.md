@@ -219,14 +219,25 @@ may refuse the rename or may overwrite silently. Only the `posix-rename` path is
 atomic with respect to such a concurrent creation. A deployment that must exclude
 that race needs a server offering the extension.
 
-SFTP remote copy is a best-effort no-clobber publish, not an atomic one.
-`CopyFileViaRoundtripAsync` downloads to a local temporary file and republishes
-through `SftpAtomicUpload.CommitPublishIfAbsent`, which issues a plain rename and
-re-probes the destination only when that rename fails. The re-probe classifies
-the error message and is deliberately not part of the data path. A server whose
-rename silently overwrites the destination therefore succeeds with no exception
-and no warning. Remote copy must not be relied upon to protect an existing
-destination.
+SFTP remote copy either reserves the destination exclusively or is refused. The
+copy runs as a server-side command over an SSH exec channel pinned to the host key
+resolved at connect time, and that command is what makes the no-overwrite contract
+real: a file is staged then published with a hard link, a directory root is
+reserved with `mkdir` without `-p`, and both fail if the destination already
+exists. If the command cannot be used, the copy is refused and the reason is
+reported; there is no second route.
+
+There used to be one. When the server-side command was unavailable, the copy fell
+back to downloading to a local temporary file and republishing through a plain
+rename, re-probing the destination only after that rename failed. A server whose
+rename silently overwrites the destination therefore succeeded with no exception
+and no warning, which meant the documented no-overwrite contract was not honoured
+on that path. The fallback has been removed rather than annotated: a copy that
+cannot promise the destination is untouched is not performed at all.
+
+Cancelling a copy raises a cancellation, not a refusal. The two are distinct
+outcomes and are reported and journaled separately, so "the user stopped this" is
+never presented as "this server cannot copy safely".
 
 FTP remote copy is refused, not attempted. The copy contract is that an existing
 destination is never overwritten, and FTP cannot honour it: every publish this
@@ -235,8 +246,9 @@ and RFC 959 says nothing about what a rename onto an existing destination does, 
 a server that silently overwrites is conformant. Previously the FTP copy ran
 through the ordinary upload, whose commit replaces an existing destination and
 reports success, so any missed pre-check became silent data loss. `CopyAsync` on
-the FTP browser now always throws and the user is told to copy over SFTP, whose
-`SSH_FXP_RENAME` is specified to fail when the target already exists. FTP cut and
+the FTP browser now always throws, and the user is pointed at SFTP with a working
+server-side copy command, which is the only route that reserves the destination
+exclusively. FTP cut and
 move make no such promise and still issue a plain rename, so they may overwrite
 silently: do not rely on a move to preserve an existing destination either.
 

@@ -12,6 +12,41 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-17: a server-side copy is the only copy, on every protocol
+
+- **The SFTP copy no longer falls back to a transfer that could overwrite** (SFTP-013). The copy is
+  performed by a server-side command over a host-key-pinned exec channel, and that command is what
+  makes the no-overwrite contract real: a file is staged then published with a hard link, a directory
+  root is reserved with `mkdir` without `-p`, and both fail when the destination already exists.
+
+  When that command could not be used, the copy used to fall back to downloading the file and
+  republishing it through a plain rename. A server whose rename silently overwrites the destination
+  made that path succeed with no exception and no warning, so the contract the interface documents was
+  not honoured there. That fallback is now removed rather than annotated: the copy is refused, with a
+  reason of its own, distinct from the FTP refusal because SFTP does have a safe commit and what
+  failed was reaching it.
+
+  The attempt now reports a named outcome instead of a boolean, so the caller can tell a decline
+  (no pinned context, non-zero exit, internal timeout, host-key rejection) from a transport failure.
+
+- **Cancelling a copy is reported as a cancellation, not as a refusal.** The exec runner tears the
+  SSH client down to cancel, which surfaces as an `SshException` rather than a cancellation, so the
+  classification now reconciles against the caller's token before deciding. Without that, pressing
+  cancel would have been reported as "this server cannot copy safely".
+
+- **The containment guard survived the removal.** Refusing to copy a directory into its own subtree
+  was enforced only inside the client-side walk that this change deletes, and a successful server-side
+  copy already bypassed it. It is now applied by the caller before any probe and before any command,
+  so the check covers every path rather than only the slow one.
+
+  Its oracles moved with it, including the case that a sibling merely sharing a textual prefix
+  (`/srv/database` against `/srv/data`) is not inside the source and must still be allowed.
+
+- Documentation reconciled in the same change: `docs/SECURITY.md` described the SFTP copy as a
+  best-effort publish that "must not be relied upon", while the FTP refusal added the day before told
+  users to switch to SFTP. Both statements are corrected, and `README.md` no longer advertises a
+  roundtrip fallback.
+
 ## 2026-08-17: FTP no longer offers a copy it cannot make safe
 
 - **Copying on the server is refused over FTP** (SFTP-013). The copy contract is that an existing
