@@ -2018,7 +2018,7 @@
   "WarnFtpsDataChannelIdentityBadge": "L'identit\u00e9 du canal de donn\u00e9es FTPS n'est pas v\u00e9rifi\u00e9e",
   "WarnRemoteEntriesSkippedUnsupported": "Entr\u00e9es ignor\u00e9es car elles ne sont ni des fichiers ni des r\u00e9pertoires : {0}. Consultez le journal pour plus de d\u00e9tails.",
   "WarnUploadTargetsSkippedUnsupported": "{0} envoi(s) ignor\u00e9(s) : la destination existe d\u00e9j\u00e0 et n'est pas un fichier r\u00e9gulier. Voir le journal pour le d\u00e9tail.",
-  "WarnUploadSourcesSkippedReparsePoints": "{0} lien(s) local(aux) ignor\u00e9(s) dans l'arborescence d'envoi s\u00e9lectionn\u00e9e. Consultez le journal pour plus de d\u00e9tails.",
+  "WarnUploadSourcesSkippedReparsePoints": "{0} lien(s) local(aux) ignor\u00e9(s), s\u00e9lectionn\u00e9(s) comme source d'envoi ou trouv\u00e9(s) dans l'arborescence s\u00e9lectionn\u00e9e. Consultez le journal pour plus de d\u00e9tails.",
   "WarnRemoteReplacementNonAtomic": "La destination '{0}' a \u00e9t\u00e9 remplac\u00e9e sans garantie atomique.",
   "WarnFtpReplacementNonAtomicMetadataNotPreserved": "La destination '{0}' a \u00e9t\u00e9 remplac\u00e9e sans garantie atomique, et Heimdall n'a pas conserv\u00e9 le propri\u00e9taire, les permissions, les horodatages, les ACL, les attributs \u00e9tendus ni les capabilities du fichier remplac\u00e9.",
   "WarnRdpFileAclFailed": "Le fichier .rdp temporaire n\u2019a pas pu \u00eatre prot\u00e9g\u00e9 par une ACL restrictive. Il contient l\u2019h\u00f4te et le nom d\u2019utilisateur, mais pas le mot de passe ; la session a tout de m\u00eame \u00e9t\u00e9 lanc\u00e9e.",
