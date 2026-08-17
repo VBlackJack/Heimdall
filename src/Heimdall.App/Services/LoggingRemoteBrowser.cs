@@ -23,10 +23,14 @@ namespace Heimdall.App.Services;
 /// <summary>
 /// Transparent <see cref="IRemoteBrowser"/> decorator that records each of the six file-transfer
 /// operations (upload / download / delete / rename / mkdir / copy) to the shared operations log. Every
-/// call is forwarded verbatim to the inner browser; exactly one <see cref="SessionOperationRecord"/> is
-/// emitted per operation (success / error / cancelled), and every exception is rethrown so the
-/// existing view-model error handling is preserved. A copy emits a single Copy record even though its
-/// inner roundtrip performs a download and an upload: those hit the undecorated inner browser directly.
+/// call is forwarded verbatim to the inner browser, and every exception is rethrown so the existing
+/// view-model error handling is preserved. When the session-logging gate is open, each operation emits
+/// exactly one <see cref="SessionOperationRecord"/> (success / error / cancelled); when it is closed the
+/// operation is still forwarded and no record is emitted at all. The gate silences the journal, never
+/// the transfer. A copy emits a single Copy record because it is a
+/// single high-level operation: for SFTP there is no download-and-upload roundtrip to fall back to any
+/// more. That says nothing about whether the server was reached — a transport that refuses fail-closed
+/// records its Copy without any server-side operation having taken place.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -41,7 +45,8 @@ namespace Heimdall.App.Services;
 /// pass-through (subscribers attach directly to the inner browser), so there is nothing to unsubscribe.
 /// </para>
 /// </remarks>
-public sealed class LoggingRemoteBrowser : IRemoteBrowser
+public sealed class LoggingRemoteBrowser
+    : IRemoteBrowser, IRemoteNoClobberCapability, IRemoteClipboardEndpointIdentity
 {
     private readonly IRemoteBrowser _inner;
     private readonly ISessionOperationLog _sink;
@@ -79,7 +84,39 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
         _protocol = protocol;
         _host = GraphicalSessionEventHelpers.ResolveHost(host, host);
         _sessionLoggingOverride = sessionLoggingOverride;
+
+        // Asked of the inner browser, never claimed on this decorator's own behalf. Claiming a
+        // guarantee the inner cannot honour would hand the caller a publisher that cannot publish,
+        // and the caller's refusal gate would then be deciding on a capability that does not exist.
+        IRemoteNoClobberPublisher? innerPublisher =
+            (inner as IRemoteNoClobberCapability)?.NoClobberPublisher;
+        NoClobberPublisher = innerPublisher is null
+            ? null
+            : new LoggingNoClobberPublisher(this, innerPublisher);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Mirrors the inner browser's answer: <c>null</c> whenever the inner cannot publish without
+    /// replacing, so a caller that refuses on a null capability refuses for the right reason.
+    /// </remarks>
+    public IRemoteNoClobberPublisher? NoClobberPublisher { get; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Resolved through the inner browser on every read rather than copied once at construction. A
+    /// wrapper around a wrapper therefore still reaches the raw browser, and an identity that only
+    /// becomes known after the session connects is not frozen as absent.
+    /// </remarks>
+    string? IRemoteClipboardEndpointIdentity.ClipboardEndpointKey => _inner switch
+    {
+        IRemoteClipboardEndpointIdentity inner => inner.ClipboardEndpointKey,
+        FtpBrowser ftpBrowser => NullIfEmpty(RemoteClipboardEndpointKey.FromFtp(ftpBrowser)),
+        _ => null,
+    };
+
+    private static string? NullIfEmpty(string value)
+        => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <inheritdoc />
     public event Action<string>? DirectoryChanged
@@ -250,4 +287,52 @@ public sealed class LoggingRemoteBrowser : IRemoteBrowser
     }
 
     private static long FileLength(string localPath) => new FileInfo(localPath).Length;
+
+    /// <summary>
+    /// Records a no-clobber publication through the same single-record path as every other operation.
+    /// </summary>
+    /// <remarks>
+    /// The logged remote path is the final destination the caller asked for. The staging path the inner
+    /// browser reserves is never visible at this seam and must not be: a record naming the staging file
+    /// would describe a name that no longer exists once the publication succeeded.
+    /// <para>
+    /// A refusal and an unconfirmed outcome both arrive as exceptions, so both are recorded as errors.
+    /// Neither may ever be recorded as a success: an operator reading a success line would conclude the
+    /// destination now holds this file, which is exactly what an unconfirmed publication cannot say.
+    /// </para>
+    /// </remarks>
+    private sealed class LoggingNoClobberPublisher : IRemoteNoClobberPublisher
+    {
+        private readonly LoggingRemoteBrowser _owner;
+        private readonly IRemoteNoClobberPublisher _inner;
+
+        internal LoggingNoClobberPublisher(LoggingRemoteBrowser owner, IRemoteNoClobberPublisher inner)
+        {
+            _owner = owner;
+            _inner = inner;
+        }
+
+        /// <inheritdoc />
+        public Task PublishFileIfAbsentAsync(
+            string localPath,
+            string remotePath,
+            CancellationToken ct = default)
+            => _owner.RunLoggedAsync(
+                () => _inner.PublishFileIfAbsentAsync(localPath, remotePath, ct),
+                ms => SessionOperationRecord.Upload.Success(
+                    _owner._protocol, _owner._host, remotePath, localPath, FileLength(localPath), ms),
+                ms => SessionOperationRecord.Upload.Cancelled(
+                    _owner._protocol, _owner._host, remotePath, localPath, ms),
+                (ms, category) => SessionOperationRecord.Upload.Error(
+                    _owner._protocol, _owner._host, remotePath, localPath, ms, category));
+
+        /// <inheritdoc />
+        public Task CreateDirectoryExclusiveAsync(string remotePath, CancellationToken ct = default)
+            => _owner.RunLoggedAsync(
+                () => _inner.CreateDirectoryExclusiveAsync(remotePath, ct),
+                ms => SessionOperationRecord.Mkdir.Success(_owner._protocol, _owner._host, remotePath, ms),
+                ms => SessionOperationRecord.Mkdir.Cancelled(_owner._protocol, _owner._host, remotePath, ms),
+                (ms, category) => SessionOperationRecord.Mkdir.Error(
+                    _owner._protocol, _owner._host, remotePath, ms, category));
+    }
 }

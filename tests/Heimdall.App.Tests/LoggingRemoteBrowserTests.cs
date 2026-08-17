@@ -15,9 +15,11 @@
  */
 
 using System.IO;
+using System.Reflection;
 using FluentAssertions;
 using Heimdall.App.Services;
 using Heimdall.Sftp;
+using Heimdall.Ssh;
 using Renci.SshNet.Common;
 
 namespace Heimdall.App.Tests;
@@ -374,6 +376,476 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
                 // Best-effort cleanup of temp artifacts.
             }
         }
+    }
+
+    // A decorator that answered for itself would hand the clipboard a publisher whose inner browser
+    // cannot publish without replacing. The capability must mirror the inner browser's own answer.
+    [Fact]
+    public void NoClobberPublisher_WhenInnerDoesNotImplementTheCapability_IsNull()
+    {
+        CapturingOperationLog sink = new();
+        FakeRemoteBrowser inner = new();
+
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+
+        decorator.Should().BeAssignableTo<IRemoteNoClobberCapability>();
+        decorator.NoClobberPublisher.Should().BeNull();
+    }
+
+    [Fact]
+    public void NoClobberPublisher_WhenInnerDeclaresNoPublisher_IsNull()
+    {
+        CapturingOperationLog sink = new();
+        CapableRemoteBrowser inner = new(new FakeRemoteBrowser(), publisher: null);
+
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+
+        decorator.NoClobberPublisher.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task NoClobberPublisher_WhenInnerCanPublish_ForwardsVerbatim_ThroughItsOwnWrapper()
+    {
+        string localPath = NewTempFileOfSize(1024);
+        CapturingOperationLog sink = new();
+        RecordingPublisher publisher = new();
+        CapableRemoteBrowser inner = new(new FakeRemoteBrowser(), publisher);
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+
+        decorator.NoClobberPublisher.Should().NotBeNull();
+
+        // Not the inner publisher itself: returning it unwrapped would forward correctly and record
+        // nothing, which is the failure mode a null check cannot see.
+        decorator.NoClobberPublisher.Should().NotBeSameAs(publisher);
+
+        await decorator.NoClobberPublisher!.PublishFileIfAbsentAsync(localPath, "/srv/data/file.bin");
+        await decorator.NoClobberPublisher!.CreateDirectoryExclusiveAsync("/srv/data/dir");
+
+        publisher.PublishCalls.Should().ContainSingle()
+            .Which.Should().Be((localPath, "/srv/data/file.bin"));
+        publisher.ReserveCalls.Should().ContainSingle().Which.Should().Be("/srv/data/dir");
+    }
+
+    [Fact]
+    public async Task PublishFileIfAbsentAsync_Success_LogsOneUploadRecordNamingTheFinalDestination()
+    {
+        string localPath = NewTempFileOfSize(4096);
+        CapturingOperationLog sink = new();
+        CapableRemoteBrowser inner = new(new FakeRemoteBrowser(), new RecordingPublisher());
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+
+        await decorator.NoClobberPublisher!.PublishFileIfAbsentAsync(localPath, "/srv/data/file.bin");
+
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(SessionOperationKind.Upload);
+        record.Result.Should().Be(SessionOperationResult.Success);
+
+        // The final destination, never the staging name the inner browser reserved: a record naming
+        // the staging file would describe a path that no longer exists once the publish succeeded.
+        record.RemotePath.Should().Be("/srv/data/file.bin");
+        record.LocalPath.Should().Be(localPath);
+        record.Bytes.Should().Be(4096);
+        record.ErrorCategory.Should().BeNull();
+    }
+
+    // A refusal and an unconfirmed outcome must never be recorded as a success. An operator reading a
+    // success line concludes the destination now holds this file, which is precisely what an
+    // unconfirmed publication cannot establish.
+    //
+    // The exception is asserted by IDENTITY, not by type. A decorator that caught the refusal and threw
+    // its own IOException wrapping it would satisfy a type check while destroying what the caller needs:
+    // the clipboard distinguishes a collision from an unconfirmed outcome by the exception it receives,
+    // and treats only the second as "may already exist on the server".
+    [Fact]
+    public async Task PublishFileIfAbsentAsync_DestinationExists_LogsAnError_AndRethrowsTheSameInstance()
+    {
+        string localPath = NewTempFileOfSize(16);
+        CapturingOperationLog sink = new();
+        RemoteDestinationExistsException injected = new("/srv/data/file.bin");
+        RecordingPublisher publisher = new() { PublishException = injected };
+        LoggingRemoteBrowser decorator = Create(new CapableRemoteBrowser(new FakeRemoteBrowser(), publisher), sink);
+
+        Func<Task> publish = () =>
+            decorator.NoClobberPublisher!.PublishFileIfAbsentAsync(localPath, "/srv/data/file.bin");
+
+        (await publish.Should().ThrowAsync<RemoteDestinationExistsException>())
+            .Which.Should().BeSameAs(injected);
+
+        AssertSingleErrorRecord(sink, SessionOperationKind.Upload, "/srv/data/file.bin");
+    }
+
+    [Fact]
+    public async Task PublishFileIfAbsentAsync_UnconfirmedOutcome_LogsAnError_AndRethrowsTheSameInstance()
+    {
+        string localPath = NewTempFileOfSize(16);
+        CapturingOperationLog sink = new();
+        RemoteNoClobberPublishUnavailableException injected =
+            new("/srv/data/file.bin", "the channel dropped");
+        RecordingPublisher publisher = new() { PublishException = injected };
+        LoggingRemoteBrowser decorator = Create(new CapableRemoteBrowser(new FakeRemoteBrowser(), publisher), sink);
+
+        Func<Task> publish = () =>
+            decorator.NoClobberPublisher!.PublishFileIfAbsentAsync(localPath, "/srv/data/file.bin");
+
+        (await publish.Should().ThrowAsync<RemoteNoClobberPublishUnavailableException>())
+            .Which.Should().BeSameAs(injected);
+
+        AssertSingleErrorRecord(sink, SessionOperationKind.Upload, "/srv/data/file.bin");
+    }
+
+    [Fact]
+    public async Task PublishFileIfAbsentAsync_Cancelled_LogsCancelled_AndRethrowsTheSameInstance()
+    {
+        string localPath = NewTempFileOfSize(16);
+        CapturingOperationLog sink = new();
+        OperationCanceledException injected = new();
+        RecordingPublisher publisher = new() { PublishException = injected };
+        LoggingRemoteBrowser decorator = Create(new CapableRemoteBrowser(new FakeRemoteBrowser(), publisher), sink);
+
+        Func<Task> publish = () =>
+            decorator.NoClobberPublisher!.PublishFileIfAbsentAsync(localPath, "/srv/data/file.bin");
+
+        (await publish.Should().ThrowAsync<OperationCanceledException>())
+            .Which.Should().BeSameAs(injected);
+
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(SessionOperationKind.Upload);
+        record.Result.Should().Be(SessionOperationResult.Cancelled);
+    }
+
+    [Fact]
+    public async Task CreateDirectoryExclusiveAsync_Success_LogsOneMkdirRecord()
+    {
+        CapturingOperationLog sink = new();
+        LoggingRemoteBrowser decorator = Create(
+            new CapableRemoteBrowser(new FakeRemoteBrowser(), new RecordingPublisher()),
+            sink);
+
+        await decorator.NoClobberPublisher!.CreateDirectoryExclusiveAsync("/srv/data/dir");
+
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(SessionOperationKind.Mkdir);
+        record.Result.Should().Be(SessionOperationResult.Success);
+        record.RemotePath.Should().Be("/srv/data/dir");
+    }
+
+    // The directory path carries the same three failure modes as the file path and had only its success
+    // covered. A reservation that failed while being recorded as a success is how a paste continues into
+    // a subtree it never reserved.
+    [Fact]
+    public async Task CreateDirectoryExclusiveAsync_PathExists_LogsMkdirError_AndRethrowsTheSameInstance()
+    {
+        CapturingOperationLog sink = new();
+        RemoteDestinationExistsException injected = new("/srv/data/dir");
+        RecordingPublisher publisher = new() { PublishException = injected };
+        LoggingRemoteBrowser decorator = Create(new CapableRemoteBrowser(new FakeRemoteBrowser(), publisher), sink);
+
+        Func<Task> reserve = () => decorator.NoClobberPublisher!.CreateDirectoryExclusiveAsync("/srv/data/dir");
+
+        (await reserve.Should().ThrowAsync<RemoteDestinationExistsException>())
+            .Which.Should().BeSameAs(injected);
+
+        AssertSingleErrorRecord(sink, SessionOperationKind.Mkdir, "/srv/data/dir");
+    }
+
+    [Fact]
+    public async Task CreateDirectoryExclusiveAsync_UnconfirmedOutcome_LogsMkdirError_AndRethrowsTheSameInstance()
+    {
+        CapturingOperationLog sink = new();
+        RemoteNoClobberPublishUnavailableException injected = new("/srv/data/dir", "the channel dropped");
+        RecordingPublisher publisher = new() { PublishException = injected };
+        LoggingRemoteBrowser decorator = Create(new CapableRemoteBrowser(new FakeRemoteBrowser(), publisher), sink);
+
+        Func<Task> reserve = () => decorator.NoClobberPublisher!.CreateDirectoryExclusiveAsync("/srv/data/dir");
+
+        (await reserve.Should().ThrowAsync<RemoteNoClobberPublishUnavailableException>())
+            .Which.Should().BeSameAs(injected);
+
+        AssertSingleErrorRecord(sink, SessionOperationKind.Mkdir, "/srv/data/dir");
+    }
+
+    [Fact]
+    public async Task CreateDirectoryExclusiveAsync_Cancelled_LogsMkdirCancelled_AndRethrowsTheSameInstance()
+    {
+        CapturingOperationLog sink = new();
+        OperationCanceledException injected = new();
+        RecordingPublisher publisher = new() { PublishException = injected };
+        LoggingRemoteBrowser decorator = Create(new CapableRemoteBrowser(new FakeRemoteBrowser(), publisher), sink);
+
+        Func<Task> reserve = () => decorator.NoClobberPublisher!.CreateDirectoryExclusiveAsync("/srv/data/dir");
+
+        (await reserve.Should().ThrowAsync<OperationCanceledException>())
+            .Which.Should().BeSameAs(injected);
+
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(SessionOperationKind.Mkdir);
+        record.Result.Should().Be(SessionOperationResult.Cancelled);
+
+        // An Upload record must not stand in for the reservation: the two are different operations and
+        // an operator filtering on Mkdir would see the directory step simply missing.
+        sink.Records.Should().NotContain(candidate => candidate.Op == SessionOperationKind.Upload);
+    }
+
+    private static void AssertSingleErrorRecord(
+        CapturingOperationLog sink,
+        SessionOperationKind expectedKind,
+        string expectedRemotePath)
+    {
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(expectedKind);
+        record.Result.Should().Be(SessionOperationResult.Error);
+        record.RemotePath.Should().Be(expectedRemotePath);
+        record.ErrorCategory.Should().NotBeNull();
+
+        // Never a success, and never the other operation's record standing in for this one.
+        record.Result.Should().NotBe(SessionOperationResult.Success);
+        sink.Records.Should().NotContain(candidate => candidate.Op != expectedKind);
+    }
+
+    // The gate silences the record, never the operation. A publication dropped because logging was off
+    // would turn a preference into data loss.
+    [Fact]
+    public async Task Publish_WhenGateDisabled_StillPublishes_AndRecordsNothing()
+    {
+        string localPath = NewTempFileOfSize(16);
+        CapturingOperationLog sink = new();
+        RecordingPublisher publisher = new();
+        LoggingRemoteBrowser decorator = Create(
+            new CapableRemoteBrowser(new FakeRemoteBrowser(), publisher),
+            sink,
+            gateEnabled: false);
+
+        await decorator.NoClobberPublisher!.PublishFileIfAbsentAsync(localPath, "/srv/data/file.bin");
+
+        publisher.PublishCalls.Should().ContainSingle();
+        sink.Records.Should().BeEmpty();
+    }
+
+    // The undecorated path. When no sink is wired the view returns the raw browser, so a browser that
+    // can publish must keep saying so: the capability probe has to work decorated and undecorated
+    // alike, which is why it is a seam and not a type test.
+    [Fact]
+    public void CreateOperationsBrowser_WithoutASink_ReturnsTheRawBrowserUnwrapped()
+    {
+        string source = ReadRepositoryFile("src/Heimdall.App/Views/EmbeddedSftpView.xaml.cs");
+
+        int methodIndex = source.IndexOf(
+            "private IRemoteBrowser CreateOperationsBrowser(",
+            StringComparison.Ordinal);
+        methodIndex.Should().BeGreaterThanOrEqualTo(0);
+
+        int guardIndex = source.IndexOf("SessionOperationLog is null", methodIndex, StringComparison.Ordinal);
+        int decorateIndex = source.IndexOf("new LoggingRemoteBrowser(", methodIndex, StringComparison.Ordinal);
+        guardIndex.Should().BeGreaterThanOrEqualTo(0);
+        decorateIndex.Should().BeGreaterThan(guardIndex);
+
+        // Between the guard and the decoration there is exactly one early return, and it returns the
+        // browser as it came in. Wrapping it in anything here would drop the inner capability.
+        string guardBlock = source[guardIndex..decorateIndex];
+        guardBlock.Should().Contain("return browser;");
+        guardBlock.Should().NotContain("new LoggingRemoteBrowser(");
+    }
+
+    // The wrapper the view actually hands to the view model, not an isolated normalizer. Two distinct
+    // FTP servers must produce two distinct keys through it: when they both produced the empty key, the
+    // clipboard treated them as one endpoint and routed the paste to the same-server path, which never
+    // consults the no-clobber gate and commits with a replacing rename.
+    [Fact]
+    public void FromConnection_ThroughTheDecorator_KeepsEachFtpEndpointDistinct()
+    {
+        using FtpBrowser first = CreateFtpBrowserAt("ftp-one.example.test", 21, "alice");
+        using FtpBrowser second = CreateFtpBrowserAt("ftp-two.example.test", 2121, "bob");
+        CapturingOperationLog sink = new();
+
+        LoggingRemoteBrowser firstWrapper = Create(first, sink, host: "ftp-one.example.test");
+        LoggingRemoteBrowser secondWrapper = Create(second, sink, host: "ftp-two.example.test");
+
+        string firstKey = RemoteClipboardEndpointKey.FromConnection(
+            firstWrapper, endpoint: string.Empty, sshParams: null);
+        string secondKey = RemoteClipboardEndpointKey.FromConnection(
+            secondWrapper, endpoint: string.Empty, sshParams: null);
+
+        firstKey.Should().Be("protocol=ftp;host=ftp-one.example.test;port=21;user=alice");
+        secondKey.Should().Be("protocol=ftp;host=ftp-two.example.test;port=2121;user=bob");
+        firstKey.Should().NotBeEmpty();
+        secondKey.Should().NotBeEmpty();
+        firstKey.Should().NotBe(secondKey);
+    }
+
+    // A wrapper around a wrapper must keep reaching the raw browser: the identity is resolved through
+    // the inner browser rather than copied once, so nesting cannot quietly erase it.
+    [Fact]
+    public void FromConnection_ThroughTwoDecorators_StillResolvesTheIdentity()
+    {
+        using FtpBrowser inner = CreateFtpBrowserAt("ftp-one.example.test", 21, "alice");
+        CapturingOperationLog sink = new();
+
+        LoggingRemoteBrowser once = Create(inner, sink, host: "ftp-one.example.test");
+        LoggingRemoteBrowser twice = Create(once, sink, host: "ftp-one.example.test");
+
+        RemoteClipboardEndpointKey.FromConnection(twice, endpoint: string.Empty, sshParams: null)
+            .Should().Be("protocol=ftp;host=ftp-one.example.test;port=21;user=alice");
+    }
+
+    // SSH parameters keep priority, so an SFTP session's logical-host identity is not replaced by
+    // whatever socket the browser happens to report.
+    [Fact]
+    public void FromConnection_WithSshParams_PrefersTheSshIdentity()
+    {
+        using FtpBrowser inner = CreateFtpBrowserAt("ftp-one.example.test", 21, "alice");
+        CapturingOperationLog sink = new();
+        LoggingRemoteBrowser wrapper = Create(inner, sink);
+        SshConnectionParams sshParams = new()
+        {
+            Host = "sftp.example.test",
+            Port = 22,
+            Username = "carol",
+        };
+
+        RemoteClipboardEndpointKey.FromConnection(wrapper, endpoint: string.Empty, sshParams)
+            .Should().Be(RemoteClipboardEndpointKey.FromSsh(sshParams));
+    }
+
+    /// <summary>
+    /// Builds a disconnected <see cref="FtpBrowser"/> carrying the endpoint metadata of a connected one.
+    /// </summary>
+    /// <remarks>
+    /// The fields are set directly because connecting would need a real FTP server. What is under test
+    /// is the identity chain through the decorator, not the transport: the browser only has to report
+    /// the same host/port/user a connected one would.
+    /// </remarks>
+    private static FtpBrowser CreateFtpBrowserAt(string host, int port, string username)
+    {
+        FtpBrowser browser = new();
+        SetPrivateField(browser, "_host", host);
+        SetPrivateField(browser, "_port", port);
+        SetPrivateField(browser, "_username", username);
+
+        browser.Host.Should().Be(host, "the metadata seam must still exist for this oracle to mean anything");
+        browser.Port.Should().Be(port);
+        browser.Username.Should().Be(username);
+
+        return browser;
+    }
+
+    private static void SetPrivateField(object target, string fieldName, object value)
+    {
+        FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException(
+                $"{target.GetType().Name}.{fieldName} was not found; this oracle would be vacuous");
+        field.SetValue(target, value);
+    }
+
+    private static string ReadRepositoryFile(string relativePath)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        directory.Should().NotBeNull("a source oracle that reads nothing proves nothing");
+
+        return File.ReadAllText(Path.Combine(directory!.FullName, relativePath));
+    }
+
+    private sealed class RecordingPublisher : IRemoteNoClobberPublisher
+    {
+        public List<(string LocalPath, string RemotePath)> PublishCalls { get; } = [];
+
+        public List<string> ReserveCalls { get; } = [];
+
+        /// <summary>When set, the publication fails with this exception.</summary>
+        public Exception? PublishException { get; set; }
+
+        public Task PublishFileIfAbsentAsync(string localPath, string remotePath, CancellationToken ct = default)
+        {
+            PublishCalls.Add((localPath, remotePath));
+            return PublishException is null ? Task.CompletedTask : Task.FromException(PublishException);
+        }
+
+        public Task CreateDirectoryExclusiveAsync(string remotePath, CancellationToken ct = default)
+        {
+            ReserveCalls.Add(remotePath);
+            return PublishException is null ? Task.CompletedTask : Task.FromException(PublishException);
+        }
+    }
+
+    /// <summary>
+    /// A browser that carries the no-clobber capability, so the decorator has something to forward.
+    /// </summary>
+    private sealed class CapableRemoteBrowser : IRemoteBrowser, IRemoteNoClobberCapability
+    {
+        private readonly FakeRemoteBrowser _inner;
+
+        internal CapableRemoteBrowser(FakeRemoteBrowser inner, IRemoteNoClobberPublisher? publisher)
+        {
+            _inner = inner;
+            NoClobberPublisher = publisher;
+        }
+
+        public IRemoteNoClobberPublisher? NoClobberPublisher { get; }
+
+        public event Action<string>? DirectoryChanged
+        {
+            add => _inner.DirectoryChanged += value;
+            remove => _inner.DirectoryChanged -= value;
+        }
+
+        public event Action<SftpTransferProgress>? TransferProgress
+        {
+            add => _inner.TransferProgress += value;
+            remove => _inner.TransferProgress -= value;
+        }
+
+        public event Action<RemoteOperationWarning>? OperationWarningRaised
+        {
+            add => _inner.OperationWarningRaised += value;
+            remove => _inner.OperationWarningRaised -= value;
+        }
+
+        public event Action<string?>? Disconnected
+        {
+            add => _inner.Disconnected += value;
+            remove => _inner.Disconnected -= value;
+        }
+
+        public string CurrentDirectory => _inner.CurrentDirectory;
+
+        public bool IsConnected => _inner.IsConnected;
+
+        public Task<IReadOnlyList<SftpFileInfo>> ListDirectoryAsync(string? path = null, CancellationToken ct = default)
+            => _inner.ListDirectoryAsync(path, ct);
+
+        public Task<string> GetCurrentDirectoryAsync(CancellationToken ct = default)
+            => _inner.GetCurrentDirectoryAsync(ct);
+
+        public Task ChangeDirectoryAsync(string path, CancellationToken ct = default)
+            => _inner.ChangeDirectoryAsync(path, ct);
+
+        public Task DownloadFileAsync(string remotePath, string localPath, CancellationToken ct = default)
+            => _inner.DownloadFileAsync(remotePath, localPath, ct);
+
+        public Task UploadFileAsync(string localPath, string remotePath, CancellationToken ct = default)
+            => _inner.UploadFileAsync(localPath, remotePath, ct);
+
+        public Task CreateDirectoryAsync(string path, CancellationToken ct = default)
+            => _inner.CreateDirectoryAsync(path, ct);
+
+        public Task DeleteAsync(string path, CancellationToken ct = default) => _inner.DeleteAsync(path, ct);
+
+        public Task ChmodAsync(string path, short mode, CancellationToken ct = default)
+            => _inner.ChmodAsync(path, mode, ct);
+
+        public Task RenameAsync(string oldPath, string newPath, CancellationToken ct = default)
+            => _inner.RenameAsync(oldPath, newPath, ct);
+
+        public Task CopyAsync(string sourcePath, string destinationPath, bool recursive, CancellationToken ct = default)
+            => _inner.CopyAsync(sourcePath, destinationPath, recursive, ct);
+
+        public void Disconnect() => _inner.Disconnect();
+
+        public void Dispose() => _inner.Dispose();
     }
 
     private sealed class CapturingOperationLog : ISessionOperationLog

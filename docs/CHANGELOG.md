@@ -12,6 +12,36 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-17: a cross-endpoint paste can no longer overwrite what it did not see
+
+- **Pasting between two remote endpoints no longer replaces existing files** (P1). Destination names
+  were resolved from the pane's cached listing while the transfer itself used a plain upload, which
+  truncates whatever sits at the destination. Anything created since the last refresh was invisible
+  to the naming step and was overwritten without a prompt.
+- **Every node is now reserved exclusively.** A file is staged and published with a hard link; a
+  directory is created with `mkdir` without `-p`. Both fail when the name is taken, and the server
+  decides, not a client-side check. The merge tolerance that let a paste continue into an existing
+  destination directory is gone: merging is how the collision simply moved one level down.
+- **FTP refuses before mutating anything.** It has no commit-time primitive that fails when the
+  destination exists, so it does not advertise the capability and the paste stops before any
+  directory is created or any byte is sent, rather than pretending to a guarantee it cannot keep.
+- **Two different FTP servers are no longer mistaken for one.** The clipboard's endpoint identity was
+  derived from a type test on the browser, which stopped matching once the operations-log decorator
+  wrapped it: every FTP pane got the same empty key, so a paste between two FTP hosts was routed to
+  the same-endpoint path and bypassed the gate entirely. Identity now travels through a seam the
+  decorators carry, and an identity that cannot be determined is never treated as a match, so an
+  unknown endpoint fails closed on the cross-endpoint path instead of silently overwriting.
+- **Listings no longer carry authority.** The destination is read live, but only to pick a free
+  name; a listing is stale the moment it returns and no safety decision rests on it.
+- **A cut keeps its source unless the move is confirmed.** A collision, a cancellation or an
+  unconfirmed outcome all keep the source and the clipboard entry, and Heimdall asks for the
+  destination to be reloaded so that what landed becomes visible when the session and the listing are
+  still available. A reload that fails never turns an unconfirmed outcome into a success.
+- **Limits, stated plainly.** Atomicity is per node, not transactional across a tree, so an
+  interrupted paste can leave a partial tree rather than risk a destructive cleanup. Provenance is
+  not guaranteed against a malicious actor holding write permission in the same directory. No real
+  SFTP server is exercised by the test suite. See `docs/SECURITY.md`.
+
 ## 2026-08-17: a server-side copy is the only copy, on every protocol
 
 - **The SFTP copy no longer falls back to a transfer that could overwrite** (SFTP-013). The copy is

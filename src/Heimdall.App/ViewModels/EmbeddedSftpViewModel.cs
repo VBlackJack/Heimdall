@@ -3143,8 +3143,29 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Whether the clipboard came from this very endpoint, so a paste may use same-server operations.
+    /// </summary>
+    /// <remarks>
+    /// An unknown identity is never treated as a match. Two blank keys are not evidence of one server;
+    /// they are evidence of two servers nobody could name, and answering <c>true</c> there routes a paste
+    /// between different hosts through the same-endpoint path, which never consults the no-clobber gate
+    /// and commits with a replacing rename or copy.
+    /// <para>
+    /// An unknown identity therefore falls through to the cross-endpoint path, which either publishes
+    /// exclusively or refuses. This is defence in depth: it holds even if a transport later stops
+    /// reporting its endpoint metadata, so losing an identity can degrade the experience but can never
+    /// silently reopen an overwrite.
+    /// </para>
+    /// </remarks>
     private bool IsClipboardForCurrentEndpoint(SftpClipboardContent clipboard)
     {
+        if (string.IsNullOrWhiteSpace(EndpointKey)
+            || string.IsNullOrWhiteSpace(clipboard.SourceEndpointKey))
+        {
+            return false;
+        }
+
         return string.Equals(clipboard.SourceEndpointKey, EndpointKey, StringComparison.Ordinal);
     }
 

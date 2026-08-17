@@ -1088,6 +1088,16 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.Equal(0, browser.ListDirectoryCallCount);
     }
 
+    // A declared same-endpoint identity, built with the production primitive so the tests cannot drift
+    // from how the application forms a key. These five tests copy or cut from a pane and paste back into
+    // the same pane, so they must say so: an undeclared identity is deliberately NOT treated as a match,
+    // because two unnamed endpoints are two servers nobody could identify, not one.
+    private static readonly string SameEndpointKey = RemoteClipboardEndpointKey.FromParts(
+        "sftp",
+        "same-endpoint.example.test",
+        22,
+        "alice");
+
     [Fact]
     public void CutSelectedCommand_CapturesSelectionAndSourceDirectoryAsCut()
     {
@@ -1095,6 +1105,7 @@ public sealed class EmbeddedSftpViewModelTests
         EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/src" };
         SftpFileInfo entry = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
         viewModel.SetSelection([entry], entry);
+        SetEndpointKey(viewModel, SameEndpointKey);
 
         viewModel.CutSelectedCommand.Execute(null);
 
@@ -1103,6 +1114,11 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.Equal(SftpClipboardMode.Cut, viewModel.Clipboard!.Mode);
         Assert.Equal("/src", viewModel.Clipboard.SourceDirectory);
         Assert.Single(viewModel.Clipboard.Entries);
+
+        // The captured content carries the declared identity: without it the paste below would be
+        // routed cross-endpoint, which is what an unnamed endpoint deliberately does.
+        Assert.Equal(SameEndpointKey, viewModel.Clipboard.SourceEndpointKey);
+        Assert.NotEmpty(viewModel.Clipboard.SourceEndpointKey);
     }
 
     [Fact]
@@ -1128,6 +1144,7 @@ public sealed class EmbeddedSftpViewModelTests
         SetBrowser(viewModel, browser);
         SftpFileInfo directory = CreateRemoteEntry("project", "/src/project", isDirectory: true);
         viewModel.SetSelection([directory], directory);
+        SetEndpointKey(viewModel, SameEndpointKey);
         viewModel.CopySelectedCommand.Execute(null);
 
         viewModel.CurrentPath = "/dst";
@@ -1151,6 +1168,7 @@ public sealed class EmbeddedSftpViewModelTests
         SetBrowser(viewModel, browser);
         SftpFileInfo file = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
         viewModel.SetSelection([file], file);
+        SetEndpointKey(viewModel, SameEndpointKey);
         viewModel.CutSelectedCommand.Execute(null);
 
         viewModel.CurrentPath = "/dst";
@@ -1174,6 +1192,7 @@ public sealed class EmbeddedSftpViewModelTests
         SetBrowser(viewModel, browser);
         SftpFileInfo file = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
         viewModel.SetSelection([file], file);
+        SetEndpointKey(viewModel, SameEndpointKey);
         viewModel.CutSelectedCommand.Execute(null);
 
         // Paste back into the same directory; the listing still contains the entry itself.
@@ -1214,6 +1233,7 @@ public sealed class EmbeddedSftpViewModelTests
         SftpFileInfo b = CreateRemoteEntry("b.txt", "/src/b.txt", isDirectory: false);
         SftpFileInfo c = CreateRemoteEntry("c.txt", "/src/c.txt", isDirectory: false);
         viewModel.SetSelection([a, b, c], a);
+        SetEndpointKey(viewModel, SameEndpointKey);
         viewModel.CutSelectedCommand.Execute(null);
 
         viewModel.CurrentPath = "/dst";
@@ -1646,6 +1666,18 @@ public sealed class EmbeddedSftpViewModelTests
         string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         return root;
+    }
+
+    /// <summary>
+    /// Declares the pane's clipboard endpoint identity, as the application does when a session opens.
+    /// </summary>
+    private static void SetEndpointKey(EmbeddedSftpViewModel viewModel, string endpointKey)
+    {
+        MethodInfo? method = typeof(EmbeddedSftpViewModel).GetMethod(
+            "SetEndpointKey",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(viewModel, [endpointKey]);
     }
 
     private static void SetBrowser(EmbeddedSftpViewModel viewModel, IRemoteBrowser browser)

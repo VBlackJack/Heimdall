@@ -312,6 +312,21 @@ public sealed partial class EmbeddedSftpViewModel
             return;
         }
 
+        // Before anything is created on the destination, and asked through the capability seam rather
+        // than by testing the browser's type: the browser may be wrapped by the operations-log
+        // decorator, and a type test would answer about the wrapper. A transport that cannot publish
+        // without replacing does not paste at all. Names here are resolved from a listing, which is a
+        // snapshot; without an exclusive publish the only thing between the user and an overwritten
+        // file is how old that snapshot is.
+        IRemoteNoClobberPublisher? publisher =
+            (_browser as IRemoteNoClobberCapability)?.NoClobberPublisher;
+        if (publisher is null)
+        {
+            await RunOnUiAsync(() => SetErrorStatus(NoClobberUnsupportedStatus()))
+                .ConfigureAwait(false);
+            return;
+        }
+
         TransferProgressValue = 0;
 
         bool cut = clipboard.Mode == SftpClipboardMode.Cut;
@@ -334,9 +349,14 @@ public sealed partial class EmbeddedSftpViewModel
         try
         {
             string targetDirectory = CurrentPath;
-            var existingNames = new HashSet<string>(
-                UnfilteredEntries.Select(entry => entry.Name),
-                StringComparer.Ordinal);
+
+            // Read live from the destination, never from the cached UI listing. The cached listing is
+            // whatever the pane last displayed, so a name it does not know about produces a destination
+            // path that already exists. This read only chooses a name: no security decision rests on
+            // it, because it can go stale the moment it returns. The guarantee is the exclusive
+            // reservation of each node below.
+            HashSet<string> existingNames = await ReadLiveDestinationNamesAsync(targetDirectory, ct)
+                .ConfigureAwait(false);
 
             int totalEntries = clipboard.Entries.Count;
             for (int index = 0; index < totalEntries; index++)
@@ -350,12 +370,17 @@ public sealed partial class EmbeddedSftpViewModel
                 TransferStatusText = TransferringEntryStatus(entry.Name, index + 1, totalEntries);
                 RemoteTransferPlan plan = await TransferCrossEndpointRootAsync(
                     sourceBrowser,
+                    publisher,
                     plannedRoot,
                     targetDirectory,
                     ct)
                     .ConfigureAwait(false);
                 skippedUnsupportedPaths.UnionWith(plan.SkippedUnsupportedPaths);
 
+                // Reached only when every node of this root was published, because a collision and an
+                // unconfirmed outcome both throw out of the call above. An unconfirmed publication in
+                // particular must never authorise this: the destination may hold the file, or not, and
+                // deleting the source on a maybe is how the only copy disappears.
                 if (cut && plan.SkippedUnsupportedPaths.Count == 0)
                 {
                     bool sourceDeleted = await DeleteCrossEndpointSourceAsync(
@@ -379,28 +404,14 @@ public sealed partial class EmbeddedSftpViewModel
                 }
             }
 
-            if (cut)
-            {
-                List<SftpFileInfo> remaining = clipboard.Entries
-                    .Where(entry => !processedCutSources.Contains(entry.FullPath))
-                    .ToList();
+            await ReconcileCutClipboardAsync(clipboard, cut, processedCutSources).ConfigureAwait(false);
 
-                await RunOnUiAsync(() =>
-                {
-                    if (remaining.Count > 0)
-                    {
-                        _remoteClipboard.Set(clipboard with { Entries = remaining });
-                    }
-                    else
-                    {
-                        _remoteClipboard.Clear();
-                    }
-                }).ConfigureAwait(false);
-            }
-
+            // Refresh first, status last. A refresh reloads the directory and reports Ready when the
+            // listing succeeds, so any status written before it is overwritten by the outcome of an
+            // unrelated operation.
+            await RefreshAfterPasteAsync().ConfigureAwait(false);
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusPasteComplete")))
                 .ConfigureAwait(false);
-            await Refresh().ConfigureAwait(false);
 
             List<string> completionWarnings = [];
             if (skippedUnsupportedPaths.Count > 0)
@@ -429,38 +440,31 @@ public sealed partial class EmbeddedSftpViewModel
                 await RunOnUiAsync(() => ShowOperationWarning(warning)).ConfigureAwait(false);
             }
         }
+        // Every exit below has begun processing, so all three reconcile the cut clipboard, attempt a
+        // refresh of the destination, and only then state the outcome. A cancellation is not proof that
+        // nothing landed: a link or a directory reservation can have taken effect before the answer was
+        // lost, so a reload is attempted and the current source is kept exactly as for an unconfirmed
+        // outcome. The reload is best-effort: a disconnected session or a failing listing leaves the view
+        // as it was, which never changes the outcome and never authorises deleting a source.
         catch (OperationCanceledException)
         {
+            await ReconcileCutClipboardAsync(clipboard, cut, processedCutSources).ConfigureAwait(false);
+            await RefreshAfterPasteAsync().ConfigureAwait(false);
             await RunOnUiAsync(() =>
                 UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled"))
                 .ConfigureAwait(false);
         }
         catch (SourceSessionUnavailableException)
         {
+            await ReconcileCutClipboardAsync(clipboard, cut, processedCutSources).ConfigureAwait(false);
+            await RefreshAfterPasteAsync().ConfigureAwait(false);
             await RunOnUiAsync(() => SetErrorStatus(SourceSessionUnavailableStatus()))
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            if (cut)
-            {
-                List<SftpFileInfo> remaining = clipboard.Entries
-                    .Where(entry => !processedCutSources.Contains(entry.FullPath))
-                    .ToList();
-
-                await RunOnUiAsync(() =>
-                {
-                    if (remaining.Count > 0)
-                    {
-                        _remoteClipboard.Set(clipboard with { Entries = remaining });
-                    }
-                    else
-                    {
-                        _remoteClipboard.Clear();
-                    }
-                }).ConfigureAwait(false);
-            }
-
+            await ReconcileCutClipboardAsync(clipboard, cut, processedCutSources).ConfigureAwait(false);
+            await RefreshAfterPasteAsync().ConfigureAwait(false);
             await RunOnUiAsync(() => SetTransferError(ex)).ConfigureAwait(false);
         }
         finally
@@ -469,8 +473,81 @@ public sealed partial class EmbeddedSftpViewModel
         }
     }
 
+    /// <summary>
+    /// Rebuilds the cut clipboard from the sources that were actually removed.
+    /// </summary>
+    /// <remarks>
+    /// Called on every exit that began processing, successful or not. Without it, an abnormal exit after
+    /// a first root has been published and its source deleted leaves that root in the clipboard pointing
+    /// at a path that no longer exists, and the next paste fails on a source it can no longer read.
+    /// <para>
+    /// Only roots whose source was genuinely deleted are dropped. The root being processed when the
+    /// interruption arrived stays, along with every root not yet reached: an ambiguous publication or
+    /// reservation must never remove an entry, because the entry is the user's record that the move did
+    /// not demonstrably complete.
+    /// </para>
+    /// </remarks>
+    private Task ReconcileCutClipboardAsync(
+        SftpClipboardContent clipboard,
+        bool cut,
+        HashSet<string> processedCutSources)
+    {
+        if (!cut)
+        {
+            return Task.CompletedTask;
+        }
+
+        List<SftpFileInfo> remaining = clipboard.Entries
+            .Where(entry => !processedCutSources.Contains(entry.FullPath))
+            .ToList();
+
+        return RunOnUiAsync(() =>
+        {
+            if (remaining.Count > 0)
+            {
+                _remoteClipboard.Set(clipboard with { Entries = remaining });
+            }
+            else
+            {
+                _remoteClipboard.Clear();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Reloads the destination directory after a paste, without letting the reload decide the outcome.
+    /// </summary>
+    /// <remarks>
+    /// The reload is best-effort in two distinct ways, and neither ever changes the paste's verdict.
+    /// <see cref="LoadDirectoryCoreAsync"/> already returns without listing when a load is in flight or
+    /// the session is disconnected, so "refreshed" can legitimately mean "nothing happened". The catch
+    /// below is defence in depth rather than a path reached today: that method handles its own failures
+    /// and is not expected to throw, and if it ever did, the transfer's result would still be what the
+    /// user needs to see.
+    /// </remarks>
+    private async Task RefreshAfterPasteAsync()
+    {
+        try
+        {
+            await Refresh().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSFTP could not refresh the destination after a cross-endpoint paste: {ex.GetType().Name}");
+        }
+    }
+
+    /// <summary>
+    /// Status shown when the destination transport cannot publish without replacing an existing entry.
+    /// </summary>
+    private string NoClobberUnsupportedStatus()
+        => _localizer?["SftpErrorPasteNoClobberUnsupported"]
+            ?? "This session cannot paste without risking overwriting existing files.";
+
     private async Task<RemoteTransferPlan> TransferCrossEndpointRootAsync(
         IRemoteBrowser sourceBrowser,
+        IRemoteNoClobberPublisher publisher,
         SftpFileInfo root,
         string targetDirectory,
         CancellationToken ct)
@@ -490,52 +567,54 @@ public sealed partial class EmbeddedSftpViewModel
 
             if (op.Kind == RemoteTransferOpKind.MakeDirectory)
             {
-                await CreateCrossEndpointDirectoryAsync(op.DestinationRemotePath, ct).ConfigureAwait(false);
+                await CreateCrossEndpointDirectoryAsync(publisher, op.DestinationRemotePath, ct)
+                    .ConfigureAwait(false);
                 continue;
             }
 
             transferredFiles++;
             string fileName = Path.GetFileName(op.SourceRemotePath);
             TransferStatusText = TransferringEntryStatus(fileName, transferredFiles, totalFiles);
-            await TransferCrossEndpointFileAsync(sourceBrowser, op, ct).ConfigureAwait(false);
+            await TransferCrossEndpointFileAsync(sourceBrowser, publisher, op, ct).ConfigureAwait(false);
         }
 
         return plan;
     }
 
-    private async Task CreateCrossEndpointDirectoryAsync(string destinationPath, CancellationToken ct)
-    {
-        if (_browser is null)
-        {
-            return;
-        }
+    /// <summary>
+    /// Reserves one destination directory exclusively, refusing rather than merging into an existing one.
+    /// </summary>
+    /// <remarks>
+    /// The merge tolerance this used to carry is removed on purpose. Continuing into a directory that
+    /// already exists is precisely how a paste ends up writing into a subtree it never reserved: every
+    /// file below it is then placed among entries that belong to somebody else, and the collision it was
+    /// meant to avoid simply moves one level down.
+    /// <para>
+    /// A tree that fails partway is therefore left incomplete. That is the lesser harm: a recursive
+    /// cleanup of a directory this paste created could delete entries another party added inside it in
+    /// the meantime.
+    /// </para>
+    /// </remarks>
+    private static Task CreateCrossEndpointDirectoryAsync(
+        IRemoteNoClobberPublisher publisher,
+        string destinationPath,
+        CancellationToken ct)
+        => publisher.CreateDirectoryExclusiveAsync(destinationPath, ct);
 
-        try
-        {
-            await _browser.CreateDirectoryAsync(destinationPath, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            if (!await RemoteDirectoryExistsAsync(_browser, destinationPath, ct).ConfigureAwait(false))
-            {
-                throw;
-            }
-
-            Core.Logging.FileLogger.Info(
-                $"EmbeddedSFTP cross-server paste merge: remote directory already exists, continuing: {destinationPath}");
-        }
-    }
-
+    /// <summary>
+    /// Downloads one source file and publishes it at its destination, which must not already exist.
+    /// </summary>
+    /// <remarks>
+    /// The publication replaces the plain upload this used to perform. An upload carries no existence
+    /// contract: it truncates whatever sits at the destination, and the destination name was chosen from
+    /// a listing that may already be out of date by the time the bytes arrive.
+    /// </remarks>
     private async Task TransferCrossEndpointFileAsync(
         IRemoteBrowser sourceBrowser,
+        IRemoteNoClobberPublisher publisher,
         RemoteTransferOp op,
         CancellationToken ct)
     {
-        if (_browser is null)
-        {
-            return;
-        }
-
         string localTemp = CreateCrossEndpointTempPath();
         try
         {
@@ -549,12 +628,38 @@ public sealed partial class EmbeddedSftpViewModel
                 throw new SourceSessionUnavailableException(ex);
             }
 
-            await _browser.UploadFileAsync(localTemp, op.DestinationRemotePath, ct).ConfigureAwait(false);
+            await publisher.PublishFileIfAbsentAsync(localTemp, op.DestinationRemotePath, ct)
+                .ConfigureAwait(false);
         }
         finally
         {
             TryDeleteCrossEndpointTempPath(localTemp);
         }
+    }
+
+    /// <summary>
+    /// Lists the destination directory live, for choosing non-colliding names only.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not <c>UnfilteredEntries</c>: that collection is what the pane last rendered, so a
+    /// file created since the last refresh is invisible to it and the name built from it collides. This
+    /// listing is not a safety check either, and nothing may treat it as one: it is stale the instant it
+    /// returns. It only avoids the common case of a name already in use.
+    /// </remarks>
+    private async Task<HashSet<string>> ReadLiveDestinationNamesAsync(
+        string targetDirectory,
+        CancellationToken ct)
+    {
+        if (_browser is null)
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        IReadOnlyList<SftpFileInfo> entries = await _browser
+            .ListDirectoryAsync(targetDirectory, ct)
+            .ConfigureAwait(false);
+
+        return new HashSet<string>(entries.Select(entry => entry.Name), StringComparer.Ordinal);
     }
 
     private static async Task<IReadOnlyList<SftpFileInfo>> ListCrossEndpointSourceDirectoryAsync(
