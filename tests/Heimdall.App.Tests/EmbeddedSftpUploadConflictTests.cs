@@ -94,7 +94,11 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Null(item.ExistingTargetKind);
     }
 
+    // Unknown and an out-of-range value are listed separately on purpose: only the second one dies if
+    // the switch loses its default arm, which is the shape that let an unclassified destination through.
     [Theory]
+    [InlineData(RemoteEntryKind.Unknown)]
+    [InlineData((RemoteEntryKind)int.MaxValue)]
     [InlineData(RemoteEntryKind.SymbolicLink)]
     [InlineData(RemoteEntryKind.Fifo)]
     [InlineData(RemoteEntryKind.Socket)]

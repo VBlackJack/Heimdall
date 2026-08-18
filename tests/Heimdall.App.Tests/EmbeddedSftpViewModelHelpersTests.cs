@@ -49,7 +49,10 @@ public sealed class EmbeddedSftpViewModelHelpersTests
         Assert.Equal(expected, actual);
     }
 
+    // The converter calls this from a per-row binding, so an unhandled value used to throw inside the
+    // layout pass rather than simply displaying a type.
     [Theory]
+    [InlineData(RemoteEntryKind.Unknown, "SftpPropertiesTypeUnknown")]
     [InlineData(RemoteEntryKind.File, "SftpPropertiesTypeFile")]
     [InlineData(RemoteEntryKind.Directory, "SftpPropertiesTypeDirectory")]
     [InlineData(RemoteEntryKind.SymbolicLink, "SftpPropertiesTypeSymlink")]

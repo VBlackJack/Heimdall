@@ -132,6 +132,72 @@ public sealed class FtpBrowserParsingTests
         Assert.Equal(RemoteEntryKind.SymbolicLink, entry.Kind);
     }
 
+    // The explicit regular-file type character. Without this the '-' arm is indistinguishable from the
+    // mode-only path that also answers File, so nothing would notice if it stopped classifying.
+    [Theory]
+    [InlineData("-rw-r--r--", RemoteEntryKind.File)]
+    [InlineData("drwxr-xr-x", RemoteEntryKind.Directory)]
+    [InlineData("lrwxrwxrwx", RemoteEntryKind.SymbolicLink)]
+    public void MapFtpItemToFileInfo_ExplicitTypeCharacter_MapsThatType(
+        string rawPermissions,
+        RemoteEntryKind expectedKind)
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "entry",
+            Type = FtpObjectType.File,
+            RawPermissions = rawPermissions,
+        };
+
+        Assert.Equal(expectedKind, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+    }
+
+    // A nine-character value is mode-only and carries no type character at all. Reading its first
+    // character as a type would classify an ordinary file by whichever permission bit came first, so a
+    // mode-only listing must keep the type the library reported.
+    [Fact]
+    public void MapFtpItemToFileInfo_FileTypeWithModeOnlyPermissions_StaysAFile()
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "notes.txt",
+            Type = FtpObjectType.File,
+            RawPermissions = "rw-r--r--",
+        };
+
+        Assert.Equal(RemoteEntryKind.File, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+    }
+
+    // A type value this build cannot interpret, with nothing in the listing to rescue it. Answering
+    // "file" here is what made an unclassifiable entry transferable.
+    [Fact]
+    public void MapFtpItemToFileInfo_UnrecognisedObjectTypeWithoutPermissions_IsUnknown()
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "mystery",
+            Type = (FtpObjectType)999,
+            RawPermissions = string.Empty,
+        };
+
+        Assert.Equal(RemoteEntryKind.Unknown, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+    }
+
+    // The server did state a type character and this build does not recognise it. That is a positive
+    // statement that the entry is not a regular file, not an absence of information.
+    [Fact]
+    public void MapFtpItemToFileInfo_UnrecognisedTypeCharacter_IsUnknown()
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "mystery",
+            Type = FtpObjectType.File,
+            RawPermissions = "?rw-r--r--",
+        };
+
+        Assert.Equal(RemoteEntryKind.Unknown, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+    }
+
     [Theory]
     [InlineData("prw-r--r--", RemoteEntryKind.Fifo)]
     [InlineData("srw-r--r--", RemoteEntryKind.Socket)]

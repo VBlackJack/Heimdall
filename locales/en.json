@@ -916,6 +916,7 @@
   "SftpPropertiesTypeSymlink": "Symbolic link",
   "SftpPropertiesTypeFifo": "Named pipe (FIFO)",
   "SftpPropertiesTypeSocket": "Socket",
+  "SftpPropertiesTypeUnknown": "Unknown type",
   "SftpPropertiesTypeDevice": "Device",
   "SftpPropertiesSize": "Size:",
   "SftpPropertiesModified": "Modified:",

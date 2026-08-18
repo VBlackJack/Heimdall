@@ -364,6 +364,32 @@ assignments, token / bearer assignments to end-of-line, and `-pw` / `-pwfile`
 flags so an unexpected stderr echo from plink cannot leak credentials into
 the application log.
 
+### Remote entries whose type cannot be determined
+
+A listing classifies each remote entry: regular file, directory, symbolic link, pipe, socket, device.
+When every one of those tests fails, the entry is reported as **unclassifiable** rather than as a
+regular file. That kind is the enum's zero value, so an uninitialised or unmapped value is the
+non-transferable one and a forgotten branch fails closed rather than open.
+
+An unclassifiable entry is refused by the application orchestration and by the guarded SFTP path: it
+is excluded from the transferable inventory, so it is not uploaded onto, not downloaded, not pasted
+and not duplicated, and the SFTP upload guard refuses it explicitly. It is shown with a distinct icon
+so it is not mistaken for a file. Renaming remains available, as it does for a pipe or a socket,
+because a rename moves a name and neither reads nor writes the object's content.
+
+The exact bound: this covers the SFTP listing's own classification and the FTP listing mapper. On
+FTP, a permission string of nine characters is mode-only and carries no type character, so it is not
+read as one; a string of ten characters or more does carry one first (the extra character of the
+`-rw-r--r--+` ACL and `.` SELinux forms comes last), and a type character this build does not recognise
+makes the entry unclassifiable. What this does **not** add is a type guard on the FTP
+upload path itself: `EnsureUploadTargetSupported` is still called only from the SFTP browser, so an
+FTP upload does not consult the destination's kind at all. That gap predates this change and applies
+equally to links, pipes, sockets and devices; it is tracked separately and is not closed here.
+
+The `ls`-based listing used for sudo browsing is unaffected: it already skips any line whose type
+character is not one it recognises. Those lines are dropped from the listing entirely; they are not
+classified as unclassifiable, and this skip should not be read as producing that kind.
+
 ### Cross-endpoint clipboard paste
 
 A paste between two different remote endpoints downloads each source file and puts it on the

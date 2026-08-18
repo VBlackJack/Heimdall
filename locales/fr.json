@@ -916,6 +916,7 @@
   "SftpPropertiesTypeSymlink": "Lien symbolique",
   "SftpPropertiesTypeFifo": "Tube nomm\u00e9 (FIFO)",
   "SftpPropertiesTypeSocket": "Socket",
+  "SftpPropertiesTypeUnknown": "Type inconnu",
   "SftpPropertiesTypeDevice": "P\u00e9riph\u00e9rique",
   "SftpPropertiesSize": "Taille :",
   "SftpPropertiesModified": "Modifi\u00e9 :",

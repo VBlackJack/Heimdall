@@ -1783,9 +1783,12 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             return RemoteEntryKind.File;
         }
 
+        // Every positive test failed, so nothing about this entry says it holds file content. Calling
+        // it a file was the defect: it made an object nobody could classify transferable like any
+        // other, and the file-only paths downstream had no way to tell the difference.
         Heimdall.Core.Logging.FileLogger.Debug(
-            $"SftpBrowser: treating unrecognized remote entry type as a file: {entry.FullName}");
-        return RemoteEntryKind.File;
+            $"SftpBrowser: remote entry type could not be determined: {entry.FullName}");
+        return RemoteEntryKind.Unknown;
     }
 
     private static string FormatPermissions(ISftpFile entry)
