@@ -79,6 +79,84 @@ public sealed class WorkspaceLockServiceTests : IAsyncLifetime
         return service;
     }
 
+    // The enrolment moved from the main view model onto this service. Type-metadata guards prove the
+    // dependency exists; they cannot tell a real delegation from a method that returns a completed task.
+    // These exercise the actual lifecycle with a fake Hello platform, so a hollowed-out delegation fails.
+    [Fact]
+    public async Task EnrollHelloAsync_UnlockedVault_DelegatesAndPersistsTheEnrollment()
+    {
+        RecordingHelloService hello = new();
+        using VaultLifecycleService lifecycle = new(_configManager, hello);
+        await lifecycle.UnlockAsync(MasterPassword.ToCharArray());
+        Assert.True(lifecycle.IsUnlocked);
+
+        using WorkspaceLockService service = new(lifecycle);
+        service.Configure(vaultEnabled: true, autoLockIdleMinutes: 0, disconnectOnLock: false);
+        int lockStateEvents = 0;
+        service.LockStateChanged += () => lockStateEvents++;
+
+        await service.EnrollHelloAsync();
+
+        // The platform was actually asked to enrol, exactly once.
+        Assert.Equal(1, hello.EnrollCalls);
+
+        // ...and its answer was persisted, checked on sentinel values only this fake produces.
+        AppSettings persisted = await _configManager.LoadSettingsAsync();
+        Assert.True(persisted.VaultHelloEnrolled);
+        Assert.Equal(RecordingHelloService.SentinelWrappedDek, persisted.VaultHelloWrappedDek);
+        Assert.Equal(RecordingHelloService.SentinelCredentialName, persisted.VaultHelloCredentialName);
+        Assert.Equal(RecordingHelloService.SentinelPublicKeyHash, persisted.VaultHelloPublicKeyHash);
+
+        // Enrolment is not an unlock: the locked state is untouched and nobody is told otherwise.
+        Assert.False(service.IsWorkspaceLocked);
+        Assert.Equal(0, lockStateEvents);
+    }
+
+    // A locked workspace must not enrol: the vault has no usable key, and the refusal has to come from
+    // the real lifecycle rather than from a guard this service invented.
+    [Fact]
+    public async Task EnrollHelloAsync_LockedWorkspace_PropagatesTheRefusalAndStaysLocked()
+    {
+        RecordingHelloService hello = new();
+        using VaultLifecycleService lifecycle = new(_configManager, hello);
+        await lifecycle.UnlockAsync(MasterPassword.ToCharArray());
+
+        using WorkspaceLockService service = new(lifecycle);
+        service.Configure(vaultEnabled: true, autoLockIdleMinutes: 0, disconnectOnLock: false);
+        service.Lock();
+        Assert.True(service.IsWorkspaceLocked);
+
+        // Subscribed after the initial lock, so only a spurious later transition would be counted.
+        int lockStateEvents = 0;
+        service.LockStateChanged += () => lockStateEvents++;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.EnrollHelloAsync());
+
+        Assert.Equal(0, hello.EnrollCalls);
+        Assert.True(service.IsWorkspaceLocked);
+        Assert.Equal(0, lockStateEvents);
+    }
+
+    // The token must reach the platform, not be dropped on the way.
+    [Fact]
+    public async Task EnrollHelloAsync_CancelledToken_DoesNotReachThePlatform()
+    {
+        RecordingHelloService hello = new();
+        using VaultLifecycleService lifecycle = new(_configManager, hello);
+        await lifecycle.UnlockAsync(MasterPassword.ToCharArray());
+
+        using WorkspaceLockService service = new(lifecycle);
+        service.Configure(vaultEnabled: true, autoLockIdleMinutes: 0, disconnectOnLock: false);
+
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.EnrollHelloAsync(cts.Token));
+
+        Assert.Equal(0, hello.EnrollCalls);
+    }
+
     [Fact]
     public void Lock_WhenEnabledAndUnlocked_SetsLockedAndZeroesDek()
     {
@@ -161,5 +239,45 @@ public sealed class WorkspaceLockServiceTests : IAsyncLifetime
 
         using var disabled = NewService(vaultEnabled: false);
         Assert.False(disabled.CanLock);
+    }
+
+    /// <summary>
+    /// A Hello platform that records enrolments and returns recognisable values.
+    /// </summary>
+    /// <remarks>
+    /// The sentinels are what make the persistence assertions meaningful: they can only have come from
+    /// here, so finding them in the settings proves the enrolment travelled the whole path.
+    /// </remarks>
+    private sealed class RecordingHelloService : IVaultHelloService
+    {
+        internal const string SentinelWrappedDek = "SENTINEL-WRAPPED-DEK";
+        internal const string SentinelCredentialName = "SENTINEL-CREDENTIAL";
+        internal const string SentinelPublicKeyHash = "SENTINEL-PUBKEY-HASH";
+
+        public int EnrollCalls { get; private set; }
+
+        public Task<bool> IsEnrollmentAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
+
+        public Task<VaultHelloEnrollment> EnrollAsync(
+            ReadOnlyMemory<byte> dek,
+            string vaultId,
+            CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            EnrollCalls++;
+            return Task.FromResult(new VaultHelloEnrollment(
+                vaultId,
+                SentinelWrappedDek,
+                "SENTINEL-CHALLENGE",
+                "SENTINEL-SALT",
+                SentinelCredentialName,
+                SentinelPublicKeyHash));
+        }
+
+        public Task<VaultDekHolder> UnlockAsync(VaultHelloEnrollment stored, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task RemoveAsync(string credentialName, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 }
