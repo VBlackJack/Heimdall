@@ -17,6 +17,11 @@
 using System.Reflection;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
+using Heimdall.App.ViewModels.Tunnels;
+using Heimdall.Core.Localization;
+using Heimdall.Core.Ssh;
+using Heimdall.Core.StateMachine;
+using Heimdall.Ssh;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Tests;
@@ -60,7 +65,7 @@ public sealed class MainViewModelCompositionTests
     [Fact]
     public void MainViewModel_ConstructorTakesTheMeasuredNumberOfDependencies()
     {
-        Assert.Equal(25, MainViewModelConstructor.GetParameters().Length);
+        Assert.Equal(23, MainViewModelConstructor.GetParameters().Length);
     }
 
     // The palette resolves a scoped service per operation. Handing it the root provider is what makes
@@ -78,4 +83,30 @@ public sealed class MainViewModelCompositionTests
             parameters,
             parameter => typeof(IServiceProvider).IsAssignableFrom(parameter.ParameterType));
     }
+
+    // The tunnelling collaborators existed on the shell's constructor only to be handed to the tunnels
+    // view model. The factory owns them now, so the shell must no longer name them at all.
+    [Fact]
+    public void MainViewModel_TakesTheTunnelsFactoryAndNotItsCollaborators()
+    {
+        ParameterInfo[] parameters = MainViewModelConstructor.GetParameters();
+
+        Assert.Contains(parameters, parameter => parameter.ParameterType == typeof(ITunnelsViewModelFactory));
+
+        foreach (Type moved in TunnellingCollaborators)
+        {
+            Assert.DoesNotContain(parameters, parameter => parameter.ParameterType == moved);
+            Assert.DoesNotContain(
+                typeof(MainViewModel).GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
+                field => field.FieldType == moved);
+        }
+    }
+
+    private static Type[] TunnellingCollaborators =>
+    [
+        typeof(Heimdall.Ssh.TunnelManager),
+        typeof(Heimdall.Core.StateMachine.ConnectionStateMachine),
+        typeof(Heimdall.Core.Ssh.IHostKeyVerifier),
+    ];
+
 }

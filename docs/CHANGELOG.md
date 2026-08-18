@@ -12,6 +12,20 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: the shell no longer carries the tunnelling services
+
+- **The tunnels view model is built by a factory that owns its collaborators.** The tunnel manager, the
+  connection state machine and the host-key verifier were parameters of the main shell for one reason
+  only: to be handed straight to the tunnels view model. The shell named three services it never spoke
+  to, and every test that built a shell had to supply them.
+- **The factory takes its owner as an argument**, not as a dependency, because the tunnels view model
+  needs the shell and the shell exposes the tunnels view model; registering it directly would close a
+  cycle in the container. This is the same shape already used for the command palette.
+- **The old public constructor of the tunnels view model is now internal**, so the factory is the single
+  composition path and a future caller cannot assemble the collaborators itself and bypass it.
+- **Measured**: the shell's constructor goes from 25 parameters to 23. This is part of an ongoing
+  decomposition; the file is still large and further responsibilities remain to be moved out.
+
 ## 2026-08-17: a failed migration no longer leaves half of itself behind
 
 - **Importing a legacy installation now commits settings and servers as one unit** (UXG-011). The two

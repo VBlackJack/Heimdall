@@ -26,6 +26,7 @@ using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Settings;
+using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
@@ -425,11 +426,8 @@ public sealed class MainViewModelSettingsNavigationTests
             MainViewModel main = new(
                 config,
                 localizer,
-                connectionStateMachine,
                 appStatus,
-                tunnelManager,
                 hostKeyStore,
-                RejectingHostKeyVerifier.Instance,
                 dialog,
                 embeddedSessionManager,
                 new HeimdallThemeService(config),
@@ -455,7 +453,14 @@ public sealed class MainViewModelSettingsNavigationTests
                     embeddedSessionManager,
                     new ExternalToolLaunchService(dialog),
                     new RecentConnectionTracker(),
-                    serviceProvider.GetRequiredService<IServiceScopeFactory>()));
+                    serviceProvider.GetRequiredService<IServiceScopeFactory>()),
+                new TunnelsViewModelFactory(
+                    localizer,
+                    tunnelManager,
+                    connectionStateMachine,
+                    hostKeyStore,
+                    RejectingHostKeyVerifier.Instance,
+                    config));
 
             return new TestHarness(
                 rootPath,

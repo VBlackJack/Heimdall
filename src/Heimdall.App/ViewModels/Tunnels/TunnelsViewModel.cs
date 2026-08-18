@@ -76,9 +76,14 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     private bool _disposed;
 
     /// <summary>
-    /// Creates a new tunnels VM and wires up the tunnel manager events.
+    /// Creates a tunnels VM bound to the shell and wires up the tunnel manager events.
     /// </summary>
-    public TunnelsViewModel(
+    /// <remarks>
+    /// Internal on purpose: production builds this through <see cref="ITunnelsViewModelFactory"/>,
+    /// which owns the tunnelling collaborators. Leaving it public would let a caller assemble those
+    /// dependencies itself and bypass the single composition path.
+    /// </remarks>
+    internal TunnelsViewModel(
         MainViewModel main,
         LocalizationManager localizer,
         TunnelManager tunnelManager,
