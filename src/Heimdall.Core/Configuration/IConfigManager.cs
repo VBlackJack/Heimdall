@@ -101,3 +101,37 @@ public interface IConfigManager
     /// </summary>
     Task SaveServersAsync(List<ServerProfileDto> servers);
 }
+/// <summary>
+/// Commits a settings change and a server-inventory change as one logical unit.
+/// </summary>
+/// <remarks>
+/// Opt-in capability rather than a member of <see cref="IConfigManager"/>: only the migration needs it,
+/// and widening the browser-facing abstraction would oblige every test double to answer for a guarantee
+/// it cannot make. A caller that cannot obtain this capability must refuse before mutating anything
+/// rather than fall back to two independent writes, which is precisely the partial-state defect this
+/// exists to close.
+/// </remarks>
+public interface IConfigTransactionalWriter
+{
+    /// <summary>
+    /// Applies both mutations under one lock, publishing nothing unless both writes are durable.
+    /// </summary>
+    /// <remarks>
+    /// Both delegates run <b>synchronously under the configuration write lock</b>. They must not call
+    /// back into the same <see cref="IConfigManager"/> (the lock is not reentrant and would deadlock),
+    /// must perform no external I/O, and must not be async delegates nor block on
+    /// <c>.Wait()</c>/<c>.Result</c>. They receive freshly loaded state, never a snapshot prepared
+    /// outside the lock, so a concurrent write persisted in the meantime is not silently overwritten.
+    /// <para>
+    /// On any failure before the commit point, both files are restored to their captured bytes, or
+    /// deleted again if they did not exist, and no runtime state is published. If a restoration itself
+    /// fails, the other is still attempted and the thrown exception reports that recovery was
+    /// incomplete rather than claiming the baselines were restored.
+    /// </para>
+    /// </remarks>
+    /// <param name="applySettingsMutation">Mutates freshly loaded settings in place.</param>
+    /// <param name="applyServersMutation">Mutates the freshly loaded server list in place.</param>
+    Task CommitMigrationAsync(
+        Action<AppSettings> applySettingsMutation,
+        Action<List<ServerProfileDto>> applyServersMutation);
+}
