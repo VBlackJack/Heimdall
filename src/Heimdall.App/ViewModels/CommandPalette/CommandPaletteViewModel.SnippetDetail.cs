@@ -275,7 +275,7 @@ public sealed partial class CommandPaletteViewModel
 
         CloseSnippetDetail();
 
-        _snippetScope = _serviceProvider.CreateScope();
+        _snippetScope = _scopeFactory.CreateScope();
         _snippetGenerator = _snippetScope.ServiceProvider.GetRequiredService<ICommandGeneratorService>();
 
         _detailAction = action;
