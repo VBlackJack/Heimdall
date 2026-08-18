@@ -27,7 +27,7 @@ namespace Heimdall.Core.Configuration;
 /// Manages application configuration files (settings.json, servers.json).
 /// Handles first-run initialization, loading, saving, and file ACL protection.
 /// </summary>
-public sealed class ConfigManager : IConfigManager
+public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -65,6 +65,16 @@ public sealed class ConfigManager : IConfigManager
     // Process-local serialization only. TODO: add cross-process locking and revision/CAS
     // before supporting multiple Heimdall instances that share one configuration directory.
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+
+    /// <summary>
+    /// Test-only injection point invoked immediately after the transactional server write.
+    /// </summary>
+    /// <remarks>
+    /// Null in production, so behaviour there is unchanged. It exists because the second write
+    /// can modify its target and then fail before returning, and that window is otherwise not
+    /// reachable deterministically from a test, which would leave the server rollback unprovable.
+    /// </remarks>
+    internal Func<Task>? AfterTransactionalServerWriteAsync { get; set; }
     private readonly object _settingsPublicationLock = new();
     private readonly Func<Task> _beforeSettingsLoadPublishAsync;
     private long _nextSettingsRevision;
@@ -361,7 +371,7 @@ public sealed class ConfigManager : IConfigManager
             _writeLock.Release();
         }
 
-        SettingsChanged?.Invoke(settingsToPublish);
+        RaiseSettingsChanged(settingsToPublish);
     }
 
     /// <summary>
@@ -479,7 +489,7 @@ public sealed class ConfigManager : IConfigManager
             _writeLock.Release();
         }
 
-        SettingsChanged?.Invoke(settings);
+        RaiseSettingsChanged(settings);
     }
 
     /// <summary>
@@ -522,9 +532,213 @@ public sealed class ConfigManager : IConfigManager
 
     private long ReserveSettingsRevision() => Interlocked.Increment(ref _nextSettingsRevision);
 
-    private bool TryPublishSettingsSnapshot(long revision, AppSettings settings)
+    /// <inheritdoc />
+    public async Task CommitMigrationAsync(
+        Action<AppSettings> applySettingsMutation,
+        Action<List<ServerProfileDto>> applyServersMutation)
     {
-        AppSettings immutableSnapshot = CloneSettings(settings);
+        ArgumentNullException.ThrowIfNull(applySettingsMutation);
+        ArgumentNullException.ThrowIfNull(applyServersMutation);
+
+        AppSettings? settingsToNotify = null;
+        byte[]? settingsBaseline = null;
+        byte[]? serversBaseline = null;
+
+        await _writeLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // Captured before anything is written, so a rollback restores what was really there rather
+            // than a re-serialisation of it.
+            bool settingsExisted = File.Exists(_settingsPath);
+            settingsBaseline = settingsExisted
+                ? await File.ReadAllBytesAsync(_settingsPath).ConfigureAwait(false)
+                : null;
+            bool serversExisted = File.Exists(_serversPath);
+            serversBaseline = serversExisted
+                ? await File.ReadAllBytesAsync(_serversPath).ConfigureAwait(false)
+                : null;
+
+            try
+            {
+                // Settings: freshly loaded HERE, under the lock. A snapshot prepared outside would be
+                // stale by exactly the window in which another writer can persist a trust decision.
+                AppSettings settings = await LoadSettingsInternalAsync(
+                    requireSupportedSchemaForWrite: true).ConfigureAwait(false);
+                applySettingsMutation(settings);
+                settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+                NormalizeTrustedHostKeys(settings);
+                ValidateSettingsWriteInvariants(settings);
+                await WriteTextAsync(
+                    _settingsPath,
+                    JsonSerializer.Serialize(settings, JsonOptions)).ConfigureAwait(false);
+
+                // Servers: the target state decides whether a physical write is needed. There is no
+                // guard on the incoming count, so an empty legacy inventory still empties a populated
+                // target instead of being mistaken for "nothing to do".
+                ServerInventoryDocument document = await LoadServerInventoryInternalAsync(
+                    requireSupportedSchemaForWrite: true).ConfigureAwait(false);
+                List<ServerProfileDto> servers = document.Servers;
+                Dictionary<string, CredentialReferenceSnapshot> credentialReferences =
+                    CaptureCredentialReferences(servers);
+                Dictionary<string, IReadOnlyDictionary<string, JsonElement>> extensionData =
+                    CaptureServerExtensionData(servers);
+                string originalJson = JsonSerializer.Serialize(servers, JsonOptions);
+                applyServersMutation(servers);
+                FreezeCredentialReferencesAcrossRenames(credentialReferences, servers);
+                PreserveServerExtensionData(extensionData, servers);
+                string mutatedJson = JsonSerializer.Serialize(servers, JsonOptions);
+
+                // Everything able to fail is prepared here, while a rollback is still possible: the
+                // snapshot to publish, the copy to notify with, and the revision. After the second write
+                // the only remaining act is an assignment that cannot throw.
+                AppSettings publicationSnapshot = CloneSettings(settings);
+                AppSettings candidate = CloneSettings(settings);
+                long revision = ReserveSettingsRevision();
+
+                if (!string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
+                {
+                    await SaveServerInventoryInternalAsync(document).ConfigureAwait(false);
+                }
+
+                if (AfterTransactionalServerWriteAsync is not null)
+                {
+                    await AfterTransactionalServerWriteAsync().ConfigureAwait(false);
+                }
+
+                TryPublishPreparedSnapshot(revision, publicationSnapshot);
+                settingsToNotify = candidate;
+            }
+            catch (Exception commitFailure)
+            {
+                List<Exception> recoveryFailures = [];
+                await TryRestoreAsync(_settingsPath, settingsExisted, settingsBaseline, recoveryFailures)
+                    .ConfigureAwait(false);
+                await TryRestoreAsync(_serversPath, serversExisted, serversBaseline, recoveryFailures)
+                    .ConfigureAwait(false);
+
+                if (recoveryFailures.Count > 0)
+                {
+                    // Never claim the baselines are back when they are not.
+                    recoveryFailures.Insert(0, commitFailure);
+                    throw new AggregateException(
+                        "Migration failed and the configuration could not be fully restored.",
+                        recoveryFailures);
+                }
+
+                throw;
+            }
+        }
+        finally
+        {
+            // Baselines can hold encrypted secrets and credential references.
+            if (settingsBaseline is not null)
+            {
+                Array.Clear(settingsBaseline);
+            }
+
+            if (serversBaseline is not null)
+            {
+                Array.Clear(serversBaseline);
+            }
+
+            _writeLock.Release();
+        }
+
+        RaiseSettingsChanged(settingsToNotify);
+    }
+
+    /// <summary>
+    /// Puts one file back to its captured bytes, or back to not existing, collecting any failure.
+    /// </summary>
+    /// <remarks>
+    /// Each restoration is attempted independently: one failing must not prevent the other from being
+    /// tried, because a half-restored pair is worse than either alone.
+    /// </remarks>
+    private static async Task TryRestoreAsync(
+        string path,
+        bool existedBefore,
+        byte[]? baseline,
+        List<Exception> failures)
+    {
+        try
+        {
+            if (existedBefore && baseline is not null)
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    await Heimdall.Core.Security.SecureFileWriter
+                        .WriteAllBytesAtomicAsync(path, baseline).ConfigureAwait(false);
+                }
+                else
+                {
+                    // Mirrors the forward write path, which is likewise non-atomic off Windows.
+                    await File.WriteAllBytesAsync(path, baseline).ConfigureAwait(false);
+                }
+
+                return;
+            }
+
+            if (File.Exists(path))
+            {
+                // It did not exist when the transaction started; leaving an empty or serialised file
+                // behind would be a durable change of its own.
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            failures.Add(ex);
+        }
+    }
+
+    /// <summary>
+    /// Notifies every subscriber, isolating each one from the others.
+    /// </summary>
+    /// <remarks>
+    /// Called outside <see cref="_writeLock"/>: a handler is free to read configuration, and invoking it
+    /// under the lock would deadlock on the non-reentrant semaphore.
+    /// <para>
+    /// Two guarantees a bare multicast invocation does not give. Each subscriber receives <b>its own
+    /// clone</b>, so one that mutates its argument cannot hand a corrupted object to the next. And a
+    /// subscriber that throws is logged and skipped rather than aborting the chain, so an observer's
+    /// failure never turns an already-durable write into a failure for everyone downstream.
+    /// </para>
+    /// </remarks>
+    private void RaiseSettingsChanged(AppSettings settings)
+    {
+        Delegate[]? subscribers = SettingsChanged?.GetInvocationList();
+        if (subscribers is null)
+        {
+            return;
+        }
+
+        foreach (Delegate subscriber in subscribers)
+        {
+            try
+            {
+                ((Action<AppSettings>)subscriber)(CloneSettings(settings));
+            }
+            catch (Exception ex)
+            {
+                Heimdall.Core.Logging.FileLogger.Error("Settings change subscriber failed", ex);
+            }
+        }
+    }
+
+    private bool TryPublishSettingsSnapshot(long revision, AppSettings settings)
+        => TryPublishPreparedSnapshot(revision, CloneSettings(settings));
+
+    /// <summary>
+    /// Publishes a snapshot that has already been cloned by the caller.
+    /// </summary>
+    /// <remarks>
+    /// The transactional commit builds its snapshot and reserves its revision <b>before</b> the second
+    /// write, so that everything able to fail has failed while a rollback is still possible. Publishing
+    /// must therefore not clone again: recloning after the second write would reintroduce a fallible
+    /// step past the point where the files can no longer be put back.
+    /// </remarks>
+    private bool TryPublishPreparedSnapshot(long revision, AppSettings immutableSnapshot)
+    {
         lock (_settingsPublicationLock)
         {
             if (_publishedSettings is not null && revision <= _publishedSettings.Revision)

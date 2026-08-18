@@ -33,6 +33,7 @@ public sealed class MigrationService
     private const int MaxWarningIdentityLength = 64;
 
     private readonly IConfigManager _configManager;
+    private readonly IConfigTransactionalWriter? _transactionalWriter;
 
     public MigrationService(IConfigManager configManager, LocalizationManager localizer)
     {
@@ -42,6 +43,11 @@ public sealed class MigrationService
         // Retain the constructor dependency for source compatibility; migration result
         // localization now belongs to MigrationPresentationPolicy.
         _configManager = configManager;
+
+        // Asked for, never demanded here: a configuration manager that cannot commit both files as one
+        // unit makes the import refuse, and that refusal belongs in the migration result the caller
+        // already handles, not in a constructor throw that would take down composition instead.
+        _transactionalWriter = configManager as IConfigTransactionalWriter;
     }
 
     /// <summary>
@@ -79,27 +85,38 @@ public sealed class MigrationService
 
         var result = new MigrationResult();
 
+        if (_transactionalWriter is null)
+        {
+            // Refuse before touching anything. Falling back to two independent writes is exactly the
+            // partial-state failure this path exists to prevent.
+            result.Error = "Configuration manager cannot commit settings and servers as one unit.";
+            return result;
+        }
+
         try
         {
-            AppSettings settings = await PrepareLegacySettingsAsync(legacyPath, ct);
+            JsonElement legacySettings = await ReadLegacySettingsAsync(legacyPath, ct);
             List<ServerProfileDto> servers = await PrepareLegacyServersAsync(
                 legacyPath,
                 result,
                 ct);
 
-            await _configManager.SaveSettingsAsync(settings);
-            result.SettingsImported = true;
-
-            if (servers.Count > 0)
-            {
-                await _configManager.MutateServersAsync(inventory =>
+            // One commit. The settings mutation is applied to state loaded inside the write lock, so a
+            // trust decision persisted since this migration started is not overwritten by a stale
+            // snapshot. The inventory is replaced unconditionally: an empty legacy inventory must empty
+            // a populated target, and it is the resulting target state that decides whether a physical
+            // write is needed.
+            await _transactionalWriter.CommitMigrationAsync(
+                settings => MapLegacySettings(legacySettings, settings),
+                inventory =>
                 {
                     inventory.Clear();
                     inventory.AddRange(servers);
-                    return servers.Count;
                 });
-            }
 
+            // Both files are durable and the runtime state is published: only now is any part of this
+            // migration true.
+            result.SettingsImported = true;
             result.Success = true;
         }
         catch (Exception ex)
@@ -110,7 +127,15 @@ public sealed class MigrationService
         return result;
     }
 
-    private async Task<AppSettings> PrepareLegacySettingsAsync(
+    /// <summary>
+    /// Reads and parses the legacy settings document, without touching current configuration.
+    /// </summary>
+    /// <remarks>
+    /// This deliberately no longer loads and maps the current settings. Doing that here produced a
+    /// snapshot taken outside the write lock, which a concurrent write persisted afterwards would then
+    /// be silently overwritten by. The mapping now runs inside the transaction, on freshly loaded state.
+    /// </remarks>
+    private static async Task<JsonElement> ReadLegacySettingsAsync(
         string legacyPath, CancellationToken ct)
     {
         string legacySettingsPath = Path.Combine(
@@ -118,11 +143,7 @@ public sealed class MigrationService
             AppConstants.BundledConfigDirectoryName,
             "settings.json");
         string legacyJson = await File.ReadAllTextAsync(legacySettingsPath, ct);
-        JsonElement legacySettings = JsonSerializer.Deserialize<JsonElement>(legacyJson);
-
-        AppSettings settings = await _configManager.LoadSettingsAsync();
-        MapLegacySettings(legacySettings, settings);
-        return settings;
+        return JsonSerializer.Deserialize<JsonElement>(legacyJson);
     }
 
     private async Task<List<ServerProfileDto>> PrepareLegacyServersAsync(

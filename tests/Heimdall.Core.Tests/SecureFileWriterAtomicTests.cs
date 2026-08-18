@@ -51,6 +51,58 @@ public sealed class SecureFileWriterAtomicTests : IDisposable
 
     private string[] StrayTemps() => Directory.GetFiles(_tempDir, "*.tmp*");
 
+    // A restoration must put the bytes back exactly as they were. The text overload takes a string, so
+    // what reaches the disk is whatever the encoder decides; these oracles are what make the byte
+    // overload's identity contract real rather than asserted.
+    [Fact]
+    public async Task WriteAllBytesAtomic_WritesTheExactBytes()
+    {
+        string target = Path.Combine(_tempDir, "exact.json");
+        byte[] content = [0x7B, 0x0D, 0x0A, 0x09, 0x22, 0x61, 0x22, 0x3A, 0x31, 0x7D, 0x0A];
+
+        await SecureFileWriter.WriteAllBytesAtomicAsync(target, content);
+
+        Assert.Equal(content, await File.ReadAllBytesAsync(target));
+    }
+
+    [Fact]
+    public async Task WriteAllBytesAtomic_PreservesAByteOrderMark()
+    {
+        string target = Path.Combine(_tempDir, "bom.json");
+
+        // UTF-8 BOM followed by non-canonical whitespace and CRLF endings.
+        byte[] content = [0xEF, 0xBB, 0xBF, 0x7B, 0x0D, 0x0A, 0x20, 0x20, 0x7D, 0x0D, 0x0A];
+
+        await SecureFileWriter.WriteAllBytesAtomicAsync(target, content);
+
+        byte[] written = await File.ReadAllBytesAsync(target);
+        Assert.Equal(content, written);
+        Assert.Equal([0xEF, 0xBB, 0xBF], written[..3]);
+    }
+
+    [Fact]
+    public async Task WriteAllBytesAtomic_StagingFails_LeavesTheExistingTargetIntact()
+    {
+        string target = Path.Combine(_tempDir, "intact.json");
+        byte[] original = [0xEF, 0xBB, 0xBF, 0x6F, 0x6C, 0x64];
+        await File.WriteAllBytesAsync(target, original);
+
+        RecordingAtomicFileOperations operations = new()
+        {
+            RestrictedByteWriteAsync = (_, _, _) => throw new IOException("staging failed"),
+        };
+
+        await Assert.ThrowsAsync<IOException>(() => SecureFileWriter.WriteAllBytesAtomicAsync(
+            target,
+            new byte[] { 0x6E, 0x65, 0x77 },
+            operations));
+
+        // The failure propagates and the live target is byte-identical to what it was.
+        Assert.Equal(original, await File.ReadAllBytesAsync(target));
+        Assert.Single(operations.RestrictedByteWritePaths);
+        Assert.Empty(operations.MoveCalls);
+    }
+
     [Fact]
     public async Task WriteAllTextAtomicAsync_CreatesFileWithContent()
     {
@@ -293,6 +345,25 @@ public sealed class SecureFileWriterAtomicTests : IDisposable
             }
 
             await File.WriteAllTextAsync(path, content, cancellationToken);
+        }
+
+        public Func<string, ReadOnlyMemory<byte>, CancellationToken, Task>? RestrictedByteWriteAsync { get; init; }
+
+        public List<string> RestrictedByteWritePaths { get; } = [];
+
+        public async Task WriteBytesWithRestrictedAclAsync(
+            string path,
+            ReadOnlyMemory<byte> content,
+            CancellationToken cancellationToken)
+        {
+            RestrictedByteWritePaths.Add(path);
+            if (RestrictedByteWriteAsync is not null)
+            {
+                await RestrictedByteWriteAsync(path, content, cancellationToken);
+                return;
+            }
+
+            await File.WriteAllBytesAsync(path, content.ToArray(), cancellationToken);
         }
 
         public async Task WriteWithoutAclAsync(

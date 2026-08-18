@@ -12,6 +12,28 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-17: a failed migration no longer leaves half of itself behind
+
+- **Importing a legacy installation now commits settings and servers as one unit** (UXG-011). The two
+  files were written in sequence, and the import reported the settings step as done the moment it
+  finished. A failure on the servers step therefore returned "migration failed" while settings were
+  already durably replaced, the running application had already been told about the new values, and the
+  result still claimed the settings had been imported.
+- **Nothing is published until both writes are durable.** On failure the runtime configuration and its
+  change notification are untouched, because neither ever happened, and both files are put back to the
+  exact bytes they had, or deleted again if they did not exist beforehand. Restoration writes the
+  captured bytes rather than a re-serialisation of them: the existing atomic writer takes a string and
+  so carries no byte-identity contract, which a restoration needs directly.
+- **If a restoration itself fails**, the other is still attempted and the error says recovery was
+  incomplete instead of claiming the previous state was put back.
+- **An empty legacy inventory now empties a populated one.** It was previously treated as "nothing to
+  do", which silently kept servers the migration was supposed to replace.
+- **A settings change notification no longer stops at the first subscriber that throws.** Each
+  subscriber receives its own copy, so one that modifies what it was given cannot corrupt the next, and
+  a failing subscriber is logged and skipped rather than turning a completed write into a failure.
+- **Limit, stated plainly**: this is atomicity against failures handled inside the process. There is no
+  journal or recovery protocol, so a system crash between the two file replacements is not covered.
+
 ## 2026-08-17: an entry nobody can classify is no longer treated as a file
 
 - **An indeterminate remote type is now explicit** (SFTP-016). When every type test failed, the SFTP

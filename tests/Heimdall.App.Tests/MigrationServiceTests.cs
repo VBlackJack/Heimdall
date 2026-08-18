@@ -251,6 +251,105 @@ public class MigrationServiceTests : IDisposable
         Assert.NotNull(result.Error);
     }
 
+    // The hole this lot closes. The pre-write failure above was already covered; a failure AFTER the
+    // settings write was not, and it left settings durably replaced, the runtime snapshot published and
+    // SettingsImported true on a migration reported as failed.
+    [Fact]
+    public async Task ImportFromLegacyAsync_ServerWriteFailsAfterSettingsWrite_RestoresEverything()
+    {
+        AppSettings currentSettings = new()
+        {
+            DefaultResolutionWidth = 1600,
+            DefaultLocale = "en",
+            DefaultTheme = "Slate"
+        };
+        await _configManager.SaveSettingsAsync(currentSettings);
+        byte[] originalSettingsBytes = await File.ReadAllBytesAsync(_configManager.SettingsPath);
+        AppSettings? baselineRuntime = _configManager.CurrentSettings;
+        Assert.NotNull(baselineRuntime);
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"),
+            """
+            {
+              "DefaultResolutionWidth": 1920,
+              "DefaultLocale": "fr",
+              "DefaultTheme": "Dracula"
+            }
+            """);
+        WriteLegacyFile(Path.Combine("config", "servers.json"),
+            """[{ "Name": "srv", "Host": "h", "Protocol": "SSH" }]""");
+
+        // The target inventory declares a schema this build refuses for writing, so the servers write
+        // fails only AFTER the settings write has already landed.
+        await File.WriteAllTextAsync(
+            _configManager.ServersPath,
+            """{ "SchemaVersion": 99999, "Servers": [] }""");
+        byte[] originalServersBytes = await File.ReadAllBytesAsync(_configManager.ServersPath);
+
+        int settingsChangedCount = 0;
+        _configManager.SettingsChanged += _ => settingsChangedCount++;
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.False(result.Success);
+        Assert.False(result.SettingsImported);
+
+        // Both files byte-identical to their baselines.
+        Assert.Equal(originalSettingsBytes, await File.ReadAllBytesAsync(_configManager.SettingsPath));
+        Assert.Equal(originalServersBytes, await File.ReadAllBytesAsync(_configManager.ServersPath));
+
+        // No candidate ever reached the runtime, and nobody was told about one.
+        Assert.Equal(0, settingsChangedCount);
+        AppSettings? runtimeAfter = _configManager.CurrentSettings;
+        Assert.NotNull(runtimeAfter);
+        Assert.Equal(baselineRuntime!.DefaultResolutionWidth, runtimeAfter!.DefaultResolutionWidth);
+        Assert.Equal(baselineRuntime.DefaultLocale, runtimeAfter.DefaultLocale);
+        Assert.Equal(baselineRuntime.DefaultTheme, runtimeAfter.DefaultTheme);
+    }
+
+    // An empty legacy inventory is not "nothing to do": the existing non-empty path replaces the
+    // inventory wholesale, so it must empty a populated target.
+    [Fact]
+    public async Task ImportFromLegacyAsync_EmptyLegacyInventory_EmptiesAPopulatedTarget()
+    {
+        await _configManager.MutateServersAsync(inventory =>
+        {
+            inventory.Add(new ServerProfileDto { Id = "existing", DisplayName = "existing" });
+            return inventory.Count;
+        });
+        Assert.Single(await _configManager.LoadServersAsync());
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"), """{ "DefaultLocale": "fr" }""");
+        WriteLegacyFile(Path.Combine("config", "servers.json"), "[]");
+
+        MigrationResult result = await _service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.True(result.Success);
+        Assert.Empty(await _configManager.LoadServersAsync());
+    }
+
+    // A configuration manager that cannot commit both files as one unit must make the import refuse
+    // before touching anything, and that refusal belongs in the result the caller already handles.
+    [Fact]
+    public async Task ImportFromLegacyAsync_ConfigManagerCannotCommitAtomically_RefusesWithoutWriting()
+    {
+        NonTransactionalConfigManager configManager = new();
+        MigrationService service = new(configManager, new LocalizationManager());
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"), """{ "DefaultLocale": "fr" }""");
+        WriteLegacyFile(Path.Combine("config", "servers.json"), "[]");
+
+        MigrationResult result = await service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.False(result.Success);
+        Assert.False(result.SettingsImported);
+        Assert.NotNull(result.Error);
+
+        // No fallback to two independent writes.
+        Assert.Equal(0, configManager.SaveSettingsCalls);
+        Assert.Equal(0, configManager.MutateServersCalls);
+    }
+
     [Fact]
     public async Task ImportFromLegacyAsync_MalformedServers_DoesNotReplaceCurrentSettings()
     {
@@ -337,5 +436,70 @@ public class MigrationServiceTests : IDisposable
         Assert.DoesNotContain(FakeSecret, serializedWarning, StringComparison.Ordinal);
         Assert.DoesNotContain("RemotePort", serializedWarning, StringComparison.Ordinal);
         Assert.DoesNotContain("Int32", serializedWarning, StringComparison.OrdinalIgnoreCase);
+    }
+}
+/// <summary>
+/// A configuration manager that does not carry the transactional capability.
+/// </summary>
+/// <remarks>
+/// Deliberately minimal and local: it exists to prove the import refuses rather than falling back to
+/// two independent writes, and it counts those writes so the refusal cannot be mistaken for silence.
+/// </remarks>
+internal sealed class NonTransactionalConfigManager : IConfigManager
+{
+    private AppSettings _settings = new();
+    private List<ServerProfileDto> _servers = [];
+
+    public int SaveSettingsCalls { get; private set; }
+
+    public int MutateServersCalls { get; private set; }
+
+    public string ConfigPath => "mem://config";
+
+    public string SettingsPath => "mem://settings.json";
+
+    public string ServersPath => "mem://servers.json";
+
+    public event Action<AppSettings>? SettingsChanged;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(_settings);
+
+    public AppSettings? CurrentSettings => _settings;
+
+    public Task SaveSettingsAsync(AppSettings settings)
+    {
+        SaveSettingsCalls++;
+        _settings = settings;
+        SettingsChanged?.Invoke(settings);
+        return Task.CompletedTask;
+    }
+
+    public Task MergeSettingAsync(Action<AppSettings> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        mutate(_settings);
+        return Task.CompletedTask;
+    }
+
+    public Task<List<ServerProfileDto>> LoadServersAsync() => Task.FromResult(_servers);
+
+    public Task SaveServersAsync(List<ServerProfileDto> servers)
+    {
+        _servers = servers;
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> MergeHostKeyAsync(string host, string fingerprint) => Task.FromResult(true);
+
+    public Task<int> MergeTrustedHostKeysAsync(IEnumerable<KeyValuePair<string, string>> hostKeys)
+        => Task.FromResult(0);
+
+    public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        MutateServersCalls++;
+        return Task.FromResult(mutate(_servers));
     }
 }

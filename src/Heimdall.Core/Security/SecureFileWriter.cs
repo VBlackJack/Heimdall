@@ -158,8 +158,10 @@ public static class SecureFileWriter
     /// post-write ACL pass and without a TOCTOU window.
     /// </summary>
     /// <remarks>
-    /// On ANY failure the temp is deleted and the ORIGINAL target is left untouched;
-    /// the error is surfaced, never swallowed. If the volume does not support the
+    /// On ANY failure the ORIGINAL target is left untouched and the error is surfaced, never
+    /// swallowed. Deleting the temp is attempted on a best-effort basis: the cleanup itself absorbs
+    /// its own failures, so a stray temp can survive a failed write. It holds only staged data.
+    /// If the volume does not support the
     /// secure ACL create (e.g. FAT/exFAT/odd network shares), the method falls back
     /// once to a same-directory temp write + best-effort ACL + atomic rename,
     /// logging a single warning. Default Windows (NTFS) always takes the
@@ -287,11 +289,99 @@ public static class SecureFileWriter
         }
     }
 
+    /// <summary>
+    /// Atomically replaces <paramref name="targetPath"/> with exactly the given bytes.
+    /// </summary>
+    /// <remarks>
+    /// The text overload carries no byte-identity contract: it takes a string, so what lands on disk is
+    /// whatever the encoder produces. Restoring a captured baseline needs the opposite guarantee, the
+    /// bytes back exactly as they were, byte-order mark and all, so it goes through this overload rather
+    /// than through a decode-then-re-encode round trip.
+    /// <para>
+    /// Same protocol as the text path: a same-directory temporary is created with the restrictive ACL
+    /// applied at creation, then renamed over the target. Every failure leaves the existing target
+    /// untouched and propagates the original error; removing the temporary is only attempted on a
+    /// best-effort basis, so a stray temporary can remain.
+    /// </para>
+    /// <para>
+    /// The buffer belongs to the caller. This method never clears it; a caller holding sensitive bytes
+    /// is responsible for zeroing its own snapshot once it is done with it.
+    /// </para>
+    /// </remarks>
+    /// <param name="targetPath">File to replace.</param>
+    /// <param name="content">Exact bytes to write.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    internal static Task WriteAllBytesAtomicAsync(
+        string targetPath,
+        ReadOnlyMemory<byte> content,
+        CancellationToken cancellationToken = default)
+        => WriteAllBytesAtomicAsync(
+            targetPath,
+            content,
+            SystemAtomicFileOperations.Instance,
+            cancellationToken);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    internal static async Task WriteAllBytesAtomicAsync(
+        string targetPath,
+        ReadOnlyMemory<byte> content,
+        IAtomicFileOperations fileOperations,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(targetPath);
+        ArgumentNullException.ThrowIfNull(fileOperations);
+
+        string? directory = Path.GetDirectoryName(Path.GetFullPath(targetPath));
+        if (string.IsNullOrEmpty(directory))
+        {
+            throw new ArgumentException("Target path must include a directory.", nameof(targetPath));
+        }
+
+        Directory.CreateDirectory(directory);
+        string tempPath = Path.Combine(
+            directory,
+            Path.GetFileName(targetPath) + ".tmp" + Guid.NewGuid().ToString("N")[..8]);
+
+        try
+        {
+            await fileOperations.WriteBytesWithRestrictedAclAsync(tempPath, content, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            TryDeleteTemp(tempPath, fileOperations);
+            throw;
+        }
+
+        try
+        {
+            fileOperations.Move(tempPath, targetPath, overwrite: true);
+        }
+        catch
+        {
+            TryDeleteTemp(tempPath, fileOperations);
+            throw;
+        }
+    }
+
     internal interface IAtomicFileOperations
     {
         Task WriteWithRestrictedAclAsync(
             string path,
             string content,
+            CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Writes exactly the given bytes, creating the file with the restrictive ACL.
+        /// </summary>
+        /// <remarks>
+        /// The buffer belongs to the caller: this method never clears it, and never keeps a reference
+        /// beyond the call. It creates no internal copy, so it has nothing of its own to clear.
+        /// </remarks>
+        Task WriteBytesWithRestrictedAclAsync(
+            string path,
+            ReadOnlyMemory<byte> content,
             CancellationToken cancellationToken);
 
         Task WriteWithoutAclAsync(
@@ -359,6 +449,39 @@ public static class SecureFileWriter
                 {
                     Array.Clear(bytes);
                 }
+            }
+        }
+
+        public async Task WriteBytesWithRestrictedAclAsync(
+            string path,
+            ReadOnlyMemory<byte> content,
+            CancellationToken cancellationToken)
+        {
+            FileSecurity security = BuildRestrictedSecurity();
+            FileInfo fileInfo = new(path);
+            fileInfo.Delete();
+
+            FileStream stream;
+            try
+            {
+                stream = fileInfo.Create(
+                    FileMode.CreateNew,
+                    FileSystemRights.WriteData,
+                    FileShare.None,
+                    4096,
+                    FileOptions.Asynchronous,
+                    security);
+            }
+            catch (NotSupportedException ex)
+            {
+                throw new AclCreationNotSupportedException(ex);
+            }
+
+            await using (stream)
+            {
+                // The caller's buffer is written straight through. No copy is made, so there is
+                // nothing here to clear, and clearing the caller's memory would be a bug.
+                await stream.WriteAsync(content, cancellationToken).ConfigureAwait(false);
             }
         }
 
