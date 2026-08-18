@@ -26,6 +26,7 @@ using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Settings;
+using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
@@ -191,11 +192,8 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
             MainViewModel main = new(
                 configManager,
                 localizer,
-                connectionStateMachine,
                 appStatus,
-                tunnelManager,
                 hostKeyStore,
-                RejectingHostKeyVerifier.Instance,
                 dialogService,
                 embeddedSessionManager,
                 new HeimdallThemeService(configManager),
@@ -223,7 +221,14 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                     new ExternalToolLaunchService(dialogService),
                     new RecentConnectionTracker(),
                     CommandLibraryTestHelpers.CreateResolverServiceProvider()
-                        .GetRequiredService<IServiceScopeFactory>()));
+                        .GetRequiredService<IServiceScopeFactory>()),
+                new TunnelsViewModelFactory(
+                    localizer,
+                    tunnelManager,
+                    connectionStateMachine,
+                    hostKeyStore,
+                    RejectingHostKeyVerifier.Instance,
+                    configManager));
 
             return new PaletteHarness(rootPath, main, dialogService, embeddedSessionManager, order);
         }

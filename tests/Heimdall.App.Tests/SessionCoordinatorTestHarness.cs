@@ -24,6 +24,7 @@ using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
@@ -61,6 +62,52 @@ public sealed partial class SessionCoordinatorPreMountTests
         }
 
         Assert.True(predicate(), "Condition was not met before timeout.");
+    }
+
+    // Metadata proves the factory is a dependency; it cannot prove the shell calls it, hands over
+    // itself, exposes what came back, and keeps ownership of it.
+    [Fact]
+    public void MainViewModel_BuildsTunnelsThroughTheFactoryExactlyOnce()
+    {
+        RecordingTunnelsFactory factory = new();
+        using TestHarness harness = TestHarness.Create(tunnelsFactory: factory);
+
+        Assert.Equal(1, factory.CreateCalls);
+
+        // The owner handed over is the very shell under construction.
+        Assert.Same(harness.Main, factory.LastOwner);
+
+        // What Create returned is what the shell exposes.
+        Assert.Same(factory.LastCreated, harness.Main.Tunnels);
+
+        // Disposal-by-owner is deliberately not asserted here: this harness supplies null! for the
+        // settings view model, so MainViewModel.Dispose faults on that unrelated gap before reaching
+        // the tunnels view model. Asserting around it would prove the workaround, not the ownership.
+    }
+
+    private sealed class RecordingTunnelsFactory : ITunnelsViewModelFactory
+    {
+        private readonly TunnelsViewModelFactory _inner = new(
+            new LocalizationManager(),
+            new TunnelManager(),
+            new ConnectionStateMachine(),
+            new HostKeyStore(),
+            Heimdall.Core.Ssh.RejectingHostKeyVerifier.Instance,
+            new InMemoryConfigManager());
+
+        public int CreateCalls { get; private set; }
+
+        public MainViewModel? LastOwner { get; private set; }
+
+        public TunnelsViewModel? LastCreated { get; private set; }
+
+        public TunnelsViewModel Create(MainViewModel owner)
+        {
+            CreateCalls++;
+            LastOwner = owner;
+            LastCreated = _inner.Create(owner);
+            return LastCreated;
+        }
     }
 
     private sealed class TestHarness : IDisposable
@@ -111,7 +158,9 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         private IReadOnlyDictionary<string, ControlledProtocolHandler> Handlers { get; }
 
-        public static TestHarness Create(bool checkAccess = true)
+        public static TestHarness Create(
+            bool checkAccess = true,
+            ITunnelsViewModelFactory? tunnelsFactory = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -180,11 +229,8 @@ public sealed partial class SessionCoordinatorPreMountTests
             MainViewModel main = new MainViewModel(
                 configManager,
                 localizer,
-                connectionStateMachine,
                 appStatus,
-                tunnelManager,
                 hostKeyStore,
-                Heimdall.Core.Ssh.RejectingHostKeyVerifier.Instance,
                 dialogService,
                 embeddedSessionManager,
                 new HeimdallThemeService(configManager),
@@ -212,7 +258,14 @@ public sealed partial class SessionCoordinatorPreMountTests
                     new ExternalToolLaunchService(dialogService),
                     new RecentConnectionTracker(),
                     new ServiceCollection().BuildServiceProvider()
-                        .GetRequiredService<IServiceScopeFactory>()));
+                        .GetRequiredService<IServiceScopeFactory>()),
+                tunnelsFactory ?? new TunnelsViewModelFactory(
+                    localizer,
+                    tunnelManager,
+                    connectionStateMachine,
+                    hostKeyStore,
+                    Heimdall.Core.Ssh.RejectingHostKeyVerifier.Instance,
+                    configManager));
 
             return new TestHarness(
                 rootPath,

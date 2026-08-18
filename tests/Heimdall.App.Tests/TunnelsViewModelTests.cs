@@ -453,6 +453,56 @@ public sealed class TunnelsViewModelTests
         Assert.True(predicate(), "Condition was not met before timeout.");
     }
 
+    // The factory must pass the INJECTED tunnel manager through. A factory that built its own would give
+    // the view model a manager nobody publishes tunnels to, and the list would stay empty forever.
+    [Fact]
+    public void Factory_CreatedViewModel_ObservesTheInjectedTunnelManager()
+    {
+        using TunnelManager tunnelManager = new();
+        ConnectionStateMachine stateMachine = new();
+        HostKeyStore hostKeyStore = new();
+        LocalizationManager localizer = new();
+        InMemoryConfigManager configManager = new();
+
+        TunnelsViewModelFactory factory = new(
+            localizer,
+            tunnelManager,
+            stateMachine,
+            hostKeyStore,
+            RejectingHostKeyVerifier.Instance,
+            configManager);
+
+        TestTunnelsHost host = new(new AppSettings());
+        using TunnelsViewModel viewModel = factory.CreateForHost(host);
+        Assert.Empty(viewModel.List);
+
+        // Published on the manager the factory was given, not on one the test also owns by luck.
+        using DummyTunnelHandle handle = new();
+        TunnelInfo info = new(
+            "srv-sentinel",
+            LocalPort: 51234,
+            RemoteHost: "10.0.0.7",
+            RemotePort: 22,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true);
+
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(info, handle, () => true));
+        viewModel.RefreshList();
+
+        TunnelInfo observed = Assert.Single(viewModel.List);
+        Assert.Equal("srv-sentinel", observed.ServerName);
+        Assert.Equal(51234, observed.LocalPort);
+        Assert.Equal(1, viewModel.Count);
+        Assert.False(viewModel.HasNoTunnels);
+    }
+
+    private sealed class DummyTunnelHandle : IDisposable
+    {
+        public void Dispose()
+        {
+        }
+    }
+
     private sealed class TestTunnelsHost(AppSettings settings) : ITunnelsHost
     {
         public ConnectionViewModel Connection { get; } = new(new LocalizationManager(), null!, null!, new PaneCloseArbiter());

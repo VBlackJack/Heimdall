@@ -29,6 +29,7 @@ using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Onboarding;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.App.ViewModels.Tools;
+using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -680,6 +681,7 @@ public partial class App : System.Windows.Application
         // Transient like its owner: the palette is built per MainViewModel, and the factory holds
         // only dependencies that are themselves safe to resolve from the root.
         services.AddTransient<ICommandPaletteViewModelFactory, CommandPaletteViewModelFactory>();
+        services.AddTransient<ITunnelsViewModelFactory, TunnelsViewModelFactory>();
         services.AddTransient<MainViewModel>();
         services.AddTransient<UpdateBannerViewModel>();
         services.AddTransient<ServerListViewModel>();

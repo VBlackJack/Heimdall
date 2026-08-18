@@ -329,11 +329,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     public MainViewModel(
         IConfigManager configManager,
         LocalizationManager localizer,
-        ConnectionStateMachine connectionSm,
         ApplicationStatusMachine appStatus,
-        TunnelManager tunnelManager,
         HostKeyStore hostKeyStore,
-        IHostKeyVerifier hostKeyVerifier,
         IDialogService dialogService,
         IEmbeddedSessionManager embeddedSessionManager,
         HeimdallThemeService themeService,
@@ -351,7 +348,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         SettingsViewModel settings,
         UpdateBannerViewModel update,
         IPaneCloseArbiter closeArbiter,
-        ICommandPaletteViewModelFactory commandPaletteFactory)
+        ICommandPaletteViewModelFactory commandPaletteFactory,
+        ITunnelsViewModelFactory tunnelsFactory)
     {
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
         _configManager = configManager;
@@ -381,14 +379,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         Sidebar = new SidebarViewModel(this, localizer, configManager, toolsTabPopulation, toolContextProvider, _uiDispatcher);
         ToolsTab = new ToolsTabViewModel(this, localizer, toolContextProvider);
         CommandPalette = commandPaletteFactory.Create(this);
-        Tunnels = new TunnelsViewModel(
-            this,
-            localizer,
-            tunnelManager,
-            connectionSm,
-            hostKeyStore,
-            hostKeyVerifier,
-            configManager);
+        Tunnels = tunnelsFactory.Create(this);
         Scheduled = new ScheduledTasksViewModel(this, localizer, dialogService, configManager, _uiDispatcher);
         Session = new SessionCoordinator(this, localizer, configManager, embeddedSessionManager, postConnectSequenceRunner, postConnectStepResolver, _uiDispatcher);
 
