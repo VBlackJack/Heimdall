@@ -24,6 +24,7 @@ using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -42,7 +43,7 @@ namespace Heimdall.App.ViewModels;
 /// <summary>
 /// ViewModel for the server list with filtering, sorting, and connection actions.
 /// </summary>
-public partial class ServerListViewModel : ObservableObject, IDisposable
+public partial class ServerListViewModel : ObservableObject, IDisposable, ISessionRestoreHost
 {
     internal static readonly TimeSpan SearchFilterDebounceDelay = TimeSpan.FromMilliseconds(300);
 
@@ -759,6 +760,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable
 
         return await ConnectCoreAsync(server, cancellationToken);
     }
+
+    /// <inheritdoc />
+    IEnumerable<ServerItemViewModel> ISessionRestoreHost.RestorableServers => Servers;
+
+    /// <inheritdoc />
+    Task<bool> ISessionRestoreHost.RestoreServerAsync(
+        string originalServerId,
+        CancellationToken cancellationToken)
+        => RestoreServerAsync(originalServerId, cancellationToken);
 
     private async Task<bool> ConnectCoreAsync(
         ServerItemViewModel server,

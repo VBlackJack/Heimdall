@@ -24,6 +24,8 @@ using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.App.ViewModels.Settings;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
@@ -85,6 +87,30 @@ public sealed partial class SessionCoordinatorPreMountTests
         // the tunnels view model. Asserting around it would prove the workaround, not the ownership.
     }
 
+    // Metadata proves the coordinator is a dependency of the shell; only running the shell's own
+    // load sequence shows that it hands the replay over, once, with its own inventory as the host.
+    [Fact]
+    public async Task MainViewModel_DelegatesSessionRestoreToTheCoordinatorWithItsOwnInventory()
+    {
+        RecordingSessionRestoreCoordinator restore = new();
+        using TestHarness harness = TestHarness.Create(sessionRestore: restore);
+
+        await harness.Main.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, restore.RestoreCalls);
+
+        // The host handed over is the shell's live server inventory, not a copy or a stand-in:
+        // a replay against anything else would reopen sessions the user cannot see.
+        Assert.Same(harness.Main.ServerList, restore.LastHost);
+
+        // And the inventory the host exposes is the live collection, not a copy taken at
+        // composition time: a snapshot of it would already be stale by the time the dialog
+        // resolves the entries against it.
+        Assert.Same(
+            harness.Main.ServerList.Servers,
+            ((ISessionRestoreHost)harness.Main.ServerList).RestorableServers);
+    }
+
     private sealed class RecordingTunnelsFactory : ITunnelsViewModelFactory
     {
         private readonly TunnelsViewModelFactory _inner = new(
@@ -107,6 +133,29 @@ public sealed partial class SessionCoordinatorPreMountTests
             LastOwner = owner;
             LastCreated = _inner.Create(owner);
             return LastCreated;
+        }
+    }
+
+    private sealed class FakeClipboardService : IClipboardService
+    {
+        public void SetText(string text)
+        {
+        }
+    }
+
+    private sealed class RecordingSessionRestoreCoordinator : ISessionRestoreCoordinator
+    {
+        public int RestoreCalls { get; private set; }
+
+        public ISessionRestoreHost? LastHost { get; private set; }
+
+        public Task RestoreAsync(
+            ISessionRestoreHost host,
+            CancellationToken cancellationToken = default)
+        {
+            RestoreCalls++;
+            LastHost = host;
+            return Task.CompletedTask;
         }
     }
 
@@ -160,7 +209,8 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         public static TestHarness Create(
             bool checkAccess = true,
-            ITunnelsViewModelFactory? tunnelsFactory = null)
+            ITunnelsViewModelFactory? tunnelsFactory = null,
+            ISessionRestoreCoordinator? sessionRestore = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -215,11 +265,22 @@ public sealed partial class SessionCoordinatorPreMountTests
                 new FakeRdpImportService(),
                 new PuttySessionImporter(new FakePuttySessionRegistrySource(), configManager),
                 new Heimdall.App.Services.Import.KnownHostsImporter(configManager, hostKeyStore));
+            // A real trusted-host-keys view model rather than null!: the shell's own load
+            // sequence runs LoadFromSettings, which refreshes it, so the null stood between this
+            // harness and every assertion about what loading the shell does.
+            TrustedHostKeysSettingsViewModel trustedHostKeys = new(
+                new HostKeyTrustService(new HostKeyStore()),
+                () => new KnownHostsImportReport(0, 0, []),
+                () => new KnownHostsExportReport(0, 0, 0),
+                localizer,
+                dialogService,
+                new FakeClipboardService(),
+                dispatcher);
             SettingsViewModel settings = new SettingsViewModel(
                 configManager,
                 localizer,
                 dialogService,
-                null!,
+                trustedHostKeys,
                 new PinManager(),
                 new Heimdall.Core.Security.Vault.VaultLifecycleService(configManager),
                 null!,
@@ -234,7 +295,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 dialogService,
                 embeddedSessionManager,
                 new HeimdallThemeService(configManager),
-                new FakeSessionSnapshotService(rootPath),
+                sessionRestore ?? new RecordingSessionRestoreCoordinator(),
                 new FakePostConnectSequenceRunner(),
                 new FakePostConnectStepResolver(),
                 toolRegistry,
@@ -589,28 +650,6 @@ public sealed partial class SessionCoordinatorPreMountTests
                 Status = PostConnectResolveStatus.Literal,
                 ResolvedInput = step.Input
             });
-        }
-    }
-
-    private sealed class FakeSessionSnapshotService(string rootPath) : ISessionSnapshotService
-    {
-        public string SnapshotPath { get; } = Path.Combine(rootPath, "snapshot.json");
-
-        public Task SaveAsync(
-            IReadOnlyList<SessionSnapshotEntry> sessions,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<SessionSnapshotFile?> LoadAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<SessionSnapshotFile?>(null);
-        }
-
-        public Task ClearAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
         }
     }
 

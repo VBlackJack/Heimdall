@@ -26,6 +26,7 @@ using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Settings;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
@@ -197,7 +198,7 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 dialogService,
                 embeddedSessionManager,
                 new HeimdallThemeService(configManager),
-                new FakeSessionSnapshotService(rootPath),
+                new FakeSessionRestoreCoordinator(),
                 new FakePostConnectSequenceRunner(),
                 new FakePostConnectStepResolver(),
                 toolRegistry,
@@ -494,20 +495,11 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
             => throw new NotSupportedException();
     }
 
-    private sealed class FakeSessionSnapshotService(string rootPath) : ISessionSnapshotService
+    private sealed class FakeSessionRestoreCoordinator : ISessionRestoreCoordinator
     {
-        public string SnapshotPath { get; } = Path.Combine(rootPath, "snapshot.json");
-
-        public Task SaveAsync(
-            IReadOnlyList<SessionSnapshotEntry> sessions,
-            CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
-
-        public Task<SessionSnapshotFile?> LoadAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult<SessionSnapshotFile?>(null);
-
-        public Task ClearAsync(CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        public Task RestoreAsync(
+            ISessionRestoreHost host,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakePostConnectSequenceRunner : IPostConnectSequenceRunner

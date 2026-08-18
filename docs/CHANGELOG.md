@@ -12,6 +12,23 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: restoring the previous session is no longer the shell's job
+
+- **Launch-time session restore moved out of the main shell into a dedicated coordinator.** Loading the
+  snapshot, asking which sessions to reopen, reopening them and then consuming the snapshot file were
+  seventy lines inlined in the shell, reachable only by starting the whole application, and therefore
+  covered by nothing.
+- **Two rules that were never written down are now enforced and tested.** A snapshot the user answered
+  for is consumed exactly once, so declining it does not leave the same sessions to be offered again at
+  the next launch; a snapshot the user never got to answer for - because the dialog failed or was
+  dismissed - is kept. And one server that cannot be reopened no longer cancels the sessions queued
+  behind it in the snapshot.
+- **The shell can no longer reach the snapshot file at all.** It receives the coordinator and hands it
+  the live server inventory; reading and deleting the file are now the coordinator's alone.
+- **Measured**: the shell's file goes from 1059 lines to 987. Its constructor still takes 23
+  parameters, because one dependency left and one arrived; the gain here is the behaviour that moved
+  out, not the count. The decomposition is still in progress.
+
 ## 2026-08-18: the shell no longer carries the tunnelling services
 
 - **The tunnels view model is built by a factory that owns its collaborators.** The tunnel manager, the

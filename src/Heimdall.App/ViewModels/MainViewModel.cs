@@ -57,7 +57,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private readonly IDialogService _dialogService;
     private readonly IEmbeddedSessionManager _embeddedSessionManager;
     private readonly HeimdallThemeService _themeService;
-    private readonly ISessionSnapshotService _sessionSnapshotService;
+    private readonly ISessionRestoreCoordinator _sessionRestore;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly WorkspaceLockService _workspaceLock;
 
@@ -334,7 +334,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         IDialogService dialogService,
         IEmbeddedSessionManager embeddedSessionManager,
         HeimdallThemeService themeService,
-        ISessionSnapshotService sessionSnapshotService,
+        ISessionRestoreCoordinator sessionRestore,
         IPostConnectSequenceRunner postConnectSequenceRunner,
         IPostConnectStepResolver postConnectStepResolver,
         ToolRegistry toolRegistry,
@@ -360,7 +360,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _dialogService = dialogService;
         _embeddedSessionManager = embeddedSessionManager;
         _themeService = themeService;
-        _sessionSnapshotService = sessionSnapshotService;
+        _sessionRestore = sessionRestore;
         _uiDispatcher = uiDispatcher;
         ToolRegistry = toolRegistry;
         Split = splitService;
@@ -557,7 +557,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             await Settings.RefreshVaultStatusAsync();
             Scheduled.Load(settings);
 
-            await RestoreSessionSnapshotAsync(cancellationToken);
+            await _sessionRestore.RestoreAsync(ServerList, cancellationToken);
 
             // OperationScope.Dispose() handles the Ready transition
             SetLocalizedApplicationStatus("StatusReady");
@@ -575,79 +575,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// </summary>
     public IReadOnlyList<SessionSnapshotEntry> GetSessionSnapshotEntries()
         => SessionSnapshotProjection.FromSessions(Connection.ActiveSessions);
-
-    private async Task RestoreSessionSnapshotAsync(CancellationToken cancellationToken)
-    {
-        var snapshot = await _sessionSnapshotService.LoadAsync(cancellationToken);
-        if (snapshot?.Sessions.Count is not > 0)
-        {
-            return;
-        }
-
-        SnapshotRestoreDialogResult? dialogResult;
-        try
-        {
-            var dialogVm = new SnapshotRestoreDialogViewModel(
-                _localizer,
-                snapshot,
-                ServerList.Servers);
-            dialogResult = await _dialogService.ShowSnapshotRestoreDialogAsync(dialogVm);
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Error("Snapshot restore dialog failed.", ex);
-            _dialogService.ShowError(
-                _localizer["DialogSnapshotRestoreTitle"],
-                _localizer.Format("ErrorSnapshotRestoreFailed", ex.Message));
-            return;
-        }
-
-        if (dialogResult is null)
-        {
-            return;
-        }
-
-        if (dialogResult.Action == SnapshotRestoreDialogAction.DontRestore)
-        {
-            await _sessionSnapshotService.ClearAsync(cancellationToken);
-            return;
-        }
-
-        var restoredCount = 0;
-        var selectedSessions = dialogResult.Sessions
-            .OrderBy(session => session.Order)
-            .ToList();
-
-        foreach (var session in selectedSessions)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            try
-            {
-                if (await ServerList.RestoreServerAsync(session.ServerId, cancellationToken))
-                {
-                    restoredCount++;
-                }
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Error(
-                    $"Session snapshot restore failed for {session.ServerId}.", ex);
-            }
-        }
-
-        await _sessionSnapshotService.ClearAsync(cancellationToken);
-
-        if (restoredCount < selectedSessions.Count)
-        {
-            _dialogService.ShowWarning(
-                _localizer["DialogSnapshotRestoreTitle"],
-                _localizer.Format(
-                    "WarningSnapshotRestorePartial",
-                    restoredCount,
-                    selectedSessions.Count));
-        }
-    }
 
     private void OnSettingsChanged(AppSettings settings)
     {
