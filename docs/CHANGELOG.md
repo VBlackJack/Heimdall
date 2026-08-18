@@ -29,6 +29,19 @@ All notable changes to Heimdall are documented in this file.
   parameters, because one dependency left and one arrived; the gain here is the behaviour that moved
   out, not the count. The decomposition is still in progress.
 
+> **Correction (2026-08-18).** "Consumed exactly once, so declining it does not leave the same
+> sessions to be offered again at the next launch" promised more than the code delivers, and is left
+> above rather than rewritten because the overstatement is part of the record. What is actually
+> guaranteed is that a single deletion is *attempted* once the user has answered. The snapshot
+> service reports a delete it could not perform - a locked or unwritable file - as an ordinary
+> completion, and a cancellation or a process exit between the replay and the delete leaves the file
+> behind, so the same sessions can be offered again and reopened a second time. Detecting that would
+> need a durable record of the replay, which does not exist. A second defect shipped with the entry
+> above: a cancellation raised by the reopen itself was caught by the handler meant for ordinary
+> per-session failures, so a cancelled restore carried on through the remaining sessions, deleted
+> the snapshot and could report a partial-restore warning. Cancellation now propagates, stops the
+> replay, attempts no deletion and is never reported as a shortfall.
+
 ## 2026-08-18: the shell no longer carries the tunnelling services
 
 - **The tunnels view model is built by a factory that owns its collaborators.** The tunnel manager, the

@@ -40,7 +40,7 @@ public interface ISessionRestoreHost
 
 /// <summary>
 /// Replays the previous run's session snapshot at launch: asks the user what to reopen, reopens it,
-/// and consumes the snapshot.
+/// then tries once to delete the snapshot.
 /// </summary>
 /// <remarks>
 /// This is the counterpart of <see cref="SessionSnapshotProjection"/>, which decides what gets
@@ -50,14 +50,23 @@ public interface ISessionRestoreCoordinator
 {
     /// <summary>
     /// Runs the whole restore sequence. Does nothing when no snapshot is present or it holds no
-    /// session. A snapshot that reached the user is consumed exactly once, whether the user
-    /// declined it or it was replayed, so the same sessions are never offered twice; a snapshot the
-    /// user never got to answer for is left in place.
+    /// session. Once the user has answered - by declining or by having the sessions replayed -
+    /// deletion of the snapshot is attempted exactly once; a snapshot the user never got to answer
+    /// for is deliberately left in place.
     /// </summary>
     /// <remarks>
-    /// An individual session that fails to reopen is logged and skipped, so one unreachable server
-    /// cannot cancel the sessions queued behind it. Cancellation is observed between sessions and
-    /// propagates, which leaves the snapshot in place for the next launch.
+    /// <para>The attempt is not a guarantee of deletion, and nothing here promises exactly-once
+    /// replay. <see cref="ISessionSnapshotService.ClearAsync"/> reports a delete it could not
+    /// perform - a locked or unwritable file - as an ordinary completion, and a cancellation or a
+    /// process exit between the replay and the delete leaves the file behind. In any of those cases
+    /// the same sessions are offered again at the next launch, and sessions already reopened once
+    /// can be reopened a second time. Detecting that would take a durable record of the replay,
+    /// which this type does not keep.</para>
+    /// <para>An individual session that fails to reopen is logged and skipped, so one unreachable
+    /// server cannot cancel the sessions queued behind it. Cancellation is different: whether it is
+    /// observed between sessions or raised by a reopen itself, it propagates, stops the replay, and
+    /// is never counted as a session failure nor reported as a partial restore - and no deletion is
+    /// attempted, so the sessions still owed are not discarded here.</para>
     /// </remarks>
     Task RestoreAsync(ISessionRestoreHost host, CancellationToken cancellationToken = default);
 }
