@@ -591,9 +591,9 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                 // Everything able to fail is prepared here, while a rollback is still possible: the
                 // snapshot to publish, the copy to notify with, and the revision. After the second write
                 // the only remaining act is an assignment that cannot throw.
-                AppSettings publicationSnapshot = CloneSettings(settings);
+                PublishedSettingsSnapshot publication =
+                    new(ReserveSettingsRevision(), CloneSettings(settings));
                 AppSettings candidate = CloneSettings(settings);
-                long revision = ReserveSettingsRevision();
 
                 if (!string.Equals(originalJson, mutatedJson, StringComparison.Ordinal))
                 {
@@ -605,7 +605,14 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                     await AfterTransactionalServerWriteAsync().ConfigureAwait(false);
                 }
 
-                TryPublishPreparedSnapshot(revision, publicationSnapshot);
+                if (!TryPublishPreparedSnapshot(publication))
+                {
+                    // A refusal is never a silent success: the rollback below puts both files
+                    // back rather than leaving them committed to a state nobody published.
+                    throw new InvalidOperationException(
+                        "Migration could not be committed: a newer settings revision is already published.");
+                }
+
                 settingsToNotify = candidate;
             }
             catch (Exception commitFailure)
@@ -738,15 +745,26 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
     /// step past the point where the files can no longer be put back.
     /// </remarks>
     private bool TryPublishPreparedSnapshot(long revision, AppSettings immutableSnapshot)
+        => TryPublishPreparedSnapshot(new PublishedSettingsSnapshot(revision, immutableSnapshot));
+
+    /// <summary>
+    /// Publishes a snapshot record the caller has already constructed.
+    /// </summary>
+    /// <remarks>
+    /// The transactional commit builds this record before its second write, so the only thing left
+    /// afterwards is a reference assignment under a lock. Allocating the record after that write would
+    /// put an operation that can fail past the point where the files can still be put back.
+    /// </remarks>
+    private bool TryPublishPreparedSnapshot(PublishedSettingsSnapshot snapshot)
     {
         lock (_settingsPublicationLock)
         {
-            if (_publishedSettings is not null && revision <= _publishedSettings.Revision)
+            if (_publishedSettings is not null && snapshot.Revision <= _publishedSettings.Revision)
             {
                 return false;
             }
 
-            _publishedSettings = new PublishedSettingsSnapshot(revision, immutableSnapshot);
+            _publishedSettings = snapshot;
             return true;
         }
     }

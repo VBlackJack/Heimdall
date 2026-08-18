@@ -106,7 +106,7 @@ public interface IConfigManager
 /// </summary>
 /// <remarks>
 /// Opt-in capability rather than a member of <see cref="IConfigManager"/>: only the migration needs it,
-/// and widening the browser-facing abstraction would oblige every test double to answer for a guarantee
+/// and widening the general configuration abstraction would oblige every test double to answer for a guarantee
 /// it cannot make. A caller that cannot obtain this capability must refuse before mutating anything
 /// rather than fall back to two independent writes, which is precisely the partial-state defect this
 /// exists to close.

@@ -19,6 +19,7 @@ using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Ssh;
 
 namespace Heimdall.App.Tests;
 
@@ -350,6 +351,33 @@ public class MigrationServiceTests : IDisposable
         Assert.Equal(0, configManager.MutateServersCalls);
     }
 
+    // The legacy values must be applied to the state the commit provides, not to anything read before
+    // it. If the migration captured settings up front, a host key trusted while it was running would be
+    // silently discarded when the stale snapshot was written back.
+    [Fact]
+    public async Task ImportFromLegacyAsync_AppliesLegacyValuesToTheFreshCommitTarget()
+    {
+        FreshTargetConfigManager configManager = new();
+        MigrationService service = new(configManager, new LocalizationManager());
+
+        WriteLegacyFile(Path.Combine("config", "settings.json"),
+            """{ "DefaultLocale": "fr", "DefaultTheme": "Dracula" }""");
+        WriteLegacyFile(Path.Combine("config", "servers.json"), "[]");
+
+        MigrationResult result = await service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.True(result.Success);
+
+        // The legacy values landed...
+        Assert.Equal("fr", configManager.Committed.DefaultLocale);
+
+        // ...and the trust decision that only exists on the fresh object survived.
+        Assert.True(configManager.Committed.TrustedHostKeysV2.ContainsKey("sentinel.example"));
+        Assert.Equal(
+            "SHA256:SENTINEL",
+            configManager.Committed.TrustedHostKeysV2["sentinel.example"].Fingerprint);
+    }
+
     [Fact]
     public async Task ImportFromLegacyAsync_MalformedServers_DoesNotReplaceCurrentSettings()
     {
@@ -501,5 +529,84 @@ internal sealed class NonTransactionalConfigManager : IConfigManager
         ArgumentNullException.ThrowIfNull(mutate);
         MutateServersCalls++;
         return Task.FromResult(mutate(_servers));
+    }
+}
+/// <summary>
+/// A transactional configuration manager whose committed state is deliberately fresher than what
+/// <see cref="LoadSettingsAsync"/> reports.
+/// </summary>
+/// <remarks>
+/// This is what makes the fresh-target guarantee measurable. The migration must map the legacy values
+/// onto the object handed to the commit, not onto anything it read beforehand: a trust decision
+/// persisted while the migration was running lives only in the fresh object, and a snapshot captured
+/// earlier would silently drop it.
+/// </remarks>
+internal sealed class FreshTargetConfigManager : IConfigManager, IConfigTransactionalWriter
+{
+    /// <summary>What a pre-transaction read sees: no trusted key yet.</summary>
+    private readonly AppSettings _staleView = new() { DefaultLocale = "en" };
+
+    /// <summary>The state the commit actually mutates, carrying a key trusted in the meantime.</summary>
+    public AppSettings Committed { get; } = new()
+    {
+        DefaultLocale = "en",
+        TrustedHostKeysV2 =
+        {
+            ["sentinel.example"] = new HostKeyEntry(
+                "SHA256:SENTINEL",
+                DateTimeOffset.UnixEpoch,
+                DateTimeOffset.UnixEpoch,
+                "ssh-ed25519",
+                HostKeySource.Unknown),
+        },
+    };
+
+    public List<ServerProfileDto> Servers { get; } = [];
+
+    public string ConfigPath => "mem://config";
+
+    public string SettingsPath => "mem://settings.json";
+
+    public string ServersPath => "mem://servers.json";
+
+    public event Action<AppSettings>? SettingsChanged;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(_staleView);
+
+    public AppSettings? CurrentSettings => Committed;
+
+    public Task SaveSettingsAsync(AppSettings settings) => Task.CompletedTask;
+
+    public Task MergeSettingAsync(Action<AppSettings> mutate) => Task.CompletedTask;
+
+    public Task<bool> MergeHostKeyAsync(string host, string fingerprint) => Task.FromResult(true);
+
+    public Task<int> MergeTrustedHostKeysAsync(IEnumerable<KeyValuePair<string, string>> hostKeys)
+        => Task.FromResult(0);
+
+    public Task<List<ServerProfileDto>> LoadServersAsync() => Task.FromResult(Servers);
+
+    public Task SaveServersAsync(List<ServerProfileDto> servers) => Task.CompletedTask;
+
+    public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        return Task.FromResult(mutate(Servers));
+    }
+
+    public Task CommitMigrationAsync(
+        Action<AppSettings> applySettingsMutation,
+        Action<List<ServerProfileDto>> applyServersMutation)
+    {
+        ArgumentNullException.ThrowIfNull(applySettingsMutation);
+        ArgumentNullException.ThrowIfNull(applyServersMutation);
+
+        // The mutation is handed the fresh object, exactly as the real manager does under its lock.
+        applySettingsMutation(Committed);
+        applyServersMutation(Servers);
+        SettingsChanged?.Invoke(Committed);
+        return Task.CompletedTask;
     }
 }
