@@ -1262,10 +1262,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         case RemoteEntryKind.File:
                             targetKinds[targetPath] = FileConflictItemKind.File;
                             break;
+                        // The default arm is the point: a value this switch does not enumerate used to
+                        // land in neither collection, so the destination was neither a known conflict
+                        // nor unsupported and the upload went ahead against it.
+                        case RemoteEntryKind.Unknown:
                         case RemoteEntryKind.SymbolicLink:
                         case RemoteEntryKind.Fifo:
                         case RemoteEntryKind.Socket:
                         case RemoteEntryKind.Device:
+                        default:
                             unsupportedTargets.Add(targetPath);
                             break;
                     }
@@ -2795,6 +2800,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 return "SftpPropertiesTypeSocket";
             case RemoteEntryKind.Device:
                 return "SftpPropertiesTypeDevice";
+            case RemoteEntryKind.Unknown:
+                return "SftpPropertiesTypeUnknown";
         }
 
         throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown remote entry kind.");
@@ -3099,7 +3106,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 's' => RemoteEntryKind.Socket,
                 'c' or 'b' => RemoteEntryKind.Device,
                 '-' => RemoteEntryKind.File,
-                _ => RemoteEntryKind.File,
+
+                // Unreachable: this same loop already skipped any line whose type character is not one
+                // of "dl-cbps", so the switch above covers every character that reaches here. The arm
+                // states that impossibility rather than quietly answering "file", as it used to.
+                _ => throw new InvalidOperationException(
+                    $"unfiltered ls type character reached the mapper: {permissions[0]}"),
             };
             string fullPath = parentPath.EndsWith("/", StringComparison.Ordinal)
                 ? $"{parentPath}{name}"

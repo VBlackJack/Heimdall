@@ -12,6 +12,36 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-17: an entry nobody can classify is no longer treated as a file
+
+- **An indeterminate remote type is now explicit** (SFTP-016). When every type test failed, the SFTP
+  listing logged the fact and then returned the regular-file kind, so an object nobody could classify
+  was transferable like any ordinary file. There is now a distinct kind for it, and the regular-file
+  value no longer doubles as "or we could not tell".
+- **The unclassifiable kind is the zero value.** An uninitialised value, or a mapper that fell through
+  without classifying, now yields the non-transferable kind instead of looking like a plain file. A cast
+  from an out-of-range integer is a different case and keeps its own numeric value: it is not converted
+  into anything. It is refused because the upload inventory gained a default arm that treats any value it
+  does not enumerate as unsupported, and because the SFTP upload guard already refused anything outside
+  its known list.
+- **FTP was mapping two different situations to "file".** A listing that carries an explicit type
+  character this build does not recognise is now unclassifiable, and so is an object type the library
+  reports that we cannot interpret. A mode-only permission string such as `rw-r--r--` carries no type
+  character at all and is unchanged: it stays a regular file, because reading its first character as a
+  type would classify a plain file by whichever permission bit happened to come first.
+- **The paths that refuse it, precisely.** The application orchestration excludes it from the
+  transferable inventory (upload destinations, download, cross-endpoint paste, duplicate); the transfer
+  tree planner refuses it; and the SFTP upload guard refuses it with its typed exception. The upload
+  inventory also gained a default arm, so a value it does not enumerate is unsupported rather than
+  silently absent from both buckets.
+- **What is still not guarded**: `FtpBrowser`'s direct upload API performs no destination-type check at
+  all. That has always been true and is equally true for links, pipes, sockets and devices; it is a
+  separate defect and this entry does not close it.
+- **It is visible.** The listing shows a distinct warning glyph, never the ordinary file icon, and the
+  properties dialog names the type.
+- **Renaming stays available**, as it does for a pipe: renaming a path moves a name and does not read
+  or transfer any content.
+
 ## 2026-08-17: a cross-endpoint paste can no longer overwrite what it did not see
 
 - **Pasting between two remote endpoints no longer replaces existing files** (P1). Destination names
@@ -451,6 +481,12 @@ figure is given: it was not measured at the time.
 
 Backfilled entry: the v2026.080200 release commit (`c80807d1`) updated only the version; this
 entry documents what it shipped - twelve commits closing the whole of SFTP-016.
+
+> **Correction (2026-08-17).** "Closing the whole of SFTP-016" was wrong. What shipped here
+> handled the special types the servers *name* - links, pipes, sockets, devices. An entry whose
+> type could not be determined at all still fell back to the regular-file kind and stayed
+> transferable. That remainder is closed by the entry below; this paragraph is left in place
+> rather than rewritten, because the overstatement is part of the record.
 
 ### Fixed
 

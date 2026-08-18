@@ -49,6 +49,7 @@ public sealed class SftpAtomicUploadTargetTests
     }
 
     [Theory]
+    [InlineData(RemoteEntryKind.Unknown)]
     [InlineData(RemoteEntryKind.SymbolicLink)]
     [InlineData(RemoteEntryKind.Fifo)]
     [InlineData(RemoteEntryKind.Socket)]

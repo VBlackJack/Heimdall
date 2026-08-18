@@ -19,7 +19,17 @@ namespace Heimdall.Sftp;
 /// <summary>Identifies the remote filesystem entry type reported by a listing producer.</summary>
 public enum RemoteEntryKind
 {
-    /// <summary>A regular file or an entry whose type could not be determined.</summary>
+    /// <summary>An entry whose type could not be determined.</summary>
+    /// <remarks>
+    /// Zero on purpose, so an uninitialised or unmapped value is the non-transferable one. When the
+    /// regular file was zero, forgetting to classify something made it look like an ordinary file and
+    /// every file-only path accepted it. An entry of this kind is never transferred: its content is
+    /// not known to be byte-addressable, and reading it can block forever or return data that does
+    /// not correspond to a stored object.
+    /// </remarks>
+    Unknown = 0,
+
+    /// <summary>A regular file.</summary>
     File,
 
     /// <summary>A directory.</summary>

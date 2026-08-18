@@ -444,6 +444,10 @@
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
                                         <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Unknown">
+                                        <Setter TargetName="FileIcon" Property="Text" Value="&#xE7BA;"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                    </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="Device">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
                                         <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>

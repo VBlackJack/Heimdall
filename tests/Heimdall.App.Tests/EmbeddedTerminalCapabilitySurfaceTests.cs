@@ -88,6 +88,18 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
             "Views",
             "EmbeddedSftpView.xaml");
 
+        // An entry nobody could classify must be visibly distinct. Asserting only that the trigger exists
+        // would pass even if it set the ordinary file appearance, so the block is extracted and read on
+        // its own: a global search would find the default glyph elsewhere in the template and prove
+        // nothing about this trigger.
+        string unknownTrigger = ExtractDataTriggerBlock(source, "Unknown");
+
+        Assert.Contains("&#xE7BA;", unknownTrigger, StringComparison.Ordinal);
+        Assert.Contains("WarningBrush", unknownTrigger, StringComparison.Ordinal);
+
+        // The plain-file appearance must not be what this trigger applies.
+        Assert.DoesNotContain("&#xE7C3;", unknownTrigger, StringComparison.Ordinal);
+        Assert.DoesNotContain("TextSecondaryBrush", unknownTrigger, StringComparison.Ordinal);
         Assert.Contains(
             "<DataTrigger Binding=\"{Binding Kind}\" Value=\"SymbolicLink\">",
             source,
@@ -234,5 +246,38 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
         int endIndex = source.IndexOf(';', signatureIndex + signature.Length);
         Assert.True(endIndex > signatureIndex, $"Member terminator was not found: {signature}");
         return source[signatureIndex..(endIndex + 1)];
+    }
+
+    /// <summary>
+    /// Returns the single <c>DataTrigger</c> block for the given <c>Kind</c> value, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Bounding is the whole point: assertions about an appearance are meaningless if they can be
+    /// satisfied by markup belonging to another trigger, or by the template's default icon.
+    /// </remarks>
+    private static string ExtractDataTriggerBlock(string xaml, string kindValue)
+    {
+        string opening = $"<DataTrigger Binding=\"{{Binding Kind}}\" Value=\"{kindValue}\">";
+        int start = xaml.IndexOf(opening, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"the {kindValue} trigger must exist");
+        Assert.Equal(1, CountOccurrences(xaml, opening));
+
+        int end = xaml.IndexOf("</DataTrigger>", start, StringComparison.Ordinal);
+        Assert.True(end > start, $"the {kindValue} trigger must be closed");
+
+        return xaml[start..(end + "</DataTrigger>".Length)];
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        int count = 0;
+        int index = haystack.IndexOf(needle, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            count++;
+            index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal);
+        }
+
+        return count;
     }
 }

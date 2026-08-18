@@ -40,6 +40,7 @@ public static class SftpAtomicUpload
             case RemoteEntryKind.File:
             case RemoteEntryKind.Directory:
                 return;
+            case RemoteEntryKind.Unknown:
             case RemoteEntryKind.SymbolicLink:
             case RemoteEntryKind.Fifo:
             case RemoteEntryKind.Socket:

@@ -76,6 +76,7 @@ public sealed class RemoteTransferTreePlannerTests
     }
 
     [Theory]
+    [InlineData(RemoteEntryKind.Unknown)]
     [InlineData(RemoteEntryKind.SymbolicLink)]
     [InlineData(RemoteEntryKind.Fifo)]
     [InlineData(RemoteEntryKind.Socket)]

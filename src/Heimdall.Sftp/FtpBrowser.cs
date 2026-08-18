@@ -800,13 +800,36 @@ public sealed class FtpBrowser : IRemoteBrowser
             $"FTPS pinned certificate failed non-overridable validity checks: {validationErrors}");
     }
 
-    internal static SftpFileInfo MapFtpItemToFileInfo(FtpListItem item, string parentPath)
+    /// <summary>
+    /// Classifies an FTP entry that the library did not report as a link or a directory.
+    /// </summary>
+    /// <remarks>
+    /// The permission string comes in two shapes and they must not be confused. A ten-character value
+    /// carries an explicit type character first (<c>-rw-r--r--</c>), so that character is authoritative.
+    /// A nine-character value is mode-only (<c>rw-r--r--</c>) and says nothing at all about the type, so
+    /// reading its first character as a type would classify a plain file by whichever permission bit
+    /// happened to be first.
+    /// <para>
+    /// Without a type character, the library's own value is all there is. Any value other than
+    /// <see cref="FtpObjectType.File"/> is one this build cannot interpret, so the entry is not treated as
+    /// a regular file.
+    /// <para>
+    /// One residue is worth naming rather than hiding: <see cref="FtpObjectType.File"/> is itself that
+    /// enum's zero value, so an item whose type was never assigned is indistinguishable here from one
+    /// positively reported as a file. That is the same shape this change removed from
+    /// <see cref="RemoteEntryKind"/>, and it cannot be fixed from this side without also refusing every
+    /// genuine file that a server lists without permissions. Whether the library can ever leave the value
+    /// unset is a property of its parsers, not of this mapper.
+    /// </para>
+    /// </para>
+    /// </remarks>
+    private static RemoteEntryKind ClassifyFtpEntry(FtpObjectType type, string? rawPermissions)
     {
-        RemoteEntryKind kind = item.Type switch
+        const int TypedPermissionsLength = 10;
+
+        if (rawPermissions is { Length: >= TypedPermissionsLength })
         {
-            FtpObjectType.Link => RemoteEntryKind.SymbolicLink,
-            FtpObjectType.Directory => RemoteEntryKind.Directory,
-            _ when !string.IsNullOrEmpty(item.RawPermissions) => item.RawPermissions[0] switch
+            return rawPermissions[0] switch
             {
                 'd' => RemoteEntryKind.Directory,
                 'l' => RemoteEntryKind.SymbolicLink,
@@ -814,9 +837,23 @@ public sealed class FtpBrowser : IRemoteBrowser
                 's' => RemoteEntryKind.Socket,
                 'c' or 'b' => RemoteEntryKind.Device,
                 '-' => RemoteEntryKind.File,
-                _ => RemoteEntryKind.File,
-            },
-            _ => RemoteEntryKind.File,
+
+                // An explicit type character this build does not recognise. The server stated a type and
+                // we cannot read it, which is precisely the case that must not become a regular file.
+                _ => RemoteEntryKind.Unknown,
+            };
+        }
+
+        return type == FtpObjectType.File ? RemoteEntryKind.File : RemoteEntryKind.Unknown;
+    }
+
+    internal static SftpFileInfo MapFtpItemToFileInfo(FtpListItem item, string parentPath)
+    {
+        RemoteEntryKind kind = item.Type switch
+        {
+            FtpObjectType.Link => RemoteEntryKind.SymbolicLink,
+            FtpObjectType.Directory => RemoteEntryKind.Directory,
+            _ => ClassifyFtpEntry(item.Type, item.RawPermissions),
         };
         bool isDirectory = kind == RemoteEntryKind.Directory;
         long size = isDirectory ? 0 : Math.Max(0, item.Size);
