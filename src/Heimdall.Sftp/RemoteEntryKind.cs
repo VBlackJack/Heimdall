@@ -23,9 +23,17 @@ public enum RemoteEntryKind
     /// <remarks>
     /// Zero on purpose, so an uninitialised or unmapped value is the non-transferable one. When the
     /// regular file was zero, forgetting to classify something made it look like an ordinary file and
-    /// every file-only path accepted it. An entry of this kind is never transferred: its content is
-    /// not known to be byte-addressable, and reading it can block forever or return data that does
-    /// not correspond to a stored object.
+    /// every file-only path accepted it.
+    /// <para>
+    /// The application transfer planner and the guarded SFTP upload path reject this kind, because its
+    /// content is not known to be byte-addressable: reading it can block indefinitely or return data
+    /// that corresponds to no stored object.
+    /// </para>
+    /// <para>
+    /// This value is classification metadata, not an execution guard. A browser API that operates
+    /// directly on a path is free to never consult it, and some do not, so each such API must enforce
+    /// its own safety policy rather than assume this kind has already stopped the caller.
+    /// </para>
     /// </remarks>
     Unknown = 0,
 
