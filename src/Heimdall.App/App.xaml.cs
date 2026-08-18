@@ -28,6 +28,7 @@ using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Onboarding;
 using Heimdall.App.ViewModels.Settings;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.Core.Certificates;
@@ -657,6 +658,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IHmacGeneratorService, HmacGeneratorService>();
         services.AddSingleton<IOtpGeneratorService, OtpGeneratorService>();
         services.AddSingleton<ISessionSnapshotService, SessionSnapshotService>();
+        services.AddSingleton<ISessionRestoreCoordinator, SessionRestoreCoordinator>();
         services.AddSingleton<IRdpImportService, RdpImportService>();
         services.AddSingleton<IProfileImportService, ProfileImportService>();
         services.AddSingleton<ICommandLibraryTransferService, CommandLibraryTransferService>();

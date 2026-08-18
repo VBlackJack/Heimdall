@@ -15,8 +15,10 @@
  */
 
 using System.Reflection;
+using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Ssh;
@@ -100,6 +102,26 @@ public sealed class MainViewModelCompositionTests
                 typeof(MainViewModel).GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
                 field => field.FieldType == moved);
         }
+    }
+
+    // The snapshot service sat on the shell for one reason: the shell ran the restore sequence
+    // itself. The coordinator owns that sequence now, so the shell must no longer be able to read
+    // or delete the snapshot file at all.
+    [Fact]
+    public void MainViewModel_TakesTheRestoreCoordinatorAndNotTheSnapshotService()
+    {
+        ParameterInfo[] parameters = MainViewModelConstructor.GetParameters();
+
+        Assert.Contains(
+            parameters,
+            parameter => parameter.ParameterType == typeof(ISessionRestoreCoordinator));
+
+        Assert.DoesNotContain(
+            parameters,
+            parameter => parameter.ParameterType == typeof(ISessionSnapshotService));
+        Assert.DoesNotContain(
+            typeof(MainViewModel).GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
+            field => field.FieldType == typeof(ISessionSnapshotService));
     }
 
     private static Type[] TunnellingCollaborators =>

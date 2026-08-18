@@ -26,6 +26,7 @@ using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Settings;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
@@ -431,7 +432,7 @@ public sealed class MainViewModelSettingsNavigationTests
                 dialog,
                 embeddedSessionManager,
                 new HeimdallThemeService(config),
-                new StubSessionSnapshotService(rootPath),
+                new StubSessionRestoreCoordinator(),
                 new StubPostConnectSequenceRunner(),
                 new StubPostConnectStepResolver(),
                 toolRegistry,
@@ -781,21 +782,11 @@ public sealed class MainViewModelSettingsNavigationTests
             throw new NotSupportedException();
     }
 
-    private sealed class StubSessionSnapshotService(string rootPath) : ISessionSnapshotService
+    private sealed class StubSessionRestoreCoordinator : ISessionRestoreCoordinator
     {
-        public string SnapshotPath { get; } = Path.Combine(rootPath, "snapshot.json");
-
-        public Task SaveAsync(
-            IReadOnlyList<SessionSnapshotEntry> sessions,
-            CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-
-        public Task<SessionSnapshotFile?> LoadAsync(
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<SessionSnapshotFile?>(null);
-
-        public Task ClearAsync(CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task RestoreAsync(
+            ISessionRestoreHost host,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class StubToolContextProvider : IToolContextProvider
