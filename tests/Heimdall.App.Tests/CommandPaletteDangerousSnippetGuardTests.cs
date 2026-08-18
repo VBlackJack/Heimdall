@@ -23,6 +23,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.App.Views;
@@ -203,7 +204,6 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 new FakePostConnectStepResolver(),
                 toolRegistry,
                 splitService,
-                new ExternalToolLaunchService(dialogService),
                 new ToolsTabPopulationService(toolRegistry),
                 new FakeToolContextProvider(),
                 dispatcher,
@@ -213,7 +213,17 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 connection,
                 settings,
                 null!,
-                CommandLibraryTestHelpers.CreateResolverServiceProvider(), new PaneCloseArbiter());
+                new PaneCloseArbiter(),
+                new CommandPaletteViewModelFactory(
+                    localizer,
+                    dialogService,
+                    toolRegistry,
+                    configManager,
+                    embeddedSessionManager,
+                    new ExternalToolLaunchService(dialogService),
+                    new RecentConnectionTracker(),
+                    CommandLibraryTestHelpers.CreateResolverServiceProvider()
+                        .GetRequiredService<IServiceScopeFactory>()));
 
             return new PaletteHarness(rootPath, main, dialogService, embeddedSessionManager, order);
         }

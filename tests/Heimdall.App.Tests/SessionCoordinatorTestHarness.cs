@@ -22,6 +22,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
@@ -192,7 +193,6 @@ public sealed partial class SessionCoordinatorPreMountTests
                 new FakePostConnectStepResolver(),
                 toolRegistry,
                 splitService,
-                new ExternalToolLaunchService(dialogService),
                 new ToolsTabPopulationService(toolRegistry),
                 new FakeToolContextProvider(),
                 dispatcher,
@@ -202,7 +202,17 @@ public sealed partial class SessionCoordinatorPreMountTests
                 connection,
                 settings,
                 null!,
-                new ServiceCollection().BuildServiceProvider(), closeArbiter);
+                closeArbiter,
+                new CommandPaletteViewModelFactory(
+                    localizer,
+                    dialogService,
+                    toolRegistry,
+                    configManager,
+                    embeddedSessionManager,
+                    new ExternalToolLaunchService(dialogService),
+                    new RecentConnectionTracker(),
+                    new ServiceCollection().BuildServiceProvider()
+                        .GetRequiredService<IServiceScopeFactory>()));
 
             return new TestHarness(
                 rootPath,

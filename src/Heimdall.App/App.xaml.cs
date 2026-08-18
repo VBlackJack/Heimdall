@@ -24,6 +24,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Onboarding;
 using Heimdall.App.ViewModels.Settings;
@@ -676,6 +677,9 @@ public partial class App : System.Windows.Application
         TwinShellBootstrapper.RegisterServices(services);
 
         // ViewModels
+        // Transient like its owner: the palette is built per MainViewModel, and the factory holds
+        // only dependencies that are themselves safe to resolve from the root.
+        services.AddTransient<ICommandPaletteViewModelFactory, CommandPaletteViewModelFactory>();
         services.AddTransient<MainViewModel>();
         services.AddTransient<UpdateBannerViewModel>();
         services.AddTransient<ServerListViewModel>();

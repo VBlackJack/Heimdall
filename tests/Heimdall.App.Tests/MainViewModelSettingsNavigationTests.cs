@@ -22,6 +22,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Settings;
@@ -437,7 +438,6 @@ public sealed class MainViewModelSettingsNavigationTests
                 new StubPostConnectStepResolver(),
                 toolRegistry,
                 splitService,
-                new ExternalToolLaunchService(dialog),
                 new ToolsTabPopulationService(toolRegistry),
                 new StubToolContextProvider(),
                 dispatcher,
@@ -446,7 +446,16 @@ public sealed class MainViewModelSettingsNavigationTests
                 connection,
                 settings,
                 update,
-                serviceProvider, new PaneCloseArbiter());
+                new PaneCloseArbiter(),
+                new CommandPaletteViewModelFactory(
+                    localizer,
+                    dialog,
+                    toolRegistry,
+                    config,
+                    embeddedSessionManager,
+                    new ExternalToolLaunchService(dialog),
+                    new RecentConnectionTracker(),
+                    serviceProvider.GetRequiredService<IServiceScopeFactory>()));
 
             return new TestHarness(
                 rootPath,

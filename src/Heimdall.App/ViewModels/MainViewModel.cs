@@ -60,7 +60,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private readonly ISessionSnapshotService _sessionSnapshotService;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly WorkspaceLockService _workspaceLock;
-    private readonly IServiceProvider _serviceProvider;
 
     private bool _disposed;
     private bool _isSettingLocalizedApplicationStatus;
@@ -343,7 +342,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         IPostConnectStepResolver postConnectStepResolver,
         ToolRegistry toolRegistry,
         SplitService splitService,
-        ExternalToolLaunchService externalToolLaunchService,
         ToolsTabPopulationService toolsTabPopulation,
         IToolContextProvider toolContextProvider,
         IUiDispatcher uiDispatcher,
@@ -352,9 +350,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ConnectionViewModel connection,
         SettingsViewModel settings,
         UpdateBannerViewModel update,
-        IServiceProvider serviceProvider,
         IPaneCloseArbiter closeArbiter,
-        IRecentConnectionTracker? recentConnections = null)
+        ICommandPaletteViewModelFactory commandPaletteFactory)
     {
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
         _configManager = configManager;
@@ -367,7 +364,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _themeService = themeService;
         _sessionSnapshotService = sessionSnapshotService;
         _uiDispatcher = uiDispatcher;
-        _serviceProvider = serviceProvider;
         ToolRegistry = toolRegistry;
         Split = splitService;
 
@@ -384,9 +380,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         Update = update;
         Sidebar = new SidebarViewModel(this, localizer, configManager, toolsTabPopulation, toolContextProvider, _uiDispatcher);
         ToolsTab = new ToolsTabViewModel(this, localizer, toolContextProvider);
-        CommandPalette = new CommandPaletteViewModel(
-            this, localizer, dialogService, toolRegistry, configManager, embeddedSessionManager,
-            externalToolLaunchService, recentConnections ?? new RecentConnectionTracker(), serviceProvider);
+        CommandPalette = commandPaletteFactory.Create(this);
         Tunnels = new TunnelsViewModel(
             this,
             localizer,
@@ -516,11 +510,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                 _localizer["VaultHelloReenrollTitle"],
                 _localizer["VaultHelloReenrollPrompt"],
                 "warning"),
-            async () =>
-            {
-                var lifecycle = _serviceProvider.GetRequiredService<VaultLifecycleService>();
-                await lifecycle.EnrollHelloAsync().ConfigureAwait(true);
-            });
+            () => _workspaceLock.EnrollHelloAsync());
     }
 
     /// <summary>

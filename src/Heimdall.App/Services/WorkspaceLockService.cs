@@ -155,6 +155,16 @@ public sealed class WorkspaceLockService : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Enrols Windows Hello for the vault this service governs.
+    /// </summary>
+    /// <remarks>
+    /// Enrolment does not change the locked state: a locked workspace stays locked, and the unlock
+    /// methods above remain the only things that release it.
+    /// </remarks>
+    /// <param name="ct">Cancellation token.</param>
+    public Task EnrollHelloAsync(CancellationToken ct = default) => _lifecycle.EnrollHelloAsync(ct);
+
     private void RefreshIdleTimer()
     {
         var shouldWatch = _vaultEnabled && !IsWorkspaceLocked && _autoLockIdleMinutes > 0;

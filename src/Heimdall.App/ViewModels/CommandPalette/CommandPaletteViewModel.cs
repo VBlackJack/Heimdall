@@ -62,7 +62,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     private readonly IEmbeddedSessionManager _embeddedSessionManager;
     private readonly ExternalToolLaunchService _externalToolLaunchService;
     private readonly IRecentConnectionTracker _recentConnections;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     /// <summary>
     /// In-memory snapshot of the TwinShell action library used by the fuzzy
@@ -99,7 +99,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         IEmbeddedSessionManager embeddedSessionManager,
         ExternalToolLaunchService externalToolLaunchService,
         IRecentConnectionTracker recentConnections,
-        IServiceProvider serviceProvider)
+        IServiceScopeFactory scopeFactory)
     {
         _main = main;
         _localizer = localizer;
@@ -109,7 +109,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         _embeddedSessionManager = embeddedSessionManager;
         _externalToolLaunchService = externalToolLaunchService;
         _recentConnections = recentConnections;
-        _serviceProvider = serviceProvider;
+        _scopeFactory = scopeFactory;
     }
 
     // ── Observable state ─────────────────────────────────────────────
@@ -202,7 +202,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         try
         {
             List<ActionModel> actions;
-            await using (var scope = _serviceProvider.CreateAsyncScope())
+            await using (AsyncServiceScope scope = _scopeFactory.CreateAsyncScope())
             {
                 var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
                 actions = (await actionService.GetAllActionsAsync()).ToList();
