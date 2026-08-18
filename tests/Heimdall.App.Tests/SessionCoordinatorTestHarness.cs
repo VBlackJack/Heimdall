@@ -111,6 +111,53 @@ public sealed partial class SessionCoordinatorPreMountTests
             ((ISessionRestoreHost)harness.Main.ServerList).RestorableServers);
     }
 
+    // The palette moved behind a factory in the same lot that removed the service locator, but only
+    // its presence on the constructor was ever pinned. The palette's own behaviour is covered
+    // end to end elsewhere through this harness; what was missing is the composition itself, which
+    // is the property its tunnels twin above already carries.
+    [Fact]
+    public void MainViewModel_BuildsTheCommandPaletteThroughTheFactoryExactlyOnce()
+    {
+        RecordingCommandPaletteFactory factory = new();
+        using TestHarness harness = TestHarness.Create(paletteFactory: factory);
+
+        Assert.Equal(1, factory.CreateCalls);
+
+        // The owner handed over is the very shell under construction.
+        Assert.Same(harness.Main, factory.LastOwner);
+
+        // What Create returned is what the shell exposes.
+        Assert.Same(factory.LastCreated, harness.Main.CommandPalette);
+    }
+
+    private sealed class RecordingCommandPaletteFactory : ICommandPaletteViewModelFactory
+    {
+        private readonly CommandPaletteViewModelFactory _inner = new(
+            new LocalizationManager(),
+            new FakeDialogService(),
+            new ToolRegistry(),
+            new InMemoryConfigManager(),
+            new FakeEmbeddedSessionManager(),
+            new ExternalToolLaunchService(new FakeDialogService()),
+            new RecentConnectionTracker(),
+            new ServiceCollection().BuildServiceProvider()
+                .GetRequiredService<IServiceScopeFactory>());
+
+        public int CreateCalls { get; private set; }
+
+        public MainViewModel? LastOwner { get; private set; }
+
+        public CommandPaletteViewModel? LastCreated { get; private set; }
+
+        public CommandPaletteViewModel Create(MainViewModel owner)
+        {
+            CreateCalls++;
+            LastOwner = owner;
+            LastCreated = _inner.Create(owner);
+            return LastCreated;
+        }
+    }
+
     private sealed class RecordingTunnelsFactory : ITunnelsViewModelFactory
     {
         private readonly TunnelsViewModelFactory _inner = new(
@@ -210,7 +257,8 @@ public sealed partial class SessionCoordinatorPreMountTests
         public static TestHarness Create(
             bool checkAccess = true,
             ITunnelsViewModelFactory? tunnelsFactory = null,
-            ISessionRestoreCoordinator? sessionRestore = null)
+            ISessionRestoreCoordinator? sessionRestore = null,
+            ICommandPaletteViewModelFactory? paletteFactory = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -310,7 +358,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 settings,
                 null!,
                 closeArbiter,
-                new CommandPaletteViewModelFactory(
+                paletteFactory ?? new CommandPaletteViewModelFactory(
                     localizer,
                     dialogService,
                     toolRegistry,
