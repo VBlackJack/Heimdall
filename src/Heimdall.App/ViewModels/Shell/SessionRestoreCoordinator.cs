@@ -23,7 +23,8 @@ using Heimdall.Core.Logging;
 namespace Heimdall.App.ViewModels.Shell;
 
 /// <summary>
-/// Default <see cref="ISessionRestoreCoordinator"/>: dialog, replay, then snapshot consumption.
+/// Default <see cref="ISessionRestoreCoordinator"/>: dialog, replay, then one attempt to delete the
+/// snapshot.
 /// </summary>
 /// <remarks>
 /// Stateless between calls, and the inventory arrives as an argument, so a single instance serves
@@ -71,7 +72,7 @@ public sealed class SessionRestoreCoordinator : ISessionRestoreCoordinator
         catch (Exception ex)
         {
             // The snapshot is deliberately left in place: the user never saw the choice, so
-            // consuming it here would silently discard sessions nobody declined.
+            // deleting it here would silently discard sessions nobody declined.
             FileLogger.Error("Snapshot restore dialog failed.", ex);
             _dialogService.ShowError(
                 _localizer["DialogSnapshotRestoreTitle"],
@@ -105,6 +106,15 @@ public sealed class SessionRestoreCoordinator : ISessionRestoreCoordinator
                 {
                     restoredCount++;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Not a session failing. The sessions queued behind this one are still owed, so the
+                // replay stops here rather than continuing, no deletion is attempted, and nothing is
+                // reported as a partial restore. Caught ahead of the general handler below, which
+                // would otherwise absorb it - and a cancellation raised inside the reopen is not
+                // visible to the loop-top check at all.
+                throw;
             }
             catch (Exception ex)
             {

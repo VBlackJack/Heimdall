@@ -33,16 +33,21 @@ namespace Heimdall.App.Tests;
 /// Launch-time replay of the previous run's session snapshot.
 /// </summary>
 /// <remarks>
-/// This orchestration had no coverage while it lived inline in the shell view model. Two rules carry
-/// the weight and neither was expressed anywhere: a snapshot the user answered for is consumed
-/// exactly once - so declined sessions are not re-offered and replayed sessions are not replayed
-/// twice - while a snapshot the user never got to answer for survives; and one session that fails to
-/// reopen must not cancel the sessions queued behind it.
+/// <para>This orchestration had no coverage while it lived inline in the shell view model. Two rules
+/// carry the weight and neither was expressed anywhere: once the user has answered, deletion of the
+/// snapshot is attempted exactly once, while a snapshot the user never got to answer for survives;
+/// and one session that fails to reopen must not cancel the sessions queued behind it.</para>
+/// <para>What these tests do not prove, because the code does not do it: that the snapshot actually
+/// disappears. Every assertion below counts calls to <c>ClearAsync</c>. The real service reports a
+/// delete it could not perform as an ordinary completion, and a cancellation or a process exit
+/// between the replay and the delete leaves the file behind, so the same sessions can be offered
+/// again - and reopened again - at the next launch. There is no exactly-once replay guarantee here
+/// and nothing below should be read as one.</para>
 /// </remarks>
 public sealed class SessionRestoreCoordinatorTests
 {
     [Fact]
-    public async Task NoSnapshotFile_AsksNothingAndConsumesNothing()
+    public async Task NoSnapshotFile_AsksNothingAndAttemptsNoDeletion()
     {
         RecordingDialogService dialogs = new();
         RecordingSnapshotService snapshots = new(snapshot: null);
@@ -56,7 +61,7 @@ public sealed class SessionRestoreCoordinatorTests
     }
 
     [Fact]
-    public async Task SnapshotWithNoSession_AsksNothingAndConsumesNothing()
+    public async Task SnapshotWithNoSession_AsksNothingAndAttemptsNoDeletion()
     {
         RecordingDialogService dialogs = new();
         RecordingSnapshotService snapshots = new(Snapshot());
@@ -70,7 +75,7 @@ public sealed class SessionRestoreCoordinatorTests
     }
 
     [Fact]
-    public async Task DontRestore_ConsumesTheSnapshotWithoutReopeningAnything()
+    public async Task DontRestore_AttemptsTheDeletionOnceWithoutReopeningAnything()
     {
         RecordingSnapshotService snapshots = new(Snapshot(Entry("srv-1", 0)));
         RecordingDialogService dialogs = new()
@@ -81,13 +86,14 @@ public sealed class SessionRestoreCoordinatorTests
 
         await CreateCoordinator(snapshots, dialogs).RestoreAsync(host, CancellationToken.None);
 
-        // Declining is an answer: leaving the file behind would re-offer the same sessions forever.
+        // Declining is an answer, so the deletion is attempted. Whether the file actually goes away
+        // is the snapshot service's business, and it reports a failed delete as an ordinary return.
         Assert.Equal(1, snapshots.ClearCalls);
         Assert.Empty(host.RestoreAttempts);
     }
 
     [Fact]
-    public async Task RestoreSelected_ReopensInSnapshotOrderThenConsumesTheSnapshotOnce()
+    public async Task RestoreSelected_ReopensInSnapshotOrderThenAttemptsTheDeletionOnce()
     {
         RecordingSnapshotService snapshots = new(
             Snapshot(Entry("srv-a", 0), Entry("srv-b", 1), Entry("srv-c", 2)));
@@ -176,7 +182,7 @@ public sealed class SessionRestoreCoordinatorTests
 
         await CreateCoordinator(snapshots, dialogs).RestoreAsync(host, CancellationToken.None);
 
-        // Nobody declined these sessions, so consuming the snapshot here would discard them silently.
+        // Nobody declined these sessions, so deleting the snapshot here would discard them silently.
         Assert.Equal(0, snapshots.ClearCalls);
         Assert.Single(dialogs.Errors);
         Assert.Empty(host.RestoreAttempts);
@@ -193,6 +199,31 @@ public sealed class SessionRestoreCoordinatorTests
 
         Assert.Equal(0, snapshots.ClearCalls);
         Assert.Empty(host.RestoreAttempts);
+    }
+
+    [Fact]
+    public async Task ARestoreThatObservesCancellation_PropagatesAndStopsTheReplay()
+    {
+        RecordingSnapshotService snapshots = new(
+            Snapshot(Entry("srv-a", 0), Entry("srv-b", 1), Entry("srv-c", 2)));
+        RecordingDialogService dialogs = new()
+        {
+            Result = new SnapshotRestoreDialogResult(
+                SnapshotRestoreDialogAction.RestoreSelected,
+                [Entry("srv-a", 0), Entry("srv-b", 1), Entry("srv-c", 2)]),
+        };
+
+        // Cancellation raised by the reopen itself, with no cancellation on the token this call was
+        // given: the loop-top check cannot see it, so only the catch around the reopen decides
+        // whether the replay stops or treats the cancellation as one server failing.
+        RecordingHost host = new() { CancelFor = "srv-a" };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateCoordinator(snapshots, dialogs).RestoreAsync(host, CancellationToken.None));
+
+        Assert.Equal(["srv-a"], host.RestoreAttempts);
+        Assert.Equal(0, snapshots.ClearCalls);
+        Assert.Empty(dialogs.Warnings);
     }
 
     [Fact]
@@ -213,7 +244,8 @@ public sealed class SessionRestoreCoordinatorTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => coordinator.RestoreAsync(host, cts.Token));
 
-        // A partial replay must keep the snapshot: the sessions never reopened are still owed.
+        // A partial replay must not even attempt the deletion: the sessions never reopened are
+        // still owed.
         Assert.Equal(["srv-a"], host.RestoreAttempts);
         Assert.Equal(0, snapshots.ClearCalls);
     }
@@ -267,6 +299,8 @@ public sealed class SessionRestoreCoordinatorTests
 
         public string? UnknownServer { get; init; }
 
+        public string? CancelFor { get; init; }
+
         public Action? OnRestore { get; init; }
 
         public IEnumerable<ServerItemViewModel> RestorableServers => [];
@@ -279,6 +313,11 @@ public sealed class SessionRestoreCoordinatorTests
             if (string.Equals(originalServerId, ThrowFor, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException($"Restore refused for {originalServerId}.");
+            }
+
+            if (string.Equals(originalServerId, CancelFor, StringComparison.Ordinal))
+            {
+                throw new OperationCanceledException();
             }
 
             return Task.FromResult(
