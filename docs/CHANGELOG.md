@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: the SSH password file no longer outlives the handshake
+
+- **The plink password file is deleted as soon as plink proves it read it.** It used to survive
+  until the session ended, so a secret needed only for the handshake could sit on disk for hours.
+  The proof is the first byte plink writes: in PuTTY 0.83 the file is read and closed while the
+  command line is parsed, before any network activity, so any output at all comes after the read.
+- **This is a proof, not a timer.** A delay would only show that time passed, and process start does
+  not even show that the child finished parsing its arguments.
+- **The exposure is reduced, not eliminated, and the finding stays open.** A session that connects
+  and then stays silent emits no first byte, so its file still waits for process exit. Closing that
+  gap needs a signal that survives a silent session; the one plink offers is `-v`, which would
+  change what the user sees in the terminal.
+- Process exit stays wired as a backstop, the deletion runs exactly once whichever signal arrives
+  first, and a launch that fails or is cancelled still deletes the file immediately.
+
 ## 2026-08-18: the embedded editor stops rewriting local files it only meant to save
 
 - **Saving a local file no longer changes its encoding.** The editor read local files with

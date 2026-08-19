@@ -353,6 +353,27 @@ to variable-length secret comparisons.
   files degrade to `FileReadError` diagnostics instead of bubbling
   exceptions to the UI.
 
+### Plink password file lifetime
+
+When an interactive SSH session authenticates with a password, that password is written to a
+short-lived file passed to plink as `-pwfile`, because the alternative is putting it on a command
+line every process on the machine can read. The file used to live until the session ended, so a
+secret needed for a handshake could sit on disk for hours.
+
+It is now deleted on the first proof that plink has consumed it: the first byte plink writes to
+stdout or stderr. That is a proof and not a delay. In PuTTY 0.83, `-pwfile` is handled inside
+`cmdline_process_param` while the command line is parsed - one line read, handle closed at once -
+strictly before any network activity. Any output whatsoever therefore comes after the password has
+been read and the file closed. Measured on the shipped 0.83 binary: an unreadable `-pwfile` against
+an unreachable host reports the file error immediately, where a readable one against the same host
+instead spends the full network timeout.
+
+**This does not close the exposure completely.** A session that connects and then stays silent
+produces no first byte, and its file waits for process exit exactly as before. Making plink announce
+the connection unconditionally would need `-v`, which would change what the user sees in the
+terminal. Process exit remains wired as a backstop, the deletion runs exactly once whichever signal
+arrives first, and a launch that fails or is cancelled deletes the file on the spot.
+
 ### Subprocess argument hardening
 
 `PlinkTunnelRunner` builds the plink argument list via
