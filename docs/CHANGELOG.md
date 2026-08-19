@@ -12,6 +12,26 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-19: the last three profile copies stop going through JSON
+
+- **Importing a legacy multi-monitor RDP profile silently turned multi-monitor off.** The importer
+  makes a defensive copy of each parsed candidate. That copy was a JSON round trip, which raised the
+  resolution-mode presence flag even though the imported document had never declared the field.
+  Saving then skipped the legacy migration, and rewrote the profile as fit-window, single monitor.
+- **Duplicating a server, and reconnecting an ad-hoc session, dropped the legacy SSH credential
+  mapping.** A profile carrying a key path and a stored password but no passphrase field offers the
+  password as the key passphrase. The round trip raised the passphrase presence flag on the copy, so
+  the copy stopped offering it: the duplicate failed to authenticate where the original succeeded.
+  Nothing repairs this for an ad-hoc reconnect, whose copy is never persisted.
+- **All three now use the same primitive as the RDP and split paths.** No production code copies a
+  profile through a JSON round trip any more, and a convention guard fails with file and line if one
+  reappears, or if any of the five complete-copy call sites stops routing through the primitive.
+- **Correction to the entry below: there are four presence flags, not three, and the round trip
+  fabricates three of them.** The fourth is the RDP resolution mode. The primitive was already
+  correct on it, since a memberwise copy carries it and no setter is used; only the count was wrong.
+  Measured: a source declaring none of the optional fields comes back from a round trip claiming the
+  WinRM port, the key passphrase and the resolution mode. Only the SSH port survives faithfully.
+
 ## 2026-08-18: one way to copy a server profile, instead of two that had drifted
 
 - **Falling back from multi-monitor no longer loses the session logging override.** When the

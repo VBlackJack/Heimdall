@@ -487,12 +487,19 @@ public sealed partial class SessionCoordinatorPreMountTests
             Result = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
+        /// <summary>
+        /// The profile instance the last connection attempt was handed, kept by reference so tests
+        /// can observe what the coordinator actually built rather than a copy of it.
+        /// </summary>
+        public ServerProfileDto? LastServer { get; private set; }
+
         public Task<ConnectionResult> ConnectAsync(
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct,
             RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
         {
+            LastServer = server;
             Started.TrySetResult(ct);
             return Result.Task.WaitAsync(ct);
         }

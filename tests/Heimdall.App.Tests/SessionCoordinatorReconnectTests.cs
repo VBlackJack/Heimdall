@@ -334,6 +334,45 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal(0, harness.Main.Session.ActiveReconnectChainCount);
     }
 
+    [Fact]
+    public async Task ReconnectSession_AdHoc_RuntimeCopyKeepsTheLegacySshCredentialMapping()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler protocolHandler = harness.GetHandler("SSH");
+        ServerProfileDto snapshot = harness.CreateServer("SSH");
+        snapshot.Id = "adhoc-ssh-demo.example.com";
+        snapshot.SshKeyPath = "/home/ops/id_ed25519";
+        snapshot.SshPasswordEncrypted = "ssh-secret";
+
+        // SshKeyPassphraseEncrypted is deliberately never assigned. That absence is what makes the
+        // stored password be offered as the key passphrase, and assigning the field - even to null -
+        // would raise its presence flag and turn the mapping off.
+        Assert.True(snapshot.UsesLegacySshCredentialMapping);
+
+        SessionTabViewModel source = harness.Main.Connection.AddSession(
+            snapshot.Id,
+            snapshot.DisplayName,
+            snapshot.ConnectionType);
+        source.MarkAsAdHoc(snapshot);
+
+        harness.Main.Session.ReconnectSession(source);
+        await protocolHandler.Started.Task.WaitAsync(TestTimeout);
+
+        ServerProfileDto runtime = Assert.IsType<ServerProfileDto>(protocolHandler.LastServer);
+
+        // The runtime copy is what the handler authenticates with, and unlike a duplicated or
+        // imported profile it is never persisted, so nothing later repairs a flag the copy invented.
+        // The JSON round-trip this replaced raised the passphrase presence flag on every copy, so an
+        // ad-hoc session that connected once could fail to reconnect.
+        Assert.NotSame(snapshot, runtime);
+        Assert.False(runtime.HasSshKeyPassphraseEncryptedField);
+        Assert.True(runtime.UsesLegacySshCredentialMapping);
+        Assert.Equal("/home/ops/id_ed25519", runtime.SshKeyPath);
+        Assert.Equal("ssh-secret", runtime.SshPasswordEncrypted);
+
+        protocolHandler.Result.SetResult(SuccessWithTerminalSession());
+    }
+
     [Theory]
     [InlineData("SSH")]
     [InlineData("RDP")]

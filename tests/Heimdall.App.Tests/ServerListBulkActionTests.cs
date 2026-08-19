@@ -894,6 +894,53 @@ public sealed class ServerListBulkActionTests
     }
 
     [Fact]
+    public async Task DuplicateSelectedAsync_TheCopyStillUsesTheLegacySshCredentialMapping()
+    {
+        FailingSaveConfigManager configManager = new();
+        await using ServerListBulkFixture fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            configManager);
+        ServerProfileDto legacy = new()
+        {
+            Id = "alpha",
+            DisplayName = "Alpha",
+            RemoteServer = "alpha.example.com",
+            ConnectionType = "SSH",
+            Group = "ops",
+            Origin = ProfileOrigin.Manual,
+            SshKeyPath = "/home/ops/id_ed25519",
+            SshPasswordEncrypted = "ssh-secret"
+        };
+
+        // SshKeyPassphraseEncrypted is deliberately never assigned: the mapping keys on the absence
+        // of the field, and assigning it - even to null - would raise the presence flag.
+        Assert.True(legacy.UsesLegacySshCredentialMapping);
+
+        await fixture.LoadServersAsync(
+            fixture.ExpandGroups("ops"),
+            legacy,
+            CreateServer("beta", "Beta", "ops"));
+
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+
+        await fixture.ViewModel.DuplicateSelectedCommand.ExecuteAsync(null);
+
+        List<ServerProfileDto> saved = Assert.IsType<List<ServerProfileDto>>(configManager.LastSavedServers);
+        ServerProfileDto clone = Assert.Single(saved, server => server.DisplayName == "Alpha (copy)");
+
+        // The duplicate used to be a JSON round-trip, which raised the passphrase presence flag on
+        // the copy even though the source never declared the field. UsesLegacySshCredentialMapping
+        // then read false, so the duplicate stopped offering the stored password as the key
+        // passphrase and failed to authenticate where the original succeeded.
+        Assert.Equal("/home/ops/id_ed25519", clone.SshKeyPath);
+        Assert.Equal("ssh-secret", clone.SshPasswordEncrypted);
+        Assert.False(clone.HasSshKeyPassphraseEncryptedField);
+        Assert.True(clone.UsesLegacySshCredentialMapping);
+        Assert.False(clone.HasWinRmPortField);
+    }
+
+    [Fact]
     public async Task DuplicateSelectedAsync_ClearsOnlyRdpPasswordAndPreservesOtherSecrets()
     {
         await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
@@ -2771,6 +2818,15 @@ public sealed class ServerListBulkActionTests
 
         public int SaveServersCallCount { get; private set; }
 
+        /// <summary>
+        /// The exact list instance the last successful persistence was handed, kept by reference.
+        /// </summary>
+        /// <remarks>
+        /// The presence flags do not survive serialization, so a test that reloads the profile
+        /// cannot observe them: reading them back requires the instance production code built.
+        /// </remarks>
+        public List<ServerProfileDto>? LastSavedServers { get; private set; }
+
         public Action? BeforeSaveServers { get; set; }
 
         public string ConfigPath => "mem://config";
@@ -2830,6 +2886,7 @@ public sealed class ServerListBulkActionTests
             }
 
             SaveServersCallCount++;
+            LastSavedServers = servers;
             _servers = servers.Select(CloneServer).ToList();
             return Task.FromResult(result);
         }
@@ -2842,6 +2899,7 @@ public sealed class ServerListBulkActionTests
             }
 
             SaveServersCallCount++;
+            LastSavedServers = servers;
             _servers = servers.Select(CloneServer).ToList();
             return Task.CompletedTask;
         }
@@ -2947,29 +3005,17 @@ public sealed class ServerListBulkActionTests
         };
     }
 
-    private static ServerProfileDto CloneServer(ServerProfileDto server)
-    {
-        return new ServerProfileDto
-        {
-            Id = server.Id,
-            DisplayName = server.DisplayName,
-            Origin = server.Origin,
-            ConnectionType = server.ConnectionType,
-            RemoteServer = server.RemoteServer,
-            RemotePort = server.RemotePort,
-            Group = server.Group,
-            ProjectId = server.ProjectId,
-            Environment = server.Environment,
-            MacAddress = server.MacAddress,
-            SshGatewayId = server.SshGatewayId,
-            UseDirectConnection = server.UseDirectConnection,
-            SshPort = server.SshPort,
-            RdpPasswordEncrypted = server.RdpPasswordEncrypted,
-            SshPasswordEncrypted = server.SshPasswordEncrypted,
-            FtpPasswordEncrypted = server.FtpPasswordEncrypted,
-            TelnetPasswordEncrypted = server.TelnetPasswordEncrypted
-        };
-    }
+    /// <summary>
+    /// Copy used by the in-memory config manager doubles to emulate the isolation a real save and
+    /// reload gives.
+    /// </summary>
+    /// <remarks>
+    /// This was a hand-written assignment list that dropped most of the profile, including
+    /// <see cref="ServerProfileDto.SshKeyPath"/>. A double that loses fields cannot be used to
+    /// observe whether production code preserved them, so it goes through the same fidelity
+    /// primitive as production.
+    /// </remarks>
+    private static ServerProfileDto CloneServer(ServerProfileDto server) => server.CloneFaithfully();
 
     private static Func<ServerProfileDto, CancellationToken, Task<ConnectionResult>> Success(
         Action<ServerProfileDto>? afterConnect = null)

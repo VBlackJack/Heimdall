@@ -503,14 +503,12 @@ public partial class ServerListViewModel
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var sourceDto = dtoMap[server.Id];
-                var json = System.Text.Json.JsonSerializer.Serialize(sourceDto);
-                var clone = System.Text.Json.JsonSerializer.Deserialize<ServerProfileDto>(json);
-                if (clone is null)
-                {
-                    Core.Logging.FileLogger.Warn(
-                        $"DuplicateServersCoreAsync skipped '{server.DisplayName}' because the DTO clone could not be created.");
-                    continue;
-                }
+
+                // A duplicate has to behave like what it was duplicated from. The JSON round-trip
+                // this replaced did not: the presence flags are not serialized, so the copy came
+                // back claiming fields the source never declared, which turned off the legacy SSH
+                // credential mapping and skipped the legacy RDP resolution migration.
+                ServerProfileDto clone = sourceDto.CloneFaithfully();
 
                 clone.Id = Guid.NewGuid().ToString();
                 clone.DisplayName = GenerateUniqueDisplayName(sourceDto.DisplayName, existingNames);

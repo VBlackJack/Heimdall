@@ -534,12 +534,19 @@ public sealed class ProfileImportService(
         return document;
     }
 
+    /// <summary>
+    /// Defensive copy of a parsed candidate, so preview and commit each work on their own instance.
+    /// </summary>
+    /// <remarks>
+    /// This used to be a JSON round-trip, which silently rewrote the imported profile: the presence
+    /// flags are not serialized, so deserializing raised three of them unconditionally. An imported
+    /// SSH profile carrying a key path and a password but no passphrase field lost
+    /// <see cref="ServerProfileDto.UsesLegacySshCredentialMapping"/> the moment it was cloned, and
+    /// the legacy RDP resolution migration was skipped on the copy. The copy now reproduces what the
+    /// imported document actually declared.
+    /// </remarks>
     private static ServerProfileDto CloneProfile(ServerProfileDto source)
-    {
-        var json = JsonSerializer.Serialize(source, ProfileJsonOptions);
-        return JsonSerializer.Deserialize<ServerProfileDto>(json, ProfileJsonOptions)
-            ?? throw new InvalidOperationException("Failed to clone imported profile.");
-    }
+        => source.CloneFaithfully();
 
     private static string CanonicalizeConnectionType(string connectionType)
     {
