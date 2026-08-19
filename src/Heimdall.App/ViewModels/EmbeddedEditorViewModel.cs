@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Heimdall.App.Services;
 using Heimdall.Core.Localization;
@@ -27,10 +28,29 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public sealed partial class EmbeddedEditorViewModel : ObservableObject
 {
+    /// <summary>
+    /// The encoder used for a local file when no encoding was captured on load - a load that failed,
+    /// or a path the editor never opened. It reproduces what
+    /// <see cref="File.WriteAllTextAsync(string, string?, CancellationToken)"/> applied here
+    /// implicitly, so nothing regresses; naming it makes that outcome a decision rather than a
+    /// default nobody chose. The absence of a byte order mark is NOT carried by this encoder -
+    /// <see cref="Encoding.GetBytes(string)"/> never emits one - but by the empty preamble handed to
+    /// <see cref="RemoteTextFileCodec.WriteAsync"/> at the call site.
+    /// </summary>
+    private static readonly Encoding LocalFallbackEncoding = new UTF8Encoding(
+        encoderShouldEmitUTF8Identifier: false);
+
     private readonly LocalizationManager? _localizer;
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private IDialogService? _dialogService;
     private long _contentRevision;
+
+    /// <summary>
+    /// The encoding and byte order mark observed when the current local file was read, kept so the
+    /// save writes the same bytes back. Null whenever nothing was captured: a remote document, a load
+    /// that failed, or a path never opened through <see cref="LoadFileAsync"/>.
+    /// </summary>
+    private RemoteTextDocument? _localDocument;
 
     [ObservableProperty]
     private string _displayTitle = "";
@@ -107,10 +127,17 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
 
         try
         {
-            return await File.ReadAllTextAsync(filePath);
+            // Read through the codec rather than File.ReadAllTextAsync so the encoding and the byte
+            // order mark survive until the save. A file that is neither BOM-carrying nor valid UTF-8
+            // now fails here instead of being silently transcoded, and lands in LoadErrorMessage
+            // through the catch below.
+            RemoteTextDocument document = await RemoteTextFileCodec.ReadAsync(filePath);
+            _localDocument = document;
+            return document.Text;
         }
         catch (Exception ex)
         {
+            _localDocument = null;
             SyntaxName = "Plain Text";
             LoadErrorMessage = ex.Message;
             Heimdall.Core.Logging.FileLogger.Warn($"EmbeddedEditor failed to open: {ex.Message}");
@@ -152,6 +179,10 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
 
         string filePath = currentFilePath;
         bool isRemote = IsRemote;
+
+        // Captured with the other state, before the gate, so a load running concurrently cannot swap
+        // the encoding under a save already in flight.
+        RemoteTextDocument? loadedDocument = _localDocument;
         long saveRevision = Interlocked.Read(ref _contentRevision);
         await _saveGate.WaitAsync();
         try
@@ -159,7 +190,10 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
             bool persisted;
             if (!isRemote)
             {
-                await File.WriteAllTextAsync(filePath, currentText);
+                RemoteTextDocument target = loadedDocument is null
+                    ? new RemoteTextDocument(currentText, LocalFallbackEncoding, ReadOnlyMemory<byte>.Empty)
+                    : loadedDocument;
+                await RemoteTextFileCodec.WriteAsync(filePath, currentText, target);
                 persisted = true;
             }
             else
