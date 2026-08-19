@@ -12,6 +12,33 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-19: a refused credential exchange no longer looks transient to RDP
+
+- **The veto on the control's own auto-reconnect ignored three extended disconnect reasons.** When
+  MsTscAx reports why it dropped, Heimdall classifies the extended reason and vetoes the control's
+  automatic reconnect for anything that is not transient. Reasons outside the recognised set fell
+  through to the high-level reason alone, and the high-level reasons that accompany a reconnect
+  bounce are exactly the ones Heimdall calls transient, so the veto could not fire.
+- **The sharpest of the three is a refused credential exchange.** Extended reason 768 is raised by
+  the client's own security layer when the credential exchange fails. It was unmapped, so the veto
+  let the control keep reconnecting while the credentials were being refused. The bound is the
+  control's own retry cap of 20 attempts, which is above a typical account lockout threshold rather
+  than below it.
+- **The other two are licensing failures.** The licensing block runs from 256 to 267, but the range
+  test stopped at 265, so a machine not licensed for remote connections, and a failure to create the
+  license store, were both treated as unclassified.
+- **The user-facing message was wrong in the same cases**, and misleadingly so: a credential refusal
+  arriving with a socket-closed high-level reason was reported as a closed socket.
+- **The reason codes were read from the MsTscAx type library rather than transcribed.** The audit
+  recommendation named two of them wrongly, one being a name that belongs to the wire-protocol error
+  table at a different value. The names used here are the ones the type library actually declares:
+  license no remote connections at 266, license store creation access denied at 267, and invalid
+  credentials at 768.
+- Known and accepted: the message decoder gives an extended reason precedence over the high-level
+  one, so mapping 768 lets it mask a more specific high-level message such as an expired password.
+  That precedence already applied to the four extended credential reasons decoded before this
+  change; it is widened, not introduced.
+
 ## 2026-08-19: the last three profile copies stop going through JSON
 
 - **Importing a legacy multi-monitor RDP profile silently turned multi-monitor off.** The importer

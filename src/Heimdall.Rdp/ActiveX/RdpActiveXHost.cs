@@ -1056,6 +1056,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
                 or ExtendedDisconnectReasonCode.ServerDeniedConnectionFips
                 or ExtendedDisconnectReasonCode.ServerInsufficientPrivileges
                 or ExtendedDisconnectReasonCode.ServerFreshCredsRequired
+                or ExtendedDisconnectReasonCode.RdpEncInvalidCredentials
                 => "BadCredentials",
             ExtendedDisconnectReasonCode.ServerLogonTimeout
                 => "ServerLogonTimeout",
@@ -1137,6 +1138,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
                 or ExtendedDisconnectReasonCode.ServerDeniedConnectionFips
                 or ExtendedDisconnectReasonCode.ServerInsufficientPrivileges
                 or ExtendedDisconnectReasonCode.ServerFreshCredsRequired
+                or ExtendedDisconnectReasonCode.RdpEncInvalidCredentials
                 => RdpDisconnectSeverity.AuthIssue,
             _ when IsLicenseExtendedDisconnectReason(extendedReason)
                 => RdpDisconnectSeverity.TerminalError,
@@ -1159,9 +1161,17 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     public static bool AllowsAutoReconnect(int reason, int extendedReason)
         => GetDisconnectSeverity(reason, extendedReason) == RdpDisconnectSeverity.Transient;
 
+    /// <summary>
+    /// Whether an extended reason falls in the contiguous MsTscAx licensing block.
+    /// </summary>
+    /// <remarks>
+    /// A numeric range rather than a member list, which holds because the block runs unbroken from
+    /// 256 to 267 with no non-licensing member inside it. The upper bound stopped at 265 before,
+    /// leaving 266 and 267 to fall through to the high-level reason.
+    /// </remarks>
     private static bool IsLicenseExtendedDisconnectReason(int extendedReason)
         => extendedReason >= (int)ExtendedDisconnectReasonCode.LicenseInternal
-            && extendedReason <= (int)ExtendedDisconnectReasonCode.LicenseCantUpgradeLicense;
+            && extendedReason <= (int)ExtendedDisconnectReasonCode.LicenseCreatingLicStoreAccDenied;
 
     #endregion
 
