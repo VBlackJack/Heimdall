@@ -20,20 +20,33 @@ using System.Security.Cryptography;
 namespace Heimdall.App.Services.Handlers;
 
 /// <summary>
-/// Answers one question about an SSH launcher executable: has its <c>-pwfile</c> behaviour been
-/// measured, so that its first byte of output proves the password file was already read.
+/// Answers one question about an SSH launcher executable, and holds the answer to the image that is
+/// actually launched: has its <c>-pwfile</c> behaviour been measured, so that its first byte of
+/// output proves the password file was already read.
 /// </summary>
 /// <remarks>
 /// <para>The answer is keyed on the exact bytes of the executable, because that is the only thing
 /// that identifies a build. A file name, a directory, a version resource and the string printed by
 /// <c>-V</c> are all attacker-chosen or simply wrong for a rebuild, and none of them says anything
 /// about when the file is read.</para>
+/// <para>Hashing alone was not enough. Between the hash and the launch the handler can wait on an
+/// interactive password dialog, an unbounded delay during which a perfectly legitimate update could
+/// replace the executable; the new, unmeasured build would then inherit the previous verdict. So the
+/// answer comes with a lease: the file is opened once, the digest is computed from that same handle,
+/// and when it matches the handle stays open - denying writes and deletion - until the launch has
+/// been issued. Measured on a temporary copy: while that lease is held the image still starts, and
+/// both replacing and writing to the file are refused.</para>
 /// <para>This is <b>not</b> a defence against a hostile binary. Heimdall hands the password to
 /// whatever executable it was pointed at, so an executable chosen to steal it has already won. What
-/// this establishes is narrower and different: whether Heimdall may apply a timing conclusion drawn
-/// from one measured build to the binary actually being launched.</para>
-/// <para>Unknown bytes are not an error. The connection proceeds; only the early deletion is
-/// withheld, and the password file is released at process exit as it always was.</para>
+/// this establishes is narrower: that the timing conclusion drawn from one measured build belongs to
+/// the image that runs.</para>
+/// <para>One residual, stated rather than glossed: the pin is taken on a path, and the launch
+/// resolves that same string again. For an absolute path - the default setting, and what the file
+/// dialog produces - both name the same file, so the binding holds. A relative path would be
+/// resolved once against the current directory here and once against the process search order at
+/// launch, and those need not agree.</para>
+/// <para>Failure is not an error. The connection proceeds; only the early deletion is withheld, and
+/// the password file is released at process exit as it always was.</para>
 /// </remarks>
 internal static class PlinkCompatibilityAttestation
 {
@@ -55,40 +68,92 @@ internal static class PlinkCompatibilityAttestation
         new(StringComparer.OrdinalIgnoreCase) { MeasuredPuttyRelease083Sha256 };
 
     /// <summary>
-    /// Reports whether the first byte written by <paramref name="executablePath"/> proves it has
-    /// already consumed its <c>-pwfile</c>.
+    /// Identifies <paramref name="executablePath"/> and, when it is a measured build, pins that
+    /// exact image until the returned lease is disposed.
     /// </summary>
     /// <param name="executablePath">The launcher about to be started.</param>
     /// <returns>
-    /// <see langword="true"/> only for an executable whose bytes match a measured build. Anything
-    /// else - an unknown build, a missing file, an unreadable file, any failure at all - returns
-    /// <see langword="false"/>, which keeps the deletion on the process-exit path.
+    /// A lease that grants the early deletion only for an executable whose bytes match a measured
+    /// build and whose image could be pinned. Anything else - an unknown build, a missing file, a
+    /// file already open for writing elsewhere, any failure at all - yields a lease that grants
+    /// nothing, which keeps the deletion on the process-exit path. Never null; always dispose it.
     /// </returns>
-    internal static bool FirstByteProvesConsumption(string? executablePath)
+    internal static PlinkAttestationLease Acquire(string? executablePath)
     {
         if (string.IsNullOrWhiteSpace(executablePath))
         {
-            return false;
+            return PlinkAttestationLease.NotAttested;
         }
 
+        FileStream? pin = null;
         try
         {
-            using FileStream stream = new(
+            // FileShare.Read and nothing else: the image can still be launched while this is held -
+            // measured, not assumed - but the file can no longer be replaced or written to. Both
+            // are what an update would need to do, and either would invalidate the digest below.
+            pin = new FileStream(
                 executablePath,
                 FileMode.Open,
                 FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete);
-            byte[] digest = SHA256.HashData(stream);
-            return AttestedIdentities.Contains(Convert.ToHexString(digest));
+                FileShare.Read);
+
+            // From this same handle, so the bytes hashed are the bytes now pinned. Re-opening the
+            // path to hash it would measure a file that is only assumed to be the pinned one.
+            byte[] digest = SHA256.HashData(pin);
+            if (!AttestedIdentities.Contains(Convert.ToHexString(digest)))
+            {
+                pin.Dispose();
+                return PlinkAttestationLease.NotAttested;
+            }
+
+            PlinkAttestationLease lease = new(pin);
+            pin = null;
+            return lease;
         }
         catch (Exception ex)
         {
-            // Deliberately broad and deliberately fail-closed: an identity that could not be read is
-            // an identity that is not attested. The path is safe to log - it is a user-chosen
-            // executable location, never the password file and never its content.
+            // Deliberately broad and deliberately fail-closed: an identity that could not be read,
+            // or an image that could not be pinned, is not attested. The path is safe to log - it is
+            // a user-chosen executable location, never the file holding the secret.
             Core.Logging.FileLogger.Warn(
-                $"[PlinkCompatibilityAttestation] Could not read the launcher identity: {ex.Message}");
-            return false;
+                $"[PlinkCompatibilityAttestation] Could not pin the launcher: {ex.Message}");
+            pin?.Dispose();
+            return PlinkAttestationLease.NotAttested;
         }
+    }
+}
+
+/// <summary>
+/// Holds the attested image in place until the launch has been issued.
+/// </summary>
+/// <remarks>
+/// Disposing releases the pin. Dispose only once the real call to start the process has returned,
+/// because until then the verdict is not yet bound to anything that has been executed.
+/// </remarks>
+internal sealed class PlinkAttestationLease : IDisposable
+{
+    /// <summary>
+    /// The lease granted when nothing could be attested. Disposing it does nothing.
+    /// </summary>
+    internal static PlinkAttestationLease NotAttested { get; } = new(null);
+
+    private readonly FileStream? _pin;
+
+    internal PlinkAttestationLease(FileStream? pin)
+    {
+        _pin = pin;
+    }
+
+    /// <summary>
+    /// Whether the launcher's first byte of output proves it already read the password file.
+    /// </summary>
+    internal bool FirstByteProvesConsumption => _pin is not null;
+
+    /// <summary>
+    /// Releases the pinned image. Safe to call more than once.
+    /// </summary>
+    public void Dispose()
+    {
+        _pin?.Dispose();
     }
 }

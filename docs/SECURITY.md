@@ -369,12 +369,22 @@ error immediately, where a readable one against the same host instead spends the
 timeout.
 
 That conclusion belongs to that build and to no other. Heimdall lets the user point `PlinkPath` at
-any executable, so before the password file is created it identifies the launcher by the SHA-256 of
-its bytes and compares it with the measured build shipped at `Assets/Tools/plink.exe`. A different
-build may well print something before it reads the file, so for any other executable - unknown
-bytes, an unreadable path, any failure at all - the early deletion is withheld and the file is
-released at process exit, as before. Nothing is trusted on a file name, a directory, a version
-resource or a string printed by `-V`: none of those says anything about when the file is read.
+any executable, so the launcher is identified by the SHA-256 of its bytes and compared with the
+measured build shipped at `Assets/Tools/plink.exe`. A different build may well print something before
+it reads the file, so for any other executable - unknown bytes, an unreadable path, any failure at
+all - the early deletion is withheld and the file is released at process exit, as before. Nothing is
+trusted on a file name, a directory, a version resource or a string printed by `-V`: none of those
+says anything about when the file is read.
+
+Identifying the bytes is not by itself enough to describe **the image that runs**. The handler can
+wait on an interactive password dialog, and that wait is unbounded; a perfectly legitimate update
+landing in that window would hand an unmeasured build the previous verdict. So the password is
+resolved in full first, dialog included, and only then is the executable opened once, hashed from
+that same handle, and - when it matches - kept open with sharing that denies writes and deletion
+until the launch has been issued. Measured on a temporary copy: while that pin is held the image
+still starts, while replacing it and writing to it are both refused. The pin is released as soon as
+the launch returns, so a later update is not held off for the whole session, and if it cannot be
+taken at all the launcher simply does not get the early deletion.
 
 This is **not** a defence against a hostile binary. Heimdall hands the password to whatever
 executable it was pointed at, so an executable chosen to steal it has already won. What the identity

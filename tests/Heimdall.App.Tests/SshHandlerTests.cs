@@ -209,7 +209,7 @@ public sealed class SshHandlerTests
     public void ShouldPromptForPlinkPassword_WithKeyPath_ReturnsFalse()
     {
         var shouldPrompt = SshHandler.ShouldPromptForPlinkPassword(
-            passwordFilePath: null,
+            password: null,
             keyPath: @"C:\keys\id_ed25519.ppk");
 
         Assert.False(shouldPrompt);
@@ -219,7 +219,7 @@ public sealed class SshHandlerTests
     public void ShouldPromptForPlinkPassword_WithoutPasswordOrKey_ReturnsTrue()
     {
         var shouldPrompt = SshHandler.ShouldPromptForPlinkPassword(
-            passwordFilePath: null,
+            password: null,
             keyPath: null);
 
         Assert.True(shouldPrompt);

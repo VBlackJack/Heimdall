@@ -46,7 +46,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
     private readonly SensitiveFileJanitorScheduler _plinkPasswordFileJanitorScheduler;
     private readonly Action<string?> _deletePlinkPasswordFile;
-    private readonly Func<string?, bool> _plinkFirstByteAttestation;
+    private readonly Func<string?, PlinkAttestationLease> _plinkAttestation;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -62,7 +62,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
         Action<string?>? deletePlinkPasswordFile = null,
-        Func<string?, bool>? plinkFirstByteAttestation = null)
+        Func<string?, PlinkAttestationLease>? plinkAttestation = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -75,8 +75,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _plinkHostKeyProbe = plinkHostKeyProbe ?? new DefaultPlinkHostKeyProbe();
         _plinkPasswordFileJanitor = plinkPasswordFileJanitor ?? new PlinkPasswordFileJanitor();
         _deletePlinkPasswordFile = deletePlinkPasswordFile ?? DeletePlinkPasswordFile;
-        _plinkFirstByteAttestation =
-            plinkFirstByteAttestation ?? PlinkCompatibilityAttestation.FirstByteProvesConsumption;
+        _plinkAttestation = plinkAttestation ?? PlinkCompatibilityAttestation.Acquire;
         _plinkPasswordFileJanitorScheduler = new SensitiveFileJanitorScheduler(
             nameof(PlinkPasswordFileJanitor),
             _plinkPasswordFileJanitor.SweepStale);
@@ -620,22 +619,20 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
 
             string? hostKeyArg = hostKeyDecision.Fingerprint;
 
-            // Attested before the file exists: whether an early deletion is allowed is a property
-            // of the launcher, decided once, and never re-derived from anything it prints.
-            bool firstByteProvesConsumption = _plinkFirstByteAttestation(plinkPath);
-
-            string? passwordFilePath = CreatePlinkPasswordFile(
-                ConnectionHelpers.DecryptPassword(server.SshPasswordEncrypted));
-            if (ShouldPromptForPlinkPassword(passwordFilePath, server.SshKeyPath))
+            // The password is resolved in full first, dialog included. Nothing is identified and
+            // nothing is written to disk while a modal can hold this thread for an unbounded time:
+            // an attestation taken before the dialog would describe an image that a legitimate
+            // update could have replaced before the launch.
+            string? password = ConnectionHelpers.DecryptPassword(server.SshPasswordEncrypted);
+            if (ShouldPromptForPlinkPassword(password, server.SshKeyPath))
             {
-                string? promptedPassword = await _dialogService.ShowPasswordInputAsync(
+                password = await _dialogService.ShowPasswordInputAsync(
                         _localizer["DialogSshPasswordPromptTitle"],
                         _localizer.Format("DialogSshPasswordPromptMessage", target),
                         ct)
                     .ConfigureAwait(false);
 
-                passwordFilePath = CreatePlinkPasswordFile(promptedPassword);
-                if (passwordFilePath is null)
+                if (string.IsNullOrEmpty(password))
                 {
                     string message = SshFailureMessageBuilder.Cancelled(_localizer);
                     _connectionSm.SetError(server.Id, message);
@@ -650,58 +647,65 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 }
             }
 
-            string args = BuildPipeModeArguments(
-                server.SshKeyPath,
-                server.SshCompression,
-                server.SshAgentForwarding,
-                server.SshX11Forwarding,
-                targetPort,
-                target,
-                hostKeyArg,
-                passwordFilePath);
-
             Heimdall.Terminal.PipeModeSession terminalSession = new Heimdall.Terminal.PipeModeSession();
             Core.Logging.FileLogger.Info(
                 $"SSH via Plink ({terminalSession.GetType().Name}) using {plinkPath} for {targetHost}:{targetPort}");
 
-            PlinkPasswordFileReleaseHandle? passwordFileRelease = null;
-            if (!string.IsNullOrEmpty(passwordFilePath))
+            // The dialog is over, so the gap between identifying the image and launching it is now
+            // bounded by this block alone. The lease pins that exact image; the block closes as soon
+            // as the launch has been issued, so a later update is not held off for the whole session.
+            using (PlinkAttestationLease attestation = _plinkAttestation(plinkPath))
             {
-                // Armed before the process starts so no output can arrive unobserved. Every path
-                // that frees this file goes through the returned handle, including the catches
-                // below: disposing the session can itself raise ProcessExited, so a direct delete
-                // there would be a second invocation.
-                passwordFileRelease = PlinkPasswordFileRelease.Arm(
-                    terminalSession,
-                    passwordFilePath,
-                    _deletePlinkPasswordFile,
-                    firstByteProvesConsumption);
-            }
+                string? passwordFilePath = CreatePlinkPasswordFile(password);
 
-            try
-            {
-                await terminalSession.StartAsync(plinkPath, args, cancellationToken: ct)
-                    .ConfigureAwait(false);
-                Core.Logging.FileLogger.Info($"Plink SSH session started: PID={terminalSession.ProcessId}");
-                passwordFilePath = null;
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                terminalSession.Dispose();
-                passwordFileRelease?.Release();
-                throw;
-            }
-            catch (Exception ex)
-            {
-                terminalSession.Dispose();
-                passwordFileRelease?.Release();
-                Core.Logging.FileLogger.Error("Plink SSH launch failed", ex);
-                _connectionSm.SetError(server.Id, ex.Message);
-                return new ConnectionResult(
-                    false,
-                    ex.Message,
-                    null,
-                    SshSessionDiagnosticFactory.CreatePipeModeFailure(ex.Message));
+                string args = BuildPipeModeArguments(
+                    server.SshKeyPath,
+                    server.SshCompression,
+                    server.SshAgentForwarding,
+                    server.SshX11Forwarding,
+                    targetPort,
+                    target,
+                    hostKeyArg,
+                    passwordFilePath);
+
+                PlinkPasswordFileReleaseHandle? passwordFileRelease = null;
+                if (!string.IsNullOrEmpty(passwordFilePath))
+                {
+                    // Armed before the process starts so no output can arrive unobserved. Every path
+                    // that frees this file goes through the returned handle, including the catches
+                    // below: disposing the session can itself raise ProcessExited, so a direct delete
+                    // there would be a second invocation.
+                    passwordFileRelease = PlinkPasswordFileRelease.Arm(
+                        terminalSession,
+                        passwordFilePath,
+                        _deletePlinkPasswordFile,
+                        attestation.FirstByteProvesConsumption);
+                }
+
+                try
+                {
+                    await terminalSession.StartAsync(plinkPath, args, cancellationToken: ct)
+                        .ConfigureAwait(false);
+                    Core.Logging.FileLogger.Info($"Plink SSH session started: PID={terminalSession.ProcessId}");
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    terminalSession.Dispose();
+                    passwordFileRelease?.Release();
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    terminalSession.Dispose();
+                    passwordFileRelease?.Release();
+                    Core.Logging.FileLogger.Error("Plink SSH launch failed", ex);
+                    _connectionSm.SetError(server.Id, ex.Message);
+                    return new ConnectionResult(
+                        false,
+                        ex.Message,
+                        null,
+                        SshSessionDiagnosticFactory.CreatePipeModeFailure(ex.Message));
+                }
             }
 
             _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
@@ -725,9 +729,12 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         return $"{user}@{host}:{port}";
     }
 
-    internal static bool ShouldPromptForPlinkPassword(string? passwordFilePath, string? keyPath)
+    internal static bool ShouldPromptForPlinkPassword(string? password, string? keyPath)
     {
-        return string.IsNullOrEmpty(passwordFilePath) && string.IsNullOrWhiteSpace(keyPath);
+        // Takes the password rather than the file that would hold it: the file is created after the
+        // dialog now, so asking about it here would mean writing the secret to disk before knowing
+        // whether the user was even going to supply one.
+        return string.IsNullOrEmpty(password) && string.IsNullOrWhiteSpace(keyPath);
     }
 
     private static (string Host, int Port) ResolvePlinkHostKeyIdentity(
