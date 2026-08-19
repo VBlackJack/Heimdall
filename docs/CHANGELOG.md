@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: the early password-file deletion now applies only to a measured launcher
+
+- **The entry below promised more than it delivered, and this narrows it.** The first byte written
+  by PuTTY 0.83 proves that build already read its `-pwfile`. Heimdall let the user point `PlinkPath`
+  at any executable and applied that conclusion to all of them. A different build may print before it
+  reads the file, and deleting then would break the authentication.
+- **The launcher is now identified by the SHA-256 of its bytes**, checked before the password file is
+  created, against the measured build shipped with the application. Anything else - an unknown build,
+  an unreadable path, any failure - keeps the deletion on the process-exit path. Nothing is trusted on
+  a file name, a directory, a version resource or a string printed by `-V`.
+- **This is not a defence against a hostile binary.** Heimdall hands the password to whatever it was
+  pointed at. The check decides whether a measured timing conclusion applies to what is running.
+- **One gate frees the file.** The launch-failure and cancellation paths dispose the session, which
+  can raise process exit, and then release; both arrive at the same gate, so the deletion runs once.
+- The silent-session limit from the entry below is unchanged and still open.
+
 ## 2026-08-18: the SSH password file no longer outlives the handshake
 
 - **The plink password file is deleted as soon as plink proves it read it.** It used to survive

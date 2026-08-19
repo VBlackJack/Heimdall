@@ -46,6 +46,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
     private readonly SensitiveFileJanitorScheduler _plinkPasswordFileJanitorScheduler;
     private readonly Action<string?> _deletePlinkPasswordFile;
+    private readonly Func<string?, bool> _plinkFirstByteAttestation;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -60,7 +61,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         IDialogService dialogService,
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
-        Action<string?>? deletePlinkPasswordFile = null)
+        Action<string?>? deletePlinkPasswordFile = null,
+        Func<string?, bool>? plinkFirstByteAttestation = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -73,6 +75,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _plinkHostKeyProbe = plinkHostKeyProbe ?? new DefaultPlinkHostKeyProbe();
         _plinkPasswordFileJanitor = plinkPasswordFileJanitor ?? new PlinkPasswordFileJanitor();
         _deletePlinkPasswordFile = deletePlinkPasswordFile ?? DeletePlinkPasswordFile;
+        _plinkFirstByteAttestation =
+            plinkFirstByteAttestation ?? PlinkCompatibilityAttestation.FirstByteProvesConsumption;
         _plinkPasswordFileJanitorScheduler = new SensitiveFileJanitorScheduler(
             nameof(PlinkPasswordFileJanitor),
             _plinkPasswordFileJanitor.SweepStale);
@@ -616,6 +620,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
 
             string? hostKeyArg = hostKeyDecision.Fingerprint;
 
+            // Attested before the file exists: whether an early deletion is allowed is a property
+            // of the launcher, decided once, and never re-derived from anything it prints.
+            bool firstByteProvesConsumption = _plinkFirstByteAttestation(plinkPath);
+
             string? passwordFilePath = CreatePlinkPasswordFile(
                 ConnectionHelpers.DecryptPassword(server.SshPasswordEncrypted));
             if (ShouldPromptForPlinkPassword(passwordFilePath, server.SshKeyPath))
@@ -656,14 +664,18 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             Core.Logging.FileLogger.Info(
                 $"SSH via Plink ({terminalSession.GetType().Name}) using {plinkPath} for {targetHost}:{targetPort}");
 
+            PlinkPasswordFileReleaseHandle? passwordFileRelease = null;
             if (!string.IsNullOrEmpty(passwordFilePath))
             {
-                // Armed before the process starts so no output can arrive unobserved. The file goes
-                // as soon as plink proves it read it, and at process exit otherwise.
-                PlinkPasswordFileRelease.Arm(
+                // Armed before the process starts so no output can arrive unobserved. Every path
+                // that frees this file goes through the returned handle, including the catches
+                // below: disposing the session can itself raise ProcessExited, so a direct delete
+                // there would be a second invocation.
+                passwordFileRelease = PlinkPasswordFileRelease.Arm(
                     terminalSession,
                     passwordFilePath,
-                    _deletePlinkPasswordFile);
+                    _deletePlinkPasswordFile,
+                    firstByteProvesConsumption);
             }
 
             try
@@ -676,13 +688,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 terminalSession.Dispose();
-                _deletePlinkPasswordFile(passwordFilePath);
+                passwordFileRelease?.Release();
                 throw;
             }
             catch (Exception ex)
             {
                 terminalSession.Dispose();
-                _deletePlinkPasswordFile(passwordFilePath);
+                passwordFileRelease?.Release();
                 Core.Logging.FileLogger.Error("Plink SSH launch failed", ex);
                 _connectionSm.SetError(server.Id, ex.Message);
                 return new ConnectionResult(
