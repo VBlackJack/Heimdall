@@ -19,6 +19,11 @@ namespace Heimdall.Rdp.ActiveX;
 /// <summary>
 /// Extended disconnect reasons reported by the MsTscAx ExtendedDisconnectReasonCode enum.
 /// </summary>
+/// <remarks>
+/// Member names follow the MsTscAx type library, minus its <c>exDiscReason</c> prefix. The
+/// licensing block is contiguous from 256 to 267, which is what lets the host classify it with a
+/// numeric range rather than a member list.
+/// </remarks>
 internal enum ExtendedDisconnectReasonCode
 {
     NoInfo = 0,
@@ -36,5 +41,16 @@ internal enum ExtendedDisconnectReasonCode
     LicenseCantFinishProtocol = 262,
     LicenseClientEndedProtocol = 263,
     LicenseErrClientEncryption = 264,
-    LicenseCantUpgradeLicense = 265
+    LicenseCantUpgradeLicense = 265,
+    LicenseNoRemoteConnections = 266,
+    LicenseCreatingLicStoreAccDenied = 267,
+
+    /// <summary>
+    /// The client's own security layer rejected the credential exchange.
+    /// </summary>
+    /// <remarks>
+    /// Raised locally by MsTscAx rather than sent by the server, and far outside the licensing
+    /// block, so only an explicit arm can classify it - a range test cannot reach it.
+    /// </remarks>
+    RdpEncInvalidCredentials = 768
 }

@@ -192,6 +192,8 @@ public sealed class RdpActiveXHostTests
     [InlineData(2308, 256)]
     [InlineData(2308, 260)]
     [InlineData(2308, 265)]
+    [InlineData(2308, 266)]
+    [InlineData(2308, 267)]
     public void GetDisconnectSeverity_LicenseExtendedReason_ReturnsTerminalError(
         int reason,
         int extendedReason)
@@ -206,6 +208,8 @@ public sealed class RdpActiveXHostTests
     [InlineData(2308, 256)]
     [InlineData(2308, 260)]
     [InlineData(2308, 265)]
+    [InlineData(2308, 266)]
+    [InlineData(2308, 267)]
     public void AllowsAutoReconnect_LicenseExtendedReason_ReturnsFalse(
         int reason,
         int extendedReason)
@@ -213,6 +217,75 @@ public sealed class RdpActiveXHostTests
         bool actual = RdpActiveXHost.AllowsAutoReconnect(reason, extendedReason);
 
         Assert.False(actual);
+    }
+
+    // The extended reason for a rejected credential exchange. It is raised by the client's own
+    // security layer, so it can accompany any high-level reason, including the network-class ones
+    // the auto-reconnect veto sees.
+    [Theory]
+    [InlineData(260)]
+    [InlineData(264)]
+    [InlineData(516)]
+    [InlineData(772)]
+    [InlineData(2308)]
+    [InlineData(3080)]
+    [InlineData(4360)]
+    public void GetDisconnectSeverity_InvalidCredentialsExtendedReason_ReturnsAuthIssue(int reason)
+    {
+        // Every row is a reason the single-argument mapping calls transient, so the assertion below
+        // can only hold because the extended reason decided it.
+        Assert.Equal(
+            RdpActiveXHost.RdpDisconnectSeverity.Transient,
+            RdpActiveXHost.GetDisconnectSeverity(reason));
+
+        RdpActiveXHost.RdpDisconnectSeverity actual =
+            RdpActiveXHost.GetDisconnectSeverity(reason, 768);
+
+        Assert.Equal(RdpActiveXHost.RdpDisconnectSeverity.AuthIssue, actual);
+    }
+
+    // The fail-open this closes: the veto on the control's own auto-reconnect used to ignore the
+    // extended reason entirely, so a transient-looking high-level reason let the reconnect proceed
+    // while the credentials were being refused.
+    [Theory]
+    [InlineData(260)]
+    [InlineData(264)]
+    [InlineData(516)]
+    [InlineData(772)]
+    [InlineData(2308)]
+    [InlineData(3080)]
+    [InlineData(4360)]
+    public void AllowsAutoReconnect_InvalidCredentialsExtendedReason_ReturnsFalse(int reason)
+    {
+        Assert.True(RdpActiveXHost.AllowsAutoReconnect(reason));
+
+        Assert.False(RdpActiveXHost.AllowsAutoReconnect(reason, 768));
+    }
+
+    [Theory]
+    [InlineData(768, "BadCredentials")]
+    [InlineData(266, "LicenseError")]
+    [InlineData(267, "LicenseError")]
+    [InlineData(265, "LicenseError")]
+    [InlineData(9, "BadCredentials")]
+    [InlineData(4, "ServerLogonTimeout")]
+    public void GetExtendedDisconnectReasonKey_MapsTheDecodedReasons(
+        int extendedReason,
+        string expectedKey)
+    {
+        Assert.Equal(expectedKey, RdpActiveXHost.GetExtendedDisconnectReasonKey(extendedReason));
+    }
+
+    // The decoder stays silent on what it does not know, so the caller can fall back to the
+    // high-level reason instead of being handed a wrong label.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(255)]
+    [InlineData(268)]
+    [InlineData(4096)]
+    public void GetExtendedDisconnectReasonKey_UnmappedReason_ReturnsNull(int extendedReason)
+    {
+        Assert.Null(RdpActiveXHost.GetExtendedDisconnectReasonKey(extendedReason));
     }
 
     [Fact]
