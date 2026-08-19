@@ -64,17 +64,18 @@ public sealed class SshHandlerConnectTests
         Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
     }
 
-    // SSH-013 wiring. The attestation is not a helper the handler may or may not consult: the
-    // decision must be taken on the executable that is actually about to run, and taken before the
-    // password file exists, because it decides what is allowed to delete that file.
+    // SSH-013 ordering. The password dialog can hold this thread for as long as the user takes, so
+    // an attestation taken before it describes an image that a legitimate update could have replaced
+    // before the launch. The dialog must therefore be finished first. Only a profile with neither a
+    // stored password nor a key reaches the prompt, which is why this case exists alongside the one
+    // below.
     [Fact]
-    public async Task ConnectSshViaPlinkAsync_AsksTheAttestationAboutTheResolvedLauncherBeforeWritingTheSecret()
+    public async Task ConnectSshViaPlinkAsync_AttestsOnlyAfterThePasswordDialogHasReturned()
     {
-        const int targetPort = 49157;
+        const int targetPort = 49158;
         string plinkPath = Path.GetTempFileName();
         string? deletedPasswordPath = null;
-        List<string?> attested = [];
-        List<bool> passwordFileExistedWhenAsked = [];
+        List<string> order = [];
 
         try
         {
@@ -99,14 +100,96 @@ public sealed class SshHandlerConnectTests
                         File.Delete(path);
                     }
                 },
-                plinkFirstByteAttestation: path =>
+                plinkAttestation: _ =>
+                {
+                    order.Add("attest");
+                    return PlinkAttestationLease.NotAttested;
+                },
+                dialogService: new PromptingDialogService(order, "typed-password"));
+
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshPasswordEncrypted = null;
+            server.SshKeyPath = null;
+            AppSettings settings = new AppSettings
+            {
+                PlinkPath = plinkPath
+            };
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.ConnectSshViaPlinkAsync(
+                server,
+                settings,
+                "127.0.0.1",
+                targetPort,
+                usesTunnel: true,
+                originalFailure: null,
+                cancellationSource.Token));
+
+            Assert.Equal(["prompt", "attest"], order);
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
+            {
+                File.Delete(deletedPasswordPath);
+            }
+
+            File.Delete(plinkPath);
+        }
+    }
+
+    // SSH-013 wiring. The attestation is not a helper the handler may or may not consult. It must
+    // be taken on the executable actually about to run, after the password dialog, before the
+    // password file exists - and the pin it takes must still be held while the launcher is started,
+    // then released. The lease here is a real PlinkAttestationLease over a real file, so "still
+    // held" is observed the only way it can be: the pinned file cannot be deleted.
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_HoldsTheAttestationLeaseAcrossTheLaunch()
+    {
+        const int targetPort = 49157;
+        string plinkPath = Path.GetTempFileName();
+        string pinned = Path.GetTempFileName();
+        string? deletedPasswordPath = null;
+        List<string?> attested = [];
+        List<bool> passwordFileExistedWhenAsked = [];
+        bool? pinnedWasHeldDuringTeardown = null;
+
+        try
+        {
+            FakeTunnelService tunnelService = new FakeTunnelService();
+            using CancellationTokenSource cancellationSource = new CancellationTokenSource();
+            HostKeyStore hostKeyStore = new HostKeyStore();
+            hostKeyStore.Trust(
+                "server01.contoso.local",
+                DefaultPorts.Ssh,
+                "SHA256:stored-test-fingerprint");
+            HostKeyTrustService hostKeyTrustService = new HostKeyTrustService(hostKeyStore);
+            CancelingPlinkHostKeyProbe probe = new CancelingPlinkHostKeyProbe(cancellationSource);
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                hostKeyTrustService,
+                probe,
+                deletePlinkPasswordFile: path =>
+                {
+                    // Reached from the release handle inside the launch catch, which sits inside the
+                    // lease scope. If the lease had already been released, this delete would succeed.
+                    pinnedWasHeldDuringTeardown = !TryDelete(pinned);
+
+                    deletedPasswordPath = path;
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        File.Delete(path);
+                    }
+                },
+                plinkAttestation: path =>
                 {
                     attested.Add(path);
                     passwordFileExistedWhenAsked.Add(
                         Directory.EnumerateFiles(
                             Path.GetTempPath(),
                             $"{PlinkPasswordFileNaming.Prefix}*").Any());
-                    return false;
+
+                    return new PlinkAttestationLease(
+                        new FileStream(pinned, FileMode.Open, FileAccess.Read, FileShare.Read));
                 });
 
             ServerProfileDto server = CreateGatewayServer();
@@ -130,6 +213,12 @@ public sealed class SshHandlerConnectTests
 
             // And asked before the secret was on disk, not after.
             Assert.Equal([false], passwordFileExistedWhenAsked);
+
+            // Held while the launch was being torn down, which is inside the lease scope.
+            Assert.True(pinnedWasHeldDuringTeardown);
+
+            // And released once the call returned, on this cancellation path as on any other.
+            Assert.True(TryDelete(pinned));
         }
         finally
         {
@@ -138,7 +227,25 @@ public sealed class SshHandlerConnectTests
                 File.Delete(deletedPasswordPath);
             }
 
+            TryDelete(pinned);
             File.Delete(plinkPath);
+        }
+    }
+
+    private static bool TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 
@@ -560,7 +667,8 @@ public sealed class SshHandlerConnectTests
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
         Action<string?>? deletePlinkPasswordFile = null,
         LocalizationManager? localizer = null,
-        Func<string?, bool>? plinkFirstByteAttestation = null)
+        Func<string?, PlinkAttestationLease>? plinkAttestation = null,
+        IDialogService? dialogService = null)
     {
         LocalizationManager effectiveLocalizer = localizer ?? new LocalizationManager();
         IHostKeyTrustService effectiveHostKeyTrustService =
@@ -573,12 +681,12 @@ public sealed class SshHandlerConnectTests
             effectiveHostKeyTrustService,
             AutoAcceptHostKeyVerifier.Instance,
             new X11ServerManager(new InMemoryConfigManager(), effectiveLocalizer),
-            new ThrowingDialogService(),
+            dialogService ?? new ThrowingDialogService(),
             plinkHostKeyProbe: plinkHostKeyProbe,
             plinkPasswordFileJanitor:
                 plinkPasswordFileJanitor ?? CreateNoOpPlinkPasswordFileJanitor(),
             deletePlinkPasswordFile: deletePlinkPasswordFile,
-            plinkFirstByteAttestation: plinkFirstByteAttestation);
+            plinkAttestation: plinkAttestation);
     }
 
     private static PlinkPasswordFileJanitor CreateNoOpPlinkPasswordFileJanitor()
@@ -898,7 +1006,21 @@ public sealed class SshHandlerConnectTests
         }
     }
 
-    private sealed class ThrowingDialogService : IDialogService
+    // Returns a password and records when it did, so the order of the dialog and the attestation
+    // is observable rather than assumed.
+    private sealed class PromptingDialogService(List<string> order, string password) : ThrowingDialogService
+    {
+        public override Task<string?> ShowPasswordInputAsync(
+            string title,
+            string prompt,
+            CancellationToken cancellationToken = default)
+        {
+            order.Add("prompt");
+            return Task.FromResult<string?>(password);
+        }
+    }
+
+    private class ThrowingDialogService : IDialogService
     {
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
         {
@@ -915,7 +1037,7 @@ public sealed class SshHandlerConnectTests
             throw new NotImplementedException();
         }
 
-        public Task<string?> ShowPasswordInputAsync(
+        public virtual Task<string?> ShowPasswordInputAsync(
             string title,
             string prompt,
             CancellationToken cancellationToken = default)

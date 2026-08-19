@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: the measured-launcher check now describes the image that actually runs
+
+- **The entry below identified the right bytes at the wrong moment.** It hashed the launcher and then
+  let the handler wait on an interactive password dialog before starting it. That wait is unbounded,
+  and an update landing in it would have handed an unmeasured build the previous verdict.
+- **The password is resolved first, dialog included.** Nothing is identified and nothing is written to
+  disk while a modal can hold the thread.
+- **The executable is then opened once, hashed from that same handle, and kept open** with sharing
+  that denies writes and deletion until the launch has been issued. Measured on a temporary copy: the
+  image still starts while that pin is held, and both replacing it and writing to it are refused. The
+  pin is released as soon as the launch returns, so a later update is not blocked for the session.
+- **If the pin cannot be taken - an unknown build, an unreadable path, a file already held writable
+  elsewhere, any failure - the connection still proceeds** and the password file simply waits for
+  process exit, as it did before any of this.
+- The silent-session limit is unchanged and still open.
+
 ## 2026-08-18: the early password-file deletion now applies only to a measured launcher
 
 - **The entry below promised more than it delivered, and this narrows it.** The first byte written
