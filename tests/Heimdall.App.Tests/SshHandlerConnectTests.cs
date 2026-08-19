@@ -64,6 +64,105 @@ public sealed class SshHandlerConnectTests
         Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
     }
 
+    // SSH-013 binding, observed at runtime rather than read off the source. An independent review
+    // showed the earlier source scan was defeated by one inserted line: the declaration and the call
+    // both still matched while an assignment between them handed back the configured path. So the
+    // two candidate paths are made to differ in whether they can start at all, and the outcome says
+    // which one was used - no seam on PipeModeSession required.
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_StartsTheLauncherOnThePathTheLeaseResolved()
+    {
+        const int targetPort = 49159;
+
+        // The configured path exists, so it resolves, but it is not a runnable image.
+        string configured = Path.Combine(Path.GetTempPath(), $"heimdall-unrunnable-{Guid.NewGuid():N}.exe");
+        File.WriteAllBytes(configured, []);
+
+        // The lease's path is the real launcher. Only a handler that starts the lease's path gets a
+        // process; one that starts the configured path fails at Process.Start.
+        string runnable = Path.Combine(Path.GetTempPath(), $"heimdall-runnable-{Guid.NewGuid():N}.exe");
+        File.Copy(ShippedLauncherPath(), runnable);
+
+        string? deletedPasswordPath = null;
+        ConnectionResult? result = null;
+
+        try
+        {
+            FakeTunnelService tunnelService = new FakeTunnelService();
+            HostKeyStore hostKeyStore = new HostKeyStore();
+            hostKeyStore.Trust(
+                "server01.contoso.local",
+                DefaultPorts.Ssh,
+                "SHA256:stored-test-fingerprint");
+            HostKeyTrustService hostKeyTrustService = new HostKeyTrustService(hostKeyStore);
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                hostKeyTrustService,
+                new FakePlinkHostKeyProbe(null),
+                deletePlinkPasswordFile: path =>
+                {
+                    deletedPasswordPath = path;
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        File.Delete(path);
+                    }
+                },
+                plinkAttestation: _ => new PlinkAttestationLease(
+                    new FileStream(runnable, FileMode.Open, FileAccess.Read, FileShare.Read),
+                    runnable));
+
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshPasswordEncrypted = CredentialProtector.Protect("temporary-password");
+            AppSettings settings = new AppSettings
+            {
+                PlinkPath = configured
+            };
+
+            result = await handler.ConnectSshViaPlinkAsync(
+                server,
+                settings,
+                "127.0.0.1",
+                targetPort,
+                usesTunnel: true,
+                originalFailure: null,
+                CancellationToken.None);
+
+            // Starting the configured path would have thrown at Process.Start and produced a failed
+            // result. Success means the launcher was started on the path the lease resolved.
+            Assert.True(
+                result.Success,
+                $"The launcher was not started on the lease's path: {result.ErrorMessage}");
+        }
+        finally
+        {
+            if (result?.Session is TerminalSessionResult terminal)
+            {
+                terminal.Session.Dispose();
+            }
+
+            if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
+            {
+                File.Delete(deletedPasswordPath);
+            }
+
+            File.Delete(configured);
+            File.Delete(runnable);
+        }
+    }
+
+    private static string ShippedLauncherPath()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null
+            && !File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return Path.Combine(directory!.FullName, "src", "Heimdall.App", "Assets", "Tools", "plink.exe");
+    }
+
     // SSH-013 ordering. The password dialog can hold this thread for as long as the user takes, so
     // an attestation taken before it describes an image that a legitimate update could have replaced
     // before the launch. The dialog must therefore be finished first. Only a profile with neither a
@@ -189,7 +288,8 @@ public sealed class SshHandlerConnectTests
                             $"{PlinkPasswordFileNaming.Prefix}*").Any());
 
                     return new PlinkAttestationLease(
-                        new FileStream(pinned, FileMode.Open, FileAccess.Read, FileShare.Read));
+                        new FileStream(pinned, FileMode.Open, FileAccess.Read, FileShare.Read),
+                        plinkPath);
                 });
 
             ServerProfileDto server = CreateGatewayServer();
