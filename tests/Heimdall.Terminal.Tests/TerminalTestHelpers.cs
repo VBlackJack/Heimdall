@@ -164,9 +164,10 @@ internal static class TerminalTestHelpers
     /// sleeping, cancellation, termination - keep <see cref="ResolvePowerShellExecutable"/>.</para>
     /// <para>It is not a cure for the stalls the CI logs show, and must not be read as one. In run
     /// 32294052268 the <see cref="TerminalWaitObservation"/> population was six waits between 54 and
-    /// 60 seconds, three of which belong to tests that keep a PowerShell child because they exercise
-    /// stdin or interleaved output. The stalling population is wider than the children swapped here,
-    /// and its cause is not established.</para>
+    /// 60 seconds: four of them are waits of the tests swapped here, and the remaining two belong to
+    /// tests that keep a PowerShell child because they exercise stdin or interleaved output. Those
+    /// two are why the swap cannot be read as the cure - the stall also reaches waits whose child is
+    /// unchanged, and its cause is not established.</para>
     /// </remarks>
     /// <returns>Absolute path to the command processor, or its bare name if it is not where
     /// expected, matching the fallback <see cref="ResolvePowerShellExecutable"/> already uses.</returns>
