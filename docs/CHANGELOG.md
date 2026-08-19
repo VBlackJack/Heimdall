@@ -12,6 +12,41 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-20: the RDP auto-reconnect events were never delivered
+
+- **Two event handlers were declared on the dispatch ids of unrelated events.** The control's
+  auto-reconnect notifications carry ids 17 and 33; Heimdall declared its handlers as 22 and 23,
+  which are the logon-error and focus-released events. The event interface is a dispatch interface,
+  so this is not a compile error and not a run-time exception. The control dispatched its own
+  auto-reconnect notifications to ids no member carried and got nothing back; it dispatched logon
+  errors and focus changes into these two handlers, where the argument lists did not match; and the
+  failure travelled back to a caller that discards it. Neither handler had ever run, and nothing
+  anywhere recorded that.
+- **The verdict handed back was a boolean, and inverted once it reached the control.** The control
+  reads an integer state where zero means keep reconnecting and one means stop. Asking to stop wrote
+  zero, which asks it to continue; asking to continue wrote one, which would have stopped it at the
+  first attempt. Correcting only the dispatch ids would therefore have turned a handler that never
+  ran into one that did the opposite of what it says.
+- **This is what the cancel path depended on.** Every reason Heimdall refuses to reconnect - a
+  refused credential exchange, a licensing failure, a gateway that went away, the user pressing
+  cancel - was routed to the control through that handler. The entry below dated 2026-08-19
+  describes classifying those reasons correctly; that work was right, and it had no effect while the
+  handler it feeds was unreachable. It takes effect now.
+- **The two ids have to be right together.** The state a reconnection sets up is only cleared by the
+  second handler, so correcting the first alone would leave a session that reconnected successfully
+  presented as still reconnecting.
+- **The declarations are now pinned against the control's own type library**, member by member,
+  with the parameter counts and the numbering of the states the verdict carries. A wrong parameter
+  count fails exactly as silently as a wrong id, so both are compared. The reason this defect
+  survived is that nothing in the product could observe it, and nothing in the test suite was
+  reading the one artifact that describes the truth.
+- **The attempt counter shown during a reconnection was reading the compiled-in cap** rather than
+  the one the control was configured with, so a profile that raises or lowers it would have shown an
+  attempt number past its own ceiling. That display had never been reachable before this change.
+- Not yet validated against a live drop: the handler now runs code that has never run in production,
+  including work marshalled back to the UI thread from inside a COM callback, and a status surface
+  that has never been rendered.
+
 ## 2026-08-19: a refused credential exchange no longer looks transient to RDP
 
 - **The veto on the control's own auto-reconnect ignored three extended disconnect reasons.** When

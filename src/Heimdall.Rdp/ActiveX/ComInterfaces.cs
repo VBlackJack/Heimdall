@@ -82,8 +82,13 @@ internal interface IMsRdpClientNonScriptable5
 
 /// <summary>
 /// COM event source interface for MsTscAx ActiveX control.
-/// DispId values must match the ActiveX type library exactly.
 /// </summary>
+/// <remarks>
+/// This is a dispatch interface, so the DispId attribute alone decides which member receives which
+/// event: declaration order plays no part, and a value the type library does not carry is simply
+/// dropped by the control with no error surfaced to anyone. The values are pinned against the type
+/// library itself by MsTscAxEventContractTests.
+/// </remarks>
 [ComImport]
 [Guid("336D5562-EFA8-482E-8CB3-C5C0FC7A7DB6")]
 [InterfaceType(ComInterfaceType.InterfaceIsIDispatch)]
@@ -106,10 +111,35 @@ public interface IMsTscAxEvents
     [DispId(12)]
     void OnRemoteDesktopSizeChange(int width, int height);
 
-    [DispId(22)]
-    void OnAutoReconnecting(int disconnectReason, int attemptCount, out bool continueReconnect);
+    /// <summary>
+    /// Raised once per automatic reconnection attempt, before the attempt is made.
+    /// </summary>
+    /// <param name="disconnectReason">Reason the session dropped.</param>
+    /// <param name="attemptCount">Number of the attempt about to be made.</param>
+    /// <param name="continueStatus">
+    /// Written back to tell the control whether to proceed. The type library declares it as an out
+    /// pointer to this enumeration, which is also how the interop importer binds it.
+    /// </param>
+    /// <remarks>
+    /// DISPID 17. It was declared as 22 before, which is OnLogonError: the control's dispatch of
+    /// this event found no member and was dropped, so the handler never ran and the control's own
+    /// reconnection was never vetoed.
+    /// </remarks>
+    [DispId(17)]
+    void OnAutoReconnecting(
+        int disconnectReason,
+        int attemptCount,
+        out AutoReconnectContinueState continueStatus);
 
-    [DispId(23)]
+    /// <summary>
+    /// Raised once when an automatic reconnection has succeeded.
+    /// </summary>
+    /// <remarks>
+    /// DISPID 33. It was declared as 23, which is OnFocusReleased. Both this and OnAutoReconnecting
+    /// have to be right together: the state a reconnection sets up is only cleared here, so a
+    /// session that reconnected would otherwise stay presented as reconnecting.
+    /// </remarks>
+    [DispId(33)]
     void OnAutoReconnected();
 }
 
@@ -133,9 +163,26 @@ public class MsTscAxEventSink : IMsTscAxEvents
     public void OnFatalError(int errorCode) => _host.RaiseFatalError(errorCode);
     public void OnRemoteDesktopSizeChange(int width, int height) => _host.RaiseRemoteDesktopSizeChanged(width, height);
 
-    public void OnAutoReconnecting(int disconnectReason, int attemptCount, out bool continueReconnect)
+    /// <summary>
+    /// Forwards the attempt to the host and writes back whether the control should proceed.
+    /// </summary>
+    /// <remarks>
+    /// <para>The polarity is not a detail. The control reads zero as "keep reconnecting", so the
+    /// previous boolean was inverted on both branches once it reached the control: asking to stop
+    /// wrote zero and asked it to continue, and asking to continue wrote one and would have stopped
+    /// it at the first attempt. Writing the state explicitly removes the coercion that hid this.
+    /// </para>
+    /// <para>The verdict is read after the host has been told, and the listeners that set it do so
+    /// on the dispatcher rather than inside this call. That works because the host raises
+    /// synchronously: a listener moved to an asynchronous dispatch would return here before setting
+    /// the flag, and the veto would be lost with nothing to show for it.</para>
+    /// </remarks>
+    public void OnAutoReconnecting(
+        int disconnectReason,
+        int attemptCount,
+        out AutoReconnectContinueState continueStatus)
     {
-        continueReconnect = true;
+        continueStatus = AutoReconnectContinueState.Automatic;
         try
         {
             // Raise first so a listener can synchronously cancel the current retry.
@@ -143,9 +190,23 @@ public class MsTscAxEventSink : IMsTscAxEvents
         }
         finally
         {
-            continueReconnect = !_host.CancelAutoReconnect;
+            continueStatus = ResolveContinueStatus(_host.CancelAutoReconnect);
         }
     }
+
+    /// <summary>
+    /// The verdict written back to the control, as a pure function of whether a cancel was asked
+    /// for.
+    /// </summary>
+    /// <remarks>
+    /// Separated so the polarity can be asserted without a live control. It is the half of this
+    /// handler that fails silently: the control accepts any integer, and reads the wrong one as a
+    /// valid instruction.
+    /// </remarks>
+    internal static AutoReconnectContinueState ResolveContinueStatus(bool cancelRequested)
+        => cancelRequested
+            ? AutoReconnectContinueState.Stop
+            : AutoReconnectContinueState.Automatic;
 
     public void OnAutoReconnected() => _host.RaiseAutoReconnected();
 }

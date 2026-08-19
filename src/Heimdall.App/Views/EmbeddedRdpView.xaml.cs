@@ -2858,7 +2858,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             localizedLabel = _localizer.Format(
                 RdpSessionStatusKeys.GetKey(status),
                 attempt,
-                RdpActiveXHost.MaxAutoReconnectAttempts);
+                ResolveReconnectAttemptCeiling());
         }
         else
         {
@@ -2880,10 +2880,9 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         {
             RdpLoadingBar.IsIndeterminate = false;
             RdpLoadingBar.Minimum = 0;
-            RdpLoadingBar.Maximum = RdpActiveXHost.MaxAutoReconnectAttempts;
-            RdpLoadingBar.Value = ResolveReconnectProgressValue(
-                reconnectAttempt ?? 0,
-                RdpActiveXHost.MaxAutoReconnectAttempts);
+            int ceiling = ResolveReconnectAttemptCeiling();
+            RdpLoadingBar.Maximum = ceiling;
+            RdpLoadingBar.Value = ResolveReconnectProgressValue(reconnectAttempt ?? 0, ceiling);
         }
         else
         {
@@ -2907,6 +2906,18 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             status is RdpSessionStatus.Error ? Brushes.IndianRed : Brushes.White);
         UpdateHealthDot();
     }
+
+    /// <summary>
+    /// How many attempts the control will actually make, rather than the compiled-in default.
+    /// </summary>
+    /// <remarks>
+    /// A profile can raise or lower the cap and the control is configured from that value, so
+    /// showing the default would present an attempt number past its own ceiling and a saturated
+    /// bar. This surface only became reachable once the auto-reconnect events were delivered, so
+    /// the divergence had never been displayed.
+    /// </remarks>
+    private int ResolveReconnectAttemptCeiling()
+        => _rdpHost?.EffectiveMaxAutoReconnectAttempts ?? RdpActiveXHost.MaxAutoReconnectAttempts;
 
     internal static int ResolveReconnectProgressValue(int currentAttempt, int maxAttempts)
     {
