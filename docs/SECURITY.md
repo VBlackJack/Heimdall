@@ -407,11 +407,21 @@ executable it was pointed at, so an executable chosen to steal it has already wo
 check establishes is narrower: whether a timing conclusion drawn from one measured build may be
 applied to the binary actually being launched.
 
-**The exposure is reduced, not eliminated.** A session that connects and then stays silent produces
-no first byte, and its file waits for process exit even on an attested launcher. Making the launcher
-announce the connection unconditionally would need `-v`, which would change what the user sees in
-the terminal. Process exit remains the backstop, every path that frees the file goes through one
-gate so the deletion runs exactly once, and a launch that fails or is cancelled releases on the spot.
+**The exposure is reduced, and the remaining case is narrower than first written here.** Measured
+against a live OpenSSH 9.6p1 target whose forced command is `sleep 600` - a session that connects
+and then says nothing at all - the launcher still writes `Using username "..."` to stderr as soon
+as it has a login name. That reaches the gate through the merged output stream, and the password
+file is deleted 93 ms after the connection returns, while the process is still running and process
+exit has not fired. A silent remote command is therefore covered.
+
+**What is not covered is a profile with no configured username.** The launcher then waits for a
+login name and writes nothing on either stream - measured: zero bytes after three seconds, process
+still alive - so no first byte arrives and the password file lives until the process exits, exactly
+as it did before any of this. Closing that would mean either refusing to write the secret before a
+username is known, or obtaining one first; both change what the product does.
+
+Process exit remains the backstop, every path that frees the file goes through one gate so the
+deletion runs exactly once, and a launch that fails or is cancelled releases on the spot.
 
 ### Subprocess argument hardening
 

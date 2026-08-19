@@ -36,8 +36,18 @@ namespace Heimdall.App.Services.Handlers;
 /// process start would not even show that the child finished parsing its arguments. A
 /// delete-and-retry loop was rejected as well: it would succeed just as readily before the launcher
 /// ever opened the file, and nothing on this side separates that from success.</para>
-/// <para>What is still not covered, and the reason SSH-013 stays open: a session that connects and
-/// then stays silent writes no first byte, so even an attested launcher waits for process exit.</para>
+/// <para>What is still not covered, and the reason SSH-013 stays open, is narrower than it was
+/// once written here. A session that connects and then produces no output of its own is covered:
+/// measured against a live OpenSSH 9.6p1 target whose forced command is <c>sleep 600</c>, the
+/// launcher writes <c>Using username "..."</c> to stderr as soon as it has a login name, that
+/// reaches this gate through the merged output stream, and the password file is deleted while the
+/// process is still running and process exit has not fired.</para>
+/// <para>The residual is a profile with <b>no configured username</b>. The launcher then waits for
+/// a login name and writes nothing at all - measured: zero bytes on either stream after three
+/// seconds, process still alive - so no first byte ever arrives and the password file lives until
+/// the process exits, exactly as before. Closing that would mean either refusing to write the
+/// secret before a username is known, or obtaining one first; both change what the product does
+/// and neither is decided here.</para>
 /// </remarks>
 internal static class PlinkPasswordFileRelease
 {
