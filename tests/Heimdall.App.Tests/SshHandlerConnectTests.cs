@@ -17,6 +17,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
@@ -161,6 +162,167 @@ public sealed class SshHandlerConnectTests
 
         Assert.NotNull(directory);
         return Path.Combine(directory!.FullName, "src", "Heimdall.App", "Assets", "Tools", "plink.exe");
+    }
+
+    // SSH-013 closure. Without a login name the launcher waits and writes nothing, so the first byte
+    // that normally proves it read the password file never arrives and the secret would sit on disk
+    // for the whole session - measured against a live server. The product now refuses instead, and
+    // refuses early: before the password dialog, before any host-key probe or trust mutation, before
+    // the launcher is identified, and before the file exists at all.
+    [Theory]
+    [InlineData(null, true, null)]          // stored password, no key
+    [InlineData("", true, null)]
+    [InlineData("   ", true, null)]
+    [InlineData(null, true, @"C:\keys\id.ppk")]  // stored password AND a key
+    [InlineData("   ", true, @"C:\keys\id.ppk")]
+    [InlineData(null, false, null)]         // neither password nor key: this path would ask for one
+    [InlineData("   ", false, null)]
+    public async Task ConnectSshViaPlinkAsync_PasswordBackedWithoutUsername_RefusesBeforeAnythingIsMaterialised(
+        string? username,
+        bool storedPassword,
+        string? keyPath)
+    {
+        const int targetPort = 49161;
+        string plinkPath = Path.GetTempFileName();
+        HashSet<string> before = [.. Directory.EnumerateFiles(
+            Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern)];
+
+        try
+        {
+            FakeTunnelService tunnelService = new();
+            HostKeyStore hostKeyStore = new();
+            HostKeyTrustService hostKeyTrustService = new(hostKeyStore);
+            FakePlinkHostKeyProbe probe = new(null);
+            int attestations = 0;
+            int deletes = 0;
+            int prompts = 0;
+
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                hostKeyTrustService,
+                probe,
+                deletePlinkPasswordFile: _ => deletes++,
+                plinkAttestation: _ =>
+                {
+                    attestations++;
+                    return PlinkAttestationLease.NotAttested;
+                },
+                dialogService: new PromptingDialogService([], "should-never-be-asked"));
+
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshUsername = username;
+            server.SshKeyPath = keyPath;
+            server.SshPasswordEncrypted = storedPassword
+                ? CredentialProtector.Protect("stored-password")
+                : null;
+
+            AppSettings settings = new() { PlinkPath = plinkPath };
+
+            ConnectionResult result = await handler.ConnectSshViaPlinkAsync(
+                server, settings, "127.0.0.1", targetPort,
+                usesTunnel: true, originalFailure: null, CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.Equal(
+                new LocalizationManager()[SshLocalizationKeys.ErrorSshUsernameRequiredForPassword],
+                result.ErrorMessage);
+            Assert.Equal(
+                SshLocalizationKeys.ErrorSshUsernameRequiredForPassword,
+                result.Failure?.MessageKey);
+
+            // Nothing was asked, probed, identified, written or started.
+            Assert.Equal(0, prompts);
+            Assert.Equal(0, probe.CallCount);
+            Assert.Equal(0, attestations);
+            Assert.Equal(0, deletes);
+            Assert.Null(result.Session);
+            Assert.Empty(hostKeyStore.GetAllEntries());
+            Assert.Empty(Directory.EnumerateFiles(
+                Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern).Except(before));
+
+            // And the tunnel reference is given back exactly once.
+            Assert.Equal(1, tunnelService.ReleaseCount);
+            Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
+        }
+        finally
+        {
+            File.Delete(plinkPath);
+        }
+    }
+
+    // A key with no password never writes the file, so the new refusal must not touch it. With the
+    // username simply absent the pre-existing path continues to its own next result.
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_KeyOnlyWithoutUsername_IsNotRefusedByTheNewGuard()
+    {
+        const int targetPort = 49162;
+        string plinkPath = Path.GetTempFileName();
+        string keyPath = Path.GetTempFileName();
+
+        try
+        {
+            FakeTunnelService tunnelService = new();
+            HostKeyStore hostKeyStore = new();
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                new HostKeyTrustService(hostKeyStore),
+                new FakePlinkHostKeyProbe(null));
+
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshUsername = null;
+            server.SshKeyPath = keyPath;
+            server.SshPasswordEncrypted = null;
+
+            AppSettings settings = new() { PlinkPath = plinkPath };
+
+            ConnectionResult result = await handler.ConnectSshViaPlinkAsync(
+                server, settings, "127.0.0.1", targetPort,
+                usesTunnel: true, originalFailure: null, CancellationToken.None);
+
+            Assert.NotEqual(
+                SshLocalizationKeys.ErrorSshUsernameRequiredForPassword,
+                result.Failure?.MessageKey);
+        }
+        finally
+        {
+            File.Delete(plinkPath);
+            File.Delete(keyPath);
+        }
+    }
+
+    // A username that is present but rejected by input validation keeps its own message: the new
+    // refusal is about a missing name, not a malformed one.
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_MalformedUsername_KeepsTheValidationMessage()
+    {
+        const int targetPort = 49163;
+        string plinkPath = Path.GetTempFileName();
+
+        try
+        {
+            FakeTunnelService tunnelService = new();
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                new HostKeyTrustService(new HostKeyStore()),
+                new FakePlinkHostKeyProbe(null));
+
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshUsername = "bad user;rm";
+            server.SshPasswordEncrypted = CredentialProtector.Protect("stored-password");
+
+            AppSettings settings = new() { PlinkPath = plinkPath };
+
+            ConnectionResult result = await handler.ConnectSshViaPlinkAsync(
+                server, settings, "127.0.0.1", targetPort,
+                usesTunnel: true, originalFailure: null, CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.Equal(SshLocalizationKeys.ErrorInvalidSshUsername, result.Failure?.MessageKey);
+        }
+        finally
+        {
+            File.Delete(plinkPath);
+        }
     }
 
     // SSH-013 ordering. The password dialog can hold this thread for as long as the user takes, so

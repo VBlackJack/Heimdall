@@ -414,11 +414,17 @@ as it has a login name. That reaches the gate through the merged output stream, 
 file is deleted 93 ms after the connection returns, while the process is still running and process
 exit has not fired. A silent remote command is therefore covered.
 
-**What is not covered is a profile with no configured username.** The launcher then waits for a
-login name and writes nothing on either stream - measured: zero bytes after three seconds, process
-still alive - so no first byte arrives and the password file lives until the process exits, exactly
-as it did before any of this. Closing that would mean either refusing to write the secret before a
-username is known, or obtaining one first; both change what the product does.
+**A profile with no configured username is now refused rather than left exposed.** The launcher in
+that case waits for a login name and writes nothing on either stream - measured: zero bytes after
+three seconds, process still alive - so no first byte arrives and the password file would live until
+the process exits. Heimdall therefore declines the connection before the password dialog, before any
+host-key probe or trust mutation, before the launcher is identified and before the file exists,
+telling the user to set a username or connect with a key.
+
+The refusal is limited to connections that would put a password on disk: a stored password, with or
+without a key, or neither password nor key, since that path goes on to ask for one. **A profile that
+authenticates with a key and no password is untouched** - it never writes the file, so it has nothing
+to protect here, and nothing about key-only connections is claimed by this.
 
 Process exit remains the backstop, every path that frees the file goes through one gate so the
 deletion runs exactly once, and a launch that fails or is cancelled releases on the spot.

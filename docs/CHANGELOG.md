@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: no SSH username, no password written to disk
+
+- **The case measured in the entry below is now refused instead of tolerated.** A profile with no
+  username left the password file on disk for the whole session, because the launcher waits for a
+  login name and writes nothing, so nothing ever proved it had read the file.
+- **Heimdall now declines that connection before anything is materialised**: before the password
+  dialog, before any host-key probe or trust mutation, before the launcher is identified, and before
+  the file exists. The message names what to do - set the SSH username, or connect with a key.
+- **The refusal is limited to connections that would put a password on disk**: a stored password,
+  with or without a key, or neither password nor key, since that path goes on to ask for one. A
+  profile that authenticates with a key and no password is untouched, and nothing about key-only
+  connections is claimed here.
+- A username that is present but malformed keeps its own existing message; this is about a missing
+  name, not a rejected one.
+- Whitespace counts as absent, because the launcher would receive a bare host either way.
+
 ## 2026-08-18: what the early password-file deletion actually covers, measured
 
 - **The entries below claimed that a session which connects and then stays silent produces no first
