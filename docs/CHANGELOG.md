@@ -12,6 +12,24 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: the embedded editor stops rewriting local files it only meant to save
+
+- **Saving a local file no longer changes its encoding.** The editor read local files with
+  `File.ReadAllTextAsync` and wrote them back with `File.WriteAllTextAsync`, which always emits UTF-8
+  without a byte order mark. Saving a UTF-16 file therefore rewrote every byte of it, and a UTF-8
+  file lost its mark, while the text on screen was unchanged. The encoding and the exact mark
+  observed when the file is opened are now kept and written back, so a save that changes nothing
+  produces the same bytes.
+- **This was the half of the defect that stayed open.** The same round trip through the remote
+  editor was fixed on 2026-08-10; the local file browser's "edit in embedded editor" action went
+  through a different code path that was never converted. Both now share one codec.
+- **A file that is neither mark-carrying nor valid UTF-8 is now reported instead of transcoded.**
+  Opening a legacy single-byte file used to silently reinterpret its bytes; it now fails to open,
+  says so, and leaves the file untouched. Refusing to open is the safe direction for a defect about
+  silent corruption, and it is a visible change for anyone who was editing such files.
+- A path the editor never opened, or one whose load failed, is still written as UTF-8 without a
+  mark, so nothing changes for callers that never obtained a document.
+
 ## 2026-08-18: restoring the previous session is no longer the shell's job
 
 - **Launch-time session restore moved out of the main shell into a dedicated coordinator.** Loading the
