@@ -195,7 +195,10 @@ public sealed class SshHandlerConnectTests
             FakePlinkHostKeyProbe probe = new(null);
             int attestations = 0;
             int deletes = 0;
-            int prompts = 0;
+
+            // Kept, not discarded: the previous version passed an anonymous list here and asserted
+            // on a counter nothing ever incremented, so "no dialog" could not fail.
+            List<string> dialogCalls = [];
 
             using SshHandler handler = CreateHandler(
                 tunnelService,
@@ -207,7 +210,7 @@ public sealed class SshHandlerConnectTests
                     attestations++;
                     return PlinkAttestationLease.NotAttested;
                 },
-                dialogService: new PromptingDialogService([], "should-never-be-asked"));
+                dialogService: new PromptingDialogService(dialogCalls, "should-never-be-asked"));
 
             ServerProfileDto server = CreateGatewayServer();
             server.SshUsername = username;
@@ -231,7 +234,7 @@ public sealed class SshHandlerConnectTests
                 result.Failure?.MessageKey);
 
             // Nothing was asked, probed, identified, written or started.
-            Assert.Equal(0, prompts);
+            Assert.Empty(dialogCalls);
             Assert.Equal(0, probe.CallCount);
             Assert.Equal(0, attestations);
             Assert.Equal(0, deletes);
@@ -258,6 +261,8 @@ public sealed class SshHandlerConnectTests
         const int targetPort = 49162;
         string plinkPath = Path.GetTempFileName();
         string keyPath = Path.GetTempFileName();
+        HashSet<string> before = [.. Directory.EnumerateFiles(
+            Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern)];
 
         try
         {
@@ -282,9 +287,20 @@ public sealed class SshHandlerConnectTests
             Assert.NotEqual(
                 SshLocalizationKeys.ErrorSshUsernameRequiredForPassword,
                 result.Failure?.MessageKey);
+
+            // A key with no password must not put one on disk either, whatever else this path does
+            // next. Asserted rather than assumed, because the guard deliberately leaves it alone.
+            Assert.Empty(Directory.EnumerateFiles(
+                Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern).Except(before));
         }
         finally
         {
+            foreach (string leftover in Directory.EnumerateFiles(
+                Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern).Except(before))
+            {
+                File.Delete(leftover);
+            }
+
             File.Delete(plinkPath);
             File.Delete(keyPath);
         }
