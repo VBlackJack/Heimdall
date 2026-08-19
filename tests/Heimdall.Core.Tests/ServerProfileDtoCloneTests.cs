@@ -25,30 +25,44 @@ namespace Heimdall.Core.Tests;
 /// </summary>
 /// <remarks>
 /// <para>Two hand-written assignment lists existed before it and had drifted in opposite
-/// directions. What makes that drift dangerous is not the missing values but the three presence
+/// directions. What makes that drift dangerous is not the missing values but the four presence
 /// flags: their setters raise them on any assignment, including of null, so a copy written as a
 /// list of assignments fabricates presence the source never had, and
 /// <see cref="ServerProfileDto.UsesLegacySshCredentialMapping"/> flips with it.</para>
 /// <para>These oracles therefore assert flag PRESERVATION, not value equality. A value-equality
 /// oracle passes on a clone that fabricates every flag, which is exactly the bug.</para>
+/// <para>They also assert that a copied dictionary keeps its comparer. A copy that imposes one
+/// keeps every key while changing how the copy is searched, so the loss is invisible to any oracle
+/// that only compares contents.</para>
 /// </remarks>
 public sealed class ServerProfileDtoCloneTests
 {
-    // All eight combinations of the three presence flags, false states included - a flag that is
-    // false is the state a setter-based copy destroys.
+    // All sixteen combinations of the four presence flags, false states included - a flag that is
+    // false is the state a setter-based copy destroys. The fourth, the RDP resolution mode, is the
+    // one whose setter fires even for the default enum value, so a copy that assigns it always
+    // claims a mode the source may never have declared.
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(false, false, true)]
-    [InlineData(false, true, false)]
-    [InlineData(false, true, true)]
-    [InlineData(true, false, false)]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, false)]
-    [InlineData(true, true, true)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, true, true, false)]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, true, true, false)]
+    [InlineData(true, true, true, true)]
     public void EveryCombinationOfThePresenceFlags_SurvivesTheClone(
         bool winRmPort,
         bool sshPort,
-        bool passphrase)
+        bool passphrase,
+        bool rdpResolutionMode)
     {
         ServerProfileDto source = new() { Id = "s", DisplayName = "S" };
 
@@ -67,6 +81,18 @@ public sealed class ServerProfileDtoCloneTests
             source.SshKeyPassphraseEncrypted = "cipher";
         }
 
+        if (rdpResolutionMode)
+        {
+            source.RdpResolutionMode = RdpResolutionMode.Fixed;
+        }
+
+        // The source is only a valid fixture for this oracle if the flags really are in the state
+        // the row asks for: an assignment that raised one by accident would make the row vacuous.
+        Assert.Equal(winRmPort, source.HasWinRmPortField);
+        Assert.Equal(sshPort, source.HasSshPortField);
+        Assert.Equal(passphrase, source.HasSshKeyPassphraseEncryptedField);
+        Assert.Equal(rdpResolutionMode, source.HasRdpResolutionModeField);
+
         ServerProfileDto clone = source.CloneFaithfully();
 
         Assert.Equal(source.HasWinRmPortField, clone.HasWinRmPortField);
@@ -74,11 +100,17 @@ public sealed class ServerProfileDtoCloneTests
         Assert.Equal(
             source.HasSshKeyPassphraseEncryptedField,
             clone.HasSshKeyPassphraseEncryptedField);
+        Assert.Equal(source.HasRdpResolutionModeField, clone.HasRdpResolutionModeField);
+
+        // Asserted against the row as well as against the source, so a clone that fabricates a flag
+        // cannot pass by having corrupted both sides identically.
+        Assert.Equal(rdpResolutionMode, clone.HasRdpResolutionModeField);
 
         // The values travel with the flags, without either being invented.
         Assert.Equal(source.WinRmPort, clone.WinRmPort);
         Assert.Equal(source.SshPort, clone.SshPort);
         Assert.Equal(source.SshKeyPassphraseEncrypted, clone.SshKeyPassphraseEncrypted);
+        Assert.Equal(source.RdpResolutionMode, clone.RdpResolutionMode);
     }
 
     // The reason the flags matter. A legacy profile - key plus password, no passphrase field - reads
@@ -203,6 +235,80 @@ public sealed class ServerProfileDtoCloneTests
 
         Assert.True(source.ExtensionData.ContainsKey("unknownFutureField"));
         Assert.False(source.ExtensionData.ContainsKey("added"));
+    }
+
+    // A dictionary is not only its contents: the comparer decides what "the same key" means. A copy
+    // that imposes one keeps every entry and still answers differently, which no content comparison
+    // can see.
+    [Fact]
+    public void ACaseInsensitiveDictionary_KeepsItsLookupSemanticsInTheClone()
+    {
+        ServerProfileDto source = new()
+        {
+            Id = "s",
+            DisplayName = "S",
+            ExtensionData = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["unknownFutureField"] = JsonSerializer.SerializeToElement(1),
+            },
+        };
+        source.PostConnectSteps.Add(new PostConnectStep
+        {
+            Id = "step-1",
+            Input = "uptime",
+            CommandLibraryParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["host"] = "alpha",
+            },
+        });
+
+        Assert.True(source.ExtensionData.ContainsKey("UNKNOWNFUTUREFIELD"));
+        Assert.True(source.PostConnectSteps[0].CommandLibraryParams!.ContainsKey("HOST"));
+
+        ServerProfileDto clone = source.CloneFaithfully();
+
+        Assert.Same(source.ExtensionData.Comparer, clone.ExtensionData.Comparer);
+        Assert.Same(
+            source.PostConnectSteps[0].CommandLibraryParams!.Comparer,
+            clone.PostConnectSteps[0].CommandLibraryParams!.Comparer);
+
+        // Asserted as behaviour too, not only as comparer identity: this is what the caller loses.
+        Assert.True(clone.ExtensionData.ContainsKey("UNKNOWNFUTUREFIELD"));
+        Assert.Equal("alpha", clone.PostConnectSteps[0].CommandLibraryParams!["HOST"]);
+    }
+
+    // Preserving the comparer must not cost the isolation: the copy is still a separate dictionary,
+    // including when a key differs from the source's only by case.
+    [Fact]
+    public void WritingToACaseInsensitiveCloneDictionary_LeavesTheSourceAlone()
+    {
+        ServerProfileDto source = new()
+        {
+            Id = "s",
+            DisplayName = "S",
+            ExtensionData = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["unknownFutureField"] = JsonSerializer.SerializeToElement(1),
+            },
+        };
+        source.PostConnectSteps.Add(new PostConnectStep
+        {
+            Id = "step-1",
+            CommandLibraryParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["host"] = "alpha",
+            },
+        });
+
+        ServerProfileDto clone = source.CloneFaithfully();
+
+        clone.ExtensionData["UNKNOWNFUTUREFIELD"] = JsonSerializer.SerializeToElement(2);
+        clone.ExtensionData["ADDED"] = JsonSerializer.SerializeToElement(3);
+        clone.PostConnectSteps[0].CommandLibraryParams!["HOST"] = "beta";
+
+        Assert.Equal("1", source.ExtensionData["unknownFutureField"].GetRawText());
+        Assert.False(source.ExtensionData.ContainsKey("added"));
+        Assert.Equal("alpha", source.PostConnectSteps[0].CommandLibraryParams!["host"]);
     }
 
     [Fact]

@@ -341,17 +341,21 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     /// </summary>
     /// <remarks>
     /// <para>Built on <see cref="object.MemberwiseClone"/> because this type is sealed: the shallow
-    /// copy carries every backing field, the three private presence flags and any scalar member added
+    /// copy carries every backing field, the four private presence flags and any scalar member added
     /// later, without a hand-written assignment list that drifts. Two such lists existed and had
     /// drifted in opposite directions before this method.</para>
     /// <para>No property setter is used while cloning. <see cref="WinRmPort"/>,
-    /// <see cref="SshPort"/> and <see cref="SshKeyPassphraseEncrypted"/> each raise their presence
-    /// flag on assignment, including for a null value, so copying through them would fabricate
-    /// presence on a clone whose source had none - which silently flips
-    /// <see cref="UsesLegacySshCredentialMapping"/> and changes how the profile authenticates.</para>
+    /// <see cref="SshPort"/>, <see cref="SshKeyPassphraseEncrypted"/> and
+    /// <see cref="RdpResolutionMode"/> each raise their presence flag on assignment, including for a
+    /// null or default value, so copying through them would fabricate presence on a clone whose
+    /// source had none - which silently flips <see cref="UsesLegacySshCredentialMapping"/> and
+    /// changes how the profile authenticates, and makes
+    /// <c>RdpResolutionProfileMigration</c> skip the legacy migration on the copy.</para>
     /// <para>Every mutable reference is then replaced by a deep copy, so writing to the clone cannot
     /// reach the original: the monitor array, the post-connect steps with their own parameter
-    /// dictionaries, and the JSON extension data.</para>
+    /// dictionaries, and the JSON extension data. Each copied dictionary keeps the comparer of the
+    /// dictionary it came from: imposing one would change how the copy is searched, which is a
+    /// silent behaviour change even though every key is still present.</para>
     /// </remarks>
     public ServerProfileDto CloneFaithfully()
     {
@@ -361,7 +365,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
         clone.PostConnectSteps = [.. PostConnectSteps.Select(CloneStep)];
         clone.ExtensionData = new Dictionary<string, JsonElement>(
             ExtensionData.Count,
-            StringComparer.Ordinal);
+            ExtensionData.Comparer);
 
         foreach (KeyValuePair<string, JsonElement> entry in ExtensionData)
         {
@@ -382,7 +386,9 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
             CommandLibraryId = step.CommandLibraryId,
             CommandLibraryParams = step.CommandLibraryParams is null
                 ? null
-                : new Dictionary<string, string>(step.CommandLibraryParams, StringComparer.Ordinal),
+                : new Dictionary<string, string>(
+                    step.CommandLibraryParams,
+                    step.CommandLibraryParams.Comparer),
             DelayMs = step.DelayMs,
             Enabled = step.Enabled,
             OnFailure = step.OnFailure,
