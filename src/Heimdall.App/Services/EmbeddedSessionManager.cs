@@ -505,13 +505,32 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         return globalValue >= 0 ? globalValue : DefaultRdpResizeEnableDelayMs;
     }
 
-    private static (ServerProfileDto Server, string? StatusKey) ResolveEmbeddedRdpRuntimeServer(ServerProfileDto server)
+    private static (ServerProfileDto Server, string? StatusKey) ResolveEmbeddedRdpRuntimeServer(
+        ServerProfileDto server)
+        => ResolveEmbeddedRdpRuntimeServer(server, GetRdpHostMonitorCount());
+
+    /// <summary>
+    /// Decides whether the requested multi-monitor layout can be honoured, and returns the profile
+    /// the session should actually run with.
+    /// </summary>
+    /// <param name="server">The configured profile. Never mutated.</param>
+    /// <param name="hostMonitorCount">
+    /// How many monitors the host reports. Injected so the decision can be exercised without the
+    /// machine the tests happen to run on deciding the outcome.
+    /// </param>
+    /// <returns>
+    /// The original profile when no fallback is needed, so the common path allocates nothing, or an
+    /// independent copy carrying the coerced display settings.
+    /// </returns>
+    internal static (ServerProfileDto Server, string? StatusKey) ResolveEmbeddedRdpRuntimeServer(
+        ServerProfileDto server,
+        int hostMonitorCount)
     {
         var requested = new RdpDisplaySettings(
             server.RdpResolutionMode,
             UseMultimon: server.RdpResolutionMode == RdpResolutionMode.Multimon,
             SelectedMonitorIndices: server.RdpSelectedMonitorIndices);
-        var host = new RdpDisplayCapabilities(GetRdpHostMonitorCount());
+        RdpDisplayCapabilities host = new(hostMonitorCount);
         var validation = RdpDisplayResolver.ValidateMultimon(host, requested);
 
         if (!validation.ShouldFallback)
@@ -557,100 +576,18 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             _ => null
         };
 
+    /// <summary>
+    /// Independent copy of the profile for a runtime override, through the single fidelity
+    /// primitive rather than a hand-written assignment list.
+    /// </summary>
+    /// <remarks>
+    /// The list this replaced had drifted: it omitted the session logging override - which is the
+    /// defect the multimon fallback exhibits - along with the vault entry name and the whole WinRM
+    /// group, and it assigned the key passphrase unconditionally, fabricating its presence flag on a
+    /// clone whose source had none.
+    /// </remarks>
     private static ServerProfileDto CloneServerProfile(ServerProfileDto server)
-        => new()
-        {
-            Id = server.Id,
-            DisplayName = server.DisplayName,
-            Origin = server.Origin,
-            ExecutionConfirmed = server.ExecutionConfirmed,
-            RemoteServer = server.RemoteServer,
-            RemotePort = server.RemotePort,
-            LocalPort = server.LocalPort,
-            Group = server.Group,
-            SshGatewayId = server.SshGatewayId,
-            RdpUsername = server.RdpUsername,
-            RdpPasswordEncrypted = server.RdpPasswordEncrypted,
-            RdpDomain = server.RdpDomain,
-            UseDirectConnection = server.UseDirectConnection,
-            ProjectId = server.ProjectId,
-            ConnectionType = server.ConnectionType,
-            SshUsername = server.SshUsername,
-            SshPort = server.SshPort,
-            SshMode = server.SshMode,
-            SshAgentForwarding = server.SshAgentForwarding,
-            SshKeyPath = server.SshKeyPath,
-            SshPasswordEncrypted = server.SshPasswordEncrypted,
-            SshKeyPassphraseEncrypted = server.SshKeyPassphraseEncrypted,
-            SshCompression = server.SshCompression,
-            SshX11Forwarding = server.SshX11Forwarding,
-            SocksProxyPort = server.SocksProxyPort,
-            RemoteBindPort = server.RemoteBindPort,
-            RemoteLocalPort = server.RemoteLocalPort,
-            PostConnectSteps = [.. server.PostConnectSteps],
-            PostConnectCommand = server.PostConnectCommand,
-            PostConnectDelayMs = server.PostConnectDelayMs,
-            RdpAntiIdle = server.RdpAntiIdle,
-            RdpAspectRatio = server.RdpAspectRatio,
-            RdpResolutionMode = server.RdpResolutionMode,
-            RdpFixedWidth = server.RdpFixedWidth,
-            RdpFixedHeight = server.RdpFixedHeight,
-            RdpInitialSmartSizing = server.RdpInitialSmartSizing,
-            RdpResizeEnableDelayMs = server.RdpResizeEnableDelayMs,
-            TunnelsPanelExpanded = server.TunnelsPanelExpanded,
-            IsFavorite = server.IsFavorite,
-            SortOrder = server.SortOrder,
-            Tags = server.Tags,
-            RdpMode = server.RdpMode,
-            RdpUseGlobalDefaults = server.RdpUseGlobalDefaults,
-            RdpRedirectClipboard = server.RdpRedirectClipboard,
-            RdpRedirectDrives = server.RdpRedirectDrives,
-            RdpRedirectPrinters = server.RdpRedirectPrinters,
-            RdpRedirectComPorts = server.RdpRedirectComPorts,
-            RdpRedirectSmartCards = server.RdpRedirectSmartCards,
-            RdpRedirectWebcam = server.RdpRedirectWebcam,
-            RdpRedirectUsb = server.RdpRedirectUsb,
-            RdpAudioMode = server.RdpAudioMode,
-            RdpAudioCapture = server.RdpAudioCapture,
-            RdpMultiMonitor = server.RdpMultiMonitor,
-            RdpSelectedMonitorIndices = [.. server.RdpSelectedMonitorIndices],
-            RdpDynamicResolution = server.RdpDynamicResolution,
-            RdpNla = server.RdpNla,
-            RdpStrictServerAuthentication = server.RdpStrictServerAuthentication,
-            RdpColorDepth = server.RdpColorDepth,
-            RdpBitmapCaching = server.RdpBitmapCaching,
-            RdpCompression = server.RdpCompression,
-            RdpAutoReconnect = server.RdpAutoReconnect,
-            RdpAdminMode = server.RdpAdminMode,
-            RdpFullScreen = server.RdpFullScreen,
-            RdpPerformanceFlags = server.RdpPerformanceFlags,
-            RdpDisableUdp = server.RdpDisableUdp,
-            RdpGateway = server.RdpGateway,
-            Environment = server.Environment,
-            MacAddress = server.MacAddress,
-            LocalShellExecutable = server.LocalShellExecutable,
-            LocalShellArguments = server.LocalShellArguments,
-            LocalShellWorkingDirectory = server.LocalShellWorkingDirectory,
-            LocalShellElevated = server.LocalShellElevated,
-            ElevationMode = server.ElevationMode,
-            CitrixStoreFrontUrl = server.CitrixStoreFrontUrl,
-            CitrixAppName = server.CitrixAppName,
-            CitrixIcaFilePath = server.CitrixIcaFilePath,
-            CitrixSeamlessMode = server.CitrixSeamlessMode,
-            CitrixUseSso = server.CitrixUseSso,
-            CitrixLaunchCommandLine = server.CitrixLaunchCommandLine,
-            FtpPort = server.FtpPort,
-            FtpUsername = server.FtpUsername,
-            FtpPasswordEncrypted = server.FtpPasswordEncrypted,
-            VncPort = server.VncPort,
-            VncPassword = server.VncPassword,
-            FtpPassiveMode = server.FtpPassiveMode,
-            FtpUseSsl = server.FtpUseSsl,
-            VncViewOnly = server.VncViewOnly,
-            TelnetPort = server.TelnetPort,
-            TelnetUsername = server.TelnetUsername,
-            TelnetPasswordEncrypted = server.TelnetPasswordEncrypted
-        };
+        => server.CloneFaithfully();
 
     public void DisconnectSession(SessionPaneModel pane, DisconnectReason reason)
     {

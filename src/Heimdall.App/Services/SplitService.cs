@@ -1016,7 +1016,12 @@ public sealed class SplitService : ISplitService
             : inventoryConnectionType ?? "RDP";
     }
 
-    private static ServerProfileDto CreatePaneScopedServerProfile(
+    /// <summary>
+    /// The profile a pane runs with: the configured one when nothing needs re-scoping, otherwise an
+    /// independent copy carrying the pane's own state key and connection type.
+    /// </summary>
+    /// <remarks>Internal so the copy's fidelity can be exercised without driving a whole split.</remarks>
+    internal static ServerProfileDto CreatePaneScopedServerProfile(
         ServerProfileDto serverDto,
         string paneServerId,
         string connectionType)
@@ -1037,116 +1042,17 @@ public sealed class SplitService : ISplitService
         return clone;
     }
 
+    /// <summary>
+    /// Independent copy of the profile for a pane-scoped session, through the single fidelity
+    /// primitive rather than a hand-written assignment list.
+    /// </summary>
+    /// <remarks>
+    /// The list this replaced omitted the JSON extension data. Its guarded copy of the key
+    /// passphrase, which existed precisely so the presence flag was not fabricated, is subsumed by
+    /// the primitive: a memberwise copy carries the flag itself rather than re-deriving it.
+    /// </remarks>
     private static ServerProfileDto CloneServerProfile(ServerProfileDto server)
-    {
-        var clone = new ServerProfileDto
-        {
-            Id = server.Id,
-            DisplayName = server.DisplayName,
-            Origin = server.Origin,
-            RemoteServer = server.RemoteServer,
-            RemotePort = server.RemotePort,
-            LocalPort = server.LocalPort,
-            Group = server.Group,
-            SshGatewayId = server.SshGatewayId,
-            RdpUsername = server.RdpUsername,
-            RdpPasswordEncrypted = server.RdpPasswordEncrypted,
-            RdpDomain = server.RdpDomain,
-            UseDirectConnection = server.UseDirectConnection,
-            ProjectId = server.ProjectId,
-            ConnectionType = server.ConnectionType,
-            SessionLoggingOverride = server.SessionLoggingOverride,
-            VaultEntryName = server.VaultEntryName,
-            WinRmPort = server.WinRmPort,
-            WinRmUsername = server.WinRmUsername,
-            WinRmPasswordEncrypted = server.WinRmPasswordEncrypted,
-            WinRmUseSsl = server.WinRmUseSsl,
-            WinRmSkipCertificateCheck = server.WinRmSkipCertificateCheck,
-            WinRmIdentityMode = server.WinRmIdentityMode,
-            SshUsername = server.SshUsername,
-            SshPort = server.SshPort,
-            SshMode = server.SshMode,
-            SshAgentForwarding = server.SshAgentForwarding,
-            SshKeyPath = server.SshKeyPath,
-            SshPasswordEncrypted = server.SshPasswordEncrypted,
-            SshCompression = server.SshCompression,
-            SshX11Forwarding = server.SshX11Forwarding,
-            SocksProxyPort = server.SocksProxyPort,
-            RemoteBindPort = server.RemoteBindPort,
-            RemoteLocalPort = server.RemoteLocalPort,
-            PostConnectSteps = [.. server.PostConnectSteps],
-            PostConnectCommand = server.PostConnectCommand,
-            PostConnectDelayMs = server.PostConnectDelayMs,
-            RdpAntiIdle = server.RdpAntiIdle,
-            RdpAspectRatio = server.RdpAspectRatio,
-            RdpResolutionMode = server.RdpResolutionMode,
-            RdpFixedWidth = server.RdpFixedWidth,
-            RdpFixedHeight = server.RdpFixedHeight,
-            RdpInitialSmartSizing = server.RdpInitialSmartSizing,
-            RdpResizeEnableDelayMs = server.RdpResizeEnableDelayMs,
-            TunnelsPanelExpanded = server.TunnelsPanelExpanded,
-            IsFavorite = server.IsFavorite,
-            SortOrder = server.SortOrder,
-            Tags = server.Tags,
-            RdpMode = server.RdpMode,
-            RdpUseGlobalDefaults = server.RdpUseGlobalDefaults,
-            RdpRedirectClipboard = server.RdpRedirectClipboard,
-            RdpRedirectDrives = server.RdpRedirectDrives,
-            RdpRedirectPrinters = server.RdpRedirectPrinters,
-            RdpRedirectComPorts = server.RdpRedirectComPorts,
-            RdpRedirectSmartCards = server.RdpRedirectSmartCards,
-            RdpRedirectWebcam = server.RdpRedirectWebcam,
-            RdpRedirectUsb = server.RdpRedirectUsb,
-            RdpAudioMode = server.RdpAudioMode,
-            RdpAudioCapture = server.RdpAudioCapture,
-            RdpMultiMonitor = server.RdpMultiMonitor,
-            RdpSelectedMonitorIndices = [.. server.RdpSelectedMonitorIndices],
-            RdpDynamicResolution = server.RdpDynamicResolution,
-            RdpNla = server.RdpNla,
-            RdpStrictServerAuthentication = server.RdpStrictServerAuthentication,
-            RdpColorDepth = server.RdpColorDepth,
-            RdpBitmapCaching = server.RdpBitmapCaching,
-            RdpCompression = server.RdpCompression,
-            RdpAutoReconnect = server.RdpAutoReconnect,
-            RdpAdminMode = server.RdpAdminMode,
-            RdpFullScreen = server.RdpFullScreen,
-            RdpPerformanceFlags = server.RdpPerformanceFlags,
-            RdpDisableUdp = server.RdpDisableUdp,
-            RdpGateway = server.RdpGateway,
-            Environment = server.Environment,
-            MacAddress = server.MacAddress,
-            LocalShellExecutable = server.LocalShellExecutable,
-            LocalShellArguments = server.LocalShellArguments,
-            LocalShellWorkingDirectory = server.LocalShellWorkingDirectory,
-            LocalShellElevated = server.LocalShellElevated,
-            ElevationMode = server.ElevationMode,
-            ExecutionConfirmed = server.ExecutionConfirmed,
-            CitrixStoreFrontUrl = server.CitrixStoreFrontUrl,
-            CitrixAppName = server.CitrixAppName,
-            CitrixIcaFilePath = server.CitrixIcaFilePath,
-            CitrixSeamlessMode = server.CitrixSeamlessMode,
-            CitrixUseSso = server.CitrixUseSso,
-            CitrixLaunchCommandLine = server.CitrixLaunchCommandLine,
-            FtpPort = server.FtpPort,
-            FtpUsername = server.FtpUsername,
-            FtpPasswordEncrypted = server.FtpPasswordEncrypted,
-            VncPort = server.VncPort,
-            VncPassword = server.VncPassword,
-            FtpPassiveMode = server.FtpPassiveMode,
-            FtpUseSsl = server.FtpUseSsl,
-            VncViewOnly = server.VncViewOnly,
-            TelnetPort = server.TelnetPort,
-            TelnetUsername = server.TelnetUsername,
-            TelnetPasswordEncrypted = server.TelnetPasswordEncrypted
-        };
-
-        if (server.HasSshKeyPassphraseEncryptedField)
-        {
-            clone.SshKeyPassphraseEncrypted = server.SshKeyPassphraseEncrypted;
-        }
-
-        return clone;
-    }
+        => server.CloneFaithfully();
 
     /// <summary>
     /// Forces embedded mode for split panes (external processes cannot be docked).
