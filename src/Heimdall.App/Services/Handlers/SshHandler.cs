@@ -548,6 +548,24 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         originalFailure));
             }
 
+            // Refused here, before the password dialog, before any host-key probe or trust
+            // mutation, before the launcher is identified and before the password file exists.
+            // Without a username the launcher waits for a login name and writes nothing, so the
+            // first byte that normally proves it consumed the file never arrives and the secret
+            // would sit on disk for the whole session. Measured, not assumed.
+            if (RequiresUsernameBeforeWritingPassword(server))
+            {
+                string msg = _localizer[SshLocalizationKeys.ErrorSshUsernameRequiredForPassword];
+                _connectionSm.SetError(server.Id, msg);
+                return new ConnectionResult(
+                    false,
+                    msg,
+                    null,
+                    SshSessionDiagnosticFactory.CreatePlinkFallbackFailure(
+                        SshLocalizationKeys.ErrorSshUsernameRequiredForPassword,
+                        msg));
+            }
+
             if (!string.IsNullOrEmpty(server.SshUsername) &&
                 !InputValidator.Validate(server.SshUsername, "SshUser"))
             {
@@ -735,6 +753,28 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         var host = string.IsNullOrWhiteSpace(server.RemoteServer) ? "?" : server.RemoteServer;
         var port = server.SshPort > 0 ? server.SshPort : DefaultPorts.Ssh;
         return $"{user}@{host}:{port}";
+    }
+
+    /// <summary>
+    /// Whether this profile would put a password on disk for a launcher that has no login name.
+    /// </summary>
+    /// <remarks>
+    /// <para>Password-backed means either a stored password - with or without a key - or neither a
+    /// password nor a key, since that path goes on to ask for a password. A profile with a key and
+    /// no password never writes the file, so it is left alone.</para>
+    /// <para>Whitespace counts as absent: the launcher would receive a bare host either way.</para>
+    /// </remarks>
+    internal static bool RequiresUsernameBeforeWritingPassword(ServerProfileDto server)
+    {
+        if (!string.IsNullOrWhiteSpace(server.SshUsername))
+        {
+            return false;
+        }
+
+        bool hasStoredPassword = !string.IsNullOrEmpty(server.SshPasswordEncrypted);
+        bool hasKey = !string.IsNullOrWhiteSpace(server.SshKeyPath);
+
+        return hasStoredPassword || !hasKey;
     }
 
     internal static bool ShouldPromptForPlinkPassword(string? password, string? keyPath)

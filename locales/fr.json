@@ -58,6 +58,7 @@
   "ErrorSshPortInUse": "Le port local est d\u00e9j\u00e0 utilis\u00e9. Fermez l'application en conflit ou choisissez un autre port.",
   "ErrorSshSessionDisconnected": "La session SSH a \u00e9t\u00e9 d\u00e9connect\u00e9e par le serveur.",
   "ErrorSshTunnelBroken": "Le tunnel SSH a \u00e9t\u00e9 ferm\u00e9 de mani\u00e8re inattendue par le serveur.",
+  "ErrorSshUsernameRequiredForPassword": "Ce profil n'a pas de nom d'utilisateur SSH, donc Heimdall n'\u00e9crit pas son mot de passe sur le disque : sans nom de connexion, le client SSH externe ne signale jamais avoir lu le fichier, et le mot de passe y resterait pendant toute la session. Renseignez le nom d'utilisateur SSH de ce profil, ou connectez-vous avec une cl\u00e9.",
   "ErrorSshTunnelPortOwnershipUnattested": "L'ex\u00e9cutable Plink configur\u00e9 n'a pas ouvert lui-m\u00eame le port transf\u00e9r\u00e9. Le tunnel a \u00e9t\u00e9 interrompu.",
   "ErrorSshUnknown": "Une erreur SSH inattendue s'est produite : {0}",
   "ErrorSshUserPlaceholder": "Erreur : Configurez votre identifiant SSH via le bouton Config. SSH.",
