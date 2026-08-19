@@ -184,9 +184,6 @@ public sealed class SshHandlerConnectTests
     {
         const int targetPort = 49161;
         string plinkPath = Path.GetTempFileName();
-        HashSet<string> before = [.. Directory.EnumerateFiles(
-            Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern)];
-
         try
         {
             FakeTunnelService tunnelService = new();
@@ -240,8 +237,13 @@ public sealed class SshHandlerConnectTests
             Assert.Equal(0, deletes);
             Assert.Null(result.Session);
             Assert.Empty(hostKeyStore.GetAllEntries());
-            Assert.Empty(Directory.EnumerateFiles(
-                Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern).Except(before));
+
+            // No scan of the temporary directory here. Every password-file writer in the product
+            // shares one prefix in one directory shared by every test process, so a file another
+            // assembly is legitimately using in that instant is indistinguishable from one this
+            // handler wrote. The counters above carry the same property without that ambiguity: the
+            // launcher was never identified and never attested, and the file is written inside the
+            // launch it never reached.
 
             // And the tunnel reference is given back exactly once.
             Assert.Equal(1, tunnelService.ReleaseCount);
@@ -261,9 +263,6 @@ public sealed class SshHandlerConnectTests
         const int targetPort = 49162;
         string plinkPath = Path.GetTempFileName();
         string keyPath = Path.GetTempFileName();
-        HashSet<string> before = [.. Directory.EnumerateFiles(
-            Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern)];
-
         try
         {
             FakeTunnelService tunnelService = new();
@@ -288,19 +287,17 @@ public sealed class SshHandlerConnectTests
                 SshLocalizationKeys.ErrorSshUsernameRequiredForPassword,
                 result.Failure?.MessageKey);
 
-            // A key with no password must not put one on disk either, whatever else this path does
-            // next. Asserted rather than assumed, because the guard deliberately leaves it alone.
-            Assert.Empty(Directory.EnumerateFiles(
-                Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern).Except(before));
+            // This test used to add that no password file appeared on disk. It cannot: the check
+            // read a directory shared with every other test process, where every writer in the
+            // product uses the same prefix, so a file another assembly was legitimately using was
+            // indistinguishable from one this call wrote. What remains is the claim this test is
+            // named for.
         }
         finally
         {
-            foreach (string leftover in Directory.EnumerateFiles(
-                Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern).Except(before))
-            {
-                File.Delete(leftover);
-            }
-
+            // Deliberately not sweeping the shared temporary directory. Doing so deleted files that
+            // other test processes were still using, which turned this test into a cause of their
+            // failures as well as a victim of theirs.
             File.Delete(plinkPath);
             File.Delete(keyPath);
         }
@@ -427,7 +424,6 @@ public sealed class SshHandlerConnectTests
         string pinned = Path.GetTempFileName();
         string? deletedPasswordPath = null;
         List<string?> attested = [];
-        List<bool> passwordFileExistedWhenAsked = [];
         bool? pinnedWasHeldDuringTeardown = null;
 
         try
@@ -460,10 +456,6 @@ public sealed class SshHandlerConnectTests
                 plinkAttestation: path =>
                 {
                     attested.Add(path);
-                    passwordFileExistedWhenAsked.Add(
-                        Directory.EnumerateFiles(
-                            Path.GetTempPath(),
-                            $"{PlinkPasswordFileNaming.Prefix}*").Any());
 
                     return new PlinkAttestationLease(
                         new FileStream(pinned, FileMode.Open, FileAccess.Read, FileShare.Read),
@@ -489,8 +481,11 @@ public sealed class SshHandlerConnectTests
             // Asked once, about the launcher that was resolved and would have been started.
             Assert.Equal([plinkPath], attested);
 
-            // And asked before the secret was on disk, not after.
-            Assert.Equal([false], passwordFileExistedWhenAsked);
+            // This test used to add that the secret was not yet on disk when the attestation was
+            // asked for. That check read the whole shared temporary directory for any file with the
+            // product's password-file prefix, so any other test process holding one made it true.
+            // The ordering it aimed at is asserted where it is attributable, in the release and
+            // lease tests, and making it provable here needs the writer itself to become a seam.
 
             // Held while the launch was being torn down, which is inside the lease scope.
             Assert.True(pinnedWasHeldDuringTeardown);
