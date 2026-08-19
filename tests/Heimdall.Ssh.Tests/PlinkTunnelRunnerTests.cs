@@ -305,23 +305,47 @@ public class PlinkTunnelRunnerTests : IDisposable
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         int localPort = GetAvailableLoopbackPort();
         var listener = new TcpListener(IPAddress.Loopback, localPort);
-        using var runner = new PlinkTunnelRunner(portCheckIntervalMs: 50, killGracePeriodMs: 100);
+        TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakePlinkProcess process = new()
+        {
+            WaitForExitResult = true,
+            StartGate = startGate
+        };
+
+        // The ownership probe stays the real one, against a real listener, so this remains a test of
+        // fail-closed detection rather than of a stubbed verdict. Only the process is faked, and only
+        // to make the instant at which the password file can be observed deterministic.
+        using PlinkTunnelRunner runner = CreateRunner(
+            WindowsTcpListenerOwnershipProbe.Instance,
+            _ => process);
         string? passwordFilePath = null;
 
         try
         {
-            Task<PlinkTunnelResult> startTask = runner.StartAsync(
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
+            Task<PlinkTunnelResult> startTask = Task.Run(() => runner.StartAsync(
+                GetCommandProcessorPath(),
                 "gw.test", 22, "user", null, "s3cret",
-                "remote", 22, localPort, "SHA256:test");
+                "remote", 22, localPort, "SHA256:test"));
 
-            passwordFilePath = Assert.Single(
-                Directory.EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern),
-                path => !existingPasswordFiles.Contains(path));
-            Assert.True(File.Exists(passwordFilePath));
+            await process.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
-            listener.Start();
-            PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+            try
+            {
+                passwordFilePath = Assert.Single(
+                    Directory.EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern),
+                    path => !existingPasswordFiles.Contains(path));
+                Assert.True(File.Exists(passwordFilePath));
+
+                // Bound while the runner is still held at process start, so the foreign listener is
+                // in place before the first attestation rather than racing it.
+                listener.Start();
+            }
+            finally
+            {
+                startGate.TrySetResult();
+            }
+
+            PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(30));
 
             Assert.False(result.Success);
             Assert.Equal(SshFailureCode.TunnelPortOwnedByDifferentProcess, result.FailureCode);
@@ -331,6 +355,7 @@ public class PlinkTunnelRunnerTests : IDisposable
         }
         finally
         {
+            startGate.TrySetResult();
             listener.Stop();
             runner.Stop();
             if (passwordFilePath is not null)
@@ -340,6 +365,11 @@ public class PlinkTunnelRunnerTests : IDisposable
         }
     }
 
+    // Polling the directory would be a race in the other direction, not a fix for one: the runner
+    // deletes the file as soon as the forwarded port is attested, so a poll that arrives late
+    // legitimately finds nothing and the test would fail for the opposite reason. The fake process
+    // instead holds the runner inside Start, which is after the arguments were built - the file
+    // exists - and before any attestation - nothing can have removed it yet.
     [Fact]
     public async Task TunnelPasswordFile_DeletedAfterAttestedBind()
     {
@@ -348,22 +378,41 @@ public class PlinkTunnelRunnerTests : IDisposable
             .EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var probe = new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess);
-        using var runner = CreateRunner(probe);
+        TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakePlinkProcess process = new()
+        {
+            WaitForExitResult = true,
+            StartGate = startGate
+        };
+        using PlinkTunnelRunner runner = CreateRunner(probe, _ => process);
         string? passwordFilePath = null;
 
         try
         {
-            Task<PlinkTunnelResult> startTask = runner.StartAsync(
+            Task<PlinkTunnelResult> startTask = Task.Run(() => runner.StartAsync(
                 GetCommandProcessorPath(),
                 "gw.test", 22, "user", null, "s3cret",
-                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test"));
 
-            passwordFilePath = Assert.Single(
-                Directory.EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern),
-                path => !existingPasswordFiles.Contains(path));
-            Assert.True(File.Exists(passwordFilePath));
+            await process.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
-            PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+            try
+            {
+                // The gate has to hold the runner BEFORE any attestation, otherwise observing the
+                // file here would still be a race. An unprobed port is what proves it does.
+                Assert.Equal(0, probe.LastExpectedProcessId);
+
+                passwordFilePath = Assert.Single(
+                    Directory.EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern),
+                    path => !existingPasswordFiles.Contains(path));
+                Assert.True(File.Exists(passwordFilePath));
+            }
+            finally
+            {
+                startGate.TrySetResult();
+            }
+
+            PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(30));
 
             Assert.True(result.Success, result.ErrorMessage);
             Assert.False(File.Exists(passwordFilePath));
@@ -371,6 +420,7 @@ public class PlinkTunnelRunnerTests : IDisposable
         }
         finally
         {
+            startGate.TrySetResult();
             runner.Stop();
             if (passwordFilePath is not null)
             {
@@ -849,8 +899,26 @@ public class PlinkTunnelRunnerTests : IDisposable
 
         public TaskCompletionSource Disposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        /// <summary>
+        /// Signalled once <see cref="Start"/> has been entered.
+        /// </summary>
+        /// <remarks>
+        /// That instant is the only one at which the password file is guaranteed to be observable:
+        /// the runner has already built its arguments, which is what writes the file, and it has not
+        /// yet begun attesting the forwarded port, which is what deletes it.
+        /// </remarks>
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>
+        /// Optional gate the fake blocks on inside <see cref="Start"/>, so a test can hold the runner
+        /// at that instant instead of racing it.
+        /// </summary>
+        public TaskCompletionSource? StartGate { get; init; }
+
         public bool Start()
         {
+            Started.TrySetResult();
+            StartGate?.Task.GetAwaiter().GetResult();
             return true;
         }
 
