@@ -192,8 +192,8 @@ public sealed class ConPtySessionTests
         try
         {
             await session.StartAsync(
-                TerminalTestHelpers.ResolvePowerShellExecutable(),
-                BuildEncodedPowerShellArguments("exit 17"));
+                TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+                TerminalTestHelpers.BuildExitCodeChildArguments(17));
 
             TerminalTimeoutContext timeoutContext = new(
                 "ProcessExited",
@@ -239,8 +239,8 @@ public sealed class ConPtySessionTests
                 Interlocked.Add(ref receivedByteCount, data.Length);
             };
             await session.StartAsync(
-                TerminalTestHelpers.ResolvePowerShellExecutable(),
-                BuildEncodedPowerShellArguments("exit 23"));
+                TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+                TerminalTestHelpers.BuildExitCodeChildArguments(23));
 
             TerminalTimeoutContext stoppedTimeoutContext = new(
                 "SessionStopped",
