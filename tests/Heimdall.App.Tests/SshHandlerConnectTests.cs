@@ -64,6 +64,84 @@ public sealed class SshHandlerConnectTests
         Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
     }
 
+    // SSH-013 wiring. The attestation is not a helper the handler may or may not consult: the
+    // decision must be taken on the executable that is actually about to run, and taken before the
+    // password file exists, because it decides what is allowed to delete that file.
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_AsksTheAttestationAboutTheResolvedLauncherBeforeWritingTheSecret()
+    {
+        const int targetPort = 49157;
+        string plinkPath = Path.GetTempFileName();
+        string? deletedPasswordPath = null;
+        List<string?> attested = [];
+        List<bool> passwordFileExistedWhenAsked = [];
+
+        try
+        {
+            FakeTunnelService tunnelService = new FakeTunnelService();
+            using CancellationTokenSource cancellationSource = new CancellationTokenSource();
+            HostKeyStore hostKeyStore = new HostKeyStore();
+            hostKeyStore.Trust(
+                "server01.contoso.local",
+                DefaultPorts.Ssh,
+                "SHA256:stored-test-fingerprint");
+            HostKeyTrustService hostKeyTrustService = new HostKeyTrustService(hostKeyStore);
+            CancelingPlinkHostKeyProbe probe = new CancelingPlinkHostKeyProbe(cancellationSource);
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                hostKeyTrustService,
+                probe,
+                deletePlinkPasswordFile: path =>
+                {
+                    deletedPasswordPath = path;
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        File.Delete(path);
+                    }
+                },
+                plinkFirstByteAttestation: path =>
+                {
+                    attested.Add(path);
+                    passwordFileExistedWhenAsked.Add(
+                        Directory.EnumerateFiles(
+                            Path.GetTempPath(),
+                            $"{PlinkPasswordFileNaming.Prefix}*").Any());
+                    return false;
+                });
+
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshPasswordEncrypted = CredentialProtector.Protect("temporary-password");
+            AppSettings settings = new AppSettings
+            {
+                PlinkPath = plinkPath
+            };
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.ConnectSshViaPlinkAsync(
+                server,
+                settings,
+                "127.0.0.1",
+                targetPort,
+                usesTunnel: true,
+                originalFailure: null,
+                cancellationSource.Token));
+
+            // Asked once, about the launcher that was resolved and would have been started.
+            Assert.Equal([plinkPath], attested);
+
+            // And asked before the secret was on disk, not after.
+            Assert.Equal([false], passwordFileExistedWhenAsked);
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
+            {
+                File.Delete(deletedPasswordPath);
+            }
+
+            File.Delete(plinkPath);
+        }
+    }
+
     [Fact]
     public async Task ConnectSshViaPlinkAsync_CallerCancellationAtProcessStart_PropagatesAndCleansResources()
     {
@@ -481,7 +559,8 @@ public sealed class SshHandlerConnectTests
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
         Action<string?>? deletePlinkPasswordFile = null,
-        LocalizationManager? localizer = null)
+        LocalizationManager? localizer = null,
+        Func<string?, bool>? plinkFirstByteAttestation = null)
     {
         LocalizationManager effectiveLocalizer = localizer ?? new LocalizationManager();
         IHostKeyTrustService effectiveHostKeyTrustService =
@@ -498,7 +577,8 @@ public sealed class SshHandlerConnectTests
             plinkHostKeyProbe: plinkHostKeyProbe,
             plinkPasswordFileJanitor:
                 plinkPasswordFileJanitor ?? CreateNoOpPlinkPasswordFileJanitor(),
-            deletePlinkPasswordFile: deletePlinkPasswordFile);
+            deletePlinkPasswordFile: deletePlinkPasswordFile,
+            plinkFirstByteAttestation: plinkFirstByteAttestation);
     }
 
     private static PlinkPasswordFileJanitor CreateNoOpPlinkPasswordFileJanitor()

@@ -19,82 +19,123 @@ using Heimdall.Terminal;
 namespace Heimdall.App.Services.Handlers;
 
 /// <summary>
-/// Decides when the plink password file may be deleted, and deletes it once.
+/// The single gate through which the SSH password file is deleted, and the decision of when that is
+/// allowed to happen early.
 /// </summary>
 /// <remarks>
-/// <para>The file exists only so plink can read the password out of it. Measured against the
-/// PuTTY 0.83 source and against the shipped 0.83 binary: <c>-pwfile</c> is handled inside
-/// <c>cmdline_process_param</c> while the command line is being parsed, one line is read, and the
-/// handle is closed immediately - all of it before any network activity. Pointing <c>-pwfile</c> at
-/// a missing file against an unreachable host reports the file error at once, where a readable file
-/// against the same host instead spends the full network timeout, which is what puts the read
-/// strictly ahead of the connection.</para>
-/// <para>So the first byte plink writes to stdout or stderr is proof that the password has already
-/// been read and the handle closed: any output at all comes after the command line was parsed. That
-/// is the signal used here. It is a real proof, not a delay - a timer would only prove that time
-/// passed, and process start would not even prove that the child finished parsing its arguments.</para>
-/// <para>What this does NOT cover, and the reason SSH-013 stays open: a session that connects and
-/// then stays completely silent produces no first byte, so its file waits for process exit as
-/// before. Heimdall does not pass <c>-v</c>, which would make plink announce the connection
-/// unconditionally, because that would change what the user sees in the terminal. Closing the
-/// remaining gap needs a signal that survives a silent session, measured against a real server.</para>
-/// <para>Process exit therefore stays wired as a backstop, and the deletion runs exactly once
-/// whichever signal arrives first.</para>
+/// <para>The file exists only so the launcher can read the password out of it, and it used to live
+/// until the session ended. For a launcher whose <c>-pwfile</c> behaviour has been measured, the
+/// first byte it writes proves the password has already been read and the handle closed, so the file
+/// goes then. See <see cref="PlinkCompatibilityAttestation"/> for what "measured" means and why the
+/// executable's bytes are what decides it.</para>
+/// <para>For any other executable the first byte proves nothing - a different build may well write
+/// something before it reads the file - so the early deletion is withheld and the file is released
+/// at process exit, exactly as before. That is a deliberate fail-closed default: withholding the
+/// early deletion costs exposure time, while deleting too early would break the authentication.</para>
+/// <para>The first byte is a proof and not a delay. A timer would only show that time passed, and
+/// process start would not even show that the child finished parsing its arguments. A
+/// delete-and-retry loop was rejected as well: it would succeed just as readily before the launcher
+/// ever opened the file, and nothing on this side separates that from success.</para>
+/// <para>What is still not covered, and the reason SSH-013 stays open: a session that connects and
+/// then stays silent writes no first byte, so even an attested launcher waits for process exit.</para>
 /// </remarks>
 internal static class PlinkPasswordFileRelease
 {
     /// <summary>
-    /// Arms the deletion of <paramref name="passwordFilePath"/> on the first proof that plink has
-    /// consumed it, with process exit as a backstop. Call before starting the session so no output
-    /// can be missed.
+    /// Arms the deletion of <paramref name="passwordFilePath"/> and returns the handle every caller
+    /// must go through. Call before starting the session so no output can be missed.
     /// </summary>
-    /// <param name="session">The session that will run plink.</param>
-    /// <param name="passwordFilePath">The file to delete once consumption is proved.</param>
-    /// <param name="delete">Performs the deletion. Invoked at most once.</param>
-    internal static void Arm(
+    /// <param name="session">The session that will run the launcher.</param>
+    /// <param name="passwordFilePath">The file to delete once it is safe to do so.</param>
+    /// <param name="delete">Performs the deletion. Invoked at most once, from any path.</param>
+    /// <param name="firstByteProvesConsumption">
+    /// Whether the launcher's first byte of output proves it already read the password file. When
+    /// <see langword="false"/>, output is not listened to at all and only process exit or an
+    /// explicit <see cref="PlinkPasswordFileReleaseHandle.Release"/> frees the file.
+    /// </param>
+    internal static PlinkPasswordFileReleaseHandle Arm(
         ITerminalSession session,
         string passwordFilePath,
-        Action<string?> delete)
+        Action<string?> delete,
+        bool firstByteProvesConsumption)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(delete);
 
-        // Both handlers are assigned before either subscription, so the release path can always
-        // unsubscribe both no matter which one fires first.
-        int released = 0;
-        Action<ReadOnlyMemory<byte>>? onData = null;
-        Action<int>? onExit = null;
+        return new PlinkPasswordFileReleaseHandle(
+            session,
+            passwordFilePath,
+            delete,
+            firstByteProvesConsumption);
+    }
+}
 
-        void Release()
+/// <summary>
+/// Owns one password file and deletes it once, whichever path gets there first.
+/// </summary>
+/// <remarks>
+/// The launch failure and cancellation paths dispose the session, which can itself raise
+/// <see cref="ITerminalSession.ProcessExited"/>, and then release explicitly. Both arrive here, so
+/// the deletion still runs a single time.
+/// </remarks>
+internal sealed class PlinkPasswordFileReleaseHandle
+{
+    private readonly ITerminalSession _session;
+    private readonly string _passwordFilePath;
+    private readonly Action<string?> _delete;
+    private readonly Action<ReadOnlyMemory<byte>>? _onData;
+    private readonly Action<int> _onExit;
+
+    private int _released;
+
+    internal PlinkPasswordFileReleaseHandle(
+        ITerminalSession session,
+        string passwordFilePath,
+        Action<string?> delete,
+        bool firstByteProvesConsumption)
+    {
+        _session = session;
+        _passwordFilePath = passwordFilePath;
+        _delete = delete;
+
+        _onExit = _ => Release();
+        _session.ProcessExited += _onExit;
+
+        if (!firstByteProvesConsumption)
         {
-            // Sequentially, what keeps this single is the unsubscription below: once both handlers
-            // are detached, no later byte or exit reaches this method at all. The exchange covers
-            // the case the unsubscription cannot, which is the two signals arriving concurrently on
-            // different threads. That window is a couple of instructions wide, so the suite cannot
-            // falsify it deterministically - a non-atomic guard survives the race oracle - and it
-            // is kept because it is free, not because a test proves it.
-            if (Interlocked.Exchange(ref released, 1) != 0)
-            {
-                return;
-            }
-
-            if (onData is not null)
-            {
-                session.DataReceived -= onData;
-            }
-
-            if (onExit is not null)
-            {
-                session.ProcessExited -= onExit;
-            }
-
-            delete(passwordFilePath);
+            // Not subscribing at all, rather than subscribing and ignoring: an unattested launcher
+            // must have no path from its output to the deletion, not merely a disabled one.
+            return;
         }
 
-        onData = _ => Release();
-        onExit = _ => Release();
+        _onData = _ => Release();
+        _session.DataReceived += _onData;
+    }
 
-        session.DataReceived += onData;
-        session.ProcessExited += onExit;
+    /// <summary>
+    /// Deletes the password file if it has not been deleted yet, and stops listening.
+    /// </summary>
+    /// <remarks>
+    /// Sequentially, what keeps this single is the unsubscription: once the handlers are detached,
+    /// no later byte or exit reaches this method. The exchange covers what the unsubscription cannot,
+    /// which is two signals arriving concurrently on different threads. That window is a couple of
+    /// instructions wide, so the suite cannot falsify it - a non-atomic guard survives the race
+    /// oracle - and it is kept because it is free, not because a test proves it.
+    /// </remarks>
+    internal void Release()
+    {
+        if (Interlocked.Exchange(ref _released, 1) != 0)
+        {
+            return;
+        }
+
+        if (_onData is not null)
+        {
+            _session.DataReceived -= _onData;
+        }
+
+        _session.ProcessExited -= _onExit;
+
+        _delete(_passwordFilePath);
     }
 }
