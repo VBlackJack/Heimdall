@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: what the early password-file deletion actually covers, measured
+
+- **The entries below claimed that a session which connects and then stays silent produces no first
+  byte. Measured against a live server, that is wrong.** With a username configured, the launcher
+  writes `Using username "..."` to stderr as soon as it starts, even when the remote command only
+  sleeps and the session says nothing further. Driving the real connection path against an OpenSSH
+  9.6p1 target with a forced `sleep 600`, the password file is deleted 93 ms after the connection
+  returns, while the process is still running and process exit has not fired, exactly once.
+- **The real remaining case is a profile with no configured username.** The launcher then waits for
+  a login name and writes nothing at all - zero bytes on either stream after three seconds, process
+  still alive - so the password file survives until the process exits, as it did before.
+- Closing that would mean refusing to write the secret before a username is known, or obtaining one
+  first. Both change what the product does, so neither is done here.
+- No test carries this: it needs a live SSH server, and the blocking lane has none. The measurement
+  is recorded, not automated.
+
 ## 2026-08-18: an absolute path does not identify the launcher, so the handle names it
 
 - **The entry below claimed too much and this corrects it.** It said that for an absolute path the

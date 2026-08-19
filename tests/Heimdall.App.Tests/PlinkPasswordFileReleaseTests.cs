@@ -29,8 +29,12 @@ namespace Heimdall.App.Tests;
 /// <para>The proof is the first byte plink writes: measured against PuTTY 0.83, <c>-pwfile</c> is
 /// read and closed while the command line is parsed, before any network activity, so any output at
 /// all comes after the read. These oracles pin the arming contract, not the timing.</para>
-/// <para>Deliberately not asserted, because the code does not do it: a session that connects and
-/// then stays silent still waits for exit. That gap is why SSH-013 is not closed.</para>
+/// <para>Deliberately not asserted, because it cannot be: whether the launcher emits anything is
+/// the launcher's business, not this type's. Measured externally against a live target - with a
+/// username configured, even a session whose remote command only sleeps gets its password file
+/// deleted while the process runs; with no username configured, the launcher writes nothing while
+/// it waits for a login name, so the file survives to process exit. That second case is why
+/// SSH-013 is not closed, and it is the exit backstop below that carries it.</para>
 /// </remarks>
 public sealed class PlinkPasswordFileReleaseTests
 {
@@ -99,15 +103,16 @@ public sealed class PlinkPasswordFileReleaseTests
     }
 
     [Fact]
-    public void Attested_ButSilent_StillDeletesAtExit()
+    public void Attested_WithNoOutputAtAll_StillDeletesAtExit()
     {
         FakeTerminalSession session = new();
         List<string?> deleted = [];
         PlinkPasswordFileRelease.Arm(session, PasswordFile, deleted.Add, Attested);
 
-        // A session that never printed anything: the backstop carries this case, which is why
-        // removing the exit subscription would be a regression rather than a cleanup, and why
-        // SSH-013 is not closed.
+        // A launcher that never printed anything. Measured to be reachable: a profile with no
+        // configured username leaves the launcher waiting for a login name, silent on both
+        // streams. The backstop is what covers it, so removing the exit subscription would be a
+        // regression rather than a cleanup.
         session.RaiseExit(1);
 
         Assert.Equal([PasswordFile], deleted);
