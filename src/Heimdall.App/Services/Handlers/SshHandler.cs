@@ -658,8 +658,12 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
 
             if (!string.IsNullOrEmpty(passwordFilePath))
             {
-                string fileToDelete = passwordFilePath;
-                terminalSession.ProcessExited += _ => _deletePlinkPasswordFile(fileToDelete);
+                // Armed before the process starts so no output can arrive unobserved. The file goes
+                // as soon as plink proves it read it, and at process exit otherwise.
+                PlinkPasswordFileRelease.Arm(
+                    terminalSession,
+                    passwordFilePath,
+                    _deletePlinkPasswordFile);
             }
 
             try
