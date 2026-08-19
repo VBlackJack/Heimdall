@@ -92,8 +92,8 @@ public sealed class PipeModeSessionTests
         try
         {
             await session.StartAsync(
-                TerminalTestHelpers.ResolvePowerShellExecutable(),
-                "-NoLogo -NoProfile -Command \"exit 37\"");
+                TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+                TerminalTestHelpers.BuildExitCodeChildArguments(37));
 
             Assert.True(
                 TerminalTestHelpers.SpinUntilProcessEvent(

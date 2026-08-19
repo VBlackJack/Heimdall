@@ -153,8 +153,8 @@ public sealed class TerminalSessionLifecycleTests
         Exception? observedException = await Record.ExceptionAsync(async () =>
         {
             await session.StartAsync(
-                TerminalTestHelpers.ResolvePowerShellExecutable(),
-                "-NoLogo -NoProfile -NonInteractive -Command \"exit 12\"");
+                TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+                TerminalTestHelpers.BuildExitCodeChildArguments(12));
             TerminalTimeoutContext timeoutContext = new(
                 "ProcessExited",
                 () => session.ProcessId,

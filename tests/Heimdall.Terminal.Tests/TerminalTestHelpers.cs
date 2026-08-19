@@ -15,6 +15,7 @@
  */
 
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Runtime.CompilerServices;
 
@@ -37,6 +38,10 @@ internal static class TerminalTestHelpers
     /// <see cref="TerminalWaitObservation"/>, which reports the ones that still outlive the old ten
     /// second bound even when they end up succeeding. That report, not the absence of failures, is
     /// what says whether the stall is gone.
+    /// Four of the waits it bounds are now gated on a command processor child rather than a
+    /// PowerShell host, so for those the startup argument above no longer applies. The bound stays
+    /// where it is deliberately: it is shared, and lowering it for some waits would trade the
+    /// evidence for a narrower failure.
     /// </remarks>
     internal static readonly TimeSpan ProcessStartupBackstop = TimeSpan.FromSeconds(60);
 
@@ -147,6 +152,58 @@ internal static class TerminalTestHelpers
             publish,
             readElapsed);
     }
+
+    /// <summary>
+    /// Child for a test whose subject is the exit code itself rather than a shell.
+    /// </summary>
+    /// <remarks>
+    /// <para>The command processor starts in a fraction of the time a PowerShell host takes, so a
+    /// test that only needs a process to end with a given code stops paying for a host it never
+    /// exercises. Measured on an idle machine, the four tests using it went from 768-859 ms to
+    /// 208-215 ms. Tests that do exercise a shell - terminal output, stdin, encoded commands,
+    /// sleeping, cancellation, termination - keep <see cref="ResolvePowerShellExecutable"/>.</para>
+    /// <para>It is not a cure for the stalls the CI logs show, and must not be read as one. In run
+    /// 32294052268 the <see cref="TerminalWaitObservation"/> population was six waits between 54 and
+    /// 60 seconds, three of which belong to tests that keep a PowerShell child because they exercise
+    /// stdin or interleaved output. The stalling population is wider than the children swapped here,
+    /// and its cause is not established.</para>
+    /// </remarks>
+    /// <returns>Absolute path to the command processor, or its bare name if it is not where
+    /// expected, matching the fallback <see cref="ResolvePowerShellExecutable"/> already uses.</returns>
+    internal static string ResolveExitCodeChildExecutable()
+    {
+        string systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        string commandProcessor = Path.Combine(systemDirectory, "cmd.exe");
+        return File.Exists(commandProcessor) ? commandProcessor : "cmd.exe";
+    }
+
+    /// <summary>
+    /// Arguments making that child exit with <paramref name="exitCode"/>.
+    /// </summary>
+    /// <param name="exitCode">
+    /// Code the child exits with. Must not be 259: that is STILL_ACTIVE, which a session reads as
+    /// "the process is still running", so a child exiting with it would never be seen to stop. Zero
+    /// is accepted but makes an exit-code assertion unable to distinguish a real exit from an
+    /// uninitialised value, so prefer a distinctive code.
+    /// </param>
+    /// <returns>The command processor arguments.</returns>
+    /// <remarks>
+    /// The child itself writes nothing for <c>/c exit N</c>, on stdout and on stderr alike. That is
+    /// not the same as the session receiving nothing: under a pseudo console the host still emits
+    /// its own bytes, which no test here asserts against. <c>/d</c> skips any AutoRun command
+    /// registered for the command processor, so a machine carrying one cannot add output of its own.
+    /// </remarks>
+    internal static string BuildExitCodeChildArguments(int exitCode)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(exitCode, StillActiveExitCode);
+
+        return string.Create(CultureInfo.InvariantCulture, $"/d /c exit {exitCode}");
+    }
+
+    /// <summary>
+    /// The value a session reads as "still running" rather than as an exit code.
+    /// </summary>
+    private const int StillActiveExitCode = 259;
 
     internal static string ResolvePowerShellExecutable()
     {
