@@ -335,6 +335,59 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public int TelnetPort { get; set; } = DefaultPorts.Telnet;
     public string? TelnetUsername { get; set; }
     public string? TelnetPasswordEncrypted { get; set; }
+
+    /// <summary>
+    /// Returns an independent copy of this profile, identical in every observable respect.
+    /// </summary>
+    /// <remarks>
+    /// <para>Built on <see cref="object.MemberwiseClone"/> because this type is sealed: the shallow
+    /// copy carries every backing field, the three private presence flags and any scalar member added
+    /// later, without a hand-written assignment list that drifts. Two such lists existed and had
+    /// drifted in opposite directions before this method.</para>
+    /// <para>No property setter is used while cloning. <see cref="WinRmPort"/>,
+    /// <see cref="SshPort"/> and <see cref="SshKeyPassphraseEncrypted"/> each raise their presence
+    /// flag on assignment, including for a null value, so copying through them would fabricate
+    /// presence on a clone whose source had none - which silently flips
+    /// <see cref="UsesLegacySshCredentialMapping"/> and changes how the profile authenticates.</para>
+    /// <para>Every mutable reference is then replaced by a deep copy, so writing to the clone cannot
+    /// reach the original: the monitor array, the post-connect steps with their own parameter
+    /// dictionaries, and the JSON extension data.</para>
+    /// </remarks>
+    public ServerProfileDto CloneFaithfully()
+    {
+        ServerProfileDto clone = (ServerProfileDto)MemberwiseClone();
+
+        clone.RdpSelectedMonitorIndices = [.. RdpSelectedMonitorIndices];
+        clone.PostConnectSteps = [.. PostConnectSteps.Select(CloneStep)];
+        clone.ExtensionData = new Dictionary<string, JsonElement>(
+            ExtensionData.Count,
+            StringComparer.Ordinal);
+
+        foreach (KeyValuePair<string, JsonElement> entry in ExtensionData)
+        {
+            // Clone(): the element otherwise stays bound to the document it was parsed from, which
+            // the source profile owns.
+            clone.ExtensionData[entry.Key] = entry.Value.Clone();
+        }
+
+        return clone;
+    }
+
+    private static PostConnectStep CloneStep(PostConnectStep step)
+    {
+        return new PostConnectStep
+        {
+            Id = step.Id,
+            Input = step.Input,
+            CommandLibraryId = step.CommandLibraryId,
+            CommandLibraryParams = step.CommandLibraryParams is null
+                ? null
+                : new Dictionary<string, string>(step.CommandLibraryParams, StringComparer.Ordinal),
+            DelayMs = step.DelayMs,
+            Enabled = step.Enabled,
+            OnFailure = step.OnFailure,
+        };
+    }
 }
 
 internal sealed class WinRmIdentityModeJsonConverter

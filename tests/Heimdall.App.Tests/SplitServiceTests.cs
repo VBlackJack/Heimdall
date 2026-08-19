@@ -2189,4 +2189,37 @@ public sealed class SplitServiceTests : IDisposable
             OwningPane = pane;
         }
     }
+
+    // RDP-023. The pane-scoped copy used to be a hand-written assignment list that had drifted from
+    // the one in the RDP path, in the other direction: it dropped the JSON extension data. Both now
+    // go through the single fidelity primitive, and this pins that the split path really does.
+    [Fact]
+    public void APaneScopedProfile_CarriesWhatTheOldManualListDropped()
+    {
+        ServerProfileDto source = System.Text.Json.JsonSerializer.Deserialize<ServerProfileDto>(
+            """{"id":"src","displayName":"Src","connectionType":"SSH","unknownFutureField":{"n":1}}""")!;
+        source.SshKeyPath = @"C:\keys\id.ppk";
+        source.SshPasswordEncrypted = "cipher";
+        source.PostConnectSteps.Add(new Heimdall.Core.Models.PostConnectStep { Input = "uptime" });
+
+        Assert.True(source.ExtensionData.ContainsKey("unknownFutureField"));
+        Assert.False(source.HasSshKeyPassphraseEncryptedField);
+
+        ServerProfileDto pane = SplitService.CreatePaneScopedServerProfile(source, "pane-1", "SSH");
+
+        Assert.NotSame(source, pane);
+        Assert.Equal("pane-1", pane.Id);
+
+        // Extension data survives, which the old list dropped.
+        Assert.True(pane.ExtensionData.ContainsKey("unknownFutureField"));
+
+        // And the presence flag is preserved rather than fabricated, which is what the old guarded
+        // copy existed to achieve and what the primitive now carries by construction.
+        Assert.False(pane.HasSshKeyPassphraseEncryptedField);
+        Assert.True(pane.UsesLegacySshCredentialMapping);
+
+        // The step list is deep-copied, so a pane cannot rewrite the inventory profile's steps.
+        pane.PostConnectSteps[0].Input = "rebooted";
+        Assert.Equal("uptime", source.PostConnectSteps[0].Input);
+    }
 }

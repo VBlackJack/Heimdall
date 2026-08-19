@@ -12,6 +12,28 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: one way to copy a server profile, instead of two that had drifted
+
+- **Falling back from multi-monitor no longer loses the session logging override.** When the
+  requested layout cannot be honoured, the session runs on a copy of the profile carrying coerced
+  display settings. That copy was a hand-written list of assignments which had dropped the logging
+  override, so falling back silently returned the profile's logging choice to the global default.
+- **Two such lists existed and had drifted in opposite directions.** The RDP one also dropped the
+  vault entry name and the whole WinRM group; the split one dropped the JSON extension data. Both
+  now go through a single primitive on the profile type itself.
+- **The primitive is a memberwise copy, not a list of assignments.** The type is sealed, so a
+  memberwise copy carries every backing field and every member added later, without a list that
+  drifts again. Every mutable reference is then deep-copied: the monitor array, the post-connect
+  steps with their own parameter dictionaries, and the extension data.
+- **It uses no property setter while copying, and that is the point.** Three properties raise a
+  presence flag on assignment, including of null, so copying through them fabricated presence the
+  source never had - which silently flipped a legacy profile out of using its password as the key
+  passphrase. The RDP list did exactly that; it was latent because only the RDP path used it.
+- **A JSON round trip was measured and rejected as the primitive**: it flips two of the three
+  presence flags, keeping only the SSH port, whose serialized form is omitted when absent.
+- Three other places still copy a profile by JSON round trip - importing profiles, reconnecting an
+  ad-hoc session, and duplicating servers in bulk. They are unchanged here and migrate next.
+
 ## 2026-08-18: no SSH username, no password written to disk
 
 - **The case measured in the entry below is now refused instead of tolerated.** A profile with no
