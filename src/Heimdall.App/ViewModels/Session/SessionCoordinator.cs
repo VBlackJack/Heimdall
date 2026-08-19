@@ -15,7 +15,6 @@
  */
 
 using System.Text;
-using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Extensions;
@@ -1462,11 +1461,19 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _main.StatusText = result.ErrorMessage ?? _localizer["ErrorConnectionFailed"];
     }
 
+    /// <summary>
+    /// Runtime copy of an ad-hoc snapshot, carrying its own session-scoped identifier.
+    /// </summary>
+    /// <remarks>
+    /// The JSON round-trip this replaced did not survive the presence flags, so reconnecting an
+    /// ad-hoc SSH session silently dropped
+    /// <see cref="ServerProfileDto.UsesLegacySshCredentialMapping"/>: the stored password stopped
+    /// being offered as the key passphrase, and the reconnect could fail where the first connection
+    /// had succeeded.
+    /// </remarks>
     private static ServerProfileDto CloneAdHocProfileForConnection(ServerProfileDto snapshot)
     {
-        string serializedSnapshot = JsonSerializer.Serialize(snapshot);
-        ServerProfileDto runtimeProfile = JsonSerializer.Deserialize<ServerProfileDto>(serializedSnapshot)
-            ?? throw new InvalidOperationException("Ad-hoc profile snapshot could not be cloned.");
+        ServerProfileDto runtimeProfile = snapshot.CloneFaithfully();
         runtimeProfile.Id = SessionIdCodec.Create(snapshot.Id);
         return runtimeProfile;
     }

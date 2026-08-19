@@ -47,6 +47,42 @@ public sealed class ProfileImportServiceTests
     }
 
     [Fact]
+    public async Task ImportFromPathAsync_LegacyMultimonProfile_KeepsMultiMonitorThroughTheDefensiveCopy()
+    {
+        using ProfileImportFixture fixture = new();
+
+        // Written by hand rather than serialized: the point is the absence of the
+        // "rdpResolutionMode" key, which is what a profile exported before that field existed looks
+        // like, and which is exactly what the legacy migration keys on.
+        string path = await fixture.WriteTextAsync(
+            "legacy-multimon.json",
+            """
+            [
+              {
+                "id": "legacy-multimon",
+                "displayName": "Legacy Multimon",
+                "connectionType": "RDP",
+                "remoteServer": "rdp.example.com",
+                "rdpMultiMonitor": true
+              }
+            ]
+            """);
+
+        ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.True(result.HasChanges);
+        ServerProfileDto stored = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+
+        // The defensive copy of a parsed candidate used to be a JSON round-trip. The presence flags
+        // are not serialized, so the copy came back claiming the document had declared a resolution
+        // mode. RdpResolutionProfileMigration.PrepareForSave then skipped the legacy migration and
+        // rewrote RdpMultiMonitor from the default mode, so importing a multi-monitor profile
+        // silently turned multi-monitor off.
+        Assert.Equal(RdpResolutionMode.Multimon, stored.RdpResolutionMode);
+        Assert.True(stored.RdpMultiMonitor);
+    }
+
+    [Fact]
     public async Task ImportFromPathAsync_Json_UsesPreviewAndImportsSelection()
     {
         using var fixture = new ProfileImportFixture();
