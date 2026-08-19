@@ -36,7 +36,9 @@ namespace Heimdall.App.Tests;
 /// with <c>null!</c> dependencies on purpose because <c>DisconnectSession</c> uses no instance
 /// state; a future dependency on those fields would surface here. The post-cancel behavior where
 /// MsTscAx raises <c>OnDisconnected</c> after <c>CancelAutoReconnect</c>, re-surfacing the overlay,
-/// is a runtime COM contract and remains validated manually on a live RDP target.
+/// is a runtime COM contract and is <b>not</b> validated: the cancel travelled through an event the
+/// control never delivered, because the handler was declared on another event's dispatch id. That
+/// is fixed, so the behavior is now reachable for the first time and still awaits a live pass.
 /// </remarks>
 [Collection(CredentialDialogPasswordDirtyCollection.Name)]
 public sealed class EmbeddedSessionManagerDisconnectTests
