@@ -682,9 +682,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         attestation.FirstByteProvesConsumption);
                 }
 
+                // The attested path comes from the pinned handle, with every junction already
+                // followed. Launching the configured string instead would resolve it a second time,
+                // and a junction repointed since the attestation makes that a different image -
+                // measured, and not prevented by the string being absolute. With nothing attested
+                // there is nothing to bind to, so the configured path is used and the password file
+                // stays on the process-exit path.
+                string launchPath = attestation.LaunchPath ?? plinkPath;
+
                 try
                 {
-                    await terminalSession.StartAsync(plinkPath, args, cancellationToken: ct)
+                    await terminalSession.StartAsync(launchPath, args, cancellationToken: ct)
                         .ConfigureAwait(false);
                     Core.Logging.FileLogger.Info($"Plink SSH session started: PID={terminalSession.ProcessId}");
                 }

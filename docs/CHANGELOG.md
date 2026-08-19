@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-18: an absolute path does not identify the launcher, so the handle names it
+
+- **The entry below claimed too much and this corrects it.** It said that for an absolute path the
+  pinned file and the launched file are the same. They are not. An open handle pins the file, not the
+  directories named on the way to it, so a junction in the path can be repointed while the handle is
+  held and the identical absolute string then reaches a different executable. Reproduced with a
+  pinned attested plink under `...\current\plink.exe`: repointing `current` and launching the same
+  string ran another image. `Path.GetFullPath` does not help.
+- **The attested lease now carries the path taken from the handle itself**, with every reparse point
+  already followed, and that is the path the launcher is started on. Measured: that form starts the
+  image, and starts the attested one even after the junction has been repointed.
+- **If the final path cannot be resolved, nothing is attested.** The connection still proceeds on the
+  configured path and the password file waits for process exit, as before.
+- The silent-session limit is unchanged and still open.
+
 ## 2026-08-18: the measured-launcher check now describes the image that actually runs
 
 - **The entry below identified the right bytes at the wrong moment.** It hashed the launcher and then

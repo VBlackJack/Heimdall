@@ -17,6 +17,7 @@
 using System.Diagnostics;
 using System.IO;
 using Heimdall.App.Services.Handlers;
+using Microsoft.Win32.SafeHandles;
 
 namespace Heimdall.App.Tests;
 
@@ -249,6 +250,273 @@ public sealed class PlinkCompatibilityAttestationTests
         lease.Dispose();
 
         Assert.False(lease.FirstByteProvesConsumption);
+    }
+
+    // The heart of it. An open handle pins the FILE, not the directories named on the way to it, so
+    // a junction in the path can be repointed while the lease is held and the very same absolute
+    // string then reaches a different executable. Reproduced here rather than argued.
+    [Fact]
+    public void AJunctionRepointedUnderTheLease_DoesNotChangeWhatTheLeaseLaunches()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"heimdall-reparse-{Guid.NewGuid():N}");
+        string targetA = Path.Combine(root, "target-a");
+        string targetB = Path.Combine(root, "target-b");
+        string current = Path.Combine(root, "current");
+        Directory.CreateDirectory(targetA);
+        Directory.CreateDirectory(targetB);
+
+        try
+        {
+            // A holds the attested launcher; B holds something else entirely, standing in for an
+            // unmeasured build.
+            File.Copy(ShippedLauncherPath(), Path.Combine(targetA, "plink.exe"));
+            File.Copy(
+                Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+                Path.Combine(targetB, "plink.exe"));
+            CreateJunction(current, targetA);
+
+            string logical = Path.Combine(current, "plink.exe");
+            using PlinkAttestationLease lease = PlinkCompatibilityAttestation.Acquire(logical);
+
+            Assert.True(lease.FirstByteProvesConsumption);
+            Assert.NotNull(lease.LaunchPath);
+
+            // Proof that the launch path came from the handle and not from string arithmetic:
+            // GetFullPath keeps the junction in the path, the handle does not.
+            Assert.Contains("target-a", lease.LaunchPath!, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("current", lease.LaunchPath!, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("current", Path.GetFullPath(logical), StringComparison.OrdinalIgnoreCase);
+            Assert.NotEqual(Path.GetFullPath(logical), lease.LaunchPath);
+
+            // The rebind, performed while the lease is held.
+            Directory.Delete(current);
+            CreateJunction(current, targetB);
+
+            // The logical path now reaches B. This is the defect, and it is asserted so the test
+            // fails loudly if the rebind ever stops working and the rest becomes vacuous.
+            Assert.Equal(
+                new FileInfo(Path.Combine(targetB, "plink.exe")).Length,
+                new FileInfo(logical).Length);
+
+            // The lease's path still reaches A, the image that was actually hashed.
+            Assert.Equal(
+                new FileInfo(Path.Combine(targetA, "plink.exe")).Length,
+                new FileInfo(lease.LaunchPath!).Length);
+            Assert.Equal(
+                File.ReadAllBytes(Path.Combine(targetA, "plink.exe")),
+                File.ReadAllBytes(lease.LaunchPath!));
+        }
+        finally
+        {
+            if (Directory.Exists(current))
+            {
+                Directory.Delete(current);
+            }
+
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void TheLaunchPathReachesTheSameBytesThatWereHashed()
+    {
+        string copy = CopyShippedLauncher();
+        try
+        {
+            using PlinkAttestationLease lease = PlinkCompatibilityAttestation.Acquire(copy);
+
+            Assert.True(lease.FirstByteProvesConsumption);
+            Assert.Equal(File.ReadAllBytes(copy), File.ReadAllBytes(lease.LaunchPath!));
+        }
+        finally
+        {
+            File.Delete(copy);
+        }
+    }
+
+    [Fact]
+    public void ARelativePath_YieldsAnAbsoluteLaunchPath()
+    {
+        string copy = CopyShippedLauncher();
+        string previous = Environment.CurrentDirectory;
+        try
+        {
+            Environment.CurrentDirectory = Path.GetDirectoryName(copy)!;
+            string relative = Path.GetFileName(copy);
+
+            using PlinkAttestationLease lease = PlinkCompatibilityAttestation.Acquire(relative);
+
+            Assert.True(lease.FirstByteProvesConsumption);
+            Assert.NotNull(lease.LaunchPath);
+
+            // A relative string would be resolved once here and once again by the launcher, against
+            // whatever the current directory happened to be by then. The handle removes the question.
+            Assert.NotEqual(relative, lease.LaunchPath);
+            Assert.Equal(File.ReadAllBytes(copy), File.ReadAllBytes(lease.LaunchPath!));
+        }
+        finally
+        {
+            Environment.CurrentDirectory = previous;
+            File.Delete(copy);
+        }
+    }
+
+    // The two halves of the verdict must never disagree: a lease that grants the early deletion
+    // without naming the image it was granted for would leave the caller launching the string it
+    // already had. Checked across every outcome the suite produces, not on one happy case.
+    [Fact]
+    public void TheVerdictAndTheLaunchPath_AlwaysAgree()
+    {
+        string attested = CopyShippedLauncher();
+        string foreign = Path.Combine(Path.GetTempPath(), $"plink-{Guid.NewGuid():N}.exe");
+        File.WriteAllBytes(foreign, [0x4D, 0x5A, 0x90, 0x00]);
+        string absent = Path.Combine(Path.GetTempPath(), $"heimdall-absent-{Guid.NewGuid():N}", "plink.exe");
+
+        try
+        {
+            foreach (string? candidate in new[] { attested, foreign, absent, null, "", "   " })
+            {
+                using PlinkAttestationLease lease = PlinkCompatibilityAttestation.Acquire(candidate);
+
+                Assert.Equal(lease.FirstByteProvesConsumption, lease.LaunchPath is not null);
+            }
+        }
+        finally
+        {
+            File.Delete(attested);
+            File.Delete(foreign);
+        }
+    }
+
+    private static void CreateJunction(string link, string target)
+    {
+        // Directory.CreateSymbolicLink needs developer mode or elevation; a junction does not, which
+        // is exactly why it is the reachable form of this defect.
+        using System.Diagnostics.Process process = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo("cmd.exe")
+            {
+                ArgumentList = { "/c", "mklink", "/J", link, target },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            })!;
+
+        process.WaitForExit(30_000);
+        Assert.True(Directory.Exists(link), $"Could not create a junction at {link}.");
+    }
+
+    // GetFinalPathNameByHandle does not fail on a handle that was just opened, so the failure
+    // branch is unreachable from outside and the resolution is supplied here instead. What matters
+    // is the consequence: no launch path means no verdict, and nothing left pinned.
+    [Fact]
+    public void WhenTheFinalPathCannotBeResolved_NothingIsAttestedAndNothingStaysPinned()
+    {
+        string copy = CopyShippedLauncher();
+        try
+        {
+            using (PlinkAttestationLease lease =
+                PlinkCompatibilityAttestation.Acquire(copy, _ => null))
+            {
+                Assert.False(lease.FirstByteProvesConsumption);
+                Assert.Null(lease.LaunchPath);
+
+                // The pin must have been released, or a legitimate update would be blocked by a
+                // lease that grants nothing.
+                File.Delete(copy);
+            }
+
+            Assert.False(File.Exists(copy));
+        }
+        finally
+        {
+            if (File.Exists(copy))
+            {
+                File.Delete(copy);
+            }
+        }
+    }
+
+    // The launch path must come from the handle that stays open, and the file must be opened once.
+    // Re-opening the path to resolve it would reintroduce exactly the second resolution this whole
+    // mechanism exists to remove, and that is invisible from outside: a re-open in the same instant
+    // yields the same answer. So it is pinned on the source instead, and said to be so.
+    [Fact]
+    public void TheLaunchPathIsResolvedFromTheHandleThatStaysOpen()
+    {
+        string body = ExtractAcquireBody();
+
+        Assert.Contains("resolveFinalPath(pin.SafeFileHandle)", body, StringComparison.Ordinal);
+
+        // Exactly one open in the whole method: the pin.
+        Assert.Equal(1, CountOccurrences(body, "new FileStream("));
+        Assert.DoesNotContain("Path.GetFullPath", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("FileInfo(", body, StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        int count = 0;
+        int index = 0;
+        while (true)
+        {
+            int found = haystack.IndexOf(needle, index, StringComparison.Ordinal);
+            if (found < 0)
+            {
+                return count;
+            }
+
+            count++;
+            index = found + needle.Length;
+        }
+    }
+
+    private static string ExtractAcquireBody()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Heimdall.App",
+            "Services",
+            "Handlers",
+            "PlinkCompatibilityAttestation.cs"));
+
+        const string Signature = "Func<SafeFileHandle, string?> resolveFinalPath)";
+        int start = source.IndexOf(Signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, "The seam overload was not found.");
+
+        int open = source.IndexOf('{', start);
+        int depth = 0;
+        for (int i = open; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+            {
+                depth++;
+            }
+            else if (source[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[open..(i + 1)];
+                }
+            }
+        }
+
+        Assert.Fail("Unbalanced body for Acquire.");
+        return string.Empty;
+    }
+
+    private static string RepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null
+            && !File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory!.FullName;
     }
 
     private static string CopyShippedLauncher()
