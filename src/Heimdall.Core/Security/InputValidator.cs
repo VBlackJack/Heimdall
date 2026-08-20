@@ -204,13 +204,38 @@ public static class InputValidator
     /// </summary>
     /// <param name="value">The domain/hostname/IP to validate.</param>
     /// <returns>True if the value is a valid domain or IP address.</returns>
-    public static bool ValidateDomain(string? value)
+    public static bool ValidateDomain(string? value) => TryCanonicalizeDomain(value, out _);
+
+    /// <summary>
+    /// Returns the exact form that was approved, rather than only whether something was.
+    /// </summary>
+    /// <param name="value">The domain, hostname or IPv4 address to approve.</param>
+    /// <param name="canonical">
+    /// On success, the string that actually passed the check; otherwise empty.
+    /// </param>
+    /// <returns><see langword="true"/> when the value could be approved.</returns>
+    /// <remarks>
+    /// <para>The check has always trimmed whitespace and stripped a leading wildcard or dot before
+    /// approving, so it approved one string while the caller kept another. A caller that persisted
+    /// the original stored a value the validator had never seen: a wildcard is not a host, and
+    /// leading dots and surrounding whitespace are not what any transport was told to accept.</para>
+    /// <para>The acceptance rule is unchanged - this returns what the existing rule approved, so
+    /// callers reading the boolean see no difference. Only a caller that keeps the value has
+    /// something new to use.</para>
+    /// </remarks>
+    public static bool TryCanonicalizeDomain(string? value, out string canonical)
     {
+        canonical = string.Empty;
+
         if (string.IsNullOrWhiteSpace(value))
             return false;
 
         string trimmed = value.Trim().TrimStart('*', '.');
-        return trimmed.Length > 0 && Validate(trimmed, "Address");
+        if (trimmed.Length == 0 || !Validate(trimmed, "Address"))
+            return false;
+
+        canonical = trimmed;
+        return true;
     }
 
     /// <summary>

@@ -225,6 +225,109 @@ public sealed class ImportedProfileValidatorTests
         Assert.Contains(nameof(ServerProfileDto.ConnectionType), failure, StringComparison.Ordinal);
     }
 
+    // ------------------------------------------------------------------
+    // The host field. It crosses the same untrusted boundary as the ports and was the one field
+    // this validator never looked at.
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("host.example.com")]
+    [InlineData("10.0.0.5")]
+    [InlineData("fe80::1")]
+    [InlineData("2001:db8::8a2e:370:7334")]
+    public void AUsableHostIsAccepted(string host)
+    {
+        ServerProfileDto profile = CreateValidProfile();
+        profile.RemoteServer = host;
+
+        Assert.Empty(ImportedProfileValidator.Validate(profile, SupportedConnectionTypes));
+    }
+
+    [Theory]
+    [InlineData("not a host")]
+    [InlineData("-leading.hyphen.example.com")]
+    [InlineData("host..example.com")]
+    [InlineData("host.example.com/../../etc")]
+    public void AnUnusableHostIsRejectedAndNamed(string host)
+    {
+        ServerProfileDto profile = CreateValidProfile();
+        profile.RemoteServer = host;
+
+        string error = Assert.Single(ImportedProfileValidator.Validate(profile, SupportedConnectionTypes));
+
+        Assert.Contains(nameof(ServerProfileDto.RemoteServer), error, StringComparison.Ordinal);
+        Assert.Contains(host, error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AnAbsentHostIsLeftAlone(string host)
+    {
+        // A local shell has no remote server, so an empty value is not a defect and must not
+        // become an import failure.
+        ServerProfileDto profile = CreateValidProfile();
+        profile.ConnectionType = "LOCAL";
+        profile.RemoteServer = host;
+
+        Assert.Empty(ImportedProfileValidator.Validate(profile, SupportedConnectionTypes));
+    }
+
+    [Theory]
+    [InlineData("  host.example.com  ", "host.example.com")]
+    [InlineData("*.example.com", "example.com")]
+    [InlineData(".example.com", "example.com")]
+    public void WhatIsKeptIsWhatWasApproved(string imported, string expected)
+    {
+        // The check always trimmed and stripped before approving, so approving one string while
+        // storing another is exactly the gap this closes.
+        ServerProfileDto profile = CreateValidProfile();
+        profile.RemoteServer = imported;
+
+        (List<ServerProfileDto> valid, List<string> failures) =
+            ImportedProfileValidator.FilterValid([profile], SupportedConnectionTypes);
+
+        Assert.Empty(failures);
+        ServerProfileDto kept = Assert.Single(valid);
+        Assert.Equal(expected, kept.RemoteServer);
+    }
+
+    [Theory]
+    [InlineData("host.example.com")]
+    [InlineData("10.0.0.5")]
+    [InlineData("fe80::1")]
+    public void AHostThatIsAlreadyApprovedIsNotRewritten(string host)
+    {
+        // Guards the guard above: a rewrite that always fired would satisfy it while silently
+        // reformatting values the user typed, and an address must never come back in another
+        // notation than the one it was written in.
+        ServerProfileDto profile = CreateValidProfile();
+        profile.RemoteServer = host;
+
+        (List<ServerProfileDto> valid, _) =
+            ImportedProfileValidator.FilterValid([profile], SupportedConnectionTypes);
+
+        Assert.Equal(host, Assert.Single(valid).RemoteServer);
+    }
+
+    [Fact]
+    public void AProfileWithAnUnusableHostIsReportedRatherThanImported()
+    {
+        ServerProfileDto usable = CreateValidProfile();
+        ServerProfileDto unusable = CreateValidProfile();
+        unusable.Id = "profile-2";
+        unusable.DisplayName = "Broken";
+        unusable.RemoteServer = "not a host";
+
+        (List<ServerProfileDto> valid, List<string> failures) =
+            ImportedProfileValidator.FilterValid([usable, unusable], SupportedConnectionTypes);
+
+        Assert.Same(usable, Assert.Single(valid));
+        string failure = Assert.Single(failures);
+        Assert.Contains("Broken", failure, StringComparison.Ordinal);
+        Assert.Contains(nameof(ServerProfileDto.RemoteServer), failure, StringComparison.Ordinal);
+    }
+
     private static ServerProfileDto CreateValidProfile() =>
         new()
         {

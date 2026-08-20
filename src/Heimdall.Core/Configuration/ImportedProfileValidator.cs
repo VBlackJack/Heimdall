@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+using System.Net;
+using Heimdall.Core.Security;
+
 namespace Heimdall.Core.Configuration;
 
 /// <summary>
@@ -61,7 +64,41 @@ public static class ImportedProfileValidator
             errors.Add($"{nameof(profile.ConnectionType)}: unsupported value '{profile.ConnectionType}'.");
         }
 
+        if (!string.IsNullOrWhiteSpace(profile.RemoteServer)
+            && CanonicalizeHost(profile.RemoteServer) is null)
+        {
+            errors.Add($"{nameof(profile.RemoteServer)}: not a usable host '{profile.RemoteServer}'.");
+        }
+
         return errors;
+    }
+
+    /// <summary>
+    /// The approved form of a host, or <see langword="null"/> when it cannot be approved.
+    /// </summary>
+    /// <remarks>
+    /// <para>An IP literal is kept as written once it parses, so an address is never silently
+    /// rewritten into another notation. Everything else goes through the domain check, which is
+    /// what decides the approved form.</para>
+    /// <para>An IP literal is accepted separately because the domain pattern covers IPv4 and
+    /// hostnames only; without this an imported IPv6 host would be refused.</para>
+    /// </remarks>
+    internal static string? CanonicalizeHost(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return null;
+        }
+
+        string trimmed = host.Trim();
+        if (IPAddress.TryParse(trimmed, out _))
+        {
+            return trimmed;
+        }
+
+        return InputValidator.TryCanonicalizeDomain(trimmed, out string canonical)
+            ? canonical
+            : null;
     }
 
     public static (List<ServerProfileDto> Valid, List<string> Failures) FilterValid(
@@ -79,6 +116,16 @@ public static class ImportedProfileValidator
             IReadOnlyList<string> errors = Validate(profile, supportedConnectionTypes);
             if (errors.Count == 0)
             {
+                // The point of the check is lost if the value that goes on to be stored is not
+                // the value that passed it. Writing the approved form back is what closes that
+                // gap; the check above has already ruled out anything with no approved form.
+                string? canonicalHost = CanonicalizeHost(profile.RemoteServer);
+                if (canonicalHost is not null
+                    && !string.Equals(canonicalHost, profile.RemoteServer, StringComparison.Ordinal))
+                {
+                    profile.RemoteServer = canonicalHost;
+                }
+
                 valid.Add(profile);
                 continue;
             }

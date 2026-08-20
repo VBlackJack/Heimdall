@@ -428,4 +428,54 @@ public class InputValidatorTests
     {
         Assert.False(InputValidator.IsShellTarget(path));
     }
+
+    // ------------------------------------------------------------------
+    // The domain check approves a trimmed, wildcard-stripped form. What it approved is now
+    // obtainable, so a caller that keeps the value can keep the one that passed.
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("host.example.com", "host.example.com")]
+    [InlineData("  host.example.com  ", "host.example.com")]
+    [InlineData("*.example.com", "example.com")]
+    [InlineData("*.sub.example.com", "sub.example.com")]
+    [InlineData(".example.com", "example.com")]
+    [InlineData("10.0.0.5", "10.0.0.5")]
+    public void TryCanonicalizeDomain_ReturnsTheFormThatWasApproved(string value, string expected)
+    {
+        Assert.True(InputValidator.TryCanonicalizeDomain(value, out string canonical));
+        Assert.Equal(expected, canonical);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("*")]
+    [InlineData("not a host")]
+    [InlineData("host..example.com")]
+    [InlineData("-leading.example.com")]
+    public void TryCanonicalizeDomain_RefusesAndYieldsNothing(string? value)
+    {
+        Assert.False(InputValidator.TryCanonicalizeDomain(value, out string canonical));
+        Assert.Equal(string.Empty, canonical);
+    }
+
+    [Theory]
+    [InlineData("host.example.com")]
+    [InlineData("  host.example.com  ")]
+    [InlineData("*.example.com")]
+    [InlineData("10.0.0.5")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not a host")]
+    [InlineData("host..example.com")]
+    [InlineData("*")]
+    public void ValidateDomain_AnswersExactlyWhatCanonicalizationAnswers(string? value)
+    {
+        // The two must not be allowed to drift: the boolean is the wrapper's only job.
+        Assert.Equal(
+            InputValidator.TryCanonicalizeDomain(value, out _),
+            InputValidator.ValidateDomain(value));
+    }
 }
