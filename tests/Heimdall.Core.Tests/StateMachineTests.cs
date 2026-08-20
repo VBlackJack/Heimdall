@@ -548,7 +548,10 @@ public class ConnectionStateMachineTests
     [InlineData(ConnectionState.Connected, ConnectionState.Initializing, false)]
     [InlineData(ConnectionState.Disconnecting, ConnectionState.Disconnected, true)]
     [InlineData(ConnectionState.Disconnecting, ConnectionState.Error, true)]
-    [InlineData(ConnectionState.Disconnecting, ConnectionState.Connected, false)]
+    // True since the RDP auto-reconnect race: a cancelled disconnect can be overtaken by an
+    // attempt that was already in flight and succeeds. Error -> Connected below stays false;
+    // a failed session does not come back without being reconnected from the start.
+    [InlineData(ConnectionState.Disconnecting, ConnectionState.Connected, true)]
     [InlineData(ConnectionState.Error, ConnectionState.Disconnected, true)]
     [InlineData(ConnectionState.Error, ConnectionState.Initializing, true)]
     [InlineData(ConnectionState.Error, ConnectionState.Connected, false)]
@@ -556,6 +559,53 @@ public class ConnectionStateMachineTests
     public void IsValidTransition_MatchesTable(ConnectionState from, ConnectionState to, bool expected)
     {
         Assert.Equal(expected, ConnectionStateMachine.IsValidTransition(from, to));
+    }
+
+    /// <summary>
+    /// The machine can represent a disconnect that was overtaken by a reconnect.
+    /// </summary>
+    /// <remarks>
+    /// The user cancels an auto-reconnect, so the session is told the disconnect has begun; the
+    /// attempt already in flight then succeeds and the session is live again. Without this path the
+    /// machine keeps reporting Disconnecting for a session that is up, and everything that counts
+    /// live sessions from it - the confirmations before closing a tab, a window, or the application
+    /// - stops seeing that session.
+    /// </remarks>
+    [Fact]
+    public void ACancelledDisconnectThatIsOvertakenByAReconnect_EndsConnected()
+    {
+        ConnectionStateMachine machine = new();
+        const string serverId = "rdp-1";
+
+        Assert.True(machine.TryTransition(serverId, ConnectionState.Initializing));
+        Assert.True(machine.TryTransition(serverId, ConnectionState.ValidatingConfig));
+        Assert.True(machine.TryTransition(serverId, ConnectionState.LaunchingRdp));
+        Assert.True(machine.TryTransition(serverId, ConnectionState.Connected));
+
+        // The user cancels the auto-reconnect.
+        Assert.True(machine.TryTransition(serverId, ConnectionState.Disconnecting));
+
+        // The attempt that was already running succeeds anyway.
+        Assert.True(machine.TryTransition(serverId, ConnectionState.Connected));
+        Assert.Equal(ConnectionState.Connected, machine.GetState(serverId));
+    }
+
+    /// <summary>
+    /// Guards the guard: the new path is narrow, not a general reopening of a terminated session.
+    /// </summary>
+    [Fact]
+    public void AFailedSessionStillCannotBecomeConnectedWithoutStartingOver()
+    {
+        ConnectionStateMachine machine = new();
+        const string serverId = "rdp-2";
+
+        Assert.True(machine.TryTransition(serverId, ConnectionState.Initializing));
+        Assert.True(machine.TryTransition(serverId, ConnectionState.ValidatingConfig));
+        Assert.True(machine.TryTransition(serverId, ConnectionState.LaunchingRdp));
+        Assert.True(machine.TryTransition(serverId, ConnectionState.Error));
+
+        Assert.False(machine.TryTransition(serverId, ConnectionState.Connected));
+        Assert.Equal(ConnectionState.Error, machine.GetState(serverId));
     }
 
     [Theory]
