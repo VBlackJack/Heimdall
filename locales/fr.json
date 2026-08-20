@@ -2629,8 +2629,9 @@
   "RdpResolutionScaledToFitToast": "Plus grand que la fen\u00eatre - l'image sera mise \u00e0 l'\u00e9chelle.",
   "RdpLetterboxHintFormat": "Fixe {0}\u00d7{1} \u2014 redimensionnez la fen\u00eatre ou changez la r\u00e9solution pour remplir.",
   "RdpResolutionReconnectFallbackToast": "Le changement de r\u00e9solution a n\u00e9cessit\u00e9 une reconnexion.",
-  "RdpMultimonFallbackSingleMonitor": "Le mode multi-\u00e9crans est demand\u00e9, mais l'h\u00f4te n'a qu'un seul \u00e9cran \u2014 bascule en mode mono-\u00e9cran.",
-  "RdpMultimonFallbackInvalidSelection": "La configuration des \u00e9crans s\u00e9lectionn\u00e9s est invalide pour cet h\u00f4te \u2014 bascule en mode mono-\u00e9cran.",
+  "RdpMultimonFallbackSingleMonitor": "Le mode multi-\u00e9crans a \u00e9t\u00e9 demand\u00e9, mais cet h\u00f4te ne peut pas le fournir. Bascule en mode mono-\u00e9cran.",
+  "RdpMultimonFallbackInvalidSelection": "La configuration des \u00e9crans s\u00e9lectionn\u00e9s est invalide pour cet h\u00f4te. Bascule en mode mono-\u00e9cran.",
+  "RdpMultimonFallbackNonContiguous": "Les \u00e9crans s\u00e9lectionn\u00e9s ne sont pas adjacents, la session devrait donc s'\u00e9tendre sur les \u00e9crans interm\u00e9diaires. Bascule en mode mono-\u00e9cran.",
   "RdpConfirmResolutionReconnectTitle": "Reconnexion requise",
   "RdpConfirmResolutionReconnectMessage": "Changer la r\u00e9solution en {0}x{1} n\u00e9cessite une reconnexion. Continuer ?",
 

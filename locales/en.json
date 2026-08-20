@@ -2631,8 +2631,9 @@
   "RdpResolutionScaledToFitToast": "Larger than window - image will be scaled.",
   "RdpLetterboxHintFormat": "Fixed {0}\u00d7{1} \u2014 resize the window or change resolution to fill.",
   "RdpResolutionReconnectFallbackToast": "Resolution change required reconnect.",
-  "RdpMultimonFallbackSingleMonitor": "Multimon requested but host has a single monitor \u2014 falling back to single-monitor mode.",
-  "RdpMultimonFallbackInvalidSelection": "Selected monitor configuration is invalid for this host \u2014 falling back to single-monitor mode.",
+  "RdpMultimonFallbackSingleMonitor": "Multi-monitor was requested, but this host cannot provide it. Falling back to single-monitor mode.",
+  "RdpMultimonFallbackInvalidSelection": "Selected monitor configuration is invalid for this host. Falling back to single-monitor mode.",
+  "RdpMultimonFallbackNonContiguous": "The selected monitors do not sit next to each other, so the session would have to span the screens between them. Falling back to single-monitor mode.",
   "RdpConfirmResolutionReconnectTitle": "Reconnect required",
   "RdpConfirmResolutionReconnectMessage": "Changing resolution to {0}x{1} requires reconnect. Continue?",
 
