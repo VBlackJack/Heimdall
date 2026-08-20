@@ -86,6 +86,26 @@ public sealed class PipeModeSessionTests
                 }
             };
 
+            // The replay is delivered inside the add-accessor above, under the delivery lock, and
+            // PipeModeSession's own comment there guarantees the read loop cannot interleave a
+            // direct delivery ahead of it. So whatever is present the instant the subscription
+            // returns was replayed, and anything live can only arrive afterwards.
+            //
+            // Without this the ordering assertion below cannot fail for the right reason. A payload
+            // that reached the subscriber live rather than from the buffer still lands before the
+            // line written next, so the test would report a passing replay having exercised no
+            // buffer at all. Same reasoning, and same wording, as the ConPTY sibling.
+            int replayedAtSubscription;
+            lock (outputLock)
+            {
+                replayedAtSubscription = output.Length;
+            }
+
+            Assert.True(
+                replayedAtSubscription > 0,
+                "Nothing was replayed when the subscription attached, so the bootstrap buffer was "
+                    + "never exercised and the ordering assertion below proves nothing.");
+
             session.Write("after-replay\r\n");
 
             await TerminalTestHelpers.AwaitProcessEventAsync(liveOutput.Task, "LiveOutput");
