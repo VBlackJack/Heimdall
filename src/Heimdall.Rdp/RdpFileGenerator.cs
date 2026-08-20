@@ -150,7 +150,8 @@ public static class RdpFileGenerator
             sb.AppendLine($"allow desktop composition:i:{((pf & 0x100) != 0 ? 1 : 0)}");
         }
 
-        // Force TCP-only: disable network auto-detection to prevent UDP probing
+        // Suppress the UDP probe by disabling network auto-detection and declaring an explicit
+        // connection type. This does not force TCP: no client-side setting can.
         if (r.DisableUdp)
         {
             sb.AppendLine("networkautodetect:i:0");

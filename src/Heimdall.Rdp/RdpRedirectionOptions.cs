@@ -93,7 +93,15 @@ public sealed class RdpRedirectionOptions
     /// </summary>
     public int PerformanceFlags { get; set; }
 
-    /// <summary>Disable UDP transport, forcing TCP-only RDP connections.</summary>
+    /// <summary>
+    /// Stop the client probing for UDP transport, by disabling automatic bandwidth detection and
+    /// declaring an explicit network type.
+    /// </summary>
+    /// <remarks>
+    /// This does not force TCP. The Remote Desktop client exposes no way for an application to
+    /// disable UDP transport; only the machine policy <c>fClientDisableUDP</c> does that. What this
+    /// removes is the probe, which is what times out behind a firewall that drops UDP.
+    /// </remarks>
     public bool DisableUdp { get; set; }
 
     /// <summary>
