@@ -155,10 +155,12 @@ UpdateLayout() -> DoEvents() -> Dispatcher.Invoke(Render) -> EnsureHandle -> Con
 **Airspace overlay rule**: Any WPF UI that must render above a `WindowsFormsHost` surface (RDP, VNC) MUST use a WPF `Popup`. A Popup creates its own top-level HWND that the OS composites above the embedded ActiveX surface. The Command Palette uses this pattern - it was originally a `Grid` overlay with `Panel.ZIndex="9999"` which was invisible over RDP sessions.
 
 Additional guards:
-- Resolution updates blocked for 5 seconds after `OnConnected` (prevents disconnect code 4360)
+- Resolution updates blocked after `OnConnected` (prevents disconnect code 4360). The delay is `AppSettings.RdpResizeEnableDelayMs`, default 10000 ms, and a per-profile value overrides it
 - COM dispose follows strict order: collapse visibility, detach from tree, disconnect, detach event sink, dispose - do NOT call `Marshal.ReleaseComObject` (let AxHost handle RCW cleanup)
 - Auto-reconnect with bounded retry (`MaxReconnectAttempts = 20`) and cancel support via COM event sink
-- Disconnect reason decoder: `GetDisconnectReasonKey()` maps 24 MsTscAx codes to i18n keys
+- Disconnect reason decoder: `GetDisconnectReasonKey()` maps 26 MsTscAx codes to i18n keys, and
+  `GetExtendedDisconnectReasonKey()` maps the extended-reason families on top of it
+- Disconnect message precedence lives in ONE place, `RdpActiveXHost.ResolveDisconnectReasonKey(reason, extendedReason)`, which both the on-screen diagnostic and the persisted session event call. The extended reason wins, except that a generic credential rejection does not overwrite a primary code naming a specific account state (locked out, expired, password expired). The two used to compose the same decoders in opposite orders and could name different causes for one disconnect. This precedence is deliberately NOT derived from the severity table: severity answers whether a code needs credential action and drives the auto-reconnect veto, which is a separate decision
 
 **Performance optimizations** (cold-start mitigation):
 - **COM pre-warm**: Background STA thread creates/disposes throwaway `RdpActiveXHost` at startup, forcing mstscax.dll + 22 static dependencies into memory (~400ms saved on first connection)
