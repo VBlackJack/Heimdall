@@ -717,7 +717,8 @@ public sealed class ConnectionViewModelCloseTests
             localizer ?? new LocalizationManager(),
             dialogService,
             splitService,
-            closeArbiter ?? new PaneCloseArbiter());
+            closeArbiter ?? new PaneCloseArbiter(),
+            new SessionWindowService(static (_, _) => { }));
     }
 
     private static void AddActiveSession(ConnectionViewModel viewModel, SessionTabViewModel session)

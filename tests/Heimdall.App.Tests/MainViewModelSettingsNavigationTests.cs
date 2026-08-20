@@ -402,7 +402,12 @@ public sealed class MainViewModelSettingsNavigationTests
                 connectionService,
                 toolRegistry,
                 dialog, new PaneCloseArbiter());
-            ConnectionViewModel connection = new(localizer, dialog, splitService, new PaneCloseArbiter());
+            ConnectionViewModel connection = new(
+                localizer,
+                dialog,
+                splitService,
+                new PaneCloseArbiter(),
+                new SessionWindowService(static (_, _) => { }));
             ServerListViewModel serverList = new(
                 config,
                 localizer,

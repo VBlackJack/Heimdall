@@ -302,7 +302,12 @@ public sealed partial class SessionCoordinatorPreMountTests
                 toolRegistry,
                 dialogService, closeArbiter);
             FakeUiDispatcher dispatcher = new(checkAccess);
-            ConnectionViewModel connection = new ConnectionViewModel(localizer, dialogService, splitService, closeArbiter);
+            ConnectionViewModel connection = new ConnectionViewModel(
+                localizer,
+                dialogService,
+                splitService,
+                closeArbiter,
+                new SessionWindowService(static (_, _) => { }));
             ServerListViewModel serverList = new ServerListViewModel(
                 configManager,
                 localizer,

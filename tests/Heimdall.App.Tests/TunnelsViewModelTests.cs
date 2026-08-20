@@ -505,7 +505,12 @@ public sealed class TunnelsViewModelTests
 
     private sealed class TestTunnelsHost(AppSettings settings) : ITunnelsHost
     {
-        public ConnectionViewModel Connection { get; } = new(new LocalizationManager(), null!, null!, new PaneCloseArbiter());
+        public ConnectionViewModel Connection { get; } = new(
+            new LocalizationManager(),
+            null!,
+            null!,
+            new PaneCloseArbiter(),
+            new SessionWindowService(static (_, _) => { }));
 
         public AppSettings Settings { get; private set; } = settings;
 

@@ -159,7 +159,12 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 toolRegistry,
                 dialogService, new PaneCloseArbiter());
             FakeUiDispatcher dispatcher = new();
-            ConnectionViewModel connection = new(localizer, dialogService, splitService, new PaneCloseArbiter());
+            ConnectionViewModel connection = new(
+                localizer,
+                dialogService,
+                splitService,
+                new PaneCloseArbiter(),
+                new SessionWindowService(static (_, _) => { }));
             ServerListViewModel serverList = new(
                 configManager,
                 localizer,
