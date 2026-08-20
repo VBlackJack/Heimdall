@@ -299,10 +299,7 @@ public class PlinkTunnelRunnerTests : IDisposable
     [Fact]
     public async Task TunnelPasswordFile_ForeignListenerFailsClosed()
     {
-        string tempDirectory = Path.GetTempPath();
-        HashSet<string> existingPasswordFiles = Directory
-            .EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        using PasswordFileDirectory passwordFiles = new();
         int localPort = GetAvailableLoopbackPort();
         var listener = new TcpListener(IPAddress.Loopback, localPort);
         TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -317,7 +314,8 @@ public class PlinkTunnelRunnerTests : IDisposable
         // to make the instant at which the password file can be observed deterministic.
         using PlinkTunnelRunner runner = CreateRunner(
             WindowsTcpListenerOwnershipProbe.Instance,
-            _ => process);
+            _ => process,
+            passwordFiles);
         string? passwordFilePath = null;
 
         try
@@ -331,9 +329,7 @@ public class PlinkTunnelRunnerTests : IDisposable
 
             try
             {
-                passwordFilePath = Assert.Single(
-                    Directory.EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern),
-                    path => !existingPasswordFiles.Contains(path));
+                passwordFilePath = Assert.Single(passwordFiles.EnumeratePasswordFiles());
                 Assert.True(File.Exists(passwordFilePath));
 
                 // Bound while the runner is still held at process start, so the foreign listener is
@@ -373,10 +369,7 @@ public class PlinkTunnelRunnerTests : IDisposable
     [Fact]
     public async Task TunnelPasswordFile_DeletedAfterAttestedBind()
     {
-        string tempDirectory = Path.GetTempPath();
-        HashSet<string> existingPasswordFiles = Directory
-            .EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        using PasswordFileDirectory passwordFiles = new();
         var probe = new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess);
         TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FakePlinkProcess process = new()
@@ -384,7 +377,7 @@ public class PlinkTunnelRunnerTests : IDisposable
             WaitForExitResult = true,
             StartGate = startGate
         };
-        using PlinkTunnelRunner runner = CreateRunner(probe, _ => process);
+        using PlinkTunnelRunner runner = CreateRunner(probe, _ => process, passwordFiles);
         string? passwordFilePath = null;
 
         try
@@ -402,9 +395,7 @@ public class PlinkTunnelRunnerTests : IDisposable
                 // file here would still be a race. An unprobed port is what proves it does.
                 Assert.Equal(0, probe.LastExpectedProcessId);
 
-                passwordFilePath = Assert.Single(
-                    Directory.EnumerateFiles(tempDirectory, PlinkPasswordFileNaming.SearchPattern),
-                    path => !existingPasswordFiles.Contains(path));
+                passwordFilePath = Assert.Single(passwordFiles.EnumeratePasswordFiles());
                 Assert.True(File.Exists(passwordFilePath));
             }
             finally
@@ -712,16 +703,15 @@ public class PlinkTunnelRunnerTests : IDisposable
     [Fact]
     public async Task Stop_WhenKillThrowsWin32_ReaperRetainsProcessAndPasswordFileIsCleaned()
     {
-        HashSet<string> filesBefore = Directory
-            .EnumerateFiles(Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        using PasswordFileDirectory passwordFiles = new();
         FakePlinkProcess process = new()
         {
             KillException = new System.ComponentModel.Win32Exception("Simulated kill failure")
         };
         using PlinkTunnelRunner runner = CreateRunner(
             new FakeOwnershipProbe(TcpListenerOwnership.NothingListening),
-            _ => process);
+            _ => process,
+            passwordFiles);
 
         PlinkTunnelResult result = await runner.StartAsync(
             GetCommandProcessorPath(),
@@ -738,9 +728,7 @@ public class PlinkTunnelRunnerTests : IDisposable
         Assert.False(result.Success);
         Assert.Equal(1, process.KillCount);
         Assert.Equal(0, process.DisposeCount);
-        Assert.DoesNotContain(
-            Directory.EnumerateFiles(Path.GetTempPath(), PlinkPasswordFileNaming.SearchPattern),
-            path => !filesBefore.Contains(path));
+        Assert.Empty(passwordFiles.EnumeratePasswordFiles());
         Assert.Equal(1, PlinkProcessReaper.PendingCount);
 
         process.CompleteExit();
@@ -852,6 +840,197 @@ public class PlinkTunnelRunnerTests : IDisposable
             new PlinkTunnelRunnerOptions(1, 100),
             probe,
             processFactory);
+    }
+
+    [Fact]
+    public async Task ThePasswordFileIsWrittenWhereTheRunnerWasToldAndNowhereElse()
+    {
+        using PasswordFileDirectory passwordFiles = new();
+        string sharedTemp = Path.GetTempPath();
+        HashSet<string> sharedBefore = Directory
+            .EnumerateFiles(sharedTemp, PlinkPasswordFileNaming.SearchPattern)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakePlinkProcess process = new()
+        {
+            WaitForExitResult = true,
+            StartGate = startGate
+        };
+        using PlinkTunnelRunner runner = CreateRunner(
+            new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess),
+            _ => process,
+            passwordFiles);
+
+        try
+        {
+            Task<PlinkTunnelResult> startTask = Task.Run(() => runner.StartAsync(
+                GetCommandProcessorPath(),
+                "gw.test", 22, "user", null, "s3cret",
+                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test"));
+
+            await process.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+            try
+            {
+                // The seam is honoured: the file lands in the directory this test owns.
+                string written = Assert.Single(passwordFiles.EnumeratePasswordFiles());
+                Assert.Equal(passwordFiles.Path, Path.GetDirectoryName(written));
+
+                // And the shared directory gained nothing. Without this the assertion above would
+                // still hold if the runner wrote to BOTH, and the isolation would be an illusion.
+                Assert.DoesNotContain(
+                    Directory.EnumerateFiles(sharedTemp, PlinkPasswordFileNaming.SearchPattern),
+                    path => !sharedBefore.Contains(path));
+            }
+            finally
+            {
+                startGate.TrySetResult();
+            }
+
+            await startTask.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            startGate.TrySetResult();
+            runner.Stop();
+        }
+    }
+
+    /// <summary>
+    /// Every search for a password file has to be rooted in a directory a test owns.
+    /// </summary>
+    /// <remarks>
+    /// The isolation is what removes the race, and it is one edit away from being undone. A
+    /// reverted observation passes every other test in this file unless something is concurrently
+    /// writing to the shared temporary directory, which a normal run does not reproduce - so the
+    /// protection has to be a rule about the source rather than a behaviour that only appears
+    /// under load. An allow-list rather than a ban list, so a new and unforeseen way of naming the
+    /// shared directory fails here instead of slipping through.
+    /// </remarks>
+    [Fact]
+    public void EverySearchForAPasswordFileIsRootedInAnOwnedDirectory()
+    {
+        string[] permittedRoots =
+        [
+            "passwordFiles.Path",                 // a directory the test owns
+            "Path, PlinkPasswordFileNaming",      // the owned directory, from inside the helper
+            "sharedTemp",                         // the negative check that nothing leaked there
+        ];
+
+        // Assembled at run time rather than written as one literal, so this method does not match
+        // its own source and report itself.
+        string enumeration = "Enumerate" + "Files(";
+
+        // The list may not permit what the guard exists to forbid. Without this, widening it to
+        // admit the shared directory is an undetectable one-word edit. It does not make the list
+        // tamper-proof - naming the shared directory through a local variable would still pass -
+        // and no allow-listed guard can claim otherwise; it closes the obvious way through.
+        Assert.DoesNotContain(
+            permittedRoots,
+            root => root.Contains("GetTempPath", StringComparison.Ordinal));
+
+        List<string> violations = [];
+        string[] lines = ReadOwnSourceLines();
+        int examined = 0;
+        for (int index = 0; index < lines.Length; index++)
+        {
+            string line = lines[index];
+            if (!line.Contains(enumeration, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            examined++;
+            if (permittedRoots.Any(root => line.Contains(root, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            violations.Add($"line {index + 1}: {line.Trim()}");
+        }
+
+        Assert.Empty(violations);
+
+        // Guards the guard: the sweep has to have found the enumerations at all. Three exist -
+        // the owned-directory helper, and the two shared-directory reads that prove nothing leaked
+        // there - so a sweep that reaches fewer is reading the wrong file or nothing at all.
+        Assert.True(examined >= 3, $"Only {examined} enumerations were examined.");
+    }
+
+    private static string[] ReadOwnSourceLines() => File.ReadAllLines(OwnSourcePath());
+
+    private static string OwnSourcePath()
+    {
+        string? directory = AppContext.BaseDirectory;
+        while (directory is not null
+            && !File.Exists(Path.Combine(directory, "Heimdall.slnx")))
+        {
+            directory = Path.GetDirectoryName(directory);
+        }
+
+        Assert.NotNull(directory);
+        string path = Path.Combine(
+            directory!,
+            "tests",
+            "Heimdall.Ssh.Tests",
+            "PlinkTunnelRunnerTests.cs");
+        Assert.True(File.Exists(path), $"Test source not found: {path}");
+        return path;
+    }
+
+    private static PlinkTunnelRunner CreateRunner(
+        ITcpListenerOwnershipProbe probe,
+        Func<ProcessStartInfo, IPlinkProcess> processFactory,
+        PasswordFileDirectory passwordFiles)
+    {
+        return new PlinkTunnelRunner(
+            new PlinkTunnelRunnerOptions(1, 100),
+            probe,
+            processFactory,
+            () => passwordFiles.Path);
+    }
+
+    /// <summary>
+    /// A directory this test owns, so the password file can be counted rather than differenced.
+    /// </summary>
+    /// <remarks>
+    /// These tests used to enumerate the shared temporary directory and subtract a baseline taken
+    /// at test start. That baseline cannot see a file a CONCURRENT process creates during the
+    /// window, and `dotnet test Heimdall.slnx` runs the assemblies in parallel - one of them drives
+    /// the real password-file writer into the same shared directory. The foreign file then counted
+    /// as the one under test and the assertion failed on a machine under load while passing in
+    /// isolation. Owning the directory removes the ambiguity instead of widening a tolerance.
+    /// </remarks>
+    private sealed class PasswordFileDirectory : IDisposable
+    {
+        public PasswordFileDirectory()
+        {
+            Path = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                $"heimdall-pwfile-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public IEnumerable<string> EnumeratePasswordFiles() =>
+            Directory.EnumerateFiles(Path, PlinkPasswordFileNaming.SearchPattern);
+
+        public void Dispose()
+        {
+            try
+            {
+                Directory.Delete(Path, recursive: true);
+            }
+            catch (IOException)
+            {
+                // A directory that cannot be removed is not a failure of the test that used it.
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
     }
 
     private static string GetCommandProcessorPath()
