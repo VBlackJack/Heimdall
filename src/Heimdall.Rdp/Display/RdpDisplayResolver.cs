@@ -105,7 +105,10 @@ public static class RdpDisplayResolver
             return new RdpMultimonValidation(false, MultimonFallbackReason.None, requested);
         }
 
-        if (host.MonitorCount == 1)
+        // Fewer than two, not exactly one. A host whose screens could not be enumerated reports
+        // zero, and zero is not one, so multimon used to survive this check whenever the selection
+        // was empty. Coercing is the conservative answer for a host that cannot be described.
+        if (host.MonitorCount <= 1)
         {
             return CreateMultimonFallback(requested, MultimonFallbackReason.SingleMonitorHost);
         }

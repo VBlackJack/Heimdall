@@ -150,6 +150,22 @@ public sealed class RdpMultimonValidationTests
             RdpDisplayCapabilities.FromMonitorBounds(monitorBounds),
             requested);
 
+    // A host whose screens could not be enumerated reports zero. With an empty selection there was
+    // no index to be out of range, so multimon used to be left on for a host nobody could describe.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void AHostThatCannotOfferMultimonFallsBackEvenWithAnEmptySelection(int monitorCount)
+    {
+        RdpMultimonValidation result = RdpDisplayResolver.ValidateMultimon(
+            new RdpDisplayCapabilities(monitorCount),
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: []));
+
+        Assert.True(result.ShouldFallback);
+        Assert.Equal(MultimonFallbackReason.SingleMonitorHost, result.Reason);
+        Assert.False(result.CoercedSettings.UseMultimon);
+    }
+
     [Fact]
     public void SelectingTheFirstAndThirdOfThreeMonitorsFallsBack()
     {

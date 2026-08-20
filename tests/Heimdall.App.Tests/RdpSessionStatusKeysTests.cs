@@ -65,6 +65,32 @@ public sealed class RdpSessionStatusKeysTests
     }
 
     [Theory]
+    [InlineData("RdpMultimonFallbackSingleMonitor")]
+    [InlineData("RdpMultimonFallbackInvalidSelection")]
+    [InlineData("RdpMultimonFallbackNonContiguous")]
+    public void MultimonFallbackKeys_ArePresentInEnglish(string key)
+    {
+        using var document = LoadLocaleDocument("en");
+
+        Assert.True(
+            document.RootElement.TryGetProperty(key, out _),
+            $"Locale key '{key}' is missing from en.json");
+    }
+
+    [Theory]
+    [InlineData("RdpMultimonFallbackSingleMonitor")]
+    [InlineData("RdpMultimonFallbackInvalidSelection")]
+    [InlineData("RdpMultimonFallbackNonContiguous")]
+    public void MultimonFallbackKeys_ArePresentInFrench(string key)
+    {
+        using var document = LoadLocaleDocument("fr");
+
+        Assert.True(
+            document.RootElement.TryGetProperty(key, out _),
+            $"Locale key '{key}' is missing from fr.json");
+    }
+
+    [Theory]
     [InlineData("BtnCancelReconnect")]
     [InlineData("TooltipCancelReconnect")]
     [InlineData("A11yCancelReconnect")]
