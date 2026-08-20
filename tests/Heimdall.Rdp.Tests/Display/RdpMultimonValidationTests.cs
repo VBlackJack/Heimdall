@@ -134,6 +134,128 @@ public sealed class RdpMultimonValidationTests
         Assert.False(secondPass.ShouldFallback);
     }
 
+    // Three dense monitors laid out left to right, which is the arrangement the finding was
+    // reported against.
+    private static readonly Rectangle[] ThreeDenseMonitors =
+    [
+        new(0, 0, 1920, 1080),
+        new(1920, 0, 1920, 1080),
+        new(3840, 0, 1920, 1080),
+    ];
+
+    private static RdpMultimonValidation ValidateAgainst(
+        IReadOnlyList<Rectangle> monitorBounds,
+        RdpDisplaySettings requested)
+        => RdpDisplayResolver.ValidateMultimon(
+            RdpDisplayCapabilities.FromMonitorBounds(monitorBounds),
+            requested);
+
+    [Fact]
+    public void SelectingTheFirstAndThirdOfThreeMonitorsFallsBack()
+    {
+        RdpMultimonValidation result = ValidateAgainst(
+            ThreeDenseMonitors,
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: [0, 2]));
+
+        Assert.True(result.ShouldFallback);
+        Assert.Equal(MultimonFallbackReason.NonContiguousSelection, result.Reason);
+        Assert.Equal(RdpResolutionMode.FitWindow, result.CoercedSettings.ResolutionMode);
+        Assert.False(result.CoercedSettings.UseMultimon);
+        Assert.Empty(result.CoercedSettings.SelectedMonitorIndices);
+    }
+
+    [Fact]
+    public void SelectingTwoAdjacentMonitorsIsAccepted()
+    {
+        RdpDisplaySettings requested =
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: [1, 2]);
+
+        RdpMultimonValidation result = ValidateAgainst(ThreeDenseMonitors, requested);
+
+        Assert.False(result.ShouldFallback);
+        Assert.Equal(MultimonFallbackReason.None, result.Reason);
+        Assert.Same(requested, result.CoercedSettings);
+    }
+
+    // An L-shape is a valid Windows 7 and later arrangement, so the whole selection is accepted
+    // even though it does not span a rectangle.
+    [Fact]
+    public void AnLShapedSelectionIsAccepted()
+    {
+        Rectangle[] lShaped =
+        [
+            new(0, 0, 1920, 1080),
+            new(1920, 0, 1920, 1080),
+            new(0, 1080, 1920, 1080),
+        ];
+        RdpDisplaySettings requested =
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: [0, 1, 2]);
+
+        RdpMultimonValidation result = ValidateAgainst(lShaped, requested);
+
+        Assert.False(result.ShouldFallback);
+        Assert.Same(requested, result.CoercedSettings);
+    }
+
+    // The "every monitor" sentinel is left alone on purpose: a host whose screens meet only at a
+    // corner works today across all of them, and coercing here would silently drop one.
+    [Fact]
+    public void AnEmptySelectionIsNotCoercedEvenWhenTheHostIsDisjoint()
+    {
+        Rectangle[] disjoint =
+        [
+            new(0, 0, 1920, 1080),
+            new(10000, 0, 1920, 1080),
+        ];
+        RdpDisplaySettings requested =
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: []);
+
+        RdpMultimonValidation result = ValidateAgainst(disjoint, requested);
+
+        Assert.False(result.ShouldFallback);
+        Assert.Same(requested, result.CoercedSettings);
+    }
+
+    [Fact]
+    public void ASingleSelectedMonitorIsNeverDisconnected()
+    {
+        RdpDisplaySettings requested =
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: [2]);
+
+        RdpMultimonValidation result = ValidateAgainst(ThreeDenseMonitors, requested);
+
+        Assert.False(result.ShouldFallback);
+        Assert.Same(requested, result.CoercedSettings);
+    }
+
+    // A host that reports a count without a topology cannot answer the question, and guessing
+    // there would be worse than leaving it unanswered.
+    [Fact]
+    public void AnUnknownTopologyDoesNotProduceAContiguityFallback()
+    {
+        RdpDisplaySettings requested =
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: [0, 2]);
+
+        RdpMultimonValidation result =
+            RdpDisplayResolver.ValidateMultimon(new RdpDisplayCapabilities(3), requested);
+
+        Assert.False(result.ShouldFallback);
+        Assert.NotEqual(MultimonFallbackReason.NonContiguousSelection, result.Reason);
+    }
+
+    // The range check still runs first, so an out-of-range index is reported as such rather than as
+    // a geometry problem the user cannot act on.
+    [Fact]
+    public void AnOutOfRangeIndexIsStillReportedAsInvalidRatherThanDisconnected()
+    {
+        RdpMultimonValidation result = ValidateAgainst(
+            ThreeDenseMonitors,
+            Settings(RdpResolutionMode.Multimon, useMultimon: true, selectedMonitors: [0, 7]));
+
+        Assert.True(result.ShouldFallback);
+        Assert.Equal(MultimonFallbackReason.InvalidMonitorIndex, result.Reason);
+    }
+
     private static RdpMultimonValidation Validate(int monitorCount, RdpDisplaySettings requested)
         => RdpDisplayResolver.ValidateMultimon(new RdpDisplayCapabilities(monitorCount), requested);
 

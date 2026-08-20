@@ -22,7 +22,13 @@ public enum MultimonFallbackReason
 {
     None = 0,
     SingleMonitorHost,
-    InvalidMonitorIndex
+    InvalidMonitorIndex,
+
+    /// <summary>
+    /// The selected monitors do not form one connected block, so the session would be describing
+    /// two islands and would be sized for the gap between them.
+    /// </summary>
+    NonContiguousSelection
 }
 
 public sealed record RdpDisplaySettings(
