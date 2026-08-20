@@ -1956,7 +1956,13 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.LocalShellArguments = dto.LocalShellArguments ?? "";
         vm.LocalShellWorkingDirectory = dto.LocalShellWorkingDirectory ?? "";
         vm.LocalShellElevated = dto.LocalShellElevated;
-        vm.ElevationMode = dto.ElevationMode;
+
+        // The effective mode, not the stored one. A profile written before the mode existed carries
+        // the elevation in the legacy flag with the mode left at None, and the dialog shows only the
+        // mode. Seeding the raw value showed None for a profile that does elevate, and saving then
+        // wrote that None back over it, so opening the dialog and pressing save silently took the
+        // elevation away. This is the same reconciliation the launcher applies.
+        vm.ElevationMode = dto.EffectiveElevationMode;
         vm.CitrixStoreFrontUrl = dto.CitrixStoreFrontUrl ?? "";
         vm.CitrixAppName = dto.CitrixAppName ?? "";
         vm.CitrixIcaFilePath = dto.CitrixIcaFilePath ?? "";
