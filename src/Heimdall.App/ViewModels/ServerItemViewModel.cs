@@ -119,9 +119,35 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
     /// <summary>Tooltip text for the sidebar health dot, recomputed on every <see cref="HealthState"/> change.</summary>
     public string HealthTooltipText => HealthReasonLocalizer.FormatTooltip(HealthState, _localizer);
 
+    /// <summary>
+    /// Whether the sidebar status dot is currently showing the session state rather than the health
+    /// verdict.
+    /// </summary>
+    /// <remarks>
+    /// The one decision, shared. The dot's colour, the tooltip on it and the spoken row name all
+    /// follow it, so none of the three can end up describing something the other two are not. What
+    /// they render differs on purpose - a tooltip has room for the longer explanation and a spoken
+    /// name does not - but the branch they take is the same one.
+    /// </remarks>
+    public bool StatusShowsConnectionState =>
+        ConnectionStateSets.StateOverridesHealth(ConnectionState);
+
+    /// <summary>
+    /// Tooltip for the sidebar status dot, describing whatever the dot is coloured for.
+    /// </summary>
+    /// <remarks>
+    /// It used to describe reachability unconditionally, while the dot beside it was already
+    /// coloured from the session state. A connected or failed session therefore showed a dot saying
+    /// one thing and a tooltip saying another - and the spoken name, which had already been
+    /// corrected to follow the dot, agreed with neither.
+    /// </remarks>
+    public string StatusTooltipText =>
+        StatusShowsConnectionState ? ConnectionStateTooltip : HealthTooltipText;
+
     partial void OnHealthStateChanged(HealthState value)
     {
         OnPropertyChanged(nameof(HealthTooltipText));
+        OnPropertyChanged(nameof(StatusTooltipText));
         OnPropertyChanged(nameof(AccessibleName));
     }
 
@@ -224,7 +250,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         "SessionTreeServerAccessibleName",
         DisplayName,
         ConnectionType.ToUpperInvariant(),
-        ConnectionStateSets.StateOverridesHealth(ConnectionState)
+        StatusShowsConnectionState
             ? ConnectionStateDisplayName
             : HealthTooltipText);
 
@@ -368,6 +394,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         OnPropertyChanged(nameof(IsActiveSession));
         OnPropertyChanged(nameof(ConnectionStateDisplayName));
         OnPropertyChanged(nameof(ConnectionStateTooltip));
+        OnPropertyChanged(nameof(StatusTooltipText));
         OnPropertyChanged(nameof(AccessibleName));
     }
 
@@ -383,6 +410,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         OnPropertyChanged(nameof(HealthTooltipText));
         OnPropertyChanged(nameof(ConnectionStateDisplayName));
         OnPropertyChanged(nameof(ConnectionStateTooltip));
+        OnPropertyChanged(nameof(StatusTooltipText));
         OnPropertyChanged(nameof(AccessibleName));
     }
 
