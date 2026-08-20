@@ -14,13 +14,43 @@
  * limitations under the License.
  */
 
+using System.Drawing;
+
 namespace Heimdall.Rdp.Display;
 
 /// <summary>
 /// Current host display topology used for RDP display decisions.
 /// </summary>
+/// <remarks>
+/// The count alone cannot answer whether a selection of monitors forms one connected block, so the
+/// bounds travel with it. They are optional: a caller that only needs the count, and a host whose
+/// screens could not be enumerated, both leave them empty.
+/// </remarks>
 public sealed record RdpDisplayCapabilities(int MonitorCount)
 {
+    /// <summary>
+    /// Bounds of each attached monitor on the virtual desktop, in the same order as the indices a
+    /// profile selects by. Empty when the topology is not known.
+    /// </summary>
+    public IReadOnlyList<Rectangle> MonitorBounds { get; init; } = [];
+
+    /// <summary>
+    /// Builds capabilities from an enumerated topology, keeping the count and the bounds in step.
+    /// </summary>
+    /// <remarks>
+    /// The list is copied, so a caller cannot change the topology a decision was taken against
+    /// after the fact.
+    /// </remarks>
+    public static RdpDisplayCapabilities FromMonitorBounds(IReadOnlyList<Rectangle> monitorBounds)
+    {
+        ArgumentNullException.ThrowIfNull(monitorBounds);
+
+        return new RdpDisplayCapabilities(monitorBounds.Count)
+        {
+            MonitorBounds = [.. monitorBounds],
+        };
+    }
+
     /// <summary>
     /// Multimon requires at least two attached screens.
     /// </summary>
