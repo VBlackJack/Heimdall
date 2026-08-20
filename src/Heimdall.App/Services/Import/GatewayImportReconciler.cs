@@ -181,20 +181,10 @@ internal static class GatewayImportReconciler
     private static string Normalize(string? value) =>
         (value ?? string.Empty).Trim().ToUpperInvariant();
 
-    private static SshGatewayDto CloneGatewayWithoutSecrets(SshGatewayDto gateway) => new()
-    {
-        Id = gateway.Id,
-        Name = gateway.Name,
-        Host = gateway.Host,
-        Port = gateway.Port,
-        User = gateway.User,
-        KeyPath = gateway.KeyPath,
-        SshPasswordEncrypted = null,
-        SshKeyPassphraseEncrypted = null,
-        IsDefault = gateway.IsDefault,
-        ParentGatewayId = gateway.ParentGatewayId,
-        HostKeyFingerprint = gateway.HostKeyFingerprint
-    };
+    // Assigning null through the passphrase setter raised its presence flag just as surely as
+    // assigning a value, so clearing a secret used to fabricate the declaration of a field.
+    private static SshGatewayDto CloneGatewayWithoutSecrets(SshGatewayDto gateway) =>
+        gateway.CloneWithoutSecrets();
 
     private sealed record GatewayAssignment(SshGatewayDto Gateway, string FinalId);
 

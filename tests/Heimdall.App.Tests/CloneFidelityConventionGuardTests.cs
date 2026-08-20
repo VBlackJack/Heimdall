@@ -43,6 +43,80 @@ public sealed class CloneFidelityConventionGuardTests
         Path.Combine("Heimdall.App", "ViewModels", "ServerListViewModel.Bulk.cs")
     ];
 
+    /// <summary>
+    /// Production files that make a complete copy of an SSH gateway.
+    /// </summary>
+    /// <remarks>
+    /// A gateway carries the same setter-raised presence flag as a profile, and the same derived
+    /// credential mapping hangs off it. The profile guard could not see these: it looks for a
+    /// profile round trip by name, and gateways were never copied through one - they were copied
+    /// field by field, which raises the flag just as surely. Only the accident that every published
+    /// settings object is laundered through a round trip of its own kept the fabrication from
+    /// reaching a connect path.
+    /// </remarks>
+    /// <remarks>
+    /// Each site carries its OWN obligation, not a choice between the two primitives. The settings
+    /// copy must keep the gateway whole; the import reconciler must drop the secrets. Accepting
+    /// either at either site let a mutation swap them and go unnoticed.
+    /// </remarks>
+    private static readonly (string RelativePath, string RequiredPrimitive)[] GatewayCompleteCopyCallSites =
+    [
+        (Path.Combine("Heimdall.App", "ViewModels", "SettingsViewModel.cs"), "CloneFaithfully()"),
+        (Path.Combine("Heimdall.App", "Services", "Import", "GatewayImportReconciler.cs"), "CloneWithoutSecrets()")
+    ];
+
+    [Fact]
+    public void EveryGatewayCopyCallSiteRoutesThroughThePrimitive()
+    {
+        string sourceRoot = Path.Combine(FindRepoRoot(), "src");
+        List<string> missing = [];
+
+        foreach ((string relativePath, string requiredPrimitive) in GatewayCompleteCopyCallSites)
+        {
+            string file = Path.Combine(sourceRoot, relativePath);
+            Assert.True(File.Exists(file), $"Expected call site no longer exists: {file}");
+
+            if (!File.ReadAllText(file).Contains(requiredPrimitive, StringComparison.Ordinal))
+            {
+                missing.Add($"{relativePath}: expected {requiredPrimitive}");
+            }
+        }
+
+        Assert.Empty(missing);
+    }
+
+    /// <summary>
+    /// No copy of a gateway may assign its passphrase property, because assigning it is what
+    /// fabricates the declaration.
+    /// </summary>
+    /// <remarks>
+    /// Stronger than the call-site check above, and independent of it: a file could route one copy
+    /// through the primitive and still hand-write another. Constructions from a foreign source are
+    /// a different act and are allowed - an imported or dialog-created gateway legitimately decides
+    /// its own fields - so only the two copy sites are swept.
+    /// </remarks>
+    [Fact]
+    public void NoGatewayCopyAssignsThePassphraseProperty()
+    {
+        string sourceRoot = Path.Combine(FindRepoRoot(), "src");
+        List<string> violations = [];
+
+        foreach ((string relativePath, _) in GatewayCompleteCopyCallSites)
+        {
+            string[] lines = File.ReadAllLines(Path.Combine(sourceRoot, relativePath));
+            for (int index = 0; index < lines.Length; index++)
+            {
+                string line = lines[index];
+                if (line.Contains("SshKeyPassphraseEncrypted =", StringComparison.Ordinal))
+                {
+                    violations.Add($"{relativePath}:{index + 1}: {line.Trim()}");
+                }
+            }
+        }
+
+        Assert.Empty(violations);
+    }
+
     [Fact]
     public void NoProductionCodeClonesAProfileThroughAJsonRoundTrip()
     {

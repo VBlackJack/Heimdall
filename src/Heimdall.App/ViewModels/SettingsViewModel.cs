@@ -2753,20 +2753,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         return false;
     }
 
-    private static SshGatewayDto CloneGateway(SshGatewayDto g) => new()
-    {
-        Id = g.Id,
-        Name = g.Name,
-        Host = g.Host,
-        Port = g.Port,
-        User = g.User,
-        KeyPath = g.KeyPath,
-        SshPasswordEncrypted = g.SshPasswordEncrypted,
-        SshKeyPassphraseEncrypted = g.SshKeyPassphraseEncrypted,
-        IsDefault = g.IsDefault,
-        ParentGatewayId = g.ParentGatewayId,
-        HostKeyFingerprint = g.HostKeyFingerprint
-    };
+    // Field-by-field this raised the passphrase presence flag on every copy, which flips
+    // UsesLegacySshCredentialMapping and changes how the gateway authenticates.
+    private static SshGatewayDto CloneGateway(SshGatewayDto g) => g.CloneFaithfully();
 
     private static ProjectDto CloneProject(ProjectDto p) => new()
     {
