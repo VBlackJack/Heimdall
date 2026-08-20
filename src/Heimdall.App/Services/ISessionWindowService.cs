@@ -32,6 +32,17 @@ public interface ISessionWindowService
     /// </summary>
     event EventHandler? SplitPaletteRequested;
 
+    /// <summary>
+    /// The sessions currently living in detached windows.
+    /// </summary>
+    /// <remarks>
+    /// Read on demand rather than kept as a registry. A registry has to be told about every
+    /// detach, reattach and close, and a missed unregistration would leave a session counted
+    /// forever - locking the user out of opening new ones, which is worse than the limit being
+    /// bypassable. Reading the live windows cannot drift from them.
+    /// </remarks>
+    IReadOnlyList<SessionTabViewModel> DetachedSessions { get; }
+
     /// <summary>Detaches a session tab into a standalone floating window.</summary>
     void DetachSessionToFloatingWindow(SessionTabViewModel session, MainViewModel vm);
 

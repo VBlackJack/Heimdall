@@ -42,20 +42,57 @@ namespace Heimdall.App.Services;
 public sealed class SessionWindowService : ISessionWindowService
 {
     private readonly Action<SessionTabViewModel, LocalizationManager> _showFloatingWindow;
+    private readonly Func<IReadOnlyList<SessionTabViewModel>> _readDetachedSessions;
 
     /// <summary>
     /// Initialises a new <see cref="SessionWindowService"/>.
     /// </summary>
     public SessionWindowService()
-        : this(ShowFloatingWindow)
+        : this(ShowFloatingWindow, ReadDetachedSessions)
     {
     }
 
     internal SessionWindowService(
         Action<SessionTabViewModel, LocalizationManager> showFloatingWindow)
+        : this(showFloatingWindow, static () => [])
+    {
+    }
+
+    internal SessionWindowService(
+        Action<SessionTabViewModel, LocalizationManager> showFloatingWindow,
+        Func<IReadOnlyList<SessionTabViewModel>> readDetachedSessions)
     {
         _showFloatingWindow = showFloatingWindow
             ?? throw new ArgumentNullException(nameof(showFloatingWindow));
+        _readDetachedSessions = readDetachedSessions
+            ?? throw new ArgumentNullException(nameof(readDetachedSessions));
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<SessionTabViewModel> DetachedSessions => _readDetachedSessions();
+
+    /// <summary>
+    /// Reads the sessions hosted by the floating windows that are open right now.
+    /// </summary>
+    /// <remarks>
+    /// Touches the window collection, so it belongs on the UI thread. Its only caller is the
+    /// session census, which runs there because it may raise a dialog. Before any window exists
+    /// there is nothing detached, which is the honest answer rather than a failure.
+    /// </remarks>
+    private static IReadOnlyList<SessionTabViewModel> ReadDetachedSessions()
+    {
+        System.Windows.Application? application = System.Windows.Application.Current;
+        if (application is null)
+        {
+            return [];
+        }
+
+        return
+        [
+            .. application.Windows
+                .OfType<Views.FloatingSessionWindow>()
+                .Select(window => window.Session)
+        ];
     }
 
     /// <summary>

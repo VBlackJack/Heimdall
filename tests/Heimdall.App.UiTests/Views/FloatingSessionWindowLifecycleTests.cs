@@ -93,7 +93,8 @@ public sealed class FloatingSessionWindowLifecycleTests
                 WpfTestHost.Localizer,
                 dialogService,
                 splitService,
-                new PaneCloseArbiter());
+                new PaneCloseArbiter(),
+                new SessionWindowService());
             MainViewModel main = CreateMainViewModel(connection);
             Window mainWindow = new()
             {
@@ -143,7 +144,8 @@ public sealed class FloatingSessionWindowLifecycleTests
                 WpfTestHost.Localizer,
                 dialogService,
                 splitService,
-                new PaneCloseArbiter());
+                new PaneCloseArbiter(),
+                new SessionWindowService());
             MainViewModel main = CreateMainViewModel(connection);
             Window mainWindow = new()
             {
@@ -240,4 +242,42 @@ public sealed class FloatingSessionWindowLifecycleTests
                 $"Split cleanup must not run when close is declined: {targetMethod?.Name ?? "<unknown>"}.");
         }
     }
+
+    [StaFact]
+    [Trait("Category", "RequiresDesktop")]
+    public void DetachedSessions_ReportsASessionHostedByARealFloatingWindow()
+    {
+        WpfTestHost.Invoke(() =>
+        {
+            SessionWindowService service = new();
+            SessionTabViewModel session = new()
+            {
+                ServerId = "detached",
+                Title = "Detached",
+                ConnectionType = "SSH",
+            };
+
+            Assert.DoesNotContain(session, service.DetachedSessions);
+
+            FloatingSessionWindow window = new(
+                session,
+                WpfTestHost.Localizer,
+                new PaneCloseArbiter());
+            try
+            {
+                window.Show();
+
+                Assert.Contains(session, service.DetachedSessions);
+            }
+            finally
+            {
+                window.Close();
+            }
+
+            // Closing is what makes the reading self-maintaining: no unregistration is performed
+            // anywhere, and the session is gone from the answer regardless.
+            Assert.DoesNotContain(session, service.DetachedSessions);
+        });
+    }
+
 }

@@ -39,7 +39,7 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
         var dialog = DispatchProxy.Create<IDialogService, TrackingDialogProxy>();
         var split = DispatchProxy.Create<ISplitService, TrackingSplitProxy>();
         var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split,
-            new PaneCloseArbiter());
+            new PaneCloseArbiter(), NoDetachedWindows());
         var existing = viewModel.AddSession("existing", "Existing", "RDP");
         existing.HostControl = new object();
 
@@ -66,7 +66,7 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
         var dialog = DispatchProxy.Create<IDialogService, TrackingDialogProxy>();
         var split = DispatchProxy.Create<ISplitService, TrackingSplitProxy>();
         var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split,
-            new PaneCloseArbiter());
+            new PaneCloseArbiter(), NoDetachedWindows());
         var existing = viewModel.AddSession("existing", "Existing", "RDP");
         existing.HostControl = new object();
 
@@ -86,7 +86,7 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
         var dialog = DispatchProxy.Create<IDialogService, TrackingDialogProxy>();
         var split = DispatchProxy.Create<ISplitService, TrackingSplitProxy>();
         var viewModel = new ConnectionViewModel(new LocalizationManager(), dialog, split,
-            new PaneCloseArbiter());
+            new PaneCloseArbiter(), NoDetachedWindows());
         var existing = viewModel.AddSession("existing", "Existing", "RDP");
         existing.HostControl = new object();
 
@@ -335,4 +335,11 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
             throw new NotSupportedException(targetMethod?.Name);
         }
     }
+
+    /// <summary>
+    /// A window service that reports nothing detached, so these tests keep asserting exactly what
+    /// they were written for: the limit as seen from one window.
+    /// </summary>
+    private static SessionWindowService NoDetachedWindows() => new(static (_, _) => { });
+
 }

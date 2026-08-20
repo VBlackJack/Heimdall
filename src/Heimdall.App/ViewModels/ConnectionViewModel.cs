@@ -57,16 +57,20 @@ public partial class ConnectionViewModel : ObservableObject
 
     private bool _refreshingAccessibleNames;
 
+    private readonly ISessionWindowService _sessionWindows;
+
     public ConnectionViewModel(
         LocalizationManager localizer,
         IDialogService dialogService,
         ISplitService splitService,
-        IPaneCloseArbiter closeArbiter)
+        IPaneCloseArbiter closeArbiter,
+        ISessionWindowService sessionWindows)
     {
         _localizer = localizer;
         _dialogService = dialogService;
         _splitService = splitService;
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
+        _sessionWindows = sessionWindows ?? throw new ArgumentNullException(nameof(sessionWindows));
 
         TrackAccessibleNames(ActiveSessions);
     }
@@ -204,10 +208,8 @@ public partial class ConnectionViewModel : ObservableObject
         string connectionType,
         int maxEmbeddedSessions)
     {
-        int currentEmbeddedSessions = ActiveSessions
-            .SelectMany(session => Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent))
-            .Count(pane => pane.HostControl is not null
-                && !ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType));
+        int currentEmbeddedSessions = CountEmbeddedPanes(
+            ActiveSessions.Concat(_sessionWindows.DetachedSessions));
 
         if (currentEmbeddedSessions >= maxEmbeddedSessions)
         {
@@ -219,6 +221,24 @@ public partial class ConnectionViewModel : ObservableObject
 
         return AddSession(serverId, title, connectionType);
     }
+
+    /// <summary>
+    /// Counts the embedded panes across a set of session tabs.
+    /// </summary>
+    /// <remarks>
+    /// <para>The limit is a limit on what the machine is hosting, so it has to be counted over
+    /// everything hosted. Counting only this window's tabs meant detaching a session removed it
+    /// from the count while it kept its ActiveX or WebView2 host alive, so detaching repeatedly
+    /// let the limit be passed without bound.</para>
+    /// <para>Distinct because a reattach puts the session back in the tab collection before the
+    /// floating window closes, so for that moment it is legitimately in both places and must
+    /// still count once. Tool panes are excluded, matching what the limit has always meant.</para>
+    /// </remarks>
+    internal static int CountEmbeddedPanes(IEnumerable<SessionTabViewModel> sessions) => sessions
+        .Distinct()
+        .SelectMany(session => Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent))
+        .Count(pane => pane.HostControl is not null
+            && !ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType));
 
     /// <summary>
     /// Adds an uncounted tab for a local tool, an external client, a diagnostic,
