@@ -1730,7 +1730,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         int snappedRdpFixedWidth = RdpDisplayHelper.SnapToMultipleOf(RdpFixedWidth, 4);
         bool supportsGateway = ProtocolCapabilities.SupportsSshGateway(ConnectionType);
 
-        return new ServerProfileDto
+        ServerProfileDto dto = new ServerProfileDto
         {
             DisplayName = DisplayName,
             Origin = Origin,
@@ -1847,11 +1847,54 @@ public partial class ServerDialogViewModel : ObservableValidator
             MacAddress = string.IsNullOrWhiteSpace(MacAddress) ? null : MacAddress,
             IsFavorite = IsFavorite
         };
+
+        CarryForwardUneditedFields(dto);
+        return dto;
+    }
+
+    /// <summary>
+    /// Copies the parts of the seed profile this dialog never edits onto the object it returns.
+    /// </summary>
+    /// <remarks>
+    /// <para>The dialog composes a fresh profile and the caller assigns it over the stored record,
+    /// so a field the dialog does not write is not left alone: it is replaced by the default. That
+    /// silently reset a profile's position in the gateway overview, collapsed its tunnels panel,
+    /// discarded any setting written by a newer version of the application, and erased the launch
+    /// command line a Citrix profile needs in order to start at all.</para>
+    /// <para>Copied out of a faithful clone rather than field by field off the seed, so the
+    /// extension data arrives detached from the document the seed parsed it from. The identity is
+    /// deliberately not carried: every caller assigns it after this returns, a fresh one when
+    /// adding or duplicating and the original one when editing, and quietly inheriting the seed's
+    /// identity on a duplicate would produce two profiles claiming to be the same record.</para>
+    /// </remarks>
+    private void CarryForwardUneditedFields(ServerProfileDto dto)
+    {
+        if (_seed is null)
+        {
+            return;
+        }
+
+        ServerProfileDto seed = _seed.CloneFaithfully();
+
+        dto.SortOrder = seed.SortOrder;
+        dto.TunnelsPanelExpanded = seed.TunnelsPanelExpanded;
+        dto.CitrixLaunchCommandLine = seed.CitrixLaunchCommandLine;
+        dto.ExtensionData = seed.ExtensionData;
     }
 
     /// <summary>
     /// Creates a ViewModel pre-populated from an existing DTO (for edit mode).
     /// </summary>
+    /// <summary>
+    /// The profile this dialog was seeded from, or null when it is composing a new one.
+    /// </summary>
+    /// <remarks>
+    /// Held so that <see cref="ToDto"/> can carry forward the parts of a profile the dialog does
+    /// not edit. The caller replaces the stored record wholesale with what the dialog returns, so
+    /// anything absent from that object is not merely unedited, it is deleted.
+    /// </remarks>
+    private ServerProfileDto? _seed;
+
     public static ServerDialogViewModel FromDto(ServerProfileDto dto)
         => FromDto(dto, monitorEnumerator: null);
 
@@ -1872,6 +1915,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         ServerDialogViewModel vm = monitorEnumerator is null
             ? new ServerDialogViewModel()
             : new ServerDialogViewModel(monitorEnumerator);
+        vm._seed = dto;
         vm._isInitializing = true;
         vm.IsEditMode = true;
         vm.IsProtocolSelected = true;
