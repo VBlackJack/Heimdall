@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-20: a failed reconnection told you to go edit your profile
+
+- **The reconnect overlay pre-focused "Edit profile" for disconnect code 4360.** That was decided
+  when 4360 was believed to mean a resolution-change timeout, which points straight at the profile's
+  display settings. It actually means the client failed to reconnect to the session, and nothing in
+  the profile is at fault for that. The useful first move is to reconnect, which is what the overlay
+  now offers.
+- **The proof that the old belief was wrong was already sitting in the code.** 3592 carries the
+  identical message and was never in the remediation list, so one disconnect offered two different
+  first actions depending on which of its two codes arrived.
+- **Codes that say the same thing now have to offer the same first action**, checked by sweeping the
+  decoder rather than by a second hand-written list. The two lists that disagreed were each
+  self-consistent, which is why the suite was green either way.
+- Nothing else moved: severity, and therefore the auto-reconnect veto, is unchanged.
+
 ## 2026-08-20: a disconnect was named one thing on screen and another in the log
 
 - **The two consumers of a disconnect composed the same two decoders in opposite orders.** The
