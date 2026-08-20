@@ -2117,6 +2117,19 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         Dispatcher.Invoke(() =>
         {
+            // The cancel raised this flag for a disconnect that then never happened, because the
+            // attempt already in flight succeeded instead. Left raised it outlives the race: it is
+            // cleared nowhere but in OnRdpDisconnected, so the NEXT genuine drop of this live
+            // session would be read as a user disconnect - no reconnect overlay, and a health dot
+            // painted as if the user had asked for it. A session dying in silence.
+            _userInitiatedDisconnect = false;
+
+            // And the machine has to be told the session came back. The two lines below already
+            // declare this view Connected; without this the state machine would still be reporting
+            // the disconnect it was told about, and everything that counts live sessions from it -
+            // the close confirmations above all - would not see this one.
+            TryTransitionConnectionState(ConnectionState.Connected);
+
             // OnRdpConnected is not re-entered on an auto-reconnect, and _connectedAtUtc is not
             // refreshed here, so the event log opens a fresh segment at the reconnect-success point.
             // This keeps the next Disconnected duration measured from the reconnect, not the original

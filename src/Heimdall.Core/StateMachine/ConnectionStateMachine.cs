@@ -48,7 +48,13 @@ public sealed class ConnectionStateMachine
         [ConnectionState.LaunchedExternalClient] = [ConnectionState.Disconnected, ConnectionState.Error, ConnectionState.Disconnecting],
         [ConnectionState.Connected] = [ConnectionState.Disconnecting, ConnectionState.Disconnected, ConnectionState.Error],
         [ConnectionState.RemoteSessionHandedOff] = [ConnectionState.Disconnecting, ConnectionState.Disconnected, ConnectionState.Error],
-        [ConnectionState.Disconnecting] = [ConnectionState.Disconnected, ConnectionState.Error],
+        // Connected is reachable from Disconnecting because a disconnect can lose a race it did
+        // not know it was in. The RDP control keeps an auto-reconnect attempt in flight after the
+        // user cancels it, and that attempt can still succeed: the session is then genuinely live
+        // while this machine had already been told the disconnect had begun. Without the edge the
+        // view reports Connected and the machine keeps saying Disconnecting, and every consumer
+        // that counts live sessions believes the machine.
+        [ConnectionState.Disconnecting] = [ConnectionState.Disconnected, ConnectionState.Error, ConnectionState.Connected],
         [ConnectionState.Error] = [ConnectionState.Disconnected, ConnectionState.Initializing],
     };
 
