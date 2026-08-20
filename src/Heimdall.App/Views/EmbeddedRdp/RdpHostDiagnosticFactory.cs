@@ -29,8 +29,10 @@ internal static class RdpHostDiagnosticFactory
 
     internal static SessionDiagnostic FromDisconnect(int reason, int extendedReason)
     {
-        string? suffix = RdpActiveXHost.GetExtendedDisconnectReasonKey(extendedReason)
-            ?? RdpActiveXHost.GetDisconnectReasonKey(reason);
+        // One shared resolver rather than a composition of its own: this consumer and the session
+        // event log used to compose the same two decoders in opposite orders, so a single
+        // disconnect could be named one thing on screen and another in the audit trail.
+        string? suffix = RdpActiveXHost.ResolveDisconnectReasonKey(reason, extendedReason);
         string messageKey = suffix is not null
             ? $"RdpDisconnect{suffix}"
             : "RdpDisconnectUnknownCode";

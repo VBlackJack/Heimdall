@@ -16,6 +16,8 @@
 
 using FluentAssertions;
 using Heimdall.App.Services;
+using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Rdp.ActiveX;
 
 namespace Heimdall.App.Tests;
@@ -167,4 +169,86 @@ public sealed class RdpSessionEventFactoryTests
         RdpSessionEventFactory.ResolveHost(rawHost: "  ", displayName: "Display Name")
             .Should().Be("Display Name");
     }
+    /// <summary>
+    /// The message on screen and the line in the log name the same cause.
+    /// </summary>
+    /// <remarks>
+    /// <para>This is the defect the lot exists for. The two consumers composed the same pair of
+    /// decoders in opposite orders, so for a disconnect where both decode, a support engineer
+    /// correlating a user's screenshot against the event log read two different causes for one
+    /// event. On (2308, 768) the overlay said the credentials were not accepted while the log
+    /// persisted RDP_SOCKET_CLOSED.</para>
+    /// <para>Asserted as an agreement between the two, not as two expected strings: expected
+    /// strings would drift apart exactly the way the implementations did.</para>
+    /// </remarks>
+    [Theory]
+    [InlineData(2308, 768)]
+    [InlineData(2308, 9)]
+    [InlineData(2308, 4)]
+    [InlineData(2308, 257)]
+    [InlineData(3335, 768)]
+    [InlineData(3591, 7)]
+    [InlineData(3847, 9)]
+    [InlineData(2567, 9)]
+    [InlineData(2055, 768)]
+    [InlineData(516, 0)]
+    [InlineData(3335, 0)]
+    public void TheOverlayAndTheLogNameTheSameCause(int reason, int extendedReason)
+    {
+        SessionDiagnostic diagnostic = RdpHostDiagnosticFactory.FromDisconnect(reason, extendedReason);
+        string loggedKey = RdpSessionEventFactory.ResolveReasonKey(reason, extendedReason);
+
+        string overlaySuffix = diagnostic.MessageKey["RdpDisconnect".Length..];
+        string expectedLoggedKey = $"RDP_{ToUpperSnake(overlaySuffix)}";
+
+        Assert.Equal(expectedLoggedKey, loggedKey);
+    }
+
+    [Fact]
+    public void TheLockedOutAccountIsNamedRatherThanCalledABadPassword()
+    {
+        // The half of the finding that is about message quality rather than agreement: a generic
+        // credential rejection used to overwrite the primary code that says which account state
+        // caused it, so a locked account was announced as "verify your username and password".
+        Assert.Equal("RDP_ACCOUNT_LOCKED_OUT", RdpSessionEventFactory.ResolveReasonKey(3335, 768));
+
+        SessionDiagnostic diagnostic = RdpHostDiagnosticFactory.FromDisconnect(3335, 768);
+        Assert.Equal("RdpDisconnectAccountLockedOut", diagnostic.MessageKey);
+    }
+
+    [Fact]
+    public void TheDisconnectRecordCarriesBothCodes()
+    {
+        // The key is resolved from both codes, so a reader given only the primary number could not
+        // always re-derive it. Both are on the line.
+        SessionEventRecord record = RdpSessionEventFactory.BuildDisconnected(
+            "host.example.com",
+            "Session",
+            reason: 3335,
+            extendedReason: 768,
+            connectedAtUtc: DateTime.UtcNow.AddSeconds(-5),
+            nowUtc: DateTime.UtcNow);
+
+        Assert.Equal(3335, record.ReasonCode);
+        Assert.Equal(768, record.ExtendedReasonCode);
+        Assert.Equal("RDP_ACCOUNT_LOCKED_OUT", record.ReasonKey);
+    }
+
+    private static string ToUpperSnake(string value)
+    {
+        System.Text.StringBuilder builder = new();
+        for (int index = 0; index < value.Length; index++)
+        {
+            char character = value[index];
+            if (index > 0 && char.IsUpper(character))
+            {
+                builder.Append('_');
+            }
+
+            builder.Append(char.ToUpperInvariant(character));
+        }
+
+        return builder.ToString();
+    }
+
 }

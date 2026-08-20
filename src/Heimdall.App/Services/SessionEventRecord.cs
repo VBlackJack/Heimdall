@@ -51,7 +51,8 @@ public sealed record SessionEventRecord
         string? reasonKey,
         int? reasonCode,
         long? durationMs,
-        string? endTrigger)
+        string? endTrigger,
+        int? extendedReasonCode)
     {
         TimestampUtc = timestampUtc;
         Protocol = protocol;
@@ -62,6 +63,7 @@ public sealed record SessionEventRecord
         ReasonCode = reasonCode;
         DurationMs = durationMs;
         EndTrigger = endTrigger;
+        ExtendedReasonCode = extendedReasonCode;
     }
 
     /// <summary>UTC instant the event occurred.</summary>
@@ -92,6 +94,16 @@ public sealed record SessionEventRecord
     public string? EndTrigger { get; }
 
     /// <summary>
+    /// Numeric RDP extended disconnect code; null for connects and for VNC/Citrix.
+    /// </summary>
+    /// <remarks>
+    /// Recorded because the reason key is resolved from BOTH codes, so the key beside a primary
+    /// number alone could not always be re-derived by a reader. With both present, the line
+    /// explains itself without knowing which decoder won.
+    /// </remarks>
+    public int? ExtendedReasonCode { get; }
+
+    /// <summary>
     /// Builds a connect event. Reason and duration fields are intentionally unset.
     /// </summary>
     /// <param name="protocol">Protocol label ("RDP" / "VNC" / "CITRIX").</param>
@@ -111,7 +123,8 @@ public sealed record SessionEventRecord
             reasonKey: null,
             reasonCode: null,
             durationMs: null,
-            endTrigger: null);
+            endTrigger: null,
+            extendedReasonCode: null);
     }
 
     /// <summary>
@@ -132,7 +145,8 @@ public sealed record SessionEventRecord
         string? reasonKey = null,
         int? reasonCode = null,
         long? durationMs = null,
-        string? endTrigger = null)
+        string? endTrigger = null,
+        int? extendedReasonCode = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
@@ -151,6 +165,7 @@ public sealed record SessionEventRecord
             reasonKey,
             reasonCode,
             durationMs,
-            endTrigger);
+            endTrigger,
+            extendedReasonCode);
     }
 }
