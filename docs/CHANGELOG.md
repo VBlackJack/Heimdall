@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: one dropped session, two different products, same sentence on screen
+
+- **The client reports a failed reconnection under either of two codes**, and the decoder resolves
+  both to one message. The retry policy read a separate list that contained one of them and not the
+  other.
+- **So the same drop behaved two ways.** Under one code the client kept reconnecting, up to twenty
+  attempts, beneath a blue notice. Under the other the session was torn down on the first bounce
+  beneath a red error. The sentence shown was word for word identical, and the support log recorded
+  the same symbolic name for both.
+- **The veto that did the tearing down runs while the client is already reconnecting**, so for a code
+  that means a reconnection failed, cancelling on the first bounce killed the very attempt that was
+  in progress.
+- **Codes that say the same thing now have to be treated the same way by the retry policy**, checked
+  by sweeping the decoder rather than by a second hand-written list. This is the severity half of the
+  check already covering which button the overlay pre-focuses.
+
 ## 2026-08-21: the settings screen refused a watchdog setting the rest of the application accepts
 
 - **Zero disables the RDP connect watchdog.** The watchdog itself treats it that way and the

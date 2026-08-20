@@ -1259,7 +1259,10 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     /// </summary>
     public static RdpDisconnectSeverity GetDisconnectSeverity(int reason) => reason switch
     {
-        260 or 264 or 516 or 772 or 2308 or 3080 or 4360
+        // 3592 and 4360 are the same failure: the decoder resolves both to ReconnectFailed and the
+        // user is shown one sentence for either. They were split here, so the same drop retried
+        // under one code and was torn down on the first bounce under the other.
+        260 or 264 or 516 or 772 or 2308 or 3080 or 3592 or 4360
             => RdpDisconnectSeverity.Transient,
         2055 or 2567 or 3335 or 3591 or 3847
             => RdpDisconnectSeverity.AuthIssue,
