@@ -143,11 +143,11 @@ public sealed class SshHandlerConnectTests
 
             if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
             {
-                File.Delete(deletedPasswordPath);
+                TemporaryFileCleanup.Delete(deletedPasswordPath);
             }
 
-            File.Delete(configured);
-            File.Delete(runnable);
+            TemporaryFileCleanup.Delete(configured);
+            TemporaryFileCleanup.Delete(runnable);
         }
     }
 
@@ -251,7 +251,7 @@ public sealed class SshHandlerConnectTests
         }
         finally
         {
-            File.Delete(plinkPath);
+            TemporaryFileCleanup.Delete(plinkPath);
         }
     }
 
@@ -298,8 +298,8 @@ public sealed class SshHandlerConnectTests
             // Deliberately not sweeping the shared temporary directory. Doing so deleted files that
             // other test processes were still using, which turned this test into a cause of their
             // failures as well as a victim of theirs.
-            File.Delete(plinkPath);
-            File.Delete(keyPath);
+            TemporaryFileCleanup.Delete(plinkPath);
+            TemporaryFileCleanup.Delete(keyPath);
         }
     }
 
@@ -334,7 +334,7 @@ public sealed class SshHandlerConnectTests
         }
         finally
         {
-            File.Delete(plinkPath);
+            TemporaryFileCleanup.Delete(plinkPath);
         }
     }
 
@@ -404,10 +404,10 @@ public sealed class SshHandlerConnectTests
         {
             if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
             {
-                File.Delete(deletedPasswordPath);
+                TemporaryFileCleanup.Delete(deletedPasswordPath);
             }
 
-            File.Delete(plinkPath);
+            TemporaryFileCleanup.Delete(plinkPath);
         }
     }
 
@@ -497,11 +497,11 @@ public sealed class SshHandlerConnectTests
         {
             if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
             {
-                File.Delete(deletedPasswordPath);
+                TemporaryFileCleanup.Delete(deletedPasswordPath);
             }
 
             TryDelete(pinned);
-            File.Delete(plinkPath);
+            TemporaryFileCleanup.Delete(plinkPath);
         }
     }
 
@@ -579,10 +579,10 @@ public sealed class SshHandlerConnectTests
         {
             if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
             {
-                File.Delete(deletedPasswordPath);
+                TemporaryFileCleanup.Delete(deletedPasswordPath);
             }
 
-            File.Delete(plinkPath);
+            TemporaryFileCleanup.Delete(plinkPath);
         }
     }
 
@@ -755,7 +755,7 @@ public sealed class SshHandlerConnectTests
         }
         finally
         {
-            File.Delete(puttyPath);
+            TemporaryFileCleanup.Delete(puttyPath);
         }
     }
 
@@ -795,7 +795,7 @@ public sealed class SshHandlerConnectTests
         }
         finally
         {
-            File.Delete(puttyPath);
+            TemporaryFileCleanup.Delete(puttyPath);
         }
     }
 
@@ -838,7 +838,7 @@ public sealed class SshHandlerConnectTests
         }
         finally
         {
-            File.Delete(puttyPath);
+            TemporaryFileCleanup.Delete(puttyPath);
         }
     }
 
@@ -929,7 +929,7 @@ public sealed class SshHandlerConnectTests
         }
         finally
         {
-            File.Delete(plinkPath);
+            TemporaryFileCleanup.Delete(plinkPath);
         }
     }
 
