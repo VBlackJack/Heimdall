@@ -144,9 +144,12 @@ public sealed class PipeModeSessionTests
 
         try
         {
+            // The command processor reads the redirected line just as well as a PowerShell host
+            // and starts in a fraction of the time. That difference is the whole point: CI runs
+            // recorded this child alive with receivedBytes=0 sixty seconds after being started.
             await session.StartAsync(
-                TerminalTestHelpers.ResolvePowerShellExecutable(),
-                "-NoLogo -NoProfile -Command \"$line = Read-Host; Write-Output ('pipe-echo:' + $line)\"");
+                TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+                TerminalTestHelpers.BuildStdinEchoChildArguments("pipe-echo:"));
 
             session.Write(Encoding.UTF8.GetBytes("hello\r\n"));
 

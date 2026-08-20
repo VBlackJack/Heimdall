@@ -91,10 +91,19 @@ public sealed class TerminalSessionLifecycleTests
         int processExitNotificationCount = 0;
         int observedExitCode = int.MinValue;
 
+        TaskCompletionSource<bool> firstLineSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
         session.DataReceived += data =>
         {
             Interlocked.Increment(ref callbackCount);
             Interlocked.Add(ref receivedByteCount, data.Length);
+
+            // Signalled before the throw, so the caller can answer the child even though this
+            // subscriber is about to fail - which is the situation under test.
+            if (Encoding.UTF8.GetString(data.Span).Contains("first", StringComparison.Ordinal))
+            {
+                firstLineSeen.TrySetResult(true);
+            }
+
             throw new InvalidOperationException("Test subscriber failure.");
         };
         session.ProcessExited += exitCode =>
@@ -104,9 +113,15 @@ public sealed class TerminalSessionLifecycleTests
             exited.TrySetResult(exitCode);
         };
 
+        // Two lines that cannot arrive in one read, because the child cannot write the second
+        // until this test has answered the first. Produced by the command processor rather than a
+        // PowerShell host, whose cold start is what CI runs measured stalling past sixty seconds.
         await session.StartAsync(
-            TerminalTestHelpers.ResolvePowerShellExecutable(),
-            "-NoLogo -NoProfile -NonInteractive -Command \"Write-Output 'first'; Start-Sleep -Milliseconds 300; Write-Output 'second'; exit 0\"");
+            TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+            TerminalTestHelpers.BuildTwoStageOutputChildArguments("first", "second"));
+
+        await TerminalTestHelpers.AwaitProcessEventAsync(firstLineSeen.Task, "FirstChildLine");
+        session.Write(Encoding.UTF8.GetBytes("go\r\n"));
 
         TerminalTimeoutContext timeoutContext = new(
             "ProcessExited",
