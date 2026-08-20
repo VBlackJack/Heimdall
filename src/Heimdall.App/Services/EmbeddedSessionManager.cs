@@ -507,16 +507,16 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
 
     private static (ServerProfileDto Server, string? StatusKey) ResolveEmbeddedRdpRuntimeServer(
         ServerProfileDto server)
-        => ResolveEmbeddedRdpRuntimeServer(server, GetRdpHostMonitorCount());
+        => ResolveEmbeddedRdpRuntimeServer(server, GetRdpHostCapabilities());
 
     /// <summary>
     /// Decides whether the requested multi-monitor layout can be honoured, and returns the profile
     /// the session should actually run with.
     /// </summary>
     /// <param name="server">The configured profile. Never mutated.</param>
-    /// <param name="hostMonitorCount">
-    /// How many monitors the host reports. Injected so the decision can be exercised without the
-    /// machine the tests happen to run on deciding the outcome.
+    /// <param name="host">
+    /// What the host reports about its monitors. Injected so the decision can be exercised without
+    /// the machine the tests happen to run on deciding the outcome.
     /// </param>
     /// <returns>
     /// The original profile when no fallback is needed, so the common path allocates nothing, or an
@@ -524,13 +524,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     /// </returns>
     internal static (ServerProfileDto Server, string? StatusKey) ResolveEmbeddedRdpRuntimeServer(
         ServerProfileDto server,
-        int hostMonitorCount)
+        RdpDisplayCapabilities host)
     {
         var requested = new RdpDisplaySettings(
             server.RdpResolutionMode,
             UseMultimon: server.RdpResolutionMode == RdpResolutionMode.Multimon,
             SelectedMonitorIndices: server.RdpSelectedMonitorIndices);
-        RdpDisplayCapabilities host = new(hostMonitorCount);
         var validation = RdpDisplayResolver.ValidateMultimon(host, requested);
 
         if (!validation.ShouldFallback)
@@ -542,6 +541,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             "EmbeddedSessionManager.RdpMultimonFallback "
             + $"reason={validation.Reason} requestedMode={requested.ResolutionMode} requestedUseMultimon={requested.UseMultimon} "
             + $"selectedMonitors={FormatMonitorIndices(requested.SelectedMonitorIndices)} monitorCount={host.MonitorCount} "
+            + $"monitorGeometry={FormatMonitorGeometry(host.MonitorBounds)} "
             + $"coercedMode={validation.CoercedSettings.ResolutionMode} coercedUseMultimon={validation.CoercedSettings.UseMultimon}");
 
         var runtimeServer = CloneServerProfile(server);
@@ -552,27 +552,56 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         return (runtimeServer, ResolveMultimonFallbackStatusKey(validation.Reason));
     }
 
-    private static int GetRdpHostMonitorCount()
+    /// <summary>
+    /// What the host reports about its monitors, or an empty topology when it cannot be read.
+    /// </summary>
+    /// <remarks>
+    /// The bounds are what makes a disconnected selection detectable at all. An enumeration failure
+    /// yields no monitors, which the validation reads as a host that cannot offer multi-monitor,
+    /// rather than as a host whose geometry happens to be unknown.
+    /// </remarks>
+    private static RdpDisplayCapabilities GetRdpHostCapabilities()
     {
         try
         {
-            return WinForms.Screen.AllScreens.Length;
+            return RdpDisplayCapabilities.FromMonitorBounds(
+                [.. WinForms.Screen.AllScreens.Select(screen => screen.Bounds)]);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"EmbeddedSessionManager.RdpMultimonFallback monitor enumeration failed: {ex.Message}");
-            return 0;
+            return RdpDisplayCapabilities.FromMonitorBounds([]);
         }
     }
 
     private static string FormatMonitorIndices(IReadOnlyList<int> indices)
         => indices.Count == 0 ? "all" : string.Join(',', indices);
 
-    private static string? ResolveMultimonFallbackStatusKey(MultimonFallbackReason reason)
+    /// <summary>
+    /// The host layout, so a fallback can be understood from the log alone.
+    /// </summary>
+    private static string FormatMonitorGeometry(IReadOnlyList<Rectangle> monitorBounds)
+        => monitorBounds.Count == 0
+            ? "unknown"
+            : string.Join(
+                ' ',
+                monitorBounds.Select(bounds =>
+                    $"{bounds.Width}x{bounds.Height}+{bounds.X}+{bounds.Y}"));
+
+    /// <summary>
+    /// The message shown for a fallback, or nothing when the session was not coerced.
+    /// </summary>
+    /// <remarks>
+    /// Internal rather than private so a test can walk the reasons and prove each one has a
+    /// message. A reason with no key coerces the session silently, which is the failure this
+    /// feature exists to remove.
+    /// </remarks>
+    internal static string? ResolveMultimonFallbackStatusKey(MultimonFallbackReason reason)
         => reason switch
         {
             MultimonFallbackReason.SingleMonitorHost => "RdpMultimonFallbackSingleMonitor",
             MultimonFallbackReason.InvalidMonitorIndex => "RdpMultimonFallbackInvalidSelection",
+            MultimonFallbackReason.NonContiguousSelection => "RdpMultimonFallbackNonContiguous",
             _ => null
         };
 
