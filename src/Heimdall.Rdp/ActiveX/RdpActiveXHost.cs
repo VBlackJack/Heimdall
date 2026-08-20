@@ -1076,6 +1076,70 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     }
 
     /// <summary>
+    /// Resolves the one message key for a disconnect, from both codes the client reports.
+    /// </summary>
+    /// <remarks>
+    /// <para>The two decoders used to be composed in opposite orders by the two consumers of the
+    /// same disconnect: the on-screen diagnostic took the extended code first, the persisted
+    /// session event took the primary one. For a disconnect where both decode, the message a user
+    /// photographed and the line an engineer read back named different causes.</para>
+    /// <para>The extended code wins, because it is what the server said about the attempt, with one
+    /// exception: it does not get to overwrite a primary code that names a specific account state.
+    /// The five extended codes below all decode to the same generic "the credentials were not
+    /// accepted", which is true of a locked, expired or must-change-password account as well - so
+    /// where the primary code says WHICH of those it is, that is the more useful of two compatible
+    /// answers.</para>
+    /// </remarks>
+    public static string? ResolveDisconnectReasonKey(int reason, int extendedReason)
+    {
+        string? extended = GetExtendedDisconnectReasonKey(extendedReason);
+        if (extended is null)
+        {
+            return GetDisconnectReasonKey(reason);
+        }
+
+        return IsGenericCredentialRejection(extendedReason) && NamesAnAccountState(reason)
+            ? GetDisconnectReasonKey(reason)
+            : extended;
+    }
+
+    /// <summary>
+    /// Whether an extended code says only that the credentials were refused, without saying why.
+    /// </summary>
+    /// <remarks>
+    /// Exactly the set that <see cref="GetExtendedDisconnectReasonKey"/> collapses onto the single
+    /// "BadCredentials" key. Deliberately not derived from the severity table: that table answers
+    /// "does this need credential action", which is a different question from "is this the vaguer
+    /// of two compatible answers", and reusing it would make one change to either silently move
+    /// the other.
+    /// </remarks>
+    private static bool IsGenericCredentialRejection(int extendedReason) =>
+        (ExtendedDisconnectReasonCode)extendedReason is
+            ExtendedDisconnectReasonCode.ServerDeniedConnection
+            or ExtendedDisconnectReasonCode.ServerDeniedConnectionFips
+            or ExtendedDisconnectReasonCode.ServerInsufficientPrivileges
+            or ExtendedDisconnectReasonCode.ServerFreshCredsRequired
+            or ExtendedDisconnectReasonCode.RdpEncInvalidCredentials;
+
+    /// <summary>
+    /// Whether a primary code names the state of an account that exists.
+    /// </summary>
+    /// <remarks>
+    /// <para>Three codes, and the boundary is deliberate. A locked, expired or expired-password
+    /// account is a reason a generic rejection happened, so the two agree and the specific one is
+    /// worth more.</para>
+    /// <para><c>2567 UserNotFound</c> is excluded although it sits beside these in the severity
+    /// table: it asserts the account does not exist, which
+    /// <see cref="ExtendedDisconnectReasonCode.ServerInsufficientPrivileges"/> contradicts outright
+    /// - that code means the server recognised the principal and refused it rights. Preferring the
+    /// primary there would turn a hedged message into a specific and false one.</para>
+    /// <para><c>2055 BadCredentials</c> is excluded because both decoders already produce the same
+    /// key for it, so there is nothing to choose.</para>
+    /// </remarks>
+    internal static bool NamesAnAccountState(int reason) =>
+        reason is 3335 or 3591 or 3847;
+
+    /// <summary>
     /// Formats a disconnect reason as a symbolic support code plus the raw numeric value.
     /// </summary>
     public static string FormatDisconnectCode(int reason)

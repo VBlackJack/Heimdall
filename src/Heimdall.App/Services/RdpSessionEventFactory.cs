@@ -41,14 +41,19 @@ internal static class RdpSessionEventFactory
         => GraphicalSessionEventHelpers.ResolveHost(rawHost, displayName);
 
     /// <summary>
-    /// Resolves a stable, symbolic RDP disconnect reason key ("RDP_&lt;UPPER_SNAKE&gt;"). Uses the
-    /// primary decoder first, then the extended-reason decoder, then "RDP_UNKNOWN". The numeric code
-    /// travels separately in <see cref="SessionEventRecord.ReasonCode"/>, so this carries no number.
+    /// Resolves a stable, symbolic RDP disconnect reason key ("RDP_&lt;UPPER_SNAKE&gt;"), or
+    /// "RDP_UNKNOWN" when neither code decodes.
     /// </summary>
+    /// <remarks>
+    /// Shares <see cref="RdpActiveXHost.ResolveDisconnectReasonKey"/> with the on-screen
+    /// diagnostic. This used to compose the two decoders primary-first while the diagnostic
+    /// composed them extended-first, so the same disconnect could be named one thing to the user
+    /// and another in the log. Both numeric codes travel separately on the record, so a reader can
+    /// always recover which decoder produced the key.
+    /// </remarks>
     public static string ResolveReasonKey(int reason, int extendedReason)
     {
-        string? key = RdpActiveXHost.GetDisconnectReasonKey(reason)
-            ?? RdpActiveXHost.GetExtendedDisconnectReasonKey(extendedReason);
+        string? key = RdpActiveXHost.ResolveDisconnectReasonKey(reason, extendedReason);
 
         return string.IsNullOrEmpty(key) ? UnknownReasonKey : $"{Protocol}_{ToUpperSnakeCase(key)}";
     }
@@ -85,7 +90,8 @@ internal static class RdpSessionEventFactory
             ResolveReasonKey(reason, extendedReason),
             reason,
             ResolveDurationMs(connectedAtUtc, nowUtc),
-            endTrigger: null);
+            endTrigger: null,
+            extendedReasonCode: extendedReason);
     }
 
     /// <summary>

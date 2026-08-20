@@ -14,12 +14,118 @@
  * limitations under the License.
  */
 
+using System.Linq;
 using Heimdall.Rdp.ActiveX;
 
 namespace Heimdall.Rdp.Tests.ActiveX;
 
 public sealed class RdpActiveXHostTests
 {
+    /// <summary>
+    /// The one place a disconnect is turned into a cause, so two consumers cannot disagree.
+    /// </summary>
+    /// <remarks>
+    /// The extended code wins, because it is what the server said about the attempt. The single
+    /// exception is a generic credential rejection meeting a primary code that names WHICH account
+    /// state caused it: those two answers agree, and the specific one is worth more.
+    /// </remarks>
+    [Theory]
+    // The extended code carries information the primary one does not.
+    [InlineData(2308, 768, "BadCredentials", "a socket close the server explains as bad credentials")]
+    [InlineData(2308, 4, "ServerLogonTimeout", "the extended code is the only one that knows")]
+    [InlineData(2308, 257, "LicenseError", "licensing is never overridden by a primary code")]
+    // A specific account state is not overwritten by a generic rejection.
+    [InlineData(3335, 768, "AccountLockedOut", "locked out, not merely refused")]
+    [InlineData(3591, 7, "AccountExpired", "expired, not merely refused")]
+    [InlineData(3847, 9, "PasswordExpired", "password expired, not merely refused")]
+    [InlineData(3335, 8, "AccountLockedOut", "every generic rejection yields the same way")]
+    [InlineData(3591, 10, "AccountExpired", "every generic rejection yields the same way")]
+    // ... but only against a GENERIC rejection.
+    [InlineData(3335, 4, "ServerLogonTimeout", "a logon timeout is not a credential verdict")]
+    [InlineData(3335, 256, "LicenseError", "a licensing failure is not a credential verdict")]
+    // 2567 is deliberately not an account state: extended 9 says the server knew the principal.
+    [InlineData(2567, 9, "BadCredentials", "user-not-found must not overrule server-knew-the-user")]
+    [InlineData(2567, 768, "BadCredentials", "excluded uniformly, not case by case")]
+    // 2055 decodes the same on both sides, so there is nothing to choose.
+    [InlineData(2055, 768, "BadCredentials", "no-op member")]
+    // With no extended information the primary code stands alone.
+    [InlineData(3335, 0, "AccountLockedOut", "no extended information")]
+    [InlineData(516, 0, "SocketConnectFailed", "no extended information")]
+    public void ResolveDisconnectReasonKey_PrefersTheMoreInformativeCode(
+        int reason,
+        int extendedReason,
+        string expected,
+        string because)
+    {
+        _ = because;
+
+        Assert.Equal(expected, RdpActiveXHost.ResolveDisconnectReasonKey(reason, extendedReason));
+    }
+
+    [Fact]
+    public void ResolveDisconnectReasonKey_ReturnsNothingWhenNeitherCodeDecodes()
+    {
+        Assert.Null(RdpActiveXHost.ResolveDisconnectReasonKey(999_999, 0));
+    }
+
+    /// <summary>
+    /// Every code the severity table calls an authentication issue is classified here, one way or
+    /// the other.
+    /// </summary>
+    /// <remarks>
+    /// The account-state set is deliberately NOT the severity arm - the two answer different
+    /// questions - but it is drawn from the same population, so a code added to that arm without a
+    /// verdict here would silently inherit "does not yield". This fails until someone decides.
+    /// </remarks>
+    [Fact]
+    public void EveryAuthenticationIssueCodeHasAVerdictOnYielding()
+    {
+        int[] authenticationIssueCodes = [2055, 2567, 3335, 3591, 3847];
+        int[] yields = [3335, 3591, 3847];
+        int[] doesNotYield = [2055, 2567];
+
+        foreach (int code in authenticationIssueCodes)
+        {
+            Assert.Equal(
+                RdpActiveXHost.RdpDisconnectSeverity.AuthIssue,
+                RdpActiveXHost.GetDisconnectSeverity(code));
+
+            Assert.True(
+                yields.Contains(code) ^ doesNotYield.Contains(code),
+                $"Code {code} is an authentication issue with no verdict on whether it yields.");
+
+            Assert.Equal(yields.Contains(code), RdpActiveXHost.NamesAnAccountState(code));
+        }
+
+        // Guards the guard: the severity arm is the population this is drawn from, so a code added
+        // there and nowhere here has to be caught rather than skipped.
+        foreach (int code in Enumerable.Range(0, 5000))
+        {
+            if (RdpActiveXHost.GetDisconnectSeverity(code) == RdpActiveXHost.RdpDisconnectSeverity.AuthIssue)
+            {
+                Assert.Contains(code, authenticationIssueCodes);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Choosing a message must not move the severity, which drives the auto-reconnect veto.
+    /// </summary>
+    [Theory]
+    [InlineData(2308, 768)]
+    [InlineData(3335, 768)]
+    [InlineData(2567, 9)]
+    [InlineData(3591, 4)]
+    public void ResolvingAMessageLeavesTheSeverityAlone(int reason, int extendedReason)
+    {
+        RdpActiveXHost.RdpDisconnectSeverity before =
+            RdpActiveXHost.GetDisconnectSeverity(reason, extendedReason);
+
+        _ = RdpActiveXHost.ResolveDisconnectReasonKey(reason, extendedReason);
+
+        Assert.Equal(before, RdpActiveXHost.GetDisconnectSeverity(reason, extendedReason));
+    }
+
     [Fact]
     public void StripScrollbarBits_RemovesOnlyNativeScrollbarStyles()
     {
