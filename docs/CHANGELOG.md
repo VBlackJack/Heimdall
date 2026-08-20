@@ -12,6 +12,19 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: opening a local shell's settings and saving turned its elevation off
+
+- **A profile stores elevation twice**: the mode, and a legacy flag that predates it. The launcher
+  reconciles the two, treating the flag as elevation when the mode says nothing. The dialog shows
+  only the mode, and read the stored one rather than the reconciled one.
+- **So a profile written before the mode existed displayed None**, even though it elevates, and
+  saving wrote that None back over it. Opening the settings of such a shell and pressing save,
+  changing nothing, took its elevation away.
+- **The dialog now seeds itself from the same reconciliation the launcher uses.** Saving also
+  settles the profile onto the modern field, so it stops depending on the legacy flag at all.
+- Turning elevation off in the dialog still turns it off. The legacy flag cannot survive that
+  change and reinstate what was just removed, which is asserted rather than assumed.
+
 ## 2026-08-21: editing a server quietly deleted the parts of it the dialog does not show
 
 - **The dialog composes a fresh profile and the caller assigns it over the stored record.** A field
