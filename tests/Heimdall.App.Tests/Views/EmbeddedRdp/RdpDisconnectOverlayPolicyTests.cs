@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Views;
 
 namespace Heimdall.App.Tests.Views.EmbeddedRdp;
@@ -45,5 +46,100 @@ public sealed class RdpDisconnectOverlayPolicyTests
         bool actual = EmbeddedRdpView.ShouldSuppressReconnectOverlay(userInitiated, reason);
 
         Assert.Equal(expected, actual);
+    }
+
+    /// <summary>
+    /// A reconnect that succeeds has to undo what the cancel that lost the race set up.
+    /// </summary>
+    /// <remarks>
+    /// <para>Cancelling an auto-reconnect raises a user-initiated flag so the disconnect it causes
+    /// arrives without an overlay. When the attempt already in flight succeeds instead, that
+    /// disconnect never happens - and the flag is cleared nowhere but in the disconnect handler, so
+    /// it outlives the race and silences the NEXT genuine drop of a live session. The theory above
+    /// is what makes that consequence concrete: with the flag still raised, every reason code
+    /// suppresses the overlay.</para>
+    /// <para>Read from source because the handler is a COM event callback on a view that needs a
+    /// desktop. Coarse on purpose: what it rules out is the reconnect path silently going back to
+    /// leaving the flag and the state machine behind, which is how the defect existed in the first
+    /// place.</para>
+    /// </remarks>
+    [Fact]
+    public void TheAutoReconnectedHandlerClearsTheCancelFlagAndTellsTheStateMachine()
+    {
+        string handler = ExtractMethodBody(
+            ReadViewSource(),
+            "private void OnRdpAutoReconnected()");
+
+        Assert.Contains("_userInitiatedDisconnect = false;", handler, StringComparison.Ordinal);
+        Assert.Contains(
+            "TryTransitionConnectionState(ConnectionState.Connected)",
+            handler,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Guards the guard: the extraction has to be reading the real handler.
+    /// </summary>
+    [Fact]
+    public void TheHandlerBeingReadIsTheOneThatAcceptsAReconnect()
+    {
+        string handler = ExtractMethodBody(
+            ReadViewSource(),
+            "private void OnRdpAutoReconnected()");
+
+        Assert.Contains("UpdateSessionStatus(RdpSessionStatus.Connected)", handler, StringComparison.Ordinal);
+        Assert.Contains("TransitionPhase(RdpConnectionPhase.Connected)", handler, StringComparison.Ordinal);
+    }
+
+    private static string ReadViewSource() => File.ReadAllText(Path.Combine(
+        FindRepoRoot(),
+        "src",
+        "Heimdall.App",
+        "Views",
+        "EmbeddedRdpView.xaml.cs"));
+
+    private static string ExtractMethodBody(string source, string signature)
+    {
+        int start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Signature not found: {signature}");
+
+        int open = source.IndexOf('{', start);
+        Assert.True(open >= 0, $"No body for: {signature}");
+
+        int depth = 0;
+        for (int index = open; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+            {
+                depth++;
+            }
+            else if (source[index] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[open..(index + 1)];
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Unbalanced body for: {signature}");
+    }
+
+    private static string FindRepoRoot()
+    {
+        string? dir = AppContext.BaseDirectory;
+        while (dir is not null)
+        {
+            if (File.Exists(Path.Combine(dir, "Heimdall.slnx")))
+            {
+                return dir;
+            }
+
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        throw new DirectoryNotFoundException(
+            $"Cannot find repository root containing Heimdall.slnx from: {AppContext.BaseDirectory}");
     }
 }

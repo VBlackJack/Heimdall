@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,6 +26,33 @@ namespace Heimdall.App.Tests;
 
 public sealed class WindowUIStateSidebarLayoutTests
 {
+    /// <summary>
+    /// How long a completed STA thread is expected to take before it is worth reporting.
+    /// </summary>
+    /// <remarks>
+    /// This was the assertion bound until a loaded CI runner missed it and reddened a run over
+    /// thread scheduling rather than over anything this file tests. It is kept as the value that
+    /// makes a slow run visible, not as the value that fails one.
+    /// </remarks>
+    private static readonly TimeSpan StaSchedulingExpectation = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// The backstop against a thread that never finishes at all.
+    /// </summary>
+    /// <remarks>
+    /// Matched to <c>TerminalTestHelpers.ProcessStartupBackstop</c>, whose own remarks record why
+    /// the value alone is not the fix: widening a bound stops the timeouts and stops the evidence
+    /// with them. So the wait below reports every completion that outlives the expectation above,
+    /// even when it succeeds. The report, not the absence of failures, is what says whether the
+    /// scheduling stall is gone.
+    /// </remarks>
+    private static readonly TimeSpan StaCompletionBackstop = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// The greppable marker for a completion that outlived the expectation.
+    /// </summary>
+    internal const string StaOverExpectationMarker = "STA_WAIT_OVER_EXPECTATION";
+
     [Fact]
     public void VisibleSidebar_FullscreenRoundTrip_RestoresMeasuredWidth()
     {
@@ -213,7 +243,65 @@ public sealed class WindowUIStateSidebarLayoutTests
         });
     }
 
-    private static void RunOnStaThread(Action action)
+    /// <summary>
+    /// The backstop has to sit above the expectation, or the evidence is unreachable.
+    /// </summary>
+    /// <remarks>
+    /// If the two were swapped, or the backstop lowered to the expectation, the wait would fail
+    /// again on a slow machine and the report below would never run - which is precisely the state
+    /// this pair exists to leave behind.
+    /// </remarks>
+    [Fact]
+    public void TheBackstopSitsAboveTheSchedulingExpectation()
+    {
+        Assert.True(
+            StaCompletionBackstop > StaSchedulingExpectation,
+            $"Backstop {StaCompletionBackstop} must exceed expectation {StaSchedulingExpectation}.");
+    }
+
+    /// <summary>
+    /// The wait is bounded by the backstop and the report is triggered by the expectation.
+    /// </summary>
+    /// <remarks>
+    /// Read from source: swapping the two values leaves both tests above green while restoring the
+    /// failure on a loaded machine, and a machine under load is exactly what a normal run is not.
+    /// </remarks>
+    [Fact]
+    public void TheWaitUsesTheBackstopAndTheReportUsesTheExpectation()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            FindRepoRoot(),
+            "tests",
+            "Heimdall.App.Tests",
+            "WindowUIStateSidebarLayoutTests.cs"));
+
+        // Composed rather than written as one literal: a needle spelled out here would be found in
+        // this very method, so the guard would pass while the real call site had been changed.
+        string boundedWait = "completed.Wait(" + nameof(StaCompletionBackstop) + ")";
+        string overExpectation = "stopwatch.Elapsed > " + nameof(StaSchedulingExpectation);
+
+        Assert.Contains(boundedWait, source, StringComparison.Ordinal);
+        Assert.Contains(overExpectation, source, StringComparison.Ordinal);
+    }
+
+    private static string FindRepoRoot()
+    {
+        string? dir = AppContext.BaseDirectory;
+        while (dir is not null)
+        {
+            if (File.Exists(Path.Combine(dir, "Heimdall.slnx")))
+            {
+                return dir;
+            }
+
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        throw new DirectoryNotFoundException(
+            $"Cannot find repository root containing Heimdall.slnx from: {AppContext.BaseDirectory}");
+    }
+
+    private void RunOnStaThread(Action action)
     {
         Exception? failure = null;
         using ManualResetEventSlim completed = new(initialState: false);
@@ -235,7 +323,29 @@ public sealed class WindowUIStateSidebarLayoutTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
 
-        Assert.True(completed.Wait(TimeSpan.FromSeconds(5)), "STA test did not complete.");
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        bool finished = completed.Wait(StaCompletionBackstop);
+        stopwatch.Stop();
+
+        Assert.True(finished, $"STA test did not complete within {StaCompletionBackstop}.");
+
+        if (stopwatch.Elapsed > StaSchedulingExpectation)
+        {
+            // Reported rather than asserted: a slow start is a fact about the machine, and losing
+            // it to a widened bound is how a stall becomes invisible. Written to the console
+            // because that is the channel a PASSING test reaches the `--verbosity normal` log
+            // through - the same channel and the same greppable shape the terminal waits use, so
+            // one query finds both families.
+            Console.Out.WriteLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} caller={1} elapsedMs={2:F3} expectationMs={3:F3} backstopMs={4:F3}",
+                StaOverExpectationMarker,
+                nameof(RunOnStaThread),
+                stopwatch.Elapsed.TotalMilliseconds,
+                StaSchedulingExpectation.TotalMilliseconds,
+                StaCompletionBackstop.TotalMilliseconds));
+        }
+
         thread.Join();
         if (failure is not null)
         {
