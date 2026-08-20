@@ -2800,7 +2800,7 @@
   "ValidationSettingsTmoutReset": "L'intervalle de r\u00e9initialisation SSH TMOUT doit \u00eatre entre 0 et 3600 secondes.",
   "ValidationSettingsSshAutoReconnectAttempts": "Le nombre de tentatives de reconnexion SSH doit \u00eatre entre 1 et 10.",
   "ValidationSettingsTunnelDelay": "Le d\u00e9lai d'\u00e9tablissement du tunnel doit \u00eatre entre 0 et 30000 ms.",
-  "ValidationSettingsRdpTimeout": "Le d\u00e9lai du watchdog de connexion RDP doit \u00eatre entre 5000 et 600000 ms.",
+  "ValidationSettingsRdpTimeout": "Le d\u00e9lai du watchdog de connexion RDP doit \u00eatre nul ou compris entre 5000 et 600000 ms.",
   "ValidationSettingsRdpResizeDelay": "Le d\u00e9lai de redimensionnement RDP doit \u00eatre nul ou compris entre 1000 et 60000 ms.",
   "ValidationSettingsRdpArtifactCleanupDelay": "Le d\u00e9lai de nettoyage des artefacts RDP doit \u00eatre compris entre 1000 et 60000 ms.",
   "ValidationSettingsRdpCredentialAutofillTimeout": "Le d\u00e9lai de saisie automatique des identifiants RDP doit \u00eatre compris entre 5000 et 300000 ms.",
