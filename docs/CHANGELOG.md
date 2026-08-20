@@ -12,6 +12,145 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-20: a disconnect was named one thing on screen and another in the log
+
+- **The two consumers of a disconnect composed the same two decoders in opposite orders.** The
+  on-screen diagnostic took the extended reason first, the persisted session event took the primary
+  one. For a disconnect where both decode, they named different causes: on reason 2308 with extended
+  768 the overlay said the credentials were not accepted while the log recorded a socket close.
+- **What that cost.** A support engineer correlating a user's screenshot against the event log read
+  two answers for one event.
+- **A locked-out account was announced as a password to re-check.** Because the extended code won on
+  the overlay, a generic credential rejection overwrote the primary code that says which account
+  state caused it - locked out, expired, or password expired.
+- **Both now resolve through one place.** The extended code wins, because it is what the server said
+  about the attempt, except against a primary code naming a specific account state: those two answers
+  agree, and the specific one is worth more.
+- **The account-state set is three codes and is deliberately not the authentication arm of the
+  severity table.** That table answers whether a code needs credential action, which is a different
+  question. In particular 2567, user not found, stays out: an extended code saying the server refused
+  the principal rights contradicts a primary code saying the account does not exist, and preferring
+  the primary there would turn a hedged message into a specific and false one.
+- The disconnect record now carries both numeric codes, because the key is resolved from both and a
+  reader given only the primary number could no longer re-derive it.
+- Severity is untouched and asserted to be: it drives the auto-reconnect veto, which is a different
+  decision from what the message says.
+
+## 2026-08-20: a cancelled RDP reconnection silenced the next real drop
+
+- **Cancelling an auto-reconnect raises a flag so the disconnect it causes arrives without an
+  overlay.** But the client keeps an attempt already in flight, and that attempt can still succeed -
+  so the disconnect never happens and the flag is never cleared.
+- **The flag then outlives the race for the rest of the session.** The next genuine drop was read as
+  a user disconnect: no reconnect overlay, and a health dot painted as if the user had asked for it.
+  A session dying in silence.
+- **The reconnect path now undoes both things the cancel set up.** It clears the flag, and it tells
+  the connection state machine the session came back - which it could not say before, because there
+  was no edge from disconnecting to connected. The view already declared itself connected on that
+  path, so everything counting live sessions from the machine stopped seeing the session.
+- The new edge is narrow, and the narrowness is asserted: a failed session still cannot become
+  connected without being reconnected from the start.
+
+## 2026-08-20: the embedded-session limit was bypassable without bound
+
+- **The limit was counted over one window's tabs.** Detaching a session removes it from that
+  collection while its host control stays alive, so detaching reset the count as far as the limit was
+  concerned. Detach, open more, detach again, and the limit is passed without bound - each of those
+  sessions still an ActiveX or WebView2 surface the machine is paying for.
+- **The census now spans both places, and reads them rather than registering them.** A registry has
+  to be told about every detach, reattach and close; one missed unregistration would leave a session
+  counted forever and lock the user out of opening new ones, which is worse than the bug being fixed.
+- **The count is distinct**, because reattaching puts a session back in the tab collection before the
+  floating window closes and it is briefly in both.
+- The window service is a required dependency rather than an optional one, so a caller that forgets
+  it fails to compile instead of silently counting nothing.
+
+## 2026-08-20: the sidebar status dot and its tooltip described different things
+
+- **The dot is coloured from the session state when there is one and from health reachability
+  otherwise. Its tooltip described reachability unconditionally.** A connected or failed row showed a
+  dot meaning one thing and a tooltip saying another.
+- **The spoken row name had already been corrected to follow the dot**, so the visible tooltip was
+  the last surface disagreeing with both: assistive technology was told the truth while the tooltip a
+  sighted user hovers was not.
+- **The branch is now one decision instead of three copies of it.** What each surface renders still
+  differs on purpose - a tooltip has room for the longer explanation, a spoken name does not - which
+  is why the shared thing is the decision and not the text.
+
+## 2026-08-20: the SFTP browser offered a download that would transfer nothing
+
+- **Selecting only directories still showed Download.** The action opened a folder picker, took a
+  destination from the user, and then moved no bytes: the transfer accepts regular files only, so
+  every selected entry was skipped.
+- **The offer and the outcome are now one decision.** A directory-only selection, an empty one, and a
+  selection of unsupported entries no longer arm the picker.
+- **A mixed selection still offers the action**, because the file in it does transfer. The
+  end-of-transfer message reports what was skipped.
+- No regression for FTP: an entry whose kind cannot be classified was already skipped by the
+  transfer, so hiding the action for a selection of those hides an action that would have moved
+  nothing.
+
+## 2026-08-20: X11 forwarding and compression said the right thing, and nothing held it true
+
+- **The in-process transport cannot honour either setting and says so; PuTTY and Plink carry them as
+  command line flags and therefore stay silent.** Those are two halves of one promise, and nothing
+  connected them.
+- **Every launcher test built its command line with both settings switched off**, so the X11 flag was
+  asserted for neither launcher and the compression flag only incidentally for one. Dropping a flag
+  left the user with no forwarding and no notice, while the suite stayed green and the capability
+  tests vouched for the silence.
+- **The claim is now derived rather than restated**: a path allowed to stay silent has to be a path
+  whose launcher passes the flags, each flag has to follow its own setting, and a forwarding-capable
+  transport added later with no launcher fails rather than inheriting silence.
+- No behaviour changed. Neither forcing Plink when a setting is requested nor implementing the
+  channels in-process is available: the in-process library offers neither, which is the same kind of
+  third-party limit already declared for the FTPS data channel.
+
+## 2026-08-20: typing into a dropped SSH session threw instead of dropping the keystroke
+
+- **The session raises an error once disposed and once its stream is gone**, and the socket raises
+  its own once the connection is really down. Terminal input arrives from a message handler whose
+  only guard was for a malformed payload, so typing after a drop took the exception out of the
+  handler.
+- **The same view already tolerated this everywhere else.** The local terminal survives a dead
+  process and the resize path survives a dead session; the SSH write was the one that did not, for
+  the same keystroke.
+- **Tolerated is not swallowed.** The named transport failures are dropped and logged; an argument or
+  reference fault is a defect and keeps travelling, which is asserted rather than assumed.
+- Nothing about the payload is logged, not its content and not its length: terminal input is exactly
+  where a password may be.
+
+## 2026-08-20: an imported profile's host was never validated
+
+- **The import validator's stated job is the fields that cross the untrusted boundary.** It checked
+  ten ports, the identity mode and the connection type. The remote host was not among them, so an
+  imported profile could carry anything there and it was stored unread.
+- **And the domain check approved a different string from the one the caller kept.** It trims
+  whitespace and strips a leading wildcard or dot before deciding, so given a wildcard host it
+  approved the bare domain and the caller went on using the wildcard, which is not a host at all.
+- **What is kept is now what passed.** An absent host stays absent, because a local shell has no
+  remote server. An IP literal is accepted separately and kept exactly as written, so an address
+  never comes back in a different notation and an IPv6 host is not refused.
+- A profile whose host cannot be approved is reported by name through the existing import failure
+  list rather than stored.
+
+## 2026-08-20: copying a gateway changed how it authenticates
+
+- **The passphrase field raises a presence flag from its setter, on every assignment including a null
+  one.** Both places that copy a gateway did it field by field, so every copy raised the flag - and
+  that flag is what the legacy credential mapping is derived from. A gateway using that mapping
+  produced a copy that did not.
+- **Three connect paths read the derivation** to decide whether the stored password is offered as the
+  key passphrase, so a copy authenticated differently from the gateway it was copied from.
+- **Nothing reached those paths, and only by accident.** Every published settings object is laundered
+  through a serialization round trip that ignores nulls, which scrubs the fabricated flag on the way
+  out. The round trip this project removed for profiles was the only thing protecting gateways from
+  the very defect that work was about, and nothing asserted it.
+- Both copies now use a primitive that touches no setter, and clearing a secret goes through the
+  backing field, because removing a secret says nothing about whether the source declared the field.
+- The convention guard is extended to gateways with each site carrying its own obligation: the
+  settings copy must keep the gateway whole, the import reconciler must drop the secrets.
+
 ## 2026-08-20: closing a window full of live sessions asked nothing
 
 - **A session's status is a token, and thirteen places were writing sentences into it.** The value
