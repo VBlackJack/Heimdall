@@ -759,7 +759,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     externalTab.OriginalServerId = originalServerId;
                     externalTab.FailureDetails = null;
                     ApplyRdpModeOverride(externalTab, connectionType, rdpModeOverride);
-                    externalTab.Status = _localizer["StatusLaunchedExternalClient"];
+                    externalTab.Status = SessionStatusTokens.LaunchedExternalClient;
                 }
 
                 _main.StatusText = _localizer["StatusLaunchedExternalClient"];
@@ -783,7 +783,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 existingTab.FailureDetails = null;
                 ReleaseConnectingCancellation(sessionId);
                 _embeddedSessionManager.AttachSshSession(existingTab, session, _main.CurrentSettings);
-                existingTab.Status = _localizer["StatusConnected"];
+                existingTab.Status = SessionStatusTokens.Connected;
                 CompleteReadySession(existingTab, sessionId, originalServerId, displayName, connectionType, session);
                 CompleteReconnectChainForSession(sessionId);
                 return;
@@ -830,10 +830,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             }
 
             tab.Status = string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase)
-                ? _localizer["StatusConnectingProgress"]
+                ? SessionStatusTokens.Connecting
                 : string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
-                    ? "RemoteSessionHandedOff"
-                    : _localizer["StatusConnected"];
+                    ? SessionStatusTokens.RemoteSessionHandedOff
+                    : SessionStatusTokens.Connected;
 
             CompleteReadySession(tab, sessionId, originalServerId, displayName, connectionType, session);
         }
@@ -927,6 +927,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         var tab = _main.Connection.AddSession(sessionId, displayName, connectionType);
         tab.OriginalServerId = originalServerId;
+        // Free-form on purpose: a failed pane shows why it failed, and the display converter
+        // passes an unrecognised value through unchanged for exactly this. No token would say as
+        // much, and a failed session is not counted as live either way.
         tab.Status = statusText;
         tab.FailureDetails = diagnostic;
         tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId);
@@ -1437,7 +1440,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 rdpView.SetOwningPane(tab.PrimaryPane);
             }
 
-            tab.Status = _localizer["StatusConnected"];
+            tab.Status = SessionStatusTokens.Connected;
             _main.StatusText = _localizer.Format(
                 "StatusConnected",
                 !string.IsNullOrWhiteSpace(runtimeProfile.DisplayName)
@@ -1453,7 +1456,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 runtimeProfile.DisplayName,
                 connectionType);
             tab.MarkAsAdHoc(snapshot);
-            tab.Status = _localizer["StatusLaunchedExternalClient"];
+            tab.Status = SessionStatusTokens.LaunchedExternalClient;
             _main.StatusText = _localizer["StatusLaunchedExternalClient"];
             return;
         }

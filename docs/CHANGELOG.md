@@ -12,6 +12,26 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-20: closing a window full of live sessions asked nothing
+
+- **A session's status is a token, and thirteen places were writing sentences into it.** The value
+  is parsed back into a connection state to decide whether a session counts as live. Localized text
+  does not parse, so those sessions counted as zero.
+- **What that cost.** Closing a tab, closing a window and quitting all ask for confirmation only
+  when at least one session is live. For SSH, SFTP, VNC, split panes, palette connections and
+  ad-hoc reconnections, none was ever counted, so none of the three ever asked.
+- **It was not a translation problem.** The value written for a connected session was the message
+  template, whose English text is "Connected to: {0}". The field held that literally, placeholder
+  and all, in every language. Two surfaces displayed the status without a converter, so they showed
+  the placeholder too.
+- **The tokens now come from one place**, which also records that two of them, connecting and
+  reconnecting, are display-only: no connection state carries those names, so a pane still being
+  established is deliberately not counted as live.
+- **The two surfaces that showed the raw value now go through the same converter** the session
+  panes already used.
+- A guard fails if any code writes localized text into a session status again, with one named
+  exception: a tool pane is not a session and must not be counted as one.
+
 ## 2026-08-20: the transport option stops claiming, in code, what it cannot do
 
 - **The setting's own contract said it disabled UDP transport.** It does not, and no application

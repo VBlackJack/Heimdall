@@ -93,6 +93,11 @@ public sealed class SessionStatusToDisplayConverter : IValueConverter
             return "SessionStatusError";
         }
 
+        if (string.Equals(status, "LaunchedExternalClient", StringComparison.OrdinalIgnoreCase))
+        {
+            return "SessionStatusLaunchedExternalClient";
+        }
+
         return null;
     }
 }

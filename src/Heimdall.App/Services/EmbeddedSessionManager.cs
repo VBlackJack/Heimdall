@@ -439,13 +439,16 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             view.SessionConnected += (serverId) =>
             {
                 _connectionSm.TryTransition(serverId, ConnectionState.Connected);
-                sessionTab.Status = _localizer["StatusConnected"];
+                sessionTab.Status = SessionStatusTokens.Connected;
                 Core.Logging.FileLogger.Info($"VNC connected: {serverId}");
             };
             view.SessionError += (serverId, errorMsg) =>
             {
                 var localizedMsg = _localizer.Format("ErrorVncConnectionFailed", errorMsg);
                 _connectionSm.SetError(serverId, localizedMsg);
+
+                // Free-form on purpose, as on the other failure paths: the pane shows the reason,
+                // and the display converter passes it through unchanged.
                 sessionTab.Status = localizedMsg;
                 Core.Logging.FileLogger.Error($"VNC error for {serverId}: {errorMsg}");
             };

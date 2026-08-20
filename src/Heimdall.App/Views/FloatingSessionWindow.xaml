@@ -1,11 +1,16 @@
 <Window x:Class="Heimdall.App.Views.FloatingSessionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:Heimdall.App.Converters"
         Title=""
         Width="1024" Height="768"
         MinWidth="400" MinHeight="300"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BackgroundBrush}">
+
+    <Window.Resources>
+        <converters:SessionStatusToDisplayConverter x:Key="SessionStatusToDisplayConverter"/>
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -44,7 +49,7 @@
                                TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="StatusText" Text="{Binding Status, Mode=OneWay}"
+                    <TextBlock x:Name="StatusText" Text="{Binding Status, Mode=OneWay, Converter={StaticResource SessionStatusToDisplayConverter}}"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"/>
