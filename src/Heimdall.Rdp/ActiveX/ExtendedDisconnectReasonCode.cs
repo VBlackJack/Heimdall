@@ -45,6 +45,24 @@ internal enum ExtendedDisconnectReasonCode
     LicenseNoRemoteConnections = 266,
     LicenseCreatingLicStoreAccDenied = 267,
 
+    /// <summary>Remote Desktop Gateway refused the credentials presented to it.</summary>
+    GatewayCredentialsRejected = 0x0300_0015,
+
+    /// <summary>The gateway's certificate could not be accepted.</summary>
+    GatewayCertificateRejected = 0x0300_0003,
+
+    /// <summary>The gateway's certificate could not be accepted (second reported value).</summary>
+    GatewayCertificateUntrusted = 0x0300_0005,
+
+    /// <summary>The gateway itself could not be reached.</summary>
+    GatewayUnreachable = 0x0300_000C,
+
+    /// <summary>The gateway did not answer in time.</summary>
+    GatewayTimeout = 0x0300_0032,
+
+    /// <summary>The gateway did not answer in time (second reported value).</summary>
+    GatewayTimeoutSecondary = 0x0300_0033,
+
     /// <summary>
     /// The client's own security layer rejected the credential exchange.
     /// </summary>
