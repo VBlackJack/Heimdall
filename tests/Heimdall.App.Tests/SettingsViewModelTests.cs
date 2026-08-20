@@ -24,6 +24,7 @@ using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Settings;
+using Heimdall.App.Views.EmbeddedRdp;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -966,6 +967,10 @@ public sealed class SettingsViewModelTests
     [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 60001, "ValidationSettingsRdpArtifactCleanupDelay")]
     [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 4999, "ValidationSettingsRdpCredentialAutofillTimeout")]
     [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 300001, "ValidationSettingsRdpCredentialAutofillTimeout")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), -1, "ValidationSettingsRdpTimeout")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 1, "ValidationSettingsRdpTimeout")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 4999, "ValidationSettingsRdpTimeout")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 600001, "ValidationSettingsRdpTimeout")]
     public async Task SaveAsync_InvalidAdvancedRdpTimeoutRejectsPersistenceAndUpdatesAdvancedBadge(
         string propertyName,
         int value,
@@ -997,6 +1002,13 @@ public sealed class SettingsViewModelTests
     [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 60000)]
     [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 5000)]
     [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 300000)]
+    // Zero disables the connect watchdog. The schema and the watchdog itself both accept it; the
+    // settings screen refused it, so a configuration with the watchdog turned off opened with an
+    // error on a field the user had set correctly, and could not be saved until it was changed.
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 0)]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 5000)]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 45000)]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 600000)]
     public async Task SaveAsync_AdvancedRdpTimeoutBoundaryPersists(
         string propertyName,
         int value)
@@ -1606,6 +1618,79 @@ public sealed class SettingsViewModelTests
         Assert.Empty(trustedHostKeys.Rows);
     }
 
+    /// <summary>
+    /// The settings screen and the settings schema must admit exactly the same watchdog timeouts.
+    /// </summary>
+    /// <remarks>
+    /// <para>Three places decide this: the watchdog reads its bounds from
+    /// <c>RdpConnectWatchdogPolicy</c>, the schema states them again in its own constants, and the
+    /// screen stated them a third time in a validation attribute. The screen's copy left out the
+    /// zero that disables the watchdog.</para>
+    /// <para>The sweep compares answers rather than restating bounds, so it holds whatever the
+    /// bounds become. What is frozen is that the three are one. It goes through the view model's
+    /// own validation rather than calling the validator method directly, because the defect was in
+    /// which attribute the property carried: a test that calls the method would pass even with the
+    /// attribute removed entirely.</para>
+    /// </remarks>
+    [Fact]
+    public void WatchdogTimeout_SettingsScreenAndSchemaAdmitTheSameValues()
+    {
+        int[] probes =
+        [
+            RdpConnectWatchdogPolicy.DisabledTimeoutMs,
+            RdpConnectWatchdogPolicy.DisabledTimeoutMs + 1,
+            RdpConnectWatchdogPolicy.MinTimeoutMs - 1,
+            RdpConnectWatchdogPolicy.MinTimeoutMs,
+            RdpConnectWatchdogPolicy.MinTimeoutMs + 1,
+            RdpConnectWatchdogPolicy.DefaultTimeoutMs,
+            RdpConnectWatchdogPolicy.MaxTimeoutMs - 1,
+            RdpConnectWatchdogPolicy.MaxTimeoutMs,
+            RdpConnectWatchdogPolicy.MaxTimeoutMs + 1,
+            -1,
+        ];
+
+        List<string> disagreements = [];
+        int refusals = 0;
+
+        foreach (int value in probes)
+        {
+            SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+            viewModel.RdpConnectWatchdogTimeoutMs = value;
+            bool screenAccepts =
+                !viewModel.GetErrors(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs))
+                    .OfType<object>()
+                    .Any();
+
+            bool schemaAccepts = SchemaAcceptsWatchdogTimeout(value);
+            if (!screenAccepts)
+            {
+                refusals++;
+            }
+
+            if (screenAccepts != schemaAccepts)
+            {
+                disagreements.Add(
+                    $"{value} ms: the settings screen {(screenAccepts ? "accepts" : "refuses")} it "
+                        + $"and the schema {(schemaAccepts ? "accepts" : "refuses")} it");
+            }
+        }
+
+        // Guarding the guard: two predicates that accepted everything would agree perfectly while
+        // proving nothing, and that is exactly the shape a broken probe would take.
+        Assert.True(refusals > 0, "the screen refused nothing, so the comparison is trivial");
+        Assert.True(disagreements.Count == 0, string.Join("\n", disagreements));
+    }
+
+    private static bool SchemaAcceptsWatchdogTimeout(int value)
+    {
+        AppSettings settings = new() { RdpConnectWatchdogTimeoutMs = value };
+        Heimdall.Core.Configuration.ValidationResult result = SchemaValidator.ValidateSettings(settings);
+
+        return !result.Errors.Any(error =>
+            error.Contains("RdpConnectWatchdogTimeoutMs", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("watchdog", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static void SetAdvancedRdpTimeout(
         SettingsViewModel viewModel,
         string propertyName,
@@ -1621,6 +1706,9 @@ public sealed class SettingsViewModelTests
                 break;
             case nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs):
                 viewModel.RdpCredentialAutofillTimeoutMs = value;
+                break;
+            case nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs):
+                viewModel.RdpConnectWatchdogTimeoutMs = value;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(propertyName), propertyName, null);

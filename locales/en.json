@@ -2803,7 +2803,7 @@
   "ValidationSettingsTmoutReset": "SSH TMOUT reset interval must be between 0 and 3600 seconds.",
   "ValidationSettingsSshAutoReconnectAttempts": "SSH auto-reconnect attempts must be between 1 and 10.",
   "ValidationSettingsTunnelDelay": "Tunnel establishment delay must be between 0 and 30000 ms.",
-  "ValidationSettingsRdpTimeout": "RDP connection watchdog timeout must be between 5000 and 600000 ms.",
+  "ValidationSettingsRdpTimeout": "RDP connection watchdog timeout must be zero or between 5000 and 600000 ms.",
   "ValidationSettingsRdpResizeDelay": "RDP resize delay must be zero or between 1000 and 60000 ms.",
   "ValidationSettingsRdpArtifactCleanupDelay": "RDP artifact cleanup delay must be between 1000 and 60000 ms.",
   "ValidationSettingsRdpCredentialAutofillTimeout": "RDP credential autofill timeout must be between 5000 and 300000 ms.",
