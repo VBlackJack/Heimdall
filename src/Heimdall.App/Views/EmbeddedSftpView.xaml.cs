@@ -1005,7 +1005,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         // also hidden on directories, an empty selection, and a multi-selection.
         CtxEdit.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxEditExternal.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
-        CtxDownload.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        // Offered only when the selection holds something the transfer will actually move, using
+        // the same predicate the planner uses. A directory-only selection used to open a folder
+        // picker and then download nothing. The handler keeps no silent guard of its own: if the
+        // action is somehow reached anyway, the existing end-of-transfer message explains what was
+        // skipped, and a silent return would say less than that.
+        CtxDownload.Visibility = EmbeddedSftpViewModel.CanDownloadSelection(
+            FileListView.SelectedItems.OfType<SftpFileInfo>())
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         // Rename targets exactly one entry. Native SFTP rename follows a symbolic link to its target,
         // so hide that unsafe action while preserving name-based FTP rename.
         CtxRename.Visibility = singleSelection

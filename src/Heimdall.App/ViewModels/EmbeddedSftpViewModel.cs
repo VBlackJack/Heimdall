@@ -1524,6 +1524,31 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Whether one remote entry can be downloaded.
+    /// </summary>
+    /// <remarks>
+    /// The single answer to that question. The planner below decides what to transfer with it, and
+    /// the context menu decides whether to offer the action with it, so the offer and the outcome
+    /// cannot drift apart. Only a regular file qualifies: a directory has no recursive download,
+    /// and no other kind is known to be byte-addressable.
+    /// </remarks>
+    public static bool IsDownloadable(SftpFileInfo entry) => entry.Kind is RemoteEntryKind.File;
+
+    /// <summary>
+    /// Whether a selection holds anything the download can actually transfer.
+    /// </summary>
+    /// <remarks>
+    /// An empty selection, a directory-only selection and a selection of unsupported entries all
+    /// answer false. Offering the action there opens a folder picker for a transfer that will move
+    /// no bytes.
+    /// </remarks>
+    public static bool CanDownloadSelection(IEnumerable<SftpFileInfo> selection)
+    {
+        ArgumentNullException.ThrowIfNull(selection);
+        return selection.Any(IsDownloadable);
+    }
+
+    /// <summary>
     /// Downloads selected remote files into the target folder.
     /// </summary>
     /// <remarks>Must be invoked on the UI thread.</remarks>
@@ -1556,7 +1581,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 ct.ThrowIfCancellationRequested();
 
                 SftpFileInfo file = files[i];
-                if (file.Kind is not RemoteEntryKind.File)
+                if (!IsDownloadable(file))
                 {
                     if (file.Kind is RemoteEntryKind.Directory)
                     {
