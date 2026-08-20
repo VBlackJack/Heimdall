@@ -1658,6 +1658,56 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
     }
 
+    /// <summary>
+    /// Whether a write raised the transport going away rather than a defect in the caller.
+    /// </summary>
+    /// <remarks>
+    /// Named types rather than a blanket catch: a session that has been disposed or has lost its
+    /// stream is a fact about the connection, while an argument or reference fault is a bug and
+    /// must keep travelling. The SSH session raises the first two of these by name, and the rest
+    /// come from the socket underneath it once the connection has actually dropped.
+    /// <para><see cref="ObjectDisposedException"/> is already an
+    /// <see cref="InvalidOperationException"/>, so naming it changes nothing this list does. It is
+    /// kept because the session raises it by name and the reader should not have to know the
+    /// hierarchy to see that; a test pins the subsumption so the redundancy stays a choice rather
+    /// than becoming an assumption.</para>
+    /// </remarks>
+    internal static bool IsTransportWriteFailure(Exception exception) => exception is
+        ObjectDisposedException
+        or InvalidOperationException
+        or IOException
+        or System.Net.Sockets.SocketException
+        or Renci.SshNet.Common.SshException;
+
+    /// <summary>
+    /// Writes through a transport, dropping the input if the transport has gone.
+    /// </summary>
+    /// <returns><see langword="true"/> when the write was delivered.</returns>
+    /// <remarks>
+    /// <para>Typing into a terminal whose session has just dropped used to throw out of the
+    /// WebView2 message handler, where the only catch was for a malformed payload. The local
+    /// terminal already tolerated a dead process and the resize path already tolerated a dead
+    /// session; the SSH write was the one that did not.</para>
+    /// <para>Neither the payload nor its length is logged. Input is exactly where a password may
+    /// be, and its length is as much of it as anyone should be told.</para>
+    /// </remarks>
+    internal static bool TryTransportWrite(Action write, string transport)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+
+        try
+        {
+            write();
+            return true;
+        }
+        catch (Exception ex) when (IsTransportWriteFailure(ex))
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSSH {transport} input dropped, transport unavailable: {ex.GetType().Name}");
+            return false;
+        }
+    }
+
     private void WriteToSession(byte[] data, bool marksTerminalInput = true)
     {
         if (_disposed || data.Length == 0)
@@ -1681,7 +1731,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         if (_session is not null)
         {
-            _session.Write(data);
+            SshShellSession session = _session;
+            TryTransportWrite(() => session.Write(data), "ssh");
         }
         else
         {
@@ -1879,7 +1930,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         if (_session is not null)
         {
-            _session.Write(text);
+            SshShellSession session = _session;
+            TryTransportWrite(() => session.Write(text), "ssh");
         }
         else
         {
