@@ -644,6 +644,86 @@ public sealed class RdpActiveXHostTests
             Tick?.Invoke(this, EventArgs.Empty);
         }
     }
+    // The overlay prints a symbolic cause beside the message. Deriving that name from the primary
+    // reason alone printed one cause next to a message naming another: the primary code for a
+    // gateway refusal is the socket close it produced, so a gateway timeout was labelled
+    // RDP_SOCKET_CLOSED.
+    [Theory]
+    [InlineData(2308, 0x0300_0032, "RDP_RD_GATEWAY_TIMEOUT \u00B7 2308 \u00B7 EXT 50331698")]
+    [InlineData(2308, 0x0300_000C, "RDP_RD_GATEWAY_UNREACHABLE \u00B7 2308 \u00B7 EXT 50331660")]
+    [InlineData(2308, 0x0200_0001, "RDP_REMOTE_APP_ERROR \u00B7 2308 \u00B7 EXT 33554433")]
+    [InlineData(2308, 768, "RDP_BAD_CREDENTIALS \u00B7 2308 \u00B7 EXT 768")]
+    public void FormatDisconnectCode_WithExtendedReason_NamesTheResolvedCauseAndBothNumbers(
+        int reason,
+        int extendedReason,
+        string expected)
+    {
+        Assert.Equal(expected, RdpActiveXHost.FormatDisconnectCode(reason, extendedReason));
+    }
+
+    // An extended reason that decodes to nothing still gets printed. It is the only specific thing
+    // anyone has to go on, and withholding it is what sent readers to the log to find it.
+    [Fact]
+    public void FormatDisconnectCode_UndecodedExtendedReason_StillPrintsIt()
+    {
+        Assert.Equal(
+            "RDP_SOCKET_CLOSED \u00B7 2308 \u00B7 EXT 4096",
+            RdpActiveXHost.FormatDisconnectCode(2308, 4096));
+    }
+
+    // Absent an extended reason the two overloads must be indistinguishable, because the one-argument
+    // form is the whole of the previous behaviour and nothing about it was meant to change.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2055)]
+    [InlineData(2308)]
+    [InlineData(3592)]
+    [InlineData(4360)]
+    [InlineData(65535)]
+    public void FormatDisconnectCode_NoExtendedReason_MatchesTheSingleArgumentForm(int reason)
+    {
+        Assert.Equal(
+            RdpActiveXHost.FormatDisconnectCode(reason),
+            RdpActiveXHost.FormatDisconnectCode(reason, RdpActiveXHost.NoExtendedDisconnectReason));
+    }
+
+    // The point of the change, stated as a property rather than as a list of examples: the symbolic
+    // name is the resolved key and not a second opinion about it. Swept over both channels so an
+    // arm added later cannot quietly reintroduce the divergence.
+    [Fact]
+    public void FormatDisconnectCode_SymbolicNameAlwaysMatchesTheResolvedKey()
+    {
+        int[] extendedProbes =
+        [
+            RdpActiveXHost.NoExtendedDisconnectReason, 4, 9, 265, 266, 267, 768, 4096,
+            0x0300_0015, 0x0300_0003, 0x0300_000C, 0x0300_0032, 0x0300_4242,
+            0x0200_0000, 0x0200_FFFF,
+        ];
+
+        int compared = 0;
+        for (int reason = 0; reason <= ushort.MaxValue; reason++)
+        {
+            foreach (int extendedReason in extendedProbes)
+            {
+                string? key = RdpActiveXHost.ResolveDisconnectReasonKey(reason, extendedReason);
+                if (key is null)
+                {
+                    continue;
+                }
+
+                string formatted = RdpActiveXHost.FormatDisconnectCode(reason, extendedReason);
+                Assert.StartsWith("RDP_", formatted, StringComparison.Ordinal);
+                Assert.DoesNotContain("RDP_UNKNOWN", formatted, StringComparison.Ordinal);
+                compared++;
+            }
+        }
+
+        // Guarding the guard: a sweep that resolved nothing would report success having compared
+        // nothing at all.
+        Assert.True(compared > 100, $"only {compared} pairs resolved, so the sweep proves nothing");
+    }
+
     // The gateway block, the six values in it with an established meaning.
     [Theory]
     [InlineData(0x0300_0015, "RdGatewayCredentials")]

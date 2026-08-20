@@ -12,6 +12,20 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-20: the reconnect overlay named a different cause than its own message
+
+- **The overlay prints a symbolic cause beside the message, and the two were resolved separately.**
+  The message came from both disconnect codes; the symbolic name came from the primary one alone. A
+  gateway timeout was therefore labelled `RDP_SOCKET_CLOSED`, because a socket close is what the
+  primary code reports when a gateway is what actually refused the session.
+- **The extended code was not shown at all.** The session event log has carried both numbers since
+  the codes were corrected, but the overlay, which is what people screenshot, carried one. When the
+  message came from the extended code, the number beside it was not the number it came from.
+- **Both now come from one resolution**, and the overlay prints both numbers. An extended code that
+  decodes to nothing is printed too: it is the only specific thing anyone has to go on.
+- Nothing changes for a disconnect with no extended code. The two forms are asserted to be
+  indistinguishable there, because that case is the whole of the previous behaviour.
+
 ## 2026-08-20: a failed reconnection told you to go edit your profile
 
 - **The reconnect overlay pre-focused "Edit profile" for disconnect code 4360.** That was decided

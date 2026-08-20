@@ -3511,7 +3511,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         if (diagnostic?.Code is int code)
         {
             disconnectCode = IsFatalErrorDiagnostic(diagnostic) ? null : code;
-            ReconnectCodeText.Text = FormatOverlayCode(diagnostic);
+            ReconnectCodeText.Text = FormatOverlayCode(diagnostic, _lastExtendedDisconnectReason);
             ReconnectCodeText.Visibility = System.Windows.Visibility.Visible;
         }
         else
@@ -3642,16 +3642,19 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         return false;
     }
 
-    private static string FormatOverlayCode(Core.SessionDiagnostics.SessionDiagnostic diagnostic)
+    private static string FormatOverlayCode(
+        Core.SessionDiagnostics.SessionDiagnostic diagnostic,
+        int extendedReason)
     {
         if (diagnostic.Code is not int code)
         {
             return string.Empty;
         }
 
+        // A fatal error carries no extended reason: it does not come from a disconnect.
         return IsFatalErrorDiagnostic(diagnostic)
             ? $"RDP_FATAL_ERROR \u00B7 {code}"
-            : RdpActiveXHost.FormatDisconnectCode(code);
+            : RdpActiveXHost.FormatDisconnectCode(code, extendedReason);
     }
 
     private static bool IsFatalErrorDiagnostic(Core.SessionDiagnostics.SessionDiagnostic diagnostic)
