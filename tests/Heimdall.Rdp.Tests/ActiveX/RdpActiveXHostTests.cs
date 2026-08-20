@@ -64,7 +64,7 @@ public sealed class RdpActiveXHostTests
     [InlineData(2055, "BadCredentials")]
     [InlineData(2308, "SocketClosed")]
     [InlineData(3848, "CredSspPolicyError")]
-    [InlineData(4360, "ResolutionChangeTimeout")]
+    [InlineData(4360, "ReconnectFailed")]
     public void GetDisconnectReasonKey_KnownCode_ReturnsKey(int reason, string expected)
     {
         string? actual = RdpActiveXHost.GetDisconnectReasonKey(reason);
@@ -186,6 +186,41 @@ public sealed class RdpActiveXHostTests
         bool actual = RdpActiveXHost.AllowsAutoReconnect(reason, extendedReason);
 
         Assert.False(actual);
+    }
+
+    // Three labels in the disconnect table named something the code does not mean. They are pinned
+    // by value here, next to the neighbours they were confused with, so a future edit cannot swap
+    // them back without saying so.
+    [Theory]
+    [InlineData(1796, "TimeoutOccurred")]
+    [InlineData(264, "ConnectionTimeout")]
+    [InlineData(2825, "NlaNotSupported")]
+    [InlineData(3080, "ClientDecompressionFailed")]
+    [InlineData(4360, "ReconnectFailed")]
+    [InlineData(3592, "ReconnectFailed")]
+    public void GetDisconnectReasonKey_CorrectedCodes_MapToTheirRealMeaning(int reason, string expected)
+    {
+        Assert.Equal(expected, RdpActiveXHost.GetDisconnectReasonKey(reason));
+    }
+
+    // The labels those three used to carry must not survive anywhere in the table, or the same
+    // wrong meaning would simply move to another code.
+    [Theory]
+    [InlineData("InternalError")]
+    [InlineData("DecompressionError")]
+    [InlineData("ResolutionChangeTimeout")]
+    public void GetDisconnectReasonKey_RetiredLabels_AreNoLongerProduced(string retired)
+    {
+        List<int> producers = [];
+        for (int reason = 0; reason <= 10000; reason++)
+        {
+            if (string.Equals(RdpActiveXHost.GetDisconnectReasonKey(reason), retired, StringComparison.Ordinal))
+            {
+                producers.Add(reason);
+            }
+        }
+
+        Assert.Empty(producers);
     }
 
     [Theory]

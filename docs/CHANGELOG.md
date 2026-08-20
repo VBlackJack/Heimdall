@@ -12,6 +12,33 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-20: three RDP disconnect codes were telling users the wrong thing
+
+- **A server demanding Network Level Authentication was reported as a data decompression error**,
+  with advice to disable bitmap caching. Code 2825 means the remote computer requires NLA and this
+  connection is not using it. The overlay was already offering "Edit profile" as the primary action
+  for that code, which was right; only the explanation was wrong. Decompression failures are 3080,
+  which is unchanged.
+- **A connection time-out was reported as an internal client error**, with advice to restart
+  Heimdall. Code 1796 is a time-out. The probable origin of that label is worth recording: the
+  client's own decoder answers "an internal error has occurred" for every code it does not know, so
+  reading a meaning off it produces exactly this mistake. The real internal-error code is 1032,
+  which Heimdall does not map, and which Microsoft's own sources disagree about.
+- **A failed reconnection was reported as a display resolution problem**, with advice to disable
+  dynamic resolution. Code 4360 means reconnecting to the session failed, and it shares that meaning
+  with 3592, which was not mapped at all and now is.
+- **Three more messages said more than the code supports.** The remote computer ending a session
+  named an administrator as the cause, where an administrator action, a failure while the connection
+  was being established, and a network interruption all produce it. A security-data error advised
+  checking NLA support, which is a different code. An unexpected authentication certificate was
+  described as one that could not be verified, and as a warning rather than the termination it is.
+- **Every label was read from the client's own interface reference and from the strings the installed
+  client returns**, rather than transcribed. A new guard walks the whole table and fails if any label
+  it produces resolves to nothing in either language, which is what a mistyped key would do.
+- Severity and overlay actions are deliberately unchanged. Making a time-out retryable, for
+  instance, would change whether the client reconnects on its own, which is a decision about
+  behaviour rather than about wording.
+
 ## 2026-08-20: the RDP auto-reconnect events were never delivered
 
 - **Two event handlers were declared on the dispatch ids of unrelated events.** The control's

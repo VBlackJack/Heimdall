@@ -1025,7 +1025,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         516 => "SocketConnectFailed",
         772 => "NetworkError",
         1030 => "SecurityError",
-        1796 => "InternalError",
+        1796 => "TimeoutOccurred",
         1800 => "ConsoleSessionInProgress",
         2055 => "BadCredentials",
         2056 => "LicensingError",
@@ -1033,15 +1033,24 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         2311 => "CertificateWarning",
         2567 => "UserNotFound",
         2822 => "EncryptionError",
-        2825 => "DecompressionError",
+        2825 => "NlaNotSupported",
         3080 => "ClientDecompressionFailed",
         3335 => "AccountLockedOut",
         3591 => "AccountExpired",
         3847 => "PasswordExpired",
         3848 => "CredSspPolicyError",
-        4360 => "ResolutionChangeTimeout",
+        3592 or 4360 => "ReconnectFailed",
         // Unknown codes intentionally fall through to raw-number display; MsTscAx
         // extended-reason bit-packing is not decoded here.
+        //
+        // The labels above are the client's own, cross-checked against the Win32 interface
+        // reference and against the strings the installed client returns for each code. Three of
+        // them used to say something else: 1796 is a time-out and was called an internal error,
+        // 2825 is a server that requires Network Level Authentication and was called a
+        // decompression failure, and 4360 is a failed reconnection and was called a resolution
+        // change. Reading a label off the client's decoder is what produced the first of those: it
+        // answers "an internal error has occurred" for every code it does not know, which is a
+        // not-found sentinel rather than a meaning.
         _ => null
     };
 
