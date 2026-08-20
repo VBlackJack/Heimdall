@@ -50,9 +50,23 @@ internal static class RdpDisconnectActionPolicy
             ? RdpOverlayPrimaryAction.EditProfile
             : RdpOverlayPrimaryAction.Reconnect;
 
+    /// <summary>
+    /// The codes for which editing the profile is the useful first move.
+    /// </summary>
+    /// <remarks>
+    /// <para>Each entry has to name something the user can change in the profile: NLA for 2308 and
+    /// 2825, the certificate expectation for 2311, compression and bitmap caching for 3080, the
+    /// CredSSP posture for 3848, the credentials for 2055.</para>
+    /// <para>4360 used to be here and no longer is. It was believed to mean a resolution-change
+    /// timeout, which pointed straight at the profile's display settings; it actually means the
+    /// client failed to reconnect to the session, and nothing in the profile is at fault for that.
+    /// The evidence that the old belief was wrong is that 3592 carries the identical message and
+    /// was never in this list, so the same disconnect offered a different first action depending
+    /// on which of its two codes arrived.</para>
+    /// </remarks>
     private static bool IsProfileRemediationCode(int? disconnectCode) => disconnectCode switch
     {
-        2055 or 2308 or 2311 or 2825 or 3080 or 3848 or 4360 => true,
+        2055 or 2308 or 2311 or 2825 or 3080 or 3848 => true,
         _ => false
     };
 }
