@@ -257,6 +257,70 @@ internal static class TerminalTestHelpers
     }
 
     /// <summary>
+    /// Arguments for a child that writes the contents of <paramref name="payloadFileName"/>, then
+    /// records that it has done so by creating <paramref name="signalFileName"/>, then waits for a
+    /// line on standard input and echoes it back behind <paramref name="livePrefix"/>.
+    /// </summary>
+    /// <param name="payloadFileName">Bare file name of the payload, in the child's working directory.</param>
+    /// <param name="signalFileName">Bare file name the child creates once the payload is written.</param>
+    /// <param name="livePrefix">Prefix the child puts in front of the line it reads back.</param>
+    /// <returns>The command processor arguments.</returns>
+    /// <remarks>
+    /// <para>Both names are relative and resolve against the child's working directory, which the
+    /// caller owns and passes to the session. That is not a convenience. An absolute path quoted
+    /// inside a nested command-processor command is broken by a space anywhere along it - measured,
+    /// not assumed - and the temporary directory's root is outside this repository's control. A bare
+    /// file name carries no such hazard whatever the directory is called.</para>
+    /// <para>The payload comes from a file because the command processor has no cheap way to emit a
+    /// six-figure run of characters, and having one is what allows this child to be the command
+    /// processor at all. The PowerShell child it replaces was measured on a saturated runner with
+    /// its process created and running and not one byte received after a minute.</para>
+    /// <para>The signal file is the causal alternative to sleeping: the caller can wait for it
+    /// rather than guess how long the payload takes to appear.</para>
+    /// </remarks>
+    internal static string BuildBootstrapReplayChildArguments(
+        string payloadFileName,
+        string signalFileName,
+        string livePrefix)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(payloadFileName);
+        ArgumentException.ThrowIfNullOrEmpty(signalFileName);
+        ArgumentException.ThrowIfNullOrEmpty(livePrefix);
+        RejectUnsafeChildFileName(payloadFileName, nameof(payloadFileName));
+        RejectUnsafeChildFileName(signalFileName, nameof(signalFileName));
+        RejectUnsafeChildLiteral(livePrefix, nameof(livePrefix));
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"/d /v:on /c \"type {payloadFileName} & echo ready>{signalFileName} "
+                + $"& set /p line= & echo {livePrefix}!line!\"");
+    }
+
+    /// <summary>
+    /// Refuses any file name that is not a bare name safe to leave unquoted.
+    /// </summary>
+    /// <remarks>
+    /// Stricter than <see cref="RejectUnsafeChildLiteral"/> on one point and looser on another: a
+    /// dot is allowed because file names have extensions, and a colon is refused because it would
+    /// make the name a drive-qualified or stream-qualified path, which is exactly the absolute form
+    /// this helper exists to keep out of the command line.
+    /// </remarks>
+    private static void RejectUnsafeChildFileName(string value, string parameterName)
+    {
+        foreach (char character in value)
+        {
+            if (!char.IsAsciiLetterOrDigit(character)
+                && character is not ('-' or '_' or '.'))
+            {
+                throw new ArgumentException(
+                    $"'{value}' contains '{character}', so it is not a bare file name safe to "
+                        + "leave unquoted in a command-processor command.",
+                    parameterName);
+            }
+        }
+    }
+
+    /// <summary>
     /// Refuses any literal that would need quoting inside a nested command-processor command.
     /// </summary>
     private static void RejectUnsafeChildLiteral(string value, string parameterName)

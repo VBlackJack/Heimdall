@@ -24,8 +24,31 @@ public sealed class PipeModeSessionTests
     [Fact]
     public async Task DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput()
     {
-        string signalPath = Path.Combine(Path.GetTempPath(), $"heimdall-pipe-ready-{Guid.NewGuid():N}.txt");
-        string escapedSignalPath = signalPath.Replace("'", "''", StringComparison.Ordinal);
+        // The child is the command processor rather than PowerShell. It carries the same
+        // contract - write a large payload, record that it is written, then wait for a line and
+        // echo it back - and it starts in a fraction of the time. The PowerShell child this
+        // replaces was measured on a saturated runner with its process created and running and
+        // not one byte received after a minute.
+        //
+        // Everything the child touches lives in a directory this test owns and passes as the
+        // child's working directory, so the command line names files without a path and without
+        // a quote. An absolute path quoted inside a nested command-processor command is broken
+        // by a space anywhere along it, and the temporary directory's root is not ours to choose.
+        const string PayloadFileName = "payload.txt";
+        const string SignalFileName = "ready.txt";
+        const string BootstrapPrefix = "PIPE-BOOTSTRAP:";
+        const string LivePrefix = "PIPE-LIVE:";
+        const int PayloadPadding = 131072;
+
+        string childDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall-pipe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(childDirectory);
+        string signalPath = Path.Combine(childDirectory, SignalFileName);
+        File.WriteAllText(
+            Path.Combine(childDirectory, PayloadFileName),
+            BootstrapPrefix + new string('X', PayloadPadding));
+
         PipeModeSession session = new();
         StringBuilder output = new();
         object outputLock = new object();
@@ -34,11 +57,12 @@ public sealed class PipeModeSessionTests
         try
         {
             await session.StartAsync(
-                TerminalTestHelpers.ResolvePowerShellExecutable(),
-                $"-NoLogo -NoProfile -Command \"$payload = 'PIPE-BOOTSTRAP:' + ('X' * 131072); " +
-                "[Console]::Out.WriteLine($payload); [Console]::Out.Flush(); " +
-                $"[IO.File]::WriteAllText('{escapedSignalPath}', 'ready'); " +
-                "$line = Read-Host; [Console]::Out.WriteLine('PIPE-LIVE:' + $line)\"");
+                TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+                TerminalTestHelpers.BuildBootstrapReplayChildArguments(
+                    PayloadFileName,
+                    SignalFileName,
+                    LivePrefix),
+                workingDirectory: childDirectory);
 
             Assert.True(
                 TerminalTestHelpers.SpinUntilProcessEvent(
@@ -53,7 +77,7 @@ public sealed class PipeModeSessionTests
                 lock (outputLock)
                 {
                     output.Append(text);
-                    hasLiveOutput = output.ToString().Contains("PIPE-LIVE:after-replay", StringComparison.Ordinal);
+                    hasLiveOutput = output.ToString().Contains(LivePrefix + "after-replay", StringComparison.Ordinal);
                 }
 
                 if (hasLiveOutput)
@@ -71,15 +95,23 @@ public sealed class PipeModeSessionTests
                 text = output.ToString();
             }
 
-            int bootstrapIndex = text.IndexOf("PIPE-BOOTSTRAP:", StringComparison.Ordinal);
-            int liveIndex = text.IndexOf("PIPE-LIVE:after-replay", StringComparison.Ordinal);
+            int bootstrapIndex = text.IndexOf(BootstrapPrefix, StringComparison.Ordinal);
+            int liveIndex = text.IndexOf(LivePrefix + "after-replay", StringComparison.Ordinal);
             Assert.True(bootstrapIndex >= 0, "The late subscriber did not receive the buffered bootstrap output.");
             Assert.True(liveIndex > bootstrapIndex, "Live output was delivered before the bootstrap replay.");
         }
         finally
         {
             session.Dispose();
-            File.Delete(signalPath);
+            try
+            {
+                Directory.Delete(childDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // The child may still hold the payload open for a moment after Dispose. Leaving a
+                // directory behind in the temporary folder must not fail the test that made it.
+            }
         }
     }
 
