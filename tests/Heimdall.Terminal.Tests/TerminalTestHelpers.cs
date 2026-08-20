@@ -202,6 +202,78 @@ internal static class TerminalTestHelpers
     }
 
     /// <summary>
+    /// Arguments for a child that reads one line from standard input and writes it back behind
+    /// <paramref name="prefix"/>, then exits with zero.
+    /// </summary>
+    /// <param name="prefix">
+    /// Text placed in front of the echoed line. Restricted to letters, digits, dash, colon and
+    /// underscore: everything else is either a command-processor metacharacter or a delayed
+    /// expansion trigger, and quoting it correctly inside the nested command is not worth the risk
+    /// for a value only tests choose.
+    /// </param>
+    /// <remarks>
+    /// <para>Delayed expansion is what makes this possible in one command: <c>%line%</c> is
+    /// substituted when the line is parsed, which is before <c>set /p</c> has run, so it would
+    /// always be empty. <c>!line!</c> under <c>/v:on</c> is substituted when the echo executes.
+    /// </para>
+    /// <para>A previous pass kept a PowerShell host for the stdin test on the grounds that it
+    /// exercises standard input. It does, and so does this - the command processor reads a line
+    /// from a redirected stdin exactly as well, without the host's cold start.</para>
+    /// </remarks>
+    internal static string BuildStdinEchoChildArguments(string prefix)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(prefix);
+        RejectUnsafeChildLiteral(prefix, nameof(prefix));
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"/d /v:on /c \"set /p line= & echo {prefix}!line!\"");
+    }
+
+    /// <summary>
+    /// Arguments for a child that writes <paramref name="first"/>, waits for a line on standard
+    /// input, then writes <paramref name="second"/> and exits with zero.
+    /// </summary>
+    /// <remarks>
+    /// <para>The two lines are guaranteed to arrive as two separate reads because the second one
+    /// cannot be written until the caller has answered the first - causality rather than a sleep.
+    /// A pause would work too and was tried; it makes the separation depend on timing, which is
+    /// the property these tests are being moved away from, and it made the test slower than the
+    /// PowerShell child it replaced.</para>
+    /// <para>Two consecutive echoes with nothing between them would not do: the reader is free to
+    /// coalesce them into one read, and a test counting notifications would then be asserting
+    /// buffer behaviour rather than the read loop.</para>
+    /// </remarks>
+    internal static string BuildTwoStageOutputChildArguments(string first, string second)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(first);
+        ArgumentException.ThrowIfNullOrEmpty(second);
+        RejectUnsafeChildLiteral(first, nameof(first));
+        RejectUnsafeChildLiteral(second, nameof(second));
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"/d /c \"echo {first}& set /p ignored= & echo {second}\"");
+    }
+
+    /// <summary>
+    /// Refuses any literal that would need quoting inside a nested command-processor command.
+    /// </summary>
+    private static void RejectUnsafeChildLiteral(string value, string parameterName)
+    {
+        foreach (char character in value)
+        {
+            if (!char.IsAsciiLetterOrDigit(character)
+                && character is not ('-' or ':' or '_'))
+            {
+                throw new ArgumentException(
+                    $"'{value}' contains '{character}', which is not safe inside a command-processor command.",
+                    parameterName);
+            }
+        }
+    }
+
+    /// <summary>
     /// The value a session reads as "still running" rather than as an exit code.
     /// </summary>
     private const int StillActiveExitCode = 259;
