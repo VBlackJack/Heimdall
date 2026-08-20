@@ -644,4 +644,131 @@ public sealed class RdpActiveXHostTests
             Tick?.Invoke(this, EventArgs.Empty);
         }
     }
+    // The gateway block, the six values in it with an established meaning.
+    [Theory]
+    [InlineData(0x0300_0015, "RdGatewayCredentials")]
+    [InlineData(0x0300_0003, "RdGatewayCertificate")]
+    [InlineData(0x0300_0005, "RdGatewayCertificate")]
+    [InlineData(0x0300_000C, "RdGatewayUnreachable")]
+    [InlineData(0x0300_0032, "RdGatewayTimeout")]
+    [InlineData(0x0300_0033, "RdGatewayTimeout")]
+    public void GetExtendedDisconnectReasonKey_MapsTheNamedGatewayReasons(
+        int extendedReason,
+        string expectedKey)
+    {
+        Assert.Equal(expectedKey, RdpActiveXHost.GetExtendedDisconnectReasonKey(extendedReason));
+    }
+
+    // A member of either block with no established meaning is named by its family rather than
+    // left to the unknown-code message. Telling someone whose connection goes through a gateway
+    // that the gateway is what refused them is the single most useful thing available here.
+    [Theory]
+    [InlineData(0x0300_0000, "RdGatewayError")]
+    [InlineData(0x0300_4242, "RdGatewayError")]
+    [InlineData(0x0300_FFFF, "RdGatewayError")]
+    [InlineData(0x0200_0000, "RemoteAppError")]
+    [InlineData(0x0200_0001, "RemoteAppError")]
+    [InlineData(0x0200_FFFF, "RemoteAppError")]
+    public void GetExtendedDisconnectReasonKey_UnnamedFamilyMember_NamesTheFamily(
+        int extendedReason,
+        string expectedKey)
+    {
+        Assert.Equal(expectedKey, RdpActiveXHost.GetExtendedDisconnectReasonKey(extendedReason));
+    }
+
+    // Both families are bounded, and each bound is asserted one value past it. Widening either
+    // range would start naming a gateway as the cause of a disconnect that has nothing to do
+    // with one, which is exactly the kind of confident wrong answer the unknown-code message
+    // exists to avoid.
+    [Theory]
+    [InlineData(0x01FF_FFFF)]
+    [InlineData(0x0201_0000)]
+    [InlineData(0x02FF_FFFF)]
+    [InlineData(0x0301_0000)]
+    public void GetExtendedDisconnectReasonKey_OutsideBothFamilies_ReturnsNull(int extendedReason)
+    {
+        Assert.Null(RdpActiveXHost.GetExtendedDisconnectReasonKey(extendedReason));
+    }
+
+    // Primary reasons with a documented meaning that the decoder used to leave unnamed.
+    [Theory]
+    [InlineData(2823, "AccountDisabled")]
+    [InlineData(3079, "TimeOfDayRestriction")]
+    [InlineData(4617, "NlaRequired")]
+    [InlineData(6151, "NoAuthenticationAuthority")]
+    [InlineData(6919, "CertificateExpired")]
+    [InlineData(7431, "ClockSkew")]
+    public void GetDisconnectReasonKey_MapsTheNewlySourcedReasons(int reason, string expectedKey)
+    {
+        Assert.Equal(expectedKey, RdpActiveXHost.GetDisconnectReasonKey(reason));
+    }
+
+    // Deliberately left unmapped, and asserted so that a later reader does not complete the table
+    // from a guess. 1032 is documented with contradictory meanings by its own vendor; the others
+    // are reported in the wild with no established meaning at all. An invented label is worse than
+    // the unknown-code message, which at least does not mislead.
+    [Theory]
+    [InlineData(1032)]
+    [InlineData(2820)]
+    [InlineData(1028)]
+    [InlineData(2312)]
+    [InlineData(4615)]
+    [InlineData(4361)]
+    public void GetDisconnectReasonKey_ReasonWithNoEstablishedMeaning_StaysUnmapped(int reason)
+    {
+        Assert.Null(RdpActiveXHost.GetDisconnectReasonKey(reason));
+    }
+
+    // This lot named disconnects; it did not re-decide any of them. Severity drives the
+    // auto-reconnect veto, which is a different question from what the message says, and the only
+    // risky direction would be making a code newly eligible for automatic retry.
+    [Theory]
+    [InlineData(2823)]
+    [InlineData(3079)]
+    [InlineData(4617)]
+    [InlineData(6151)]
+    [InlineData(6919)]
+    [InlineData(7431)]
+    public void GetDisconnectSeverity_NewlyNamedReasons_StayTerminalAndUnretried(int reason)
+    {
+        Assert.Equal(
+            RdpActiveXHost.RdpDisconnectSeverity.TerminalError,
+            RdpActiveXHost.GetDisconnectSeverity(reason));
+        Assert.False(RdpActiveXHost.AllowsAutoReconnect(reason));
+    }
+
+    // Naming a family did not move the retry decision either: it still comes from the primary
+    // reason, exactly as it did when the extended code decoded to nothing. The second assertion
+    // is the one that matters, because it compares against the same call without the extended
+    // code rather than against a value written here.
+    [Theory]
+    [InlineData(2308, 0x0300_0032, true)]
+    [InlineData(2823, 0x0300_0032, false)]
+    [InlineData(2308, 0x0200_0001, true)]
+    public void AllowsAutoReconnect_FamilyNamedExtendedReason_StillFollowsThePrimary(
+        int reason,
+        int extendedReason,
+        bool expected)
+    {
+        Assert.Equal(expected, RdpActiveXHost.AllowsAutoReconnect(reason, extendedReason));
+        Assert.Equal(
+            RdpActiveXHost.AllowsAutoReconnect(reason),
+            RdpActiveXHost.AllowsAutoReconnect(reason, extendedReason));
+    }
+
+    // The resolver's rule is unchanged by the new families: the extended code wins, because it is
+    // what the server said about the attempt, and a gateway refusing the attempt is not one of the
+    // generic credential rejections that lose to a primary code naming an account state. A gateway
+    // turns you away before the server ever reads the account, so the account state is stale.
+    [Theory]
+    [InlineData(2308, 0x0300_000C, "RdGatewayUnreachable")]
+    [InlineData(2823, 0x0300_4242, "RdGatewayError")]
+    [InlineData(3335, 0x0300_0015, "RdGatewayCredentials")]
+    public void ResolveDisconnectReasonKey_FamilyNamedExtendedCode_WinsOverThePrimary(
+        int reason,
+        int extendedReason,
+        string expected)
+    {
+        Assert.Equal(expected, RdpActiveXHost.ResolveDisconnectReasonKey(reason, extendedReason));
+    }
 }

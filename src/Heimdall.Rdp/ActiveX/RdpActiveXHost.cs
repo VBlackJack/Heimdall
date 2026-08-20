@@ -1033,13 +1033,19 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         2311 => "CertificateWarning",
         2567 => "UserNotFound",
         2822 => "EncryptionError",
+        2823 => "AccountDisabled",
         2825 => "NlaNotSupported",
+        3079 => "TimeOfDayRestriction",
         3080 => "ClientDecompressionFailed",
         3335 => "AccountLockedOut",
         3591 => "AccountExpired",
         3847 => "PasswordExpired",
         3848 => "CredSspPolicyError",
         3592 or 4360 => "ReconnectFailed",
+        4617 => "NlaRequired",
+        6151 => "NoAuthenticationAuthority",
+        6919 => "CertificateExpired",
+        7431 => "ClockSkew",
         // Unknown codes intentionally fall through to raw-number display; MsTscAx
         // extended-reason bit-packing is not decoded here.
         //
@@ -1069,11 +1075,54 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
                 => "BadCredentials",
             ExtendedDisconnectReasonCode.ServerLogonTimeout
                 => "ServerLogonTimeout",
+            ExtendedDisconnectReasonCode.GatewayCredentialsRejected
+                => "RdGatewayCredentials",
+            ExtendedDisconnectReasonCode.GatewayCertificateRejected
+                or ExtendedDisconnectReasonCode.GatewayCertificateUntrusted
+                => "RdGatewayCertificate",
+            ExtendedDisconnectReasonCode.GatewayUnreachable
+                => "RdGatewayUnreachable",
+            ExtendedDisconnectReasonCode.GatewayTimeout
+                or ExtendedDisconnectReasonCode.GatewayTimeoutSecondary
+                => "RdGatewayTimeout",
             _ when IsLicenseExtendedDisconnectReason(extendedReason)
                 => "LicenseError",
+            _ when IsGatewayExtendedDisconnectReason(extendedReason)
+                => "RdGatewayError",
+            _ when IsRemoteAppExtendedDisconnectReason(extendedReason)
+                => "RemoteAppError",
             _ => null
         };
     }
+
+    /// <summary>
+    /// Whether an extended reason belongs to the Remote Desktop Gateway block.
+    /// </summary>
+    /// <remarks>
+    /// <para>A range rather than a member list, and for a different reason than the licensing one:
+    /// the block holds more than ninety values, of which only the handful named above have an
+    /// established meaning. Recognising the range turns every other one from a bare number into
+    /// "the gateway is what refused you", which is the single most useful thing to tell someone
+    /// whose connection goes through one.</para>
+    /// <para>The named members come from the client error reference, not from a disconnect observed
+    /// here: no Remote Desktop Gateway is reachable from this machine. What IS established without
+    /// a gateway is that these values cannot arrive on the primary channel - a primary reason is a
+    /// two-byte encoding and these are eight-digit - so the extended channel is where they land.
+    /// </para>
+    /// </remarks>
+    private static bool IsGatewayExtendedDisconnectReason(int extendedReason)
+        => extendedReason is >= 0x0300_0000 and <= 0x0300_FFFF;
+
+    /// <summary>
+    /// Whether an extended reason belongs to the RemoteApp block.
+    /// </summary>
+    /// <remarks>
+    /// Same treatment as the gateway block and for the same reason: no member of it has an
+    /// established meaning here, so the family is named and the raw number is left to speak for
+    /// the specifics.
+    /// </remarks>
+    private static bool IsRemoteAppExtendedDisconnectReason(int extendedReason)
+        => extendedReason is >= 0x0200_0000 and <= 0x0200_FFFF;
 
     /// <summary>
     /// Resolves the one message key for a disconnect, from both codes the client reports.
