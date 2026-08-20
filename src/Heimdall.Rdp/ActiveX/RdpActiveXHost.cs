@@ -1874,7 +1874,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
             TrySetSelectedMonitors(ocx, selectedMonitorIndices);
         }
 
-        // Force TCP-only: disable bandwidth auto-detection (which uses UDP probes)
+        // Suppress the UDP probe: disable bandwidth auto-detection (which uses UDP probes)
         // and set an explicit network type so the client does not attempt UDP transport.
         // The MsTscAx ActiveX control has no direct "DisableUDP" COM property;
         // disabling BandwidthDetection + explicit NetworkConnectionType achieves the

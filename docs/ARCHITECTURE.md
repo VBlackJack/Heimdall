@@ -165,7 +165,7 @@ Additional guards:
 - **DNS pre-resolution**: `Dns.GetHostEntryAsync()` fire-and-forget on server selection in tree view
 - **TCP keep-alive**: `KeepAliveIntervalMs = 60_000` for network break detection
 - **Per-server experience flags**: `AdvancedSettings9.PerformanceFlags` bitmask (wallpaper, themes, animations, drag, cursor shadow, composition) configurable in Server Dialog
-- **TCP-only mode**: `BandwidthDetection = false` + `NetworkConnectionType = 6` (LAN) disables UDP probe to avoid firewall timeouts
+- **UDP probe suppression**: `BandwidthDetection = false` + `NetworkConnectionType = 6` (LAN) stops the UDP probe that times out behind firewalls. It does not force TCP: no client-side setting can, only the `fClientDisableUDP` machine policy
 
 ### 4b. RDP Profile Resolution and One-Shot Mode Override
 

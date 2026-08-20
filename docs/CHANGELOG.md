@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-20: the transport option stops claiming, in code, what it cannot do
+
+- **The setting's own contract said it disabled UDP transport.** It does not, and no application
+  can: the Remote Desktop client offers no way to turn UDP off, and only the `fClientDisableUDP`
+  machine policy does. What the setting removes is the probe, which is the thing that times out
+  behind a firewall that drops UDP.
+- The label a user reads was corrected earlier and already describes the mechanism. What survived
+  was the claim in the code: the option's own documentation comment, two comments at the sites that
+  write the settings, and an architecture heading calling it a TCP-only mode.
+- **The question of whether Heimdall owes a real TCP-only capability is answered: it does not.**
+  Reading the machine policy and refusing to connect when it is unset would turn a preference into
+  an outage, for a connection that works.
+- A guard now fails if any source under the RDP project claims to force TCP again, because this is
+  a claim that already outlived its truth once.
+
 ## 2026-08-20: three RDP disconnect codes were telling users the wrong thing
 
 - **A server demanding Network Level Authentication was reported as a data decompression error**,
