@@ -18,9 +18,9 @@ using System.IO;
 using System.Text.Json;
 using Heimdall.App.Views;
 using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Core.Localization;
 using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Rdp.ActiveX;
-using Heimdall.Core.Localization;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
