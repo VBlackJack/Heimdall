@@ -130,6 +130,27 @@ public sealed class ConPtySessionTests
                 }
             };
 
+            // The replay is delivered inside the add-accessor, under the delivery lock, and
+            // ConPtySession's own comment there guarantees the read loop cannot interleave a
+            // direct delivery ahead of it. So anything present the instant the subscription
+            // returns was replayed, and anything delivered live can only arrive afterwards.
+            //
+            // Without this check the test does not test replay. If the shell had not printed
+            // yet when the wait above expired, its output reached the subscriber LIVE, the
+            // non-emptiness assertion below passed, and no buffer was ever replayed. That is
+            // precisely the slow-runner case this test exists to cover, and it was the case in
+            // which the test could not fail.
+            int bufferedAtSubscription;
+            lock (outputLock)
+            {
+                bufferedAtSubscription = output.Length;
+            }
+
+            Assert.True(
+                bufferedAtSubscription > 0,
+                "Nothing was replayed when the subscription attached, so any output observed "
+                    + "below was delivered live and the bootstrap buffer was never exercised.");
+
             string text = await TerminalTestHelpers.AwaitProcessEventAsync(
                 outputObserved.Task,
                 "DataReceivedReplay");
