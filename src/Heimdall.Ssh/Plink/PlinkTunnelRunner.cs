@@ -129,6 +129,7 @@ public sealed class PlinkTunnelRunner : IDisposable
     private readonly TimeSpan _processKillGracePeriod;
     private readonly ITcpListenerOwnershipProbe _listenerOwnershipProbe;
     private readonly Func<ProcessStartInfo, IPlinkProcess> _processFactory;
+    private readonly Func<string> _passwordFileDirectory;
 
     private IPlinkProcess? _process;
     private string? _pwFilePath;
@@ -166,14 +167,40 @@ public sealed class PlinkTunnelRunner : IDisposable
         PlinkTunnelRunnerOptions options,
         ITcpListenerOwnershipProbe listenerOwnershipProbe,
         Func<ProcessStartInfo, IPlinkProcess> processFactory)
+        : this(options, listenerOwnershipProbe, processFactory, Path.GetTempPath)
+    {
+    }
+
+    /// <summary>
+    /// Initialises a runner that writes its password file somewhere other than the user's
+    /// temporary directory.
+    /// </summary>
+    /// <param name="passwordFileDirectory">
+    /// Where the <c>-pwfile</c> argument is materialised. Production passes
+    /// <see cref="Path.GetTempPath"/>.
+    /// </param>
+    /// <remarks>
+    /// A test that has to observe the file cannot observe a directory it shares with every other
+    /// process on the machine: the file it is looking for and a file some concurrent test happens
+    /// to create are indistinguishable there, and a run of the whole solution runs those tests in
+    /// parallel. Given its own directory a test observes an exact count instead of a difference
+    /// against a baseline, which is both stronger and unraceable.
+    /// </remarks>
+    internal PlinkTunnelRunner(
+        PlinkTunnelRunnerOptions options,
+        ITcpListenerOwnershipProbe listenerOwnershipProbe,
+        Func<ProcessStartInfo, IPlinkProcess> processFactory,
+        Func<string> passwordFileDirectory)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(listenerOwnershipProbe);
         ArgumentNullException.ThrowIfNull(processFactory);
+        ArgumentNullException.ThrowIfNull(passwordFileDirectory);
         _portCheckInterval = TimeSpan.FromMilliseconds(options.PortCheckIntervalMs);
         _processKillGracePeriod = TimeSpan.FromMilliseconds(options.KillGracePeriodMs);
         _listenerOwnershipProbe = listenerOwnershipProbe;
         _processFactory = processFactory;
+        _passwordFileDirectory = passwordFileDirectory;
     }
 
     /// <summary>Whether the underlying plink process is running.</summary>
@@ -605,7 +632,7 @@ public sealed class PlinkTunnelRunner : IDisposable
             // the TOCTOU window between creation and permission enforcement.
             CleanupPasswordFile();
             _pwFilePath = Path.Combine(
-                Path.GetTempPath(),
+                _passwordFileDirectory(),
                 $"{PlinkPasswordFileNaming.Prefix}{Guid.NewGuid():N}");
 
             if (OperatingSystem.IsWindows())
