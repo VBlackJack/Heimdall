@@ -12,6 +12,18 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: the settings screen refused a watchdog setting the rest of the application accepts
+
+- **Zero disables the RDP connect watchdog.** The watchdog itself treats it that way and the
+  settings schema explicitly allows it, but the settings screen declared its own range starting at
+  five seconds and rejected it.
+- **So a configuration with the watchdog disabled opened with an error on a field that was set
+  correctly**, and blocked saving anything else on that screen until it was changed. The watchdog
+  could not be turned off from the interface at all.
+- **The screen now takes its bounds from the same policy the watchdog reads**, rather than writing
+  the numbers out a third time, so the three answers are one answer whatever the bounds become.
+- The validation message says so in both languages, and the error range now reads "zero or between".
+
 ## 2026-08-21: opening a local shell's settings and saving turned its elevation off
 
 - **A profile stores elevation twice**: the mode, and a legacy flag that predates it. The launcher

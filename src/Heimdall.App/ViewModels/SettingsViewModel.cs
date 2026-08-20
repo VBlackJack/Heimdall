@@ -604,7 +604,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(5000, 600000, ErrorMessage = "RDP connection watchdog timeout must be between 5000 and 600000 ms.")]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateRdpConnectWatchdogTimeoutMsValue))]
     private int _rdpConnectWatchdogTimeoutMs = 45000;
 
     [ObservableProperty]
@@ -2590,6 +2590,38 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             "RDP resize delay must be zero or between 1000 and 60000 ms.");
     }
 
+    /// <summary>
+    /// Validates the RDP connection watchdog timeout while preserving zero as the explicit disable
+    /// value.
+    /// </summary>
+    /// <param name="value">The configured timeout in milliseconds.</param>
+    /// <param name="context">The validation context supplied by the data annotations pipeline.</param>
+    /// <returns>A validation error when the value is neither zero nor within the supported range.</returns>
+    /// <remarks>
+    /// <para>The bounds come from <see cref="Views.EmbeddedRdp.RdpConnectWatchdogPolicy"/>, the type
+    /// the watchdog itself reads, rather than being written out again here. A plain range attribute
+    /// could not express "zero, or five seconds to ten minutes", so it declared the range alone and
+    /// rejected the disable value that both the schema and the watchdog accept. A settings file with
+    /// the watchdog disabled therefore opened with an error on a field the user had set correctly,
+    /// and blocked saving anything else until it was changed.</para>
+    /// </remarks>
+    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateRdpConnectWatchdogTimeoutMsValue(
+        int value,
+        ValidationContext context)
+    {
+        _ = context;
+
+        if (value == Views.EmbeddedRdp.RdpConnectWatchdogPolicy.DisabledTimeoutMs
+            || (value >= Views.EmbeddedRdp.RdpConnectWatchdogPolicy.MinTimeoutMs
+                && value <= Views.EmbeddedRdp.RdpConnectWatchdogPolicy.MaxTimeoutMs))
+        {
+            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
+        }
+
+        return new System.ComponentModel.DataAnnotations.ValidationResult(
+            "RDP connection watchdog timeout must be zero or between 5000 and 600000 ms.");
+    }
+
     private static readonly Dictionary<string, string> SettingsValidationKeyMap = new(StringComparer.Ordinal)
     {
         ["Max embedded sessions must be between 1 and 20."] = "ValidationSettingsMaxSessions",
@@ -2598,7 +2630,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ["SSH TMOUT reset interval must be between 0 and 3600 seconds."] = "ValidationSettingsTmoutReset",
         ["SSH auto-reconnect attempts must be between 1 and 10."] = "ValidationSettingsSshAutoReconnectAttempts",
         ["Tunnel establishment delay must be between 0 and 30000 ms."] = "ValidationSettingsTunnelDelay",
-        ["RDP connection watchdog timeout must be between 5000 and 600000 ms."] = "ValidationSettingsRdpTimeout",
+        ["RDP connection watchdog timeout must be zero or between 5000 and 600000 ms."] = "ValidationSettingsRdpTimeout",
         ["RDP resize delay must be zero or between 1000 and 60000 ms."] = "ValidationSettingsRdpResizeDelay",
         ["RDP artifact cleanup delay must be between 1000 and 60000 ms."] = "ValidationSettingsRdpArtifactCleanupDelay",
         ["RDP credential autofill timeout must be between 5000 and 300000 ms."] = "ValidationSettingsRdpCredentialAutofillTimeout",
