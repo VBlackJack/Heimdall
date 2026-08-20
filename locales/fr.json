@@ -3324,7 +3324,7 @@
   "SessionStatusDisconnecting": "D\u00e9connexion...",
   "SessionStatusReconnecting": "Reconnexion...",
   "SessionStatusError": "Erreur",
-  "SessionStatusLaunchedExternalClient": "Client externe lancé",
+  "SessionStatusLaunchedExternalClient": "Client externe lanc\u00e9",
   "SplitSecondaryDisconnected": "Session deconnectee",
   "SplitSecondaryConnecting": "Connexion en cours...",
   "SplitDropToMerge": "Deposer pour diviser",
