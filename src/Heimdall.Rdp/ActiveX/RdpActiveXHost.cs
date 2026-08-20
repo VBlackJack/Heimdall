@@ -1192,13 +1192,35 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     /// Formats a disconnect reason as a symbolic support code plus the raw numeric value.
     /// </summary>
     public static string FormatDisconnectCode(int reason)
+        => FormatDisconnectCode(reason, NoExtendedDisconnectReason);
+
+    /// <summary>
+    /// Formats a disconnect for the reconnect overlay, from both codes.
+    /// </summary>
+    /// <param name="reason">The high-level MsTscAx disconnect reason.</param>
+    /// <param name="extendedReason">The optional extended disconnect reason.</param>
+    /// <returns>The symbolic name of the resolved cause, the reason, and the extended reason.</returns>
+    /// <remarks>
+    /// <para>The symbolic name comes from <see cref="ResolveDisconnectReasonKey"/>, which is the
+    /// same resolution the displayed message comes from. Deriving it from the primary reason alone
+    /// let the overlay print one cause beside a message naming another: a gateway timeout was shown
+    /// as RDP_SOCKET_CLOSED, because the socket close is what the primary code reports when a
+    /// gateway is what actually refused the session.</para>
+    /// <para>The extended reason is appended whenever there is one, decoded or not. When it decoded,
+    /// it is the number the message came from and a reader needs it to re-derive the message; when
+    /// it did not, it is the only specific thing anyone has to go on.</para>
+    /// </remarks>
+    public static string FormatDisconnectCode(int reason, int extendedReason)
     {
-        var reasonKey = GetDisconnectReasonKey(reason);
-        var symbolicCode = reasonKey is null
+        string? reasonKey = ResolveDisconnectReasonKey(reason, extendedReason);
+        string symbolicCode = reasonKey is null
             ? "UNKNOWN"
             : ToUpperSnakeCase(reasonKey);
 
-        return $"RDP_{symbolicCode} \u00B7 {reason}";
+        string formatted = $"RDP_{symbolicCode} \u00B7 {reason}";
+        return extendedReason == NoExtendedDisconnectReason
+            ? formatted
+            : $"{formatted} \u00B7 EXT {extendedReason}";
     }
 
     private static string ToUpperSnakeCase(string value)
