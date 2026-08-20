@@ -19,12 +19,66 @@ using System.Text.Json;
 using Heimdall.App.Views;
 using Heimdall.App.Views.EmbeddedRdp;
 using Heimdall.Core.SessionDiagnostics;
+using Heimdall.Rdp.ActiveX;
+using Heimdall.Core.Localization;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
 
 public sealed class RdpHostDiagnosticFactoryTests
 {
+    // Every key the table can produce has to exist in both locales. A label that resolves to
+    // nothing is indistinguishable from a correct one until a user hits that code.
+    [Fact]
+    public async Task EveryDisconnectMessageKeyResolvesInBothLocales()
+    {
+        HashSet<string> keys = [];
+        for (int reason = 0; reason <= 10000; reason++)
+        {
+            if (RdpActiveXHost.GetDisconnectReasonKey(reason) is { } suffix)
+            {
+                keys.Add($"RdpDisconnect{suffix}");
+            }
+        }
+
+        // A silent drop to an empty sweep would otherwise read as a pass.
+        Assert.NotEmpty(keys);
+        Assert.Contains("RdpDisconnectTimeoutOccurred", keys);
+        Assert.Contains("RdpDisconnectNlaNotSupported", keys);
+        Assert.Contains("RdpDisconnectReconnectFailed", keys);
+
+        foreach (string locale in new[] { "en", "fr" })
+        {
+            LocalizationManager localizer = new();
+            await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+
+            List<string> unresolved = [];
+            foreach (string key in keys)
+            {
+                string value = localizer[key];
+                if (string.IsNullOrWhiteSpace(value) || string.Equals(value, key, StringComparison.Ordinal))
+                {
+                    unresolved.Add($"{locale}: {key}");
+                }
+            }
+
+            Assert.Empty(unresolved);
+        }
+    }
+
+    [Theory]
+    [InlineData(1796, "RdpDisconnectTimeoutOccurred")]
+    [InlineData(2825, "RdpDisconnectNlaNotSupported")]
+    [InlineData(4360, "RdpDisconnectReconnectFailed")]
+    [InlineData(3592, "RdpDisconnectReconnectFailed")]
+    public void FromDisconnect_CorrectedCodes_CarryTheirRealMessage(int reason, string expectedKey)
+    {
+        SessionDiagnostic diagnostic = RdpHostDiagnosticFactory.FromDisconnect(reason);
+
+        Assert.Equal(expectedKey, diagnostic.MessageKey);
+        Assert.Equal(reason, diagnostic.Code);
+    }
+
     [Theory]
     [InlineData(0, "RdpDisconnectNoInfo")]
     [InlineData(516, "RdpDisconnectSocketConnectFailed")]
