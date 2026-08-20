@@ -12,6 +12,26 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: editing a server quietly deleted the parts of it the dialog does not show
+
+- **The dialog composes a fresh profile and the caller assigns it over the stored record.** A field
+  the dialog does not write is therefore not left alone: it is replaced by the default. Four were
+  being lost on every edit.
+- **A Citrix profile lost its launch command line**, which is what the Citrix launcher reads in
+  order to start the published application at all. Editing anything else about that profile, even
+  its display name, broke it.
+- **A profile lost its position** in the gateway overview, so it jumped after an edit. That value
+  comes from the legacy migration, and the RDP importer already knew to preserve it. The dialog was
+  the one surface that did not.
+- **The tunnels panel collapsed**, and **any setting written by a newer version of the application
+  was discarded**, because the profile carries unknown fields forward and the dialog's projection
+  did not.
+- **What the dialog does not edit is now carried over from the profile it was opened on**, taken
+  from a faithful clone so the copied data is detached from the record it came from. The identity is
+  deliberately not carried: every caller assigns it afterwards, and inheriting it on a duplicate
+  would produce two profiles claiming to be the same record.
+- Composing a new profile inherits nothing, which is asserted rather than assumed.
+
 ## 2026-08-20: the reconnect overlay named a different cause than its own message
 
 - **The overlay prints a symbolic cause beside the message, and the two were resolved separately.**
