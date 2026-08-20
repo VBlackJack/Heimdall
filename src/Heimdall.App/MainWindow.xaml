@@ -13,6 +13,7 @@
         xmlns:tunnels="clr-namespace:Heimdall.App.ViewModels.Tunnels"
         xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
         xmlns:controls="clr-namespace:Heimdall.App.Controls"
+        xmlns:converters="clr-namespace:Heimdall.App.Converters"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="{Binding WindowTitle}"
@@ -29,6 +30,7 @@
         PreviewDrop="OnWindowPreviewDrop">
 
     <Window.Resources>
+        <converters:SessionStatusToDisplayConverter x:Key="SessionStatusToDisplayConverter"/>
         <!-- Implicit DataTemplates for recursive split pane tree rendering -->
         <DataTemplate DataType="{x:Type models:SessionPaneModel}">
             <views:SessionPaneControl/>
@@ -48,7 +50,7 @@
                         <ProgressBar IsIndeterminate="True"
                                      Width="200" Height="3"
                                      Margin="0,0,0,12"/>
-                        <TextBlock Text="{Binding Status}"
+                        <TextBlock Text="{Binding Status, Converter={StaticResource SessionStatusToDisplayConverter}}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"/>

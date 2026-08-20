@@ -3325,6 +3325,7 @@
   "SessionStatusDisconnecting": "Disconnecting...",
   "SessionStatusReconnecting": "Reconnecting...",
   "SessionStatusError": "Error",
+  "SessionStatusLaunchedExternalClient": "External client launched",
   "SplitSecondaryDisconnected": "Session disconnected",
   "SplitSecondaryConnecting": "Connecting...",
   "SplitDropToMerge": "Drop to split",

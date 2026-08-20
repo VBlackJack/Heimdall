@@ -277,7 +277,7 @@ public sealed class SplitService : ISplitService
             {
                 sftpView.SetOwningPane(newPane);
             }
-            newPane.Status = "Connected";
+            newPane.Status = SessionStatusTokens.Connected;
 
             LayoutMemory.Record(
                 targetPane.OriginalServerId, serverDto.Id,
@@ -635,7 +635,7 @@ public sealed class SplitService : ISplitService
             ReleaseOldConnectionStateOnce("ReconnectPane pre-connect");
             pane.FailureDetails = null;
             pane.HostControl = null;
-            pane.Status = _localizer["SplitSecondaryConnecting"];
+            pane.Status = SessionStatusTokens.Connecting;
 
             var servers = await _configManager.LoadServersAsync();
             var settings = await _configManager.LoadSettingsAsync();
@@ -646,7 +646,7 @@ public sealed class SplitService : ISplitService
 
             if (serverDto is null)
             {
-                pane.Status = "Error";
+                pane.Status = SessionStatusTokens.Error;
                 Core.Logging.FileLogger.Warn(
                     $"ReconnectPane failed: server '{serverId}' no longer in inventory.");
                 return;
@@ -673,7 +673,7 @@ public sealed class SplitService : ISplitService
 
             if (!result.Success || result.Session is null)
             {
-                pane.Status = "Error";
+                pane.Status = SessionStatusTokens.Error;
                 pane.FailureDetails = result.Failure;
                 SetStatusText?.Invoke(result.ErrorMessage ?? _localizer["ErrorSplitSessionFailed"]);
                 Core.Logging.FileLogger.Warn(
@@ -712,7 +712,7 @@ public sealed class SplitService : ISplitService
             {
                 SafeDisposeSessionResult(result.Session);
                 CleanupOrphanedPane(paneScopedServerDto.Id);
-                pane.Status = "Error";
+                pane.Status = SessionStatusTokens.Error;
                 SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
                 Core.Logging.FileLogger.Error(
                     $"ReconnectPane host creation failed for '{paneScopedServerDto.DisplayName}': {ex.Message}", ex);
@@ -734,7 +734,7 @@ public sealed class SplitService : ISplitService
             }
             pane.ServerId = paneScopedServerDto.Id;
             pane.ConnectionType = effectiveConnectionType;
-            pane.Status = "Connected";
+            pane.Status = SessionStatusTokens.Connected;
 
             // No LayoutMemory.Record here — reconnect targets the same server,
             // and the pair was already recorded when the split was first created.
@@ -747,7 +747,7 @@ public sealed class SplitService : ISplitService
         }
         catch (Exception ex)
         {
-            pane.Status = "Error";
+            pane.Status = SessionStatusTokens.Error;
             ReleaseOldConnectionStateOnce("ReconnectPane exception");
             Core.Logging.FileLogger.Error($"ReconnectPane error: {ex.Message}", ex);
             SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");

@@ -750,7 +750,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                 rdpView.SetOwningPane(tab.PrimaryPane);
             }
 
-            tab.Status = _localizer["StatusConnected"];
+            tab.Status = SessionStatusTokens.Connected;
             StatusText = _localizer.Format("StatusConnected",
                 !string.IsNullOrWhiteSpace(dto.DisplayName) ? dto.DisplayName : dto.RemoteServer);
         }
@@ -759,7 +759,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             // External mode: a process was launched; keep a lightweight ad-hoc tab.
             var tab = Connection.AddSession(dto.Id, dto.DisplayName, connType);
             tab.MarkAsAdHoc(dto);
-            tab.Status = _localizer["StatusLaunchedExternalClient"];
+            tab.Status = SessionStatusTokens.LaunchedExternalClient;
             StatusText = _localizer["StatusLaunchedExternalClient"];
         }
         else
@@ -973,6 +973,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         {
             tab.HostControl = _embeddedSessionManager.CreateToolControl(
                 tab, toolId, context, _currentSettings);
+            // Deliberately free text rather than a state token: a tool pane is not a session, and
+            // the connected-session census must not count it as one.
             tab.Status = _localizer["StatusReady"];
         }
         catch (Exception ex)

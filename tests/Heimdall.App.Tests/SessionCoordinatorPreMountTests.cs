@@ -20,6 +20,7 @@ using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.SessionDiagnostics;
+using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
@@ -281,7 +282,10 @@ public sealed partial class SessionCoordinatorPreMountTests
         SessionTabViewModel tab = Assert.Single(harness.Main.Connection.ActiveSessions);
         Assert.Equal(RdpModeOverride.ForceExternal, tab.RdpModeOverride);
         Assert.Equal("Demo RDP (forced external)", tab.DisplayTitle);
-        Assert.Equal("External client launched", tab.Status);
+        // A token, not the sentence: the pane status is parsed back into a connection state,
+        // and the localized text is produced from it by the display converter.
+        Assert.Equal(SessionStatusTokens.LaunchedExternalClient, tab.Status);
+        Assert.True(ConnectionStateSets.IsConnected(tab.Status));
         Assert.Null(harness.StateMachine.GetStateData("session-rdp-forced-external"));
     }
 
