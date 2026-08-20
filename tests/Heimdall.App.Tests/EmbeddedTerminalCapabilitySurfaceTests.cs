@@ -16,6 +16,8 @@
 
 using System.IO;
 using System.Xml.Linq;
+using Heimdall.App.ViewModels;
+using Heimdall.Sftp;
 
 namespace Heimdall.App.Tests;
 
@@ -188,6 +190,108 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
 
         Assert.Contains("ElevateRequested is not null", method, StringComparison.Ordinal);
     }
+
+    // ------------------------------------------------------------------
+    // The download gate. Kept here rather than with the transfer tests because what it decides is
+    // a capability surface: whether the action is offered at all.
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// The whole kind space, so a kind added later has to be classified rather than inherit an
+    /// answer.
+    /// </summary>
+    [Theory]
+    [InlineData(RemoteEntryKind.File, true)]
+    [InlineData(RemoteEntryKind.Directory, false)]
+    [InlineData(RemoteEntryKind.SymbolicLink, false)]
+    [InlineData(RemoteEntryKind.Fifo, false)]
+    [InlineData(RemoteEntryKind.Socket, false)]
+    [InlineData(RemoteEntryKind.Device, false)]
+    [InlineData(RemoteEntryKind.Unknown, false)]
+    public void SftpDownload_OnlyARegularFileIsDownloadable(RemoteEntryKind kind, bool downloadable)
+    {
+        Assert.Equal(downloadable, EmbeddedSftpViewModel.IsDownloadable(Entry("payload", kind)));
+    }
+
+    [Fact]
+    public void SftpDownload_EveryKindIsCoveredAbove()
+    {
+        // Guards the theory: a kind added to the enum without a row here would otherwise be
+        // silently untested, and the answer for it would be whatever the predicate happens to say.
+        Assert.Equal(7, Enum.GetValues<RemoteEntryKind>().Length);
+    }
+
+    [Fact]
+    public void SftpDownload_IsNotOfferedForASelectionThatWouldTransferNothing()
+    {
+        Assert.False(EmbeddedSftpViewModel.CanDownloadSelection([]));
+        Assert.False(EmbeddedSftpViewModel.CanDownloadSelection(
+            [Entry("logs", RemoteEntryKind.Directory)]));
+        Assert.False(EmbeddedSftpViewModel.CanDownloadSelection(
+            [Entry("logs", RemoteEntryKind.Directory), Entry("etc", RemoteEntryKind.Directory)]));
+        Assert.False(EmbeddedSftpViewModel.CanDownloadSelection(
+            [Entry("pipe", RemoteEntryKind.Fifo), Entry("link", RemoteEntryKind.SymbolicLink)]));
+    }
+
+    [Fact]
+    public void SftpDownload_IsOfferedWhenTheSelectionHoldsAtLeastOneFile()
+    {
+        Assert.True(EmbeddedSftpViewModel.CanDownloadSelection(
+            [Entry("notes.txt", RemoteEntryKind.File)]));
+
+        // A mixed selection still transfers the file, so hiding the action there would remove a
+        // download that works. The end-of-transfer message reports what was skipped.
+        Assert.True(EmbeddedSftpViewModel.CanDownloadSelection(
+            [Entry("logs", RemoteEntryKind.Directory), Entry("notes.txt", RemoteEntryKind.File)]));
+    }
+
+    /// <summary>
+    /// The offer and the outcome have to be the same decision, not two copies of it.
+    /// </summary>
+    /// <remarks>
+    /// A directory-only selection used to open a folder picker and then download nothing. Gating
+    /// the menu on a second, independently written predicate would fix that until the two drifted;
+    /// both sides are read from source here so they cannot.
+    /// </remarks>
+    [Fact]
+    public void SftpDownload_TheMenuAndThePlannerAskTheSamePredicate()
+    {
+        string viewSource = ReadRepoFile(
+            "src",
+            "Heimdall.App",
+            "Views",
+            "EmbeddedSftpView.xaml.cs");
+        string contextMenu = ExtractMethodBody(
+            viewSource,
+            "private void OnContextMenuOpened(object sender, RoutedEventArgs e)");
+        string viewModelSource = ReadRepoFile(
+            "src",
+            "Heimdall.App",
+            "ViewModels",
+            "EmbeddedSftpViewModel.cs");
+        string download = ExtractMethodBody(
+            viewModelSource,
+            "public async Task DownloadFilesAsync(IReadOnlyList<SftpFileInfo> files, string targetFolder)");
+
+        Assert.Contains(
+            "CtxDownload.Visibility = EmbeddedSftpViewModel.CanDownloadSelection(",
+            contextMenu,
+            StringComparison.Ordinal);
+        Assert.Contains("if (!IsDownloadable(file))", download, StringComparison.Ordinal);
+
+        // The menu must not re-derive the answer from the kind on its own.
+        Assert.DoesNotContain("CtxDownload.Visibility = hasSelection", contextMenu, StringComparison.Ordinal);
+    }
+
+    private static SftpFileInfo Entry(string name, RemoteEntryKind kind) => new(
+        name,
+        $"/remote/{name}",
+        kind,
+        Size: 1,
+        LastModified: DateTime.UnixEpoch,
+        Permissions: "rw-r--r--",
+        Owner: "1000",
+        Group: "1000");
 
     private static string ReadRepoFile(params string[] relativeParts) =>
         File.ReadAllText(Path.Combine([FindRepoRoot(), .. relativeParts]));
