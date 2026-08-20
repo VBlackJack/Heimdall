@@ -115,7 +115,44 @@ public static class RdpDisplayResolver
             return CreateMultimonFallback(requested, MultimonFallbackReason.InvalidMonitorIndex);
         }
 
+        if (IsSelectionDisconnected(host, requested.SelectedMonitorIndices))
+        {
+            return CreateMultimonFallback(requested, MultimonFallbackReason.NonContiguousSelection);
+        }
+
         return new RdpMultimonValidation(false, MultimonFallbackReason.None, requested);
+    }
+
+    /// <summary>
+    /// Whether an explicit selection of two or more monitors leaves the desktop in pieces.
+    /// </summary>
+    /// <remarks>
+    /// <para>Answered only when the topology is actually known. A host whose screens could not be
+    /// enumerated carries a count without bounds, and guessing there would be worse than the
+    /// question going unanswered.</para>
+    /// <para>An empty selection is the "every monitor" sentinel and is deliberately left alone.
+    /// Windows permits arrangements where two monitors meet only at a corner; such a host works
+    /// today across all its screens, and coercing the sentinel would silently drop one of them.
+    /// </para>
+    /// <para>A single selected monitor cannot be disconnected from anything.</para>
+    /// <para>The count check here is deliberately redundant with the predicate, which also treats
+    /// fewer than two monitors as connected. Removing either one alone changes nothing observable;
+    /// they are kept apart so that a future change to what the predicate says about an empty set
+    /// cannot silently start coercing the sentinel.</para>
+    /// </remarks>
+    private static bool IsSelectionDisconnected(
+        RdpDisplayCapabilities host,
+        IReadOnlyList<int> selectedMonitorIndices)
+    {
+        if (selectedMonitorIndices.Count < 2 || host.MonitorBounds.Count != host.MonitorCount)
+        {
+            return false;
+        }
+
+        Rectangle[] selectedBounds =
+            [.. selectedMonitorIndices.Select(index => host.MonitorBounds[index])];
+
+        return !RdpMonitorContiguity.AreContiguous(selectedBounds);
     }
 
     public static Size ResolveExternalAutoWindowedSize(Size primaryWorkingArea, Size fallback)
