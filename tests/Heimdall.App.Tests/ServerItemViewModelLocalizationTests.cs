@@ -310,6 +310,154 @@ public sealed class ServerItemViewModelLocalizationTests
     }
 
     [Fact]
+    public async Task StatusTooltip_DescribesWhateverTheDotIsColouredFor()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            connectionState: "Disconnected",
+            localizer: localizer);
+
+        viewModel.HealthState = new HealthState(
+            HealthStatus.Up,
+            DateTime.MinValue,
+            12,
+            null);
+
+        // Idle row: the dot falls back to reachability, so the tooltip does too.
+        Assert.False(viewModel.StatusShowsConnectionState);
+        Assert.Equal(viewModel.HealthTooltipText, viewModel.StatusTooltipText);
+        Assert.Contains("Reachable", viewModel.StatusTooltipText, StringComparison.Ordinal);
+
+        // Live row: the dot is coloured from the session state. The tooltip used to keep saying
+        // "Reachable" here, next to a dot that no longer meant that.
+        viewModel.ConnectionState = "Connected";
+
+        Assert.True(viewModel.StatusShowsConnectionState);
+        Assert.Equal(viewModel.ConnectionStateTooltip, viewModel.StatusTooltipText);
+        Assert.DoesNotContain("Reachable", viewModel.StatusTooltipText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StatusTooltip_StillReportsHealthWhileTheHostIsUnreachableAndIdle()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            connectionState: "Disconnected",
+            localizer: localizer);
+
+        viewModel.HealthState = new HealthState(
+            HealthStatus.Down,
+            DateTime.MinValue,
+            null,
+            "timeout");
+
+        // Guards the guard: a tooltip hard-wired to the state text would pass the test above by
+        // never mentioning health at all.
+        Assert.Equal(viewModel.HealthTooltipText, viewModel.StatusTooltipText);
+        Assert.NotEqual(viewModel.ConnectionStateTooltip, viewModel.StatusTooltipText);
+    }
+
+    /// <summary>
+    /// The dot, its tooltip and the spoken name have to take the same branch.
+    /// </summary>
+    /// <remarks>
+    /// They render it differently on purpose - the tooltip carries the longer explanation, the
+    /// spoken name the short one - so this pins the decision rather than the text. Every state that
+    /// reaches a row is covered, including the transitional ones, because those are exactly where
+    /// the tooltip and the name used to disagree.
+    /// </remarks>
+    [Theory]
+    [InlineData("Disconnected", false)]
+    [InlineData("Connected", true)]
+    [InlineData("Error", true)]
+    [InlineData("Disconnecting", true)]
+    [InlineData("LaunchedExternalClient", true)]
+    [InlineData("RemoteSessionHandedOff", true)]
+    [InlineData("", false)]
+    public async Task StatusTooltip_TakesTheSameBranchAsTheSpokenName(string state, bool followsState)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            connectionState: state,
+            localizer: localizer);
+
+        viewModel.HealthState = new HealthState(
+            HealthStatus.Up,
+            DateTime.MinValue,
+            12,
+            null);
+
+        Assert.Equal(followsState, viewModel.StatusShowsConnectionState);
+
+        if (followsState)
+        {
+            Assert.Equal(viewModel.ConnectionStateTooltip, viewModel.StatusTooltipText);
+            Assert.DoesNotContain(
+                viewModel.HealthTooltipText,
+                viewModel.AccessibleName,
+                StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Equal(viewModel.HealthTooltipText, viewModel.StatusTooltipText);
+            Assert.Contains(
+                viewModel.HealthTooltipText,
+                viewModel.AccessibleName,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task StatusTooltip_RaisesPropertyChangedForEveryInputThatMovesIt()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            localizer: localizer);
+        List<string?> changed = [];
+        viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        AssertStatusTooltipRaised(() => viewModel.ConnectionState = "Connected");
+        AssertStatusTooltipRaised(() => viewModel.HealthState = new HealthState(
+            HealthStatus.Up,
+            DateTime.MinValue,
+            8,
+            null));
+
+        void AssertStatusTooltipRaised(Action mutation)
+        {
+            changed.Clear();
+            mutation();
+            Assert.Contains(nameof(ServerItemViewModel.StatusTooltipText), changed);
+        }
+    }
+
+    [Fact]
+    public void ServerTreeNode_BindsTheStatusDotTooltipToTheEffectiveStatus()
+    {
+        string repositoryRoot = FindRepositoryRoot();
+        string xaml = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "Heimdall.App",
+            "MainWindow.xaml"));
+
+        Assert.Contains(
+            "ToolTip=\"{Binding StatusTooltipText}\"",
+            xaml,
+            StringComparison.Ordinal);
+
+        // The dot must not go back to describing health while being coloured from the state.
+        Assert.DoesNotContain(
+            "ToolTip=\"{Binding HealthTooltipText}\"",
+            xaml,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ServerTreeNode_BindsAccessibleNameToAutomationName()
     {
         string repositoryRoot = FindRepositoryRoot();

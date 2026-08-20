@@ -691,7 +691,7 @@
                                             <Ellipse Grid.Column="1"
                                                      Width="7" Height="7" Margin="2,0,8,0"
                                                      VerticalAlignment="Center"
-                                                     ToolTip="{Binding HealthTooltipText}"
+                                                     ToolTip="{Binding StatusTooltipText}"
                                                      ToolTipService.InitialShowDelay="200">
                                                 <Ellipse.Fill>
                                                     <MultiBinding Converter="{StaticResource ServerStatusToColorConverter}">
