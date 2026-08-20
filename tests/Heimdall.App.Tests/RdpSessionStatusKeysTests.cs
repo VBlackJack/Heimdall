@@ -16,7 +16,9 @@
 
 using System.IO;
 using System.Text.Json;
+using Heimdall.App.Services;
 using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Rdp.Display;
 
 namespace Heimdall.App.Tests;
 
@@ -62,6 +64,56 @@ public sealed class RdpSessionStatusKeysTests
                 document.RootElement.TryGetProperty(key, out _),
                 $"Locale key '{key}' for {status} is missing from en.json");
         }
+    }
+
+    /// <summary>
+    /// Every reason the product can coerce a session for has to have something to say about it.
+    /// </summary>
+    /// <remarks>
+    /// Driven from the enumeration rather than from a list of keys, so a reason added later without
+    /// a message fails here instead of coercing a session in silence. The parity check in CI
+    /// compares the two languages against each other; it cannot see a key the code asks for and
+    /// neither language has.
+    /// </remarks>
+    [Fact]
+    public void EveryMultimonFallbackReason_HasAMessageInBothLanguages()
+    {
+        using var english = LoadLocaleDocument("en");
+        using var french = LoadLocaleDocument("fr");
+        List<string> missing = [];
+        int checkedReasons = 0;
+
+        foreach (MultimonFallbackReason reason in Enum.GetValues<MultimonFallbackReason>())
+        {
+            if (reason == MultimonFallbackReason.None)
+            {
+                continue;
+            }
+
+            checkedReasons++;
+            string? key = EmbeddedSessionManager.ResolveMultimonFallbackStatusKey(reason);
+            if (key is null)
+            {
+                missing.Add($"{reason}: no status key");
+                continue;
+            }
+
+            if (!english.RootElement.TryGetProperty(key, out _))
+            {
+                missing.Add($"{reason}: '{key}' missing from en.json");
+            }
+
+            if (!french.RootElement.TryGetProperty(key, out _))
+            {
+                missing.Add($"{reason}: '{key}' missing from fr.json");
+            }
+        }
+
+        Assert.Empty(missing);
+
+        // A reason set that shrank to nothing would otherwise read as a pass.
+        Assert.Equal(Enum.GetValues<MultimonFallbackReason>().Length - 1, checkedReasons);
+        Assert.True(checkedReasons >= 3);
     }
 
     [Theory]
