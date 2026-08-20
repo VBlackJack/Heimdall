@@ -86,8 +86,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>Heimdall</AssemblyName>
     <RootNamespace>Heimdall.App</RootNamespace>
-    <Version>1.0.0815.1</Version>
-    <InformationalVersion>2026.081501</InformationalVersion>
+    <Version>1.0.0820.1</Version>
+    <InformationalVersion>2026.082001</InformationalVersion>
     <Authors>Julien Bombled</Authors>
     <Product>Heimdall</Product>
     <Description>Secure Connection Manager - RDP, SSH, SFTP</Description>
