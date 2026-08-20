@@ -143,6 +143,42 @@ public sealed class GatewayImportReconcilerTests
         User = user
     };
 
+    /// <summary>
+    /// An imported gateway is added without the secrets it arrived with.
+    /// </summary>
+    /// <remarks>
+    /// The reconciler exists to decide which gateways to add, not to carry credentials into the
+    /// result. Clearing them must also not fabricate the declaration of the passphrase field: that
+    /// flag is what the legacy credential mapping is derived from, and the mapping decides on the
+    /// connect paths whether the stored password is offered as the key passphrase.
+    /// </remarks>
+    [Fact]
+    public void AnImportedGatewayIsAddedWithoutItsSecretsAndWithoutFabricatedPresence()
+    {
+        SshGatewayDto imported = Gateway("gw-imported", "bastion.example.com", "operator");
+        imported.KeyPath = @"C:\keys\bastion.ppk";
+        imported.SshPasswordEncrypted = "cipher";
+
+        Assert.True(imported.UsesLegacySshCredentialMapping);
+
+        GatewayImportReconciliationResult result = GatewayImportReconciler.Reconcile(
+            [],
+            [imported],
+            [],
+            NewIdFactory("gw-imported"));
+
+        SshGatewayDto added = Assert.Single(result.GatewaysToAdd);
+
+        Assert.Null(added.SshPasswordEncrypted);
+        Assert.Null(added.SshKeyPassphraseEncrypted);
+        Assert.False(added.HasSshKeyPassphraseEncryptedField);
+
+        // The gateway itself is still identifiable; only the secrets are gone.
+        Assert.Equal(imported.Host, added.Host);
+        Assert.Equal(imported.User, added.User);
+        Assert.Equal(imported.KeyPath, added.KeyPath);
+    }
+
     private static ServerProfileDto Server(string id, string gatewayId) => new()
     {
         Id = id,
