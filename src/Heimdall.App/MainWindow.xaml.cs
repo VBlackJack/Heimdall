@@ -1748,9 +1748,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 TabSessions.IsChecked = true;
                 SwitchToTab(ShellTab.Sessions);
                 break;
-            case 1: // Step 2 done → navigate to Settings tab
-                TabSettings.IsChecked = true;
-                SwitchToTab(ShellTab.Settings);
+            case 1: // Step 2 done → navigate to Tools tab
+                TabTools.IsChecked = true;
+                SwitchToTab(ShellTab.Tools);
                 break;
                 // Step 3 (index 2): sidebar switch happens in OnOnboardingCompleted
                 // once persistence has succeeded.
@@ -1759,6 +1759,13 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void OnOnboardingCompleted(object? sender, EventArgs e)
     {
+        // End where a new user has something to do. Each step navigates as it is
+        // read, so without this the tour finishes on whichever tab the last step
+        // left behind and the empty-state panel that invites the first session is
+        // never seen at all.
+        TabSessions.IsChecked = true;
+        SwitchToTab(ShellTab.Sessions);
+
         // Switch to Tools tab via the VM. The OneWay binding propagates the
         // change back to the RadioButton group and the VM persists the choice.
         if (DataContext is MainViewModel vm)

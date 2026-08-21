@@ -2565,8 +2565,14 @@
                     MinWidth="80"
                     Margin="0,0,8,0"
                     Style="{DynamicResource SecondaryButtonStyle}"/>
+            <!-- Disabled until a protocol is chosen: the button is IsDefault, so on the
+                 picker step both a click and the Enter key reached a handler that returned
+                 without saying anything. ShowFormFields raises PropertyChanged from both
+                 OnIsProtocolSelectedChanged and OnIsEditModeChanged, so this flips live when
+                 a tile is clicked and back again on Back. -->
             <Button x:Name="DlgSrv_SaveBtn"
                     IsDefault="True"
+                    IsEnabled="{Binding ShowFormFields}"
                     AutomationProperties.Name="{loc:Translate ServerDialogBtnSave}"
                     MinWidth="80"
                     Click="OnSaveClick"
