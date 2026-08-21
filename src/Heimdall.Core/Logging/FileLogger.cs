@@ -82,6 +82,19 @@ public sealed class FileLogger : IDisposable
     public static void Error(string message) => Log("ERROR", message);
     public static void Error(string message, Exception ex) => Log("ERROR", $"{message}: {ex.Message}");
 
+    /// <summary>
+    /// Records an exception with everything a reader needs to diagnose it: its type,
+    /// its stack, and the whole inner-exception chain.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Error(string, Exception)"/> keeps only <see cref="Exception.Message"/>,
+    /// which on a crash path is the same sentence the user just read in the dialog. The
+    /// log is the one artefact they can send when reporting the failure, so it has to
+    /// hold more than the dialog did. Reserved for that case: it is far more verbose
+    /// than the ordinary error line and would drown a routine log.
+    /// </remarks>
+    public static void ErrorDetailed(string message, Exception ex) => Log("ERROR", $"{message}: {ex}");
+
     /// <summary>Flushes all queued log entries to disk immediately.</summary>
     public static void Flush() => _instance?.FlushInternal();
 
