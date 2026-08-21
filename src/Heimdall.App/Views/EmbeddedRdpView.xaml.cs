@@ -295,6 +295,18 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             force: true);
     }
 
+    /// <summary>
+    /// Localization keys this view resolves at runtime rather than through XAML markup.
+    /// </summary>
+    /// <remarks>
+    /// Named here so the guard that checks the locale files can reference the same constant. A key
+    /// spelled out at the call site compiles, passes every comparison, and resolves to nothing.
+    /// </remarks>
+    internal static class LocaleKeys
+    {
+        internal const string ReconnectSucceededAfterCancel = "RdpReconnectSucceededAfterCancelToast";
+    }
+
     private void ShowTransientToast(string message)
     {
         if (!Dispatcher.CheckAccess())
@@ -2124,6 +2136,10 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         Dispatcher.Invoke(() =>
         {
+            // Read before it is cleared, because it is the whole reason there is anything to say:
+            // the user asked for this reconnection to stop and it succeeded anyway.
+            bool cancelLostTheRace = _userInitiatedDisconnect;
+
             // The cancel raised this flag for a disconnect that then never happened, because the
             // attempt already in flight succeeded instead. Left raised it outlives the race: it is
             // cleared nowhere but in OnRdpDisconnected, so the NEXT genuine drop of this live
@@ -2147,6 +2163,16 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             TransitionPhase(RdpConnectionPhase.Connected);
             UpdateSessionStatus(RdpSessionStatus.Connected);
             UpdateRedirectionIndicators();
+
+            // Cancelling stops the retries that have not started yet; an attempt already inside
+            // MsTscAx keeps going and can still succeed. The session is kept, because the button
+            // says Cancel rather than Close and asks to stop waiting, not to throw work away. But
+            // without this the screen went from "closing" to "connected" and never said why, so the
+            // user was left holding a session they thought they had given up on.
+            if (cancelLostTheRace)
+            {
+                ShowTransientToast(_localizer?[LocaleKeys.ReconnectSucceededAfterCancel] ?? string.Empty);
+            }
 
             if (ShouldUseDynamicResolutionUpdates())
             {
