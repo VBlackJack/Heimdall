@@ -323,7 +323,7 @@ Un bouton bascule de la barre d'outils fait passer le listage de répertoire du 
 
 ### 16. Système de split récursif à N panneaux
 
-**Architecture** : la disposition en split est modélisée comme un arbre binaire de nœuds `ISplitContent` :
+**Architecture** : la disposition en split est modélisée comme un arbre binaire de noeuds `ISplitContent` :
 
 ```
 ISplitContent (marker interface)
@@ -419,7 +419,7 @@ Une **barrière Windows Hello** complémentaire (`IWindowsHelloService` au-dessu
 
 ### 21. Supervision de santé serveur (canal SSH multiplexé)
 
-**Problème** : les administrateurs veulent des données de santé en un coup d'œil (CPU, RAM, disque) pour les serveurs connectés, sans ouvrir un outil de supervision séparé.
+**Problème** : les administrateurs veulent des données de santé en un coup d'oeil (CPU, RAM, disque) pour les serveurs connectés, sans ouvrir un outil de supervision séparé.
 
 **Solution** : `ServerHealthMonitor`, dans `Heimdall.Ssh`, réutilise le `SshClient` existant d'une session shell active pour exécuter des commandes de supervision légères (`top -bn1`, `free -m`, `df -h /`) sur des canaux SSH multiplexés, à un intervalle configurable (15 secondes par défaut). Les commandes passent par la surface APM de SSH.NET (`BeginExecute`/`EndExecute`) encapsulée avec `Task.Factory.FromAsync`, et les trois sondes s'exécutent simultanément avec `Task.WhenAll`. Les résultats sont analysés par expressions régulières compilées vers un enregistrement `ServerHealthData` et affichés dans l'interface.
 

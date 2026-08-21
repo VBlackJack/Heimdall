@@ -63,6 +63,7 @@ Index of all issues encountered during development and their solutions.
 46. [FTP - Cleartext Credential Warning](#ftp-cleartext-credential-warning)
 47. [WinRM Gateway - HTTP 12152 Invalid Server Response](#winrm-gateway-12152)
 48. [KeePassXC Credential Provider - Common Gotchas](#keepassxc-credential-provider)
+49. [RDP Embedded - Session Cut Off Shortly After Connecting](#rdp-slow-server-cutoff)
 
 ---
 
@@ -904,3 +905,15 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Key lesson**: KeePassXC itself does not need to be running or unlocked - `keepassxc-cli` opens the `.kdbx` file directly using the master password and/or key file supplied by Heimdall.
 
 **Files**: `Security/CommandCredentialProvider.cs`, `Security/CredentialProviderFactory.cs`, `Services/CredentialProviderPresetService.cs`, `ViewModels/SettingsViewModel.cs`
+
+---
+
+## 49. RDP Embedded - Session Cut Off Shortly After Connecting {#rdp-slow-server-cutoff}
+
+**Symptom**: A server whose Windows session loads slower than usual is dropped by Heimdall shortly after it has already reported "Connected". The session is visibly up first, then cut on its own.
+
+**Root cause**: Unconfirmed. Three candidates remain: a forced resize about ten seconds after connect, an exhausted auto-reconnect, or a premature credential cleanup. No log of a slow reproduction exists yet, which is why none of them has been ruled out.
+
+**Solution**: None yet. What settles it is one clean capture covering the whole sequence, with the cutoff time noted by hand: see [repro/capture-rdp-slow-server-cutoff-log.md](repro/capture-rdp-slow-server-cutoff-log.md). The procedure is written for whoever can reproduce the failure, and one capture following it is enough to tell the three candidates apart.
+
+**Files**: none until the cause is confirmed.

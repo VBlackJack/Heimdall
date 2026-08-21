@@ -131,20 +131,34 @@ the release notes, and translating it would impose permanent double maintenance 
 
 French documents use French accents, the ones an AZERTY keyboard produces.
 
-What is banned, in both languages, is the punctuation an editor inserts on its own:
+Two kinds of character are refused, in both languages, and for the same reason: a plain ASCII
+character says the same thing and survives a Windows terminal, a diff, a console code page and a
+CI log.
 
-| Instead of | Write |
+| Refused | Write |
 |---|---|
-| em dash, en dash | `-` |
-| curly quotes and apostrophes | `"` and `'` |
+| em dash, en dash, unicode hyphen, minus sign | `-` |
+| curly quotes, low quotes, **French guillemets** | `"` |
+| curly apostrophe | `'` |
 | single-character ellipsis | `...` |
-| non-breaking or thin space | a plain space |
+| no-break, narrow and thin spaces, zero-width space, byte order mark | a plain space, or nothing |
+| **oe and ae ligatures** | `oe`, `ae` |
 
-Arrows and box-drawing characters are welcome where they carry meaning. Dependency graphs and
-directory trees read better with them, so they are a deliberate exception rather than an oversight.
+The guillemets and the ligatures are on that list because the AZERTY layout does not produce
+them: writing one means reaching for a substitute the reader's terminal may not render.
+`scripts/NotesTypographyGuard.ps1` lists them as deliberately absent, with the same remedies.
 
-`scripts/NotesTypographyGuard.ps1` is authoritative for the banned set and is run by
-`Build.ps1 -Mode Release` against the release notes, fail-closed.
+**Arrows, box-drawing characters, ballot boxes and emoji are welcome.** A dependency graph, a
+directory tree and a checklist read better with them, and they carry something no pair of ASCII
+characters carries as clearly. That is a deliberate exception rather than an oversight.
+
+`DocumentationTypographyGuardTests` enforces this over `README*.md`, `SECURITY*.md` and all of
+`docs/`, **recursively**. The recursion is asserted separately, because a hand-run sweep of
+`docs/*.md` once passed while two subdirectories went unexamined.
+
+**Release notes are held to a stricter rule**: ASCII and AZERTY characters only, arrows included
+in the refusal. `scripts/NotesTypographyGuard.ps1` is authoritative there and runs fail-closed
+inside `Build.ps1 -Mode Release`.
 
 ## Localization And I18n
 
