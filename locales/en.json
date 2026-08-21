@@ -3292,7 +3292,7 @@
   "SettingsResetRdpDefaultsConfirmTitle": "Reset RDP defaults?",
   "SettingsResetRdpDefaultsConfirmBody": "Restore all RDP-related defaults to their factory values? Existing servers are not affected.",
   "SettingsResetDefaultsConfirmTitle": "Reset all settings?",
-  "SettingsResetDefaultsConfirmBody": "Restore every Settings tab to factory defaults? Unsaved changes in Settings will be discarded. Existing servers are not affected until you save.",
+  "SettingsResetDefaultsConfirmBody": "Restore every Settings tab to factory defaults? Unsaved changes in Settings will be discarded. Your servers, SSH gateways and projects are kept.",
   "ApplyAllNoChanges": "All servers already use this mode.",
   "ConfirmApplyAllTitle": "Apply to All Servers",
   "ConfirmApplySshModeMessage": "This will change the SSH mode to '{0}' for {1} of {2} servers. This action cannot be undone.",

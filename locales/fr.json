@@ -3289,7 +3289,7 @@
   "SettingsResetRdpDefaultsConfirmTitle": "R\u00e9initialiser les valeurs RDP ?",
   "SettingsResetRdpDefaultsConfirmBody": "Restaurer toutes les valeurs RDP par d\u00e9faut ? Les serveurs existants ne sont pas affect\u00e9s.",
   "SettingsResetDefaultsConfirmTitle": "R\u00e9initialiser tous les r\u00e9glages ?",
-  "SettingsResetDefaultsConfirmBody": "Restaurer tous les onglets Settings aux valeurs d'usine ? Les modifications non enregistr\u00e9es dans Settings seront perdues. Les serveurs existants ne sont pas affect\u00e9s tant que vous n'enregistrez pas.",
+  "SettingsResetDefaultsConfirmBody": "Restaurer tous les onglets Settings aux valeurs d'usine ? Les modifications non enregistr\u00e9es dans Settings seront perdues. Vos serveurs, passerelles SSH et projets sont conserv\u00e9s.",
   "ApplyAllNoChanges": "Tous les serveurs utilisent d\u00e9j\u00e0 ce mode.",
   "ConfirmApplyAllTitle": "Appliquer \u00e0 tous les serveurs",
   "ConfirmApplySshModeMessage": "Cela changera le mode SSH en \u00ab {0} \u00bb pour {1} serveurs sur {2}. Cette action est irr\u00e9versible.",

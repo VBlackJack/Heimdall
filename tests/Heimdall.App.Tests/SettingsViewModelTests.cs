@@ -1198,6 +1198,45 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task ResetToDefaultsCommand_RestoresPreferencesButKeepsGatewaysAndProjects()
+    {
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(new FakeConfigManager(), dialog);
+
+        var seeded = new AppSettings();
+        seeded.SshGateways.Add(new SshGatewayDto
+        {
+            Id = "gw-1",
+            Name = "Bastion",
+            Host = "10.0.0.1",
+            Port = 2222,
+            User = "ops",
+            SshPasswordEncrypted = "encrypted-secret"
+        });
+        seeded.Projects.Add(new ProjectDto { Id = "prj-1", Name = "Production" });
+        viewModel.LoadFromSettings(seeded);
+        viewModel.DefaultTheme = "Buffy";
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+
+        // Preferences go back to factory values, which is what the button promises.
+        var expected = await LoadExpectedFactoryDefaultsAsync();
+        Assert.Equal(expected.DefaultTheme, viewModel.DefaultTheme);
+
+        // The inventory survives. A gateway's stored password is only ever reported
+        // back as a boolean, so dropping it here would destroy a secret the user
+        // cannot read out of the product and cannot retype from memory.
+        var gateway = Assert.Single(viewModel.Gateways);
+        Assert.Equal("Bastion", gateway.Name);
+        Assert.Equal("10.0.0.1", gateway.Host);
+        Assert.Equal(2222, gateway.Port);
+        Assert.True(gateway.HasPassword);
+
+        var project = Assert.Single(viewModel.Projects);
+        Assert.Equal("Production", project.Name);
+    }
+
+    [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {
         var dialog = new FakeDialogService { ConfirmResult = false };
