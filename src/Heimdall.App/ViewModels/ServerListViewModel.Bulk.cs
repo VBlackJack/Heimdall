@@ -385,15 +385,14 @@ public partial class ServerListViewModel
             return;
         }
 
-        // Windows Hello gate: verify once for the whole batch, before the plan is
-        // prepared (plan preparation resolves stored credentials). Abort on failure.
-        var settings = await _configManager.LoadSettingsAsync();
-        if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
+        var plan = await PrepareBulkConnectPlanAsync(selectedItems, cancellationToken);
+        if (plan.Refused)
         {
+            // The gate has already told the user why. Saying "nothing to connect" on top of that
+            // would name the wrong reason.
             return;
         }
 
-        var plan = await PrepareBulkConnectPlanAsync(selectedItems, cancellationToken);
         if (plan.ConnectableCount <= 0)
         {
             StatusMessageRequested?.Invoke(_localizer["StatusBulkConnectNothingToConnect"]);
@@ -431,15 +430,9 @@ public partial class ServerListViewModel
         IReadOnlyList<ServerItemViewModel> serversToConnect,
         CancellationToken cancellationToken = default)
     {
-        // Windows Hello gate for any caller of this entry point, before credentials are
-        // resolved in plan preparation. The shared grace window prevents a second prompt
-        // if a recent verification (single-connect or another batch) already succeeded.
-        var settings = await _configManager.LoadSettingsAsync();
-        if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
-        {
-            return;
-        }
-
+        // The Windows Hello gate is applied inside plan preparation, which is the one place every
+        // bulk connect passes through. The shared grace window prevents a second prompt if a recent
+        // verification, from single-connect or another batch, already succeeded.
         var plan = await PrepareBulkConnectPlanAsync(serversToConnect, cancellationToken);
         await ConnectServersBulkCoreAsync(plan, cancellationToken);
     }
@@ -1218,6 +1211,17 @@ public partial class ServerListViewModel
             return new BulkConnectPlan(settings, [], 0);
         }
 
+        // The Windows Hello gate lives here, in the one method every bulk connect passes through,
+        // rather than in each caller. It used to sit in the two public entry points, and the folder
+        // context menu's "Connect all" reached this method without going through either: it called
+        // plan preparation directly, so stored credentials were resolved below without the gate the
+        // user had configured. Putting the gate immediately above the resolution it protects means
+        // a caller cannot arrive here without passing it.
+        if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
+        {
+            return new BulkConnectPlan(settings, [], 0, Refused: true);
+        }
+
         var serverDtos = await _configManager.LoadServersAsync();
         var dtoMap = serverDtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
         var candidates = new List<BulkConnectCandidate>(selectedServers.Count);
@@ -1294,6 +1298,14 @@ public partial class ServerListViewModel
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(plan);
+
+        // A refused plan carries no candidates, so this is belt and braces rather than the gate
+        // itself. It is here so that a plan built by some future path cannot be executed without
+        // anyone noticing it was refused.
+        if (plan.Refused)
+        {
+            return;
+        }
 
         if (plan.ConnectableCount <= 0)
         {
@@ -1784,7 +1796,8 @@ public partial class ServerListViewModel
     internal sealed record BulkConnectPlan(
         AppSettings Settings,
         IReadOnlyList<BulkConnectCandidate> Candidates,
-        int SkippedCount)
+        int SkippedCount,
+        bool Refused = false)
     {
         public int ConnectableCount => Candidates.Count;
     }

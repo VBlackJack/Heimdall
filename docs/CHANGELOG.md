@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: connecting a whole folder skipped the Windows Hello prompt
+
+- **Right-clicking a folder and choosing Connect all did not ask for Windows Hello**, even with the
+  setting turned on. Stored credentials were resolved and used without the verification the user had
+  configured.
+- **The gate was in the two entry points, and this menu used neither.** It called plan preparation
+  directly, which is where stored credentials are resolved, so it arrived past the gate rather than
+  through it. The omission dates from the gate's introduction rather than from a later change.
+- **The gate now lives inside plan preparation**, immediately above the credential resolution it
+  protects, which is the one place every bulk connect passes through. A caller cannot reach the
+  credentials without passing it, rather than being trusted to call it first.
+- Single-server connect is unaffected and keeps its own gate. The shared grace window still means one
+  prompt per batch, and none at all when the setting is off.
+- Two checks now hold this in place: the gate must sit above credential resolution in plan
+  preparation, and plan preparation must remain the only route to bulk credential resolution.
+
 ## 2026-08-21: one dropped session, two different products, same sentence on screen
 
 - **The client reports a failed reconnection under either of two codes**, and the decoder resolves

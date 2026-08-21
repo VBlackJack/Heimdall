@@ -519,6 +519,12 @@ public sealed class ContextMenuFactory
         connectAllItem.Click += async (_, _) =>
         {
             var plan = await vm.ServerList.PrepareBulkConnectPlanAsync(allServers, CancellationToken.None);
+            if (plan.Refused)
+            {
+                // The gate reports its own outcome; naming a different reason here would mislead.
+                return;
+            }
+
             if (plan.ConnectableCount <= 0)
             {
                 vm.StatusText = vm.Localize("StatusBulkConnectNothingToConnect");
