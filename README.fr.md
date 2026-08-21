@@ -78,6 +78,12 @@ toutes les deux :
 > **Dans le doute, prenez Standard.** Elle fonctionne sur toute machine Windows 10 ou 11 disposant
 > d'Edge, c'est-à-dire la quasi-totalité.
 
+La page des releases propose aussi un `.msi`, et il arrive en tête de la liste. Il existe pour le
+déploiement géré par GPO ou SCCM : il s'installe pour tous les utilisateurs de la machine,
+demande des droits d'administrateur, et n'est pas mis à jour par le mécanisme interne de
+Heimdall. À moins de le déployer à l'échelle d'une organisation, prenez plutôt un
+`_Setup.exe` ou un `.zip`.
+
 Chaque édition existe en **installeur** (raccourcis, mises à jour, désinstallation) ou en **zip**
 (décompressez et lancez `Heimdall.exe`, rien n'est installé).
 

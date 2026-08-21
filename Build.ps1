@@ -582,6 +582,7 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
                 elseif ($name -match 'standard.*\.zip') { "Portable, requires Edge/WebView2 (~${sz} MB)" }
                 elseif ($name -match 'SelfContained.*Setup') { "Installer, bundled WebView2 (~${sz} MB)" }
                 elseif ($name -match 'Standard.*Setup') { "Installer, requires Edge/WebView2 (~${sz} MB)" }
+                elseif ($name -match '\.msi$') { "Managed deployment only (GPO/SCCM), needs an administrator and is not updated in place (~${sz} MB)" }
                 else { "~${sz} MB" }
         $notes += "| ``$name`` | $desc |`n"
     }
