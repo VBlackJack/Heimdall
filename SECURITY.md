@@ -1,5 +1,7 @@
 # Security Policy
 
+*Also available in French: [SECURITY.fr.md](SECURITY.fr.md).*
+
 Heimdall accepts private security reports through the maintainer channel
 used to share this repository. Do not file public issues for suspected
 vulnerabilities.

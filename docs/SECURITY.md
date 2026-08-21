@@ -1,5 +1,7 @@
 # Security Notes
 
+*Also available in French: [fr/SECURITY.md](fr/SECURITY.md).*
+
 This document records known security considerations, limitations, and deliberate
 defense-in-depth decisions in Heimdall.
 

@@ -12,6 +12,8 @@
 
 # Heimdall
 
+*Also available in French: [README.fr.md](README.fr.md).*
+
 [![CI](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml/badge.svg)](https://github.com/VBlackJack/Heimdall/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-8%2C000%2B%20passing-brightgreen.svg)]()
@@ -44,7 +46,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - Per-server resolution profiles: Fit Window, Fixed, Smart Sizing, and Multimon, with a per-profile **Selected monitors** picker in Multimon mode (empty selection = use all monitors, backward-compatible with existing profiles) and connect-time topology validation that falls back to single-monitor mode when the host cannot honor the saved selection (`2e9b938`)
 - Fit Window mode scales the remote desktop to the host area with Smart Sizing enabled by default, eliminating native Win32 scrollbars on real Windows RDP targets; use Fixed mode for pixel-perfect native rendering
 - Automatic DPI scale tracking via `IMsRdpExtendedSettings` with `Window.DpiChanged` updates
-- **Mode-aware Resolution menu and toolbar button**: the menu starts with an `Active mode: <mode>` header (showing `Fixed (1920×1080)` when applicable) and the toolbar button glyph changes per mode (Auto / Fit / Smart / Fixed / Multimon)
+- **Mode-aware Resolution menu and toolbar button**: the menu starts with an `Active mode: <mode>` header (showing `Fixed (1920x1080)` when applicable) and the toolbar button glyph changes per mode (Auto / Fit / Smart / Fixed / Multimon)
 - Tab context-menu resolution submenu with presets, Match Window, Custom, and Save as default - same `Active mode` header as the toolbar menu
 - Letterboxed fixed-resolution rendering when Smart Sizing is disabled - the active RDP region is materialized by a 1px border, with surrounding bands rendered in the theme `SurfaceBrush` (the `WindowsFormsHost` is pinned to the exact region so the Win32 HWND no longer bleeds the system-gray default through the letterbox), and a first-letterbox hint badge fades out after a few seconds
 - Fullscreen UX with a high-contrast exit chip plus F11, Esc, and Ctrl+Shift+F11 escape paths
@@ -55,7 +57,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 - **Edit profile always reachable from the reconnect overlay**: every disconnect code (network, transient, security) keeps the `Edit profile` button visible so users can tweak resolution, gateway or multi-monitor without closing the overlay first
 - Credential autofill for CredUI dialogs (EnumThreadWindows + UI Automation), with Debug broker-window diagnostics limited to metadata such as title, handle, PID, and process name; credential fields are never logged (`1d7c78c`)
 - **Honest external-launch state**: when an external mstsc client is spawned, the session shows up in warning color with a dedicated *External client launched* status, signalling that Heimdall cannot directly observe the remote session beyond the launch itself
-- **Unified RDP import**: `.rdp` files dragged onto the main window or imported from `Settings → Import` go through the same preview/conflict resolution flow
+- **Unified RDP import**: `.rdp` files dragged onto the main window or imported from `Settings -> Import` go through the same preview/conflict resolution flow
 - **Performance**: COM pre-warm at startup, DNS pre-resolution on server selection, per-server experience flags (wallpaper/themes/animations), TCP-only mode for firewall-heavy environments
 
 ### SSH Terminal
@@ -193,7 +195,7 @@ Built with .NET 10 and WPF. Secure, feature-rich Windows connection manager with
 
 ### Built-in Sysops Toolbox (59 tools)
 
-All tools open as session tabs (split with any session or tool, detach, reorder). Accessible via **dedicated Tools tab**, **Ctrl+K** palette, the **sidebar Tools tab** (Sessions/Tools toggle at the top of the left panel, **Ctrl+Shift+T**), or **"+" → Add Tool** menu. The tabbed sidebar hosts the session `TreeView` and a full-height tool browser side by side - the Tools tab displays a collapsible `TreeView` of categories (Network, Security, Encoding, System, External) populated from `ToolRegistry`, with a filter box matching on name + aliases and an always-present **Favorites** section at the top. Right-click any sidebar tool leaf to pin or unpin it without launching the tool; the same persisted `FavoriteToolIds` feed both the sidebar Favorites section and the dedicated Tools tab, while favorites stay sorted alphabetically by localized display name and filtered like every other category. Tools can be saved in the session `TreeView` alongside real sessions. Centralized `ToolRegistry` with vector icons, categories, and command aliases. **Favorites** (pin/unpin with persistence) and **recently used** tools remain available on the dedicated Tools tab as well. Singleton behavior for context-free tools. Built-in help system with usage examples (? button). Dedicated detail panel for tools with descriptions. Password Generator supports saveable custom presets (JSON persistence), optional clipboard auto-clear, and 3 generation modes (Random, Syllable, Passphrase). Cross-tool navigation via right-click context menus (IP → Port Scanner → Cert Inspector). Network tools support scanning via SSH tunnel ("Route via" gateway selector). **First-launch onboarding** overlay with guided introduction.
+All tools open as session tabs (split with any session or tool, detach, reorder). Accessible via **dedicated Tools tab**, **Ctrl+K** palette, the **sidebar Tools tab** (Sessions/Tools toggle at the top of the left panel, **Ctrl+Shift+T**), or **"+" -> Add Tool** menu. The tabbed sidebar hosts the session `TreeView` and a full-height tool browser side by side - the Tools tab displays a collapsible `TreeView` of categories (Network, Security, Encoding, System, External) populated from `ToolRegistry`, with a filter box matching on name + aliases and an always-present **Favorites** section at the top. Right-click any sidebar tool leaf to pin or unpin it without launching the tool; the same persisted `FavoriteToolIds` feed both the sidebar Favorites section and the dedicated Tools tab, while favorites stay sorted alphabetically by localized display name and filtered like every other category. Tools can be saved in the session `TreeView` alongside real sessions. Centralized `ToolRegistry` with vector icons, categories, and command aliases. **Favorites** (pin/unpin with persistence) and **recently used** tools remain available on the dedicated Tools tab as well. Singleton behavior for context-free tools. Built-in help system with usage examples (? button). Dedicated detail panel for tools with descriptions. Password Generator supports saveable custom presets (JSON persistence), optional clipboard auto-clear, and 3 generation modes (Random, Syllable, Passphrase). Cross-tool navigation via right-click context menus (IP -> Port Scanner -> Cert Inspector). Network tools support scanning via SSH tunnel ("Route via" gateway selector). **First-launch onboarding** overlay with guided introduction.
 
 | Category | Tools |
 |----------|-------|
@@ -206,8 +208,8 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Tabbed sessions with drag-to-reorder
 - Tab detach to floating window (Chrome-style drag-out or context menu)
 - **Recursive N-pane split**: up to 8 panes per tab in any layout (2x2, L-shape, 3 side-by-side, etc.)
-- Split any pane further: right-click → "Split..." → Horizontal | Vertical, or Command Palette
-- **Merge existing tab**: right-click → "Merge with..." → session or tool → Horizontal | Vertical (reparents live connection without reconnecting)
+- Split any pane further: right-click -> "Split..." -> Horizontal | Vertical, or Command Palette
+- **Merge existing tab**: right-click -> "Merge with..." -> session or tool -> Horizontal | Vertical (reparents live connection without reconnecting)
 - **Mixed session + tool splits**: freely combine connections and built-in tools in the same tab (e.g., SSH terminal left + Network Cartography right)
 - **Drag-to-split**: drag a tab onto the content area of another tab to merge (orientation auto-detected from drop position)
 - Swap panes, toggle orientation (Ctrl+Shift+O), detach any pane to floating window
@@ -216,7 +218,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Per-pane disconnect overlay with Reconnect and Close buttons (accessible labels for screen readers)
 - Pane-scoped failure disclosure for SSH and RDP with structured stage/code/detail diagnostics
 - Loading overlay with spinner during pane connection
-- **Minimum pane size enforcement**: 120×80px prevents splitter from collapsing panes to unusable size
+- **Minimum pane size enforcement**: 120x80px prevents splitter from collapsing panes to unusable size
 - **Double-click splitter** resets ratio to 50/50; hover border on panes for better active pane feedback
 - **Dynamic splitter cursor**: SizeNS for horizontal splits, SizeWE for vertical (updates on orientation toggle)
 - Splitter ratio remembered per pane across tab switches; restored on merge from split layout history
@@ -225,7 +227,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Deferred state machine cleanup**: reconnect releases old tunnel/state only after new connection succeeds or definitively fails
 - **Merge feedback**: status bar message when a busy tool blocks a merge operation
 - Command Palette renders as a WPF `Popup` (own HWND) above RDP/VNC ActiveX surfaces
-- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/group, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog), and **bulk edit SSH gateway** (credential-free, four explicit outcomes - preserve / force direct / inherit / specific - skipping protocols that do not support gateways)
+- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) -> right-click -> bulk connect, duplicate, delete, move to project/group, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog), and **bulk edit SSH gateway** (credential-free, four explicit outcomes - preserve / force direct / inherit / specific - skipping protocols that do not support gateways)
 - **Inline rename**: F2 or Ctrl+E renames sessions and folders directly in the tree, without opening a dialog, and stays correct under virtualization
 - **Structured tree filters**: filter the session tree by protocol/type, favorite, and connected state, combined with the debounced text search through one versioned pass over stable nodes; a colored dot on the filter button signals an active filter
 - **Virtualized session tree**: recycling virtualization keeps the tree smooth at thousands of sessions and "Expand all" no longer freezes; long names show in full with an automatic horizontal scrollbar when they exceed the pane, and search now expands folders that contain a match and highlights the matched text
@@ -431,7 +433,7 @@ Release mode also produces Inno Setup `.exe` installers in `Dist/installers/` wi
 | Citrix | StoreBrowse CLI integration |
 | Crypto | System.Security.Cryptography.ProtectedData (DPAPI) |
 | Testing | xUnit (7,900+ passing tests across 8 projects) |
-| Built-in Tools | 59 sysops tools (Ctrl+K → `tools` or Ctrl+Shift+T) |
+| Built-in Tools | 59 sysops tools (Ctrl+K -> `tools` or Ctrl+Shift+T) |
 | Serialization | System.Text.Json |
 
 ---
