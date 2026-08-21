@@ -71,15 +71,34 @@ public sealed class SftpBrowserDisconnectTests
         var disconnectedCount = 0;
         browser.Disconnected += _ => disconnectedCount++;
 
+        // Disconnect runs on its own thread, and the oracle is that it returns at all.
+        //
+        // A Disconnect that waited for the client lock could not return: the lock is released only
+        // from the dispose that Disconnect is supposed to force, so waiting for it deadlocks. The
+        // failure mode being excluded is therefore a hang, not slowness, and a bounded wait states
+        // that exactly.
+        //
+        // This used to assert that the call took under a second, against a lock timeout of forty
+        // milliseconds. That is a fixed wall-clock bound inside an assertion: on a loaded runner the
+        // thread can simply be descheduled for longer than that, and the test then failed for a
+        // reason that had nothing to do with the property. Observed once on a full-suite run and not
+        // reproducible in isolation, which is the signature rather than an argument that it is rare.
         var stopwatch = Stopwatch.StartNew();
-        browser.Disconnect();
+        Task disconnect = Task.Run(browser.Disconnect);
+        await disconnect.WaitAsync(SignalBackstop);
         stopwatch.Stop();
 
         await operationUnwound.Task.WaitAsync(SignalBackstop);
 
-        Assert.True(
-            stopwatch.Elapsed < TimeSpan.FromSeconds(1),
-            $"Forced disconnect took {stopwatch.Elapsed}.");
+        // Kept as an observation rather than an assertion. It costs nothing when the run is quick
+        // and gives a number to read when it is not, without a slow machine being able to turn a
+        // correct implementation red.
+        if (stopwatch.Elapsed > TimeSpan.FromSeconds(1))
+        {
+            Console.Out.WriteLine(
+                $"SFTP_FORCED_DISCONNECT_SLOW forced disconnect returned after {stopwatch.Elapsed}.");
+        }
+
         Assert.Equal(1, client.DisposeCount);
         Assert.Equal(1, disconnectedCount);
         AssertConnectionContextDropped(browser);
