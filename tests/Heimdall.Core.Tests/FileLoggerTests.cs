@@ -95,6 +95,62 @@ public class FileLoggerTests : IDisposable
     }
 
     [Fact]
+    public void Error_RecordsOnlyTheMessage()
+    {
+        FileLogger.Initialize(_tempDir);
+        FileLogger.Error("Startup failure", BuildNestedException());
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
+
+        // This is the whole reason ErrorDetailed exists: on a crash path the ordinary
+        // error line is the same sentence the user just read in the dialog, so a log
+        // built from it tells the author nothing new.
+        Assert.Contains("outer failure", content);
+        Assert.DoesNotContain("inner failure", content);
+        Assert.DoesNotContain("BuildNestedException", content);
+    }
+
+    [Fact]
+    public void ErrorDetailed_RecordsTheStackAndTheInnerChain()
+    {
+        FileLogger.Initialize(_tempDir);
+        FileLogger.ErrorDetailed("Unhandled exception", BuildNestedException());
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
+
+        Assert.Contains("[ERROR]", content);
+        Assert.Contains("outer failure", content);
+        Assert.Contains("inner failure", content);
+        Assert.Contains("InvalidOperationException", content);
+        Assert.Contains("BuildNestedException", content);
+    }
+
+    /// <summary>
+    /// Thrown and caught for real, because an exception that was never thrown carries
+    /// no stack trace and the assertion above would pass for the wrong reason.
+    /// </summary>
+    private static Exception BuildNestedException()
+    {
+        try
+        {
+            try
+            {
+                throw new InvalidOperationException("inner failure");
+            }
+            catch (InvalidOperationException inner)
+            {
+                throw new ApplicationException("outer failure", inner);
+            }
+        }
+        catch (ApplicationException caught)
+        {
+            return caught;
+        }
+    }
+
+    [Fact]
     public void Warn_WritesEntryWithWarnLevel()
     {
         FileLogger.Initialize(_tempDir);

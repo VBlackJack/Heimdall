@@ -1075,10 +1075,17 @@ public partial class App : System.Windows.Application
 
     private void ShowUnhandledException(Exception exception)
     {
+        // Written here rather than at the three call sites: this is the chokepoint every
+        // unhandled failure passes through. Flushed immediately because the queue is
+        // drained on a timer and on OnExit, neither of which is guaranteed to run when
+        // the process is on its way down.
+        Core.Logging.FileLogger.ErrorDetailed("Unhandled exception", exception);
+        Core.Logging.FileLogger.Flush();
+
         // Hardcoded last-resort copy for the case where localization itself is broken.
         // English-only by design — this path runs when DI / locale loading failed.
         const string LastResortTitle = "Heimdall Error";
-        const string LastResortBody = "An unexpected error occurred. Full details have been written to the log file.";
+        const string LastResortBody = "An unexpected error occurred. A diagnostic log may be available in %LOCALAPPDATA%\\Heimdall\\logs.";
 
         string errorTitle = LastResortTitle;
         string errorBody = $"{LastResortBody}\n\n{exception.Message}";

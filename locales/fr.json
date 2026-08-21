@@ -3377,7 +3377,7 @@
   "MigrationWarningInvalidLegacyField": "valeur de champ h\u00e9rit\u00e9 invalide",
   "MigrationWarningUnexpectedMappingFailure": "\u00e9chec inattendu de la conversion",
   "MigrationWarningsOmitted": "{0} autre(s) profil(s) ignor\u00e9(s) non affich\u00e9(s).",
-  "ErrorUnhandledBody": "Une erreur inattendue est survenue :\n\n{0}\n\nLes d\u00e9tails complets ont \u00e9t\u00e9 enregistr\u00e9s dans le fichier journal.",
+  "ErrorUnhandledBody": "Une erreur inattendue est survenue :\n\n{0}\n\nUn journal de diagnostic est peut-\u00eatre disponible dans %LOCALAPPDATA%\\Heimdall\\logs. Si ce dossier n'existe pas, Heimdall n'a pas pu en \u00e9crire un.",
   "PasteConfirmDangerousTitle": "Collage dangereux",
   "PasteConfirmMultiLineTitle": "Collage multilignes",
   "ConfirmDeleteGatewayDetailMessage": "Supprimer la passerelle \u00ab {0} \u00bb ? Les sessions utilisant cette passerelle perdront leur configuration de tunnel.",

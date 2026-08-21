@@ -3378,7 +3378,7 @@
   "MigrationWarningInvalidLegacyField": "invalid legacy field value",
   "MigrationWarningUnexpectedMappingFailure": "unexpected mapping failure",
   "MigrationWarningsOmitted": "{0} additional skipped profile(s) not shown.",
-  "ErrorUnhandledBody": "An unexpected error occurred:\n\n{0}\n\nFull details have been written to the log file.",
+  "ErrorUnhandledBody": "An unexpected error occurred:\n\n{0}\n\nA diagnostic log may be available in %LOCALAPPDATA%\\Heimdall\\logs. If that folder does not exist, Heimdall could not write one.",
   "PasteConfirmDangerousTitle": "Dangerous paste",
   "PasteConfirmMultiLineTitle": "Multi-line paste",
   "ConfirmDeleteGatewayDetailMessage": "Delete gateway \"{0}\"? Sessions using this gateway will lose their tunnel configuration.",
