@@ -129,10 +129,9 @@ the release notes, and translating it would impose permanent double maintenance 
 
 ### Characters
 
-ASCII only, with one exception: French accented letters producible on an AZERTY keyboard, in French
-documents.
+French documents use French accents, the ones an AZERTY keyboard produces.
 
-Forbidden everywhere, English included:
+What is banned, in both languages, is the punctuation an editor inserts on its own:
 
 | Instead of | Write |
 |---|---|
@@ -140,12 +139,9 @@ Forbidden everywhere, English included:
 | curly quotes and apostrophes | `"` and `'` |
 | single-character ellipsis | `...` |
 | non-breaking or thin space | a plain space |
-| Unicode arrows | `->` and `<->` |
-| box-drawing characters | `+--` and `\--` |
-| Unicode multiplication, minus, greater-or-equal | `x`, `-`, `>=` |
 
-These characters break in Windows terminals, in diffs, in console code pages and in CI logs. It is
-the same reason the locale files use `\uXXXX` escapes.
+Arrows and box-drawing characters are welcome where they carry meaning. Dependency graphs and
+directory trees read better with them, so they are a deliberate exception rather than an oversight.
 
 `scripts/NotesTypographyGuard.ps1` is authoritative for the banned set and is run by
 `Build.ps1 -Mode Release` against the release notes, fail-closed.

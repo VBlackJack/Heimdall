@@ -195,8 +195,8 @@ Lorsque le remplissage automatique échoue silencieusement, activez la journalis
 **Solution** : utiliser le **mode pipe** (PAS ConPTY) pour les terminaux SSH. `PipeModeSession` redirige stdin/stdout directement, sans pseudo-console. Combiné à l'option `-t` de plink (qui force l'allocation d'un PTY distant), les séquences VT passent en brut.
 
 ```
-xterm.js -> ESC[A -> stdin pipe -> plink -t -> remote PTY -> bash
-bash -> ESC[A response -> stdout pipe -> xterm.js
+xterm.js → ESC[A → stdin pipe → plink -t → remote PTY → bash
+bash → ESC[A response → stdout pipe → xterm.js
 ```
 
 **Règle clé** : ne JAMAIS utiliser ConPTY pour des terminaux SSH qui passent par plink. ConPTY est réservé aux shells locaux.
@@ -214,7 +214,7 @@ bash -> ESC[A response -> stdout pipe -> xterm.js
 **Solution** : remplacer par **WebView2 + xterm.js**, le moteur de rendu de terminal standard du marché :
 - xterm.js prend en charge TOUT le rendu VT100/xterm (couleurs, curseur, historique de défilement, souris)
 - transfert de données binaire-safe en base64 entre le processus et xterm.js
-- `PostWebMessageAsString` pour C# -> JS, `WebMessageReceived` pour JS -> C#
+- `PostWebMessageAsString` pour C# → JS, `WebMessageReceived` pour JS → C#
 
 **Fichiers** : `EmbeddedSshView.xaml`, `EmbeddedSshView.xaml.cs`, `Assets/terminal.html`
 
@@ -224,7 +224,7 @@ bash -> ESC[A response -> stdout pipe -> xterm.js
 
 **Symptôme** : le curseur xterm.js clignote extrêmement vite, bien plus rapidement que la normale.
 
-**Cause racine** : WPF et WebView2 se disputent le focus. Les gestionnaires `GotFocus` et `PreviewMouseDown` du UserControl appellent `FocusTerminal()`, qui donne le focus à WebView2, ce qui déclenche `LostFocus` côté WPF, qui redéclenche `GotFocus` -> boucle de focus infinie.
+**Cause racine** : WPF et WebView2 se disputent le focus. Les gestionnaires `GotFocus` et `PreviewMouseDown` du UserControl appellent `FocusTerminal()`, qui donne le focus à WebView2, ce qui déclenche `LostFocus` côté WPF, qui redéclenche `GotFocus` → boucle de focus infinie.
 
 **Solution** :
 1. Supprimer les gestionnaires `GotFocus` et `PreviewMouseDown`

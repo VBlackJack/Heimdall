@@ -195,8 +195,8 @@ When autofill silently fails, enable Debug-level logging for `CredentialAutofill
 **Solution**: Use **pipe mode** (NOT ConPTY) for SSH terminals. `PipeModeSession` redirects stdin/stdout directly without a pseudo-console. Combined with plink's `-t` flag (forces remote PTY allocation), VT sequences pass through raw.
 
 ```
-xterm.js -> ESC[A -> stdin pipe -> plink -t -> remote PTY -> bash
-bash -> ESC[A response -> stdout pipe -> xterm.js
+xterm.js → ESC[A → stdin pipe → plink -t → remote PTY → bash
+bash → ESC[A response → stdout pipe → xterm.js
 ```
 
 **Key Rule**: NEVER use ConPTY for SSH terminals that go through plink. ConPTY is for local shells only.
@@ -214,7 +214,7 @@ bash -> ESC[A response -> stdout pipe -> xterm.js
 **Solution**: Replace with **WebView2 + xterm.js** - the industry standard terminal renderer:
 - xterm.js handles ALL VT100/xterm rendering (colors, cursor, scrollback, mouse)
 - Binary-safe base64 data transfer between process and xterm.js
-- `PostWebMessageAsString` for C# -> JS, `WebMessageReceived` for JS -> C#
+- `PostWebMessageAsString` for C# → JS, `WebMessageReceived` for JS → C#
 
 **Files**: `EmbeddedSshView.xaml`, `EmbeddedSshView.xaml.cs`, `Assets/terminal.html`
 
@@ -224,7 +224,7 @@ bash -> ESC[A response -> stdout pipe -> xterm.js
 
 **Symptom**: The xterm.js cursor blinks extremely rapidly, much faster than normal.
 
-**Root Cause**: WPF and WebView2 fighting over focus. `GotFocus` and `PreviewMouseDown` handlers on the UserControl call `FocusTerminal()` which sets focus to WebView2, which triggers WPF `LostFocus`, which triggers `GotFocus` again -> infinite focus loop.
+**Root Cause**: WPF and WebView2 fighting over focus. `GotFocus` and `PreviewMouseDown` handlers on the UserControl call `FocusTerminal()` which sets focus to WebView2, which triggers WPF `LostFocus`, which triggers `GotFocus` again → infinite focus loop.
 
 **Solution**:
 1. Remove `GotFocus` and `PreviewMouseDown` handlers
@@ -874,7 +874,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 **Symptom**: A WinRM profile routed through an SSH gateway fails with WinHTTP error `12152` ("the server returned an invalid or unrecognized response"). The Heimdall log shows the tunnel established cleanly; the error surfaces inside the PowerShell terminal.
 
-**Root cause**: Environmental, not a Heimdall fault. A hand-built `plink` tunnel reproduces the failure outside Heimdall - the TCP forward opens (`TcpTestSucceeded: True`) but the HTTP/WinRM exchange is closed by the target service or an application-layer device on the `bastion -> target` path. An RDP profile through the same bastion works, confirming the tunnel machinery is sound.
+**Root cause**: Environmental, not a Heimdall fault. A hand-built `plink` tunnel reproduces the failure outside Heimdall - the TCP forward opens (`TcpTestSucceeded: True`) but the HTTP/WinRM exchange is closed by the target service or an application-layer device on the `bastion → target` path. An RDP profile through the same bastion works, confirming the tunnel machinery is sound.
 
 **Solution**: No code fix in Heimdall. Diagnose the environment path (bastion forwarding policy, target WinRM listener, intermediate IPS/proxy). Full isolation procedure and `plink` console reading grid: see [winrm-gateway-12152-diagnostic.md](winrm-gateway-12152-diagnostic.md).
 

@@ -18,32 +18,32 @@ Heimdall is a .NET 10 WPF application organized as a multi-project solution with
 
 ```
 Heimdall.slnx (14 projects)
-+-- src/
-|   +-- Heimdall.Core          net10.0         Models, session diagnostics, security, config, state machine, i18n, network scanner, utilities
-|   +-- Heimdall.Ssh           net10.0         SSH engine, tunnels, Pageant, TOFU, failure classifier, health monitor
-|   +-- Heimdall.Rdp           net10.0-windows RDP + Citrix engine (ActiveX, StoreBrowse), credential autofill
-|   +-- Heimdall.Sftp          net10.0         SFTP/FTP browser (SSH.NET + FluentFTP), remote file editing
-|   +-- Heimdall.Terminal      net10.0-windows Terminal sessions (pipe mode, ConPTY, Telnet)
-|   +-- TwinShell.Core         net10.0         Terminal emulator core abstractions
-|   +-- TwinShell.Persistence  net10.0         Terminal persistence primitives
-|   +-- TwinShell.Infrastructure net10.0       Terminal infrastructure services
-|   \-- Heimdall.App           net10.0-windows WPF application (MVVM, views, themes, DI)
-|       +-- Views: MainWindow, SessionPaneControl, SplitContainerControl,
-|       |          EmbeddedRdpView, EmbeddedSshView, EmbeddedSftpView,
-|       |          EmbeddedCitrixView, EmbeddedVncView, FloatingSessionWindow
-|       +-- Views/Tools: 59 built-in sysops tools (IToolView interface)
-|       \-- Services: ConnectionService (.Rdp/.Ssh/.Sftp/.Ftp/.Vnc/.Telnet/.Citrix/.Local/.Tunnel),
-|                     SplitService, SessionWindowService, EmbeddedSessionManager, ToolRegistry,
-|                     TaskSchedulerService, MacroService, EphemeralFileServer, FileShareService,
-|                     X11ServerManager, WebSocketVncProxy, KeyboardShortcutService,
-|                     ContextMenuFactory, SessionTabContextMenuFactory, ToolsTabPopulationService,
-|                     SessionHealthMonitor (inventory TCP reachability probes), HealthReasonLocalizer
-\-- tests/
-    +-- Heimdall.Core.Tests    State machine, HMAC integrity, input validation, PIN manager, config manager tests
-    +-- Heimdall.Ssh.Tests     SSH engine tests (failure classifier, preflight, TOFU, Pageant, Plink)
-    +-- Heimdall.App.Tests     SplitService, SessionDiagnostic, NotesStorage, theming wrapper/bridge, Migration, EphemeralFileServer, tool coherence
-    +-- Heimdall.Rdp.Tests     RDP credential autofill and broker-selection tests
-    \-- Heimdall.App.UiTests   Desktop UIAutomation smoke and accessibility coverage
+├── src/
+│   ├── Heimdall.Core          net10.0         Models, session diagnostics, security, config, state machine, i18n, network scanner, utilities
+│   ├── Heimdall.Ssh           net10.0         SSH engine, tunnels, Pageant, TOFU, failure classifier, health monitor
+│   ├── Heimdall.Rdp           net10.0-windows RDP + Citrix engine (ActiveX, StoreBrowse), credential autofill
+│   ├── Heimdall.Sftp          net10.0         SFTP/FTP browser (SSH.NET + FluentFTP), remote file editing
+│   ├── Heimdall.Terminal      net10.0-windows Terminal sessions (pipe mode, ConPTY, Telnet)
+│   ├── TwinShell.Core         net10.0         Terminal emulator core abstractions
+│   ├── TwinShell.Persistence  net10.0         Terminal persistence primitives
+│   ├── TwinShell.Infrastructure net10.0       Terminal infrastructure services
+│   └── Heimdall.App           net10.0-windows WPF application (MVVM, views, themes, DI)
+│       ├── Views: MainWindow, SessionPaneControl, SplitContainerControl,
+│       │          EmbeddedRdpView, EmbeddedSshView, EmbeddedSftpView,
+│       │          EmbeddedCitrixView, EmbeddedVncView, FloatingSessionWindow
+│       ├── Views/Tools: 59 built-in sysops tools (IToolView interface)
+│       └── Services: ConnectionService (.Rdp/.Ssh/.Sftp/.Ftp/.Vnc/.Telnet/.Citrix/.Local/.Tunnel),
+│                     SplitService, SessionWindowService, EmbeddedSessionManager, ToolRegistry,
+│                     TaskSchedulerService, MacroService, EphemeralFileServer, FileShareService,
+│                     X11ServerManager, WebSocketVncProxy, KeyboardShortcutService,
+│                     ContextMenuFactory, SessionTabContextMenuFactory, ToolsTabPopulationService,
+│                     SessionHealthMonitor (inventory TCP reachability probes), HealthReasonLocalizer
+└── tests/
+    ├── Heimdall.Core.Tests    State machine, HMAC integrity, input validation, PIN manager, config manager tests
+    ├── Heimdall.Ssh.Tests     SSH engine tests (failure classifier, preflight, TOFU, Pageant, Plink)
+    ├── Heimdall.App.Tests     SplitService, SessionDiagnostic, NotesStorage, theming wrapper/bridge, Migration, EphemeralFileServer, tool coherence
+    ├── Heimdall.Rdp.Tests     RDP credential autofill and broker-selection tests
+    └── Heimdall.App.UiTests   Desktop UIAutomation smoke and accessibility coverage
 ```
 
 ## Dependency Graph
@@ -113,7 +113,7 @@ ConPTY (`ConPtySession`) is kept for local shell scenarios only.
 | Mode | Mechanism | Embedded Terminal | AdminByRequest Compatible |
 |------|-----------|-------------------|---------------------------|
 | `None` | No elevation | Yes | N/A |
-| `Auto` | gsudo `--direct` -> external window fallback | Yes (gsudo) / No (fallback) | Yes |
+| `Auto` | gsudo `--direct` → external window fallback | Yes (gsudo) / No (fallback) | Yes |
 | `Gsudo` | gsudo `--direct` only | Yes | Partial |
 | `Runas` | `ShellExecute` with `runas` verb | No (external window) | Yes |
 
@@ -263,7 +263,7 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 **Unified fuzzy ranker**: `CommandPaletteViewModel.Search.cs` scores tools (localized label + `CommandPrefixes` aliases + category), external tools, servers (`DisplayName`, `RemoteServer`, `Group`, `Username`, `ConnectionType`, `Environment`, `Tags`, `ProjectName`), and TwinShell snippets in a single pass before sorting and taking the top 20. The only early-return paths are (1) explicit argument-bearing tool invocations - `<prefix> <argument>` where `LabelWithArgKey` is defined, e.g. `ping 8.8.8.8` or `subnet 10.0.0.0/8` - and (2) the literal `tool`/`tools` query that lists every registered tool. Everything else mixes results so queries like `calculator`, `formatter`, or `encoder` surface the tool match alongside any servers that also match.
 
-**Snippet indexing**: The palette refreshes a per-open snapshot of the TwinShell action library via a scoped `IActionService` resolved through `IServiceProvider.CreateAsyncScope` - fire-and-forget at every `Open()`/`OpenSplit()` so the cache is always fresh without blocking the popup. Snippets score on Title (full weight), Tags (full weight, important for sysops queries like `disk` or `df`), Description and Category (halved). On selection, `HandleSnippetSelection` resolves the best copy-paste payload (`ResolveSnippetCommand`: Windows template -> Linux template -> first example -> action title), writes it to `System.Windows.Clipboard`, and surfaces a status message - snippets are clipboard-only, intercepted before any split/connect routing so a `snippet-*` Id can never accidentally open a tab or merge a pane.
+**Snippet indexing**: The palette refreshes a per-open snapshot of the TwinShell action library via a scoped `IActionService` resolved through `IServiceProvider.CreateAsyncScope` - fire-and-forget at every `Open()`/`OpenSplit()` so the cache is always fresh without blocking the popup. Snippets score on Title (full weight), Tags (full weight, important for sysops queries like `disk` or `df`), Description and Category (halved). On selection, `HandleSnippetSelection` resolves the best copy-paste payload (`ResolveSnippetCommand`: Windows template → Linux template → first example → action title), writes it to `System.Windows.Clipboard`, and surfaces a status message - snippets are clipboard-only, intercepted before any split/connect routing so a `snippet-*` Id can never accidentally open a tab or merge a pane.
 
 **Visual section headers**: The flat ListBox consumes a `CollectionViewSource` with `PropertyGroupDescription` on `Group`. `PaletteGroupHeaderConverter` normalizes empty Group values to a localized `Servers` / `Quick Connect` fallback so no untitled section ever renders. Ad-hoc items (`adhoc-ssh-...`, `adhoc-rdp-...`) explicitly take the `PaletteQuickConnectHeader` group so they cluster under their own header instead of falling through to the fallback.
 
@@ -303,7 +303,7 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 **Tier 1 - Automatic fallback** (transparent to user):
 Every file operation catches typed permission-denied exceptions (`SftpPermissionDeniedException`, plus local `UnauthorizedAccessException` for temp-file paths), then retries via SSH exec:
-- Upload: SFTP to `/tmp/` -> `sudo tee` to target; cleanup runs as a separate `sudo rm -f` command from a `finally` path
+- Upload: SFTP to `/tmp/` → `sudo tee` to target; cleanup runs as a separate `sudo rm -f` command from a `finally` path
 - Download: `sudo cat` via SSH exec
 - Edit: delegates to `RemoteFileEditor.EditFileSudoAsync`
 - Chmod/Rename/Delete/Mkdir: `sudo chmod`/`mv`/`rm`/`mkdir` via SSH exec
@@ -327,8 +327,8 @@ Toolbar toggle button switches directory listing from SFTP `ListDirectory` to `s
 
 ```
 ISplitContent (marker interface)
-+-- SessionPaneModel     Leaf: PaneId (GUID), HostControl, ServerId, OriginalServerId, Title, Status, FailureDetails, ...
-\-- SplitContainerModel  Branch: First, Second (ISplitContent), Orientation, SplitRatio
+├── SessionPaneModel     Leaf: PaneId (GUID), HostControl, ServerId, OriginalServerId, Title, Status, FailureDetails, ...
+└── SplitContainerModel  Branch: First, Second (ISplitContent), Orientation, SplitRatio
                          Constants: MinRatio (0.1), MaxRatio (0.9), DefaultRatio (0.5), SplitterThickness (4)
                          Auto-clamping: SplitRatio setter clamps to [MinRatio, MaxRatio] BEFORE PropertyChanged
 ```
@@ -343,10 +343,10 @@ ISplitContent (marker interface)
 - `SplitSessionWithServerAsync` - async connection + tree insertion with CancellationToken propagated to protocol handlers
 - `SplitSessionWithTool` - synchronous tool docking
 - `MergeExistingSession` - live reparent with CanClose() check on all source tree leaves (not just primary shim); user feedback when blocked by busy tool
-- `ClosePane` - type-aware cleanup: disconnect/dispose host -> set `HostControl=null` -> remove pane from tree
+- `ClosePane` - type-aware cleanup: disconnect/dispose host → set `HostControl=null` → remove pane from tree
 - `CloseAllPanes` - centralized tab teardown: CanClose() gate, cancellation, history, tunnel release, state reset, disposal (called by `ConnectionViewModel.CloseSessionInternal`)
 - `ReconnectPaneAsync` - deferred old state machine cleanup (released only after new connection succeeds); no longer creates self-referential LayoutMemory entries
-- `SwapSplitPanesAsync` - async two-phase swap: detach host controls -> await visual tree -> swap model -> await again -> restore (prevents WebView2/ActiveX reparenting race)
+- `SwapSplitPanesAsync` - async two-phase swap: detach host controls → await visual tree → swap model → await again → restore (prevents WebView2/ActiveX reparenting race)
 - `ToggleSplitOrientation` - in-place tree mutation
 - `ConnectByProtocolAsync` - unified 8-protocol dispatch with CancellationToken passthrough to all `ConnectionService.Connect*Async` handlers
 - Per-session `CancellationTokenSource` lifecycle (`RegisterSession`/`CancelSession` with deferred dispose to avoid leaks)
@@ -356,11 +356,11 @@ ISplitContent (marker interface)
 
 **Rendering**: WPF implicit `DataTemplate`s in `Window.Resources` recursively instantiate `SessionPaneControl` (leaf) and `SplitContainerControl` (branch with `GridSplitter`). Each leaf manages its own overlays (loading spinner, disconnect with Reconnect/Close buttons, accessible labels). Focus accent (`IsKeyboardFocusWithin`) on active pane + hover border (`IsMouseOver`) for visual feedback. Both controls subscribe in constructor and detach all event handlers in `Unloaded` (PropertyChanged, Click, DragCompleted, MouseDoubleClick) to prevent memory leaks. Minimum pane size enforced (MinWidth=120, MinHeight=80). Double-click splitter resets ratio to 50/50. NaN/Infinity guard on drag completion. GridSplitter cursor updates dynamically (`SizeNS` for Horizontal, `SizeWE` for Vertical) in `ApplyLayout()`.
 
-**Split new connection**: Right-click -> "Split..." -> Horizontal | Vertical -> Command Palette in split mode -> select server -> new `SessionPaneModel` inserted into tree via `SplitContainerModel` wrapping. Loading overlay visible during async connection. Post-await guard aborts if pane was removed or tab closed during connection. Per-session CancellationToken ensures graceful abort when tab is closed. Split palette shows ALL servers from inventory (not limited to recent).
+**Split new connection**: Right-click → "Split..." → Horizontal | Vertical → Command Palette in split mode → select server → new `SessionPaneModel` inserted into tree via `SplitContainerModel` wrapping. Loading overlay visible during async connection. Post-await guard aborts if pane was removed or tab closed during connection. Per-session CancellationToken ensures graceful abort when tab is closed. Split palette shows ALL servers from inventory (not limited to recent).
 
 **Split with tool**: When a built-in tool is selected in split mode (palette search or recent tools), `SplitSessionWithTool()` creates the tool control synchronously via `EmbeddedSessionManager.CreateToolControl()` and docks it directly into the split pane - no loading overlay or async connection needed. Tool panes use `ConnectionType = "TOOL:<ID>"` and a GUID-based `ServerId` for tree addressing.
 
-**Merge existing session or tool**: Right-click -> "Merge with..." -> session or tool -> Horizontal | Vertical -> `MergeExistingSession()` reparents the live `HostControl` into a new pane without reconnecting. Checks `CanClose()` on all source tool panes before proceeding (busy tool blocks merge). Works symmetrically for both connection tabs and tool tabs. Uses `OriginalServerId` as stable lookup key (fallback from `ServerId` which may be empty during connection; tool tabs use `ServerId` directly). Consults `SplitLayoutMemory` to restore prior ratio for previously-paired servers. Cancels any in-progress operations for the source session. State machine entries preserved during merge (connections alive, just reparented) - cleanup happens when the tab is eventually closed.
+**Merge existing session or tool**: Right-click → "Merge with..." → session or tool → Horizontal | Vertical → `MergeExistingSession()` reparents the live `HostControl` into a new pane without reconnecting. Checks `CanClose()` on all source tool panes before proceeding (busy tool blocks merge). Works symmetrically for both connection tabs and tool tabs. Uses `OriginalServerId` as stable lookup key (fallback from `ServerId` which may be empty during connection; tool tabs use `ServerId` directly). Consults `SplitLayoutMemory` to restore prior ratio for previously-paired servers. Cancels any in-progress operations for the source session. State machine entries preserved during merge (connections alive, just reparented) - cleanup happens when the tab is eventually closed.
 
 **Drag-to-split**: Drag a tab onto the content area of another tab. Orientation is auto-detected from drop position (closest edge). Works on already-split sessions to create 3+ pane layouts.
 
@@ -427,7 +427,7 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 **Problem**: §21 only sees CPU/RAM/disk **after** the user has connected. The user also wants an at-a-glance view of which servers in the inventory are reachable on the network **before** opening a session - green/red dots in the sidebar rather than discovering at click-time that a host is down.
 
-**Solution**: `Heimdall.Core.SessionHealth` defines the data model (`HealthStatus` enum, immutable `HealthState` record, `IHealthProbe` test seam, `TcpHealthProbe` default implementation) and `Heimdall.App.Services.SessionHealthMonitor` orchestrates it. A `System.Threading.Timer` fires every `SessionHealthCheckIntervalSeconds` (default 60), loads the latest inventory from `IConfigManager.LoadServersAsync` (so adds/removes via the server dialog are picked up automatically without a separate refresh hook), and dispatches throttled parallel TCP probes through a `SemaphoreSlim` (default 10 concurrent). The protocol -> port resolver maps RDP->`RemotePort`, SSH/SFTP->`SshPort`, VNC->`VncPort`, FTP->`FtpPort`, Telnet->`TelnetPort`; Citrix and Local Shell are intentionally not probed. Gateway-fronted servers (`SshGatewayId != null`) short-circuit to `Unknown` without consuming a probe slot - direct probes would always fail because the gateway is the only reachable hop. State for servers removed from the inventory between cycles is evicted on the next cycle.
+**Solution**: `Heimdall.Core.SessionHealth` defines the data model (`HealthStatus` enum, immutable `HealthState` record, `IHealthProbe` test seam, `TcpHealthProbe` default implementation) and `Heimdall.App.Services.SessionHealthMonitor` orchestrates it. A `System.Threading.Timer` fires every `SessionHealthCheckIntervalSeconds` (default 60), loads the latest inventory from `IConfigManager.LoadServersAsync` (so adds/removes via the server dialog are picked up automatically without a separate refresh hook), and dispatches throttled parallel TCP probes through a `SemaphoreSlim` (default 10 concurrent). The protocol → port resolver maps RDP→`RemotePort`, SSH/SFTP→`SshPort`, VNC→`VncPort`, FTP→`FtpPort`, Telnet→`TelnetPort`; Citrix and Local Shell are intentionally not probed. Gateway-fronted servers (`SshGatewayId != null`) short-circuit to `Unknown` without consuming a probe slot - direct probes would always fail because the gateway is the only reachable hop. State for servers removed from the inventory between cycles is evicted on the next cycle.
 
 **Settings integration**: `IConfigManager.SettingsChanged` is subscribed in the constructor; toggling `SessionHealthMonitorEnabled` or changing any of the four `SessionHealth*` settings re-arms the Timer without restart. Disabling clears the in-memory state dictionary.
 
@@ -481,7 +481,7 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 **Decision rule**: if the method's entire body is `Mw_X.Text = vm.Localize(...)` against named elements, use a partial class. If it manipulates the tree or builds controls from data and can be reshaped to take a `Panel`/`Control` parameter, extract to a service. The same `ConnectionService` in `Heimdall.App/Services/` already uses this partial-class pattern with 10 files for its per-protocol connection flows.
 
-**Result**: `MainWindow.xaml.cs` dropped from **4,895 -> 2,123 lines (-57%)** across Chantier 1 + Phases 1-3, with each extracted unit now independently reviewable and the door open for targeted unit tests where appropriate. Phase 1 extracted `OnboardingFlowViewModel`, `FileShareService`, and the `WindowUI` partial. Phase 2 extracted `KeyboardShortcutService`, `SidebarViewModel`, `ToolsTabViewModel`, and removed a dead `OnWindowDeactivated` Command Palette handler that had been closing the palette on open. Phase 3 extracted `TreeInteractions`/`TabInteractions` partials, `SessionTabContextMenuFactory`, and `SessionWindowService`.
+**Result**: `MainWindow.xaml.cs` dropped from **4,895 → 2,123 lines (−57%)** across Chantier 1 + Phases 1-3, with each extracted unit now independently reviewable and the door open for targeted unit tests where appropriate. Phase 1 extracted `OnboardingFlowViewModel`, `FileShareService`, and the `WindowUI` partial. Phase 2 extracted `KeyboardShortcutService`, `SidebarViewModel`, `ToolsTabViewModel`, and removed a dead `OnWindowDeactivated` Command Palette handler that had been closing the palette on open. Phase 3 extracted `TreeInteractions`/`TabInteractions` partials, `SessionTabContextMenuFactory`, and `SessionWindowService`.
 
 ### 27. MainViewModel Sub-VM Composition
 
@@ -501,7 +501,7 @@ Two additional shell-layer sub-VMs were extracted during Phase 2 to mirror the X
 - **`SidebarViewModel`** - Sessions/Tools tab toggle, tool filter text, `SidebarToolCategoryViewModel` tree, lazy population on first activation, `Ctrl+Shift+T` toggle target selection (the sibling RadioButton must be explicitly set - see `ToggleSidebarTab()` gotcha in §Sidebar).
 - **`ToolsTabViewModel`** - full-page Tools browser VM state (favorites, recents, filter, section visibility). Section rendering itself stays in `ToolsTabPopulationService` (which writes to named XAML panels), wired through a Panel-injection event so the VM never touches `FrameworkElement` directly.
 
-**Result**: `MainViewModel.cs` dropped from **1,917 -> 628 lines (-67%)**. The shell class now orchestrates sub-VM instantiation, shared settings, the single `OpenToolCallback`, and the composed `LoadAsync` pipeline. Each sub-VM is independently navigable, testable in isolation (sub-VMs that don't touch `Application.Current.Dispatcher` run cleanly in xUnit), and owns its own event-subscription lifecycle via `IDisposable`.
+**Result**: `MainViewModel.cs` dropped from **1,917 → 628 lines (−67%)**. The shell class now orchestrates sub-VM instantiation, shared settings, the single `OpenToolCallback`, and the composed `LoadAsync` pipeline. Each sub-VM is independently navigable, testable in isolation (sub-VMs that don't touch `Application.Current.Dispatcher` run cleanly in xUnit), and owns its own event-subscription lifecycle via `IDisposable`.
 
 ### 28. Declarative i18n Migration (Phase 5)
 
@@ -511,14 +511,14 @@ Two additional shell-layer sub-VMs were extracted during Phase 2 to mirror the X
 
 Migration was split by UI pattern:
 
-- **5A - Navigation + Toolbar labels (58 sites)**: tab strip headers, toolbar button content/tooltips, Quick Connect / Quick File Server, broadcast toggle label, status-bar ready text, and shortcuts hint. Straight mappings used the mechanical pattern `Mw_X.Text = vm.Localize("Key")` -> `Text="{loc:Translate Key}"`.
+- **5A - Navigation + Toolbar labels (58 sites)**: tab strip headers, toolbar button content/tooltips, Quick Connect / Quick File Server, broadcast toggle label, status-bar ready text, and shortcuts hint. Straight mappings used the mechanical pattern `Mw_X.Text = vm.Localize("Key")` → `Text="{loc:Translate Key}"`.
 - **5B - Accessibility attributes (39 sites)**: all imperative `AutomationProperties.SetName(Mw_X, vm.Localize("Key"))` calls moved to `AutomationProperties.Name="{loc:Translate Key}"` on the owning XAML element. `ApplyAccessibilityLocalization` was deleted entirely.
 - **5C.1 - Tunnel + Scheduled + About (40 sites)**: tunnel/scheduled DataGrid column headers, context-menu headers, action buttons, and field labels moved 1-for-1 to XAML. `ApplyScheduledLocalization` had no residual work and was deleted.
 - **5C.2 - Settings tab (160 sites)**: the densest pass covered 6 settings sub-tabs with radios, checkboxes, labels, watermarks, tooltips, and option groups. It included 24 `Content` + `AutomationProperties.Name` twin migrations spanning theme variants, session persistence, transport modes, RDP display/audio options, gateway actions, apply-mode buttons, and credential-provider actions. `ApplySettingsLocalization` remains only as a residual runtime UI population stub.
 - **5D.1 - Composites via inline `<Run>` (8 sites)**: status-bar composites (`" " + key + " " + key`) and About feature bullets (`"\u2022 " + key`) were split into anonymous inline `Run` elements containing literal text plus `{loc:Translate Key}` bindings. `ApplyNavigationLocalization` and `ApplyAboutLocalization` were deleted.
 - **5D.2 - Logic-heavy cases (2 sites + helper extraction)**: the share-folder conditional label moved out of `ApplyToolbarLocalization` into `UpdateShareFolderLabel()` on `MainWindow`, called from `SharingStarted`, `SharingStopped`, the locale handler, and startup while `FileShareService` remains non-INPC. The tunnel-panel header `{0}` split moved to `TunnelsViewModel.TunnelPanelHeaderPrefix` / `TunnelPanelHeaderSuffix`, with `Mode=OneWay` inline `Run` bindings and `LocalizationManager.LocaleChanged` re-notification. `ApplyToolbarLocalization` and `ApplyTunnelLocalization` were deleted.
 
-**Result**: `MainWindow.Localization.cs` dropped from **523 -> 122 lines (-77%)**. Its remaining responsibilities are deliberately not pure XAML label localization:
+**Result**: `MainWindow.Localization.cs` dropped from **523 → 122 lines (−77%)**. Its remaining responsibilities are deliberately not pure XAML label localization:
 
 - `ApplyLocalization()` - now a one-call dispatcher to `ApplySettingsLocalization(vm)`.
 - `ApplySettingsLocalization()` - residual runtime UI population: `PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`, `UpdateExternalToolProviderStatus`, and the async token-status check. These helpers generate or update dynamic UI from runtime state, so they stay imperative until a dedicated settings-helper extraction.
@@ -618,7 +618,7 @@ The application uses a centralized Design System defined in `CommonControls.xaml
 - Each tool has a per-tool glyph (Segoe MDL2 Assets) + category color in tree view and palette
 
 **Micro-animations** - Subtle transitions for panels toggling visibility:
-- `FadeInPanelStyle`: `DoubleAnimation` opacity 0->1 in 150ms on `Visibility=Visible`
+- `FadeInPanelStyle`: `DoubleAnimation` opacity 0→1 in 150ms on `Visibility=Visible`
 - Duration tokens: `AnimationFast` (150ms), `AnimationMedium` (250ms)
 - Applied to: session loading overlay, SSH/RDP/VNC reconnect overlays
 
@@ -844,8 +844,8 @@ When opening a tool from a server context menu, all available server metadata is
 ### Tool Navigation
 
 - **Ctrl+Shift+T**: Toggle between the Servers and Tools tabs of the left sidebar (`SidebarTabServers` / `SidebarTabTools` grouped RadioButtons)
-- **Ctrl+K -> "tools"**: Command palette lists all tools grouped by category
-- **Ctrl+K -> "ping 10.0.0.1"**: Opens tool with prefilled argument
+- **Ctrl+K → "tools"**: Command palette lists all tools grouped by category
+- **Ctrl+K → "ping 10.0.0.1"**: Opens tool with prefilled argument
 - **Recent tools**: Last 5 used tools shown at top of palette when opened
 - **Singleton behavior**: Context-free tools (UUID, Password, Chmod) reuse existing tab
 - **External tools**: Also searchable in Ctrl+K palette
@@ -853,7 +853,7 @@ When opening a tool from a server context menu, all available server metadata is
 - **Detail panel**: Selecting a tool in TreeView shows dedicated panel (name, category, description, "Open in Tab")
 - **Password presets**: Custom presets saved to `config/password-presets.json`, restored on click, deleted via right-click
 - **Protocol colors**: Theme-aware brushes are defined in `HeimdallThemeBridge.xaml` on ThemeForge slots - resolved through `DynamicResource` where possible and re-evaluated on theme swap via `HeimdallThemeService.ThemeRevision` triggers for converter-based bindings
-- **Cross-tool navigation**: `ToolContextMenuHelper` with `OpenToolAction` callback enables right-click -> open another tool with prefilled context
+- **Cross-tool navigation**: `ToolContextMenuHelper` with `OpenToolAction` callback enables right-click → open another tool with prefilled context
 
 ### Notes Tool (Obsidian-style)
 
@@ -864,16 +864,16 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 - **Fallback**: AvalonEdit with `MarkdownHighlighting` (XSHD) + `MarkdownLivePreviewTransformer` (header scaling, strikethrough decorations, dimmed syntax chars).
 - **Selection**: `MilkdownEditorControl.IsAvailable` checks for `index.html` asset; `IsHostInitialized` verifies WebView2 host was created; WebView2 init deferred to `Loaded` event via `WaitUntilLoadedAsync()` dispatcher yield. Falls back to AvalonEdit if `!IsHostInitialized` after `InitializeAsync()`.
 
-**C# <-> JS bridge** (`MilkdownEditorControl`):
-- JS -> C#: `ready`, `change { markdown, dirty }`, `open-link { payload }`
-- C# -> JS: `set-content`, `set-theme`, `set-readonly`, `focus`, `insert`, `set-menu-labels`
+**C# ↔ JS bridge** (`MilkdownEditorControl`):
+- JS → C#: `ready`, `change { markdown, dirty }`, `open-link { payload }`
+- C# → JS: `set-content`, `set-theme`, `set-readonly`, `focus`, `insert`, `set-menu-labels`
 - Content sync via `ContentChanged` event (debounced 200ms on JS side)
 - Theme: Dracula palette in dark mode via Crepe `--crepe-*` CSS tokens (removed legacy `@milkdown/theme-nord`). AvalonEdit highlighting uses matching Dracula colors
 
 **File management** (`NotesStorageService`):
 - Storage: `config/notes/` (configurable via `AppSettings.NotesDirectory`)
 - `NoteTreeNode.BuildTree()`: builds filesystem-mirroring tree from flat note list, includes empty folders via `AddEmptyFolders()`
-- Inter-note links: `FindNotePathAsync()` resolves by title -> filename -> slug -> relative path with accent-insensitive fallback (`RemoveDiacritics`); `ResolveOrCreateNoteAsync()` creates on miss
+- Inter-note links: `FindNotePathAsync()` resolves by title → filename → slug → relative path with accent-insensitive fallback (`RemoveDiacritics`); `ResolveOrCreateNoteAsync()` creates on miss
 - Tags: extracted from `> tags: x, y` metadata lines in blockquotes
 - Path traversal: `ValidatePathWithinRoot()` on all I/O operations
 - Sync save: `SaveNote()` synchronous method for `CanClose()`/`Dispose()` (avoids sync-over-async)
@@ -889,7 +889,7 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 **Drag & drop**: Internal (move note between folders via `MoveNoteToFolderAsync`) + external (.md file import via copy to notes root)
 - **Network Cartography engine**: `Heimdall.Core.Discovery/` namespace with CartographyEngine (ping sweep + TTL capture, port scan, banner grab, HTTP/HTTPS header extraction, TLS cert inspection, NetBIOS/SNMP/mDNS UDP probes, OS fingerprinting, KB cache-skip), UdpProbeEngine (raw NetBIOS NBSTAT + SNMPv2c GET + mDNS service discovery), OsFingerprinter (TTL + 33 banner patterns), RoleClassifier (46+ port patterns, 96+ banner fingerprints, compiled CnRegex, multi-source ClassifyEnriched), OuiDatabase (300+ MAC prefixes), VlanDetector, DrawIoExporter, ScanHistoryManager (atomic write, ACL, retention, typed HostChange diff), KnowledgeBaseManager (static pure helpers for persistent per-field Observation\<T\> timestamps, merge-on-scan, TTL-based cache acceleration, host purge), and `INetworkKnowledgeBaseStore` (ViewModel persistence seam; `FileNetworkKnowledgeBaseStore` default, `InMemoryNetworkKnowledgeBaseStore` for tests). `CartographyEngine` continues to use the pure helper surface, while the ViewModel routes I/O through the store seam introduced to fix the Phase 3.6 initial-load race.
 - **PowerShell Execution Policy**: Configurable in Settings > Terminal, applied as `-ExecutionPolicy` flag on local shell launch
-- **Elevation modes**: `None` / `Auto` (gsudo `--direct` -> external window fallback) / `Gsudo` / `Runas` - `Auto` default for AdminByRequest/CyberArk/BeyondTrust compatibility, configurable per server profile
+- **Elevation modes**: `None` / `Auto` (gsudo `--direct` → external window fallback) / `Gsudo` / `Runas` - `Auto` default for AdminByRequest/CyberArk/BeyondTrust compatibility, configurable per server profile
 
 ### Network Cartography Initialization Serialization
 
@@ -926,11 +926,11 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 - `SidebarToolCategoryViewModel` (`ObservableObject` via CommunityToolkit.Mvvm): `CategoryName`, `BrushKey`, `Tools`, `VisibleCount` (drives the header badge), `IsExpanded` (two-way), `IsVisible`
 - `SidebarToolItemViewModel`: `Id`, `Name`, `BrushKey`, `IconGeometryKey`, pre-lowercased `Searchable` blob (`name + aliases`) for allocation-free filtering. Favorite state is not stored on the leaf VM; it is resolved live from `FavoriteToolIds`.
 
-`HierarchicalDataTemplate` renders category headers (accent dot + name + count badge) and leaves (14x14 vector icon + name). Brush bindings use `MultiBinding` over `[BrushKey, DataContext.ThemeRevision]` routed through `ResourceKeyToBrushConverter` - theme swap reactivity is automatic, no rebuild required. Icon geometries use `ResourceKeyToGeometryConverter` (immutable across themes).
+`HierarchicalDataTemplate` renders category headers (accent dot + name + count badge) and leaves (14×14 vector icon + name). Brush bindings use `MultiBinding` over `[BrushKey, DataContext.ThemeRevision]` routed through `ResourceKeyToBrushConverter` - theme swap reactivity is automatic, no rebuild required. Icon geometries use `ResourceKeyToGeometryConverter` (immutable across themes).
 
 **Filter**: `OnSidebarToolsFilterChanged` updates `IsVisible` per item (via `Searchable.Contains(filterLower)`) and `VisibleCount` / `IsExpanded` per category. Auto-expand when a filter is active, collapse when cleared. The Favorites category participates in the same filtering rules as every other category. An empty-state label appears when no category has a visible child.
 
-**Launch flow**: `OnSidebarToolsSelectedItemChanged` -> `LaunchSidebarTool(item)` -> resolves descriptor via `ToolRegistry.All.FirstOrDefault(Id)` -> reuses the same `CreateInheritedToolContext` / `ResolveToolTabTitle` / `vm.OpenToolTabAsync` / `vm.TrackRecentTool` primitives as the full-page Tools tab. Before opening, the main Servers tab is activated so the session panel is visible. Right-click sets a `_suppressSidebarLaunch` guard before selection changes so the tool does not open while the favorites ContextMenu is targeted. The redundant sidebar `MouseDoubleClick` launcher was removed because single-click already opens the tool and could otherwise produce duplicate tabs for context/network tools.
+**Launch flow**: `OnSidebarToolsSelectedItemChanged` → `LaunchSidebarTool(item)` → resolves descriptor via `ToolRegistry.All.FirstOrDefault(Id)` → reuses the same `CreateInheritedToolContext` / `ResolveToolTabTitle` / `vm.OpenToolTabAsync` / `vm.TrackRecentTool` primitives as the full-page Tools tab. Before opening, the main Servers tab is activated so the session panel is visible. Right-click sets a `_suppressSidebarLaunch` guard before selection changes so the tool does not open while the favorites ContextMenu is targeted. The redundant sidebar `MouseDoubleClick` launcher was removed because single-click already opens the tool and could otherwise produce duplicate tabs for context/network tools.
 
 **Favorites sync**: `MainViewModel.ToggleFavoriteToolAsync` remains the single writer for `FavoriteToolIds` and raises a `FavoritesChanged` event after persistence. `SidebarViewModel` subscribes to that signal and applies targeted add/remove mutation to the Favorites category, then invalidates the sidebar filter. This keeps the sidebar synchronized whether the toggle originated from the sidebar ContextMenu or the full-page Tools tab pin button. A favorited tool is represented by two independent `SidebarToolItemViewModel` instances: one in Favorites and one in its original category.
 
@@ -946,9 +946,9 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 Full-page browser on the main navigation rail, independent of the sidebar Tools tab. Contains 3 sections - Favorites (pinned tools, persisted in `AppSettings.FavoriteToolIds`), Recently Used (`_recentToolIds`, max 5), and All Tools by category. Cards are 280px wide with pin/unpin button and category-colored icon background. Search filters across name, aliases, and descriptions.
 
-**Launch flow**: `OnToolsTabCardClick` -> `vm.OpenToolTabAsync` -> `EmbeddedSessionManager.CreateToolControl` -> `ToolRegistry.CreateView` (factory lambda) -> `view.Initialize(context, localizer)`. Non-network tools use singleton tab behavior. Network tools pass selected server as `TargetHost` directly (no intermediate prompt). `OpenToolTabAsync` cleans up orphaned tabs on `CreateToolControl` failure.
+**Launch flow**: `OnToolsTabCardClick` → `vm.OpenToolTabAsync` → `EmbeddedSessionManager.CreateToolControl` → `ToolRegistry.CreateView` (factory lambda) → `view.Initialize(context, localizer)`. Non-network tools use singleton tab behavior. Network tools pass selected server as `TargetHost` directly (no intermediate prompt). `OpenToolTabAsync` cleans up orphaned tabs on `CreateToolControl` failure.
 
-**Onboarding**: 3-step first-launch overlay (`OnboardingOverlay`, `Panel.ZIndex=500`). Steps: Connect to Servers -> Built-in Tools -> Quick Connect. Each step navigates to the relevant UI area (Servers tab -> Settings tab -> switches the sidebar to the Tools tab). Keyboard accessible (Escape, Tab cycle, focus management). Persisted via `AppSettings.OnboardingCompleted`.
+**Onboarding**: 3-step first-launch overlay (`OnboardingOverlay`, `Panel.ZIndex=500`). Steps: Connect to Servers → Built-in Tools → Quick Connect. Each step navigates to the relevant UI area (Servers tab → Settings tab → switches the sidebar to the Tools tab). Keyboard accessible (Escape, Tab cycle, focus management). Persisted via `AppSettings.OnboardingCompleted`.
 
 **NetworkCartography responsive**: Columns use proportional (`*`) widths with `MinWidth`. `SizeChanged` handler hides detail columns below 1100px and secondary columns below 800px for split pane support.
 

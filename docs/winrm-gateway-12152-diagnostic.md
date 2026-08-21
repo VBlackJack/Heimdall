@@ -56,7 +56,7 @@ unexpectedly.
 
 The failure reproduces **outside Heimdall**, with a hand-built tunnel. Heimdall
 is not in the path of the fault. The cause is environmental: the WinRM service on
-the target, or an application-layer device along the `bastion -> winrm-target.example.internal:5985`
+the target, or an application-layer device along the `bastion → winrm-target.example.internal:5985`
 path, terminates the HTTP session.
 
 ## Reading the `plink` console
