@@ -1386,8 +1386,30 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (!confirmed) return;
 
+        // Gateways and projects are inventory, not preferences. A gateway carries a
+        // stored password and passphrase that the interface only ever reports as
+        // booleans, so wiping one destroys a secret no user can read back, and the
+        // servers this reset leaves alone hold references to both. Carry them across
+        // the reload, together with the deletions still pending: LoadFromSettings
+        // clears those sets, and losing them would orphan the references that the
+        // save path cleans up.
+        List<SshGatewayDto> keptGateways = _pendingGateways.Select(CloneGateway).ToList();
+        List<ProjectDto> keptProjects = _pendingProjects.Select(CloneProject).ToList();
+        List<string> keptDeletedProjectIds = _deletedProjectIds.ToList();
+        List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
+
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
+        defaults.SshGateways = keptGateways;
+        defaults.Projects = keptProjects;
+
         LoadFromSettings(defaults);
+
+        _deletedProjectIds.AddRange(keptDeletedProjectIds);
+        foreach (string gatewayId in keptDeletedGatewayIds)
+        {
+            _deletedGatewayIds.Add(gatewayId);
+        }
+
         IsDirty = true;
     }
 
