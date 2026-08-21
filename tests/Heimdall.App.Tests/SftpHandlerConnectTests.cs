@@ -147,6 +147,47 @@ public sealed class SftpHandlerConnectTests
         Assert.Equal(0, tunnelService.SetupCallCount);
     }
 
+    [Fact]
+    public async Task ConnectAsync_RejectsMissingUsername_BeforeTunnelSetup()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService();
+        SftpHandler handler = CreateHandler(tunnelService);
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+        server.SshUsername = null;
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("ErrorSshUsernameRequired", result.ErrorMessage);
+        Assert.Null(result.Session);
+
+        // SSH.NET rejects an empty user name from every authentication method, so the
+        // session could never authenticate. Nothing should be raised and no host key
+        // trusted on its behalf.
+        Assert.Equal(0, tunnelService.SetupCallCount);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_RejectsWhitespaceUsername_BeforeTunnelSetup()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService();
+        SftpHandler handler = CreateHandler(tunnelService);
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+        server.SshUsername = "   ";
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("ErrorSshUsernameRequired", result.ErrorMessage);
+        Assert.Equal(0, tunnelService.SetupCallCount);
+    }
+
     private static SftpHandler CreateHandler(FakeTunnelService tunnelService)
     {
         return new SftpHandler(

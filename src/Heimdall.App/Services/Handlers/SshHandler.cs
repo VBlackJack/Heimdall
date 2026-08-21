@@ -189,6 +189,26 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 .ConfigureAwait(false);
         }
 
+        // Past this point the connection goes through SSH.NET, which rejects an empty
+        // user name from every authentication method: without this the attempt reached
+        // the transport and came back as a raw ArgumentException, after the host-key
+        // prompt had already asked the user to trust the server. Deliberately below the
+        // Plink branch, which asks for a login name itself and whose own guard tolerates
+        // a key-only profile without one.
+        if (ConnectionHelpers.RequiresUsernameToConnect(server))
+        {
+            string usernameMsg = _localizer[SshLocalizationKeys.ErrorSshUsernameRequired];
+            _connectionSm.SetError(server.Id, usernameMsg);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            return new ConnectionResult(
+                false,
+                usernameMsg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(
+                    SshLocalizationKeys.ErrorSshUsernameRequired,
+                    usernameMsg));
+        }
+
         SshCapabilityNotice? capabilityNotice = SshCapabilityScope.Evaluate(
             SshResolvedPath.Direct,
             server.SshX11Forwarding,
