@@ -394,6 +394,8 @@ public partial class PortScannerView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"PortScanner CSV export failed: {ex.Message}");
+            TxtError.Text = string.Format(L("StatusExportFailed"), ex.Message);
+            TxtError.Visibility = Visibility.Visible;
         }
     }
 
@@ -413,6 +415,8 @@ public partial class PortScannerView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"PortScanner clipboard copy failed: {ex.Message}");
+            TxtError.Text = string.Format(L("StatusClipboardCopyFailed"), ex.Message);
+            TxtError.Visibility = Visibility.Visible;
         }
     }
 

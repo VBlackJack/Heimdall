@@ -777,6 +777,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SecNumCloud HTML export failed: {ex.Message}");
+            ShowInlineError(string.Format(L("StatusExportFailed"), ex.Message));
         }
     }
 
@@ -801,6 +802,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SecNumCloud CSV export failed: {ex.Message}");
+            ShowInlineError(string.Format(L("StatusExportFailed"), ex.Message));
         }
     }
 
@@ -825,6 +827,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SecNumCloud Draw.io export failed: {ex.Message}");
+            ShowInlineError(string.Format(L("StatusExportFailed"), ex.Message));
         }
     }
 

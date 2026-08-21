@@ -298,6 +298,10 @@ public partial class SmbEnumeratorView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SmbEnumerator clipboard copy failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusClipboardCopyFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 

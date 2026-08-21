@@ -319,6 +319,10 @@ public partial class TcpTracerouteView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"Traceroute clipboard copy failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusClipboardCopyFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 

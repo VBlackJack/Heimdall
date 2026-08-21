@@ -280,6 +280,10 @@ public partial class HttpHeaderAnalyzerView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"HttpHeaderAnalyzer clipboard copy failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusClipboardCopyFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 

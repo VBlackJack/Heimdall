@@ -311,6 +311,10 @@ public partial class BannerGrabberView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"BannerGrabber CSV export failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusExportFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 
@@ -335,6 +339,10 @@ public partial class BannerGrabberView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"BannerGrabber clipboard copy failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusClipboardCopyFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 
