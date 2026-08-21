@@ -277,4 +277,54 @@ public sealed class VaultUnlockDialogViewModelTests
         Assert.Equal(0, confirmCalls);
         Assert.Equal(0, enrollCalls);
     }
+
+    [Fact]
+    public async Task Unlock_WhenLockedOut_SchedulesItsOwnReopen()
+    {
+        var lockout = new PinManager(maxAttempts: 1, lockoutDuration: TimeSpan.FromMinutes(5));
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => throw new VaultUnlockException(), lockout, Localizer(), migrationInProgress: false);
+
+        await viewModel.UnlockCommand.ExecuteAsync(Pw("bad-attempt-1!"));
+
+        Assert.True(viewModel.IsLockedOut);
+
+        // The password box, the unlock button and the Hello button are all bound to
+        // CanSubmit and go dead together, so no user action can reach the view-model
+        // while the gate is shut. If the gate does not re-check itself, the expiry
+        // PinManager already applies is never observed and the only way out is to
+        // kill the process.
+        Assert.True(viewModel.IsLockoutRefreshScheduled);
+    }
+
+    [Fact]
+    public async Task Unlock_WhenLockoutExpires_ReopensTheGateAndStopsRefreshing()
+    {
+        var lockout = new PinManager(maxAttempts: 1, lockoutDuration: TimeSpan.FromMinutes(5));
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => throw new VaultUnlockException(), lockout, Localizer(), migrationInProgress: false);
+
+        await viewModel.UnlockCommand.ExecuteAsync(Pw("bad-attempt-1!"));
+        Assert.False(viewModel.CanSubmit);
+
+        // Expire the lockout without waiting on a clock: restoring a past expiry is
+        // exactly what PinManager does when it reconciles persisted state.
+        lockout.RestoreLockoutState(failureCount: 1, lockoutUntilUtc: DateTime.UtcNow.AddMinutes(-1));
+        viewModel.RefreshLockoutState();
+
+        Assert.False(viewModel.IsLockedOut);
+        Assert.True(viewModel.CanSubmit);
+        Assert.Equal("", viewModel.LockoutMessage);
+        Assert.False(viewModel.IsLockoutRefreshScheduled);
+    }
+
+    [Fact]
+    public void Constructor_NotLockedOut_DoesNotRefresh()
+    {
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask, new PinManager(), Localizer(), migrationInProgress: false);
+
+        Assert.False(viewModel.IsLockedOut);
+        Assert.False(viewModel.IsLockoutRefreshScheduled);
+    }
 }

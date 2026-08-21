@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Localization;
@@ -43,6 +44,7 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
     private readonly PinManager _lockout;
     private readonly LocalizationManager _localizer;
     private readonly bool _migrationInProgress;
+    private readonly DispatcherTimer _lockoutRefreshTimer;
 
     [ObservableProperty]
     private string _errorMessage = "";
@@ -105,8 +107,22 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
         _migrationInProgress = migrationInProgress;
         ShowHelloUnlock = showHelloUnlock && unlockWithHelloAsync is not null;
 
+        // PinManager.IsLockedOut expires on its own, but nothing on the locked
+        // gate can call back into the view-model: the password box, the unlock
+        // button and the Hello button are all bound to CanSubmit and go dead
+        // together. Without this timer the expiry is never observed and the
+        // gate stays shut until the process is killed.
+        _lockoutRefreshTimer = new DispatcherTimer { Interval = LockoutRefreshInterval };
+        _lockoutRefreshTimer.Tick += OnLockoutRefreshTick;
+
         UpdateLockoutState();
     }
+
+    /// <summary>
+    /// How often the gate re-reads the lockout while it is closed. One second
+    /// keeps the displayed countdown honest without measurable cost.
+    /// </summary>
+    private static readonly TimeSpan LockoutRefreshInterval = TimeSpan.FromSeconds(1);
 
     /// <summary>Whether the unlock action is currently available.</summary>
     public bool CanSubmit => !IsLockedOut && !IsBusy;
@@ -153,6 +169,7 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
                 // CPU-bound, so this keeps the busy indicator responsive.
                 await Task.Run(() => _unlockAsync(password)).ConfigureAwait(true);
                 _lockout.ResetFailures();
+                _lockoutRefreshTimer.Stop();
                 IsMasterPasswordVerified = true;
                 await OfferHelloReenrollAfterMasterUnlockAsync().ConfigureAwait(true);
                 IsVerified = true;
@@ -266,6 +283,21 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Test seam: whether the lockout countdown is actively re-checking itself.
+    /// A locked gate that is not refreshing can never reopen.
+    /// </summary>
+    internal bool IsLockoutRefreshScheduled => _lockoutRefreshTimer.IsEnabled;
+
+    /// <summary>
+    /// Re-read the lockout from <see cref="PinManager"/> and reopen the gate when
+    /// it has expired. Driven by the countdown timer, and by tests, because no
+    /// user action can reach the view-model while the gate is shut.
+    /// </summary>
+    internal void RefreshLockoutState() => UpdateLockoutState();
+
+    private void OnLockoutRefreshTick(object? sender, EventArgs e) => UpdateLockoutState();
+
     private void UpdateLockoutState()
     {
         IsLockedOut = _lockout.IsLockedOut;
@@ -277,9 +309,11 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
             LockoutMessage = _localizer.Format(
                 "VaultUnlockLockedOut",
                 (int)Math.Ceiling(remaining.TotalMinutes));
+            _lockoutRefreshTimer.Start();
             return;
         }
 
+        _lockoutRefreshTimer.Stop();
         LockoutMessage = "";
     }
 }
