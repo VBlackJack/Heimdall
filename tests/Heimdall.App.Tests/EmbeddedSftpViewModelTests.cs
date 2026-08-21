@@ -991,6 +991,131 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task DeleteEntriesAsync_DeclinedEscalation_LeavesTheEntryAloneAndSaysWhy()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (path, _) => string.Equals(path, "/srv/denied", StringComparison.Ordinal)
+                ? Task.FromException(new RemoteRecursiveDeleteException(
+                    RemoteRecursiveDeleteFailureReason.PermissionDenied))
+                : Task.CompletedTask,
+        };
+        int sudoCallCount = 0;
+        Func<string, CancellationToken, Task> sudoExecutor = (_, _) =>
+        {
+            sudoCallCount++;
+            return Task.CompletedTask;
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        SetPrivateField(
+            viewModel,
+            "_sshParams",
+            new SshConnectionParams { Host = "example.test", Username = "tester" });
+        SetPrivateField(viewModel, "_sudoDeleteCommandExecutor", sudoExecutor);
+
+        string escalationTitle = localizer.GetString("SftpConfirmSudoDeleteTitle");
+        ConfirmingDialogService dialog = new()
+        {
+            // Say yes to the deletion itself and no to running it as root.
+            ConfirmHandler = (title, _) =>
+                !string.Equals(title, escalationTitle, StringComparison.Ordinal),
+        };
+        viewModel.SetDialogService(dialog);
+
+        await viewModel.DeleteEntriesAsync(
+            [CreateRemoteEntry("denied", "/srv/denied", isDirectory: true)]);
+
+        Assert.Equal(0, sudoCallCount);
+        Assert.Equal(
+            localizer.Format("SftpDeleteRefusedPermissionDenied", "denied"),
+            viewModel.StatusText);
+        Assert.True(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_TwoRefusedEntries_AsksToEscalateOnlyOnce()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (_, _) => Task.FromException(new RemoteRecursiveDeleteException(
+                RemoteRecursiveDeleteFailureReason.PermissionDenied)),
+        };
+        int sudoCallCount = 0;
+        Func<string, CancellationToken, Task> sudoExecutor = (_, _) =>
+        {
+            sudoCallCount++;
+            return Task.CompletedTask;
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        SetPrivateField(
+            viewModel,
+            "_sshParams",
+            new SshConnectionParams { Host = "example.test", Username = "tester" });
+        SetPrivateField(viewModel, "_sudoDeleteCommandExecutor", sudoExecutor);
+        ConfirmingDialogService dialog = new();
+        viewModel.SetDialogService(dialog);
+
+        await viewModel.DeleteEntriesAsync(
+        [
+            CreateRemoteEntry("first", "/srv/first", isDirectory: true),
+            CreateRemoteEntry("second", "/srv/second", isDirectory: true),
+        ]);
+
+        string escalationTitle = localizer.GetString("SftpConfirmSudoDeleteTitle");
+        int escalationPrompts = dialog.ConfirmCalls
+            .Count(call => string.Equals(call.Title, escalationTitle, StringComparison.Ordinal));
+
+        // One answer settles the batch. Asking per entry would stack a dialog in front of
+        // the user for every refused file in a multi-selection.
+        Assert.Equal(1, escalationPrompts);
+        Assert.Equal(2, sudoCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_EscalationPrompt_NamesTheEntryAndIsMarkedDangerous()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            DeleteHandler = (_, _) => Task.FromException(new RemoteRecursiveDeleteException(
+                RemoteRecursiveDeleteFailureReason.PermissionDenied)),
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        SetPrivateField(
+            viewModel,
+            "_sshParams",
+            new SshConnectionParams { Host = "example.test", Username = "tester" });
+        SetPrivateField(
+            viewModel,
+            "_sudoDeleteCommandExecutor",
+            (Func<string, CancellationToken, Task>)((_, _) => Task.CompletedTask));
+        ConfirmingDialogService dialog = new();
+        viewModel.SetDialogService(dialog);
+
+        await viewModel.DeleteEntriesAsync(
+            [CreateRemoteEntry("denied", "/srv/denied", isDirectory: true)]);
+
+        string escalationTitle = localizer.GetString("SftpConfirmSudoDeleteTitle");
+        var prompt = Assert.Single(
+            dialog.ConfirmCalls,
+            call => string.Equals(call.Title, escalationTitle, StringComparison.Ordinal));
+
+        Assert.Contains("denied", prompt.Message, StringComparison.Ordinal);
+        Assert.Equal("danger", prompt.Severity);
+    }
+
+    [Fact]
     public async Task DeleteEntriesAsync_SudoFailureDoesNotAbortRemainingEntry()
     {
         FakeUiDispatcher dispatcher = new();
@@ -1922,8 +2047,16 @@ public sealed class EmbeddedSftpViewModelTests
             _hasInput = true;
         }
 
+        /// <summary>Answers every confirmation with yes unless a handler says otherwise.</summary>
+        public Func<string, string, bool>? ConfirmHandler { get; set; }
+
+        public List<(string Title, string Message, string Severity)> ConfirmCalls { get; } = [];
+
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
-            => Task.FromResult(true);
+        {
+            ConfirmCalls.Add((title, message, severity));
+            return Task.FromResult(ConfirmHandler?.Invoke(title, message) ?? true);
+        }
 
         public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)
             => throw new NotSupportedException();

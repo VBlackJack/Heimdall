@@ -2566,14 +2566,34 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         IRemoteBrowser browser = _browser;
+        IDialogService dialogService = _dialogService;
         List<DeleteEntryFailure> failures = [];
         int deletedCount = 0;
+
+        SudoEscalationConsent consent = new(async refusedName =>
+        {
+            bool granted = false;
+
+            // The loop runs off the UI thread, and this dialog service is blocking-then
+            // -Task.FromResult, so the question has to be marshalled rather than awaited
+            // where the refusal was caught.
+            await _uiDispatcher.InvokeAsync(async () =>
+            {
+                granted = await dialogService.ShowConfirmAsync(
+                    L10n("SftpConfirmSudoDeleteTitle"),
+                    _localizer?.Format("SftpConfirmSudoDelete", refusedName)
+                        ?? $"Delete \"{refusedName}\" as root?",
+                    "danger").ConfigureAwait(true);
+            }).ConfigureAwait(false);
+
+            return granted;
+        });
 
         try
         {
             foreach (SftpFileInfo file in entries)
             {
-                DeleteEntryFailure? failure = await TryDeleteEntryAsync(browser, file)
+                DeleteEntryFailure? failure = await TryDeleteEntryAsync(browser, file, consent)
                     .ConfigureAwait(false);
                 if (failure is null)
                 {
@@ -2615,7 +2635,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     private async Task<DeleteEntryFailure?> TryDeleteEntryAsync(
         IRemoteBrowser browser,
-        SftpFileInfo file)
+        SftpFileInfo file,
+        SudoEscalationConsent consent)
     {
         if (SftpPathGuard.IsProtectedRoot(file.FullPath))
         {
@@ -2635,6 +2656,19 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
         catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
         {
+            // Escalating is a different act from the delete that was asked for: a
+            // recursive removal running as root, which nothing undoes. Listing escalates
+            // on the same signal without asking, and that stays as it is - reading a
+            // directory you do not own is reversible, and this is not.
+            if (!await consent.IsGrantedAsync(file.Name).ConfigureAwait(false))
+            {
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedSFTP sudo deletion declined by the user for '{file.Name}'.");
+                return new DeleteEntryFailure(
+                    file.Name,
+                    RemoteRecursiveDeleteFailureReason.PermissionDenied);
+            }
+
             try
             {
                 SftpPathGuard.ThrowIfProtectedRoot(file.FullPath, "sudo delete");
@@ -2701,6 +2735,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     L10n("SftpDeleteRefusedExecUnavailable"),
                 RemoteRecursiveDeleteFailureReason.ShellOrRmUnavailable =>
                     L10n("SftpDeleteRefusedShellUnavailable"),
+                RemoteRecursiveDeleteFailureReason.PermissionDenied =>
+                    _localizer?.Format("SftpDeleteRefusedPermissionDenied", firstFailure.Name)
+                        ?? "SftpDeleteRefusedPermissionDenied",
                 _ => _localizer?.Format("SftpDeleteFailedEntry", firstFailure.Name)
                     ?? "SftpDeleteFailedEntry",
             };
@@ -3253,6 +3290,30 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         _errorHighlightTimer?.Dispose();
         _errorHighlightTimer = null;
+    }
+
+    /// <summary>
+    /// One answer per delete batch, for the question "your account was refused, do it as
+    /// root instead?".
+    /// </summary>
+    /// <remarks>
+    /// Asking inside the per-entry loop would put a dialog in front of the user for every
+    /// denied file in a multi-selection, so the first answer settles the whole deletion
+    /// and the prompt says as much.
+    /// </remarks>
+    private sealed class SudoEscalationConsent(Func<string, Task<bool>> ask)
+    {
+        private bool? _answer;
+
+        public async Task<bool> IsGrantedAsync(string firstRefusedName)
+        {
+            if (_answer is null)
+            {
+                _answer = await ask(firstRefusedName).ConfigureAwait(false);
+            }
+
+            return _answer.Value;
+        }
     }
 
     private sealed record DeleteEntryFailure(
