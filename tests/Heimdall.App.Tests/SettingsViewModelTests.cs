@@ -959,22 +959,31 @@ public sealed class SettingsViewModelTests
     }
 
     [Theory]
-    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), -1, "ValidationSettingsRdpResizeDelay")]
-    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 1, "ValidationSettingsRdpResizeDelay")]
-    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 999, "ValidationSettingsRdpResizeDelay")]
-    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 60001, "ValidationSettingsRdpResizeDelay")]
-    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 999, "ValidationSettingsRdpArtifactCleanupDelay")]
-    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 60001, "ValidationSettingsRdpArtifactCleanupDelay")]
-    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 4999, "ValidationSettingsRdpCredentialAutofillTimeout")]
-    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 300001, "ValidationSettingsRdpCredentialAutofillTimeout")]
-    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), -1, "ValidationSettingsRdpTimeout")]
-    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 1, "ValidationSettingsRdpTimeout")]
-    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 4999, "ValidationSettingsRdpTimeout")]
-    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 600001, "ValidationSettingsRdpTimeout")]
+    // Each row names the badge that must light. Those rows used to say Advanced for every one of
+    // them, which is how four settings whose fields are on the RDP tab came to be counted on the
+    // Advanced badge: the assertion agreed with the code and both were wrong about the screen.
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), -1, "ValidationSettingsRdpResizeDelay", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 1, "ValidationSettingsRdpResizeDelay", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 999, "ValidationSettingsRdpResizeDelay", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpResizeEnableDelayMs), 60001, "ValidationSettingsRdpResizeDelay", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 999, "ValidationSettingsRdpArtifactCleanupDelay", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpArtifactCleanupDelayMs), 60001, "ValidationSettingsRdpArtifactCleanupDelay", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 4999, "ValidationSettingsRdpCredentialAutofillTimeout", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpCredentialAutofillTimeoutMs), 300001, "ValidationSettingsRdpCredentialAutofillTimeout", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), -1, "ValidationSettingsRdpTimeout", "Advanced")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 1, "ValidationSettingsRdpTimeout", "Advanced")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 4999, "ValidationSettingsRdpTimeout", "Advanced")]
+    [InlineData(nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs), 600001, "ValidationSettingsRdpTimeout", "Advanced")]
+    // The two settings that were in no array at all: the save was refused with nothing shown.
+    [InlineData(nameof(SettingsViewModel.RdpKeepAliveIntervalMs), 4999, "ValidationSettingsRdpKeepAlive", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.RdpKeepAliveIntervalMs), 300001, "ValidationSettingsRdpKeepAlive", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.UpdateCheckIntervalHours), 0, "ValidationSettingsUpdateCheckInterval", "General")]
+    [InlineData(nameof(SettingsViewModel.UpdateCheckIntervalHours), 8761, "ValidationSettingsUpdateCheckInterval", "General")]
     public async Task SaveAsync_InvalidAdvancedRdpTimeoutRejectsPersistenceAndUpdatesAdvancedBadge(
         string propertyName,
         int value,
-        string expectedValidationKey)
+        string expectedValidationKey,
+        string expectedBadge)
     {
         FakeConfigManager config = new FakeConfigManager();
         SettingsViewModel viewModel = CreateViewModel(config);
@@ -987,11 +996,44 @@ public sealed class SettingsViewModelTests
         Assert.True(viewModel.HasValidationErrors);
         Assert.Equal(expectedValidationKey, viewModel.ValidationSummary);
         Assert.NotEmpty(viewModel.GetErrors(propertyName));
-        Assert.Equal(1, viewModel.AdvancedTabErrorCount);
-        Assert.True(viewModel.HasAdvancedTabErrors);
-        Assert.Equal(0, viewModel.GeneralTabErrorCount);
-        Assert.Equal(0, viewModel.TerminalTabErrorCount);
-        Assert.Equal(0, viewModel.SshTabErrorCount);
+        AssertOnlyBadgeLit(viewModel, expectedBadge);
+    }
+
+    /// <summary>
+    /// Asserts the named tab badge shows exactly one error and no other badge shows any.
+    /// </summary>
+    /// <remarks>
+    /// Written as "one badge, and only that one" rather than as an assertion about the expected
+    /// badge alone, because the defect this replaces was a badge lighting on the wrong tab: an
+    /// assertion that only looked at the tab it expected would have been satisfied by the very
+    /// arrangement that sent the user to the wrong place.
+    /// </remarks>
+    private static void AssertOnlyBadgeLit(SettingsViewModel viewModel, string expectedBadge)
+    {
+        (string Name, int Count, bool Has)[] badges =
+        [
+            ("General", viewModel.GeneralTabErrorCount, viewModel.HasGeneralTabErrors),
+            ("Terminal", viewModel.TerminalTabErrorCount, viewModel.HasTerminalTabErrors),
+            ("Ssh", viewModel.SshTabErrorCount, viewModel.HasSshTabErrors),
+            ("Rdp", viewModel.RdpTabErrorCount, viewModel.HasRdpTabErrors),
+            ("Advanced", viewModel.AdvancedTabErrorCount, viewModel.HasAdvancedTabErrors),
+        ];
+
+        Assert.Contains(badges, badge => badge.Name == expectedBadge);
+
+        foreach ((string name, int count, bool has) in badges)
+        {
+            if (name == expectedBadge)
+            {
+                Assert.Equal(1, count);
+                Assert.True(has, $"the {name} badge should be showing");
+            }
+            else
+            {
+                Assert.Equal(0, count);
+                Assert.False(has, $"the {name} badge should not be showing");
+            }
+        }
     }
 
     [Theory]
@@ -1709,6 +1751,12 @@ public sealed class SettingsViewModelTests
                 break;
             case nameof(SettingsViewModel.RdpConnectWatchdogTimeoutMs):
                 viewModel.RdpConnectWatchdogTimeoutMs = value;
+                break;
+            case nameof(SettingsViewModel.RdpKeepAliveIntervalMs):
+                viewModel.RdpKeepAliveIntervalMs = value;
+                break;
+            case nameof(SettingsViewModel.UpdateCheckIntervalHours):
+                viewModel.UpdateCheckIntervalHours = value;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(propertyName), propertyName, null);

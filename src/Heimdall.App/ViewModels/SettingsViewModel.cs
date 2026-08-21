@@ -2528,7 +2528,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             or nameof(GeneralTabErrorCount) or nameof(HasGeneralTabErrors)
             or nameof(TerminalTabErrorCount) or nameof(HasTerminalTabErrors)
             or nameof(SshTabErrorCount) or nameof(HasSshTabErrors)
-            or nameof(AdvancedTabErrorCount) or nameof(HasAdvancedTabErrors)))
+            or nameof(AdvancedTabErrorCount) or nameof(HasAdvancedTabErrors)
+            or nameof(RdpTabErrorCount) or nameof(HasRdpTabErrors)))
         {
             IsDirty = true;
         }
@@ -2552,6 +2553,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private int _advancedTabErrorCount;
 
+    [ObservableProperty]
+    private int _rdpTabErrorCount;
+
     public bool HasGeneralTabErrors => GeneralTabErrorCount > 0;
 
     public bool HasTerminalTabErrors => TerminalTabErrorCount > 0;
@@ -2559,6 +2563,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     public bool HasSshTabErrors => SshTabErrorCount > 0;
 
     public bool HasAdvancedTabErrors => AdvancedTabErrorCount > 0;
+
+    public bool HasRdpTabErrors => RdpTabErrorCount > 0;
 
     partial void OnGeneralTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasGeneralTabErrors));
 
@@ -2625,6 +2631,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private static readonly Dictionary<string, string> SettingsValidationKeyMap = new(StringComparer.Ordinal)
     {
         ["Max embedded sessions must be between 1 and 20."] = "ValidationSettingsMaxSessions",
+        ["Update check interval must be between 1 and 8760 hours."] = "ValidationSettingsUpdateCheckInterval",
+        ["RDP keep-alive interval must be between 5000 and 300000 ms."] = "ValidationSettingsRdpKeepAlive",
         ["Terminal font size must be between 8 and 72."] = "ValidationSettingsFontSize",
         ["Anti-idle interval must be between 0 and 3600 seconds."] = "ValidationSettingsAntiIdle",
         ["SSH TMOUT reset interval must be between 0 and 3600 seconds."] = "ValidationSettingsTmoutReset",
@@ -2644,6 +2652,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private static readonly string[] GeneralValidatedSettingPropertyNames =
     [
         nameof(MaxEmbeddedSessions),
+        nameof(UpdateCheckIntervalHours),
     ];
 
     private static readonly string[] TerminalValidatedSettingPropertyNames =
@@ -2662,14 +2671,28 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [
         nameof(TunnelEstablishmentDelayMs),
         nameof(RdpConnectWatchdogTimeoutMs),
-        nameof(RdpResizeEnableDelayMs),
-        nameof(RdpArtifactCleanupDelayMs),
-        nameof(RdpCredentialAutofillTimeoutMs),
-        nameof(RdpAutoReconnectMaxAttempts),
         nameof(ExternalToolTimeoutMs),
         nameof(SessionHealthCheckIntervalSeconds),
         nameof(SessionHealthProbeTimeoutMs),
         nameof(SessionHealthMaxConcurrent),
+    ];
+
+    /// <summary>
+    /// The validated settings whose fields live on the RDP tab.
+    /// </summary>
+    /// <remarks>
+    /// Four of these were counted on the Advanced badge while their fields are on this tab, so the
+    /// badge sent the user to look somewhere the field is not. Two further settings were in no list
+    /// at all, which is worse: the save was refused with no banner, no badge and no field error, so
+    /// pressing Save simply did nothing.
+    /// </remarks>
+    private static readonly string[] RdpValidatedSettingPropertyNames =
+    [
+        nameof(RdpResizeEnableDelayMs),
+        nameof(RdpArtifactCleanupDelayMs),
+        nameof(RdpCredentialAutofillTimeoutMs),
+        nameof(RdpAutoReconnectMaxAttempts),
+        nameof(RdpKeepAliveIntervalMs),
     ];
 
     private string? GetLocalizedFieldError(string propertyName)
@@ -2694,10 +2717,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         TerminalTabErrorCount = CountValidationErrors(TerminalValidatedSettingPropertyNames);
         SshTabErrorCount = CountValidationErrors(SshValidatedSettingPropertyNames);
         AdvancedTabErrorCount = CountValidationErrors(AdvancedValidatedSettingPropertyNames);
+        RdpTabErrorCount = CountValidationErrors(RdpValidatedSettingPropertyNames);
 
         string? firstError = GetFirstLocalizedFieldError(GeneralValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(TerminalValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(SshValidatedSettingPropertyNames)
+            ?? GetFirstLocalizedFieldError(RdpValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(AdvancedValidatedSettingPropertyNames);
 
         ValidationSummary = firstError;

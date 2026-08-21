@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: two settings refused to save and would not say why
+
+- **Saving is refused when any validated setting is out of range, but the banner and the tab badges
+  are counted from a separate list.** Two settings were on no list, so entering a bad value in them
+  refused the save with no banner, no tab badge and no field error. Pressing Save simply did nothing.
+- The two were the update check interval, on the General tab, and the RDP keep-alive interval.
+- **Four more were counted on the Advanced badge although their fields are on the RDP tab**, so the
+  badge sent the user to the wrong tab to find the field at fault. The RDP tab had no badge at all.
+- **The RDP tab now has its own badge**, the four settings are counted there, and the two that were
+  counted nowhere are counted where their fields are.
+- A check now reads each setting's tab from the window markup instead of trusting a second list, so a
+  setting counted on the wrong tab, or on none, fails rather than shipping. It is what found the four
+  that had been on the wrong badge all along.
+- The tests that expected the Advanced badge for those four had recorded the defect rather than the
+  intent. They are corrected, and each now names the badge that must light and asserts no other does.
+
 ## 2026-08-21: connecting a whole folder skipped the Windows Hello prompt
 
 - **Right-clicking a folder and choosing Connect all did not ask for Windows Hello**, even with the

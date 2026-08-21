@@ -2797,6 +2797,8 @@
   "ValidationRdpFixedWidthRange": "RDP fixed width must be between 200 and 7680.",
   "ValidationRdpFixedHeightRange": "RDP fixed height must be between 200 and 4320.",
   "ValidationRdpResizeEnableDelayRange": "Leave the RDP resize delay empty to inherit the global default, enter 0 to disable the lockout, or enter a value from 1000 to 60000 ms.",
+  "ValidationSettingsUpdateCheckInterval": "Update check interval must be between 1 and 8760 hours.",
+  "ValidationSettingsRdpKeepAlive": "RDP keep-alive interval must be between 5000 and 300000 ms.",
   "ValidationSettingsMaxSessions": "Max embedded sessions must be between 1 and 20.",
   "ValidationSettingsFontSize": "Terminal font size must be between 8 and 72.",
   "ValidationSettingsAntiIdle": "Anti-idle interval must be between 0 and 3600 seconds.",

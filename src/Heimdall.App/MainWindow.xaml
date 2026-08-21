@@ -2709,7 +2709,22 @@
                     </TabItem>
 
                     <!-- ═══════ RDP ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabRdp" Header="{loc:Translate SettingsTabRdp}" Style="{StaticResource ThemedTabItemStyle}">
+                    <TabItem x:Name="Mw_SettingsTabRdp" Style="{StaticResource ThemedTabItemStyle}">
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{loc:Translate SettingsTabRdp}"/>
+                                <Border CornerRadius="8"
+                                        Background="{DynamicResource ErrorTextBrush}"
+                                        MinWidth="18" Height="18"
+                                        Padding="5,0" Margin="6,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding Settings.HasRdpTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="{Binding Settings.RdpTabErrorCount}"
+                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                        </TabItem.Header>
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*"/>
