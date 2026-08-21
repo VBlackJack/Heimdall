@@ -122,6 +122,8 @@ public partial class WifiNetworksView : UserControl, IToolView
         catch (ExternalException ex)
         {
             Core.Logging.FileLogger.Warn($"WifiNetworks clipboard copy failed: {ex.Message}");
+            _vm.ErrorText = string.Format(L("StatusClipboardCopyFailed"), ex.Message);
+            _vm.HasError = true;
         }
     }
 

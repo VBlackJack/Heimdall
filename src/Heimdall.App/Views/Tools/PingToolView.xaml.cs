@@ -292,6 +292,7 @@ public partial class PingToolView : UserControl, IToolView
             catch (Exception ex)
             {
                 Core.Logging.FileLogger.Warn($"PingTool clipboard copy failed: {ex.Message}");
+                AppendLogLine(string.Format(L("StatusClipboardCopyFailed"), ex.Message), true);
             }
         }
     }
@@ -324,6 +325,7 @@ public partial class PingToolView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"PingTool CSV export failed: {ex.Message}");
+            AppendLogLine(string.Format(L("StatusExportFailed"), ex.Message), true);
         }
     }
 

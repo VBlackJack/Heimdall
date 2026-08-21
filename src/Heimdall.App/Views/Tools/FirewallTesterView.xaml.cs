@@ -421,6 +421,10 @@ public partial class FirewallTesterView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"FirewallTester CSV export failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusExportFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 
@@ -445,6 +449,10 @@ public partial class FirewallTesterView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"FirewallTester clipboard copy failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusClipboardCopyFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 

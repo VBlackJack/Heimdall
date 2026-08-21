@@ -304,6 +304,10 @@ public partial class SnmpWalkerView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SNMP Walker clipboard copy failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusClipboardCopyFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 
@@ -333,6 +337,10 @@ public partial class SnmpWalkerView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SNMP Walker CSV export failed: {ex.Message}");
+            _viewState.ShowError(
+                string.Format(L("StatusExportFailed"), ex.Message),
+                showEmptyState: false,
+                keepResultsVisible: true);
         }
     }
 

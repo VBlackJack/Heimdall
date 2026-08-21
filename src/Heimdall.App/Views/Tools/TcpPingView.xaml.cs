@@ -36,7 +36,10 @@ public partial class TcpPingView : UserControl, IToolView
     private readonly TcpPingService _service = new();
     private TcpPingViewModel? _vm;
     private Action<bool>? _setBusy;
+    private LocalizationManager? _localizer;
     private bool _disposed;
+
+    private string L(string key) => _localizer?[key] ?? key;
 
     public TcpPingView()
     {
@@ -55,6 +58,7 @@ public partial class TcpPingView : UserControl, IToolView
         }
 
         _setBusy = context?.SetBusyAction;
+        _localizer = localizer;
         _vm.UpdateLocalizer(localizer);
 
         _vm.Host = string.Empty;
@@ -157,6 +161,8 @@ public partial class TcpPingView : UserControl, IToolView
         catch (ExternalException ex)
         {
             Core.Logging.FileLogger.Warn($"TcpPing clipboard copy failed: {ex.Message}");
+            _vm.ErrorText = string.Format(L("StatusClipboardCopyFailed"), ex.Message);
+            _vm.ShowError = true;
         }
     }
 }

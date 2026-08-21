@@ -243,6 +243,8 @@ public partial class DefaultCredentialView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"DefaultCredential scanner clipboard copy failed: {ex.Message}");
+            TxtError.Text = string.Format(L("StatusClipboardCopyFailed"), ex.Message);
+            TxtError.Visibility = Visibility.Visible;
         }
     }
 
@@ -272,6 +274,8 @@ public partial class DefaultCredentialView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"DefaultCredential scanner CSV export failed: {ex.Message}");
+            TxtError.Text = string.Format(L("StatusExportFailed"), ex.Message);
+            TxtError.Visibility = Visibility.Visible;
         }
     }
 

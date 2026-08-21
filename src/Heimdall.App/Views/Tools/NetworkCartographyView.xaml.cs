@@ -572,6 +572,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"NetworkCartography CSV export failed: {ex.Message}");
+            _vm.StatusText = string.Format(L("StatusExportFailed"), ex.Message);
         }
     }
 
@@ -607,6 +608,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"NetworkCartography Draw.io export failed: {ex.Message}");
+            _vm.StatusText = string.Format(L("StatusExportFailed"), ex.Message);
         }
     }
 
@@ -635,6 +637,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"NetworkCartography edit diagram failed: {ex.Message}");
+            _vm.StatusText = string.Format(L("ToolNetMapErrorEditDiagramFailed"), ex.Message);
         }
     }
 
@@ -812,6 +815,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"KB clear failed: {ex.Message}");
+            _vm.StatusText = string.Format(L("ToolNetMapErrorKbClearFailed"), ex.Message);
         }
     }
 
