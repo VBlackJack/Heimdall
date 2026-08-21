@@ -73,6 +73,11 @@ Get the latest release from the [Releases](../../releases) page. Two editions, b
 > **Not sure? Choose Standard.** It works on any Windows 10 or 11 machine that has Edge, which is
 > nearly all of them.
 
+The releases page also carries a `.msi`, and it sorts first in the list. It is there for managed
+deployment through GPO or SCCM: it installs for every user on the machine, needs an administrator,
+and is not updated by Heimdall's own updater. Unless you are deploying it across an organisation,
+take a `_Setup.exe` or a `.zip` instead.
+
 Each edition comes as an **installer** (shortcuts, upgrades, uninstaller) or a **zip** (unzip and
 run `Heimdall.exe`, nothing installed).
 
