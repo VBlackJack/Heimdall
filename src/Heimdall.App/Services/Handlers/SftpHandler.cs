@@ -16,6 +16,7 @@
 
 using System.Globalization;
 using System.Net;
+using Heimdall.App.Localization;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -97,6 +98,22 @@ internal sealed class SftpHandler : IProtocolHandler
             var msg = _localizer.Format("ErrorInvalidPort", port.ToString(CultureInfo.InvariantCulture));
             _connectionSm.SetError(server.Id, msg);
             return new ConnectionResult(false, msg, null);
+        }
+
+        // SFTP has no external launcher to fall back on, so a blank login name is
+        // always fatal. Refused before the tunnel and the host-key prompt, for the same
+        // reason as the SSH handler.
+        if (ConnectionHelpers.RequiresUsernameToConnect(server))
+        {
+            string usernameMsg = _localizer[SshLocalizationKeys.ErrorSshUsernameRequired];
+            _connectionSm.SetError(server.Id, usernameMsg);
+            return new ConnectionResult(
+                false,
+                usernameMsg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(
+                    SshLocalizationKeys.ErrorSshUsernameRequired,
+                    usernameMsg));
         }
 
         (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) =

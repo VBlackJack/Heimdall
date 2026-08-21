@@ -59,6 +59,7 @@
   "ErrorSshSessionDisconnected": "SSH session was disconnected by the server.",
   "ErrorSshTunnelBroken": "The SSH tunnel was unexpectedly closed by the server.",
   "ErrorSshUsernameRequiredForPassword": "This profile has no SSH username, so Heimdall will not write its password to disk: without a login name the external SSH client never reports having read the file, and the password would stay there for the whole session. Set the SSH username on this profile, or connect with a key instead.",
+  "ErrorSshUsernameRequired": "This profile has no SSH username, so Heimdall cannot sign in. Edit the profile and set the SSH username, then connect again.",
   "ErrorSshTunnelPortOwnershipUnattested": "The configured Plink executable did not open the forwarded port itself. The tunnel was stopped.",
   "ErrorSshUnknown": "An unexpected SSH error occurred: {0}",
   "ErrorSshUserPlaceholder": "Error: Configure your SSH username via the SSH Settings button.",

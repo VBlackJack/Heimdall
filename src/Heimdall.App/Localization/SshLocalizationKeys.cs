@@ -36,6 +36,7 @@ internal static class SshLocalizationKeys
     public const string ErrorPlinkPassphraseUnsupported = "ErrorPlinkPassphraseUnsupported";
     public const string ErrorSshTunnelPortOwnershipUnattested = "ErrorSshTunnelPortOwnershipUnattested";
     public const string ErrorSshUsernameRequiredForPassword = "ErrorSshUsernameRequiredForPassword";
+    public const string ErrorSshUsernameRequired = "ErrorSshUsernameRequired";
     public const string ErrorPreflightFailed = "ErrorPreflightFailed";
     public const string ErrorPuttyNotConfigured = "ErrorPuttyNotConfigured";
     public const string ErrorSshCancelled = "ErrorSshCancelled";

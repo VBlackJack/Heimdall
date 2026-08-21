@@ -933,6 +933,43 @@ public sealed class SshHandlerConnectTests
         }
     }
 
+    // The embedded client is the default path and the least guarded of the three: the
+    // external branch validates the username's shape and Plink has a guard of its own,
+    // while this one used to carry a blank name all the way into SSH.NET and come back
+    // with a raw ArgumentException - after the host-key prompt had already run.
+    [Fact]
+    public async Task ConnectAsync_EmbeddedWithoutUsername_RefusesAndReleasesTheTunnel()
+    {
+        const int targetPort = 49170;
+        FakeTunnelService tunnelService = new()
+        {
+            UsesTunnel = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = targetPort
+        };
+
+        // The default host-key trust service throws if it is ever consulted, so reaching
+        // it would fail this test rather than pass it silently.
+        using SshHandler handler = CreateHandler(tunnelService);
+
+        ServerProfileDto server = CreateGatewayServer();
+        server.SshUsername = null;
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(SshLocalizationKeys.ErrorSshUsernameRequired, result.ErrorMessage);
+        Assert.Equal(
+            SshLocalizationKeys.ErrorSshUsernameRequired,
+            result.Failure?.MessageKey);
+        Assert.Null(result.Session);
+        Assert.Equal(1, tunnelService.ReleaseCount);
+        Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
+    }
+
     private static SshHandler CreateHandler(
         FakeTunnelService tunnelService,
         IHostKeyTrustService? hostKeyTrustService = null,

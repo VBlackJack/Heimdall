@@ -126,6 +126,24 @@ internal static class ConnectionHelpers
     /// Decrypts a credential string. Supports both HMAC-protected and
     /// legacy DPAPI-only formats via <see cref="CredentialProtector"/>.
     /// </summary>
+    /// <summary>
+    /// Whether the embedded SSH client would be unable to authenticate for want of a
+    /// login name.
+    /// </summary>
+    /// <remarks>
+    /// <para>SSH.NET rejects an empty user name from every authentication method, so a
+    /// blank username fails whatever credentials the profile carries and surfaces a raw
+    /// ArgumentException rather than anything a user can act on.</para>
+    /// <para>Deliberately broader than
+    /// <see cref="Handlers.SshHandler.RequiresUsernameBeforeWritingPassword"/>, which
+    /// exists to keep a password file off disk for a launcher that will never read it
+    /// and therefore tolerates a key-only profile. It does not cover the external
+    /// launcher: PuTTY asks for a login name of its own.</para>
+    /// <para>Shared by the SSH and SFTP handlers so the two cannot drift apart.</para>
+    /// </remarks>
+    internal static bool RequiresUsernameToConnect(ServerProfileDto server)
+        => string.IsNullOrWhiteSpace(server.SshUsername);
+
     internal static string? DecryptPassword(string? encryptedValue)
     {
         return CredentialProtector.Unprotect(encryptedValue);
