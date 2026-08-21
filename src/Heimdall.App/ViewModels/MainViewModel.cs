@@ -210,6 +210,12 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             bool settingsSaved = await Settings.TrySaveAsync();
             if (!settingsSaved)
             {
+                // Returning here holds the user on the Settings tab. Without this they
+                // are held there with no statement of why, and every further attempt to
+                // leave repeats the same silent refusal.
+                _dialogService.ShowWarning(
+                    Localize("SettingsCloseSaveFailedTitle"),
+                    Localize("SettingsCloseSaveFailedMessage"));
                 return;
             }
         }

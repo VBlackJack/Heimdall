@@ -121,6 +121,29 @@ public sealed class MainViewModelSettingsNavigationTests
     }
 
     /// <summary>
+    /// The guard holds the user on Settings when the save fails. Holding them there
+    /// without a word means every further attempt to leave repeats the same silent
+    /// refusal, with nothing on screen to act on.
+    /// </summary>
+    [Fact]
+    public async Task SelectedTab_SaveReturnsFalse_SaysWhyItIsHoldingYou()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        harness.Main.SelectedTab = "Settings";
+        harness.Main.Settings.MaxEmbeddedSessions = 0;
+
+        harness.Main.SelectedTab = "About";
+
+        Assert.Equal("Settings", harness.Main.SelectedTab);
+        var warning = Assert.Single(harness.Dialog.WarningCalls);
+
+        // This harness loads the real locale files, so the expectation is derived from the
+        // same source as the production call rather than restating the English wording.
+        Assert.Equal(harness.Main.Localize("SettingsCloseSaveFailedTitle"), warning.Title);
+        Assert.Equal(harness.Main.Localize("SettingsCloseSaveFailedMessage"), warning.Message);
+    }
+
+    /// <summary>
     /// Ensures the existing settings save exception path prevents the requested tab change.
     /// </summary>
     [Fact]
@@ -680,8 +703,11 @@ public sealed class MainViewModelSettingsNavigationTests
         {
         }
 
+        public List<(string Title, string Message)> WarningCalls { get; } = [];
+
         public void ShowWarning(string title, string message)
         {
+            WarningCalls.Add((title, message));
         }
     }
 

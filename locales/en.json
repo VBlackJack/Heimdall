@@ -1560,7 +1560,7 @@
   "SettingsUnsavedWarning": "You have unsaved settings changes. Apply them before leaving?",
   "SettingsUnsavedWarningTitle": "Unsaved Changes",
   "SettingsCloseSaveFailedTitle": "Settings Not Saved",
-  "SettingsCloseSaveFailedMessage": "Heimdall could not save the settings. Review validation errors or retry before closing.",
+  "SettingsCloseSaveFailedMessage": "Heimdall could not save the settings. Review the validation errors, then try again. If none are shown, the details are in the log.",
   "SettingsUnsavedChanges": "You have unsaved changes",
   "ProjectColorBlue": "Blue",
   "ProjectColorGreen": "Green",

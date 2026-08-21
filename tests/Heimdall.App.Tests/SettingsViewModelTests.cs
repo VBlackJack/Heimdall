@@ -1176,6 +1176,36 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveCommand_WhenPersistenceFails_TellsTheUser()
+    {
+        var config = new FakeConfigManager { FailOnMergeSetting = true };
+        var dialog = new FakeDialogService();
+        var viewModel = CreateViewModel(config, dialog);
+        viewModel.DefaultTheme = "Buffy";
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        // A persistence failure raises no badge and no validation summary: before this
+        // it went to the log and nowhere the user could see.
+        var warning = Assert.Single(dialog.WarningCalls);
+        Assert.Equal("SettingsCloseSaveFailedTitle", warning.Title);
+        Assert.Equal("SettingsCloseSaveFailedMessage", warning.Message);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhenPersistenceSucceeds_SaysNothing()
+    {
+        var config = new FakeConfigManager();
+        var dialog = new FakeDialogService();
+        var viewModel = CreateViewModel(config, dialog);
+        viewModel.DefaultTheme = "Buffy";
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Empty(dialog.WarningCalls);
+    }
+
+    [Fact]
     public async Task ResetToDefaultsCommand_RestoresFactoryDefaultsAfterConfirmation()
     {
         var dialog = new FakeDialogService { ConfirmResult = true };
