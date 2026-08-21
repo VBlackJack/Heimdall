@@ -35,7 +35,7 @@ Use this checklist for every new tool and during significant UX refactors.
 
 ## Sidebar And Search
 
-- Session sidebar search and inline actions stay on a single row: search takes the remaining width (`MinWidth=120`), the primary action (Add) stays inline as 1-click, and secondary actions (Import submenu, Expand all, Collapse all) collapse into the kebab `...` overflow menu.
+- Session sidebar search and inline actions stay on a single row: search takes the remaining width (`MinWidth=120`), the primary action (Add) stays inline as 1-click, and secondary actions (Import submenu, Expand all, Collapse all) collapse into the kebab `⋮` overflow menu.
 - The filter result count is a hint `TextBlock` that collapses to 0 height when no filter is active; the toolbar row only grows when there is something to show.
 - Icon-only sidebar actions keep localized tooltips and `AutomationProperties.Name`.
 - Long session names preserve the leading identifier; tooltips expose the full `DisplayName`.

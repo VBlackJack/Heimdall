@@ -138,10 +138,9 @@ lecteur.
 
 ### Caractères
 
-ASCII uniquement, avec une seule exception : les lettres accentuées françaises produisibles au
-clavier AZERTY, dans les documents français.
+Les documents français utilisent les accents français, ceux que produit un clavier AZERTY.
 
-Proscrits partout, y compris en anglais :
+Ce qui est proscrit, dans les deux langues, c'est la ponctuation qu'un éditeur insère de lui-même :
 
 | Au lieu de | Écrire |
 |---|---|
@@ -149,13 +148,10 @@ Proscrits partout, y compris en anglais :
 | guillemets et apostrophes courbes | `"` et `'` |
 | points de suspension en un caractère | `...` |
 | espace insécable ou fine | une espace ordinaire |
-| flèches Unicode | `->` et `<->` |
-| caractères de tracé de boîte | `+--` et `\--` |
-| multiplication, moins, supérieur ou égal Unicode | `x`, `-`, `>=` |
 
-Ces caractères cassent dans les terminaux Windows, les diffs, les pages de code console et les
-journaux de CI. C'est la même raison qui impose les échappements `\uXXXX` dans les fichiers
-de locale.
+Les flèches et les caractères de tracé de boîte sont les bienvenus là où ils portent du sens. Les
+graphes de dépendances et les arbres de répertoires se lisent mieux avec eux : c'est une exception
+délibérée, pas un oubli.
 
 `scripts/NotesTypographyGuard.ps1` fait autorité sur le jeu banni et est exécuté par
 `Build.ps1 -Mode Release` contre les notes de version, en échec bloquant.
