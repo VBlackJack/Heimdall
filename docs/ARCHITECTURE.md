@@ -481,7 +481,7 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 **Decision rule**: if the method's entire body is `Mw_X.Text = vm.Localize(...)` against named elements, use a partial class. If it manipulates the tree or builds controls from data and can be reshaped to take a `Panel`/`Control` parameter, extract to a service. The same `ConnectionService` in `Heimdall.App/Services/` already uses this partial-class pattern with 10 files for its per-protocol connection flows.
 
-**Result**: `MainWindow.xaml.cs` dropped from **4,895 → 2,123 lines (−57%)** across Chantier 1 + Phases 1-3, with each extracted unit now independently reviewable and the door open for targeted unit tests where appropriate. Phase 1 extracted `OnboardingFlowViewModel`, `FileShareService`, and the `WindowUI` partial. Phase 2 extracted `KeyboardShortcutService`, `SidebarViewModel`, `ToolsTabViewModel`, and removed a dead `OnWindowDeactivated` Command Palette handler that had been closing the palette on open. Phase 3 extracted `TreeInteractions`/`TabInteractions` partials, `SessionTabContextMenuFactory`, and `SessionWindowService`.
+**Result**: `MainWindow.xaml.cs` dropped from **4,895 → 2,123 lines (-57%)** across Chantier 1 + Phases 1-3, with each extracted unit now independently reviewable and the door open for targeted unit tests where appropriate. Phase 1 extracted `OnboardingFlowViewModel`, `FileShareService`, and the `WindowUI` partial. Phase 2 extracted `KeyboardShortcutService`, `SidebarViewModel`, `ToolsTabViewModel`, and removed a dead `OnWindowDeactivated` Command Palette handler that had been closing the palette on open. Phase 3 extracted `TreeInteractions`/`TabInteractions` partials, `SessionTabContextMenuFactory`, and `SessionWindowService`.
 
 ### 27. MainViewModel Sub-VM Composition
 
@@ -501,7 +501,7 @@ Two additional shell-layer sub-VMs were extracted during Phase 2 to mirror the X
 - **`SidebarViewModel`** - Sessions/Tools tab toggle, tool filter text, `SidebarToolCategoryViewModel` tree, lazy population on first activation, `Ctrl+Shift+T` toggle target selection (the sibling RadioButton must be explicitly set - see `ToggleSidebarTab()` gotcha in §Sidebar).
 - **`ToolsTabViewModel`** - full-page Tools browser VM state (favorites, recents, filter, section visibility). Section rendering itself stays in `ToolsTabPopulationService` (which writes to named XAML panels), wired through a Panel-injection event so the VM never touches `FrameworkElement` directly.
 
-**Result**: `MainViewModel.cs` dropped from **1,917 → 628 lines (−67%)**. The shell class now orchestrates sub-VM instantiation, shared settings, the single `OpenToolCallback`, and the composed `LoadAsync` pipeline. Each sub-VM is independently navigable, testable in isolation (sub-VMs that don't touch `Application.Current.Dispatcher` run cleanly in xUnit), and owns its own event-subscription lifecycle via `IDisposable`.
+**Result**: `MainViewModel.cs` dropped from **1,917 → 628 lines (-67%)**. The shell class now orchestrates sub-VM instantiation, shared settings, the single `OpenToolCallback`, and the composed `LoadAsync` pipeline. Each sub-VM is independently navigable, testable in isolation (sub-VMs that don't touch `Application.Current.Dispatcher` run cleanly in xUnit), and owns its own event-subscription lifecycle via `IDisposable`.
 
 ### 28. Declarative i18n Migration (Phase 5)
 
@@ -518,7 +518,7 @@ Migration was split by UI pattern:
 - **5D.1 - Composites via inline `<Run>` (8 sites)**: status-bar composites (`" " + key + " " + key`) and About feature bullets (`"\u2022 " + key`) were split into anonymous inline `Run` elements containing literal text plus `{loc:Translate Key}` bindings. `ApplyNavigationLocalization` and `ApplyAboutLocalization` were deleted.
 - **5D.2 - Logic-heavy cases (2 sites + helper extraction)**: the share-folder conditional label moved out of `ApplyToolbarLocalization` into `UpdateShareFolderLabel()` on `MainWindow`, called from `SharingStarted`, `SharingStopped`, the locale handler, and startup while `FileShareService` remains non-INPC. The tunnel-panel header `{0}` split moved to `TunnelsViewModel.TunnelPanelHeaderPrefix` / `TunnelPanelHeaderSuffix`, with `Mode=OneWay` inline `Run` bindings and `LocalizationManager.LocaleChanged` re-notification. `ApplyToolbarLocalization` and `ApplyTunnelLocalization` were deleted.
 
-**Result**: `MainWindow.Localization.cs` dropped from **523 → 122 lines (−77%)**. Its remaining responsibilities are deliberately not pure XAML label localization:
+**Result**: `MainWindow.Localization.cs` dropped from **523 → 122 lines (-77%)**. Its remaining responsibilities are deliberately not pure XAML label localization:
 
 - `ApplyLocalization()` - now a one-call dispatcher to `ApplySettingsLocalization(vm)`.
 - `ApplySettingsLocalization()` - residual runtime UI population: `PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`, `UpdateExternalToolProviderStatus`, and the async token-status check. These helpers generate or update dynamic UI from runtime state, so they stay imperative until a dedicated settings-helper extraction.

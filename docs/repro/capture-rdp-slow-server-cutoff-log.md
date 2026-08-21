@@ -1,5 +1,7 @@
 ## 🟦 Capture a Diagnostic Log for the Slow-Server RDP Cutoff
 
+*Also available in French: [../fr/repro/capture-rdp-slow-server-cutoff-log.md](../fr/repro/capture-rdp-slow-server-cutoff-log.md).*
+
 > Some RDP servers whose Windows session loads slower than usual get their
 > connection dropped by Heimdall **after** it has already reported "Connected".
 > No log of a slow reproduction exists yet, so the cause is still unconfirmed - 

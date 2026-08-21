@@ -266,9 +266,9 @@ une copie qui ne peut pas promettre que la destination reste intacte n'est tout
 simplement pas effectuée.
 
 Annuler une copie lève une annulation, pas un refus. Ce sont deux issues
-distinctes, rapportées et journalisées séparément, afin que « l'utilisateur a
-arrêté ceci » ne soit jamais présenté comme « ce serveur ne peut pas copier en
-toute sécurité ».
+distinctes, rapportées et journalisées séparément, afin que "l'utilisateur a
+arrêté ceci" ne soit jamais présenté comme "ce serveur ne peut pas copier en
+toute sécurité".
 
 La copie distante FTP est refusée, pas tentée. Le contrat de copie veut qu'une
 destination existante ne soit jamais écrasée, et FTP ne peut pas l'honorer :
@@ -357,7 +357,7 @@ conservent jamais de handle IPC d'une requête à l'autre. Chaque appel à
 (Pageant) ou une nouvelle connexion de tube nommé (agent OpenSSH), puis le
 libère avant de retourner. Les sondes de disponibilité ont un délai de 250 ms ;
 les requêtes réelles ont un délai de 5 s. Un tube introuvable comme un
-dépassement de délai retournent « indisponible » sans lever d'exception. La
+dépassement de délai retournent "indisponible" sans lever d'exception. La
 préférence de l'utilisateur entre les agents est un réglage d'exécution
 (`AppSettings.SshAgentPreference`) ; les changements prennent effet à la
 prochaine tentative de connexion, sans redémarrage de l'application.
@@ -390,7 +390,7 @@ fichiers `known_hosts` fournis de l'extérieur :
   un diagnostic `MalformedLine` ; cela protège contre une ligne géante unique
   forçant une allocation importante.
 - **`MaxFileSizeBytes = 50 MB`** - les fichiers de plus de 50 Mo sont refusés
-  d'emblée avec un diagnostic typé `FileTooLarge`. L'importeur du cœur comme
+  d'emblée avec un diagnostic typé `FileTooLarge`. L'importeur du coeur comme
   l'importeur côté application lisent en flux via `StreamReader` plutôt que
   `File.ReadAllText`, et encadrent les entrées/sorties d'un `try/catch` afin que
   les fichiers verrouillés ou illisibles se dégradent en diagnostics
@@ -526,7 +526,7 @@ lu comme produisant ce type.
 ### Collage du presse-papiers entre endpoints distincts
 
 Un collage entre deux endpoints distants différents télécharge chaque fichier source et le dépose sur
-le serveur de destination. Chaque nœud qu'il y crée, fichier comme répertoire, passe par une
+le serveur de destination. Chaque noeud qu'il y crée, fichier comme répertoire, passe par une
 primitive **exclusive** : un fichier est mis en attente puis publié par un lien physique, un
 répertoire est réservé par un `mkdir` sans `-p`. Les deux échouent lorsque quelque chose occupe déjà
 le nom, et c'est le serveur qui tranche, pas le client.
@@ -538,7 +538,7 @@ endpoints vers lui est refusé **avant** la création du moindre répertoire et 
 octet.
 
 Ce refus anticipé se décide par transport, pas par session. Une session SFTP qui annonce la capacité
-mais ne peut pas atteindre son canal exec épinglé refuse plus tard, au premier nœud qu'elle tente de
+mais ne peut pas atteindre son canal exec épinglé refuse plus tard, au premier noeud qu'elle tente de
 publier : un fichier source peut alors déjà avoir été récupéré dans un temporaire local. Rien n'est
 créé ni remplacé sur la destination dans ce cas, et le temporaire est supprimé ; ce qui est perdu,
 c'est l'effort de transfert, pas des données.
@@ -564,7 +564,7 @@ comme il l'a toujours fait.
 Les listages de répertoires sont lus en direct depuis la destination plutôt que depuis ce que le
 volet a affiché en dernier, mais ils servent **uniquement** à choisir un nom qui n'est pas déjà pris.
 Un listage ne fait autorité sur rien : il est déjà périmé à l'instant où il revient. La garantie
-provient de la réservation exclusive de chaque nœud, jamais d'une sonde préalable.
+provient de la réservation exclusive de chaque noeud, jamais d'une sonde préalable.
 
 Ni une collision, ni une annulation, ni un résultat non confirmé n'autorisent jamais la suppression
 de la source d'un couper. Une annulation, en particulier, n'est pas la preuve que rien n'a atterri :
@@ -575,7 +575,7 @@ verdict. La source est conservée et l'entrée de presse-papiers est conservée 
 un rechargement en échec ne transforme jamais une issue non confirmée en succès et n'autorise jamais
 la suppression de la source.
 
-L'atomicité est par nœud, pas transactionnelle à l'échelle d'une arborescence. Un collage interrompu
+L'atomicité est par noeud, pas transactionnelle à l'échelle d'une arborescence. Un collage interrompu
 en cours de route peut laisser une arborescence partielle sur la destination. C'est délibéré :
 nettoyer récursivement un répertoire créé par le collage pourrait supprimer des entrées qu'un tiers y
 a ajoutées entre-temps.

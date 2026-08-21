@@ -63,6 +63,7 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 46. [FTP - avertissement d'identifiants en clair](#ftp-cleartext-credential-warning)
 47. [Passerelle WinRM - réponse serveur invalide HTTP 12152](#winrm-gateway-12152)
 48. [Fournisseur d'identifiants KeePassXC - pièges courants](#keepassxc-credential-provider)
+49. [RDP embarqué - session coupée peu après la connexion](#rdp-slow-server-cutoff)
 
 ---
 
@@ -808,9 +809,9 @@ var extendedSettings = ocx as IMsRdpExtendedSettings;
 
 4. Conserver un repli explicite par `Marshal.QueryInterface` avec le même IID, pour le diagnostic dans les environnements COM inhabituels.
 
-N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsTscAx.10`, il renvoie `E_NOINTERFACE` pour les interfaces COM sœurs et constitue le mauvais motif d'acquisition.
+N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsTscAx.10`, il renvoie `E_NOINTERFACE` pour les interfaces COM soeurs et constitue le mauvais motif d'acquisition.
 
-**Leçon clé** : pour les interfaces COM sœurs de MsTscAx, faites confiance au QueryInterface direct sur l'OCX, pas à la surface IDispatch dynamique exposée par l'encapsuleur AxHost.
+**Leçon clé** : pour les interfaces COM soeurs de MsTscAx, faites confiance au QueryInterface direct sur l'OCX, pas à la surface IDispatch dynamique exposée par l'encapsuleur AxHost.
 
 **Fichiers** : `Heimdall.Rdp/ActiveX/ComInterfaces.cs`, `Heimdall.Rdp/ActiveX/RdpActiveXHost.cs`
 
@@ -904,3 +905,15 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Leçon clé** : KeePassXC lui-même n'a pas besoin d'être lancé ni déverrouillé - `keepassxc-cli` ouvre directement le fichier `.kdbx` avec le mot de passe maître et/ou le fichier de clé fournis par Heimdall.
 
 **Fichiers** : `Security/CommandCredentialProvider.cs`, `Security/CredentialProviderFactory.cs`, `Services/CredentialProviderPresetService.cs`, `ViewModels/SettingsViewModel.cs`
+
+---
+
+## 49. RDP embarqué - session coupée peu après la connexion {#rdp-slow-server-cutoff}
+
+**Symptôme** : un serveur dont la session Windows se charge plus lentement que d'habitude est coupé par Heimdall peu après qu'il a déjà annoncé "Connecté". La session est visiblement active d'abord, puis coupée d'elle-même.
+
+**Cause racine** : non confirmée. Trois candidats subsistent : un redimensionnement forcé environ dix secondes après la connexion, une reconnexion automatique épuisée, ou un nettoyage prématuré des identifiants. Aucun journal d'une reproduction lente n'existe encore, et c'est pourquoi aucun d'eux n'a été écarté.
+
+**Solution** : aucune pour l'instant. Ce qui trancherait est une capture propre couvrant toute la séquence, avec l'heure de coupure notée à la main : voir [repro/capture-rdp-slow-server-cutoff-log.md](repro/capture-rdp-slow-server-cutoff-log.md). La procédure est écrite pour quiconque peut reproduire la panne, et une seule capture qui la suit suffit à départager les trois candidats.
+
+**Fichiers** : aucun tant que la cause n'est pas confirmée.

@@ -140,21 +140,36 @@ lecteur.
 
 Les documents français utilisent les accents français, ceux que produit un clavier AZERTY.
 
-Ce qui est proscrit, dans les deux langues, c'est la ponctuation qu'un éditeur insère de lui-même :
+Deux sortes de caractères sont refusées, dans les deux langues, et pour la même raison : un
+caractère ASCII ordinaire dit la même chose et survit à un terminal Windows, un diff, une page de
+code console et un journal de CI.
 
-| Au lieu de | Écrire |
+| Refusé | Écrire |
 |---|---|
-| tiret cadratin, tiret demi-cadratin | `-` |
-| guillemets et apostrophes courbes | `"` et `'` |
+| tiret cadratin, tiret demi-cadratin, trait d'union Unicode, signe moins | `-` |
+| guillemets courbes, guillemets bas, **guillemets français** | `"` |
+| apostrophe courbe | `'` |
 | points de suspension en un caractère | `...` |
-| espace insécable ou fine | une espace ordinaire |
+| espaces insécable, fine et de largeur nulle, marque d'ordre des octets | une espace ordinaire, ou rien |
+| **ligatures oe et ae** | `oe`, `ae` |
 
-Les flèches et les caractères de tracé de boîte sont les bienvenus là où ils portent du sens. Les
-graphes de dépendances et les arbres de répertoires se lisent mieux avec eux : c'est une exception
-délibérée, pas un oubli.
+Les guillemets et les ligatures figurent sur cette liste parce que le clavier AZERTY ne les produit
+pas : en écrire un, c'est aller chercher un substitut que le terminal du lecteur ne rendra
+peut-être pas. `scripts/NotesTypographyGuard.ps1` les déclare délibérément absents, avec les
+mêmes remèdes.
 
-`scripts/NotesTypographyGuard.ps1` fait autorité sur le jeu banni et est exécuté par
-`Build.ps1 -Mode Release` contre les notes de version, en échec bloquant.
+**Les flèches, les caractères de tracé de boîte, les cases à cocher et les emoji sont les
+bienvenus.** Un graphe de dépendances, un arbre de répertoires et une liste de contrôle se lisent
+mieux avec eux, et ils portent quelque chose qu'aucune paire de caractères ASCII ne porte aussi
+clairement. C'est une exception délibérée, pas un oubli.
+
+`DocumentationTypographyGuardTests` applique cette règle à `README*.md`, `SECURITY*.md` et tout
+`docs/`, **récursivement**. La récursivité est assertée séparément, parce qu'un balayage à la main
+de `docs/*.md` est un jour passé au vert alors que deux sous-répertoires n'avaient pas été ouverts.
+
+**Les notes de version suivent une règle plus stricte** : caractères ASCII et AZERTY uniquement,
+flèches comprises dans le refus. `scripts/NotesTypographyGuard.ps1` y fait autorité et s'exécute en
+échec bloquant dans `Build.ps1 -Mode Release`.
 
 ## Localisation et i18n
 

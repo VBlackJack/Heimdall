@@ -2322,7 +2322,7 @@ inline bootstrapper seed replace them. Supervisor reconnaissance grepped the
 exact symbol across all of `src/` and `tests/` (not just the bootstrapper),
 which surfaced two domino pairs (`Backup`→`Config`, `BatchExecution`→`Audit`).
 
-- **Deleted (21 files, −3,320 lines)** - `BackupService` / `IBackupService`,
+- **Deleted (21 files, -3,320 lines)** - `BackupService` / `IBackupService`,
   `ConfigurationService` / `IConfigurationService`, the native `SettingsService`
   class, `ImportExportService` / `IImportExportService`, `BatchExecutionService`
   / `IBatchExecutionService`, `AuditLogService` / `IAuditLogService` and the full
@@ -3473,7 +3473,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ### Refactor - MainWindow + MainViewModel decomposition (Phases 1-4)
 
-**`MainWindow.xaml.cs`: 3,490 → 2,123 LOC (−39%)**
+**`MainWindow.xaml.cs`: 3,490 → 2,123 LOC (-39%)**
 
 - **Phase 1** - Extract 3 isolated low-risk domains:
   - `OnboardingFlowViewModel` (first-launch 3-step overlay, resolved by `MainWindow` via DI)
@@ -3493,7 +3493,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
   - `SessionSplitService` (detach/split/merge/unsplit orchestration, `SplitPaletteRequested` event)
   - Initial `ServerListViewModel.MoveServerToGroupAsync` extraction for the tree drag-drop write path (later unified with the context-menu path in the move-to-group parity pass)
 
-**`MainViewModel.cs`: 1,917 → 628 LOC (−67%)**
+**`MainViewModel.cs`: 1,917 → 628 LOC (-67%)**
 
 - **Phase 4** - `MainViewModel` decomposition into 4 sub-VMs (constructor-composed, not DI-registered; `IDisposable` for event-subscription cleanup):
   - `CommandPaletteViewModel` (14 methods: fuzzy search ranking, tool-command parsing, ad-hoc `user@host:port` parsing with protocol inference, connect/split flows, `SplitLayoutMemory` pairing)
@@ -3529,7 +3529,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 ### Post-v2026.041301 audit follow-up (2026-04-13) - code-behind split, observability, assets diet
 
 #### Code organization - MainWindow code-behind split (Chantier 1)
-- **`MainWindow.xaml.cs` shrunk from 4,895 → 3,490 lines** (−1,405 lines, −29%) via three structural extractions. Zero behavior change - pure file splits verified by build + full test suite
+- **`MainWindow.xaml.cs` shrunk from 4,895 → 3,490 lines** (-1,405 lines, -29%) via three structural extractions. Zero behavior change - pure file splits verified by build + full test suite
 - **`Services/ContextMenuFactory.cs`** (647 lines, new) - builds the four session `TreeView` context menus (server, folder, tool, empty area) and the "Detected Tools" submenu from `ExternalToolProviderService`. Constructor-injected via DI; reached from MainWindow through a small `IContextMenuCallbacks` interface so the menu builder never touches window-scoped state directly
 - **`Services/ToolsTabPopulationService.cs`** (605 lines, new) - owns the full-page Tools tab rebuild (Favorites / Recents / categories / 280px cards with search filter), the sidebar Tools `TreeView` data + filter logic, and the pure helpers `GetCategoryBrushKey` / `GetInheritedToolTargetHost` / `CreateInheritedToolContext` / `ResolveToolTabTitle`. Tool card click/pin callbacks are plain `Action<T>` delegates (no interface ceremony for two callbacks). Uses `Application.Current.FindResource` for theme tokens so the service stays decoupled from any specific `FrameworkElement`. `PopulateToolsTab` itself stayed in `MainWindow.xaml.cs` as a thin wrapper because it writes to named header elements (`Mw_ToolsTabTitle`, `Mw_ToolsTabCount`) that are tightly coupled to the XAML tree
 - **`MainWindow.Localization.cs`** (519 lines, new partial class) - holds the 8 `Apply*Localization` methods (`ApplyLocalization` orchestrator + Navigation / Toolbar / Tunnel / Scheduled / Settings / About / Accessibility) and the three helpers that are only ever called from `ApplySettingsLocalization` (`PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`). `UpdateExternalToolProviderStatus` and `UpdateTokenStatus` stayed in the main code-behind because they have additional callers (external-tool rescan, Git sync token save/clear handlers)
@@ -3554,8 +3554,8 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - **`SwapSplitPanesAsync` intentionally untested** - it early-returns when `System.Windows.Application.Current?.Dispatcher` is null, which is always the case in xUnit. Standing up a WPF `Application` + STA dispatcher pump is the same blocker that keeps `ThemeServiceTests` at `[Skip]` and is out of scope here
 
 #### Assets diet (Chantier 3 - PERF-04 + PERF-05)
-- **Orphaned PNGs removed (−9.6 MB)**: `Assets/Icons/app/icon-flat.png` (4.19 MB), `icon-rays.png` (3.18 MB), `logo.png` (1.85 MB). Reference audit (`git grep` across source + XAML + csproj + installer scripts) turned up only historical `docs/CHANGELOG.md` mentions and unrelated `/logo.png` references inside `drawio/js/*.min.js` (which point at `Assets/drawio/images/logo.png`, a different file). The real app icon `src/Heimdall.App/app.ico`, wired via `<ApplicationIcon>` in the csproj, is untouched
-- **Draw.io locales pruned (−2.95 MB)**: `Assets/drawio/resources/` went from 59 files / 3.1 MB down to 4 files / 149 KB. Kept `dia.txt` (base / English fallback - draw.io's loader uses this name for English), `dia_fr.txt`, `dia_i18n.txt` (auto-generated key manifest), and `README.md`. Removed 55 other `dia_*.txt` locale files - Heimdall is English/French only and draw.io falls back to `dia.txt` for any missing locale
+- **Orphaned PNGs removed (-9.6 MB)**: `Assets/Icons/app/icon-flat.png` (4.19 MB), `icon-rays.png` (3.18 MB), `logo.png` (1.85 MB). Reference audit (`git grep` across source + XAML + csproj + installer scripts) turned up only historical `docs/CHANGELOG.md` mentions and unrelated `/logo.png` references inside `drawio/js/*.min.js` (which point at `Assets/drawio/images/logo.png`, a different file). The real app icon `src/Heimdall.App/app.ico`, wired via `<ApplicationIcon>` in the csproj, is untouched
+- **Draw.io locales pruned (-2.95 MB)**: `Assets/drawio/resources/` went from 59 files / 3.1 MB down to 4 files / 149 KB. Kept `dia.txt` (base / English fallback - draw.io's loader uses this name for English), `dia_fr.txt`, `dia_i18n.txt` (auto-generated key manifest), and `README.md`. Removed 55 other `dia_*.txt` locale files - Heimdall is English/French only and draw.io falls back to `dia.txt` for any missing locale
 - **`Assets/drawio/VENDORED.md`** updated with three new sections documenting what was pruned, what is a candidate for further pruning *with a runtime test plan* (viewer bundles ~5.6 MB, `shapes-14-6-5.min.js` vs `shapes.min.js` duplication ~1.4 MB, clipart `img/` categories up to ~8 MB), and what is intentionally kept
 - **Total on-disk savings: ~12.55 MB** from source control. The `Assets\**\*` glob in `Heimdall.App.csproj` means removed files simply drop out of the deploy - no csproj edit required
 
