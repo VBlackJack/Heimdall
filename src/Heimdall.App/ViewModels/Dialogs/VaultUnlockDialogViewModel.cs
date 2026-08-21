@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
-using System.Windows.Threading;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
