@@ -821,7 +821,14 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        TransitionPhase(RdpConnectionPhase.Preparing);
+        // No phase, because nothing is being prepared. This used to say Preparing, and three
+        // surfaces read that literally: the phase stepper lit its first segment as though a
+        // connection were starting, the connect-cancel button appeared in place of the one just
+        // clicked with the same "_Cancel" label so the click looked like it had done nothing, and
+        // the connect watchdog was armed, whose expiry raises a reconnect overlay on a session the
+        // user asked to abandon. The sibling handler for cancelling an in-progress connection has
+        // always used None; these two do the same kind of thing and now say the same thing.
+        TransitionPhase(RdpConnectionPhase.None);
 
         try
         {
