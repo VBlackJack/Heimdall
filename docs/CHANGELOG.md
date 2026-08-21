@@ -12,6 +12,25 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: cancelling a reconnection looked like starting one
+
+- **Clicking Cancel on an auto-reconnect put the view into the phase that means a connection is being
+  prepared.** Three things on screen read that literally, all of them at once.
+- **The phase stepper lit its first segment**, so beside a status line reading "Closing the embedded
+  Remote Desktop session." the stepper showed a connection starting.
+- **A second Cancel button took the place of the first.** The reconnect one disappears on the click
+  and the connect one appears, and both carry the same label, so the click looked like it had done
+  nothing at all.
+- **The connect watchdog was armed.** Had the attempt already in flight neither finished nor failed
+  before it expired, the watchdog would have raised a reconnect prompt on a session the user had just
+  asked to abandon.
+- **The two cancellations now say the same thing.** Cancelling an in-progress connection had always
+  set no phase; cancelling a reconnection now does the same. The status line, which was briefly
+  overwritten with "Preparing the embedded Remote Desktop session." before settling on the closing
+  message, no longer flickers.
+- What is checked from now on is not the name of the phase but that both cancellations agree, and
+  that whatever they agree on does not read as a connection in progress.
+
 ## 2026-08-21: two settings refused to save and would not say why
 
 - **Saving is refused when any validated setting is out of range, but the banner and the tab badges
