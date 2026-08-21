@@ -83,6 +83,54 @@ public sealed class ServerListBulkWindowsHelloGateTests
         Assert.Equal(1, hello.VerifyCalls);
     }
 
+    // The folder context menu's "Connect all" does not use either public entry point: it calls plan
+    // preparation directly and then the plan overload. That is how it reached credential resolution
+    // without the gate. This covers that path by calling the same two methods in the same order.
+    [Fact]
+    public async Task PlanPreparation_HelloVerificationFails_RefusesBeforeResolvingCredentials()
+    {
+        var hello = new FakeWindowsHelloService { Available = true, VerifyResult = false };
+        var handler = new CountingProtocolHandler("SSH");
+        await using var fixture = await Fixture.CreateAsync(hello, handler, requireHello: true);
+
+        ServerListViewModel.BulkConnectPlan plan =
+            await fixture.ViewModel.PrepareBulkConnectPlanAsync(
+                fixture.ViewModel.Servers.ToList(),
+                CancellationToken.None);
+
+        Assert.True(plan.Refused);
+        Assert.Equal(0, plan.ConnectableCount);
+        Assert.Equal(1, hello.VerifyCalls);
+
+        // And executing the refused plan connects nothing, so a caller that ignored Refused would
+        // still not reach a session.
+        await fixture.ViewModel.ConnectServersBulkCoreAsync(plan, CancellationToken.None);
+
+        Assert.Empty(handler.ConnectedServerIds);
+    }
+
+    // The same path when the gate allows: it must not become refused for any other reason, or the
+    // test above would pass on a plan preparation that never worked at all.
+    [Fact]
+    public async Task PlanPreparation_HelloVerified_ProducesAWorkablePlan()
+    {
+        var hello = new FakeWindowsHelloService { Available = true, VerifyResult = true };
+        var handler = new CountingProtocolHandler("SSH");
+        await using var fixture = await Fixture.CreateAsync(hello, handler, requireHello: true);
+
+        ServerListViewModel.BulkConnectPlan plan =
+            await fixture.ViewModel.PrepareBulkConnectPlanAsync(
+                fixture.ViewModel.Servers.ToList(),
+                CancellationToken.None);
+
+        Assert.False(plan.Refused);
+        Assert.Equal(3, plan.ConnectableCount);
+
+        await fixture.ViewModel.ConnectServersBulkCoreAsync(plan, CancellationToken.None);
+
+        Assert.Equal(3, handler.ConnectedServerIds.Count);
+    }
+
     [Fact]
     public async Task BulkConnect_SettingOff_ServiceNeverCalled()
     {

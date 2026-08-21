@@ -204,6 +204,83 @@ public sealed class CredentialGuardTests
         Assert.True(bulkGuard >= 0);
         Assert.True(bulkGuard < bulkCredentialProvider);
         Assert.Contains("showMessage: !credentialGuardMessageShown", bulkPreparation, StringComparison.Ordinal);
+
+        // The Windows Hello gate belongs in plan preparation too, and above the credential
+        // resolution it protects. It used to sit in the two public entry points instead, and the
+        // folder context menu reached this method without going through either of them.
+        int bulkWindowsHello = bulkPreparation.IndexOf(
+            "EnsureWindowsHelloAsync(",
+            StringComparison.Ordinal);
+
+        Assert.True(
+            bulkWindowsHello >= 0,
+            "Plan preparation no longer applies the Windows Hello gate, so any caller reaching it "
+                + "directly resolves stored credentials ungated.");
+        Assert.True(bulkWindowsHello < bulkCredentialProvider);
+    }
+
+    /// <summary>
+    /// Plan preparation must be the only door to bulk credential resolution.
+    /// </summary>
+    /// <remarks>
+    /// The gate is enforced there rather than in each caller, which only holds while no other
+    /// method resolves credentials for a batch. A second such method would be ungated by
+    /// construction and nothing else here would notice.
+    /// </remarks>
+    [Fact]
+    public void OnlyTheTwoKnownMethodsResolveCredentialsBeforeConnecting()
+    {
+        string[] permitted =
+        [
+            "private async Task<bool> ConnectCoreAsync",
+            "internal async Task<BulkConnectPlan> PrepareBulkConnectPlanAsync",
+        ];
+
+        string root = FindRepoRoot();
+        List<string> offenders = [];
+        int inspected = 0;
+
+        foreach (string file in Directory.EnumerateFiles(
+            Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories))
+        {
+            if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string source = File.ReadAllText(file);
+            int call = source.IndexOf("TryResolveExternalCredentialsAsync(", StringComparison.Ordinal);
+            while (call >= 0)
+            {
+                inspected++;
+                string before = source[..call];
+                bool insidePermitted = permitted.Any(signature =>
+                {
+                    int declaration = before.LastIndexOf(signature, StringComparison.Ordinal);
+                    if (declaration < 0)
+                    {
+                        return false;
+                    }
+
+                    // No other permitted declaration may open between it and the call.
+                    return !permitted.Any(other =>
+                        before.LastIndexOf(other, StringComparison.Ordinal) > declaration);
+                });
+
+                if (!insidePermitted && !before.EndsWith("Task<bool> ", StringComparison.Ordinal))
+                {
+                    offenders.Add($"{Path.GetFileName(file)} resolves credentials outside the gated methods");
+                }
+
+                call = source.IndexOf("TryResolveExternalCredentialsAsync(", call + 1, StringComparison.Ordinal);
+            }
+        }
+
+        // Guarding the guard: a scan that found no call at all would report success while the two
+        // gated methods had been renamed out from under it.
+        Assert.True(inspected >= 2, $"only {inspected} credential-resolution sites found in src");
+        Assert.True(offenders.Count == 0, string.Join("\n", offenders.Distinct()));
     }
 
     private static RdpHandler CreateHandler(
