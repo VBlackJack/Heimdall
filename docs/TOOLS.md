@@ -10,6 +10,8 @@
 
 # Tools Reference
 
+*Also available in French: [fr/TOOLS.md](fr/TOOLS.md).*
+
 Developer reference for Heimdall's built-in tools, external tool
 providers, and tool-hosting infrastructure.
 

@@ -10,6 +10,8 @@
 
 # CI flaky tests - `Category=CIUnstable`
 
+*Also available in French: [fr/CI_FLAKY_TESTS.md](fr/CI_FLAKY_TESTS.md).*
+
 A small set of tests that are stable on developer machines turn red
 intermittently on the GitHub Actions Windows runner. They are tagged
 `[Trait("Category", "CIUnstable")]` and excluded from the bloquant CI

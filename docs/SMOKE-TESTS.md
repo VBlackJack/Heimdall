@@ -4,6 +4,8 @@ Licensed under the Apache License, Version 2.0
 -->
 # Smoke Tests
 
+*Also available in French: [fr/SMOKE-TESTS.md](fr/SMOKE-TESTS.md).*
+
 This repo now carries a small UIAutomation smoke harness for high-signal desktop checks that were previously rebuilt ad hoc during refactors.
 
 ## Files

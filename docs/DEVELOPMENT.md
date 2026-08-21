@@ -10,6 +10,8 @@
 
 # Development Guide
 
+*Also available in French: [fr/DEVELOPMENT.md](fr/DEVELOPMENT.md).*
+
 Shared development reference for Heimdall. This file is versioned project
 documentation; keep machine-local paths, credentials, editor preferences, and
 temporary workflow notes out of it.
@@ -107,6 +109,46 @@ Build outputs are ignored and written under:
 - Shell arguments must go through `InputValidator.EscapeShellArg()` or a
   structured argument API such as `ProcessStartInfo.ArgumentList`.
 - Prefer existing project patterns and helper APIs over new abstractions.
+
+## Documentation Conventions
+
+Three categories, and a file belongs to exactly one of them.
+
+**Private and working documents** live in `local/` at the repository root, which is gitignored.
+Agent briefs, audits in progress, resumption notes, diagnostic captures, operation logs. Nothing
+there is published.
+
+**Public documents** are versioned and exist in two languages. English stays at its usual location
+(`README.md`, `docs/*.md`); French mirrors it (`README.fr.md`, `docs/fr/*.md`). Each version links
+to the other under its title. A change to one is not finished until the other says the same thing.
+
+**Published release notes** are English by default, in `docs/release-notes/v<version>.md`.
+
+`docs/CHANGELOG.md` is English only. It is a chronological engineering record of the same genre as
+the release notes, and translating it would impose permanent double maintenance with no reader.
+
+### Characters
+
+ASCII only, with one exception: French accented letters producible on an AZERTY keyboard, in French
+documents.
+
+Forbidden everywhere, English included:
+
+| Instead of | Write |
+|---|---|
+| em dash, en dash | `-` |
+| curly quotes and apostrophes | `"` and `'` |
+| single-character ellipsis | `...` |
+| non-breaking or thin space | a plain space |
+| Unicode arrows | `->` and `<->` |
+| box-drawing characters | `+--` and `\--` |
+| Unicode multiplication, minus, greater-or-equal | `x`, `-`, `>=` |
+
+These characters break in Windows terminals, in diffs, in console code pages and in CI logs. It is
+the same reason the locale files use `\uXXXX` escapes.
+
+`scripts/NotesTypographyGuard.ps1` is authoritative for the banned set and is run by
+`Build.ps1 -Mode Release` against the release notes, fail-closed.
 
 ## Localization And I18n
 
