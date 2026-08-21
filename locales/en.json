@@ -2630,6 +2630,7 @@
   "RdpResolutionLargerThanWindowTooltip": "Larger than window - image will be scaled.",
   "RdpResolutionScaledToFitToast": "Larger than window - image will be scaled.",
   "RdpLetterboxHintFormat": "Fixed {0}\u00d7{1} \u2014 resize the window or change resolution to fill.",
+  "RdpReconnectSucceededAfterCancelToast": "Reconnection completed before your cancellation took effect. The session was kept.",
   "RdpResolutionReconnectFallbackToast": "Resolution change required reconnect.",
   "RdpMultimonFallbackSingleMonitor": "Multi-monitor was requested, but this host cannot provide it. Falling back to single-monitor mode.",
   "RdpMultimonFallbackInvalidSelection": "Selected monitor configuration is invalid for this host. Falling back to single-monitor mode.",

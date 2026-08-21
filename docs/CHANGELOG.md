@@ -12,6 +12,19 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-21: a cancelled reconnection that succeeded anyway now says so
+
+- **Cancelling stops the retries that have not started yet.** An attempt already under way inside the
+  Remote Desktop control keeps going, and it can still succeed.
+- **The session is kept when that happens**, which is the right outcome: the button says Cancel
+  rather than Close, and its tooltip offers to stop the retry loop. It asks to stop waiting, not to
+  throw work away.
+- **What was missing was a word.** The screen went from "closing the session" to "connected" with no
+  explanation, leaving the user holding a session they thought they had given up on. A short notice
+  now says the reconnection completed before the cancellation took effect and the session was kept.
+- It uses the same self-dismissing notice the view already shows for other one-off events, so it
+  never blocks and never needs acknowledging.
+
 ## 2026-08-21: cancelling a reconnection looked like starting one
 
 - **Clicking Cancel on an auto-reconnect put the view into the phase that means a connection is being

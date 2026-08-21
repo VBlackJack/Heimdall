@@ -2628,6 +2628,7 @@
   "RdpResolutionLargerThanWindowTooltip": "Plus grand que la fen\u00eatre - l'image sera mise \u00e0 l'\u00e9chelle.",
   "RdpResolutionScaledToFitToast": "Plus grand que la fen\u00eatre - l'image sera mise \u00e0 l'\u00e9chelle.",
   "RdpLetterboxHintFormat": "Fixe {0}\u00d7{1} \u2014 redimensionnez la fen\u00eatre ou changez la r\u00e9solution pour remplir.",
+  "RdpReconnectSucceededAfterCancelToast": "La reconnexion a abouti avant que votre annulation ne prenne effet. La session a \u00e9t\u00e9 conserv\u00e9e.",
   "RdpResolutionReconnectFallbackToast": "Le changement de r\u00e9solution a n\u00e9cessit\u00e9 une reconnexion.",
   "RdpMultimonFallbackSingleMonitor": "Le mode multi-\u00e9crans a \u00e9t\u00e9 demand\u00e9, mais cet h\u00f4te ne peut pas le fournir. Bascule en mode mono-\u00e9cran.",
   "RdpMultimonFallbackInvalidSelection": "La configuration des \u00e9crans s\u00e9lectionn\u00e9s est invalide pour cet h\u00f4te. Bascule en mode mono-\u00e9cran.",
