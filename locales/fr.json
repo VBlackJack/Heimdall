@@ -2794,6 +2794,8 @@
   "ValidationRdpFixedWidthRange": "La largeur RDP fixe doit \u00eatre comprise entre 200 et 7680.",
   "ValidationRdpFixedHeightRange": "La hauteur RDP fixe doit \u00eatre comprise entre 200 et 4320.",
   "ValidationRdpResizeEnableDelayRange": "Laissez le d\u00e9lai de redimensionnement RDP vide pour h\u00e9riter de la valeur globale, saisissez 0 pour d\u00e9sactiver le verrouillage, ou saisissez une valeur de 1000 \u00e0 60000 ms.",
+  "ValidationSettingsUpdateCheckInterval": "L'intervalle de v\u00e9rification des mises \u00e0 jour doit \u00eatre compris entre 1 et 8760 heures.",
+  "ValidationSettingsRdpKeepAlive": "L'intervalle de maintien de connexion RDP doit \u00eatre compris entre 5000 et 300000 ms.",
   "ValidationSettingsMaxSessions": "Le nombre max de sessions embarqu\u00e9es doit \u00eatre entre 1 et 20.",
   "ValidationSettingsFontSize": "La taille de police du terminal doit \u00eatre entre 8 et 72.",
   "ValidationSettingsAntiIdle": "L'intervalle anti-inactivit\u00e9 doit \u00eatre entre 0 et 3600 secondes.",
