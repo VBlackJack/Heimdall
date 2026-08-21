@@ -1115,7 +1115,19 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [RelayCommand]
     private async Task SaveAsync(CancellationToken cancellationToken)
-        => await TrySaveAsync(cancellationToken);
+    {
+        if (await TrySaveAsync(cancellationToken) || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        // Pressing Save and getting nothing back is the worst of the outcomes:
+        // a validation failure at least raises a tab badge, while a persistence
+        // failure was written to the log and nowhere else.
+        _dialogService.ShowWarning(
+            _localizer["SettingsCloseSaveFailedTitle"],
+            _localizer["SettingsCloseSaveFailedMessage"]);
+    }
 
     /// <summary>
     /// Validates and persists the current settings.
