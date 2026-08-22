@@ -15,6 +15,7 @@
  */
 
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Extensions;
@@ -64,6 +65,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private bool _disposed;
     private bool _isSettingLocalizedApplicationStatus;
     private string? _localizedApplicationStatusKey;
+    private bool _statusTextIsSessionDerived;
+    private SessionTabViewModel? _observedSession;
+    private PropertyChangedEventHandler? _observedSessionHandler;
     private Action? _onConfigurationChanged;
     private Action<string, string, Core.Models.ToolContext>? _onToolSessionRequested;
     private Action<string>? _onStatusMessageRequested;
@@ -104,6 +108,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         if (!_isSettingLocalizedApplicationStatus)
         {
             _localizedApplicationStatusKey = null;
+            _statusTextIsSessionDerived = false;
         }
     }
 
@@ -185,6 +190,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     partial void OnDragDisplaySessionChanged(SessionTabViewModel? value)
     {
         OnPropertyChanged(nameof(DisplayedSession));
+        ObserveDisplayedSession();
     }
 
     /// <summary>
@@ -442,6 +448,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             if (string.Equals(e.PropertyName, nameof(ConnectionViewModel.ActiveSession), StringComparison.Ordinal))
             {
                 OnPropertyChanged(nameof(DisplayedSession));
+                ObserveDisplayedSession();
             }
         };
         Connection.PropertyChanged += _connectionPropertyChangedHandler;
@@ -613,8 +620,100 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         {
             SetLocalizedApplicationStatus(statusKey);
         }
+        else if (_statusTextIsSessionDerived)
+        {
+            RefreshSessionStatusText();
+        }
 
         OnPropertyChanged(nameof(DropToMergeText));
+    }
+
+    /// <summary>
+    /// Follows whichever session is on screen, so the status bar can be re-derived when its
+    /// condition changes rather than when someone remembers to say so.
+    /// </summary>
+    /// <remarks>
+    /// The bar used to be written once, at connection, and never revised. A session that
+    /// dropped left the sentence "Connected to: X" standing over a panel already announcing
+    /// the disconnection. Adding one more write on the VNC drop path would have fixed VNC
+    /// and left every other path exactly as wrong.
+    /// </remarks>
+    private void ObserveDisplayedSession()
+    {
+        SessionTabViewModel? session = DisplayedSession;
+        if (ReferenceEquals(session, _observedSession))
+        {
+            return;
+        }
+
+        if (_observedSession is not null && _observedSessionHandler is not null)
+        {
+            _observedSession.PropertyChanged -= _observedSessionHandler;
+        }
+
+        _observedSession = session;
+
+        if (session is not null)
+        {
+            _observedSessionHandler ??= (_, e) =>
+            {
+                if (string.Equals(e.PropertyName, nameof(SessionTabViewModel.Status), StringComparison.Ordinal)
+                    || string.Equals(e.PropertyName, nameof(SessionTabViewModel.Title), StringComparison.Ordinal))
+                {
+                    RefreshSessionStatusText();
+                }
+            };
+            session.PropertyChanged += _observedSessionHandler;
+        }
+
+        RefreshSessionStatusText();
+    }
+
+    /// <summary>
+    /// States the displayed session's condition in the status bar, from the session itself.
+    /// </summary>
+    /// <remarks>
+    /// An established session keeps the wording it has always had. Any other condition is
+    /// named with the same short label the tab header uses, through the shared resolver, so
+    /// the two surfaces cannot drift apart. A pane carrying a free-form failure reason shows
+    /// that reason, because hiding a diagnostic behind "Error" helps nobody.
+    /// </remarks>
+    private void RefreshSessionStatusText()
+    {
+        SessionTabViewModel? session = DisplayedSession;
+        if (session is null)
+        {
+            SetLocalizedApplicationStatus("StatusReady");
+            return;
+        }
+
+        // Title, not DisplayTitle: the latter carries suffixes that would change the
+        // sentence this bar has always shown for a connected session.
+        string displayName = session.Title ?? string.Empty;
+        string text;
+
+        if (SessionStatusDisplay.IsEstablished(session.Status))
+        {
+            text = _localizer.Format("StatusConnected", displayName);
+        }
+        else
+        {
+            string? key = SessionStatusDisplay.ResolveKey(session.Status);
+            string condition = key is null ? session.Status ?? string.Empty : _localizer[key];
+            text = _localizer.Format("StatusSessionState", displayName, condition);
+        }
+
+        _isSettingLocalizedApplicationStatus = true;
+        try
+        {
+            StatusText = text;
+            _localizedApplicationStatusKey = null;
+            _statusTextIsSessionDerived = true;
+        }
+        finally
+        {
+            _isSettingLocalizedApplicationStatus = false;
+        }
     }
 
     private void SetLocalizedApplicationStatus(string localizationKey)

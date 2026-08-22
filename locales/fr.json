@@ -557,6 +557,7 @@
   "ErrorPsftpNotFound": "Erreur : psftp introuvable. Chemin attendu : {0}",
   "StatusSshConnecting": "Connexion SSH vers : {0}...",
   "StatusConnected": "Connect\u00e9 \u00e0 : {0}",
+  "StatusSessionState": "{0} : {1}",
   "StatusLaunchedExternalClient": "Client externe lanc\u00e9",
   "StatusLaunchedExternalClientTooltip": "mstsc.exe a \u00e9t\u00e9 lanc\u00e9. Heimdall ne peut pas observer directement l'\u00e9tat de la session distante jusqu'\u00e0 la fermeture du client.",
   "StatusRemoteSessionHandedOff": "Session d\u00e9marr\u00e9e",

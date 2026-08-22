@@ -18,6 +18,8 @@ using System.Globalization;
 using System.Windows.Data;
 using Heimdall.App.Localization;
 
+using Heimdall.App.ViewModels;
+
 namespace Heimdall.App.Converters;
 
 /// <summary>
@@ -49,55 +51,10 @@ public sealed class SessionStatusToDisplayConverter : IValueConverter
             return value;
         }
 
-        string? key = ResolveKey(status);
+        string? key = SessionStatusDisplay.ResolveKey(status);
         return key is null ? status : _localize(key);
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
-
-    private static string? ResolveKey(string status)
-    {
-        if (string.Equals(status, "Connected", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusConnected";
-        }
-
-        if (string.Equals(status, "RemoteSessionHandedOff", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusRemoteSessionHandedOff";
-        }
-
-        if (string.Equals(status, "Connecting", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusConnecting";
-        }
-
-        if (string.Equals(status, "Disconnected", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusDisconnected";
-        }
-
-        if (string.Equals(status, "Disconnecting", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusDisconnecting";
-        }
-
-        if (string.Equals(status, "Reconnecting", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusReconnecting";
-        }
-
-        if (string.Equals(status, "Error", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusError";
-        }
-
-        if (string.Equals(status, "LaunchedExternalClient", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SessionStatusLaunchedExternalClient";
-        }
-
-        return null;
-    }
 }
