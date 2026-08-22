@@ -67,6 +67,18 @@ jobs:
           # The script runs in a child scope, so its `exit 1` does not end this block.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure PowerShell, no .NET and no build needed. Proves the build's staging
+      # copy is idempotent and that its cleanup reaches trees deeper than MAX_PATH.
+      # Both defects were live at once on 2026-08-22: the cleanup silently failed on
+      # the bundled node_modules trees, so the copy nested, so the next build failed
+      # harder. A release was abandoned over it.
+      - name: Check the build staging copy is idempotent
+        shell: pwsh
+        run: |
+          ./scripts/Test-BuildTreeCopy.ps1
+          # The script runs in a child scope, so its `exit 1` does not end this block.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v6
         with:
