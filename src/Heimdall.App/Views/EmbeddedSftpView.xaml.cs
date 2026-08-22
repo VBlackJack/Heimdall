@@ -1240,7 +1240,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 ?? $"Editing: {file.Name}");
 
             // Download file content for embedded editing
-            tempPath = Path.Combine(Path.GetTempPath(), "Heimdall", "edit", Guid.NewGuid().ToString("N"));
+            tempPath = Path.Combine(
+                EditorTempPaths.Root,
+                Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempPath);
             _activeEditTempDirs.Add(tempPath);
             string localPath = Path.Combine(tempPath, Path.GetFileName(file.Name));

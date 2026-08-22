@@ -40,6 +40,7 @@ using Heimdall.Core.SessionHealth;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Core.Updates;
+using Heimdall.Core.Utilities;
 using Heimdall.Sftp;
 using Heimdall.Ssh;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,6 +167,23 @@ public partial class App : System.Windows.Application
             // Forces loading of mstscax.dll + 22 static dependencies (~300-500ms) at startup
             // instead of on the first RDP connection.
             PreWarmRdpRuntime();
+
+            // Remove editor working directories left by earlier sessions. They are kept
+            // deliberately when the application is torn down while a save is in flight -
+            // that retention preserves the user's typed text - but nothing ever removed
+            // them afterwards, so each one survived forever holding a file's contents.
+            // Off the startup path: tidying is never a reason to delay a launch.
+            _ = Task.Run(() =>
+            {
+                int removed = EditorTempSweeper.Sweep(
+                    EditorTempPaths.Root,
+                    DateTimeOffset.UtcNow);
+                if (removed > 0)
+                {
+                    Heimdall.Core.Logging.FileLogger.Info(
+                        $"Swept {removed} stale editor working director{(removed == 1 ? "y" : "ies")}");
+                }
+            });
 
             // Respect Windows "Show animations" accessibility setting (WCAG 2.1 § 2.3.3).
             // When disabled, override animation durations to zero for instant state transitions.
