@@ -69,11 +69,11 @@ gives you memory for free.
 below the run-to-run noise of the measurement, and the sign was unfavourable. Lower it if you
 are short of bandwidth, not if you are short of memory.
 
-**Bitmap caching.** The checkbox does not do what its name suggests. It maps to the RDP
-control's `BitmapPersistence` property, which controls whether the bitmap cache is written
-**to disk** between sessions. It does not control the in-memory cache, and there is no setting
-in Heimdall that does. Turning it off frees no RAM, and it costs you the disk cache that would
-otherwise spare some redraws on reconnect.
+**Keep bitmap cache on disk.** This checkbox was called "Bitmap caching" until the name was
+found to mislead. It controls whether the bitmap cache is written **to disk** between sessions.
+It does not control the in-memory cache, and there is no setting in Heimdall that does. Turning
+it off frees no memory, and it costs you the disk cache that would otherwise spare some redraws
+on reconnect.
 
 **Compression.** This is a bandwidth setting. It was not measured to affect memory and there
 is no mechanism by which it would.

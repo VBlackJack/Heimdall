@@ -69,10 +69,10 @@ travailler. Rien ici ne donne de la mémoire gratuitement.
 tombait sous le bruit de mesure d'un lancement à l'autre, et son signe était défavorable.
 Baissez-la si vous manquez de bande passante, pas si vous manquez de mémoire.
 
-**Le cache bitmap.** La case ne fait pas ce que son nom suggère. Elle pilote la propriété
-`BitmapPersistence` du contrôle RDP, qui décide si le cache bitmap est écrit **sur disque**
-entre deux sessions. Elle ne pilote pas le cache en mémoire, et aucun réglage de Heimdall ne le
-fait. La décocher ne libère aucune RAM, et vous perdez le cache disque qui aurait épargné des
+**Conserver le cache bitmap sur disque.** Cette case s'appelait "Cache bitmap" jusqu'à ce que ce
+nom se révèle trompeur. Elle décide si le cache bitmap est écrit **sur disque** entre deux
+sessions. Elle ne pilote pas le cache en mémoire, et aucun réglage de Heimdall ne le fait. La
+décocher ne libère aucune mémoire, et vous perdez le cache disque qui aurait épargné des
 redessins à la reconnexion.
 
 **La compression.** C'est un réglage de bande passante. Aucun effet mémoire n'a été mesuré, et
