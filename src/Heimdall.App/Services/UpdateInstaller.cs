@@ -97,7 +97,10 @@ internal sealed class UpdateInstaller : IUpdateInstaller
             return false;
         }
 
-        FileLogger.Info($"Update relauncher launched={launched} elevation={requiresElevation}");
+        // The transcript path is recorded here because it is the only account of what
+        // happens after this process exits, and until now its name appeared nowhere.
+        FileLogger.Info(
+            $"Update relauncher launched={launched} elevation={requiresElevation} transcript={logPath}");
         return launched;
     }
 
