@@ -371,6 +371,91 @@ public sealed class Base64ToolViewModelTests
     /// Holds a codec call open so a second invocation can be attempted while the first is still
     /// in flight, and counts how many times the body was actually entered.
     /// </summary>
+    /// <summary>
+    /// BL-0059's first action, answered: a double execution is NOT reachable by the user,
+    /// and the reason is structural rather than a matter of timing.
+    /// </summary>
+    /// <remarks>
+    /// The concern was that the in-flight flag might be set only after the codec yields,
+    /// leaving a window a second click could enter. It is not: the command checks the
+    /// guard and sets the flag in two consecutive synchronous statements, with no await
+    /// between them, so by the time the codec can yield at all the tool already reports
+    /// itself busy.
+    /// <para>
+    /// This test observes that from inside the codec, which is the only place that can
+    /// see the state at the instant of the first possible yield. It does not depend on
+    /// winning a race, so it cannot be flaky - and it fails against a build where the
+    /// flag is set after the first await.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task EncodeAsync_ByTheTimeTheCodecRuns_TheToolAlreadyReportsItselfBusy()
+    {
+        StateObservingBase64ToolService service = new();
+        Base64ToolViewModel vm = new(service) { InputText = "hello" };
+        service.ObserveOnEntry = () => vm.IsEncodeEnabled;
+
+        await vm.EncodeCommand.ExecuteAsync(null);
+
+        Assert.True(service.WasEntered);
+        Assert.False(
+            service.ObservedEnabledOnEntry,
+            "the guard must already be closed when the codec is reached, or a yield inside "
+            + "the codec would open a window a second invocation could enter");
+    }
+
+    /// <summary>
+    /// The window the item worried about does exist at the service layer, above its
+    /// asynchronous threshold. Recorded so the conclusion above is not read as "the codec
+    /// never yields", which would stop being true the moment the threshold moved.
+    /// </summary>
+    [Fact]
+    public async Task Service_AboveItsThreshold_CompletesOffTheCallingThread()
+    {
+        Base64ToolService service = new();
+        byte[] small = new byte[1024];
+        byte[] large = new byte[(100 * 1024) + 1];
+
+        Task<string> smallTask = service.EncodeAsync(small, urlSafe: false, CancellationToken.None);
+        Task<string> largeTask = service.EncodeAsync(large, urlSafe: false, CancellationToken.None);
+
+        // Below the threshold the result is already there, so nothing can interleave.
+        Assert.True(smallTask.IsCompleted);
+
+        await largeTask;
+        Assert.NotEmpty(await largeTask);
+    }
+
+    /// <summary>Reports what the view model looked like at the moment the codec was reached.</summary>
+    private sealed class StateObservingBase64ToolService : IBase64ToolService
+    {
+        public Func<bool>? ObserveOnEntry { get; set; }
+
+        public bool WasEntered { get; private set; }
+
+        public bool ObservedEnabledOnEntry { get; private set; }
+
+        public Task<string> EncodeAsync(byte[] data, bool urlSafe, CancellationToken ct)
+        {
+            WasEntered = true;
+            ObservedEnabledOnEntry = ObserveOnEntry?.Invoke() ?? false;
+            return Task.FromResult(Heimdall.Core.Codecs.Base64Codec.Encode(data, urlSafe));
+        }
+
+        public Task<byte[]> DecodeAsync(string base64, bool urlSafe, CancellationToken ct)
+        {
+            WasEntered = true;
+            ObservedEnabledOnEntry = ObserveOnEntry?.Invoke() ?? false;
+            return Task.FromResult(Heimdall.Core.Codecs.Base64Codec.Decode(base64, urlSafe));
+        }
+
+        public Task<FileLoadOutcome> LoadFileAsync(string path, long maxBytes, CancellationToken ct)
+            => Task.FromResult(new FileLoadOutcome(true, [1], "data.bin", FileLoadError.None));
+
+        public Task SaveFileAsync(string path, byte[] data, CancellationToken ct)
+            => Task.CompletedTask;
+    }
+
     private sealed class GatedBase64ToolService : IBase64ToolService
     {
         private readonly TaskCompletionSource _release =
