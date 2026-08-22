@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Build script for Heimdall - produces portable distributions and installers.
 
@@ -265,6 +265,68 @@ if ($variants -contains 'SelfContained' -and -not $hasWv2Runtime) {
 
 # ── Helper: publish one variant ───────────────────────────────────────────
 
+function Remove-TreeRobust {
+    <#
+    .SYNOPSIS
+        Deletes a directory tree, including paths Remove-Item cannot reach.
+    .DESCRIPTION
+        Remove-Item -Recurse fails with "the directory is not empty" on trees whose
+        paths exceed MAX_PATH, and the bundled terminal assets carry node_modules
+        trees that do. The failure is quiet in its consequences rather than its
+        message: the stale folder survives, the next copy nests inside it, and the
+        build after that fails harder. Mirroring an empty directory over the target
+        works at any depth, so it is used first and Remove-Item only finishes the
+        job on the emptied folder.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+
+    $empty = Join-Path ([System.IO.Path]::GetTempPath()) ("heimdall-empty-" + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $empty -Force | Out-Null
+    try {
+        & robocopy $empty $Path /MIR /NFL /NDL /NJH /NJS /NC /NS /R:1 /W:1 | Out-Null
+        # robocopy reports work done through its exit code; anything below 8 is
+        # success. Cleared so a later $LASTEXITCODE check cannot read it as ours.
+        $global:LASTEXITCODE = 0
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    finally {
+        Remove-Item -LiteralPath $empty -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if (Test-Path -LiteralPath $Path) {
+        throw "Could not remove '$Path'. A stale build folder would make the next copy nest inside it."
+    }
+}
+
+function Copy-TreeContents {
+    <#
+    .SYNOPSIS
+        Replaces a destination directory with the contents of a source directory.
+    .DESCRIPTION
+        Copy-Item -Recurse copies the source FOLDER into the destination when the
+        destination already exists, so a second build produces Assets\Assets and a
+        third produces Assets\Assets\Assets, duplicating whatever they contain.
+        Copying the contents into a freshly emptied destination is idempotent: any
+        number of runs leaves the same layout.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Source,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Destination
+    )
+
+    Remove-TreeRobust -Path $Destination
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    Copy-Item (Join-Path $Source '*') $Destination -Recurse -Force
+}
+
 function Publish-Variant {
     param([string]$VariantName)
 
@@ -278,7 +340,7 @@ function Publish-Variant {
     # but never removes stale ones, so a surviving folder accumulates cruft
     # across builds of the same version. Scoped to $variantDir, never $distDir,
     # so the auto-increment scan over sibling build folders stays intact.
-    if (Test-Path $variantDir) { Remove-Item $variantDir -Recurse -Force }
+    Remove-TreeRobust -Path $variantDir
 
     Write-Host "  Publishing $VariantName to $variantFolder..." -ForegroundColor Yellow
     dotnet publish $AppProject -c $Mode -o $variantDir --nologo --verbosity quiet --self-contained true -r win-x64 -p:PublishSingleFile=false @versionArgs
@@ -311,7 +373,7 @@ function Publish-Variant {
     $assetsSrc = Join-Path $ProjectRoot 'src\Heimdall.App\Assets'
     $assetsDest = Join-Path $variantDir 'Assets'
     if (Test-Path $assetsSrc) {
-        Copy-Item $assetsSrc $assetsDest -Recurse -Force
+        Copy-TreeContents -Source $assetsSrc -Destination $assetsDest
     }
 
     # Bundle WebView2 runtime for SelfContained edition only.
@@ -321,9 +383,7 @@ function Publish-Variant {
     # whenever the destination already exists, duplicating ~400 MB per level.
     if ($VariantName -eq 'SelfContained') {
         $wv2Dest = Join-Path $variantDir 'runtimes\webview2'
-        if (Test-Path $wv2Dest) { Remove-Item $wv2Dest -Recurse -Force }
-        New-Item -ItemType Directory -Path $wv2Dest -Force | Out-Null
-        Copy-Item (Join-Path $wv2Runtime '*') $wv2Dest -Recurse -Force
+        Copy-TreeContents -Source $wv2Runtime -Destination $wv2Dest
         Write-Host "    + WebView2 Fixed Version Runtime bundled" -ForegroundColor DarkGray
     }
 
