@@ -15,9 +15,11 @@
  */
 
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Interop;
 using FlaUI.UIA3;
 using Heimdall.App.Automation;
@@ -83,10 +85,11 @@ public sealed class SessionTreeSelectionAutomationTests
         try
         {
             // The selected set is asserted through the peers rather than through GetSelection():
-            // GetSelection marshals each peer with ProviderFromPeer, which yields nothing until a
+            // GetSelection hands back marshalled providers, and nothing can be marshalled until a
             // UI Automation client is attached, so counting it here would measure the absence of a
             // client rather than the selection. SessionTree_MultiSelection_IsVisibleThroughRealUiAutomation
-            // is where the marshalled array is proved, with a real client on the other end.
+            // is where the marshalled array is proved, with a real client on the other end - and it
+            // has to be, because which peer is marshallable is a question only a live tree answers.
             Assert.Equal(
                 ["srv-0", "srv-2"],
                 SelectedPeersOf(tree).Select(peer => ((ServerItemViewModel)peer.BoundItem!).DisplayName));
@@ -349,8 +352,29 @@ public sealed class SessionTreeSelectionAutomationTests
             Width = 320,
             Height = 240,
             ItemsSource = servers,
-            SelectionHost = selectionHost
+            SelectionHost = selectionHost,
+            ItemContainerStyle = RowNamingStyle()
         };
+
+    /// <summary>Names each row after the server it shows, so a client can tell the rows apart.</summary>
+    /// <remarks>
+    /// The name goes on the CONTAINER. A row that carries no name of its own falls back to
+    /// ToString() of the bound item, which here is the view model's type name - identical for every
+    /// row and useless to a client - and a name set inside a data template never reaches the
+    /// automation tree at all, because the elements a template produces carry no peer.
+    /// <para>
+    /// This is arrangement, not the thing under test: naming the rows is what lets the assertions
+    /// below say WHICH rows the selection reports rather than only how many.
+    /// </para>
+    /// </remarks>
+    private static Style RowNamingStyle()
+    {
+        Style style = new(typeof(SessionTreeViewItem));
+        style.Setters.Add(new Setter(
+            AutomationProperties.NameProperty,
+            new Binding(nameof(ServerItemViewModel.DisplayName))));
+        return style;
+    }
 
     private static Window ShowTree(SessionTreeView tree)
     {
