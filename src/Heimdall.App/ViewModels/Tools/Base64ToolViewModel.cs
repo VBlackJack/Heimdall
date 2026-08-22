@@ -91,7 +91,30 @@ public sealed partial class Base64ToolViewModel : ObservableObject, IDisposable
     public async Task PrefillInput(string? input)
     {
         InputText = input ?? string.Empty;
-        await EncodeCoreAsync(CancellationToken.None).ConfigureAwait(false);
+
+        // Goes through the same gate as the commands. This entry point used to reach the
+        // codec directly, without checking that nothing was in flight and without marking
+        // that something now was, which left the "not while another run is in flight"
+        // contract false for every path that started here.
+        if (!CanExecuteAction())
+        {
+            _initialized = true;
+            return;
+        }
+
+        using var cts = ReplaceCancellationTokenSource();
+        try
+        {
+            await EncodeCoreAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            CompleteOperation(cts);
+        }
+
         _initialized = true;
     }
 

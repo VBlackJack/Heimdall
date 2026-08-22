@@ -24,6 +24,51 @@ namespace Heimdall.App.Tests;
 
 public sealed class Base64ToolViewModelTests
 {
+    /// <summary>
+    /// PrefillInput reached the codec directly, without the gate the commands go through.
+    /// It could therefore start a second run over a first one, and, because it never marked
+    /// anything as in flight, let a command start a second run over it.
+    /// </summary>
+    [Fact]
+    public async Task PrefillInput_WhileACommandIsRunning_DoesNotReenterTheBody()
+    {
+        GatedBase64ToolService service = new();
+        Base64ToolViewModel vm = new(service) { InputText = "hello" };
+
+        Task first = vm.EncodeCommand.ExecuteAsync(null);
+        await service.FirstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Task prefill = vm.PrefillInput("world");
+
+        service.Release();
+        await Task.WhenAll(first, prefill).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, service.EncodeEntryCount);
+        Assert.False(service.FirstTokenWasCancelled);
+    }
+
+    /// <summary>
+    /// The other half of the same contract: while PrefillInput is running, a command must
+    /// find the tool busy. Fails against a build where PrefillInput never sets that state.
+    /// </summary>
+    [Fact]
+    public async Task PrefillInput_WhileRunning_BlocksACommandFromReenteringTheBody()
+    {
+        GatedBase64ToolService service = new();
+        Base64ToolViewModel vm = new(service);
+
+        Task prefill = vm.PrefillInput("hello");
+        await service.FirstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(vm.EncodeCommand.CanExecute(null));
+        Task second = vm.EncodeCommand.ExecuteAsync(null);
+
+        service.Release();
+        await Task.WhenAll(prefill, second).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, service.EncodeEntryCount);
+    }
+
     [Fact]
     public async Task DecodeCommand_SecondExecuteAsyncWhileRunning_DoesNotReenterTheBody()
     {
