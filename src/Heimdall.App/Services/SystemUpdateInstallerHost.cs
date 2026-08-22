@@ -15,8 +15,10 @@
  */
 
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Security;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
 using Heimdall.Core.Updates;
 
@@ -30,11 +32,28 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
 {
     private const string ScriptPrefix = "Heimdall_relaunch_";
     private const string ScriptExtension = ".ps1";
+
+    /// <summary>Sortable and readable, so successive attempts sit in order on disk.</summary>
+    private const string LogTimestampFormat = "yyyyMMdd-HHmmss";
     private const string LogExtension = ".log";
     private const string WritableProbePrefix = "Heimdall_writeprobe_";
     private const string WritableProbeExtension = ".tmp";
     private const string PreferredPowerShell = "pwsh.exe";
     private const string FallbackPowerShell = "powershell.exe";
+
+    private readonly string _dataRoot;
+
+    /// <param name="dataRoot">
+    /// Application data root. Injectable so a test can point it at a temporary
+    /// directory: a test that exercised the real one would read and write the
+    /// operator's own profile, which is the defect BL-0063 records.
+    /// </param>
+    public SystemUpdateInstallerHost(string? dataRoot = null)
+    {
+        _dataRoot = string.IsNullOrWhiteSpace(dataRoot)
+            ? ApplicationDataPathResolver.Resolve()
+            : dataRoot;
+    }
 
     public string? ExecutablePath => Environment.ProcessPath;
 
@@ -48,8 +67,25 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
             $"{ScriptPrefix}{Guid.NewGuid():N}{ScriptExtension}");
     }
 
-    public string CreateLogPath() =>
-        Path.Combine(Path.GetTempPath(), $"{ScriptPrefix}{Guid.NewGuid():N}{LogExtension}");
+    /// <summary>
+    /// Where the relauncher writes its transcript: the log directory the application
+    /// already shows and already opens for the user.
+    /// </summary>
+    /// <remarks>
+    /// It used to be a random GUID under %TEMP%, and that name was recorded nowhere -
+    /// not in the application log, not in the interface. The transcript is the only
+    /// account of what happened after the application exited, so an update that failed
+    /// left an explanation nobody could find. A sortable, dated name in the directory
+    /// the About panel names makes it reachable without any new interface.
+    /// </remarks>
+    public string CreateLogPath()
+    {
+        string logsDirectory = ApplicationDataPathResolver.GetLogsDirectory(_dataRoot);
+        Directory.CreateDirectory(logsDirectory);
+        return Path.Combine(
+            logsDirectory,
+            $"{ScriptPrefix}{DateTime.UtcNow.ToString(LogTimestampFormat, CultureInfo.InvariantCulture)}{LogExtension}");
+    }
 
     public string ResolvePowerShellExecutable()
     {
