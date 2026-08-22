@@ -451,7 +451,8 @@ public sealed class MainViewModelSettingsNavigationTests
                 browserLauncher,
                 updateInstallFlow,
                 dialog,
-                localizer);
+                localizer,
+                new FakeUpdateOutcomeStore());
             MainViewModel main = new(
                 config,
                 localizer,

@@ -190,7 +190,7 @@ public sealed class UpdateBannerViewModelTests
         var browser = new StubBrowserLauncher();
         var vm = new UpdateBannerViewModel(
             update, new StubConfigManager(settings), new AppVersionProvider(Current), browser,
-            new FakeUpdateInstallFlow(), new ConfirmingDialogService(false), new LocalizationManager());
+            new FakeUpdateInstallFlow(), new ConfirmingDialogService(false), new LocalizationManager(), new FakeUpdateOutcomeStore());
         await vm.CheckOnStartupAsync(CancellationToken.None);
 
         vm.ViewReleaseCommand.Execute(null);
@@ -306,13 +306,120 @@ public sealed class UpdateBannerViewModelTests
         Assert.False(vm.IsInstalling);
     }
 
+    [Fact]
+    public async Task ReportPreviousAttempt_VersionDidNotMove_ShowsAnOutcomeNoticeRatherThanAnOffer()
+    {
+        var store = new FakeUpdateOutcomeStore
+        {
+            Pending = new UpdateAttemptRecord(
+                UpdateAttemptRecord.CurrentSchemaVersion,
+                Newer,
+                DateTimeOffset.UtcNow),
+        };
+        var localizer = await CreateLocalizerAsync();
+        var vm = CreateViewModel(
+            BaseSettings(),
+            new StubUpdateService { Result = UpToDate() },
+            Current,
+            localizer: localizer,
+            outcomeStore: store);
+
+        await vm.ReportPreviousAttemptAsync(CancellationToken.None);
+
+        Assert.True(vm.IsBannerVisible);
+
+        // The banner's offer affordances hang off IsBannerVisible. Without this flag the
+        // user would read "a new version is available:" followed by nothing, above
+        // buttons with no version to act on.
+        Assert.True(vm.IsOutcomeNotice);
+        Assert.False(vm.IsUpdateOffer);
+        Assert.Equal(
+            localizer.Format("UpdateBannerOutcomeNotApplied", Newer),
+            vm.BannerStatusText);
+    }
+
+    [Fact]
+    public async Task ReportPreviousAttempt_VersionAdvanced_SaysNothing()
+    {
+        var store = new FakeUpdateOutcomeStore
+        {
+            Pending = new UpdateAttemptRecord(
+                UpdateAttemptRecord.CurrentSchemaVersion,
+                Newer,
+                DateTimeOffset.UtcNow),
+        };
+        var vm = CreateViewModel(
+            BaseSettings(),
+            new StubUpdateService { Result = UpToDate() },
+            Newer,
+            outcomeStore: store);
+
+        await vm.ReportPreviousAttemptAsync(CancellationToken.None);
+
+        // The direction that would cost the most confidence: announcing a failure to
+        // someone who is demonstrably running the new version.
+        Assert.False(vm.IsBannerVisible);
+        Assert.Equal(string.Empty, vm.BannerStatusText);
+
+        // Consumed all the same, so it cannot resurface at some later launch.
+        Assert.Contains(FakeUpdateOutcomeStore.TakeCall, store.Calls);
+    }
+
+    [Fact]
+    public async Task ReportPreviousAttempt_NothingPending_SaysNothing()
+    {
+        var store = new FakeUpdateOutcomeStore();
+        var vm = CreateViewModel(
+            BaseSettings(),
+            new StubUpdateService { Result = UpToDate() },
+            Current,
+            outcomeStore: store);
+
+        await vm.ReportPreviousAttemptAsync(CancellationToken.None);
+
+        Assert.False(vm.IsBannerVisible);
+    }
+
+    [Fact]
+    public async Task ReportPreviousAttempt_RunsEvenWhenTheStartupCheckWouldReturnEarly()
+    {
+        var store = new FakeUpdateOutcomeStore
+        {
+            Pending = new UpdateAttemptRecord(
+                UpdateAttemptRecord.CurrentSchemaVersion,
+                Newer,
+                DateTimeOffset.UtcNow),
+        };
+        var localizer = await CreateLocalizerAsync();
+
+        // Both conditions that make CheckOnStartupAsync return early. A reader placed
+        // inside it would be silent in exactly the case it exists for: a relaunch
+        // minutes after a failed update falls squarely inside the throttle window.
+        var settings = BaseSettings();
+        settings.UpdateCheckEnabled = false;
+        settings.UpdateLastCheckUtc = DateTime.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+
+        var vm = CreateViewModel(
+            settings,
+            new StubUpdateService { Result = UpToDate() },
+            Current,
+            localizer: localizer,
+            outcomeStore: store);
+
+        await vm.ReportPreviousAttemptAsync(CancellationToken.None);
+
+        Assert.True(vm.IsBannerVisible);
+        Assert.True(vm.IsOutcomeNotice);
+    }
+
     private static UpdateBannerViewModel CreateViewModel(
         AppSettings settings,
         StubUpdateService update,
         string informationalVersion,
         IUpdateInstallFlow? installFlow = null,
         IDialogService? dialogService = null,
-        LocalizationManager? localizer = null)
+        LocalizationManager? localizer = null,
+        IUpdateOutcomeStore? outcomeStore = null)
         => new(
             update,
             new StubConfigManager(settings),
@@ -320,7 +427,8 @@ public sealed class UpdateBannerViewModelTests
             new StubBrowserLauncher(),
             installFlow ?? new FakeUpdateInstallFlow(),
             dialogService ?? new ConfirmingDialogService(true),
-            localizer ?? new LocalizationManager());
+            localizer ?? new LocalizationManager(),
+            outcomeStore ?? new FakeUpdateOutcomeStore());
 
     private static async Task<LocalizationManager> CreateLocalizerAsync()
     {

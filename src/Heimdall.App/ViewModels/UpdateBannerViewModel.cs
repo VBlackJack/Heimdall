@@ -38,6 +38,7 @@ public partial class UpdateBannerViewModel : ObservableObject
     private readonly IUpdateInstallFlow _installFlow;
     private readonly IDialogService _dialogService;
     private readonly LocalizationManager _localizer;
+    private readonly IUpdateOutcomeStore _outcomeStore;
 
     private HeimdallVersion? _candidateVersion;
     private string _releaseUrl = string.Empty;
@@ -69,6 +70,25 @@ public partial class UpdateBannerViewModel : ObservableObject
     partial void OnBannerStatusTextChanged(string value) =>
         OnPropertyChanged(nameof(HasBannerStatus));
 
+    /// <summary>
+    /// True when the banner is reporting what a previous update attempt did, rather than
+    /// offering a new version.
+    /// </summary>
+    /// <remarks>
+    /// The banner's offer affordances - the version line, Download and install, View
+    /// release, Skip this version - all hang off <see cref="IsBannerVisible"/>. Showing an
+    /// outcome without this flag would leave "a new version is available:" followed by
+    /// nothing, above buttons that have no version to act on.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _isOutcomeNotice;
+
+    /// <summary>True when the banner is offering an update, which is its ordinary use.</summary>
+    public bool IsUpdateOffer => !IsOutcomeNotice;
+
+    partial void OnIsOutcomeNoticeChanged(bool value) =>
+        OnPropertyChanged(nameof(IsUpdateOffer));
+
     public UpdateBannerViewModel(
         IUpdateService updateService,
         IConfigManager configManager,
@@ -76,7 +96,8 @@ public partial class UpdateBannerViewModel : ObservableObject
         IBrowserLauncher browserLauncher,
         IUpdateInstallFlow installFlow,
         IDialogService dialogService,
-        LocalizationManager localizer)
+        LocalizationManager localizer,
+        IUpdateOutcomeStore outcomeStore)
     {
         _updateService = updateService;
         _configManager = configManager;
@@ -85,6 +106,53 @@ public partial class UpdateBannerViewModel : ObservableObject
         _installFlow = installFlow;
         _dialogService = dialogService;
         _localizer = localizer;
+        _outcomeStore = outcomeStore;
+    }
+
+    /// <summary>
+    /// Reports what the previous update attempt did, if anything, and clears the record.
+    /// </summary>
+    /// <remarks>
+    /// A separate entry point rather than a branch inside
+    /// <see cref="CheckOnStartupAsync"/>, and that is not a matter of taste. That method
+    /// returns early when update checks are disabled, and again inside a throttle window
+    /// whose default is a day. A relaunch minutes after a failed update lands squarely in
+    /// the throttle, so a reader placed there would be silent in exactly the case it
+    /// exists for.
+    /// <para>
+    /// It says nothing at all unless the version really did not move. Telling someone
+    /// their update failed while they are looking at the new version would cost more
+    /// confidence than the silence this replaces.
+    /// </para>
+    /// </remarks>
+    public Task ReportPreviousAttemptAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        UpdateAttemptRecord? attempt = _outcomeStore.TryTakePending();
+        UpdateRelaunchOutcome outcome = UpdateOutcomeClassifier.Classify(
+            attempt,
+            _appVersionProvider.Current);
+
+        if (outcome is UpdateRelaunchOutcome.None or UpdateRelaunchOutcome.Succeeded)
+        {
+            return Task.CompletedTask;
+        }
+
+        Core.Logging.FileLogger.Warn(
+            $"[Updates] previous attempt did not apply: attempted={attempt?.AttemptedVersion} "
+            + $"running={_appVersionProvider.Current?.ToString()}");
+
+        string? key = UpdateRelaunchOutcomeText.StatusKey(outcome);
+        if (key is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        BannerStatusText = _localizer.Format(key, attempt?.AttemptedVersion ?? string.Empty);
+        IsOutcomeNotice = true;
+        IsBannerVisible = true;
+        return Task.CompletedTask;
     }
 
     /// <summary>

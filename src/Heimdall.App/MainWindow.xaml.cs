@@ -271,6 +271,19 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 ShowOnboardingOverlay(viewModel.CurrentSettings);
             }
 
+            // Reports a previous update attempt that did not apply. A sibling of the
+            // startup check rather than a step inside it: that check returns early when
+            // updates are disabled and again inside its throttle window, which is exactly
+            // where a relaunch minutes after a failed update lands.
+            try
+            {
+                await viewModel.Update.ReportPreviousAttemptAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn($"[Updates] previous attempt report: {ex.Message}");
+            }
+
             // Throttled background update check (usually a no-op). Never blocks the UI.
             try
             {

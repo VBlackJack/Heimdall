@@ -128,7 +128,8 @@ public sealed class UpdateBannerDownloadButtonTests
             new StubBrowserLauncher(),
             new UnusedUpdateInstallFlow(),
             new UnusedDialogService(),
-            new LocalizationManager());
+            new LocalizationManager(),
+            new UnusedUpdateOutcomeStore());
 
     private static AppSettings BaseSettings() => new()
     {
@@ -220,6 +221,21 @@ public sealed class UpdateBannerDownloadButtonTests
 
         public Task SaveServersAsync(List<ServerProfileDto> servers) => throw new NotSupportedException();
     }
+
+    /// <summary>An outcome store these tests never consult.</summary>
+    private sealed class UnusedUpdateOutcomeStore : IUpdateOutcomeStore
+    {
+        public void WriteAttempt(string attemptedVersion)
+        {
+        }
+
+        public void Clear()
+        {
+        }
+
+        public UpdateAttemptRecord? TryTakePending() => null;
+    }
+
 
     private sealed class UnusedDialogService : IDialogService
     {

@@ -271,25 +271,36 @@
                     Visibility="{Binding Update.IsBannerVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                 <DockPanel LastChildFill="False">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- The offer affordances. Hidden when the banner is reporting what a
+                             previous attempt did: there is no candidate version to act on. -->
+                        <Button x:Name="Mw_UpdateBannerDismiss" Content="{loc:Translate UpdateBannerDismissBtn}" Command="{Binding Update.LaterCommand}"
+                                Style="{DynamicResource SecondaryButtonStyle}" Margin="0,0,8,0"
+                                Visibility="{Binding Update.IsOutcomeNotice, Converter={StaticResource BoolToVisibilityConverter}}"
+                                AutomationProperties.Name="{loc:Translate UpdateBannerDismissBtn}"/>
                         <Button x:Name="Mw_UpdateBannerDownloadInstall" Content="{loc:Translate SettingsBtnDownloadInstall}" Command="{Binding Update.DownloadAndInstallCommand}"
                                 Style="{DynamicResource PrimaryButtonStyle}" Margin="0,0,8,0"
-                                AutomationProperties.Name="{loc:Translate SettingsBtnDownloadInstall}"/>
+                                AutomationProperties.Name="{loc:Translate SettingsBtnDownloadInstall}"
+                                Visibility="{Binding Update.IsUpdateOffer, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <Button x:Name="Mw_UpdateBannerLater" Content="{loc:Translate UpdateBannerLaterBtn}" Command="{Binding Update.LaterCommand}"
                                 Style="{DynamicResource SecondaryButtonStyle}" Margin="0,0,8,0"
-                                AutomationProperties.Name="{loc:Translate UpdateBannerLaterBtn}"/>
+                                AutomationProperties.Name="{loc:Translate UpdateBannerLaterBtn}"
+                                Visibility="{Binding Update.IsUpdateOffer, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <Button x:Name="Mw_UpdateBannerViewRelease" Content="{loc:Translate UpdateBannerViewReleaseBtn}" Command="{Binding Update.ViewReleaseCommand}"
                                 Style="{DynamicResource QuietButtonStyle}" Margin="0,0,8,0"
-                                AutomationProperties.Name="{loc:Translate UpdateBannerViewReleaseBtn}"/>
+                                AutomationProperties.Name="{loc:Translate UpdateBannerViewReleaseBtn}"
+                                Visibility="{Binding Update.IsUpdateOffer, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <Button x:Name="Mw_UpdateBannerSkip" Content="{loc:Translate UpdateBannerSkipVersionBtn}" Command="{Binding Update.SkipVersionCommand}"
                                 Style="{DynamicResource QuietButtonStyle}"
-                                AutomationProperties.Name="{loc:Translate UpdateBannerSkipVersionBtn}"/>
+                                AutomationProperties.Name="{loc:Translate UpdateBannerSkipVersionBtn}"
+                                Visibility="{Binding Update.IsUpdateOffer, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <Button x:Name="Mw_UpdateBannerCancel" Content="{loc:Translate BtnCancel}" Command="{Binding Update.DownloadAndInstallCancelCommand}"
                                 Style="{DynamicResource SecondaryButtonStyle}" Margin="8,0,0,0"
                                 Visibility="{Binding Update.IsInstalling, Converter={StaticResource BoolToVisibilityConverter}}"
                                 AutomationProperties.Name="{loc:Translate BtnCancel}"/>
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
-                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}">
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Visibility="{Binding Update.IsUpdateOffer, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Run Text="{loc:Translate UpdateBannerText}"/><Run Text="{Binding Update.BannerVersionText}" FontWeight="SemiBold"/>
                         </TextBlock>
                         <ProgressBar x:Name="Mw_UpdateBannerProgress" Minimum="0" Maximum="1" Value="{Binding Update.DownloadProgress}"
