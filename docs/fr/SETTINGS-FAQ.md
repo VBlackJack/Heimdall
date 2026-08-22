@@ -94,11 +94,11 @@ coffre ne porte pas exactement le même nom que celle de Heimdall.
 
 ## RDP et mémoire
 
-**Cache bitmap - à lire.** Le libellé induit en erreur et nous en sommes conscients. La case
-pilote la propriété `BitmapPersistence` du contrôle RDP, qui décide si le cache bitmap est
-écrit **sur disque** entre deux sessions. **Elle ne pilote pas le cache en mémoire**, et aucun
-réglage de Heimdall ne le fait. La décocher ne libère aucune RAM et vous coûte le cache disque
-qui aurait épargné des redessins à la reconnexion. Laissez-la active.
+**Conserver le cache bitmap sur disque - à lire.** Cette case s'appelait "Cache bitmap", un nom
+qui induisait en erreur, elle a donc été renommée. Elle décide si le cache bitmap est écrit
+**sur disque** entre deux sessions, pour qu'une reconnexion le réutilise au lieu de tout
+redessiner. **Elle ne pilote pas le cache en mémoire**, et aucun réglage de Heimdall ne le fait.
+La décocher ne libère aucune mémoire et vous coûte le cache disque. Laissez-la active.
 
 **Profondeur de couleur** - 32 bits par défaut. La baisser à 16 bits n'a économisé aucune
 mémoire mesurable. Baissez-la si vous manquez de bande passante, pas si vous manquez de

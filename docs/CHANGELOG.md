@@ -12,6 +12,19 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-22: the bitmap caching checkbox now says what it does
+
+- **"Bitmap caching" is now "Keep bitmap cache on disk".** The old name described something the
+  checkbox does not control. It decides whether the cache is written to disk between sessions, so a
+  reconnection can reuse it instead of redrawing; it has never had any effect on the cache held in
+  memory.
+- **The tooltip was wrong too**, and has been rewritten. It promised reduced bandwidth and better
+  responsiveness over slow links, which is what an in-memory cache would give you. It now says what
+  the setting does, and states that turning it off frees no memory.
+- **Anyone hunting for memory to reclaim was being misled into the worst move available**: turning
+  this off costs the disk cache and gives nothing back. The name, the tooltip, the server dialog,
+  the screen-reader labels and the reconnection error message all now agree.
+
 ## 2026-08-22: opening and closing Remote Desktop sessions no longer costs the machine
 
 - **Every Remote Desktop session used to leave something behind.** Opening one and closing it

@@ -89,11 +89,11 @@ the entry in Heimdall.
 
 ## RDP and memory
 
-**Bitmap caching - read this one.** The label is misleading and we are aware of it. The
-checkbox maps to the RDP control's `BitmapPersistence` property, which decides whether the
-bitmap cache is written **to disk** between sessions. **It does not control the in-memory
-cache**, and no setting in Heimdall does. Turning it off frees no RAM and costs you the disk
-cache that would otherwise spare redraws on reconnect. Leave it on.
+**Keep bitmap cache on disk** - this checkbox used to be called "Bitmap caching", which was
+misleading, so it was renamed. It decides whether the bitmap cache is written **to disk** between
+sessions, so a reconnection can reuse it instead of redrawing. **It does not control the in-memory
+cache**, and no setting in Heimdall does. Turning it off frees no memory and costs you the disk
+cache. Leave it on.
 
 **Color depth** - 32-bit by default. Lowering it to 16-bit saved no measurable memory in
 testing. Lower it if you are short of bandwidth, not if you are short of memory.
