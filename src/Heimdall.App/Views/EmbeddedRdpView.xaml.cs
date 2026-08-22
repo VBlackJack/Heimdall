@@ -131,7 +131,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private RdpSessionStatus _sessionStatus = RdpSessionStatus.Disconnecting;
     private bool _initialized;
     private bool _connectStarted;
-    private bool _eventSinkAttached;
     private bool _disposed;
     private bool _allowResolutionUpdates;
     private bool _sleepPreventionActive;
@@ -573,10 +572,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
     void IRdpDisconnectTeardownTarget.DetachEventSink()
     {
-        if (_eventSinkAttached)
+        // Whether the sink is advised is the control's own fact. Mirroring it here would
+        // be a second copy of one truth, free to disagree with the first.
+        if (_rdpHost?.IsEventSinkAttached == true)
         {
-            _rdpHost?.DetachEventSink();
-            _eventSinkAttached = false;
+            _rdpHost.DetachEventSink();
         }
     }
 
@@ -1552,15 +1552,13 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                 settings.RdpAutoReconnectMaxAttempts,
                 settings.RdpKeepAliveIntervalMs);
 
-            if (!_eventSinkAttached)
+            if (!_rdpHost.IsEventSinkAttached)
             {
                 if (!_rdpHost.AttachEventSink())
                 {
                     throw new InvalidOperationException(
                         _rdpHost.LastError ?? "Failed to attach the Remote Desktop event sink.");
                 }
-
-                _eventSinkAttached = true;
             }
 
             Core.Logging.FileLogger.Info("EmbeddedRDP calling Connect()...");
