@@ -76,10 +76,13 @@ public sealed class DeadClickRegressionTests
             Path.Combine("src", "Heimdall.App", "Views", "Tools", "SmbEnumeratorView.xaml"),
             "BtnEnumerate",
             "CanToggleEnumeration");
+        // Bound to the view model's own predicate, as BtnEnumerate above already is, rather
+        // than to a raw state flag. The browse button, the drop-zone border and the drag
+        // cursor announce one decision, so they now read it from one place.
         AssertButtonIsEnabledBinding(
             Path.Combine("src", "Heimdall.App", "Views", "Tools", "HashGeneratorView.xaml"),
             "BtnBrowseFile",
-            "IsFileHashing");
+            "CanAcceptFile");
     }
 
     private static string ExtractMethodBody(string source, string signature)

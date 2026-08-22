@@ -284,6 +284,7 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
 
     partial void OnIsFileHashingChanged(bool value)
     {
+        OnPropertyChanged(nameof(CanAcceptFile));
         HashFileCommand.NotifyCanExecuteChanged();
         ClearFileCommand.NotifyCanExecuteChanged();
     }
@@ -294,7 +295,18 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
         ClearFileCommand.NotifyCanExecuteChanged();
     }
 
-    private bool CanHashFile(string? path) => !_disposed && !IsFileHashing && !string.IsNullOrWhiteSpace(path);
+    /// <summary>
+    /// Whether the tool will take a file at all, independent of which file.
+    /// </summary>
+    /// <remarks>
+    /// The single source for the three surfaces that announce it: the browse button, the
+    /// drop-zone border, and the drag cursor. They used to hold two predicates for one
+    /// decision - the button on <see cref="IsFileHashing"/> alone, the other two on
+    /// <see cref="CanHashFile"/> - which left nothing to keep them in agreement.
+    /// </remarks>
+    public bool CanAcceptFile => !_disposed && !IsFileHashing;
+
+    private bool CanHashFile(string? path) => CanAcceptFile && !string.IsNullOrWhiteSpace(path);
 
     private bool CanClearFile() => IsFileMode;
 
