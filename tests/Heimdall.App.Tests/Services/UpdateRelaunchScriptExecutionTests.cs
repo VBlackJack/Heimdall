@@ -15,6 +15,7 @@
  */
 
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -160,8 +161,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         ScriptRun run = await sandbox.RunAsync(powerShellHost);
 
-        Assert.Contains(InstallerRole, await sandbox.ReadMarkerAsync(InstallerRole));
-        Assert.Contains(RelaunchRole, await sandbox.ReadMarkerAsync(RelaunchRole));
+        await sandbox.WaitForRoleAsync(InstallerRole);
+        await sandbox.WaitForRoleAsync(RelaunchRole);
         Assert.False(File.Exists(sandbox.InstallerPath), "the installer should be removed");
         Assert.False(File.Exists(sandbox.ScriptPath), "the script should delete itself");
 
@@ -191,11 +192,11 @@ public sealed class UpdateRelaunchScriptExecutionTests
         ScriptRun run = await sandbox.RunAsync(powerShellHost);
 
         Assert.True(run.ExitCode != 0, "a rejected installer must not report success");
-        Assert.False(sandbox.MarkerExists(InstallerRole), "the installer must never have run");
+        Assert.False(sandbox.SequenceContainsRole(InstallerRole), "the installer must never have run");
 
         // The whole purpose of the outer finally: the user gets their application back
         // even when the update was refused.
-        Assert.Contains(RelaunchRole, await sandbox.ReadMarkerAsync(RelaunchRole));
+        await sandbox.WaitForRoleAsync(RelaunchRole);
         Assert.False(File.Exists(sandbox.ScriptPath), "the script should delete itself");
     }
 
@@ -226,7 +227,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         // The relaunch precedes the cleanup, so the user still gets their application
         // back. That ordering is the whole reason this failure is survivable today.
-        Assert.Contains(RelaunchRole, await sandbox.ReadMarkerAsync(RelaunchRole));
+        await sandbox.WaitForRoleAsync(RelaunchRole);
     }
 
     /// <summary>Resolves the PowerShell hosts the way the production host does.</summary>
@@ -375,6 +376,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// </summary>
     private sealed class UpdateScriptSandbox : IDisposable
     {
+        private ScriptRun? _lastRun;
+
         internal UpdateScriptSandbox()
         {
             Root = Path.Combine(
@@ -455,9 +458,16 @@ public sealed class UpdateRelaunchScriptExecutionTests
             InstallerExitCode = 0;
         }
 
-        internal string MarkerPath(string role) => Path.Combine(MarkerDirectory, $"{role}.txt");
+        /// <summary>
+        /// One file for both roles. The stand-in appends, so a single file carries the
+        /// whole sequence in the order it happened, which is more than two files could
+        /// say and needs no argument quoting to arrange.
+        /// </summary>
+        internal string SequencePath => Path.Combine(MarkerDirectory, "sequence.txt");
 
-        internal bool MarkerExists(string role) => File.Exists(MarkerPath(role));
+        internal bool SequenceContainsRole(string role) =>
+            File.Exists(SequencePath)
+            && File.ReadAllText(SequencePath).Contains($"{role}|", StringComparison.Ordinal);
 
         internal UpdateRelaunchSpec CreateSpec(bool requiresElevation = false, bool withLog = true)
         {
@@ -469,9 +479,15 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 ScriptPath: ScriptPath,
                 StagingDirectory: StageDirectory,
                 RequiresElevation: requiresElevation,
-                InstallerArguments:
-                    $"--role {InstallerRole} --exit-code {InstallerExitCode} "
-                    + $"--marker \"{MarkerPath(InstallerRole)}\"",
+
+                // No quotes and no paths in the argument list, deliberately. Windows
+                // PowerShell 5.1 and pwsh 7 do not agree on how a quoted path inside a
+                // single -ArgumentList string is split, and the disagreement showed up
+                // only on a CI runner: 5.1 failed while 7 passed. The stand-in takes its
+                // marker path from the environment instead, which both hosts pass to a
+                // child identically - and which the relaunch already had to use, because
+                // the script starts the target with no arguments at all.
+                InstallerArguments: $"--role {InstallerRole} --exit-code {InstallerExitCode}",
                 WaitTimeoutSeconds: TestWaitTimeoutSeconds,
                 LogPath: withLog ? LogPath : null);
         }
@@ -482,38 +498,60 @@ public sealed class UpdateRelaunchScriptExecutionTests
             AssertFenced(spec, Root);
             await File.WriteAllTextAsync(ScriptPath, UpdateRelaunchScript.Build(spec));
 
-            // The script relaunches the target with no arguments, so the target learns
-            // where to record through the environment the host passes down.
-            return await RunHostAsync(powerShellHost, ScriptPath, MarkerPath(RelaunchRole));
+            // Both roles learn where to record through the environment: the script starts
+            // the relaunch target with no arguments at all, and the installer takes the
+            // same channel so no path has to survive -ArgumentList quoting.
+            _lastRun = await RunHostAsync(powerShellHost, ScriptPath, SequencePath);
+            return _lastRun;
         }
 
-        internal async Task<string> ReadMarkerAsync(string role)
+        internal async Task WaitForRoleAsync(string role)
         {
-            string path = MarkerPath(role);
+            string marker = $"{role}|";
             DateTime deadline = DateTime.UtcNow + MarkerDeadline;
             while (DateTime.UtcNow < deadline)
             {
-                if (File.Exists(path))
+                try
                 {
-                    try
+                    if (File.Exists(SequencePath)
+                        && (await File.ReadAllTextAsync(SequencePath)).Contains(marker, StringComparison.Ordinal))
                     {
-                        string text = await File.ReadAllTextAsync(path);
-                        if (text.Length > 0)
-                        {
-                            return text;
-                        }
+                        return;
                     }
-                    catch (IOException)
-                    {
-                        // Still being written; fall through and retry.
-                    }
+                }
+                catch (IOException)
+                {
+                    // Still being written; fall through and retry.
                 }
 
                 await Task.Delay(25);
             }
 
             throw new TimeoutException(
-                $"marker '{role}' never appeared within {MarkerDeadline.TotalSeconds} s at {path}");
+                $"'{role}' never recorded within {MarkerDeadline.TotalSeconds} s.{Environment.NewLine}{Diagnose()}");
+        }
+
+        /// <summary>
+        /// Everything known about the run, gathered for a failure message.
+        /// </summary>
+        /// <remarks>
+        /// The first CI failure of this harness reported only that a marker had not
+        /// appeared, which said nothing about why and could not be reproduced locally.
+        /// A timeout here is worth nothing without the script's own account of itself.
+        /// </remarks>
+        private string Diagnose()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"host exit code: {_lastRun?.ExitCode.ToString(CultureInfo.InvariantCulture) ?? "not run"}");
+            sb.AppendLine($"host stdout: {_lastRun?.StandardOutput}");
+            sb.AppendLine($"host stderr: {_lastRun?.StandardError}");
+            sb.AppendLine($"installer still present: {File.Exists(InstallerPath)}");
+            sb.AppendLine($"script still present: {File.Exists(ScriptPath)}");
+            sb.AppendLine(
+                $"sequence file: {(File.Exists(SequencePath) ? File.ReadAllText(SequencePath) : "absent")}");
+            sb.AppendLine(
+                $"transcript: {(File.Exists(LogPath) ? File.ReadAllText(LogPath) : "absent")}");
+            return sb.ToString();
         }
 
         public void Dispose()
