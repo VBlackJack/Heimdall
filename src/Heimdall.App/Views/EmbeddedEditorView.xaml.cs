@@ -53,6 +53,16 @@ public partial class EmbeddedEditorView : UserControl
     }
 
     /// <summary>
+    /// Forwards the host's close veto to the view model. Hosts hold the view, not its view model,
+    /// so the wiring has to be reachable from here.
+    /// </summary>
+    internal Func<bool>? CloseRefusedByHost
+    {
+        get => _viewModel.CloseRefusedByHost;
+        set => _viewModel.CloseRefusedByHost = value;
+    }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="EmbeddedEditorView"/> class.
     /// </summary>
     /// <param name="localizer">Optional localization manager passed through to the view model.</param>

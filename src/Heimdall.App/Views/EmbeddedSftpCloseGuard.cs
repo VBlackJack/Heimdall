@@ -79,18 +79,42 @@ public sealed class EmbeddedSftpCloseGuard : ICloseGuard
         return new CloseGuardState(snapshot.IsBusy, snapshot.Epoch);
     }
 
+    /// <summary>
+    /// The one place that decides whether a save in flight refuses a close, and under which
+    /// sentence. Returns the locale key to show, or <see langword="null"/> when nothing refuses.
+    /// </summary>
+    /// <remarks>
+    /// Extracted so every surface that can close this editor asks the same question and quotes the
+    /// same answer. The pane, the split pane, the floating window and the editor overlay's own
+    /// Close button all route here; a second copy of the condition is how the two surfaces would
+    /// drift into disagreeing about one save.
+    /// <para>
+    /// Why the refusal is terminal, rather than a question the user could answer: NOT because a
+    /// teardown would leave a half-written file on the server. It would not - all three write paths
+    /// stage to a temporary name and publish by an atomic rename, so the destination is never
+    /// touched before the write has completed. The real reason is that the write cannot be stopped.
+    /// The upload sits in a synchronous stream write that takes no cancellation token, so granting
+    /// the close would hand the user back a pane while the upload thread stays wedged inside the
+    /// SSH library holding the browser's client lock, on a browser the teardown is about to
+    /// dispose - and the save the user believed had been accepted would silently never happen.
+    /// </para>
+    /// </remarks>
+    /// <param name="snapshot">One atomic read of the pane's protectable state.</param>
+    public static string? DescribeEditorSaveRefusal(SftpCloseGuardSnapshot snapshot)
+    {
+        return snapshot.IsEditorSaveInProgress ? SftpCloseGuardLocaleKeys.EditorSaveBlocked : null;
+    }
+
     public CloseDecision PollClose(CloseRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         SftpCloseGuardSnapshot snapshot = _sample();
 
-        // A save in flight is refused outright rather than confirmed. Tearing the pane down mid-save
-        // would leave a half-written file on the server, and no answer the user could give would
-        // make that acceptable - so this one is terminal, and it has to be tested first.
-        if (snapshot.IsEditorSaveInProgress)
+        // The refusal is terminal, so it has to be tested first.
+        if (DescribeEditorSaveRefusal(snapshot) is { } reasonKey)
         {
-            return CloseDecision.Deny(SftpCloseGuardLocaleKeys.EditorSaveBlocked, snapshot.Epoch);
+            return CloseDecision.Deny(reasonKey, snapshot.Epoch);
         }
 
         // The rest is losable work the user is entitled to abandon knowingly, so it becomes a
@@ -122,7 +146,7 @@ public sealed class EmbeddedSftpCloseGuard : ICloseGuard
             return true;
         }
 
-        if (snapshot.IsEditorSaveInProgress)
+        if (DescribeEditorSaveRefusal(snapshot) is not null)
         {
             return false;
         }

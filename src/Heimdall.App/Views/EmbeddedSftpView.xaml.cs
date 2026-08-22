@@ -573,6 +573,50 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             CloseGuardConfirmSeverity);
     }
 
+    /// <summary>
+    /// Answers the inline editor's own Close button with the same decision the pane guard makes,
+    /// and says the refusal out loud. Returns <see langword="true"/> when the close is refused.
+    /// </summary>
+    /// <remarks>
+    /// The editor overlay is the fourth surface that can close this pane, and it was the only one
+    /// that stayed silent: the tab, the split pane and the floating window all already show this
+    /// same sentence under this same title. Routing through
+    /// <see cref="EmbeddedSftpCloseGuard.DescribeEditorSaveRefusal"/> rather than re-testing the
+    /// field is what keeps the four from ever disagreeing about one save.
+    /// </remarks>
+    private bool RefuseInlineEditorCloseWhileSaving()
+    {
+        if (EmbeddedSftpCloseGuard.DescribeEditorSaveRefusal(SampleCloseGuardSnapshot())
+            is not { } reasonKey)
+        {
+            return false;
+        }
+
+        ReportCloseGuardRefusal(reasonKey);
+        return true;
+    }
+
+    /// <summary>Shows a close refusal, under the shared close-guard title.</summary>
+    /// <remarks>
+    /// Refuses in silence when the session was never initialized, which is the OPPOSITE of what
+    /// <see cref="ConfirmCloseAsync"/> does with the same missing services. There, nothing had been
+    /// started that a refusal would protect, so consent is the safe answer. Here a save is
+    /// genuinely in flight, so the rule outranks our ability to explain it.
+    /// </remarks>
+    private void ReportCloseGuardRefusal(string reasonKey)
+    {
+        LocalizationManager? localizer = _localizer;
+        IDialogService? dialogService = _dialogService;
+        if (localizer is null || dialogService is null)
+        {
+            return;
+        }
+
+        dialogService.ShowInfo(
+            localizer[CloseGuardLocaleKeys.BlockedTitle],
+            localizer.Format(reasonKey, DescribeClosePane()));
+    }
+
     /// <summary>The pane's own header label, interpolated into the guard's messages.</summary>
     private string DescribeClosePane()
     {
@@ -1269,6 +1313,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
                 // Open in embedded AvalonEdit editor
                 EmbeddedEditorView editorView = new(_localizer);
+
+                // Assigned before the overlay is mounted, and before anything can be typed into it.
+                // A guard attached to no host is a guard that never runs - that is exactly how the
+                // pane's own close guard sat inert for weeks after it shipped.
+                editorView.CloseRefusedByHost = RefuseInlineEditorCloseWhileSaving;
                 editorView.OpenContent(file.Name, content);
 
                 SessionPaneModel? inlineEditorPane = _ownerPane;
@@ -1411,12 +1460,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                     }
                 };
 
-                // Close → restore SFTP panel, refresh listing
+                // Close → restore SFTP panel, refresh listing, drop the temp copy.
+                // One handler rather than two: both used to test the same field independently,
+                // which is one rule kept in two places. The order below is load-bearing, and the
+                // cleanup stays OUTSIDE the restore branch because it has to run even when the
+                // pane identity check declines - otherwise a temp directory is leaked.
                 editorView.CloseRequested += () =>
                 {
-                    if (_inlineEditorSaveInProgress)
+                    if (RefuseInlineEditorCloseWhileSaving())
                     {
-                        // Upload still in progress; ignore close to avoid deleting temp file
                         return;
                     }
 
@@ -1424,12 +1476,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                     {
                         _ = RefreshRemoteAsync();
                     }
-                };
 
-                // Cleanup temp on close
-                editorView.CloseRequested += () =>
-                {
-                    if (_inlineEditorSaveInProgress) return;
                     CleanupEditTempDir(tempPath);
                 };
             }

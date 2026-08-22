@@ -44,8 +44,11 @@ public sealed class EmbeddedSftpCloseGuardTests
 
         CloseDecision decision = guard.PollClose(Request());
 
-        // Terminal rather than a question: tearing the pane down mid-save would leave a half-written
-        // file on the server, and no answer the user could give would make that acceptable.
+        // Terminal rather than a question, and NOT because a teardown would leave a half-written
+        // file on the server - every write path publishes by an atomic rename, so it would not.
+        // The reason is that the write cannot be stopped: granting the close would return the pane
+        // while the upload thread stays wedged in the SSH library holding the browser's client lock,
+        // and the save the user believed had been accepted would silently never happen.
         Assert.Equal(CloseVerdict.Deny, decision.Verdict);
         Assert.Equal(SftpCloseGuardLocaleKeys.EditorSaveBlocked, decision.ReasonKey);
     }
@@ -81,9 +84,61 @@ public sealed class EmbeddedSftpCloseGuardTests
         SftpCloseGuardSnapshot snapshot = new(true, true, false, 1);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
 
-        // Confirming would be a lie: consenting to lose the transfer would not make the half-written
-        // file acceptable, so the terminal refusal has to be tested first.
+        // Confirming would be a lie: no answer the user gives can stop an uninterruptible write, so
+        // the terminal refusal has to be tested first.
         Assert.Equal(CloseVerdict.Deny, guard.PollClose(Request()).Verdict);
+    }
+
+    [Fact]
+    public void DescribeEditorSaveRefusal_SaveInFlight_NamesTheSameKeyPollCloseDenies()
+    {
+        SftpCloseGuardSnapshot snapshot = new(false, true, false, 1);
+        EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
+
+        // The point of the shared predicate: the pane surface and the editor overlay cannot name
+        // two different sentences for one save, because there is only one sentence to name.
+        Assert.Equal(
+            SftpCloseGuardLocaleKeys.EditorSaveBlocked,
+            EmbeddedSftpCloseGuard.DescribeEditorSaveRefusal(snapshot));
+        Assert.Equal(
+            guard.PollClose(Request()).ReasonKey,
+            EmbeddedSftpCloseGuard.DescribeEditorSaveRefusal(snapshot));
+    }
+
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, false, false)]
+    public void DescribeEditorSaveRefusal_NoSaveInFlight_ReturnsNoRefusal(
+        bool transferInProgress,
+        bool saveInProgress,
+        bool unsavedChanges)
+    {
+        SftpCloseGuardSnapshot snapshot = new(transferInProgress, saveInProgress, unsavedChanges, 1);
+
+        // A running transfer and unsaved text are losable work the user may abandon knowingly, so
+        // each stays a question. Only the save refuses - the editor's Close must not be widened
+        // into a second veto surface.
+        Assert.Null(EmbeddedSftpCloseGuard.DescribeEditorSaveRefusal(snapshot));
+    }
+
+    [Fact]
+    public async Task ResolveCloseAsync_SaveInFlight_RefusesWithoutAsking()
+    {
+        SftpCloseGuardSnapshot snapshot = new(false, true, false, 1);
+        int prompts = 0;
+        EmbeddedSftpCloseGuard guard = CreateGuard(
+            () => snapshot,
+            (_, _) =>
+            {
+                prompts++;
+                return Task.FromResult(true);
+            });
+
+        // The asynchronous phase has to hold the same line as the poll. Without this, a consenting
+        // user reaches the confirmation and is told the close succeeded when it did not.
+        Assert.False(await guard.ResolveCloseAsync(Request(), CancellationToken.None));
+        Assert.Equal(0, prompts);
     }
 
     [Fact]
