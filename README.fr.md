@@ -109,7 +109,7 @@ nom ou son adresse.
 | [Guide utilisateur](docs/fr/USER-GUIDE.md) | Commencez ici si vous utilisez Heimdall |
 | [Référence des fonctionnalités](docs/fr/FEATURES.md) | Tout ce que fait Heimdall, protocole par protocole |
 | [Outils](docs/fr/TOOLS.md) | La boîte à outils sysops intégrée |
-| [FAQ des réglages](docs/fr/SETTINGS-FAQ.md) | Ce que fait chaque option, et celles qui ne servent à rien |
+| [FAQ des réglages](docs/fr/SETTINGS-FAQ.md) | Les options qui ne parlent pas d'elles-mêmes, et celle qui trompe |
 | [Mémoire RDP](docs/fr/RDP-PERFORMANCE.md) | Ce que coûte une session, et le seul réglage qui le change |
 | [Dépannage](docs/fr/TROUBLESHOOTING.md) | Pannes précises, rédigées pour un lecteur technique |
 | [Sécurité](SECURITY.fr.md) | Comment les identifiants sont protégés, et comment signaler un problème |

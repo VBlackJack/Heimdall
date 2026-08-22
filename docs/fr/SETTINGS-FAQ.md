@@ -11,13 +11,42 @@
 
 *Also available in English: [../SETTINGS-FAQ.md](../SETTINGS-FAQ.md).*
 
-Settings compte 65 options. Cette page traite celles qui posent réellement question : les
-ambiguës, celles qui portent un vrai compromis, et celle dont le libellé induit en erreur. Les
-options qui font ce que leur nom annonce, comme Thème ou Taille de police, ne sont pas répétées
-ici.
+Settings est un grand écran, et certaines de ses options sont opaques tant qu'on ne sait pas déjà
+à quoi elles renvoient. Cette page traite celles-là : les ambiguës, celles qui portent un vrai
+compromis, celle dont le libellé induit en erreur, et celles dont la formulation suppose un savoir
+que l'interface ne donne jamais. Les options qui font ce que leur nom annonce, comme Thème ou
+Taille de police, ne sont pas répétées ici.
 
 Quand une réponse dit qu'un réglage ne fait pas quelque chose, c'est une affirmation mesurée ou
 vérifiée dans le code, pas une supposition.
+
+## Verrouiller Heimdall lui-même
+
+Trois contrôles, dans le même écran, qui ne protègent pas la même chose.
+
+**PIN d'application** est un verrou d'écran. Heimdall enregistre une empreinte de votre PIN et
+compare ce que vous tapez au démarrage. Cela empêche quelqu'un qui s'assoit devant votre machine
+déverrouillée de parcourir votre liste de serveurs. **Cela ne chiffre rien.** Vos mots de passe
+enregistrés sont protégés par DPAPI que vous posiez un PIN ou non, et qui détient votre fichier
+de configuration peut en retirer le PIN.
+
+**Mot de passe maître** est du chiffrement. Ce que vous tapez passe par Argon2id pour dériver
+une clé, et cette clé chiffre le trousseau. Sans lui, les secrets enregistrés sont illisibles, y
+compris pour un programme tournant sous votre propre compte Windows. C'est celui-là qu'il faut
+poser pour protéger vos identifiants au repos.
+
+**Déverrouillage par Windows Hello** ne remplace ni l'un ni l'autre. Il se pose par-dessus le
+mot de passe maître, pour déverrouiller d'une empreinte au lieu de le saisir.
+
+**Lequel vous faut-il ?** Si la crainte est un collègue devant votre poste laissé sans
+surveillance, le PIN suffit. Si elle porte sur le fichier d'identifiants lui-même, seul le mot
+de passe maître y répond. Les deux se cumulent, et poser un PIN en pensant obtenir le second
+protège beaucoup moins qu'il n'y paraît.
+
+**Générer un fichier de récupération** écrit un fichier `.heimdall-recovery` capable de
+réinitialiser un PIN oublié. Une réserve que la boîte de dialogue n'énonce pas : ce fichier est
+chiffré pour votre compte Windows sur cette machine, donc inutilisable depuis une autre machine
+ou un autre compte. Il sauve un PIN oublié, pas un ordinateur perdu.
 
 ## Sécurité
 
@@ -143,6 +172,58 @@ qui exige de renseigner **Chemin de PuTTY**.
 session** enregistre en plus le contenu des sessions terminal dans **Répertoire des journaux de
 session**. La seconde enregistre ce que vous tapez et ce qui revient : réfléchissez à
 l'emplacement de ce répertoire.
+
+## Migration depuis l'ancienne version
+
+**Ce que "legacy" désigne ici** - Heimdall a remplacé un outil PowerShell antérieur nommé
+**RDPManager**. Cette section ne concerne que ceux qui l'ont utilisé. Si ce nom ne vous dit
+rien, rien ici ne vous concerne.
+
+Au premier démarrage, Heimdall cherche dans les dossiers voisins un répertoire `RDPManager`
+contenant un `config/servers.json`, et propose de l'importer. Si vous refusez, il prend une
+empreinte de ces données pour cesser de vous le demander.
+
+**Proposer la migration au prochain démarrage** annule ce refus. Deux conditions doivent encore
+être réunies au démarrage suivant, et c'est la partie qui surprend : l'ancien dossier doit
+toujours être là, **et votre liste de serveurs actuelle doit être vide**. Heimdall ne propose
+jamais de fondre un import dans un inventaire que vous avez déjà constitué. Cliquez avec des
+serveurs déjà configurés et il ne se passera rien au démarrage suivant, sans message pour
+l'expliquer.
+
+## Partage de fichiers
+
+**Activer le partage TFTP** démarre un petit serveur TFTP, pour pousser des firmwares et des
+configurations vers du matériel réseau qui ne parle rien d'autre. TFTP n'a aucune
+authentification ni aucun chiffrement : qui atteint le port peut lire et écrire dans le dossier
+partagé. Activez-le sur un réseau de confiance, le temps du transfert, puis coupez-le.
+
+## Passerelles SSH, PuTTY et Plink
+
+**Passerelles SSH** sont des rebonds. Vous déclarez une machine joignable, et Heimdall fait
+transiter par elle les sessions vers des machines qui ne le sont pas directement. C'est le
+réglage à chercher quand un serveur n'est accessible que depuis l'intérieur d'un réseau que vous
+atteignez en SSH.
+
+**Chemin de plink.exe** n'est nécessaire que pour les chemins passant par PuTTY : clés Pageant,
+serveurs en keyboard-interactive, et le repli sur Plink. Des fichiers de clés seuls n'en ont pas
+besoin. **Chemin de PuTTY** n'est nécessaire que si le mode SSH est réglé sur External ; laissé
+vide, il est cherché à côté de plink.exe.
+
+## Détection des outils tiers
+
+**Répertoires Sysinternals, NirSoft et NanaRun** - Heimdall n'embarque pas ces suites. Indiquez
+un dossier où vous en avez déjà installé une, et les outils qui s'y trouvent apparaissent dans
+la boîte à outils. Laissez vide et Heimdall propose simplement ses outils intégrés.
+
+## Projets
+
+Une étiquette pour regrouper les sessions par client, site ou environnement, et filtrer l'arbre
+dessus. Purement organisationnel : cela ne change rien à la façon dont une connexion est faite.
+
+## Éditeur externe
+
+L'éditeur ouvert quand vous modifiez un fichier distant en SFTP. Laissé vide, Windows ouvre le
+fichier avec ce qu'il associe à cette extension.
 
 ## Voir aussi
 
