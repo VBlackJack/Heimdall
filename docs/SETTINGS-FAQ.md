@@ -11,12 +11,40 @@
 
 *Also available in French: [fr/SETTINGS-FAQ.md](fr/SETTINGS-FAQ.md).*
 
-Settings has 65 options. This page covers the ones people actually ask about: the ambiguous
-ones, the ones with a real trade-off, and the one whose label is misleading. Options that do
-what their name says, such as Theme or Font size, are not repeated here.
+Settings is a large screen, and some of its options are opaque unless you already know what they
+refer to. This page covers those: the ambiguous ones, the ones carrying a real trade-off, the one
+whose label is misleading, and the ones whose wording assumes knowledge the interface never gives
+you. Options that do what their name says, such as Theme or Font size, are not repeated here.
 
 Where an answer says a setting does not do something, that is a measured or code-verified
 statement, not a guess.
+
+## Locking Heimdall itself
+
+Three controls, in the same screen, protecting three different things.
+
+**Application PIN** is a screen lock. Heimdall stores a hash of your PIN and compares what you
+type at startup. It stops someone who sits down at your unlocked machine from browsing your
+server list. **It encrypts nothing.** Your saved passwords are protected by Windows DPAPI
+whether or not you set a PIN, and someone holding your configuration file can strip the PIN out
+of it.
+
+**Master password** is encryption. What you type goes through Argon2id to derive a key, and that
+key encrypts the credential store. Without it the stored secrets cannot be read, including by
+something running under your own Windows account. Set this one if you want your credentials
+protected at rest.
+
+**Windows Hello unlock** replaces neither. It sits on top of the master password so you can
+unlock with a fingerprint instead of typing it.
+
+**Which do you actually want?** If the worry is a colleague using your unattended machine, the
+PIN is enough. If the worry is the credential file itself, only the master password answers it.
+The two stack, and setting a PIN when you meant the second gives you much less than it appears.
+
+**Generate Recovery File** writes a `.heimdall-recovery` file that can reset a forgotten PIN.
+One caveat the dialog does not spell out: the file is encrypted for your Windows account on this
+machine, so it cannot be used from another machine or another account. It rescues a forgotten
+PIN, not a lost computer.
 
 ## Security
 
@@ -132,6 +160,56 @@ session but isolates each session in its own process.
 **Enable logging** writes the application log. **Enable session logging** additionally records
 the content of terminal sessions to **Session log directory**. The second one records what you
 typed and what came back, so consider where that directory lives.
+
+## Legacy migration
+
+**What "legacy" means here** - Heimdall replaced an earlier PowerShell tool called
+**RDPManager**. This section concerns only people who used it. If that name means nothing to
+you, nothing here applies.
+
+At first start, Heimdall looks in the folders around itself for an `RDPManager` folder holding a
+`config/servers.json`, and offers to import it. Decline, and it fingerprints that data so it
+stops asking.
+
+**Offer legacy migration at next startup** clears that refusal. Two conditions must still hold
+at the next start, and this is the part that surprises people: the old folder must still be
+there, **and your current server list must be empty**. Heimdall never offers to merge an import
+into an inventory you have already built. Click it with servers already configured and nothing
+will happen at the next start, with no message to explain why.
+
+## File sharing
+
+**Enable TFTP sharing** starts a small TFTP server, for pushing firmware and configuration to
+network gear that speaks nothing else. TFTP has no authentication and no encryption of any kind:
+anyone who can reach the port can read and write the shared folder. Turn it on for a trusted LAN
+for the length of the transfer, and turn it off afterwards.
+
+## SSH gateways, PuTTY and Plink
+
+**SSH Gateways** are jump hosts. You declare a machine that is reachable, and Heimdall routes
+sessions through it to machines that are not reachable directly. This is the setting to look for
+when a server is only accessible from inside a network you reach over SSH.
+
+**Path to plink.exe** is needed only for the PuTTY-based paths: Pageant keys,
+keyboard-interactive servers, and the Plink fallback. Key files alone need nothing here.
+**PuTTY path** is needed only when SSH mode is set to External; left blank it is looked for next
+to plink.exe.
+
+## Third-party tool detection
+
+**Sysinternals, NirSoft and NanaRun directories** - Heimdall does not ship these suites. Point it
+at a folder where you have already installed one, and the tools it finds there appear in the
+toolbox. Leave them empty and Heimdall simply offers its own built-in tools.
+
+## Projects
+
+A label for grouping sessions by client, site or environment, and filtering the tree by it.
+Purely organisational: it changes nothing about how a connection is made.
+
+## External editor
+
+The editor opened when you edit a remote file over SFTP. Left empty, Windows opens the file with
+whatever it associates with that extension.
 
 ## Related
 

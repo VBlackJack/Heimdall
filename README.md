@@ -101,7 +101,7 @@ and **Ctrl+K** to jump straight to a machine by name or address.
 | [User Guide](docs/USER-GUIDE.md) | Start here if you are using Heimdall |
 | [Feature reference](docs/FEATURES.md) | Everything it does, protocol by protocol |
 | [Tools](docs/TOOLS.md) | The built-in sysops toolbox |
-| [Settings FAQ](docs/SETTINGS-FAQ.md) | What each option does, and which ones do nothing |
+| [Settings FAQ](docs/SETTINGS-FAQ.md) | The options that are not self-explanatory, and the one that misleads |
 | [RDP memory tuning](docs/RDP-PERFORMANCE.md) | What a session costs, and the one setting that changes it |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Specific failures, written for a technical reader |
 | [Security](SECURITY.md) | How credentials are protected, and how to report a problem |
