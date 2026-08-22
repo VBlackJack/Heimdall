@@ -52,9 +52,16 @@ internal static class Program
     /// </remarks>
     private const string MarkerEnvironmentVariable = "HEIMDALL_UPDATE_STUB_MARKER";
 
+    /// <summary>Exit code source when no <c>--exit-code</c> survives the command line.</summary>
+    private const string ExitCodeEnvironmentVariable = "HEIMDALL_UPDATE_STUB_EXIT_CODE";
+
     private static int Main(string[] args)
     {
-        int exitCode = 0;
+        int exitCode = int.TryParse(
+            Environment.GetEnvironmentVariable(ExitCodeEnvironmentVariable),
+            out int fromEnvironment)
+            ? fromEnvironment
+            : 0;
         string? markerPath = Environment.GetEnvironmentVariable(MarkerEnvironmentVariable);
 
         // Defaults to the executable's own name, so a copy placed as the relaunch
@@ -83,8 +90,14 @@ internal static class Program
                     break;
 
                 default:
-                    Console.Error.WriteLine($"Unrecognized argument: {args[i]}");
-                    return UsageExitCode;
+
+                    // Ignored rather than fatal. Windows PowerShell 5.1 and pwsh 7 do
+                    // not agree on how a single -ArgumentList string is split into a
+                    // child's arguments, and a real silent installer ignores switches
+                    // it does not know. Everything that matters arrives through the
+                    // environment, which both hosts pass down identically.
+                    Console.Error.WriteLine($"Ignoring unrecognized argument: {args[i]}");
+                    break;
             }
         }
 

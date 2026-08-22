@@ -72,6 +72,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
     private const string MarkerEnvironmentVariable = "HEIMDALL_UPDATE_STUB_MARKER";
 
+    private const string ExitCodeEnvironmentVariable = "HEIMDALL_UPDATE_STUB_EXIT_CODE";
+
     public static TheoryData<string> PowerShellHosts()
     {
         var data = new TheoryData<string>();
@@ -318,7 +320,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
     private static async Task<ScriptRun> RunHostAsync(
         string powerShellHost,
         string scriptPath,
-        string? markerPath)
+        string? markerPath,
+        int installerExitCode = 0)
     {
         var psi = new ProcessStartInfo(powerShellHost)
         {
@@ -345,6 +348,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
         if (markerPath is not null)
         {
             psi.Environment[MarkerEnvironmentVariable] = markerPath;
+            psi.Environment[ExitCodeEnvironmentVariable] =
+                installerExitCode.ToString(CultureInfo.InvariantCulture);
         }
 
         using Process process = Process.Start(psi)
@@ -501,7 +506,11 @@ public sealed class UpdateRelaunchScriptExecutionTests
             // Both roles learn where to record through the environment: the script starts
             // the relaunch target with no arguments at all, and the installer takes the
             // same channel so no path has to survive -ArgumentList quoting.
-            _lastRun = await RunHostAsync(powerShellHost, ScriptPath, SequencePath);
+            _lastRun = await RunHostAsync(
+                powerShellHost,
+                ScriptPath,
+                SequencePath,
+                InstallerExitCode);
             return _lastRun;
         }
 
