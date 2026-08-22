@@ -557,6 +557,7 @@
   "ErrorPsftpNotFound": "Error: psftp not found. Expected at: {0}",
   "StatusSshConnecting": "SSH connection to: {0}...",
   "StatusConnected": "Connected to: {0}",
+  "StatusSessionState": "{0}: {1}",
   "StatusLaunchedExternalClient": "External client launched",
   "StatusLaunchedExternalClientTooltip": "mstsc.exe was launched. Heimdall cannot directly observe the remote session state until the client exits.",
   "StatusRemoteSessionHandedOff": "Session started",
