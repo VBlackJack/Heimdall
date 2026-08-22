@@ -52,14 +52,14 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     /// Default number of auto-reconnect attempts; <see cref="SetResilienceOptions"/>
     /// can override it within the [1,60] MsTscAx range.
     /// </summary>
-    public const int MaxAutoReconnectAttempts = 20;
+    public const int MaxAutoReconnectAttempts = RdpSessionState.DefaultMaxAutoReconnectAttempts;
     public const int NoExtendedDisconnectReason = (int)ExtendedDisconnectReasonCode.NoInfo;
 
     private const int MinAutoReconnectAttempts = 1;
     private const int MaxAutoReconnectAttemptsLimit = 60;
 
     /// <summary>TCP keep-alive interval in milliseconds (60 seconds).</summary>
-    public const int DefaultKeepAliveIntervalMs = 60_000;
+    public const int DefaultKeepAliveIntervalMs = RdpSessionState.DefaultKeepAliveIntervalMs;
 
     private const int MinKeepAliveIntervalMs = 5_000;
     private const int MaxKeepAliveIntervalMs = 300_000;
@@ -71,26 +71,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     private readonly string _activeXClsid;
     private readonly RdpPostConnectStripTimer _postConnectStripTimer;
 
-    // Pending configuration applied before the ActiveX handle is created
-    private string _pendingHost = string.Empty;
-    private int _pendingPort = DefaultPorts.Rdp;
-    private string _pendingUsername = string.Empty;
-    private string? _pendingPassword;
-    private string? _pendingDomain;
-    private int _pendingWidth = 1024;
-    private int _pendingHeight = 768;
-    private int _pendingColorDepth = 32;
-    private uint _pendingDesktopScaleFactor = 100;
-    private uint _pendingDeviceScaleFactor = 100;
-    private double _pendingDpiScaleX = 1.0;
-    private double _pendingDpiScaleY = 1.0;
-    private RdpResolutionMode _pendingResolutionMode = RdpResolutionMode.FitWindow;
-    private bool _pendingIsFullscreen;
-    private IReadOnlyList<(int Width, int Height)> _pendingResolutionPresets = [];
-    private IReadOnlyList<int> _pendingSelectedMonitorIndices = [];
-    private RdpRedirectionOptions _pendingRedirections = new();
-    private int _maxAutoReconnectAttempts = MaxAutoReconnectAttempts;
-    private int _keepAliveIntervalMs = DefaultKeepAliveIntervalMs;
+    // Everything one session configures, held apart so that it can be reset wholesale
+    // before this control is handed to another session.
+    private readonly RdpSessionState _session = new();
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int PutUseMultimonDelegate(
@@ -183,6 +166,19 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     /// <inheritdoc />
     public bool IsConnected { get; private set; }
 
+    /// <summary>
+    /// True while the COM event sink is advised. Derived from the connection point rather
+    /// than mirrored in a caller, so no second copy of this fact can disagree with it.
+    /// </summary>
+    public bool IsEventSinkAttached => _cookie is not null;
+
+    /// <summary>
+    /// False once this control has met something that makes reuse unsafe. A control that
+    /// reported a fatal error, or that failed to reset, is discarded rather than handed to
+    /// another session: recycling a poisoned control costs more than the leak reuse avoids.
+    /// </summary>
+    public bool IsReusable { get; private set; } = true;
+
     /// <summary>The ActiveX CLSID used to instantiate this control.</summary>
     public string ActiveXClsid => _activeXClsid;
 
@@ -270,8 +266,8 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     public void SetServer(string host, int port = DefaultPorts.Rdp)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
-        _pendingHost = host;
-        _pendingPort = port;
+        _session.Host = host;
+        _session.Port = port;
         Core.Logging.FileLogger.Info(
             $"RdpActiveXHost.SetServer: host={host} port={port} handleCreated={IsHandleCreated} clsid={_activeXClsid}");
 
@@ -286,9 +282,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     public void SetCredentials(string username, string? password = null, string? domain = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
-        _pendingUsername = username;
-        _pendingPassword = password;
-        _pendingDomain = domain;
+        _session.Username = username;
+        _session.Password = password;
+        _session.Domain = domain;
 
         var ocx = GetActiveXInstance();
         if (ocx is not null)
@@ -300,11 +296,11 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     /// <inheritdoc />
     public void SetDisplay(int width, int height, int colorDepth = 32)
     {
-        _pendingWidth = SnapDesktopWidth(width);
-        _pendingHeight = height;
-        _pendingColorDepth = colorDepth;
+        _session.Width = SnapDesktopWidth(width);
+        _session.Height = height;
+        _session.ColorDepth = colorDepth;
         Core.Logging.FileLogger.Info(
-            $"RdpActiveXHost.SetDisplay: width={_pendingWidth} height={height} colorDepth={colorDepth} handleCreated={IsHandleCreated}");
+            $"RdpActiveXHost.SetDisplay: width={_session.Width} height={height} colorDepth={colorDepth} handleCreated={IsHandleCreated}");
 
         var ocx = GetActiveXInstance();
         if (ocx is not null)
@@ -322,17 +318,17 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         IReadOnlyList<(int Width, int Height)>? presets = null,
         IReadOnlyList<int>? selectedMonitorIndices = null)
     {
-        _pendingResolutionMode = resolutionMode;
-        _pendingIsFullscreen = isFullscreen;
-        _pendingResolutionPresets = presets is null
+        _session.ResolutionMode = resolutionMode;
+        _session.IsFullscreen = isFullscreen;
+        _session.ResolutionPresets = presets is null
             ? []
             : presets.Where(preset => preset.Width > 0 && preset.Height > 0).ToArray();
-        _pendingSelectedMonitorIndices = selectedMonitorIndices is null
+        _session.SelectedMonitorIndices = selectedMonitorIndices is null
             ? []
             : selectedMonitorIndices.Where(index => index >= 0).ToArray();
 
         Core.Logging.FileLogger.Info(
-            $"RdpActiveXHost.SetResolutionMode: mode={resolutionMode} fullscreen={isFullscreen} presets={_pendingResolutionPresets.Count} selectedMonitors={string.Join(',', _pendingSelectedMonitorIndices)} handleCreated={IsHandleCreated}");
+            $"RdpActiveXHost.SetResolutionMode: mode={resolutionMode} fullscreen={isFullscreen} presets={_session.ResolutionPresets.Count} selectedMonitors={string.Join(',', _session.SelectedMonitorIndices)} handleCreated={IsHandleCreated}");
     }
 
     /// <summary>
@@ -344,10 +340,10 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         double dpiScaleX = 1.0,
         double dpiScaleY = 1.0)
     {
-        _pendingDesktopScaleFactor = desktopScaleFactor;
-        _pendingDeviceScaleFactor = deviceScaleFactor;
-        _pendingDpiScaleX = dpiScaleX;
-        _pendingDpiScaleY = dpiScaleY;
+        _session.DesktopScaleFactor = desktopScaleFactor;
+        _session.DeviceScaleFactor = deviceScaleFactor;
+        _session.DpiScaleX = dpiScaleX;
+        _session.DpiScaleY = dpiScaleY;
         Core.Logging.FileLogger.Info(
             $"RdpActiveXHost.SetDisplayScaleFactors: desktop={desktopScaleFactor} device={deviceScaleFactor} dpi={dpiScaleX:0.##}x{dpiScaleY:0.##} connected={IsConnected} handleCreated={IsHandleCreated}");
 
@@ -382,7 +378,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     public void SetRedirections(RdpRedirectionOptions redirections)
     {
         ArgumentNullException.ThrowIfNull(redirections);
-        _pendingRedirections = redirections;
+        _session.Redirections = redirections;
         Core.Logging.FileLogger.Info(
             $"RdpActiveXHost.SetRedirections: clipboard={redirections.Clipboard} drives={redirections.Drives} printers={redirections.Printers} dynamicResolution={redirections.DynamicResolution}");
 
@@ -396,17 +392,17 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     /// <inheritdoc />
     public void SetResilienceOptions(int maxAutoReconnectAttempts, int keepAliveIntervalMs)
     {
-        _maxAutoReconnectAttempts = Math.Clamp(
+        _session.MaxAutoReconnectAttempts = Math.Clamp(
             maxAutoReconnectAttempts,
             MinAutoReconnectAttempts,
             MaxAutoReconnectAttemptsLimit);
-        _keepAliveIntervalMs = Math.Clamp(
+        _session.KeepAliveIntervalMs = Math.Clamp(
             keepAliveIntervalMs,
             MinKeepAliveIntervalMs,
             MaxKeepAliveIntervalMs);
 
         Core.Logging.FileLogger.Info(
-            $"RdpActiveXHost.SetResilienceOptions: reconnectAttempts={_maxAutoReconnectAttempts} keepAliveMs={_keepAliveIntervalMs} handleCreated={IsHandleCreated}");
+            $"RdpActiveXHost.SetResilienceOptions: reconnectAttempts={_session.MaxAutoReconnectAttempts} keepAliveMs={_session.KeepAliveIntervalMs} handleCreated={IsHandleCreated}");
 
         var ocx = GetActiveXInstance();
         if (ocx is not null)
@@ -415,9 +411,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         }
     }
 
-    public int EffectiveMaxAutoReconnectAttempts => _maxAutoReconnectAttempts;
+    public int EffectiveMaxAutoReconnectAttempts => _session.MaxAutoReconnectAttempts;
 
-    public int EffectiveKeepAliveIntervalMs => _keepAliveIntervalMs;
+    public int EffectiveKeepAliveIntervalMs => _session.KeepAliveIntervalMs;
 
     /// <inheritdoc />
     public void Connect()
@@ -426,7 +422,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
             ?? throw new InvalidOperationException("ActiveX control is not initialized. Ensure the host control handle is created first.");
 
         Core.Logging.FileLogger.Info(
-            $"RdpActiveXHost.Connect: handle=0x{HostHandle.ToInt64():X} clsid={_activeXClsid} ocxType={ocx.GetType().FullName ?? "unknown"} size={_pendingWidth}x{_pendingHeight}");
+            $"RdpActiveXHost.Connect: handle=0x{HostHandle.ToInt64():X} clsid={_activeXClsid} ocxType={ocx.GetType().FullName ?? "unknown"} size={_session.Width}x{_session.Height}");
 
         try
         {
@@ -449,7 +445,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         finally
         {
             // Clear plaintext password from managed memory after the connection attempt.
-            _pendingPassword = null;
+            _session.Password = null;
         }
     }
 
@@ -564,7 +560,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
             return null;
         }
 
-        _pendingIsFullscreen = isFullscreen;
+        _session.IsFullscreen = isFullscreen;
 
         try
         {
@@ -737,6 +733,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         try
         {
             IsConnected = false;
+            IsReusable = false;
             StopPostConnectStripTimerOnUiThread($"OnFatalError error={errorCode}");
             try
             {
@@ -1650,13 +1647,13 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         {
             hostContext = BuildHostDisplayContext();
             var effectiveContext = RdpDisplayResolver.Resolve(
-                _pendingResolutionMode,
+                _session.ResolutionMode,
                 hostContext,
-                _pendingResolutionPresets,
-                _pendingWidth,
-                _pendingHeight);
+                _session.ResolutionPresets,
+                _session.Width,
+                _session.Height);
 
-            if (_pendingResolutionMode == RdpResolutionMode.Fixed)
+            if (_session.ResolutionMode == RdpResolutionMode.Fixed)
             {
                 effectiveContext = effectiveContext with
                 {
@@ -1664,14 +1661,14 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
                 };
             }
 
-            _pendingWidth = effectiveContext.Width;
-            _pendingHeight = effectiveContext.Height;
-            _pendingDesktopScaleFactor = effectiveContext.DesktopScaleFactor;
-            _pendingDeviceScaleFactor = effectiveContext.DeviceScaleFactor;
-            _pendingDpiScaleX = hostContext.DesktopDpiScale;
-            _pendingDpiScaleY = hostContext.DesktopDpiScale;
+            _session.Width = effectiveContext.Width;
+            _session.Height = effectiveContext.Height;
+            _session.DesktopScaleFactor = effectiveContext.DesktopScaleFactor;
+            _session.DeviceScaleFactor = effectiveContext.DeviceScaleFactor;
+            _session.DpiScaleX = hostContext.DesktopDpiScale;
+            _session.DpiScaleY = hostContext.DesktopDpiScale;
             InitialSmartSizing = effectiveContext.SmartSizingEnabled;
-            _pendingRedirections.MultiMonitor = effectiveContext.MultiMonitorEnabled;
+            _session.Redirections.MultiMonitor = effectiveContext.MultiMonitorEnabled;
 
             Core.Logging.FileLogger.Info(
                 $"RDP display mode: configured={effectiveContext.ConfiguredMode} effective={effectiveContext.EffectiveMode} {effectiveContext.Width}x{effectiveContext.Height} dpi={effectiveContext.DesktopScaleFactor}/{effectiveContext.DeviceScaleFactor} smartSizing={effectiveContext.SmartSizingEnabled} multimon={effectiveContext.MultiMonitorEnabled} reason={effectiveContext.Reason}");
@@ -1697,7 +1694,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         var viewport = new DrawingSize(ClientSize.Width, ClientSize.Height);
         if (viewport.Width <= 0 || viewport.Height <= 0)
         {
-            viewport = new DrawingSize(_pendingWidth, _pendingHeight);
+            viewport = new DrawingSize(_session.Width, _session.Height);
         }
 
         return new HostDisplayContext
@@ -1706,10 +1703,10 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
             WorkingAreaPhysicalPx = new DrawingSize(workingArea.Width, workingArea.Height),
             DesktopDpiScale = ResolveHostDpiScale(),
             ViewportPhysicalPx = viewport,
-            IsFullscreen = _pendingIsFullscreen,
+            IsFullscreen = _session.IsFullscreen,
             ScreenCount = allScreens.Length,
-            IsMultiMonitorRequested = _pendingResolutionMode == RdpResolutionMode.Multimon
-                || _pendingRedirections.MultiMonitor
+            IsMultiMonitorRequested = _session.ResolutionMode == RdpResolutionMode.Multimon
+                || _session.Redirections.MultiMonitor
         };
     }
 
@@ -1728,7 +1725,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
 
     private Screen[] ResolveDisplayTargetScreens(Screen currentScreen, Screen[] allScreens)
     {
-        if (_pendingResolutionMode != RdpResolutionMode.Multimon)
+        if (_session.ResolutionMode != RdpResolutionMode.Multimon)
         {
             return [currentScreen];
         }
@@ -1754,7 +1751,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
 
     private int[] ResolvePendingSelectedMonitorIndices(int availableMonitorCount)
         => RdpSelectedMonitorValidator.Validate(
-            _pendingSelectedMonitorIndices,
+            _session.SelectedMonitorIndices,
             availableMonitorCount,
             message => Core.Logging.FileLogger.Warn($"[RdpActiveXHost] {message}"));
 
@@ -1783,9 +1780,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
 
     private double ResolveHostDpiScale()
     {
-        if (_pendingDpiScaleX > 0 && !double.IsNaN(_pendingDpiScaleX) && !double.IsInfinity(_pendingDpiScaleX))
+        if (_session.DpiScaleX > 0 && !double.IsNaN(_session.DpiScaleX) && !double.IsInfinity(_session.DpiScaleX))
         {
-            return _pendingDpiScaleX;
+            return _session.DpiScaleX;
         }
 
         try
@@ -1806,12 +1803,12 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     {
         return JsonSerializer.Serialize(new
         {
-            configuredMode = _pendingResolutionMode.ToString(),
-            configuredWidthPx = _pendingWidth,
-            configuredHeightPx = _pendingHeight,
-            isFullscreen = _pendingIsFullscreen,
-            selectedMonitorIndices = _pendingSelectedMonitorIndices,
-            presets = _pendingResolutionPresets
+            configuredMode = _session.ResolutionMode.ToString(),
+            configuredWidthPx = _session.Width,
+            configuredHeightPx = _session.Height,
+            isFullscreen = _session.IsFullscreen,
+            selectedMonitorIndices = _session.SelectedMonitorIndices,
+            presets = _session.ResolutionPresets
                 .Select(preset => new { preset.Width, preset.Height })
                 .ToArray(),
             hostContext = hostContext is null
@@ -1838,40 +1835,40 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
 
     private void ApplyServerSettings(object ocx)
     {
-        if (string.IsNullOrWhiteSpace(_pendingHost)) return;
+        if (string.IsNullOrWhiteSpace(_session.Host)) return;
 
         dynamic ax = ocx;
-        ax.Server = _pendingHost;
-        ax.AdvancedSettings2.RDPPort = _pendingPort;
+        ax.Server = _session.Host;
+        ax.AdvancedSettings2.RDPPort = _session.Port;
     }
 
     private void ApplyCredentialSettings(object ocx)
     {
         dynamic ax = ocx;
 
-        if (!string.IsNullOrWhiteSpace(_pendingUsername))
+        if (!string.IsNullOrWhiteSpace(_session.Username))
         {
-            ax.UserName = _pendingUsername;
+            ax.UserName = _session.Username;
         }
 
-        if (!string.IsNullOrWhiteSpace(_pendingDomain))
+        if (!string.IsNullOrWhiteSpace(_session.Domain))
         {
-            ax.Domain = _pendingDomain;
+            ax.Domain = _session.Domain;
         }
 
         // Password must be set via IMsTscNonScriptable, not via IDispatch
-        if (_pendingPassword is not null)
+        if (_session.Password is not null)
         {
-            SetClearTextPassword(_pendingPassword);
+            SetClearTextPassword(_session.Password);
         }
     }
 
     private void ApplyDisplaySettings(object ocx)
     {
         dynamic ax = ocx;
-        ax.DesktopWidth = _pendingWidth;
-        ax.DesktopHeight = _pendingHeight;
-        ax.ColorDepth = _pendingColorDepth;
+        ax.DesktopWidth = _session.Width;
+        ax.DesktopHeight = _session.Height;
+        ax.ColorDepth = _session.ColorDepth;
 
         ApplySmartSizing(ocx, InitialSmartSizing);
         StripScrollbarStylesRecursive();
@@ -1885,8 +1882,8 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         var deviceSet = false;
         if (extendedReached && extendedSettings is not null)
         {
-            desktopSet = TrySetExtendedSetting(extendedSettings, "DesktopScaleFactor", _pendingDesktopScaleFactor);
-            deviceSet = TrySetExtendedSetting(extendedSettings, "DeviceScaleFactor", _pendingDeviceScaleFactor);
+            desktopSet = TrySetExtendedSetting(extendedSettings, "DesktopScaleFactor", _session.DesktopScaleFactor);
+            deviceSet = TrySetExtendedSetting(extendedSettings, "DeviceScaleFactor", _session.DeviceScaleFactor);
         }
 
         stopwatch.Stop();
@@ -1896,11 +1893,11 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         if (desktopSet && deviceSet)
         {
             Core.Logging.FileLogger.Info(
-                $"RdpActiveXHost.ApplyDisplayScaleSettings Successfully set DesktopScaleFactor={_pendingDesktopScaleFactor} DeviceScaleFactor={_pendingDeviceScaleFactor} extendedSettings={DescribeComObject(extendedSettings)}");
+                $"RdpActiveXHost.ApplyDisplayScaleSettings Successfully set DesktopScaleFactor={_session.DesktopScaleFactor} DeviceScaleFactor={_session.DeviceScaleFactor} extendedSettings={DescribeComObject(extendedSettings)}");
         }
 
         Core.Logging.FileLogger.Info(
-            $"RdpActiveXHost.ApplyDisplayScaleSettings: desktopScaleFactor={_pendingDesktopScaleFactor} deviceScaleFactor={_pendingDeviceScaleFactor} dpi={_pendingDpiScaleX:0.##}x{_pendingDpiScaleY:0.##} extendedSettings={(desktopSet && deviceSet ? "reached" : "fallback")}");
+            $"RdpActiveXHost.ApplyDisplayScaleSettings: desktopScaleFactor={_session.DesktopScaleFactor} deviceScaleFactor={_session.DeviceScaleFactor} dpi={_session.DpiScaleX:0.##}x{_session.DpiScaleY:0.##} extendedSettings={(desktopSet && deviceSet ? "reached" : "fallback")}");
 
         if (!desktopSet || !deviceSet)
         {
@@ -1929,48 +1926,48 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         var adv = ax.AdvancedSettings9;
 
         // Clipboard
-        adv.RedirectClipboard = _pendingRedirections.Clipboard;
+        adv.RedirectClipboard = _session.Redirections.Clipboard;
 
         // Drives
-        adv.RedirectDrives = _pendingRedirections.Drives;
+        adv.RedirectDrives = _session.Redirections.Drives;
 
         // Printers
-        adv.RedirectPrinters = _pendingRedirections.Printers;
+        adv.RedirectPrinters = _session.Redirections.Printers;
 
         // COM ports
-        adv.RedirectPorts = _pendingRedirections.ComPorts;
+        adv.RedirectPorts = _session.Redirections.ComPorts;
 
         // Smart cards
-        adv.RedirectSmartCards = _pendingRedirections.SmartCards;
+        adv.RedirectSmartCards = _session.Redirections.SmartCards;
 
         // Audio mode: 0 = redirect to client, 1 = play at remote, 2 = disable.
-        adv.AudioRedirectionMode = RdpRedirectionOptions.MapAudioModeToRdpValue(_pendingRedirections.AudioMode);
+        adv.AudioRedirectionMode = RdpRedirectionOptions.MapAudioModeToRdpValue(_session.Redirections.AudioMode);
 
         // Audio capture (COM property expects int: 0=disabled, 1=enabled)
-        adv.AudioCaptureRedirectionMode = _pendingRedirections.AudioCapture ? 1 : 0;
+        adv.AudioCaptureRedirectionMode = _session.Redirections.AudioCapture ? 1 : 0;
 
         // NLA - shared resolver keeps the embedded host in parity with the .rdp generator
         RdpAuthenticationSettings auth = RdpAuthenticationResolver.Resolve(
-            _pendingRedirections.Nla,
-            _pendingRedirections.StrictServerAuthentication);
+            _session.Redirections.Nla,
+            _session.Redirections.StrictServerAuthentication);
         adv.EnableCredSspSupport = auth.EnableCredSspSupport;
         adv.AuthenticationLevel = auth.AuthenticationLevel;
 
         // Bitmap caching
-        adv.BitmapPersistence = _pendingRedirections.BitmapCaching ? 1 : 0;
+        adv.BitmapPersistence = _session.Redirections.BitmapCaching ? 1 : 0;
 
         // Compression
-        adv.Compress = _pendingRedirections.Compression ? 1 : 0;
+        adv.Compress = _session.Redirections.Compression ? 1 : 0;
 
         // Auto-reconnect with bounded retry count
-        adv.EnableAutoReconnect = _pendingRedirections.AutoReconnect;
-        if (_pendingRedirections.AutoReconnect)
+        adv.EnableAutoReconnect = _session.Redirections.AutoReconnect;
+        if (_session.Redirections.AutoReconnect)
         {
-            TrySetDynamic("MaxReconnectAttempts", () => adv.MaxReconnectAttempts = _maxAutoReconnectAttempts);
+            TrySetDynamic("MaxReconnectAttempts", () => adv.MaxReconnectAttempts = _session.MaxAutoReconnectAttempts);
         }
 
         // USB / PnP device redirection
-        if (_pendingRedirections.Usb)
+        if (_session.Redirections.Usb)
         {
             TrySetDynamic("RedirectDevices", () => adv.RedirectDevices = true);
         }
@@ -1988,25 +1985,25 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         TrySetDynamic("allowBackgroundInput", () => adv.allowBackgroundInput = 1);
 
         // TCP keep-alive interval for network break detection
-        TrySetDynamic("KeepAliveInterval", () => adv.KeepAliveInterval = _keepAliveIntervalMs);
+        TrySetDynamic("KeepAliveInterval", () => adv.KeepAliveInterval = _session.KeepAliveIntervalMs);
 
-        // Performance flags (disable visual effects for bandwidth optimization)
-        if (_pendingRedirections.PerformanceFlags > 0)
-        {
-            TrySetDynamic("PerformanceFlags", () => adv.PerformanceFlags = _pendingRedirections.PerformanceFlags);
-        }
+        // Performance flags (disable visual effects for bandwidth optimization).
+        // Written unconditionally, including when the profile asks for none: a value
+        // that is only ever written when non-zero is a value a reused control inherits
+        // from whichever session set it last.
+        TrySetDynamic("PerformanceFlags", () => adv.PerformanceFlags = _session.Redirections.PerformanceFlags);
 
         // Network auto-detect: let the server continuously adapt encoding to bandwidth.
         // Skipped when DisableUdp is set (that path forces LAN profile instead).
-        if (!_pendingRedirections.DisableUdp)
+        if (!_session.Redirections.DisableUdp)
         {
             TrySetDynamic("BandwidthDetection", () => adv.BandwidthDetection = true);
             TrySetDynamic("NetworkConnectionType", () => adv.NetworkConnectionType = 7); // CONNECTION_TYPE_AUTODETECT
         }
 
         // Multi-monitor is a pre-Connect nonscriptable setting. Runtime changes require reconnect.
-        TrySetUseMultimon(ocx, _pendingRedirections.MultiMonitor);
-        if (_pendingRedirections.MultiMonitor && _pendingResolutionMode == RdpResolutionMode.Multimon)
+        TrySetUseMultimon(ocx, _session.Redirections.MultiMonitor);
+        if (_session.Redirections.MultiMonitor && _session.ResolutionMode == RdpResolutionMode.Multimon)
         {
             var selectedMonitorIndices = ResolvePendingSelectedMonitorIndices();
             TrySetSelectedMonitors(ocx, selectedMonitorIndices);
@@ -2017,7 +2014,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
         // The MsTscAx ActiveX control has no direct "DisableUDP" COM property;
         // disabling BandwidthDetection + explicit NetworkConnectionType achieves the
         // same result by preventing the UDP probe that times out behind firewalls.
-        if (_pendingRedirections.DisableUdp)
+        if (_session.Redirections.DisableUdp)
         {
             TrySetDynamic("DisableUdp BandwidthDetection", () => adv.BandwidthDetection = false);
             TrySetDynamic("DisableUdp NetworkConnectionType", () => adv.NetworkConnectionType = 6); // LAN — no probing needed
@@ -2028,7 +2025,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
 
     private void ApplyGatewaySettings(object ocx)
     {
-        string? gateway = _pendingRedirections.GatewayHostname;
+        string? gateway = _session.Redirections.GatewayHostname;
         if (string.IsNullOrWhiteSpace(gateway))
         {
             // No gateway configured — leave MsTscAx at its default (direct).
@@ -2060,6 +2057,84 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     #endregion
 
     #region Cleanup
+
+    /// <summary>
+    /// Returns this control to the state a freshly created one would be in, so it can serve
+    /// another session, and reports whether that succeeded.
+    /// </summary>
+    /// <returns>
+    /// True when the control is safe to hand to another session. False when it is not, in
+    /// which case the caller must dispose it instead of reusing it.
+    /// </returns>
+    /// <remarks>
+    /// Creating a control that ever connects costs a measured 66 kernel handles that are
+    /// never returned, against roughly 3 for reusing one, which is why this exists. The
+    /// price of reuse is that every trace of the previous session has to go: its
+    /// credential, its settings, and its event subscribers, which would otherwise keep
+    /// receiving events belonging to a session they know nothing about.
+    /// </remarks>
+    public bool ResetForReuse()
+    {
+        if (_disposed || !IsReusable)
+        {
+            return false;
+        }
+
+        try
+        {
+            StopPostConnectStripTimerOnUiThread("ResetForReuse");
+            DetachEventSink();
+            ClearEventSubscribers();
+            ClearRemoteCredential();
+
+            _session.Reset();
+            CancelAutoReconnect = false;
+            IsConnected = false;
+            LastError = null;
+            LastExtendedDisconnectReason = NoExtendedDisconnectReason;
+
+            Core.Logging.FileLogger.Info("RdpActiveXHost.ResetForReuse: control returned to a reusable state");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            IsReusable = false;
+            Core.Logging.FileLogger.Warn(
+                $"RdpActiveXHost.ResetForReuse failed, control will not be reused: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Drops every subscriber. A view that has been torn down must not keep receiving the
+    /// events of the session that follows it on the same control.
+    /// </summary>
+    private void ClearEventSubscribers()
+    {
+        Connected = null;
+        Disconnected = null;
+        FatalError = null;
+        LoginComplete = null;
+        AutoReconnecting = null;
+        AutoReconnected = null;
+    }
+
+    /// <summary>
+    /// Overwrites the password held by the control itself. Resetting the pending state is
+    /// not enough: the secret was pushed across to the OCX and stays there until replaced.
+    /// </summary>
+    private void ClearRemoteCredential()
+    {
+        try
+        {
+            _ = SetClearTextPassword(string.Empty);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"RdpActiveXHost.ClearRemoteCredential failed: {ex.Message}");
+        }
+    }
 
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
