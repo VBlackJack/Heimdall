@@ -49,6 +49,13 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     private readonly ITunnelService _tunnelService;
     private readonly ISessionLogService _sessionLogService;
     private readonly ISessionEventLog _sessionEventLog;
+
+    /// <summary>
+    /// One pool for the life of the application, so a session that follows another can
+    /// inherit its RDP control. Creating a control that ever connects costs a measured 66
+    /// kernel handles the operating system never returns; reusing one costs about 3.
+    /// </summary>
+    private readonly PooledRdpHostProvider _rdpHostProvider = new();
     private readonly ISessionOperationLog _sessionOperationLog;
     private readonly ConfigManager _configManager;
 
@@ -159,6 +166,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         {
             var view = new EmbeddedRdpView
             {
+                HostProvider = _rdpHostProvider,
                 SessionEventLog = _sessionEventLog,
                 // Read the LIVE global toggle at the seam (ConfigManager.CurrentSettings is replaced
                 // on Save/Merge/Load), so enabling session logging takes effect without a restart.

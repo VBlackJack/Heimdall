@@ -38,7 +38,7 @@ namespace Heimdall.Rdp.ActiveX;
 /// <see cref="AxHost.CreateSink"/> override — this causes hangs in non-STA
 /// contexts (e.g., unit tests). Call it explicitly after the handle is created.
 /// </summary>
-public sealed class RdpActiveXHost : AxHost, IRdpSession
+public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
 {
     // MsTscAx ActiveX control CLSID — Terminal Services Client 8.0+
     public const string DefaultMsTscAxClsid = "7cacbd7b-0d99-468f-ac33-22e495c0afe5";
@@ -60,6 +60,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
 
     /// <summary>TCP keep-alive interval in milliseconds (60 seconds).</summary>
     public const int DefaultKeepAliveIntervalMs = RdpSessionState.DefaultKeepAliveIntervalMs;
+
+    /// <summary>Smart sizing applied to a control that has not been told otherwise.</summary>
+    public const bool DefaultInitialSmartSizing = true;
 
     private const int MinKeepAliveIntervalMs = 5_000;
     private const int MaxKeepAliveIntervalMs = 300_000;
@@ -190,7 +193,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
     /// </summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     [System.ComponentModel.Browsable(false)]
-    public bool InitialSmartSizing { get; set; } = true;
+    public bool InitialSmartSizing { get; set; } = DefaultInitialSmartSizing;
 
     public int LastExtendedDisconnectReason { get; private set; } = NoExtendedDisconnectReason;
 
@@ -2088,6 +2091,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession
             ClearRemoteCredential();
 
             _session.Reset();
+            InitialSmartSizing = DefaultInitialSmartSizing;
             CancelAutoReconnect = false;
             IsConnected = false;
             LastError = null;

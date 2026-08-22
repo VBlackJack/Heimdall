@@ -174,6 +174,13 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     public ISessionEventLog? SessionEventLog { get; set; }
 
     /// <summary>
+    /// Where this view gets its RDP control and gives it back. Defaults to creating one per
+    /// session, which is what happened before pooling existed, so a view constructed without
+    /// a provider behaves exactly as it used to.
+    /// </summary>
+    public IRdpHostProvider HostProvider { get; set; } = new TransientRdpHostProvider();
+
+    /// <summary>
     /// Provider for the LIVE global session-logging toggle, read at each emit so the setting takes
     /// effect without a restart. Supplied by <c>EmbeddedSessionManager</c> over
     /// <c>ConfigManager.CurrentSettings</c>; the view never snapshots it.
@@ -582,8 +589,14 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
     void IRdpDisconnectTeardownTarget.DisposeHost()
     {
-        _rdpHost?.Dispose();
+        // Handed back rather than destroyed. The field is cleared first, so nothing here can
+        // reach a control that now belongs to the provider, or to another session.
+        RdpActiveXHost? host = _rdpHost;
         _rdpHost = null;
+        if (host is not null)
+        {
+            HostProvider.Release(host);
+        }
     }
 
     internal IntPtr GetRdpKeyboardInputHandle()
@@ -2190,11 +2203,12 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
     private void CreateHostControl()
     {
-        _rdpHost = new RdpActiveXHost
-        {
-            Dock = WinForms.DockStyle.Fill,
-            InitialSmartSizing = ResolveInitialSmartSizing(_server)
-        };
+        // Acquired rather than constructed: a control that has ever connected costs a
+        // measured 66 kernel handles that are never returned, so one is reused when the
+        // provider has a spare.
+        _rdpHost = HostProvider.Acquire();
+        _rdpHost.Dock = WinForms.DockStyle.Fill;
+        _rdpHost.InitialSmartSizing = ResolveInitialSmartSizing(_server);
 
         _rdpHost.Connected += OnRdpConnected;
         _rdpHost.Disconnected += OnRdpDisconnected;
