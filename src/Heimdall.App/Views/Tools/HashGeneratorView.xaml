@@ -127,7 +127,7 @@
                                 DockPanel.Dock="Right"
                                 TabIndex="1"
                                 Click="OnBrowseFileClick"
-                                IsEnabled="{Binding IsFileHashing, Converter={StaticResource InvertBoolConverter}}"
+                                IsEnabled="{Binding CanAcceptFile}"
                                 Style="{DynamicResource SecondaryButtonStyle}"
                                 Padding="{StaticResource PaddingButtonPrimary}"
                                 Margin="{StaticResource MarginInlineControl}"

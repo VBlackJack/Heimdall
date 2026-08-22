@@ -25,6 +25,61 @@ namespace Heimdall.App.Tests;
 
 public sealed class HashGeneratorViewModelTests
 {
+    /// <summary>
+    /// The browse button, the drop-zone border and the drag cursor all announce one thing:
+    /// whether the tool will take a file. They must never disagree, whatever the state.
+    /// </summary>
+    /// <remarks>
+    /// The button used to be gated on IsFileHashing alone while the two drag surfaces went
+    /// through the command's predicate, which also refuses once disposed. Two predicates for
+    /// one decision, with nothing holding them together.
+    /// </remarks>
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void CanAcceptFile_AndTheCommandPredicate_AgreeForAValidPath(
+        bool hashing,
+        bool expected)
+    {
+        var vm = new HashGeneratorViewModel(new FakeHashGeneratorService())
+        {
+            IsFileHashing = hashing
+        };
+
+        Assert.Equal(expected, vm.CanAcceptFile);
+        Assert.Equal(vm.CanAcceptFile, vm.HashFileCommand.CanExecute("C:/some/file.bin"));
+    }
+
+    /// <summary>
+    /// Disposal is the state the button used to miss entirely: it stayed enabled while both
+    /// drag surfaces refused.
+    /// </summary>
+    [Fact]
+    public void CanAcceptFile_AfterDispose_AgreesWithTheCommandPredicate()
+    {
+        var vm = new HashGeneratorViewModel(new FakeHashGeneratorService());
+        Assert.True(vm.CanAcceptFile);
+
+        vm.Dispose();
+
+        Assert.False(vm.CanAcceptFile);
+        Assert.Equal(vm.CanAcceptFile, vm.HashFileCommand.CanExecute("C:/some/file.bin"));
+    }
+
+    /// <summary>
+    /// A path is still required, so the shared predicate must not make the command accept
+    /// an empty one.
+    /// </summary>
+    [Fact]
+    public void CommandPredicate_StillRequiresAPath_WhenTheToolWouldAcceptAFile()
+    {
+        var vm = new HashGeneratorViewModel(new FakeHashGeneratorService());
+
+        Assert.True(vm.CanAcceptFile);
+        Assert.False(vm.HashFileCommand.CanExecute(null));
+        Assert.False(vm.HashFileCommand.CanExecute("   "));
+    }
+
     [Fact]
     public async Task Initialize_PopulatesSixRowsInCanonicalOrder()
     {

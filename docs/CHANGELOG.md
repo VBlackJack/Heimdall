@@ -12,6 +12,44 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-22: opening and closing Remote Desktop sessions no longer costs the machine
+
+- **Every Remote Desktop session used to leave something behind.** Opening one and closing it
+  consumed around 60 system handles that Windows never got back, whether the session connected or
+  failed. A day of ordinary use, which is precisely opening and closing sessions, accumulated
+  thousands of them. Nothing in Task Manager showed it, which is why it went unnoticed for so long.
+- **Heimdall now reuses the Remote Desktop control instead of building a new one each time.** The
+  cost belongs to creating the control, not to connecting, so reusing one removes it entirely.
+  Measured over the same cycles as before: the handle count no longer grows at all.
+- **The control is scrubbed between sessions.** Its stored password is overwritten, its settings
+  return to their defaults, and a control that has met a fatal error is destroyed rather than
+  handed on. A session never inherits anything from the one before it.
+- **This is not the memory figure.** The resources involved do not show up as memory, so this
+  change is unlikely to move the number reported in the Windows task manager. It is a separate
+  defect, found while investigating that one.
+
+## 2026-08-22: two new pages, and a setting that was telling you the wrong thing
+
+- **A settings FAQ** covers the options that are not self-explanatory, including the two locks that
+  are easy to confuse: the application PIN is a screen lock and encrypts nothing, while the master
+  password derives a key that encrypts your stored credentials. Setting the first while meaning the
+  second gives much less protection than it appears to.
+- **A page on Remote Desktop memory** gives what a session actually costs, measured, and which
+  settings change that number. Most of them do not.
+- **Bitmap caching does not do what its name suggests**, and both pages now say so. It controls
+  whether the cache is kept on disk between sessions; it does not control the cache in memory, and
+  turning it off frees nothing while costing you the redraws it would have saved.
+
+## 2026-08-22: a prefilled Base64 tool could run twice at once
+
+- **Opening the Base64 tool with text already in it started an encode that ignored the rule the
+  buttons follow.** It could begin while another run was in progress, and let a button begin
+  another over it. The tool now refuses in both directions, as it already did between two clicks.
+- **The file drop zone in the hash generator now agrees with itself.** The browse button, the drop
+  border and the drag cursor answer one question, whether the tool will take a file, and they used
+  to answer it from two different places. After the tool was closed they disagreed outright: the
+  button stayed enabled over a zone that refused everything.
+
 ## 2026-08-21: a cancelled reconnection that succeeded anyway now says so
 
 - **Cancelling stops the retries that have not started yet.** An attempt already under way inside the

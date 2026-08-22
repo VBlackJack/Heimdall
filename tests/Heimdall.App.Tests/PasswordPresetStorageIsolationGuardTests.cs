@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Heimdall.App.Tests;
@@ -38,30 +39,59 @@ namespace Heimdall.App.Tests;
 /// </remarks>
 public sealed class PasswordPresetStorageIsolationGuardTests
 {
-    private const string TestProjectRelativePath = "tests/Heimdall.App.Tests";
+    private const string TestRootRelativePath = "tests";
+
+    /// <summary>
+    /// Test projects the sweep must reach. Named rather than merely counted, so that renaming
+    /// or moving one is a failure here instead of a silent loss of coverage.
+    /// </summary>
+    private static readonly string[] ExpectedTestProjects =
+    [
+        "Heimdall.App.Tests",
+        "Heimdall.App.UiTests"
+    ];
 
     /// <summary>
     /// Parameterless construction of either type, in any of the forms C# accepts: <c>new T()</c>,
     /// and the target-typed <c>T x = new();</c> that the fixed call site itself uses.
     /// </summary>
+    private const char LineFeed = '\n';
+
     private static readonly Regex UnboundConstruction = new(
         @"new\s+(?:PasswordGeneratorViewModel|PasswordPresetStorage)\s*\(\s*\)"
-        + @"|(?:PasswordGeneratorViewModel|PasswordPresetStorage)\s+\w+\s*=\s*new\s*\(\s*\)",
+        + @"|(?:PasswordGeneratorViewModel|PasswordPresetStorage)\s+\w+\s*=\s*new\s*\(\s*\)"
+        // An argument is not on its own proof of isolation: one derived from the production
+        // resolver points at the operator's own directory, which is the very thing refused.
+        + @"|new\s+(?:PasswordGeneratorViewModel|PasswordPresetStorage)\s*\([^)]*ApplicationDataPathResolver[^)]*\)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     [Fact]
     public void NoTestBuildsPresetStorageWithoutAnInjectedPath()
     {
         string repoRoot = FindRepoRoot();
-        string testRoot = Path.Combine(repoRoot, TestProjectRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        string testRoot = Path.Combine(repoRoot, TestRootRelativePath);
 
-        Assert.True(Directory.Exists(testRoot), $"Test project directory not found: {testRoot}");
+        Assert.True(Directory.Exists(testRoot), $"Test root directory not found: {testRoot}");
 
-        string[] sources = Directory.GetFiles(testRoot, "*.cs", SearchOption.AllDirectories);
+        string[] sources = Directory.GetFiles(testRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .ToArray();
 
         // A guard that scans nothing passes for the wrong reason, so the sweep asserts it found
         // the corpus it is supposed to police.
         Assert.NotEmpty(sources);
+
+        // And that it reached every project that can reach these types. Scoping this sweep to a
+        // single assembly is what let a second one construct them unwatched: Heimdall.App.UiTests
+        // references Heimdall.App too.
+        foreach (string project in ExpectedTestProjects)
+        {
+            string marker = $"{Path.DirectorySeparatorChar}{project}{Path.DirectorySeparatorChar}";
+            Assert.Contains(
+                sources,
+                path => path.Contains(marker, StringComparison.Ordinal));
+        }
 
         List<string> violations = [];
         foreach (string source in sources.OrderBy(path => path, StringComparer.Ordinal))
@@ -72,15 +102,16 @@ public sealed class PasswordPresetStorageIsolationGuardTests
                 continue;
             }
 
-            string[] lines = File.ReadAllLines(source);
-            for (int index = 0; index < lines.Length; index++)
+            // Scanned as one string rather than line by line, so a construction split across
+            // lines cannot slip through the gap between two reads.
+            string text = File.ReadAllText(source);
+            foreach (Match match in UnboundConstruction.Matches(text))
             {
-                if (UnboundConstruction.IsMatch(lines[index]))
-                {
-                    string relativePath = Path.GetRelativePath(repoRoot, source)
-                        .Replace(Path.DirectorySeparatorChar, '/');
-                    violations.Add($"  {relativePath}:{index + 1} - {lines[index].Trim()}");
-                }
+                string relativePath = Path.GetRelativePath(repoRoot, source)
+                    .Replace(Path.DirectorySeparatorChar, '/');
+                int line = text.Take(match.Index).Count(character => character == LineFeed) + 1;
+                string quoted = match.Value.ReplaceLineEndings(" ").Trim();
+                violations.Add($"  {relativePath}:{line} - {quoted}");
             }
         }
 
@@ -108,6 +139,16 @@ public sealed class PasswordPresetStorageIsolationGuardTests
         Assert.DoesNotMatch(UnboundConstruction, "new PasswordGeneratorViewModel(new PasswordPresetStorage(path))");
         Assert.DoesNotMatch(UnboundConstruction, "PasswordGeneratorViewModel sut = new(storage);");
         Assert.DoesNotMatch(UnboundConstruction, "new PasswordPresetStorage(_presetsDirectoryPath)");
+
+        // Split across lines, which the previous line-by-line sweep could not see.
+        Assert.Matches(
+            UnboundConstruction,
+            "var store = new PasswordPresetStorage(" + Environment.NewLine + "            );");
+
+        // An argument that resolves the production location is not isolation.
+        Assert.Matches(
+            UnboundConstruction,
+            "new PasswordPresetStorage(ApplicationDataPathResolver.Resolve())");
     }
 
     private static string ThisFileName => Path.GetFileName(
