@@ -185,6 +185,82 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
     }
 
     /// <summary>
+    /// The editor's own Close button, during a save, must say the same thing the tab, the split
+    /// pane and the floating window already say - and must stop raising a question it will ignore.
+    /// </summary>
+    /// <remarks>
+    /// Built out of production parts end to end, because the defect lives exactly at the junction
+    /// between the overlay and the pane's guard: a guard tested alone and an overlay tested alone
+    /// both stay green while nothing connects them.
+    /// </remarks>
+    [Fact]
+    public async Task MountedSftpPane_CloseDuringInlineSave_SpeaksTheGuardsRefusalInsteadOfAsking()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(async () =>
+        {
+            BlockingUploadRemoteBrowser browser = new();
+            LocalizationManager localizer = await CreateEnglishLocalizer();
+            IDialogService dialog = DispatchProxy.Create<IDialogService, RecordingDialogProxy>();
+            RecordingDialogProxy recording = (RecordingDialogProxy)dialog;
+            (EmbeddedSftpView owner, _) = CreateInitializedOwner(browser, localizer, dialog);
+            try
+            {
+                await InvokeEditFile(owner, CreateRemoteFile(7));
+
+                EmbeddedEditorView firstEditor = Assert.IsType<EmbeddedEditorView>(
+                    GetActiveInlineEditor(owner));
+                EmbeddedEditorViewModel firstEditorViewModel =
+                    Assert.IsType<EmbeddedEditorViewModel>(firstEditor.DataContext);
+
+                // The overlay resolves its own dialog service when it loads, and it never loads
+                // here because the control is not in a visual tree. Injected directly so a raised
+                // confirmation is recorded rather than dropped on a null service.
+                SetEditorDialogService(firstEditorViewModel, dialog);
+
+                // The common case, and the one that used to lie: text typed, then saved. IsModified
+                // is cleared only after a successful persist, so it is still true during the save.
+                firstEditorViewModel.NotifyTextChanged();
+                Assert.True(firstEditorViewModel.IsModified);
+
+                Task<bool> firstSave = firstEditorViewModel.SaveAsync("first update");
+                await browser.UploadStarted.Task;
+
+                await firstEditorViewModel.RequestClose();
+
+                // The oracle. Asking is the defect, not merely a cosmetic detail: the user answered
+                // this question and the answer was thrown away.
+                Assert.Empty(recording.ConfirmCalls);
+
+                // Derived from the keys, never from a literal, so rewording either catalogue entry
+                // cannot break this test - only failing to speak can.
+                (string Title, string Message) spoken = Assert.Single(recording.InfoCalls);
+                Assert.Equal(localizer[CloseGuardLocaleKeys.BlockedTitle], spoken.Title);
+                Assert.Equal(
+                    localizer.Format(
+                        SftpCloseGuardLocaleKeys.EditorSaveBlocked,
+                        GetClosePaneLabel(owner)),
+                    spoken.Message);
+                Assert.Same(firstEditor, GetActiveInlineEditor(owner));
+
+                // State-driven, not a permanent lock: once the save lands, the same gesture closes.
+                string activeTempPath = GetActiveInlineEditorTempPath(owner);
+                browser.ReleaseUpload();
+                Assert.True(await firstSave);
+
+                await firstEditorViewModel.RequestClose();
+
+                Assert.Null(GetActiveInlineEditor(owner));
+                Assert.Single(recording.InfoCalls);
+                Assert.False(Directory.Exists(activeTempPath));
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }).Task.Unwrap();
+    }
+
+    /// <summary>
     /// The junction the guard exists for: the object a close path actually hands to the arbiter is
     /// the pane's <c>HostControl</c>, so the guard is only reachable if THAT object implements
     /// <see cref="ICloseGuard"/>.
@@ -267,6 +343,31 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
         return Assert.IsType<CancellationTokenSource>(field.GetValue(owner));
     }
 
+    /// <summary>The pane label the view interpolates into a close-guard message.</summary>
+    private static string GetClosePaneLabel(EmbeddedSftpView owner)
+    {
+        MethodInfo? method = typeof(EmbeddedSftpView).GetMethod(
+            "DescribeClosePane",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return Assert.IsType<string>(method.Invoke(owner, null));
+    }
+
+    /// <summary>
+    /// Injects a dialog service into the mounted editor's view model, which normally resolves one
+    /// from DI when the control loads - and never loads outside a visual tree.
+    /// </summary>
+    private static void SetEditorDialogService(
+        EmbeddedEditorViewModel viewModel,
+        IDialogService dialogService)
+    {
+        MethodInfo? method = typeof(EmbeddedEditorViewModel).GetMethod(
+            "SetDialogService",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(viewModel, [dialogService]);
+    }
+
     private static string GetActiveInlineEditorTempPath(EmbeddedSftpView owner)
     {
         FieldInfo? field = typeof(EmbeddedSftpView).GetField(
@@ -287,7 +388,8 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
 
     private static (EmbeddedSftpView Owner, SessionPaneModel Pane) CreateInitializedOwner(
         IRemoteBrowser browser,
-        LocalizationManager? localizer = null)
+        LocalizationManager? localizer = null,
+        IDialogService? dialogService = null)
     {
         ConstructorInfo? constructor = typeof(EmbeddedSftpView).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
@@ -316,7 +418,7 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             "Test SFTP",
             "test.example:22",
             localizer ?? new LocalizationManager(),
-            DispatchProxy.Create<IDialogService, NullDialogProxy>(),
+            dialogService ?? DispatchProxy.Create<IDialogService, NullDialogProxy>(),
             new HostKeyStore());
         return (owner, pane);
     }
@@ -381,6 +483,40 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
         public bool CheckAccess()
         {
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Records what the pane said and consents to everything it was asked.
+    /// </summary>
+    /// <remarks>
+    /// Consenting is what makes the refusal observable. <see cref="NullDialogProxy"/> answers
+    /// <see langword="false"/> to every confirmation, so with it an editor that stayed open cannot
+    /// be told apart from one that asked and was declined - the assertion passes for the wrong
+    /// reason and survives every mutant. Here a raised question would be answered yes and the close
+    /// would go through, so a silent editor is the only way the test can end mounted.
+    /// </remarks>
+    private class RecordingDialogProxy : DispatchProxy
+    {
+        public List<(string Title, string Message)> InfoCalls { get; } = [];
+
+        public List<(string Title, string Message)> ConfirmCalls { get; } = [];
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IDialogService.ShowInfo))
+            {
+                InfoCalls.Add(((string)args![0]!, (string)args![1]!));
+                return null;
+            }
+
+            if (targetMethod?.Name == nameof(IDialogService.ShowConfirmAsync))
+            {
+                ConfirmCalls.Add(((string)args![0]!, (string)args![1]!));
+                return Task.FromResult(true);
+            }
+
+            throw new NotSupportedException(targetMethod?.Name);
         }
     }
 

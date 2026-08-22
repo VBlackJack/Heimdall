@@ -15,7 +15,9 @@
  */
 
 using System.IO;
+using System.Reflection;
 using System.Text;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 
 namespace Heimdall.App.Tests;
@@ -212,6 +214,71 @@ public sealed class EmbeddedEditorViewModelTests
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task RequestClose_HostRefuses_SkipsTheUnsavedPromptAndStaysOpen()
+    {
+        var dialog = DispatchProxy.Create<IDialogService, ConsentingDialogProxy>();
+        EmbeddedEditorViewModel viewModel = new();
+        viewModel.LoadContent("remote.txt");
+        viewModel.NotifyTextChanged();
+        viewModel.SetDialogService(dialog);
+        viewModel.CloseRefusedByHost = () => true;
+
+        bool closeRaised = false;
+        viewModel.CloseRequested += () => closeRaised = true;
+
+        await viewModel.RequestClose();
+
+        // IsModified stays true for the whole duration of a save, so without the veto running first
+        // the user is asked "close and discard?", answers yes, and the host throws that answer away.
+        // Asking a question whose answer will be ignored is worse than saying nothing.
+        Assert.Equal(0, ((ConsentingDialogProxy)(object)dialog).ConfirmCallCount);
+        Assert.False(closeRaised);
+        Assert.True(viewModel.IsModified);
+    }
+
+    [Fact]
+    public async Task RequestClose_HostAllows_StillPromptsWhenModified()
+    {
+        var dialog = DispatchProxy.Create<IDialogService, ConsentingDialogProxy>();
+        EmbeddedEditorViewModel viewModel = new();
+        viewModel.LoadContent("remote.txt");
+        viewModel.NotifyTextChanged();
+        viewModel.SetDialogService(dialog);
+        viewModel.CloseRefusedByHost = () => false;
+
+        bool closeRaised = false;
+        viewModel.CloseRequested += () => closeRaised = true;
+
+        await viewModel.RequestClose();
+
+        // The host hook is a veto, never a bypass: a permissive host must leave the unsaved-changes
+        // question exactly where it was, which is what the standalone local-file editor relies on.
+        Assert.Equal(1, ((ConsentingDialogProxy)(object)dialog).ConfirmCallCount);
+        Assert.True(closeRaised);
+    }
+
+    /// <summary>
+    /// Counts confirmations and answers yes to all of them. Consenting is what makes the pair of
+    /// tests above discriminating: a double that declines would keep the editor open for the wrong
+    /// reason and stay green whether or not the veto ran.
+    /// </summary>
+    private class ConsentingDialogProxy : DispatchProxy
+    {
+        public int ConfirmCallCount { get; private set; }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IDialogService.ShowConfirmAsync))
+            {
+                ConfirmCallCount++;
+                return Task.FromResult(true);
+            }
+
+            throw new NotSupportedException(targetMethod?.Name);
         }
     }
 }

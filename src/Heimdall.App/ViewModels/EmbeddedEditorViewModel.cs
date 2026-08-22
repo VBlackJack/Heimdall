@@ -103,6 +103,17 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     public event Action? CloseRequested;
 
     /// <summary>
+    /// Lets the host that mounted this editor veto a close before anything is asked of the user.
+    /// Returns <see langword="true"/> to refuse. Unset means no host veto, which is what a
+    /// standalone local-file editor needs.
+    /// </summary>
+    /// <remarks>
+    /// A veto, never a bypass: when it declines, the unsaved-changes prompt still runs exactly as
+    /// before. The host is expected to have told the user why it refused - this side only stops.
+    /// </remarks>
+    internal Func<bool>? CloseRefusedByHost { get; set; }
+
+    /// <summary>
     /// Updates the dialog service after construction when the view resolves it lazily from DI.
     /// </summary>
     /// <param name="dialogService">The dialog service to use for prompts and notifications.</param>
@@ -233,8 +244,19 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     /// <summary>
     /// Requests to close the editor, prompting for confirmation when unsaved changes exist.
     /// </summary>
+    /// <remarks>
+    /// The host veto is consulted FIRST, above the unsaved-changes prompt, and the order carries
+    /// the whole point. <see cref="IsModified"/> stays true for the entire duration of a save - it
+    /// is cleared only once the write has been persisted - so asking first would put a question to
+    /// the user that a refusing host is then going to ignore, which is worse than saying nothing.
+    /// </remarks>
     public async Task RequestClose()
     {
+        if (CloseRefusedByHost?.Invoke() == true)
+        {
+            return;
+        }
+
         if (IsModified)
         {
             if (_dialogService is null)

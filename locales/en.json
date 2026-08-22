@@ -890,7 +890,7 @@
   "SftpCloseGuardTitle": "Transfer In Progress",
   "SftpCloseGuardTransferMessage": "A file transfer is running on \"{0}\". Closing now cancels it. Close anyway?",
   "SftpCloseGuardTransferBlocked": "The transfer on \"{0}\" is still running.",
-  "SftpCloseGuardEditorSaveBlocked": "A file is still being saved on \"{0}\". Wait for the save to finish.",
+  "SftpCloseGuardEditorSaveBlocked": "The save on \"{0}\" is still running.",
   "SftpCloseGuardEditorDirtyMessage": "The editor on \"{0}\" has unsaved changes. Close and discard them?",
   "SftpStatusConnected": "Connected",
   "SftpStatusDisconnected": "Disconnected",

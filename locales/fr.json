@@ -890,7 +890,7 @@
   "SftpCloseGuardTitle": "Transfert en cours",
   "SftpCloseGuardTransferMessage": "Un transfert de fichier est en cours sur \u00ab {0} \u00bb. Fermer maintenant l'annulera. Fermer quand m\u00eame ?",
   "SftpCloseGuardTransferBlocked": "Le transfert sur \u00ab {0} \u00bb est toujours en cours.",
-  "SftpCloseGuardEditorSaveBlocked": "Un fichier est encore en cours d'enregistrement sur \u00ab {0} \u00bb. Attendez la fin de l'enregistrement.",
+  "SftpCloseGuardEditorSaveBlocked": "L'enregistrement sur \u00ab {0} \u00bb est toujours en cours.",
   "SftpCloseGuardEditorDirtyMessage": "L'\u00e9diteur sur \u00ab {0} \u00bb contient des modifications non enregistr\u00e9es. Fermer et les abandonner ?",
   "SftpStatusConnected": "Connect\u00e9",
   "SftpStatusDisconnected": "D\u00e9connect\u00e9",
