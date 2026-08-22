@@ -534,6 +534,13 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IUpdateInstallerHost, SystemUpdateInstallerHost>();
         services.AddSingleton<IUpdateInstaller, UpdateInstaller>();
         services.AddSingleton<IApplicationLifecycle, ApplicationLifecycle>();
+
+        // Lives in the application's own data directory, not beside the installed
+        // binaries: the installer replaces the install directory, so a record kept there
+        // would not reliably survive the event it exists to describe.
+        services.AddSingleton<IUpdateOutcomeStore>(_ => new UpdateOutcomeStore(
+            ApplicationDataPathResolver.GetUpdatesDirectory(
+                _dataRoot ?? ApplicationDataPathResolver.Resolve())));
         services.AddSingleton<IUpdateInstallFlow, UpdateInstallFlow>();
         services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
         services.AddSingleton<IConnectionService, ConnectionService>();

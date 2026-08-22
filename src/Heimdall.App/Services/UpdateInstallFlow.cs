@@ -29,18 +29,22 @@ internal sealed class UpdateInstallFlow : IUpdateInstallFlow
     private readonly IUpdateService _updateService;
     private readonly IUpdateInstaller _updateInstaller;
     private readonly IApplicationLifecycle _lifecycle;
+    private readonly IUpdateOutcomeStore _outcomeStore;
 
     public UpdateInstallFlow(
         IUpdateService updateService,
         IUpdateInstaller updateInstaller,
-        IApplicationLifecycle lifecycle)
+        IApplicationLifecycle lifecycle,
+        IUpdateOutcomeStore outcomeStore)
     {
         ArgumentNullException.ThrowIfNull(updateService);
         ArgumentNullException.ThrowIfNull(updateInstaller);
         ArgumentNullException.ThrowIfNull(lifecycle);
+        ArgumentNullException.ThrowIfNull(outcomeStore);
         _updateService = updateService;
         _updateInstaller = updateInstaller;
         _lifecycle = lifecycle;
+        _outcomeStore = outcomeStore;
     }
 
     public async Task<UpdateInstallOutcome> RunAsync(
@@ -54,6 +58,13 @@ internal sealed class UpdateInstallFlow : IUpdateInstallFlow
         {
             using IVerifiedUpdatePackage package = await _updateService
                 .DownloadVerifiedAsync(update, progress, cancellationToken);
+
+            // Written BEFORE the relauncher is launched, not after, and that ordering is
+            // a specification. The relauncher can be killed the instant it starts, and
+            // this process is about to exit; a record written afterwards might never be
+            // written at all, in exactly the case that most needs explaining.
+            _outcomeStore.WriteAttempt(update.Version.ToString());
+
             bool launched = _updateInstaller.BeginInstall(package);
             if (launched)
             {
@@ -62,6 +73,10 @@ internal sealed class UpdateInstallFlow : IUpdateInstallFlow
                 return UpdateInstallOutcome.Started;
             }
 
+            // Nothing left this process, so there is nothing to explain later. Leaving the
+            // record would make the next ordinary startup announce a failure that never
+            // happened.
+            _outcomeStore.Clear();
             return UpdateInstallOutcome.InstallLaunchFailed;
         }
         catch (OperationCanceledException)

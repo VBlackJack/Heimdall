@@ -40,7 +40,7 @@ public sealed class UpdateInstallFlowTests
         var updateService = new FakeUpdateService();
         var installer = new FakeUpdateInstaller { BeginInstallResult = true };
         var lifecycle = new FakeApplicationLifecycle();
-        var flow = new UpdateInstallFlow(updateService, installer, lifecycle);
+        var flow = new UpdateInstallFlow(updateService, installer, lifecycle, new FakeUpdateOutcomeStore());
         var progress = new Progress<double>();
 
         var outcome = await flow.RunAsync(SampleUpdate(), progress, CancellationToken.None);
@@ -55,12 +55,68 @@ public sealed class UpdateInstallFlowTests
     }
 
     [Fact]
+    public async Task RunAsync_RecordsTheAttemptBeforeHandingControlToTheRelauncher()
+    {
+        var updateService = new FakeUpdateService();
+        var store = new FakeUpdateOutcomeStore();
+        var installer = new RecordingUpdateInstaller(store) { BeginInstallResult = true };
+        var flow = new UpdateInstallFlow(
+            updateService,
+            installer,
+            new FakeApplicationLifecycle(),
+            store);
+
+        await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
+
+        // Ordering, not presence, and it is a specification rather than a style. The
+        // relauncher can be killed the instant it starts and this process is about to
+        // exit, so a record written afterwards might never be written at all - in
+        // exactly the case that most needs explaining. Proved from the recorded
+        // sequence rather than from a counter, which would race the same way.
+        store.Calls.Should().StartWith(
+            new[] { FakeUpdateOutcomeStore.WriteAttemptCall, RecordingUpdateInstaller.BeginInstallCall });
+        store.LastAttemptedVersion.Should().Be(SampleUpdate().Version.ToString());
+    }
+
+    [Fact]
+    public async Task RunAsync_RelauncherNeverLaunched_ClearsTheAttemptRecord()
+    {
+        var store = new FakeUpdateOutcomeStore();
+        var flow = new UpdateInstallFlow(
+            new FakeUpdateService(),
+            new FakeUpdateInstaller { BeginInstallResult = false },
+            new FakeApplicationLifecycle(),
+            store);
+
+        var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
+
+        // Nothing left this process, so there is nothing to explain later. Leaving the
+        // record would make the next ordinary startup announce a failure that never was.
+        outcome.Should().Be(UpdateInstallOutcome.InstallLaunchFailed);
+        store.Calls.Should().Contain(FakeUpdateOutcomeStore.ClearCall);
+    }
+
+    /// <summary>An installer that records itself into the same sequence as the store.</summary>
+    private sealed class RecordingUpdateInstaller(FakeUpdateOutcomeStore store) : IUpdateInstaller
+    {
+        public const string BeginInstallCall = "BeginInstall";
+
+        public bool BeginInstallResult { get; init; }
+
+        public bool BeginInstall(IVerifiedUpdatePackage package)
+        {
+            store.RecordExternalCall(BeginInstallCall);
+            return BeginInstallResult;
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_BeginInstallFalse_ReturnsInstallLaunchFailedWithoutShutdown()
     {
         var updateService = new FakeUpdateService();
         var installer = new FakeUpdateInstaller { BeginInstallResult = false };
         var lifecycle = new FakeApplicationLifecycle();
-        var flow = new UpdateInstallFlow(updateService, installer, lifecycle);
+        var flow = new UpdateInstallFlow(updateService, installer, lifecycle, new FakeUpdateOutcomeStore());
 
         var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
 
@@ -77,7 +133,7 @@ public sealed class UpdateInstallFlowTests
         var updateService = new FakeUpdateService { DownloadException = new OperationCanceledException() };
         var installer = new FakeUpdateInstaller();
         var lifecycle = new FakeApplicationLifecycle();
-        var flow = new UpdateInstallFlow(updateService, installer, lifecycle);
+        var flow = new UpdateInstallFlow(updateService, installer, lifecycle, new FakeUpdateOutcomeStore());
 
         var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
 
@@ -92,7 +148,7 @@ public sealed class UpdateInstallFlowTests
         var updateService = new FakeUpdateService { DownloadException = new InvalidOperationException("checksum mismatch") };
         var installer = new FakeUpdateInstaller();
         var lifecycle = new FakeApplicationLifecycle();
-        var flow = new UpdateInstallFlow(updateService, installer, lifecycle);
+        var flow = new UpdateInstallFlow(updateService, installer, lifecycle, new FakeUpdateOutcomeStore());
 
         var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
 
@@ -107,7 +163,7 @@ public sealed class UpdateInstallFlowTests
         var updateService = new FakeUpdateService { DownloadException = new IOException("network down") };
         var installer = new FakeUpdateInstaller();
         var lifecycle = new FakeApplicationLifecycle();
-        var flow = new UpdateInstallFlow(updateService, installer, lifecycle);
+        var flow = new UpdateInstallFlow(updateService, installer, lifecycle, new FakeUpdateOutcomeStore());
 
         var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
 

@@ -670,6 +670,8 @@
   "UpdateBannerText": "Une nouvelle version est disponible : ",
   "UpdateBannerViewReleaseBtn": "Voir la release",
   "UpdateBannerLaterBtn": "Plus tard",
+  "UpdateBannerDismissBtn": "Fermer",
+  "UpdateBannerOutcomeNotApplied": "La mise à jour vers {0} n'a pas été appliquée. Heimdall fonctionne toujours sur la version précédente. Le journal du relanceur se trouve dans le dossier de journaux indiqué dans le panneau A propos.",
   "UpdateBannerSkipVersionBtn": "Ignorer cette version",
   "SettingsTooltipCollapseTunnelsPanelByDefault": "\u00c9tat initial quand aucun override par profil n'est d\u00e9fini. Les changements manuels pendant une session sont m\u00e9moris\u00e9s par profil serveur.",
   "SettingsSectionSshDefaults": "Param\u00e8tres SSH & SFTP par d\u00e9faut",
