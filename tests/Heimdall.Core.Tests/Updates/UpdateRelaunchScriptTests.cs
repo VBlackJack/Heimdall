@@ -169,6 +169,39 @@ public sealed class UpdateRelaunchScriptTests
         Assert.True(relaunchIndex > finallyIndex, "relaunch must appear after the finally token");
     }
 
+    /// <remarks>
+    /// The test above does not pin what its name promises, which is why this one exists
+    /// beside it rather than replacing it. Its <c>IndexOf("finally")</c> matches the
+    /// FIRST occurrence of that substring, and the first one in the emitted text is the
+    /// inner SHA-256 disposal - inside the try, before the catch. Moving the relaunch
+    /// out of the outer finally and into the try, the exact regression the backlog warns
+    /// against, still leaves it after that index and keeps the older test green.
+    /// <para>
+    /// Anchoring on the outer <c>} catch {</c> and the outer <c>} finally {</c> makes the
+    /// ordering unambiguous. This is a fast tripwire, not the oracle: text can prove what
+    /// was emitted but never that it is reached. The execution harness is the oracle.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Build_RelaunchFollowsTheOuterFinallyThatFollowsTheOuterCatch()
+    {
+        var spec = SampleSpec();
+        var script = UpdateRelaunchScript.Build(spec);
+
+        var outerCatchIndex = script.IndexOf("} catch {", StringComparison.Ordinal);
+        Assert.True(outerCatchIndex >= 0, "script must contain the outer catch");
+
+        var outerFinallyIndex = script.IndexOf(
+            "} finally {", outerCatchIndex, StringComparison.Ordinal);
+        Assert.True(outerFinallyIndex > outerCatchIndex, "the outer finally must follow the outer catch");
+
+        var relaunchIndex = script.IndexOf(
+            $"Start-Process -FilePath '{spec.TargetExecutablePath}'", StringComparison.Ordinal);
+        Assert.True(
+            relaunchIndex > outerFinallyIndex,
+            "the relaunch must sit inside the outer finally, so it runs on every path");
+    }
+
     [Fact]
     public void Build_PathWithSingleQuote_IsEscapedInScript()
     {

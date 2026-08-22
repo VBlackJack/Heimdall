@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A stand-in executable for the update relauncher tests. It plays two roles in the
+    same binary: the installer the generated script launches, and the application the
+    script relaunches afterwards.
+
+    It exists as a purpose-built project rather than a copied system binary for two
+    measured reasons. Copying a system executable to a name like "installer.exe" and
+    driving it from a generated script is a shape endpoint protection classifies as
+    malicious. And a catalog-signed copy reports an Authenticode status of Valid,
+    which sends the script's signature gate into certificate chain building and its
+    network timeouts. An unsigned apphost avoids both.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+</Project>
