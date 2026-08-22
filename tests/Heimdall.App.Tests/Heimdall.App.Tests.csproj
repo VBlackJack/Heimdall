@@ -25,4 +25,34 @@
     <ProjectReference Include="..\..\src\Heimdall.App\Heimdall.App.csproj" />
   </ItemGroup>
 
+  <!--
+    The update relauncher tests drive a stand-in executable. The reference exists for
+    build ordering only - none of its types are used - and the resolved apphost path is
+    baked into this assembly's metadata rather than reconstructed at run time. Guessing
+    a bin path is how a fixture silently stops being there: the guess still resolves to
+    a plausible string, the file is simply absent, and the test reports something other
+    than what it was written to measure.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\fixtures\Heimdall.UpdateStub\Heimdall.UpdateStub.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <Target Name="InjectUpdateStubPath"
+          BeforeTargets="GetAssemblyAttributes"
+          DependsOnTargets="ResolveProjectReferences">
+    <MSBuild Projects="..\fixtures\Heimdall.UpdateStub\Heimdall.UpdateStub.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);Platform=$(Platform)">
+      <Output TaskParameter="TargetOutputs" PropertyName="UpdateStubTargetPath" />
+    </MSBuild>
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>UpdateStubPath</_Parameter1>
+        <_Parameter2>$([System.IO.Path]::ChangeExtension($(UpdateStubTargetPath), '.exe'))</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
 </Project>
