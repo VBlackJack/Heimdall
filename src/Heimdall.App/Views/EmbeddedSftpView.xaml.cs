@@ -440,9 +440,25 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
-        _disposed = true;
         bool inlineEditorSaveInProgress = _inlineEditorSaveInProgress;
         string? activeInlineEditorTempPath = _activeInlineEditorTempPath;
+
+        // Retained before _disposed is set, and that order is the whole protection.
+        // The flag is what opens the delete: the save's own finally drops this directory
+        // as soon as it observes a disposed view. Nothing orders that observation
+        // against the rest of this method, so leaving the retention until after the
+        // teardown work leaves a stretch in which the only copy of the user's typed
+        // text can be deleted by a cleanup that runs inside it. Removing the path first
+        // makes CleanupEditTempDir refuse it for the whole of that stretch.
+        //
+        // The loop below then needs no special case: this path is no longer in the set
+        // it walks.
+        if (inlineEditorSaveInProgress && activeInlineEditorTempPath is not null)
+        {
+            _activeEditTempDirs.Remove(activeInlineEditorTempPath);
+        }
+
+        _disposed = true;
         DismissInlineEditor();
         _viewModel.MarkDisposed();
 
@@ -483,28 +499,6 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         List<string> activeEditTempDirs = _activeEditTempDirs.ToList();
         foreach (string tempPath in activeEditTempDirs)
         {
-            if (inlineEditorSaveInProgress
-                && string.Equals(
-                    tempPath,
-                    activeInlineEditorTempPath,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                // Skipping the loop is not enough to keep this directory. It holds the
-                // file the upload is still reading, and the only copy of what the user
-                // typed - and the save's own finally deletes it when the upload finally
-                // returns and finds this view disposed. Forgetting the path here is what
-                // makes the retention survive that: CleanupEditTempDir refuses any path
-                // it does not know, so removing it from the set turns the protection into
-                // something that method enforces rather than something every caller must
-                // remember.
-                //
-                // The consequence of leaving it in the set was the opposite of the
-                // intention: the text survived only while the upload stayed wedged
-                // forever, and was destroyed the moment the teardown actually worked.
-                _activeEditTempDirs.Remove(tempPath);
-                continue;
-            }
-
             CleanupEditTempDir(tempPath);
         }
 

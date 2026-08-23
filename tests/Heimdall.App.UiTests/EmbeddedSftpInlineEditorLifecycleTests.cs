@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -250,6 +251,88 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
     }
 
     /// <summary>
+    /// The retention must already hold while the teardown is still running, not only once
+    /// it has finished.
+    /// </summary>
+    /// <remarks>
+    /// The save's own finally deletes this directory as soon as it observes a disposed view,
+    /// and nothing orders that observation against the rest of Dispose. So a cleanup landing
+    /// part way through the teardown has to be refused exactly like one landing after it.
+    /// <para>
+    /// Pinned from inside that window rather than by racing a thread against it: clearing the
+    /// inline editor host's content happens between the disposed flag and the temp-directory
+    /// loop, so its change notification is a deterministic foothold in the stretch that used
+    /// to be unprotected.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task InlineEditor_CleanupLandsDuringTeardown_StillKeepsTheEditedText()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(async () =>
+        {
+            BlockingUploadRemoteBrowser browser = new();
+            (EmbeddedSftpView owner, _) = CreateInitializedOwner(browser);
+            try
+            {
+                ContentControl inlineEditorHost = Assert.IsType<ContentControl>(
+                    owner.FindName("InlineEditorHost"));
+                await InvokeEditFile(owner, CreateRemoteFile(7));
+
+                EmbeddedEditorView editor = Assert.IsType<EmbeddedEditorView>(
+                    GetActiveInlineEditor(owner));
+                EmbeddedEditorViewModel editorViewModel =
+                    Assert.IsType<EmbeddedEditorViewModel>(editor.DataContext);
+
+                string activeTempPath = GetActiveInlineEditorTempPath(owner);
+                Task<bool> save = editorViewModel.SaveAsync("the only copy of this text");
+                await browser.UploadStarted.Task;
+
+                int cleanupsDuringTeardown = 0;
+                DependencyPropertyDescriptor contentDescriptor =
+                    DependencyPropertyDescriptor.FromProperty(
+                        ContentControl.ContentProperty,
+                        typeof(ContentControl));
+                EventHandler onContentChanged = (_, _) =>
+                {
+                    if (inlineEditorHost.Content is not null)
+                    {
+                        return;
+                    }
+
+                    // Stands in for the save's finally arriving here rather than later.
+                    // It calls exactly what that finally calls, with the same argument.
+                    cleanupsDuringTeardown++;
+                    InvokeCleanupEditTempDir(owner, activeTempPath);
+                };
+
+                contentDescriptor.AddValueChanged(inlineEditorHost, onContentChanged);
+                try
+                {
+                    owner.Dispose();
+                }
+                finally
+                {
+                    contentDescriptor.RemoveValueChanged(inlineEditorHost, onContentChanged);
+                }
+
+                // Without this the assertion below would hold for the wrong reason: a
+                // cleanup that never ran cannot delete anything.
+                Assert.Equal(1, cleanupsDuringTeardown);
+                Assert.True(
+                    Directory.Exists(activeTempPath),
+                    "a cleanup during the teardown must not take the edited text with it");
+
+                Assert.False(await save);
+                Assert.True(Directory.Exists(activeTempPath));
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }).Task.Unwrap();
+    }
+
+    /// <summary>
     /// The editor's own Close button, during a save, must say the same thing the tab, the split
     /// pane and the floating window already say - and must stop raising a question it will ignore.
     /// </summary>
@@ -431,6 +514,15 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method.Invoke(viewModel, [dialogService]);
+    }
+
+    private static void InvokeCleanupEditTempDir(EmbeddedSftpView owner, string tempPath)
+    {
+        MethodInfo? cleanup = typeof(EmbeddedSftpView).GetMethod(
+            "CleanupEditTempDir",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(cleanup);
+        cleanup.Invoke(owner, [tempPath]);
     }
 
     private static string GetActiveInlineEditorTempPath(EmbeddedSftpView owner)
