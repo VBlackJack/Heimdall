@@ -170,12 +170,77 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
                 Assert.False(await secondSave);
                 Assert.True(cancellationObserved.Task.IsCompletedSuccessfully);
                 Assert.True(browser.UploadCancellationObserved.Task.IsCompletedSuccessfully);
-                Assert.False(Directory.Exists(activeTempPath));
+
+                // Inverted deliberately. This assertion used to require the directory to
+                // be gone, and it was the only thing pinning a data-loss path: the
+                // directory holds the only copy of what the user typed, and tearing the
+                // session down while a save is in flight is exactly when they have not
+                // got it anywhere else.
+                //
+                // Two things changed. The retention is now load-bearing rather than
+                // incidental - the close guard refuses to close a saving pane on the
+                // stated grounds that the user's work is safe on disk - and a startup
+                // sweeper reclaims these directories once they are a day old, so keeping
+                // one costs a bounded amount of temp space instead of leaking forever.
+                Assert.True(
+                    Directory.Exists(activeTempPath),
+                    "a teardown during a save must keep the user's edited text");
                 Assert.Same(owner, pane.HostControl);
                 Assert.Null(GetActiveInlineEditor(owner));
                 Assert.Null(inlineEditorHost.Content);
                 Assert.Equal(Visibility.Collapsed, inlineEditorHost.Visibility);
                 Assert.Equal(Visibility.Collapsed, browserSurface.Visibility);
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }).Task.Unwrap();
+    }
+
+    /// <summary>
+    /// The user's edited text survives a teardown even when the upload afterwards
+    /// unwinds - which is the case the retention used to get exactly backwards.
+    /// </summary>
+    /// <remarks>
+    /// Disposing the view skips the in-flight edit directory, but it used to leave the
+    /// path in the set of active directories, and the save's own finally deletes it on
+    /// finding the view disposed. So the text was kept only while the upload stayed
+    /// wedged forever, and destroyed the moment the teardown actually did what it is for.
+    /// <para>
+    /// Reachable with no new affordance: locking the workspace disposes panes and leaves
+    /// the process running, so the finally gets its chance.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task InlineEditor_SessionDisposedThenUploadUnwinds_KeepsTheEditedText()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(async () =>
+        {
+            BlockingUploadRemoteBrowser browser = new();
+            (EmbeddedSftpView owner, _) = CreateInitializedOwner(browser);
+            try
+            {
+                await InvokeEditFile(owner, CreateRemoteFile(7));
+
+                EmbeddedEditorView editor = Assert.IsType<EmbeddedEditorView>(
+                    GetActiveInlineEditor(owner));
+                EmbeddedEditorViewModel editorViewModel =
+                    Assert.IsType<EmbeddedEditorViewModel>(editor.DataContext);
+
+                string activeTempPath = GetActiveInlineEditorTempPath(owner);
+                Task<bool> save = editorViewModel.SaveAsync("the only copy of this text");
+                await browser.UploadStarted.Task;
+
+                owner.Dispose();
+
+                // The teardown succeeds and the upload unwinds afterwards. That is the
+                // ordinary outcome, and it is the one that used to delete the directory.
+                Assert.False(await save);
+
+                Assert.True(
+                    Directory.Exists(activeTempPath),
+                    "the edited text must outlive both the teardown and the upload's unwind");
             }
             finally
             {
