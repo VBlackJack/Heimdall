@@ -617,7 +617,10 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             _inlineEditorEscapeAttempted))
         {
             case EditorSaveEscapeOutcome.Response.OfferEscape:
-                _ = OfferSaveEscapeAsync();
+                // Observed, not abandoned. This is the one path a user takes when
+                // everything else has already stopped responding; a throw inside it
+                // vanishing without trace is the exact shape of defect it exists to end.
+                _ = ObserveFaultedTask(OfferSaveEscapeAsync(), "editor save escape");
                 break;
 
             case EditorSaveEscapeOutcome.Response.ReportOutcome:
