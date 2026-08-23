@@ -269,6 +269,19 @@ public sealed class AppSettings
     // Key: "host:port" or "[ipv6]:port"; Value: certificate fingerprint + provenance.
     public Dictionary<string, FtpsCertificateEntry> TrustedFtpsCertificates { get; set; } = new();
 
+    /// <summary>RDP certificates trusted per profile - a SET each, never one.</summary>
+    /// <remarks>
+    /// Keyed by profile identifier, and holding a LIST rather than a single value, because
+    /// one name can front several machines: a pool of domain controllers each carrying its
+    /// own self-signed certificate. Windows keeps one thumbprint per name and therefore
+    /// re-asks forever; holding the set is the point of the feature.
+    /// <para>
+    /// Kept in settings rather than on the profile so that exporting a profile does not
+    /// carry trust decisions to another machine.
+    /// </para>
+    /// </remarks>
+    public Dictionary<string, List<RdpCertificateEntry>> TrustedRdpCertificates { get; set; } = new();
+
     // Scheduled connections
     public List<ScheduledTaskDto> ScheduledTasks { get; set; } = new();
 

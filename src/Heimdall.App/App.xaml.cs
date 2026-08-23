@@ -261,6 +261,15 @@ public partial class App : System.Windows.Application
                 _ = PersistTrustedFtpsCertificateEntryAsync(configManager, key, entry);
             };
 
+            var rdpCertificateStore = _serviceProvider.GetRequiredService<RdpCertificateTrustStore>();
+            rdpCertificateStore.LoadFromConfig(
+                settings.TrustedRdpCertificates.Select(
+                    pair => (pair.Key, (IEnumerable<RdpCertificateEntry>)(pair.Value ?? []))));
+            rdpCertificateStore.TrustChanged += (profileId, entries) =>
+            {
+                _ = PersistTrustedRdpCertificatesAsync(configManager, profileId, entries);
+            };
+
             _serviceProvider.GetRequiredService<KnownHostsStartupSync>().StartIfEnabled(settings);
 
             // Subscribe to runtime settings changes for logging and theme updates
@@ -520,6 +529,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<TrustPromptCoordinator>();
         services.AddSingleton<IHostKeyVerifier, DialogHostKeyVerifier>();
         services.AddSingleton<FtpsCertificateStore>();
+        services.AddSingleton<RdpCertificateTrustStore>();
         services.AddSingleton<IFtpsCertificateVerifier, DialogFtpsCertificateVerifier>();
         services.AddSingleton<PinManager>();
 
@@ -804,6 +814,44 @@ public partial class App : System.Windows.Application
         {
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"Failed to persist host key metadata for {key}: {ex.Message}");
+        }
+    }
+
+    /// <summary>Writes back the whole trusted set of one profile.</summary>
+    /// <param name="configManager">Where settings are merged.</param>
+    /// <param name="profileId">The profile whose set changed.</param>
+    /// <param name="entries">The set as the store now holds it.</param>
+    /// <remarks>
+    /// Writes the SET the store handed over, never a delta: a persister that appended
+    /// would keep a certificate the user just removed, and one that replaced with a single
+    /// value would reproduce the Windows defect this whole feature exists to escape.
+    /// <para>
+    /// An empty set removes the key rather than storing an empty list, so forgetting the
+    /// last certificate leaves no trace of the profile in the file.
+    /// </para>
+    /// </remarks>
+    internal static async Task PersistTrustedRdpCertificatesAsync(
+        IConfigManager configManager,
+        string profileId,
+        IReadOnlyCollection<RdpCertificateEntry> entries)
+    {
+        try
+        {
+            await configManager.MergeSettingAsync(settings =>
+            {
+                if (entries.Count == 0)
+                {
+                    settings.TrustedRdpCertificates.Remove(profileId);
+                    return;
+                }
+
+                settings.TrustedRdpCertificates[profileId] = [.. entries];
+            });
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"Failed to persist trusted RDP certificates for {profileId}: {ex.Message}");
         }
     }
 
