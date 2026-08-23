@@ -12,6 +12,57 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-23: Remote Desktop certificates, a way out of a stuck save, and updates that speak
+
+- **Heimdall can now hold the Remote Desktop certificate trust that Windows cannot.** Windows
+  stores exactly one server thumbprint per host name. Behind one name there is often a pool of
+  domain controllers, each with its own self-signed certificate, so every connection can land on a
+  different member: the stored thumbprint disagrees, the warning returns, and accepting it
+  overwrites the previous one. The loop never ends, and it does the same under native `mstsc`.
+  Heimdall keeps a set of approved thumbprints per profile instead, so each machine is approved
+  once and the profile then goes quiet.
+- **The question only appears where nothing else was checking.** It runs when Network Level
+  Authentication is off, which is the case where Windows requires nothing of the server. With NLA
+  on, Windows performs its own check and Heimdall adds no prompt and no network round trip.
+- **The question says how many certificates the profile already trusts**, so a second or third one
+  reads as "another machine behind this name" rather than as the same alarm repeated. Answering
+  "Just this once" is never written to disk. Declining stops the connection and says so.
+- **Anything Heimdall could not verify connects exactly as before.** An unreachable endpoint, one
+  that offers no certificate at all, or a probe that fails, all proceed untouched. A verification
+  step must not become a new way to fail on a path that worked without it.
+
+- **A Remote Desktop file editor save that never returns no longer traps you.** When an SFTP save
+  wedges, the editor now offers to cut the SFTP connection, which is the only action that reaches a
+  write already inside the library. The safe answer is on both Enter and Escape, and pressing the
+  button a second time reports what already happened instead of asking again about a done deed.
+- **The close button used to lie rather than merely refuse.** During a save it left the modified
+  flag set, so you were asked "close and discard?", answered yes, and had your answer silently
+  thrown away. All four ways of closing now say the same thing.
+- **Editor working directories left behind by earlier sessions are swept at startup**, including
+  the ones a previous version had no way to remove.
+
+- **SFTP asks for a password when a connection is refused for want of a usable credential**, retries
+  once, and now says what SSH says in the same situation.
+
+- **An update that does not install now tells you, and tells you why.** The relaunch script used to
+  report success whatever happened: the installer exit code was never read, and the one branch that
+  could have reported a failure was unreachable code. The transcript is written where you can find
+  it.
+- **Updates could fail to install at all on some machines, silently.** The script asked Windows for
+  an Authenticode verdict without guarding the call; where the PowerShell security module will not
+  load, that command does not exist and the script died there, before the installer was ever
+  launched. Obtaining the verdict is now allowed to fail; an invalid signature still refuses, and
+  the SHA-256 check that follows is unchanged.
+
+- **A dropped VNC session no longer shows "Connected" in the status bar** while the panel says it
+  disconnected. Both surfaces now derive their wording from the same place.
+
+- **Screen readers get the right answer from the session tree.** A multiple selection used to be
+  reported half-complete, and server rows announced an internal class name instead of the server.
+  Both are fixed, and both were only visible to a real accessibility client.
+
+- **The Base64 tool no longer risks running a conversion twice** on one activation.
+
 ## 2026-08-22: the bitmap caching checkbox now says what it does
 
 - **"Bitmap caching" is now "Keep bitmap cache on disk".** The old name described something the

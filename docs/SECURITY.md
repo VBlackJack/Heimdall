@@ -169,6 +169,60 @@ backward compatibility but is `[Obsolete]`; new code must use the host/port
 aware verification APIs so trust decisions remain scoped to the correct
 endpoint.
 
+### RDP server certificate trust
+
+Windows keeps exactly **one** RDP server thumbprint per host name. Behind a
+single name there is often more than one machine - a pool of domain
+controllers, each with its own self-signed RDP certificate. Every connection
+may land on a different member, so the stored thumbprint disagrees, Windows
+asks again, and accepting overwrites the previous one. The loop never
+converges, and it happens with native `mstsc` too: it is a property of
+one-thumbprint-per-name storage, not a Heimdall defect.
+
+Heimdall keeps a **set** of approved thumbprints per profile, which is what
+makes the loop terminate. Each member of a pool is approved once, and the
+profile then stays silent until a machine is rebuilt.
+
+**The check runs only where nothing else checks.** `RdpCertificateGate`
+verifies exclusively when the resolved `AuthenticationLevel` is `0`, which is
+the level applied when NLA is off and which requires nothing of the server. At
+levels 1 and 2 Windows performs its own server-authentication step and shows
+its own warning; a second question about the same fact would be one prompt too
+many, and a prompt users learn to click through is worse than no prompt. This
+also means no connection that has verification today gains a network round
+trip.
+
+**Every outcome other than an explicit refusal proceeds.** `RdpCertificateProbe`
+opens its own TCP connection, performs the X.224 negotiation, and reads the
+certificate offered by the TLS layer. If the endpoint is unreachable, keeps
+standard RDP security and offers no certificate at all, or the probe throws,
+Heimdall has verified **nothing** and the connection is opened exactly as it
+would have been without this feature. Refusing on an unverifiable endpoint
+would turn a verification step into a new way to fail on a path that worked
+before; accepting one as verified would be strictly worse than never having
+built any of this.
+
+**Approval is per profile, and per thumbprint.** Trusting adds to the set and
+never replaces it; re-approving a thumbprint keeps its original timestamp.
+"Just this once" is held in memory for the run and is never written to disk.
+Durable entries live in `trustedRdpCertificates` in `settings.json`, keyed by
+profile id, each carrying the thumbprint, when it was first trusted, and the
+subject and issuer the probe read, so a future settings screen can name the
+machine rather than show forty hexadecimal pairs.
+
+**Known limitation, and the reason the set matters.** Nothing guarantees that
+the ActiveX control reconnects to the same machine the probe inspected - on a
+multi-member pool that is the normal case, not an edge case. With a set this is
+harmless: every member has been approved individually, so whichever one answers,
+its certificate has been seen and accepted. A scheme that approved a *pool*
+rather than individual certificates would make the same race harmful, because
+the machine actually joined could present a certificate that was never approved,
+only assumed to belong. That is why pool-shaped trust was rejected: there is no
+cryptographic link between two self-signed certificates from two different
+machines, and this feature replaces a Microsoft check that then lets CredSSP
+credentials through, so it cannot be more permissive than the check it
+disables.
+
 ### SFTP sudo escalation and remote editing
 
 SFTP sudo fallback is deliberately narrow. `EmbeddedSftpViewModel`
