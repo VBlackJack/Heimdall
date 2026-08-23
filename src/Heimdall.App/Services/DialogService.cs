@@ -49,6 +49,27 @@ public interface IDialogService
         => ShowConfirmAsync(title, message, severity);
 
     /// <summary>
+    /// Confirmation whose buttons are named after the acts they perform, with the
+    /// non-destructive one taking Enter.
+    /// </summary>
+    /// <remarks>
+    /// The plain overloads label their buttons Yes and No and make the affirmative the
+    /// default. That is wrong wherever the affirmative destroys something and the user
+    /// has been pressing Enter at a surface that was not responding - which is exactly
+    /// the situation this exists for. A default implementation forwards to the plain
+    /// overload so existing implementations need no change.
+    /// </remarks>
+    /// <param name="confirmLabel">Label for the answer that performs the act.</param>
+    /// <param name="declineLabel">Label for the answer that does nothing, and takes Enter.</param>
+    Task<bool> ShowConfirmAsync(
+        string title,
+        string message,
+        string severity,
+        string confirmLabel,
+        string declineLabel)
+        => ShowConfirmAsync(title, message, severity);
+
+    /// <summary>
     /// Shows a three-choice dialog (Save / Discard / Cancel).
     /// </summary>
     /// <returns>True = Save, false = Discard, null = Cancel.</returns>

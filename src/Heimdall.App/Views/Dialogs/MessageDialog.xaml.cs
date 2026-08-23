@@ -70,7 +70,8 @@ public partial class MessageDialog : Window
         string severity = "info",
         string primaryLabel = "Yes",
         string secondaryLabel = "No",
-        bool topmost = false)
+        bool topmost = false,
+        bool primaryIsDefault = true)
     {
         var dialog = new MessageDialog { Owner = owner };
         dialog.Topmost = topmost;
@@ -87,6 +88,16 @@ public partial class MessageDialog : Window
         // neutralized so Escape cannot land on an invisible button.
         dialog.BtnSecondary.IsCancel = true;
         dialog.BtnTertiary.IsCancel = false;
+
+        // Enter follows the primary button by default, which is right when the primary
+        // answer is the ordinary one. Where it destroys something, the caller moves the
+        // default to the secondary, so Enter and Escape agree - and a user who has been
+        // pressing Enter at an unresponsive surface does not confirm by momentum.
+        if (!primaryIsDefault)
+        {
+            dialog.BtnPrimary.IsDefault = false;
+            dialog.BtnSecondary.IsDefault = true;
+        }
 
         ApplySeverityStyle(dialog, severity);
 

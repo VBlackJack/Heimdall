@@ -63,6 +63,35 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task<bool> ShowConfirmAsync(
+        string title,
+        string message,
+        string severity,
+        string confirmLabel,
+        string declineLabel)
+    {
+        // Declines while shutting down, where the other overloads consent. They consent
+        // because their callers are close paths that must not stall an exit; this one
+        // performs a destructive act, and nobody is there to have asked for it.
+        if (IsApplicationShuttingDown())
+        {
+            return Task.FromResult(false);
+        }
+
+        bool result = Views.Dialogs.MessageDialog.ShowConfirm(
+            GetOwnerWindow(),
+            title,
+            message,
+            "warning",
+            confirmLabel,
+            declineLabel,
+            topmost: false,
+            primaryIsDefault: false);
+
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
     public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)
     {
         if (IsApplicationShuttingDown())
