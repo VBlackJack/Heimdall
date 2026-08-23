@@ -50,6 +50,12 @@ public sealed class ServerDialogProfileFidelityTests
             "assigned by every caller after the dialog returns: a fresh one when adding or "
             + "duplicating, the original one when editing. Carrying the seed's identity through a "
             + "duplicate would produce two profiles claiming to be the same record.",
+        ["AllowCredentialPrompt"] =
+            "per-attempt caller intent, not a profile field. Granted by the connect path for a "
+            + "connection someone asked for and withheld from a restore reconnecting on its own. "
+            + "Carrying it through the dialog would let an edit decide whether a later connection "
+            + "may raise a credential prompt, which is not the dialog's decision to make - and it "
+            + "is never serialized, so resetting to its default is the correct outcome.",
     };
 
     [Fact]

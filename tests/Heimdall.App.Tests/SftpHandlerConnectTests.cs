@@ -16,6 +16,7 @@
 
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
@@ -24,6 +25,7 @@ using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
+using Renci.SshNet.Common;
 
 namespace Heimdall.App.Tests;
 
@@ -188,14 +190,222 @@ public sealed class SftpHandlerConnectTests
         Assert.Equal(0, tunnelService.SetupCallCount);
     }
 
-    private static SftpHandler CreateHandler(FakeTunnelService tunnelService)
+    [Fact]
+    public async Task ConnectAsync_NoCredentialOffered_OffersAPasswordAndRetriesWithIt()
+    {
+        FakeTunnelService tunnelService = new() { UsesTunnel = false };
+        var dialog = DispatchProxy.Create<IDialogService, RecordingPasswordDialogProxy>();
+        var recording = (RecordingPasswordDialogProxy)dialog;
+        recording.Answer = "typed-secret";
+
+        List<string?> passwordsSeen = [];
+        SftpHandler handler = CreateHandler(
+            tunnelService,
+            dialog,
+            (browser, sshParams, store, verifier, token) =>
+            {
+                passwordsSeen.Add(sshParams.Password);
+                throw new SshAuthenticationException("No suitable authentication method found.");
+            });
+
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+        server.AllowCredentialPrompt = true;
+
+        await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        // Exactly one prompt, and the second attempt carried what was typed.
+        Assert.Single(recording.PasswordPrompts);
+        Assert.Equal([null, "typed-secret"], passwordsSeen);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_WithoutTheCallerFlag_NeverAsks()
+    {
+        FakeTunnelService tunnelService = new() { UsesTunnel = false };
+        int attempts = 0;
+
+        // The default dialog double throws on every member, so a prompt here fails loudly.
+        SftpHandler handler = CreateHandler(
+            tunnelService,
+            connectBrowser: (browser, sshParams, store, verifier, token) =>
+            {
+                attempts++;
+                throw new SshAuthenticationException("No suitable authentication method found.");
+            });
+
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        // A pane opened as a side effect must fail quietly, not raise a modal.
+        Assert.False(result.Success);
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_UserDismissesThePrompt_StopsWithoutASecondAttempt()
+    {
+        FakeTunnelService tunnelService = new() { UsesTunnel = false };
+        var dialog = DispatchProxy.Create<IDialogService, RecordingPasswordDialogProxy>();
+        ((RecordingPasswordDialogProxy)dialog).Answer = null;
+
+        int attempts = 0;
+        SftpHandler handler = CreateHandler(
+            tunnelService,
+            dialog,
+            (browser, sshParams, store, verifier, token) =>
+            {
+                attempts++;
+                throw new SshAuthenticationException("No suitable authentication method found.");
+            });
+
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+        server.AllowCredentialPrompt = true;
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_FailureAPasswordCannotFix_NeverAsks()
+    {
+        FakeTunnelService tunnelService = new() { UsesTunnel = false };
+        int attempts = 0;
+
+        SftpHandler handler = CreateHandler(
+            tunnelService,
+            connectBrowser: (browser, sshParams, store, verifier, token) =>
+            {
+                attempts++;
+                throw new System.Net.Sockets.SocketException(10061);
+            });
+
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+        server.AllowCredentialPrompt = true;
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        // A refused connection is not a credential problem. Offering a password box
+        // there would be a lie about what went wrong.
+        Assert.False(result.Success);
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_RetryAfterAPrompt_KeepsTheSameTunnel()
+    {
+        FakeTunnelService tunnelService = new()
+        {
+            UsesTunnel = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = 54321
+        };
+        var dialog = DispatchProxy.Create<IDialogService, RecordingPasswordDialogProxy>();
+        ((RecordingPasswordDialogProxy)dialog).Answer = "typed-secret";
+
+        SftpHandler handler = CreateHandler(
+            tunnelService,
+            dialog,
+            (browser, sshParams, store, verifier, token) =>
+                throw new SshAuthenticationException("No suitable authentication method found."));
+
+        ServerProfileDto server = CreateGatewayServer();
+        server.AllowCredentialPrompt = true;
+
+        await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        // Set up once, released once, across two attempts. Releasing between them would
+        // dispose the forward, and a re-setup would bind a different, OS-assigned port.
+        Assert.Equal(1, tunnelService.SetupCallCount);
+        Assert.Equal(1, tunnelService.ReleaseCount);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_TypedPassword_NeverReachesTheProfile()
+    {
+        FakeTunnelService tunnelService = new() { UsesTunnel = false };
+        var dialog = DispatchProxy.Create<IDialogService, RecordingPasswordDialogProxy>();
+        const string Secret = "sentinel-never-persisted";
+        ((RecordingPasswordDialogProxy)dialog).Answer = Secret;
+
+        SftpHandler handler = CreateHandler(
+            tunnelService,
+            dialog,
+            (browser, sshParams, store, verifier, token) =>
+                throw new SshAuthenticationException("No suitable authentication method found."));
+
+        ServerProfileDto server = CreateDirectServer(DefaultPorts.Ssh);
+        server.AllowCredentialPrompt = true;
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        // The typed value lives for the attempt and nowhere else. Not on the profile,
+        // not in the message the user is shown, not in the diagnostic.
+        Assert.Null(server.SshPasswordEncrypted);
+        Assert.DoesNotContain(Secret, result.ErrorMessage ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    private static SftpHandler CreateHandler(
+        FakeTunnelService tunnelService,
+        IDialogService? dialogService = null,
+        SftpHandler.ConnectBrowserDelegate? connectBrowser = null,
+        ConnectionStateMachine? connectionSm = null,
+        LocalizationManager? localizer = null)
     {
         return new SftpHandler(
             tunnelService,
-            new ConnectionStateMachine(),
-            new LocalizationManager(),
+            connectionSm ?? new ConnectionStateMachine(),
+            localizer ?? new LocalizationManager(),
             new HostKeyStore(),
-            AutoAcceptHostKeyVerifier.Instance);
+            AutoAcceptHostKeyVerifier.Instance,
+
+            // Throws on every member by default. A dialog raised where none was
+            // expected has to fail loudly: a double that quietly returns null would
+            // let an unwanted prompt ship as a green test.
+            dialogService ?? DispatchProxy.Create<IDialogService, ThrowingDialogProxy>(),
+            connectBrowser);
+    }
+
+    /// <summary>Refuses every dialog. The default for tests that expect no question.</summary>
+    private class ThrowingDialogProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+            => throw new NotSupportedException(
+                $"unexpected dialog call: {targetMethod?.Name}");
+    }
+
+    /// <summary>Answers the password prompt with a scripted value and records the ask.</summary>
+    private class RecordingPasswordDialogProxy : DispatchProxy
+    {
+        public List<(string Title, string Message)> PasswordPrompts { get; } = [];
+
+        public string? Answer { get; set; }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IDialogService.ShowPasswordInputAsync))
+            {
+                PasswordPrompts.Add(((string)args![0]!, (string)args![1]!));
+                return Task.FromResult(Answer);
+            }
+
+            throw new NotSupportedException(
+                $"unexpected dialog call: {targetMethod?.Name}");
+        }
     }
 
     private static ServerProfileDto CreateGatewayServer()

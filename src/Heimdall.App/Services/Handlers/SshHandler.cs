@@ -334,31 +334,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         return new ConnectionResult(true, null, new SshSessionResult(session, server.SessionLoggingOverride));
     }
 
-    private SshFailureInfo LocalizeFailure(SshFailureInfo failure, string targetHost)
-    {
-        string message = FailureClassifier.FormatMessage(
-            failure,
-            key =>
-            {
-                if (!_localizer.HasKey(key))
-                {
-                    return null;
-                }
-
-                object formatArgument = failure.Code is SshFailureCode.NetworkRefused
-                    or SshFailureCode.NetworkTimedOut
-                    or SshFailureCode.NetworkReset
-                    ? targetHost
-                    : failure.Message;
-                return _localizer.Format(key, formatArgument);
-            });
-
-        return new SshFailureInfo(
-            failure.Code,
-            message,
-            failure.IsFatal,
-            failure.OriginalException);
-    }
+    /// <remarks>
+    /// The body moved to <see cref="SshFailureLocalizer"/> so the SFTP handler can call
+    /// the same thing. Kept here as a delegating wrapper: its two call sites and every
+    /// existing test are then untouched by the move.
+    /// </remarks>
+    private SshFailureInfo LocalizeFailure(SshFailureInfo failure, string targetHost) =>
+        SshFailureLocalizer.Localize(failure, _localizer, targetHost);
 
     private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
     {
