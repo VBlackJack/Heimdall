@@ -666,6 +666,11 @@
 
                                 <!-- Server leaf node template -->
                                 <DataTemplate DataType="{x:Type vm:ServerItemViewModel}">
+                                    <!-- The AutomationProperties.Name below is inert and shadowed: a Border has no
+                                         automation peer, so it never reached a screen reader. Believing otherwise is
+                                         what left server rows announcing their view-model class name. The name a
+                                         client actually reads is set on the TreeViewItem container by
+                                         SessionTreeItemAccessibilityBehavior. Do not rely on this line. -->
                                     <Border x:Name="ServerSelectionChrome"
                                             Margin="0,0,4,0"
                                             HorizontalAlignment="Stretch"
@@ -803,7 +808,7 @@
                                        BasedOn="{StaticResource ThemedTreeViewItemStyle}">
                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                     <Setter Property="Focusable" Value="True"/>
-                                    <Setter Property="behaviors:FolderTreeItemAccessibilityBehavior.IsEnabled" Value="True"/>
+                                    <Setter Property="behaviors:SessionTreeItemAccessibilityBehavior.IsEnabled" Value="True"/>
                                     <Setter Property="Padding" Value="1,1"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                     <Setter Property="HorizontalAlignment" Value="Left"/>

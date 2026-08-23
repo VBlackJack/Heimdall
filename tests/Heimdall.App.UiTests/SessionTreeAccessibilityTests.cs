@@ -210,7 +210,7 @@ public sealed class SessionTreeAccessibilityTests
             var itemStyle = new Style(typeof(TreeViewItem));
             itemStyle.Setters.Add(new Setter(UIElement.FocusableProperty, true));
             itemStyle.Setters.Add(new Setter(
-                FolderTreeItemAccessibilityBehavior.IsEnabledProperty,
+                SessionTreeItemAccessibilityBehavior.IsEnabledProperty,
                 true));
             tree.ItemContainerStyle = itemStyle;
 
@@ -248,6 +248,69 @@ public sealed class SessionTreeAccessibilityTests
                 StringComparison.Ordinal);
             Assert.True(folderElement.Current.IsKeyboardFocusable);
             Assert.True(folderElement.Current.HasKeyboardFocus);
+        }
+        finally
+        {
+            WpfTestHost.Invoke(() => window!.Close());
+        }
+    }
+
+    [StaFact]
+    public void ServerContainer_ExposesItsOwnIdentityRatherThanItsViewModelTypeName()
+    {
+        ServerItemViewModel server = new()
+        {
+            Id = "srv-1",
+            DisplayName = "web-01",
+            ConnectionType = "ssh",
+        };
+        TreeView? tree = null;
+        Window? window = null;
+        IntPtr windowHandle = IntPtr.Zero;
+        WpfTestHost.Invoke(() =>
+        {
+            tree = new TreeView
+            {
+                Width = 320,
+                Height = 240,
+                ItemsSource = new[] { server }
+            };
+            var itemStyle = new Style(typeof(TreeViewItem));
+            itemStyle.Setters.Add(new Setter(UIElement.FocusableProperty, true));
+            itemStyle.Setters.Add(new Setter(
+                SessionTreeItemAccessibilityBehavior.IsEnabledProperty,
+                true));
+            tree.ItemContainerStyle = itemStyle;
+
+            window = Show(tree);
+            var container = Assert.IsType<TreeViewItem>(
+                tree.ItemContainerGenerator.ContainerFromItem(server));
+            AutomationProperties.SetAutomationId(container, "WebOneServer");
+            window.Activate();
+            windowHandle = new WindowInteropHelper(window).Handle;
+        });
+
+        try
+        {
+            AutomationElement root = AutomationElement.FromHandle(windowHandle);
+            AutomationElement? serverElement = root.FindFirst(
+                TreeScope.Descendants,
+                new PropertyCondition(
+                    AutomationElement.AutomationIdProperty,
+                    "WebOneServer"));
+
+            Assert.NotNull(serverElement);
+
+            // Measured through a live client, because that is the only place the defect is
+            // visible. The data template sets AutomationProperties.Name on a Border, which has
+            // no automation peer, so the binding is inert and the container falls back to
+            // ToString() of the bound item - announcing the class name to a screen reader.
+            Assert.DoesNotContain(
+                nameof(ServerItemViewModel),
+                serverElement!.Current.Name,
+                StringComparison.Ordinal);
+            Assert.Contains("web-01", serverElement.Current.Name, StringComparison.Ordinal);
+            Assert.Equal(server.AccessibleName, serverElement.Current.Name);
         }
         finally
         {
