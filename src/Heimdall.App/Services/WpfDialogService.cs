@@ -82,7 +82,7 @@ public sealed class WpfDialogService(
             GetOwnerWindow(),
             title,
             message,
-            "warning",
+            severity,
             confirmLabel,
             declineLabel,
             topmost: false,
