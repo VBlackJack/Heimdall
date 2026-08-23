@@ -61,6 +61,21 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _syntaxName = "Plain Text";
 
+    /// <summary>A notice about this editor, shown in its own status bar.</summary>
+    /// <remarks>
+    /// The pane's status bar lives inside the browser surface, which showing this
+    /// overlay collapses. Without a line here, an act taken from the overlay has
+    /// nowhere to report - which is how a button comes to do something and say nothing.
+    /// </remarks>
+    [ObservableProperty]
+    private string _noticeText = "";
+
+    /// <summary>True when a notice should be shown.</summary>
+    public bool HasNotice => !string.IsNullOrEmpty(NoticeText);
+
+    partial void OnNoticeTextChanged(string value) =>
+        OnPropertyChanged(nameof(HasNotice));
+
     [ObservableProperty]
     private bool _isModified;
 

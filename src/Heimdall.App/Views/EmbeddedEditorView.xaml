@@ -60,6 +60,16 @@
                 <TextBlock Text="{Binding SyntaxName}"
                            FontSize="{StaticResource FontSizeCaption}"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                <!-- Where an act taken from this overlay reports itself. The pane's own
+                     status bar is inside the browser surface, which is collapsed while
+                     the editor is up. -->
+                <TextBlock x:Name="EditorNoticeText" Text="{Binding NoticeText}"
+                           Margin="16,0,0,0" TextWrapping="Wrap"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource WarningBrush}"
+                           AutomationProperties.Name="{Binding NoticeText}"
+                           Visibility="{Binding HasNotice, Converter={StaticResource BoolToVisibilityConverter}}"/>
             </DockPanel>
         </Border>
     </Grid>

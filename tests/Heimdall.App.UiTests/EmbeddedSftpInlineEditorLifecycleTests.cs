@@ -333,16 +333,20 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
     }
 
     /// <summary>
-    /// The editor's own Close button, during a save, must say the same thing the tab, the split
-    /// pane and the floating window already say - and must stop raising a question it will ignore.
+    /// The editor's own Close button, during a save, offers the one act that can reach the save -
+    /// and never the unsaved-changes question, whose answer the guard would then ignore.
     /// </summary>
     /// <remarks>
     /// Built out of production parts end to end, because the defect lives exactly at the junction
     /// between the overlay and the pane's guard: a guard tested alone and an overlay tested alone
     /// both stay green while nothing connects them.
+    /// <para>
+    /// The answer given here is the declining one. It is the default the dialog puts under both
+    /// Enter and Escape, and it must leave the session exactly as it found it.
+    /// </para>
     /// </remarks>
     [Fact]
-    public async Task MountedSftpPane_CloseDuringInlineSave_SpeaksTheGuardsRefusalInsteadOfAsking()
+    public async Task MountedSftpPane_CloseDuringInlineSave_OffersTheEscapeAndNeverTheUnsavedPrompt()
     {
         await WpfTestHost.Dispatcher.InvokeAsync(async () =>
         {
@@ -350,6 +354,7 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             LocalizationManager localizer = await CreateEnglishLocalizer();
             IDialogService dialog = DispatchProxy.Create<IDialogService, RecordingDialogProxy>();
             RecordingDialogProxy recording = (RecordingDialogProxy)dialog;
+            recording.ConfirmResult = false;
             (EmbeddedSftpView owner, _) = CreateInitializedOwner(browser, localizer, dialog);
             try
             {
@@ -375,19 +380,34 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
 
                 await firstEditorViewModel.RequestClose();
 
-                // The oracle. Asking is the defect, not merely a cosmetic detail: the user answered
-                // this question and the answer was thrown away.
-                Assert.Empty(recording.ConfirmCalls);
+                // The oracle. Exactly one question, and it is the one the pane can act on.
+                // The unsaved-changes prompt asking whether to discard work the user is in
+                // the middle of saving is the defect: they answered it and the answer was
+                // thrown away. Pinned by the title rather than by counting, because a count
+                // cannot tell the two questions apart.
+                (string Title, string Message) asked = Assert.Single(recording.ConfirmCalls);
+                Assert.Equal(
+                    localizer[SftpCloseGuardLocaleKeys.EditorSaveEscapeTitle],
+                    asked.Title);
 
-                // Derived from the keys, never from a literal, so rewording either catalogue entry
-                // cannot break this test - only failing to speak can.
-                (string Title, string Message) spoken = Assert.Single(recording.InfoCalls);
-                Assert.Equal(localizer[CloseGuardLocaleKeys.BlockedTitle], spoken.Title);
+                // Derived from the keys, never from a literal, so rewording any catalogue entry
+                // cannot break this test - only asking the wrong thing can.
                 Assert.Equal(
                     localizer.Format(
-                        SftpCloseGuardLocaleKeys.EditorSaveBlocked,
-                        GetClosePaneLabel(owner)),
-                    spoken.Message);
+                        SftpCloseGuardLocaleKeys.EditorSaveEscapeMessage,
+                        GetClosePaneLabel(owner),
+                        GetActiveInlineEditorTempPath(owner)),
+                    asked.Message);
+                Assert.Equal(
+                    [
+                        localizer[SftpCloseGuardLocaleKeys.EditorSaveEscapeConfirm],
+                        localizer[SftpCloseGuardLocaleKeys.EditorSaveEscapeKeepWaiting]
+                    ],
+                    recording.ConfirmLabels[0]);
+
+                // Declining is inert: no notice, no drop, and the overlay keeps the text.
+                Assert.Empty(recording.InfoCalls);
+                Assert.Equal(0, browser.DisconnectCalls);
                 Assert.Same(firstEditor, GetActiveInlineEditor(owner));
 
                 // State-driven, not a permanent lock: once the save lands, the same gesture closes.
@@ -398,7 +418,8 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
                 await firstEditorViewModel.RequestClose();
 
                 Assert.Null(GetActiveInlineEditor(owner));
-                Assert.Single(recording.InfoCalls);
+                Assert.Single(recording.ConfirmCalls);
+                Assert.Empty(recording.InfoCalls);
                 Assert.False(Directory.Exists(activeTempPath));
             }
             finally
@@ -523,6 +544,88 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(cleanup);
         cleanup.Invoke(owner, [tempPath]);
+    }
+
+    /// <summary>
+    /// Consenting to the escape drops the connection once, and a second press reports how
+    /// that went instead of asking the same question again.
+    /// </summary>
+    /// <remarks>
+    /// The only test built on a save that never ends, which is the state the whole escape
+    /// exists for. The save task is deliberately never awaited: awaiting it would be the
+    /// test doing exactly what the user cannot.
+    /// <para>
+    /// Dropping the transport is not a cancellation and is not guaranteed to reach a
+    /// wedged write, so the honest report after it is that the save has not ended - not
+    /// silence, and not a claim of success.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task MountedSftpPane_EscapeConsentedOnAWedgedSave_DropsOnceThenSaysItHasNotEnded()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(async () =>
+        {
+            BlockingUploadRemoteBrowser browser = new() { UploadIgnoresCancellation = true };
+            LocalizationManager localizer = await CreateEnglishLocalizer();
+            IDialogService dialog = DispatchProxy.Create<IDialogService, RecordingDialogProxy>();
+            RecordingDialogProxy recording = (RecordingDialogProxy)dialog;
+            (EmbeddedSftpView owner, _) = CreateInitializedOwner(browser, localizer, dialog);
+            try
+            {
+                await InvokeEditFile(owner, CreateRemoteFile(7));
+
+                EmbeddedEditorView editor = Assert.IsType<EmbeddedEditorView>(
+                    GetActiveInlineEditor(owner));
+                EmbeddedEditorViewModel editorViewModel =
+                    Assert.IsType<EmbeddedEditorViewModel>(editor.DataContext);
+                SetEditorDialogService(editorViewModel, dialog);
+                editorViewModel.NotifyTextChanged();
+
+                // Never awaited, and it never completes.
+                _ = editorViewModel.SaveAsync("text the transport will not carry");
+                await browser.UploadStarted.Task;
+
+                await editorViewModel.RequestClose();
+                await WaitForAsync(
+                    () => browser.DisconnectCalls == 1,
+                    "consenting must issue the disconnect");
+
+                (string Title, string Message) asked = Assert.Single(recording.ConfirmCalls);
+                Assert.Equal(
+                    localizer[SftpCloseGuardLocaleKeys.EditorSaveEscapeTitle],
+                    asked.Title);
+
+                await editorViewModel.RequestClose();
+
+                // No second question, and no second drop: the connection is already gone.
+                Assert.Single(recording.ConfirmCalls);
+                Assert.Equal(1, browser.DisconnectCalls);
+
+                // Derived from the key, so the sentence can be reworded but not swapped
+                // for the one that claims the drop worked.
+                Assert.Equal(
+                    localizer.Format(
+                        SftpCloseGuardLocaleKeys.EditorSaveEscapeStuck,
+                        GetClosePaneLabel(owner)),
+                    editorViewModel.NoticeText);
+                Assert.Same(editor, GetActiveInlineEditor(owner));
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }).Task.Unwrap();
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition, string because)
+    {
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(condition(), because);
     }
 
     private static string GetActiveInlineEditorTempPath(EmbeddedSftpView owner)
@@ -659,6 +762,12 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
 
         public List<(string Title, string Message)> ConfirmCalls { get; } = [];
 
+        /// <summary>The confirm/decline labels of each recorded question, in order.</summary>
+        public List<string[]> ConfirmLabels { get; } = [];
+
+        /// <summary>What the user answers. False is the non-destructive answer here.</summary>
+        public bool ConfirmResult { get; set; } = true;
+
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             if (targetMethod?.Name == nameof(IDialogService.ShowInfo))
@@ -670,7 +779,8 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
             if (targetMethod?.Name == nameof(IDialogService.ShowConfirmAsync))
             {
                 ConfirmCalls.Add(((string)args![0]!, (string)args![1]!));
-                return Task.FromResult(true);
+                ConfirmLabels.Add([.. args!.Skip(3).Select(arg => arg as string ?? string.Empty)]);
+                return Task.FromResult(ConfirmResult);
             }
 
             throw new NotSupportedException(targetMethod?.Name);
@@ -713,6 +823,7 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
     private sealed class BlockingUploadRemoteBrowser : IRemoteBrowser
     {
         private TaskCompletionSource _uploadStarted = NewSignal();
+        private int _disconnectCalls;
         private TaskCompletionSource _releaseUpload = NewSignal();
 
         public event Action<string>? DirectoryChanged
@@ -754,6 +865,18 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
         public bool UnrelatedProgressCausedCancellation { get; private set; }
 
         public bool DownloadCancellationObserved { get; private set; }
+
+        /// <summary>
+        /// Makes the upload ignore the cancellation token, as the real one does.
+        /// </summary>
+        /// <remarks>
+        /// The remote write is a synchronous call inside the SSH library and takes no
+        /// token. A double that honours one would offer a lever the product does not
+        /// have, and every test built on it would pass for a reason the user never gets.
+        /// </remarks>
+        public bool UploadIgnoresCancellation { get; init; }
+
+        public int DisconnectCalls => _disconnectCalls;
 
         public void PrepareUpload()
         {
@@ -822,6 +945,13 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
         {
             _ = remotePath;
             _uploadStarted.TrySetResult();
+            if (UploadIgnoresCancellation)
+            {
+                await _releaseUpload.Task;
+                UploadedContent = await File.ReadAllTextAsync(localPath, CancellationToken.None);
+                return;
+            }
+
             try
             {
                 await _releaseUpload.Task.WaitAsync(ct);
@@ -868,6 +998,7 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
 
         public void Disconnect()
         {
+            Interlocked.Increment(ref _disconnectCalls);
         }
 
         public void Dispose()
