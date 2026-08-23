@@ -16,7 +16,10 @@
 
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
+using Heimdall.App.Services;
+using Heimdall.App.ViewModels.Tools;
 
 namespace Heimdall.App.Tests;
 
@@ -25,16 +28,18 @@ namespace Heimdall.App.Tests;
 /// storage without supplying a storage path.
 /// </summary>
 /// <remarks>
-/// Both types have a parameterless constructor that resolves the real user location:
-/// <c>PasswordPresetStorage()</c> chains to <c>ApplicationDataPathResolver.Resolve()</c>, which
-/// is <c>%LOCALAPPDATA%\Heimdall</c>. A test built that way reads and rewrites the operator's
-/// own presets, outside any sandbox, and its teardown deletes a temporary directory that was
-/// never the file it touched. That is what happened before the last unbound call site was fixed.
+/// Both types once had a parameterless constructor that resolved the real user location:
+/// <c>PasswordPresetStorage()</c> chained to <c>ApplicationDataPathResolver.Resolve()</c>, which
+/// is <c>%LOCALAPPDATA%\Heimdall</c>. A test built that way read and rewrote the operator's own
+/// presets, outside any sandbox, and its teardown deleted a temporary directory that was never
+/// the file it touched. That is what happened before the last unbound call site was fixed.
 /// <para>
-/// The production constructors stay: they are how the application resolves its own storage. What
-/// is refused is reaching them from a test. The guard scans source rather than behaviour because
-/// the damage is done the moment such a test runs, so an oracle that only observes the outcome
-/// would have to write to the real file to detect the problem.
+/// <b>Those two constructors are gone since 2026-08-23</b>, and the production location is
+/// resolved once in the composition root. The compiler now refuses what this sweep used to
+/// police by pattern - see <see cref="NeitherType_OffersAWayToReachTheRealUserLocation"/>,
+/// which is the oracle that would notice one coming back. This source sweep stays as a belt:
+/// it also catches an argument DERIVED from the production resolver, which compiles perfectly
+/// well and is just as damaging.
 /// </para>
 /// </remarks>
 public sealed class PasswordPresetStorageIsolationGuardTests
@@ -64,6 +69,24 @@ public sealed class PasswordPresetStorageIsolationGuardTests
         // resolver points at the operator's own directory, which is the very thing refused.
         + @"|new\s+(?:PasswordGeneratorViewModel|PasswordPresetStorage)\s*\([^)]*ApplicationDataPathResolver[^)]*\)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    [Fact]
+    public void NeitherType_OffersAWayToReachTheRealUserLocation()
+    {
+        // The substitution decided on 2026-08-23 and delivered here. The sweep below polices
+        // by pattern; this one is the compiler. A parameterless constructor put back on either
+        // type would restore the only two ways a test could reach %LOCALAPPDATA%\Heimdall, and
+        // the sweep would go on passing until somebody actually wrote the call.
+        Assert.Null(ParameterlessConstructorOf(typeof(PasswordPresetStorage)));
+        Assert.Null(ParameterlessConstructorOf(typeof(PasswordGeneratorViewModel)));
+    }
+
+    private static ConstructorInfo? ParameterlessConstructorOf(Type type)
+        => type.GetConstructor(
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            types: Type.EmptyTypes,
+            modifiers: null);
 
     [Fact]
     public void NoTestBuildsPresetStorageWithoutAnInjectedPath()

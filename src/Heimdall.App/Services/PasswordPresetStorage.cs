@@ -34,11 +34,15 @@ internal sealed class PasswordPresetStorage : IPasswordPresetStorage
     private const string PresetsFileName = "password-presets.json";
     private readonly string _filePath;
 
-    public PasswordPresetStorage()
-        : this(ApplicationDataPathResolver.Resolve())
-    {
-    }
-
+    /// <summary>Creates a storage rooted in the supplied directory.</summary>
+    /// <param name="directoryPath">Where the preset file lives.</param>
+    /// <remarks>
+    /// <b>There is deliberately no parameterless constructor.</b> One existed and chained to
+    /// <c>ApplicationDataPathResolver.Resolve()</c>, so any caller - a test included - could
+    /// reach the operator's own preset file under <c>%LOCALAPPDATA%\Heimdall</c> by writing
+    /// nothing at all. The production location is now resolved once, in the composition root,
+    /// and reaching it any other way does not compile.
+    /// </remarks>
     internal PasswordPresetStorage(string directoryPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);

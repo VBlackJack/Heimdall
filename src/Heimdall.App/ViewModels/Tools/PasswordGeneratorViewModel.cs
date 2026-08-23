@@ -220,11 +220,15 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private string[] _englishWords = [];
     private string[] _frenchWords = [];
 
-    public PasswordGeneratorViewModel()
-        : this(new PasswordPresetStorage())
-    {
-    }
-
+    /// <summary>Creates the view model over the supplied preset storage.</summary>
+    /// <param name="presetStorage">Where presets are read and written.</param>
+    /// <remarks>
+    /// <b>There is deliberately no parameterless constructor.</b> One existed and built an
+    /// unbound <see cref="PasswordPresetStorage"/>, which resolved the operator's own data
+    /// directory. It was the second of the only two ways a test could reach production
+    /// storage; both are gone, so the compiler now enforces what a source guard used to
+    /// police by pattern.
+    /// </remarks>
     internal PasswordGeneratorViewModel(IPasswordPresetStorage presetStorage)
     {
         ArgumentNullException.ThrowIfNull(presetStorage);
