@@ -186,6 +186,20 @@ public sealed class RdpCertificateVerifierTests
         Assert.Equal(1, prompt.Asked);
     }
 
+    [Fact]
+    public async Task Verify_UnknownCertificate_TellsThePromptWhichProfileIsAsking()
+    {
+        FakePrompt prompt = new(RdpTrustAnswer.Refuse);
+
+        await Build(Obtained(Thumb), new RdpCertificateTrustStore(), prompt)
+            .VerifyAsync(Request(), default);
+
+        // Trust is per profile, so a presenter has to be able to keep two profiles'
+        // questions apart. Without this, one dialog naming profile A could supply the
+        // answer for profile B - durable trust granted from a question never shown.
+        Assert.Equal(ProfileId, Assert.Single(prompt.Contexts).ProfileId);
+    }
+
     private static RdpCertificateVerificationRequest Request()
         => new(ProfileId, "DC pool", "dc-pool.example.com", 3389);
 
