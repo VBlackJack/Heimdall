@@ -304,6 +304,13 @@ public sealed class SessionTreeSelectionAutomationTests
                 unrealized.Length == 0,
                 $"rows never realized, so they cannot be selected: {string.Join(", ", unrealized)}");
 
+            // Second discriminator, in process, before the client is attached. The
+            // provider marshals each selected row through ProviderFromPeer, and a peer
+            // that never received a hwnd marshals to null and is dropped silently. If
+            // this holds while the client below sees fewer, the row is lost between the
+            // provider and the client rather than inside GetSelection.
+            Assert.Equal(2, SelectionProviderOf(tree).GetSelection().Length);
+
             nint handle = new WindowInteropHelper(window).Handle;
             using UIA3Automation automation = new();
             FlaUI.Core.AutomationElements.AutomationElement root = automation.FromHandle(handle);
