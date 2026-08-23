@@ -63,6 +63,75 @@ public partial class MessageDialog : Window
     /// Shows a themed confirmation dialog with Yes/No buttons.
     /// Returns true if the user clicked the primary (Yes) button.
     /// </summary>
+    /// <summary>Labels the two confirm buttons and places the keyboard defaults.</summary>
+    /// <param name="dialog">The dialog being prepared.</param>
+    /// <param name="primaryLabel">Label of the accepting button.</param>
+    /// <param name="secondaryLabel">Label of the declining button.</param>
+    /// <param name="primaryIsDefault">Whether Enter accepts.</param>
+    /// <remarks>
+    /// Separated from <see cref="ShowConfirm"/> because that method ends in a blocking
+    /// <c>ShowDialog</c>, so nothing downstream of it can be observed by a test. Which
+    /// key does what is exactly the part worth pinning.
+    /// </remarks>
+    internal static void ConfigureConfirmButtons(
+        MessageDialog dialog,
+        string primaryLabel,
+        string secondaryLabel,
+        bool primaryIsDefault)
+    {
+        ArgumentNullException.ThrowIfNull(dialog);
+
+        dialog.BtnPrimary.Content = primaryLabel;
+        dialog.BtnSecondary.Content = secondaryLabel;
+        dialog.BtnSecondary.Visibility = Visibility.Visible;
+        System.Windows.Automation.AutomationProperties.SetName(dialog.BtnPrimary, primaryLabel);
+        System.Windows.Automation.AutomationProperties.SetName(dialog.BtnSecondary, secondaryLabel);
+
+        ConfirmKeyRoles roles = DescribeConfirmKeyRoles(primaryIsDefault);
+        dialog.BtnSecondary.IsCancel = roles.SecondaryIsCancel;
+        dialog.BtnTertiary.IsCancel = roles.TertiaryIsCancel;
+        dialog.BtnPrimary.IsDefault = roles.PrimaryIsDefault;
+        dialog.BtnSecondary.IsDefault = roles.SecondaryIsDefault;
+    }
+
+    /// <summary>Which keyboard role each confirm button carries.</summary>
+    /// <param name="PrimaryIsDefault">Whether Enter accepts.</param>
+    /// <param name="SecondaryIsDefault">Whether Enter declines.</param>
+    /// <param name="SecondaryIsCancel">Whether Escape declines.</param>
+    /// <param name="TertiaryIsCancel">Whether Escape reaches the collapsed button.</param>
+    internal readonly record struct ConfirmKeyRoles(
+        bool PrimaryIsDefault,
+        bool SecondaryIsDefault,
+        bool SecondaryIsCancel,
+        bool TertiaryIsCancel);
+
+    /// <summary>Decides which key does what on a two-button confirmation.</summary>
+    /// <param name="primaryIsDefault">Whether the caller wants Enter to accept.</param>
+    /// <remarks>
+    /// Escape always maps to the non-destructive outcome: BtnSecondary's handler sets
+    /// Result = false, and the XAML IsCancel on the collapsed BtnTertiary is cleared so
+    /// Escape cannot land on a button nobody can see.
+    /// <para>
+    /// Enter follows the caller. That is right when accepting is the ordinary answer;
+    /// where it destroys something the caller moves the default onto the declining
+    /// button, so both keys agree and a user who has been pressing Enter at an
+    /// unresponsive surface does not confirm by momentum. Exactly one button carries
+    /// the default, because WPF allows one per scope.
+    /// </para>
+    /// <para>
+    /// Separate from the assignment because a test cannot construct this dialog: a
+    /// Window built on the shared test dispatcher seals application-level styles onto
+    /// that thread and every later test that touches them fails on thread affinity.
+    /// So the rule is pinned here and the four assignments above are not.
+    /// </para>
+    /// </remarks>
+    internal static ConfirmKeyRoles DescribeConfirmKeyRoles(bool primaryIsDefault) =>
+        new(
+            PrimaryIsDefault: primaryIsDefault,
+            SecondaryIsDefault: !primaryIsDefault,
+            SecondaryIsCancel: true,
+            TertiaryIsCancel: false);
+
     public static bool ShowConfirm(
         Window? owner,
         string title,
@@ -77,27 +146,7 @@ public partial class MessageDialog : Window
         dialog.Topmost = topmost;
         dialog.TitleText.Text = title;
         dialog.MessageText.Text = message;
-        dialog.BtnPrimary.Content = primaryLabel;
-        dialog.BtnSecondary.Content = secondaryLabel;
-        dialog.BtnSecondary.Visibility = Visibility.Visible;
-        System.Windows.Automation.AutomationProperties.SetName(dialog.BtnPrimary, primaryLabel);
-        System.Windows.Automation.AutomationProperties.SetName(dialog.BtnSecondary, secondaryLabel);
-
-        // Escape maps to the non-destructive outcome: BtnSecondary's handler sets
-        // Result = false ("No"). The XAML IsCancel on the collapsed BtnTertiary is
-        // neutralized so Escape cannot land on an invisible button.
-        dialog.BtnSecondary.IsCancel = true;
-        dialog.BtnTertiary.IsCancel = false;
-
-        // Enter follows the primary button by default, which is right when the primary
-        // answer is the ordinary one. Where it destroys something, the caller moves the
-        // default to the secondary, so Enter and Escape agree - and a user who has been
-        // pressing Enter at an unresponsive surface does not confirm by momentum.
-        if (!primaryIsDefault)
-        {
-            dialog.BtnPrimary.IsDefault = false;
-            dialog.BtnSecondary.IsDefault = true;
-        }
+        ConfigureConfirmButtons(dialog, primaryLabel, secondaryLabel, primaryIsDefault);
 
         ApplySeverityStyle(dialog, severity);
 
