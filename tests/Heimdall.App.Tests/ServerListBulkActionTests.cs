@@ -784,10 +784,14 @@ public sealed class ServerListBulkActionTests
             fixture.ViewModel.Servers.ToList(),
             cts.Token);
 
+        // This assertion used to read "Connected 1, failed 0, skipped 0." for a selection
+        // of three. Two servers were never attempted and appeared in no counter at all, so
+        // the summary was FALSE rather than merely terse - and this test froze it. The run
+        // must now account for every selected server and say it was cut short.
         Assert.Equal(
             [
                 "Connecting 1/3: Alpha...",
-                "Connected 1, failed 0, skipped 0."
+                "Connected 1, failed 0, skipped 0. Cancelled: 2 not attempted."
             ],
             fixture.StatusMessages);
     }
@@ -808,7 +812,12 @@ public sealed class ServerListBulkActionTests
 
         await fixture.ViewModel.ConnectSelectedCommand.ExecuteAsync(null);
 
-        Assert.Equal("Nothing to connect.", fixture.LastStatusMessage);
+        // Three servers were selected and every one was skipped. Saying only "Nothing to
+        // connect." names an empty selection, which is not what happened: this path used to
+        // discard the skip count entirely.
+        Assert.Equal(
+            "Nothing to connect: 3 selected server(s) were skipped.",
+            fixture.LastStatusMessage);
         Assert.Equal(0, fixture.DialogService.ConfirmCallCount);
     }
 

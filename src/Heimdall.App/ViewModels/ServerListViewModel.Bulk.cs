@@ -395,7 +395,7 @@ public partial class ServerListViewModel
 
         if (plan.ConnectableCount <= 0)
         {
-            StatusMessageRequested?.Invoke(_localizer["StatusBulkConnectNothingToConnect"]);
+            StatusMessageRequested?.Invoke(ComposeNothingToConnectStatus(plan.SkippedCount));
             return;
         }
 
@@ -1309,7 +1309,7 @@ public partial class ServerListViewModel
 
         if (plan.ConnectableCount <= 0)
         {
-            StatusMessageRequested?.Invoke(_localizer["StatusBulkConnectNothingToConnect"]);
+            StatusMessageRequested?.Invoke(ComposeNothingToConnectStatus(plan.SkippedCount));
             return;
         }
 
@@ -1409,14 +1409,41 @@ public partial class ServerListViewModel
             }
         }
 
-        StatusMessageRequested?.Invoke(
-            _localizer.Format(
-                "StatusBulkConnectSummary",
-                connectedCount,
-                failedCount,
-                skippedCount));
+        BulkConnectTally tally = BulkConnectSummary.Describe(
+            selected: plan.ConnectableCount + plan.SkippedCount,
+            connected: connectedCount,
+            failed: failedCount,
+            skipped: skippedCount,
+            cancelled: cancelled);
+
+        var summary = _localizer.Format(
+            "StatusBulkConnectSummary",
+            tally.Connected,
+            tally.Failed,
+            tally.Skipped);
+
+        // Without this, a run cancelled part way reported only what it managed to do and
+        // the rest vanished from the arithmetic - three servers cancelled after the first
+        // read as "connected 1, failed 0, skipped 0", which is false rather than terse.
+        if (tally.NeedsCancellationNotice)
+        {
+            summary += " " + _localizer.Format(
+                "StatusBulkConnectCancelledSuffix",
+                tally.NotAttempted);
+        }
+
+        StatusMessageRequested?.Invoke(summary);
     }
 
+    /// <summary>The message shown when a bulk connect finds nothing it can attempt.</summary>
+    /// <param name="skippedCount">Selected servers skipped before any attempt.</param>
+    internal string ComposeNothingToConnectStatus(int skippedCount)
+    {
+        var key = BulkConnectSummary.NothingToConnectKey(skippedCount);
+        return skippedCount > 0
+            ? _localizer.Format(key, skippedCount)
+            : _localizer[key];
+    }
     private async Task<bool> MoveServersToGroupCoreAsync(
         IReadOnlyList<ServerItemViewModel> serversToMove,
         string? targetGroup,

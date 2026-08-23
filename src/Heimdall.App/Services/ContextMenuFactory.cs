@@ -527,7 +527,7 @@ public sealed class ContextMenuFactory
 
             if (plan.ConnectableCount <= 0)
             {
-                vm.StatusText = vm.Localize("StatusBulkConnectNothingToConnect");
+                vm.StatusText = vm.ServerList.ComposeNothingToConnectStatus(plan.SkippedCount);
                 return;
             }
 

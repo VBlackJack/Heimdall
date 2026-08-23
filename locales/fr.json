@@ -1519,6 +1519,8 @@
   "ConfirmConnectAllMessage": "Se connecter aux {0} sessions de ce groupe ?",
   "StatusConnectAllProgress": "Connexion {0}/{1} : {2}...",
   "StatusConnectedAllCount": "{0} sessions connect\u00e9es.",
+  "StatusBulkConnectCancelledSuffix": "Annul\u00e9 : {0} non tent\u00e9(s).",
+  "StatusBulkConnectNothingToConnectSkipped": "Rien \u00e0 connecter : {0} serveur(s) s\u00e9lectionn\u00e9(s) ont \u00e9t\u00e9 ignor\u00e9s.",
   "StatusBulkConnectSummary": "Connect\u00e9s {0}, \u00e9checs {1}, ignor\u00e9s {2}.",
   "StatusBulkConnectNothingToConnect": "Rien \u00e0 connecter.",
   "StatusBulkDuplicated": "{0} \u00e9l\u00e9ment(s) dupliqu\u00e9(s).",

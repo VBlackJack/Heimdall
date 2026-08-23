@@ -1519,6 +1519,8 @@
   "ConfirmConnectAllMessage": "Connect to all {0} sessions in this group?",
   "StatusConnectAllProgress": "Connecting {0}/{1}: {2}...",
   "StatusConnectedAllCount": "Connected {0} sessions.",
+  "StatusBulkConnectCancelledSuffix": "Cancelled: {0} not attempted.",
+  "StatusBulkConnectNothingToConnectSkipped": "Nothing to connect: {0} selected server(s) were skipped.",
   "StatusBulkConnectSummary": "Connected {0}, failed {1}, skipped {2}.",
   "StatusBulkConnectNothingToConnect": "Nothing to connect.",
   "StatusBulkDuplicated": "Duplicated {0} item(s).",
