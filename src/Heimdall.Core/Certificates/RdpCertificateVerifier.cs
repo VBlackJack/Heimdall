@@ -60,7 +60,19 @@ public sealed record RdpCertificatePromptContext(
     string Host,
     string Thumbprint,
     string? Subject,
-    int AlreadyTrustedCount);
+    int AlreadyTrustedCount)
+{
+    /// <summary>
+    /// Identifies the profile whose trust set the answer will be written to.
+    /// </summary>
+    /// <remarks>
+    /// Carried so a presenter can keep questions for different profiles apart.
+    /// Trust is per profile, so one dialog naming profile A must never supply the
+    /// answer for profile B - that would grant durable trust from a question the
+    /// user was never shown.
+    /// </remarks>
+    public string? ProfileId { get; init; }
+}
 
 /// <summary>What the user answered.</summary>
 public enum RdpTrustAnswer
@@ -162,7 +174,10 @@ public sealed class RdpCertificateVerifier(
                 request.Host,
                 probed.Thumbprint,
                 probed.Subject,
-                decision.AlreadyTrustedCount),
+                decision.AlreadyTrustedCount)
+            {
+                ProfileId = request.ProfileId,
+            },
             cancellationToken);
 
         return Remember(request.ProfileId, probed, answer);

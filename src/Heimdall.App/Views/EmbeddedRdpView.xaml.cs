@@ -29,6 +29,7 @@ using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
@@ -103,6 +104,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
     private CancellationTokenSource? _autofillCts;
     private CancellationTokenSource? _stabilizationCts;
+    private CancellationTokenSource? _certificateVerificationCts;
     private DispatcherTimer? _antiIdleTimer;
     private DispatcherTimer? _autofillFilledTimer;
     private DispatcherTimer? _transientToastTimer;
@@ -530,6 +532,9 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _stabilizationCts?.Cancel();
         _stabilizationCts?.Dispose();
         _stabilizationCts = null;
+        _certificateVerificationCts?.Cancel();
+        _certificateVerificationCts?.Dispose();
+        _certificateVerificationCts = null;
         StopReconnectElapsedTracking();
         StopAntiIdleTimer();
         StopConnectWatchdog();
@@ -678,7 +683,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         Core.Logging.FileLogger.Info(
             $"EmbeddedRDP Loaded: isVisible={IsVisible} formsVisible={FormsHost.IsVisible} formsSize={FormsHost.ActualWidth:0.##}x{FormsHost.ActualHeight:0.##} surfaceSize={SurfaceContainer.ActualWidth:0.##}x{SurfaceContainer.ActualHeight:0.##}");
 
-        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(BeginConnect));
+        _ = StartVerifiedConnectAsync();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -2987,6 +2992,108 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
 
         return Math.Clamp(currentAttempt, 0, maxAttempts);
+    }
+
+    /// <summary>
+    /// Checks the server certificate, then starts the connection unless the user
+    /// refused it.
+    /// </summary>
+    /// <remarks>
+    /// The single place a certificate question can stop a session. It runs once per
+    /// view, not once per attempt: the retry path re-enters <c>BeginConnect</c>
+    /// directly, so a surface that is not ready yet does not re-probe the endpoint or
+    /// ask the user twice.
+    /// </remarks>
+    private async Task StartVerifiedConnectAsync()
+    {
+        RdpConnectionDecision decision = await VerifyServerCertificateAsync();
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (decision == RdpConnectionDecision.Abandon)
+        {
+            HandleCertificateRefused();
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(BeginConnect));
+    }
+
+    /// <summary>Runs the certificate check for this profile, when one is owed.</summary>
+    private async Task<RdpConnectionDecision> VerifyServerCertificateAsync()
+    {
+        AppSettings? settings = _settings;
+        ServerProfileDto? server = _server;
+        if (_disposed || server is null || settings is null)
+        {
+            return RdpConnectionDecision.Proceed;
+        }
+
+        RdpRedirectionOptions redirections =
+            RdpProfileResolver.BuildRedirections(server, settings);
+        RdpAuthenticationSettings auth = RdpAuthenticationResolver.Resolve(
+            redirections.Nla,
+            redirections.StrictServerAuthentication);
+
+        if (!RdpCertificateGate.VerificationRequired(auth.AuthenticationLevel))
+        {
+            return RdpConnectionDecision.Proceed;
+        }
+
+        RdpCertificateVerifier? verifier = (Application.Current as App)
+            ?.Services?.GetService<RdpCertificateVerifier>();
+        if (verifier is null)
+        {
+            // Nothing was verified, so nothing may change.
+            Core.Logging.FileLogger.Warn(
+                "EmbeddedRDP certificate verifier is unavailable; connecting unverified.");
+            return RdpConnectionDecision.Proceed;
+        }
+
+        _certificateVerificationCts?.Dispose();
+        _certificateVerificationCts = new CancellationTokenSource();
+
+        // The address actually dialled, which for a tunneled session is the local end
+        // of the tunnel - the certificate that answers there is the one that matters.
+        RdpCertificateVerificationRequest request = new(
+            server.Id,
+            string.IsNullOrWhiteSpace(server.DisplayName)
+                ? server.RemoteServer
+                : server.DisplayName,
+            ResolveConnectHost(server),
+            ResolveConnectPort(server));
+
+        return await RdpCertificateGate.DecideConnectionAsync(
+            auth.AuthenticationLevel,
+            async ct =>
+            {
+                RdpVerificationOutcome outcome = await verifier.VerifyAsync(request, ct);
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedRDP certificate verification: host={request.Host}:"
+                    + $"{request.Port} outcome={outcome}");
+                return outcome;
+            },
+            ex => Core.Logging.FileLogger.Warn(
+                $"EmbeddedRDP certificate verification could not run: {ex.Message}"),
+            _certificateVerificationCts.Token);
+    }
+
+    /// <summary>Ends the attempt the user declined, and says why.</summary>
+    /// <remarks>
+    /// Reported through the error surface because the tab is finished either way, but
+    /// with its own wording: this is not a fault, it is the answer the user gave.
+    /// </remarks>
+    private void HandleCertificateRefused()
+    {
+        Core.Logging.FileLogger.Warn(
+            "EmbeddedRDP connection abandoned: the server certificate was refused.");
+        _allowResolutionUpdates = false;
+        TransitionPhase(RdpConnectionPhase.None);
+        UpdateSessionStatus(RdpSessionStatus.Error);
+        StatusTextBlock.Text = L("RdpCertificateRefusedStatus");
     }
 
     private void HandleFailure(string message, Exception ex)

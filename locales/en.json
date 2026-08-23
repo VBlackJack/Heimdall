@@ -899,6 +899,7 @@
   "SftpCloseGuardTransferMessage": "A file transfer is running on \"{0}\". Closing now cancels it. Close anyway?",
   "SftpCloseGuardTransferBlocked": "The transfer on \"{0}\" is still running.",
   "SftpCloseGuardEditorSaveBlocked": "The save on \"{0}\" is still running.",
+  "RdpCertificateRefusedStatus": "Connection cancelled: you did not approve the certificate this server presented.",
   "RdpCertPromptTitle": "Unrecognised Server Certificate",
   "RdpCertPromptMessage": "\"{0}\" answered at {1}, presenting a certificate this profile has never approved.\n\nHeimdall cannot tell whether this is the machine you expect. Approve it only if you recognise the fingerprint below, or if you know that several machines answer to this name.",
   "RdpCertPromptAlreadyTrustedOne": "This profile already trusts 1 other certificate for this name, which usually means more than one machine answers to it.",

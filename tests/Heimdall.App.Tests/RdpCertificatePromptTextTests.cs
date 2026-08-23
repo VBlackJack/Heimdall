@@ -108,6 +108,20 @@ public sealed class RdpCertificatePromptTextTests
         }
     }
 
+    [Fact]
+    public async Task RefusalStatus_IsTranslatedInBothCatalogues()
+    {
+        LocalizationManager english = await CreateLocalizerAsync("en");
+        LocalizationManager french = await CreateLocalizerAsync("fr");
+
+        // Shown on the tab when the user declines. It reaches the screen from C# rather
+        // than from XAML, so the XAML key-coverage guard does not see it.
+        const string Key = "RdpCertificateRefusedStatus";
+        Assert.NotEqual(Key, english[Key]);
+        Assert.NotEqual(Key, french[Key]);
+        Assert.NotEqual(english[Key], french[Key]);
+    }
+
     private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
     {
         LocalizationManager manager = new();

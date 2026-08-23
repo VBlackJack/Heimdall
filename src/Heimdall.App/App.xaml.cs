@@ -530,6 +530,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IHostKeyVerifier, DialogHostKeyVerifier>();
         services.AddSingleton<FtpsCertificateStore>();
         services.AddSingleton<RdpCertificateTrustStore>();
+        services.AddSingleton<IRdpCertificateProbe>(_ => new RdpCertificateProbe());
+        services.AddSingleton<IRdpCertificateTrustPrompt, DialogRdpCertificateTrustPrompt>();
+        services.AddSingleton<RdpCertificateVerifier>();
         services.AddSingleton<IFtpsCertificateVerifier, DialogFtpsCertificateVerifier>();
         services.AddSingleton<PinManager>();
 

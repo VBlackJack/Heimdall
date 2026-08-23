@@ -19,24 +19,35 @@ namespace Heimdall.App.Services;
 internal enum TrustPromptKind
 {
     SshHostKey,
-    FtpsCertificate
+    FtpsCertificate,
+    RdpCertificate
 }
 
 internal readonly record struct TrustPromptKey(
     TrustPromptKind Kind,
     string Host,
     int Port,
-    string PresentedFingerprint)
+    string PresentedFingerprint,
+    string Scope = "")
 {
+    /// <summary>Builds a key for one trust question.</summary>
+    /// <param name="scope">
+    /// Distinguishes questions that share an endpoint and a fingerprint but not
+    /// the store their answer lands in. Empty where trust is keyed by endpoint
+    /// alone, as for SSH host keys and FTPS certificates; the RDP prompt passes
+    /// the profile, because RDP trust is per profile and coalescing two profiles
+    /// into one dialog would answer for a profile the user never saw.
+    /// </param>
     public static TrustPromptKey Create(
         TrustPromptKind kind,
         string host,
         int port,
-        string presentedFingerprint)
+        string presentedFingerprint,
+        string scope = "")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         ArgumentException.ThrowIfNullOrWhiteSpace(presentedFingerprint);
-        return new TrustPromptKey(kind, host, port, presentedFingerprint);
+        return new TrustPromptKey(kind, host, port, presentedFingerprint, scope);
     }
 }
 

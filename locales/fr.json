@@ -899,6 +899,7 @@
   "SftpCloseGuardTransferMessage": "Un transfert de fichier est en cours sur \u00ab {0} \u00bb. Fermer maintenant l'annulera. Fermer quand m\u00eame ?",
   "SftpCloseGuardTransferBlocked": "Le transfert sur \u00ab {0} \u00bb est toujours en cours.",
   "SftpCloseGuardEditorSaveBlocked": "L'enregistrement sur \u00ab {0} \u00bb est toujours en cours.",
+  "RdpCertificateRefusedStatus": "Connexion annul\u00e9e : vous n'avez pas approuv\u00e9 le certificat pr\u00e9sent\u00e9 par ce serveur.",
   "RdpCertPromptTitle": "Certificat de serveur non reconnu",
   "RdpCertPromptMessage": "\u00ab {0} \u00bb a r\u00e9pondu sur {1}, en pr\u00e9sentant un certificat que ce profil n'a jamais approuv\u00e9.\n\nHeimdall ne peut pas dire s'il s'agit de la machine attendue. Ne l'approuvez que si vous reconnaissez l'empreinte ci-dessous, ou si vous savez que plusieurs machines r\u00e9pondent \u00e0 ce nom.",
   "RdpCertPromptAlreadyTrustedOne": "Ce profil approuve d\u00e9j\u00e0 1 autre certificat pour ce nom, ce qui signifie le plus souvent que plusieurs machines y r\u00e9pondent.",
