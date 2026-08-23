@@ -155,6 +155,50 @@ public sealed class UpdateRelaunchScriptExecutionTests
             $"the generated script does not parse.\nstdout:\n{run.StandardOutput}\nstderr:\n{run.StandardError}");
     }
 
+    /// <summary>
+    /// The mandatory gate, reached and refused on its own terms: a properly signed
+    /// installer whose bytes do not match the hash the application obtained.
+    /// </summary>
+    /// <remarks>
+    /// Its neighbour is named after this gate but never reaches it - a non-PE file is
+    /// turned back at the signature line, recording the Preparation stage. So did any
+    /// host where Get-AuthenticodeSignature was unavailable, which is how that test came
+    /// to pass on a runner for a reason of its own.
+    /// <para>
+    /// This one asserts the recorded STAGE rather than merely a non-zero exit code, so
+    /// no earlier abort can satisfy it: an abort before the hash is compared records
+    /// Preparation, never IntegrityRejected.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Execute_HashMismatch_RefusesAtTheMandatoryGate(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+
+        // A real, signature-clean executable, so nothing turns it back before the hash.
+        sandbox.PlaceInstaller(exitCode: 0);
+        sandbox.ExpectedSha256Override = new string('0', 64);
+
+        ScriptRun run = await sandbox.RunAsync(powerShellHost);
+
+        Assert.True(run.ExitCode != 0, "a hash mismatch must not report success");
+        Assert.False(
+            sandbox.SequenceContainsRole(InstallerRole),
+            "an installer whose bytes are not the ones verified must never run");
+
+        string recorded = await File.ReadAllTextAsync(sandbox.FailureRecordPath);
+        UpdateFailureRecord? record = JsonSerializer.Deserialize<UpdateFailureRecord>(
+            recorded,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(record);
+        Assert.Equal(UpdateOutcomeStage.IntegrityRejected, record!.Stage);
+
+        // The refusal must not cost the user their application.
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+    }
+
     /// <remarks>
     /// Informational rather than blocking, and the reason is a named limitation rather
     /// than a flake - but NOT the limitation this remark used to name. The reading below
@@ -284,9 +328,12 @@ public sealed class UpdateRelaunchScriptExecutionTests
         // is silent to the user. And NOTHING may ever be appended after the staging
         // Remove-Item: any statement placed there would be skipped exactly when cleanup
         // had already gone wrong.
-        // Same weakness as its neighbour: an abort at the signature line satisfies both
-        // of these too, so under Windows PowerShell 5.1 on a runner this passes without
-        // reaching the cleanup it describes. See BL-0091.
+        // Tightened with the BL-0091 fix, and this line is the point of it: an abort
+        // before the installer used to satisfy the two assertions below, so on a host
+        // where Get-AuthenticodeSignature was unavailable this passed without ever
+        // reaching the cleanup it describes.
+        await sandbox.WaitForRoleAsync(InstallerRole);
+
         Assert.True(Directory.Exists(sandbox.StageDirectory), "a non-empty staging directory survives");
         Assert.True(run.ExitCode != 0, "the truncated finally leaves the host with a failing exit code");
 
@@ -584,6 +631,12 @@ public sealed class UpdateRelaunchScriptExecutionTests
             InstallerExitCode = exitCode;
         }
 
+        /// <summary>
+        /// A well-formed hash the installer does not have, so the run reaches the
+        /// SHA-256 gate rather than being turned back earlier.
+        /// </summary>
+        internal string? ExpectedSha256Override { get; set; }
+
         internal void PlaceNonExecutableInstaller()
         {
             File.WriteAllText(InstallerPath, "this is not a portable executable");
@@ -605,7 +658,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
         {
             return new UpdateRelaunchSpec(
                 InstallerPath: InstallerPath,
-                ExpectedInstallerSha256: Sha256OfFileOrPlaceholder(InstallerPath),
+                ExpectedInstallerSha256:
+                    ExpectedSha256Override ?? Sha256OfFileOrPlaceholder(InstallerPath),
                 TargetExecutablePath: TargetExecutablePath,
                 ProcessId: Environment.ProcessId,
                 ScriptPath: ScriptPath,

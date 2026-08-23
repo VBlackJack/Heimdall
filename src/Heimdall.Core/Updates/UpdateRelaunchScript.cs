@@ -119,9 +119,26 @@ public static class UpdateRelaunchScript
 
         sb.AppendLine(
             $"    Wait-Process -Id {spec.ProcessId} -Timeout {spec.WaitTimeoutSeconds} -ErrorAction SilentlyContinue");
-        sb.AppendLine("    $signature = Get-AuthenticodeSignature -LiteralPath $installerPath");
+        // Obtaining a verdict and judging one are separate things, and only the second
+        // is a reason to refuse. Measured on a GitHub runner: Windows PowerShell 5.1 can
+        // fail to import Microsoft.PowerShell.Security, so the command does not exist at
+        // all, and under ErrorActionPreference Stop that aborted the update before the
+        // installer ever launched - for a reason with nothing to do with the package.
+        //
+        // Treating an unobtainable verdict as fatal was also stricter than the policy
+        // below states: NotSigned is accepted outright, so an unsigned installer already
+        // passes here. What actually guards the boundary is the SHA-256 comparison that
+        // follows, which is mandatory and cannot be skipped.
+        sb.AppendLine("    $signature = $null");
+        sb.AppendLine("    try {");
         sb.AppendLine(
-            "    if ($signature.Status -ne 'Valid' "
+            "        $signature = Get-AuthenticodeSignature -LiteralPath $installerPath");
+        sb.AppendLine("    } catch {");
+        sb.AppendLine(
+            "        Write-Warning ('Authenticode verdict unavailable: ' + $_)");
+        sb.AppendLine("    }");
+        sb.AppendLine(
+            "    if ($null -ne $signature -and $signature.Status -ne 'Valid' "
             + "-and $signature.Status -ne 'NotSigned') {");
         sb.AppendLine("        throw 'Installer Authenticode signature is present but invalid.'");
         sb.AppendLine("    }");
