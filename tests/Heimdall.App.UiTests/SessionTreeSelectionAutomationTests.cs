@@ -279,10 +279,31 @@ public sealed class SessionTreeSelectionAutomationTests
         host.Selected.Add(servers[0]);
         host.Selected.Add(servers[2]);
         SessionTreeView tree = CreateTree(host, servers);
+
+        // Realization is not what this test is about, and on a runner it is not a given.
+        // A row with no container has no peer, so it cannot appear in any selection
+        // whatever the marshalling does - which would fail this test for a reason that has
+        // nothing to do with its subject. Turning virtualization off removes the variable
+        // rather than hoping the viewport is tall enough.
+        VirtualizingPanel.SetIsVirtualizing(tree, false);
         Window window = ShowTree(tree);
 
         try
         {
+            // Stated separately from the assertions below, and before them, so a failure
+            // says WHICH of the two happened: rows that never materialized, or a selection
+            // that did not marshal. Those need opposite fixes, and the console cannot be
+            // asked afterwards.
+            string[] unrealized =
+            [
+                .. servers
+                    .Where(server => tree.ItemContainerGenerator.ContainerFromItem(server) is null)
+                    .Select(server => server.DisplayName)
+            ];
+            Assert.True(
+                unrealized.Length == 0,
+                $"rows never realized, so they cannot be selected: {string.Join(", ", unrealized)}");
+
             nint handle = new WindowInteropHelper(window).Handle;
             using UIA3Automation automation = new();
             FlaUI.Core.AutomationElements.AutomationElement root = automation.FromHandle(handle);

@@ -157,20 +157,27 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
     /// <remarks>
     /// Informational rather than blocking, and the reason is a named limitation rather
-    /// than a flake. This is the only test that has the script LAUNCH the stand-in
-    /// installer, and it fails on a GitHub runner while passing on a developer machine.
-    /// The diagnostic is consistent across three runs: the installer file is removed, so
-    /// the script reached and returned from Start-Process, and the relaunch - the same
-    /// binary, reading the same environment variable - records itself normally. Only the
-    /// child launched through Start-Process -Wait never runs.
+    /// than a flake - but NOT the limitation this remark used to name. The reading below
+    /// replaces one that the runner's own transcript falsified once #243 started
+    /// uploading it.
     /// <para>
-    /// The difference between the two launches is that one is waited on, and PowerShell's
-    /// Start-Process uses ShellExecute. A runner has no interactive window station, which
-    /// is the same class of constraint that puts the -Verb RunAs branch permanently out
-    /// of reach of any execution test. It is left running here rather than deleted or
-    /// silenced: it still executes on CI, its failure is still reported, and it is a real
-    /// oracle on a developer machine, where it is also where the ordering mutant is
-    /// measured.
+    /// The failure is confined to Windows PowerShell 5.1. The same test, on the same
+    /// runner, in the same run, PASSES under PowerShell 7 - same Start-Process, same
+    /// window station - so neither of those can be the cause. What the transcript shows
+    /// instead: Microsoft.PowerShell.Security fails to import, its extended type data
+    /// declaring members of System.Security.AccessControl.ObjectSecurity that are
+    /// already present, so Get-AuthenticodeSignature does not exist and the script
+    /// terminates at the signature line under $ErrorActionPreference = 'Stop'.
+    /// Start-Process is never reached at all. The installer file being gone afterwards
+    /// proves only that the outer finally ran.
+    /// </para>
+    /// <para>
+    /// That is a product defect rather than a harness one, and it is recorded as
+    /// BL-0091: the application falls back to powershell.exe wherever PowerShell 7 is
+    /// absent, so on such a machine no update can install. Left running rather than
+    /// silenced: it still executes, its failure is still reported, and it is a real
+    /// oracle under PowerShell 7 and on a developer machine, where the ordering mutant
+    /// is also measured.
     /// </para>
     /// </remarks>
     [Trait("Category", "CIUnstable")]
@@ -213,6 +220,13 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         ScriptRun run = await sandbox.RunAsync(powerShellHost);
 
+        // KNOWN WEAKNESS, recorded rather than left to be rediscovered. Both assertions
+        // below are satisfied by ANY abort before the installer launches, so on a host
+        // where Get-AuthenticodeSignature is unavailable this test passes without ever
+        // exercising the hash gate it exists for - which is exactly what happens on a
+        // GitHub runner under Windows PowerShell 5.1. Tightening it to name the stage
+        // that failed would make it red there, correctly, which is why it belongs with
+        // the fix in BL-0091 rather than ahead of it.
         Assert.True(run.ExitCode != 0, "a rejected installer must not report success");
         Assert.False(sandbox.SequenceContainsRole(InstallerRole), "the installer must never have run");
 
@@ -224,20 +238,27 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
     /// <remarks>
     /// Informational rather than blocking, and the reason is a named limitation rather
-    /// than a flake. This is the only test that has the script LAUNCH the stand-in
-    /// installer, and it fails on a GitHub runner while passing on a developer machine.
-    /// The diagnostic is consistent across three runs: the installer file is removed, so
-    /// the script reached and returned from Start-Process, and the relaunch - the same
-    /// binary, reading the same environment variable - records itself normally. Only the
-    /// child launched through Start-Process -Wait never runs.
+    /// than a flake - but NOT the limitation this remark used to name. The reading below
+    /// replaces one that the runner's own transcript falsified once #243 started
+    /// uploading it.
     /// <para>
-    /// The difference between the two launches is that one is waited on, and PowerShell's
-    /// Start-Process uses ShellExecute. A runner has no interactive window station, which
-    /// is the same class of constraint that puts the -Verb RunAs branch permanently out
-    /// of reach of any execution test. It is left running here rather than deleted or
-    /// silenced: it still executes on CI, its failure is still reported, and it is a real
-    /// oracle on a developer machine, where it is also where the ordering mutant is
-    /// measured.
+    /// The failure is confined to Windows PowerShell 5.1. The same test, on the same
+    /// runner, in the same run, PASSES under PowerShell 7 - same Start-Process, same
+    /// window station - so neither of those can be the cause. What the transcript shows
+    /// instead: Microsoft.PowerShell.Security fails to import, its extended type data
+    /// declaring members of System.Security.AccessControl.ObjectSecurity that are
+    /// already present, so Get-AuthenticodeSignature does not exist and the script
+    /// terminates at the signature line under $ErrorActionPreference = 'Stop'.
+    /// Start-Process is never reached at all. The installer file being gone afterwards
+    /// proves only that the outer finally ran.
+    /// </para>
+    /// <para>
+    /// That is a product defect rather than a harness one, and it is recorded as
+    /// BL-0091: the application falls back to powershell.exe wherever PowerShell 7 is
+    /// absent, so on such a machine no update can install. Left running rather than
+    /// silenced: it still executes, its failure is still reported, and it is a real
+    /// oracle under PowerShell 7 and on a developer machine, where the ordering mutant
+    /// is also measured.
     /// </para>
     /// </remarks>
     [Trait("Category", "CIUnstable")]
@@ -263,6 +284,9 @@ public sealed class UpdateRelaunchScriptExecutionTests
         // is silent to the user. And NOTHING may ever be appended after the staging
         // Remove-Item: any statement placed there would be skipped exactly when cleanup
         // had already gone wrong.
+        // Same weakness as its neighbour: an abort at the signature line satisfies both
+        // of these too, so under Windows PowerShell 5.1 on a runner this passes without
+        // reaching the cleanup it describes. See BL-0091.
         Assert.True(Directory.Exists(sandbox.StageDirectory), "a non-empty staging directory survives");
         Assert.True(run.ExitCode != 0, "the truncated finally leaves the host with a failing exit code");
 
@@ -277,9 +301,10 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// still contains every substring a text assertion could search for, in a plausible
     /// order. Only running the script can tell the two apart.
     /// <para>
-    /// Informational for the same reason as its neighbours: it launches the installer
-    /// through Start-Process, which goes via ShellExecute, and a runner has no interactive
-    /// window station.
+    /// Informational for the same reason as its neighbours, which is not the reason
+    /// they used to give: on a GitHub runner it fails under Windows PowerShell 5.1 and
+    /// passes under PowerShell 7, because Microsoft.PowerShell.Security will not import
+    /// there and the script dies at Get-AuthenticodeSignature. See BL-0091.
     /// </para>
     /// </remarks>
     [Trait("Category", "CIUnstable")]
