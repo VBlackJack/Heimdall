@@ -552,6 +552,11 @@ public partial class App : System.Windows.Application
         services.AddSingleton<X11ServerManager>();
         services.AddSingleton<ExternalToolProviderService>();
         services.AddSingleton<ToolRegistry>();
+
+        // The single place the real preset location is resolved. Neither the storage nor the
+        // view model can reach it any more: their parameterless constructors are gone.
+        services.AddSingleton<IPasswordPresetStorage>(
+            _ => new PasswordPresetStorage(ApplicationDataPathResolver.Resolve()));
         services.AddSingleton<HeimdallThemeService>();
 
         // Updater services (no UI wiring yet)

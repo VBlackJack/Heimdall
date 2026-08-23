@@ -44,10 +44,24 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     public PasswordGeneratorView()
     {
         InitializeComponent();
-        _vm = new PasswordGeneratorViewModel();
+        _vm = new PasswordGeneratorViewModel(ResolvePresetStorage());
         DataContext = _vm;
         _vm.PropertyChanged += OnVmPropertyChanged;
     }
+
+    /// <summary>The one place the production preset location is reached.</summary>
+    /// <remarks>
+    /// <b>Deliberately without a fallback.</b> A fallback that resolved the real user
+    /// directory would rebuild the hazard this wiring removes - the point is that no path
+    /// outside the composition root can reach the operator's own preset file. Throwing is
+    /// louder than silently writing to it, and this view is only ever created by the running
+    /// application: no XAML instantiates it and no test builds it.
+    /// </remarks>
+    private static IPasswordPresetStorage ResolvePresetStorage()
+        => (Application.Current as App)?.Services?.GetService<IPasswordPresetStorage>()
+            ?? throw new InvalidOperationException(
+                "Password preset storage is unavailable. This view must be created by the "
+                + "running application, which supplies it from the composition root.");
 
     /// <summary>
     /// Initializes the view with optional context and localizer.
