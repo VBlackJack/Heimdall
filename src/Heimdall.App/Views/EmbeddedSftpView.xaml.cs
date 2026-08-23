@@ -489,6 +489,19 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                     activeInlineEditorTempPath,
                     StringComparison.OrdinalIgnoreCase))
             {
+                // Skipping the loop is not enough to keep this directory. It holds the
+                // file the upload is still reading, and the only copy of what the user
+                // typed - and the save's own finally deletes it when the upload finally
+                // returns and finds this view disposed. Forgetting the path here is what
+                // makes the retention survive that: CleanupEditTempDir refuses any path
+                // it does not know, so removing it from the set turns the protection into
+                // something that method enforces rather than something every caller must
+                // remember.
+                //
+                // The consequence of leaving it in the set was the opposite of the
+                // intention: the text survived only while the upload stayed wedged
+                // forever, and was destroyed the moment the teardown actually worked.
+                _activeEditTempDirs.Remove(tempPath);
                 continue;
             }
 
