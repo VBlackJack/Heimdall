@@ -304,13 +304,6 @@ public sealed class SessionTreeSelectionAutomationTests
                 unrealized.Length == 0,
                 $"rows never realized, so they cannot be selected: {string.Join(", ", unrealized)}");
 
-            // Second discriminator, in process, before the client is attached. The
-            // provider marshals each selected row through ProviderFromPeer, and a peer
-            // that never received a hwnd marshals to null and is dropped silently. If
-            // this holds while the client below sees fewer, the row is lost between the
-            // provider and the client rather than inside GetSelection.
-            Assert.Equal(2, SelectionProviderOf(tree).GetSelection().Length);
-
             nint handle = new WindowInteropHelper(window).Handle;
             using UIA3Automation automation = new();
             FlaUI.Core.AutomationElements.AutomationElement root = automation.FromHandle(handle);
@@ -323,6 +316,27 @@ public sealed class SessionTreeSelectionAutomationTests
                 treeElement!.Patterns.Selection.IsSupported,
                 "The session tree exposes no Selection pattern.");
             FlaUI.Core.Patterns.ISelectionPattern selection = treeElement.Patterns.Selection.Pattern;
+
+            // Second discriminator, and it stays inside the client on purpose. Asking
+            // the rows themselves what they report, before asking the tree for its
+            // selection as a whole, separates a row that never reached the client from a
+            // row the selection call dropped.
+            //
+            // A peer built here instead would answer a different question: it would not
+            // be the peer attached to the tree, and an unattached peer carries no hwnd,
+            // so it marshals to nothing. That is the very defect this test exists for,
+            // and measuring it that way reports zero on a runner while the client sees
+            // rows - measured, on the first attempt at exactly that mistake.
+            string[] rowsReportingSelected =
+            [
+                .. treeElement.FindAllDescendants(condition =>
+                        condition.ByControlType(FlaUI.Core.Definitions.ControlType.TreeItem))
+                    .Where(row => row.Patterns.SelectionItem.IsSupported
+                        && row.Patterns.SelectionItem.Pattern.IsSelected.Value)
+                    .Select(row => row.Name)
+                    .OrderBy(name => name, StringComparer.Ordinal)
+            ];
+            Assert.Equal(["srv-0", "srv-2"], rowsReportingSelected);
 
             Assert.True(selection.CanSelectMultiple.Value);
             Assert.Equal(2, selection.Selection.Value.Length);
