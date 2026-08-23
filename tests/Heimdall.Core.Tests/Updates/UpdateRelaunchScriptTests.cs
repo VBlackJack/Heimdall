@@ -325,6 +325,58 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Contains("$signature.Status -ne 'NotSigned'", script);
     }
 
+    /// <summary>
+    /// Failing to OBTAIN a signature verdict must not refuse the update; only a verdict
+    /// that is present and bad may.
+    /// </summary>
+    /// <remarks>
+    /// Measured on a GitHub runner: Windows PowerShell 5.1 can fail to import
+    /// Microsoft.PowerShell.Security, so Get-AuthenticodeSignature does not exist and,
+    /// under ErrorActionPreference Stop, the script died at that line before the
+    /// installer ever launched. The application falls back to that host wherever
+    /// PowerShell 7 is absent, so on such a machine no update could install at all.
+    /// <para>
+    /// Refusing on an unobtainable verdict was also stricter than the policy the script
+    /// states: NotSigned is accepted outright. What guards the boundary is the SHA-256
+    /// comparison below, which stays mandatory.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Build_UnobtainableSignatureVerdict_DoesNotRefuseTheUpdate()
+    {
+        var script = UpdateRelaunchScript.Build(SampleSpec());
+
+        int initIndex = script.IndexOf("$signature = $null", StringComparison.Ordinal);
+        int tryIndex = script.IndexOf("try {", initIndex, StringComparison.Ordinal);
+        int callIndex = script.IndexOf("Get-AuthenticodeSignature", StringComparison.Ordinal);
+        int catchIndex = script.IndexOf("} catch {", callIndex, StringComparison.Ordinal);
+        int guardIndex = script.IndexOf(
+            "if ($null -ne $signature -and $signature.Status -ne 'Valid'",
+            StringComparison.Ordinal);
+        int refusalIndex = script.IndexOf(
+            "Installer Authenticode signature is present but invalid.",
+            StringComparison.Ordinal);
+        int hashComparisonIndex = script.IndexOf(
+            "Installer SHA-256 verification failed at the execution boundary.",
+            StringComparison.Ordinal);
+
+        // The call is wrapped, so a host that cannot provide the command does not end
+        // the update.
+        Assert.True(initIndex >= 0, "the verdict is not initialised");
+        Assert.True(tryIndex > initIndex);
+        Assert.True(callIndex > tryIndex);
+        Assert.True(catchIndex > callIndex, "the call is not wrapped");
+
+        // And the refusal is reached only when a verdict actually exists. Without this
+        // guard a null verdict would compare unequal to both accepted values and refuse
+        // the update on the strength of nothing at all.
+        Assert.True(guardIndex > catchIndex, "the refusal is not guarded by a verdict");
+        Assert.True(refusalIndex > guardIndex);
+
+        // Unchanged and load-bearing: the mandatory gate still follows.
+        Assert.True(hashComparisonIndex > refusalIndex);
+    }
+
     [Fact]
     public void Build_InvalidInstallerHash_Throws()
     {
