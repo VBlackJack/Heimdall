@@ -48,7 +48,21 @@ public class SessionTreeViewAutomationPeer : TreeViewAutomationPeer, ISelectionP
     bool ISelectionProvider.IsSelectionRequired => false;
 
     IRawElementProviderSimple[] ISelectionProvider.GetSelection()
-        => [.. SelectedPeers().Select(ProviderFromPeer).OfType<IRawElementProviderSimple>()];
+        => [.. SelectedPeers()
+            .Select(ClientVisiblePeerFor)
+            .Select(ProviderFromPeer)
+            .OfType<IRawElementProviderSimple>()];
+
+    /// <summary>The peer a UI Automation client can resolve for a realized row.</summary>
+    /// <remarks>
+    /// An items control does not put container peers in the automation tree. It puts one data-item
+    /// peer per item and hangs the container peer off it as
+    /// <see cref="AutomationPeer.EventsSource"/>, so a container peer never gets an hwnd and
+    /// <c>ProviderFromPeer</c> answers null for it - silently. Every selected row was dropped on
+    /// the way out and the array came back empty however many rows were selected, which is the
+    /// same nothing the defect this peer exists to fix used to report.
+    /// </remarks>
+    private static AutomationPeer ClientVisiblePeerFor(AutomationPeer peer) => peer.EventsSource ?? peer;
 
     /// <summary>Every realized row peer the selection host counts as selected, in tree order.</summary>
     /// <remarks>

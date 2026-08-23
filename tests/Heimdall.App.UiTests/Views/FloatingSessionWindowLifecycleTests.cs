@@ -37,8 +37,13 @@ public sealed class FloatingSessionWindowLifecycleTests
         {
             const string InitialTitle = "Initial session";
             const string UpdatedTitle = "Updated session";
-            const string InitialStatus = "Connecting";
-            const string UpdatedStatus = "Error";
+            // Free-form reasons rather than status tokens. The converter passes a status the
+            // mapping does not know through unchanged, so what the header shows is fixed by the
+            // session alone and does not move with whatever locale is in force - and a pane that
+            // failed really does carry its reason as free text. Tracking is what this test is for;
+            // the mapping gets its own assertion at the end, where only the mapping is asserted.
+            const string InitialStatus = "Host unreachable";
+            const string UpdatedStatus = "Authentication failed";
             const string InitialTunnelRoute = "via gateway-a";
             const string UpdatedTunnelRoute = "via gateway-b";
             SessionTabViewModel session = new()
@@ -72,6 +77,16 @@ public sealed class FloatingSessionWindowLifecycleTests
                 Assert.Equal(
                     string.Format(WpfTestHost.Localizer["SessionDetachTitle"], UpdatedTitle),
                     window.Title);
+
+                // A status the mapping does know is shown as its label, not as the raw token: the
+                // detached header states a session's condition the way the tab header and the
+                // status bar do, through SessionStatusDisplay. Which label depends on the locale
+                // in force, so the assertion is that the mapping happened, not what it produced.
+                session.Status = SessionStatusTokens.Reconnecting;
+                FlushDispatcher();
+
+                Assert.NotEqual(SessionStatusTokens.Reconnecting, statusText.Text);
+                Assert.NotEmpty(statusText.Text);
             }
             finally
             {
