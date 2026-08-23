@@ -34,6 +34,9 @@ internal interface IUpdateInstallerHost
     /// <summary>Creates a unique temporary path for the relauncher transcript (.log).</summary>
     string CreateLogPath();
 
+    /// <summary>Where the relauncher records what went wrong, when something does.</summary>
+    string CreateFailureRecordPath();
+
     /// <summary>Resolves the PowerShell host: pwsh.exe when available, else powershell.exe.</summary>
     string ResolvePowerShellExecutable();
 

@@ -45,6 +45,8 @@ internal sealed class FakeUpdateOutcomeStore : IUpdateOutcomeStore
 
     public UpdateAttemptRecord? Pending { get; set; }
 
+    public UpdateFailureRecord? PendingFailure { get; set; }
+
     /// <summary>Lets a collaborator record itself into the same sequence.</summary>
     public void RecordExternalCall(string name) => _calls.Add(name);
 
@@ -60,11 +62,13 @@ internal sealed class FakeUpdateOutcomeStore : IUpdateOutcomeStore
         _calls.Add(ClearCall);
     }
 
-    public UpdateAttemptRecord? TryTakePending()
+    public PendingUpdateOutcome? TryTakePending()
     {
         _calls.Add(TakeCall);
         UpdateAttemptRecord? pending = Pending;
+        UpdateFailureRecord? failure = PendingFailure;
         Pending = null;
-        return pending;
+        PendingFailure = null;
+        return pending is null ? null : new PendingUpdateOutcome(pending, failure);
     }
 }

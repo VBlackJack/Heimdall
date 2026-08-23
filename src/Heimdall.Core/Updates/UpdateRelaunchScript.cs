@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.Text;
 
 namespace Heimdall.Core.Updates;
@@ -32,7 +33,8 @@ public sealed record UpdateRelaunchSpec(
     bool RequiresElevation = false,
     string InstallerArguments = UpdateRelaunchScript.DefaultInstallerArguments,
     int WaitTimeoutSeconds = UpdateRelaunchScript.DefaultWaitTimeoutSeconds,
-    string? LogPath = null);
+    string? LogPath = null,
+    string? FailureRecordPath = null);
 
 /// <summary>
 /// Pure builder for the detached PowerShell relauncher used by the in-app updater.
@@ -93,6 +95,7 @@ public static class UpdateRelaunchScript
         ValidateSha256(spec.ExpectedInstallerSha256, nameof(spec.ExpectedInstallerSha256));
 
         var hasLog = !string.IsNullOrEmpty(spec.LogPath);
+        var hasFailureRecord = !string.IsNullOrEmpty(spec.FailureRecordPath);
         var elevation = spec.RequiresElevation ? " -Verb RunAs" : string.Empty;
         string installerPath = EscapeSingleQuoted(spec.InstallerPath);
         string expectedInstallerSha256 = EscapeSingleQuoted(spec.ExpectedInstallerSha256);
@@ -103,6 +106,9 @@ public static class UpdateRelaunchScript
         sb.AppendLine("$installerStream = $null");
         sb.AppendLine($"$installerPath = '{installerPath}'");
         sb.AppendLine($"$expectedInstallerSha256 = '{expectedInstallerSha256}'");
+        sb.AppendLine($"$updateStage = '{UpdateOutcomeStage.Preparation}'");
+        sb.AppendLine("$installerExitCode = 0");
+        sb.AppendLine("$installerExitKnown = 0");
         sb.AppendLine("try {");
 
         if (hasLog)
@@ -131,15 +137,61 @@ public static class UpdateRelaunchScript
         sb.AppendLine("    } finally {");
         sb.AppendLine("        $sha256.Dispose()");
         sb.AppendLine("    }");
+        sb.AppendLine($"    $updateStage = '{UpdateOutcomeStage.IntegrityRejected}'");
         sb.AppendLine(
             "    if (-not [System.String]::Equals($actualInstallerSha256, "
             + "$expectedInstallerSha256, [System.StringComparison]::OrdinalIgnoreCase)) {");
         sb.AppendLine("        throw 'Installer SHA-256 verification failed at the execution boundary.'");
         sb.AppendLine("    }");
+        sb.AppendLine($"    $updateStage = '{UpdateOutcomeStage.InstallerLaunch}'");
         sb.AppendLine(
-            $"    Start-Process -FilePath $installerPath{elevation} "
-            + $"-ArgumentList '{EscapeSingleQuoted(spec.InstallerArguments)}' -Wait");
+            $"    $installerProcess = Start-Process -FilePath $installerPath{elevation} "
+            + $"-ArgumentList '{EscapeSingleQuoted(spec.InstallerArguments)}' -Wait -PassThru");
+
+        // The guard wraps the property ACCESS, not merely the null object. Reading
+        // ExitCode can throw depending on how the process was started, and an
+        // unreadable code must degrade to exactly today's behaviour rather than be
+        // reported as a failure that was never measured.
+        sb.AppendLine("    if ($null -ne $installerProcess) {");
+        sb.AppendLine("        try {");
+        sb.AppendLine("            $installerExitCode = [int]$installerProcess.ExitCode");
+        sb.AppendLine("            $installerExitKnown = 1");
+        sb.AppendLine("        } catch {");
+        sb.AppendLine("            $installerExitKnown = 0");
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
+
+        // Both conditions, deliberately: an unknown code is never a failure.
+        sb.AppendLine(
+            "    if ($installerExitKnown -eq 1 -and $installerExitCode -ne 0) {");
+        sb.AppendLine($"        $updateStage = '{UpdateOutcomeStage.InstallerExit}'");
+        sb.AppendLine("        throw 'Installer reported a non-zero exit code.'");
+        sb.AppendLine("    }");
         sb.AppendLine("} catch {");
+
+        // STRICTLY BEFORE Write-Error, and that ordering is the whole point. Under
+        // $ErrorActionPreference = 'Stop' a Write-Error inside a catch is a TERMINATING
+        // error: it abandons the rest of the block. Anything appended after it is dead
+        // code that no text assertion can tell from live code.
+        //
+        // Wrapped in its own try/catch because failing to explain a failure must never
+        // become a second failure - the finally below still has to bring the
+        // application back.
+        if (hasFailureRecord)
+        {
+            sb.AppendLine("    try {");
+            sb.AppendLine(
+                "        [System.IO.File]::WriteAllText('"
+                + EscapeSingleQuoted(spec.FailureRecordPath!)
+                + "', '{\"schemaVersion\":"
+                + UpdateFailureRecord.CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture)
+                + ",\"stage\":\"' + $updateStage + '\",\"installerExitCode\":' "
+                + "+ $installerExitCode + ',\"installerExitCodeKnown\":' "
+                + "+ $installerExitKnown + '}')");
+            sb.AppendLine("    } catch {");
+            sb.AppendLine("    }");
+        }
+
         sb.AppendLine("    Write-Error $_");
         sb.AppendLine("} finally {");
         sb.AppendLine("    if ($null -ne $installerStream) {");

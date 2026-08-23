@@ -39,6 +39,9 @@ public static class UpdateRelaunchOutcomeText
         UpdateRelaunchOutcome.None => null,
         UpdateRelaunchOutcome.Succeeded => null,
         UpdateRelaunchOutcome.NotApplied => "UpdateBannerOutcomeNotApplied",
+        UpdateRelaunchOutcome.CancelledByUser => "UpdateBannerOutcomeCancelled",
+        UpdateRelaunchOutcome.InstallerFailed => "UpdateBannerOutcomeInstallerFailed",
+        UpdateRelaunchOutcome.IntegrityRejected => "UpdateBannerOutcomeIntegrityRejected",
         _ => null, // total, and silent: an unknown outcome must not invent a message.
     };
 }

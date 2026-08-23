@@ -46,6 +46,10 @@ public sealed class UpdateInstallerTests
         public string ScriptPathValue { get; set; } =
             @"C:\Temp\update-stage\Heimdall_relaunch_script.ps1";
         public string LogPathValue { get; set; } = @"C:\Temp\Heimdall_relaunch_log.log";
+
+        // A distinct value on purpose: a double that returned the transcript path for
+        // both would hide the very confusion it should catch.
+        public string FailureRecordPathValue { get; set; } = @"C:\Temp\updates\update-failure.json";
         public string PowerShellExecutable { get; set; } = "pwsh.exe";
 
         public string? WrittenPath { get; private set; }
@@ -64,6 +68,8 @@ public sealed class UpdateInstallerTests
         }
 
         public string CreateLogPath() => LogPathValue;
+
+        public string CreateFailureRecordPath() => FailureRecordPathValue;
 
         public string ResolvePowerShellExecutable() => PowerShellExecutable;
 

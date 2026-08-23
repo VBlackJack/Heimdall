@@ -37,9 +37,11 @@ public static class UpdateOutcomeClassifier
     /// this fixes, so a false report has to survive the version check first.
     /// </remarks>
     /// <param name="attempt">The pending record, or null when none was found.</param>
+    /// <param name="failure">What the relauncher recorded, when it recorded anything.</param>
     /// <param name="runningVersion">The version actually running now.</param>
     public static UpdateRelaunchOutcome Classify(
         UpdateAttemptRecord? attempt,
+        UpdateFailureRecord? failure,
         HeimdallVersion? runningVersion)
     {
         if (attempt is null)
@@ -54,6 +56,11 @@ public static class UpdateOutcomeClassifier
             return UpdateRelaunchOutcome.None;
         }
 
+        // The version check comes FIRST, before any failure record is consulted. That
+        // ordering is the fail-safe, and it is what makes a false alarm require two
+        // independent things to go wrong: an installer that reports an error after the
+        // files were in fact replaced is a documented possibility, and the user looking
+        // at the new version must not be told it failed.
         string? running = runningVersion?.ToString();
         if (!string.IsNullOrWhiteSpace(running)
             && string.Equals(running, attempt.AttemptedVersion, StringComparison.OrdinalIgnoreCase))
@@ -61,6 +68,26 @@ public static class UpdateOutcomeClassifier
             return UpdateRelaunchOutcome.Succeeded;
         }
 
+        if (failure is null)
+        {
+            return UpdateRelaunchOutcome.NotApplied;
+        }
+
+        if (string.Equals(failure.Stage, UpdateOutcomeStage.IntegrityRejected, StringComparison.Ordinal))
+        {
+            return UpdateRelaunchOutcome.IntegrityRejected;
+        }
+
+        if (failure.HasExitCode)
+        {
+            return InnoSetupExitCode.IsUserCancellation(failure.InstallerExitCode)
+                ? UpdateRelaunchOutcome.CancelledByUser
+                : UpdateRelaunchOutcome.InstallerFailed;
+        }
+
+        // A stage token this build does not recognize, or an exit code that could not be
+        // read, falls back to the statement that is still true. An unknown token must
+        // never throw and must never invent a cause.
         return UpdateRelaunchOutcome.NotApplied;
     }
 }

@@ -38,7 +38,7 @@ public sealed class UpdateOutcomeTests : IDisposable
     {
         Assert.Equal(
             UpdateRelaunchOutcome.None,
-            UpdateOutcomeClassifier.Classify(null, HeimdallVersion.Parse("2026.082201")));
+            UpdateOutcomeClassifier.Classify(null, null, HeimdallVersion.Parse("2026.082201")));
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class UpdateOutcomeTests : IDisposable
         // confidence than the silence this whole change replaces.
         Assert.Equal(
             UpdateRelaunchOutcome.Succeeded,
-            UpdateOutcomeClassifier.Classify(attempt, HeimdallVersion.Parse("2026.082202")));
+            UpdateOutcomeClassifier.Classify(attempt, null, HeimdallVersion.Parse("2026.082202")));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class UpdateOutcomeTests : IDisposable
 
         Assert.Equal(
             UpdateRelaunchOutcome.NotApplied,
-            UpdateOutcomeClassifier.Classify(attempt, HeimdallVersion.Parse("2026.082201")));
+            UpdateOutcomeClassifier.Classify(attempt, null, HeimdallVersion.Parse("2026.082201")));
     }
 
     [Fact]
@@ -73,8 +73,132 @@ public sealed class UpdateOutcomeTests : IDisposable
         // unparsed value as an empty string, so this is reachable rather than theoretical.
         Assert.Equal(
             UpdateRelaunchOutcome.None,
-            UpdateOutcomeClassifier.Classify(attempt, HeimdallVersion.Parse("2026.082201")));
+            UpdateOutcomeClassifier.Classify(attempt, null, HeimdallVersion.Parse("2026.082201")));
     }
+
+    private static UpdateFailureRecord Failure(string stage, int exitCode, int known) =>
+        new(UpdateFailureRecord.CurrentSchemaVersion, stage, exitCode, known);
+
+    [Fact]
+    public void Classify_RunningTheAttemptedVersion_WinsOverAnyFailureRecord()
+    {
+        UpdateAttemptRecord attempt = Attempt("2026.082202", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure(UpdateOutcomeStage.InstallerExit, 3, known: 1);
+
+        // The single most important assertion in this file. An installer can report an
+        // error after the files were in fact replaced, so the version check comes first
+        // and a false alarm needs two independent things to go wrong.
+        Assert.Equal(
+            UpdateRelaunchOutcome.Succeeded,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082202")));
+    }
+
+    [Theory]
+    [InlineData(InnoSetupExitCode.CancelledBeforeInstall, UpdateRelaunchOutcome.CancelledByUser)]
+    [InlineData(InnoSetupExitCode.CancelledDuringInstall, UpdateRelaunchOutcome.CancelledByUser)]
+    [InlineData(InnoSetupExitCode.InitializationFailed, UpdateRelaunchOutcome.InstallerFailed)]
+    [InlineData(InnoSetupExitCode.FatalPreparationError, UpdateRelaunchOutcome.InstallerFailed)]
+    [InlineData(InnoSetupExitCode.FatalInstallError, UpdateRelaunchOutcome.InstallerFailed)]
+    [InlineData(InnoSetupExitCode.CannotProceed, UpdateRelaunchOutcome.InstallerFailed)]
+    public void Classify_KnownExitCode_SeparatesCancellationFromFailure(
+        int exitCode,
+        UpdateRelaunchOutcome expected)
+    {
+        UpdateAttemptRecord attempt = Attempt("2026.082202", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure(UpdateOutcomeStage.InstallerExit, exitCode, known: 1);
+
+        // A user who declined the elevation prompt or cancelled the wizard did not suffer
+        // a failure, and that is very probably the most frequent reason an update does
+        // not apply. The two must not share wording.
+        Assert.Equal(
+            expected,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082201")));
+    }
+
+    [Fact]
+    public void Classify_IntegrityRejected_IsReportedAsItsOwnCause()
+    {
+        UpdateAttemptRecord attempt = Attempt("2026.082202", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure(UpdateOutcomeStage.IntegrityRejected, 0, known: 0);
+
+        Assert.Equal(
+            UpdateRelaunchOutcome.IntegrityRejected,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082201")));
+    }
+
+    [Fact]
+    public void Classify_ExitCodeThatCouldNotBeRead_StatesOnlyWhatIsStillTrue()
+    {
+        UpdateAttemptRecord attempt = Attempt("2026.082202", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure(UpdateOutcomeStage.InstallerExit, 0, known: 0);
+
+        // Unknown is never a cause. The statement that the version did not move survives.
+        Assert.Equal(
+            UpdateRelaunchOutcome.NotApplied,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082201")));
+    }
+
+    [Fact]
+    public void Classify_UnknownStageToken_DoesNotThrowAndInventsNoCause()
+    {
+        UpdateAttemptRecord attempt = Attempt("2026.082202", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure("SomethingAFutureBuildWrote", 0, known: 0);
+
+        Assert.Equal(
+            UpdateRelaunchOutcome.NotApplied,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082201")));
+    }
+
+    [Fact]
+    public void Store_RoundTripsTheFailureRecordAlongsideTheAttempt()
+    {
+        Directory.CreateDirectory(_directory);
+        var store = new UpdateOutcomeStore(_directory);
+        store.WriteAttempt("2026.082202");
+        WriteFailure(@"{""schemaVersion"":1,""stage"":""InstallerExit"",""installerExitCode"":3,""installerExitCodeKnown"":1}");
+
+        PendingUpdateOutcome? taken = store.TryTakePending();
+
+        Assert.NotNull(taken);
+        Assert.Equal(UpdateOutcomeStage.InstallerExit, taken!.Failure!.Stage);
+        Assert.Equal(3, taken.Failure.InstallerExitCode);
+        Assert.True(taken.Failure.HasExitCode);
+        Assert.False(File.Exists(Path.Combine(_directory, "update-failure.json")));
+    }
+
+    [Fact]
+    public void Store_UnparseableFailureRecord_CostsTheCauseNotTheReport()
+    {
+        Directory.CreateDirectory(_directory);
+        var store = new UpdateOutcomeStore(_directory);
+        store.WriteAttempt("2026.082202");
+        WriteFailure("{ truncated");
+
+        PendingUpdateOutcome? taken = store.TryTakePending();
+
+        // The attempt alone still supports the statement that the version did not move.
+        Assert.NotNull(taken);
+        Assert.Null(taken!.Failure);
+    }
+
+    [Fact]
+    public void Store_WriteAttempt_DiscardsAPreviousRunsFailureRecord()
+    {
+        Directory.CreateDirectory(_directory);
+        var store = new UpdateOutcomeStore(_directory);
+        WriteFailure(@"{""schemaVersion"":1,""stage"":""InstallerExit"",""installerExitCode"":3,""installerExitCodeKnown"":1}");
+
+        store.WriteAttempt("2026.082202");
+
+        // It described a different update entirely. Reading it against this attempt would
+        // report a cause that belongs to something else.
+        PendingUpdateOutcome? taken = store.TryTakePending();
+        Assert.NotNull(taken);
+        Assert.Null(taken!.Failure);
+    }
+
+    private void WriteFailure(string json) =>
+        File.WriteAllText(Path.Combine(_directory, "update-failure.json"), json);
 
     [Fact]
     public void Store_RoundTripsAnAttemptAndRemovesItOnRead()
@@ -82,10 +206,11 @@ public sealed class UpdateOutcomeTests : IDisposable
         var store = new UpdateOutcomeStore(_directory);
         store.WriteAttempt("2026.082202");
 
-        UpdateAttemptRecord? taken = store.TryTakePending();
+        PendingUpdateOutcome? taken = store.TryTakePending();
 
         Assert.NotNull(taken);
-        Assert.Equal("2026.082202", taken!.AttemptedVersion);
+        Assert.Equal("2026.082202", taken!.Attempt.AttemptedVersion);
+        Assert.Null(taken.Failure);
 
         // Read once: a second startup must not report the same attempt again.
         Assert.Null(store.TryTakePending());

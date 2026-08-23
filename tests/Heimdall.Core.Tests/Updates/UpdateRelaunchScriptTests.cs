@@ -24,12 +24,15 @@ public sealed class UpdateRelaunchScriptTests
     private static readonly string InstallerSha256 = new('a', 64);
     private static readonly string ScriptSha256 = new('b', 64);
 
+    private const string FailureRecordPath = @"C:\Temp\updates\update-failure.json";
+
     private static UpdateRelaunchSpec SampleSpec(
         bool requiresElevation = false,
         string? logPath = null,
         string installerPath = @"C:\Temp\HeimdallSetup.exe",
         string targetExecutablePath = @"C:\Program Files\Heimdall\Heimdall.exe",
-        string scriptPath = @"C:\Temp\heimdall_relaunch.ps1") =>
+        string scriptPath = @"C:\Temp\heimdall_relaunch.ps1",
+        string? failureRecordPath = null) =>
         new(
             InstallerPath: installerPath,
             ExpectedInstallerSha256: InstallerSha256,
@@ -38,7 +41,8 @@ public sealed class UpdateRelaunchScriptTests
             ScriptPath: scriptPath,
             StagingDirectory: @"C:\Temp\update-stage",
             RequiresElevation: requiresElevation,
-            LogPath: logPath);
+            LogPath: logPath,
+            FailureRecordPath: failureRecordPath);
 
     [Fact]
     public void EscapeSingleQuoted_DoublesSingleQuotes()
@@ -200,6 +204,89 @@ public sealed class UpdateRelaunchScriptTests
         Assert.True(
             relaunchIndex > outerFinallyIndex,
             "the relaunch must sit inside the outer finally, so it runs on every path");
+    }
+
+    /// <remarks>
+    /// The installer's exit code was never read: Start-Process ran it with -Wait and no
+    /// -PassThru, so an installer that ran and failed raised nothing and the catch was
+    /// never entered. That, and not the catch, is where the silence came from.
+    /// </remarks>
+    [Fact]
+    public void Build_CapturesTheInstallerAndChecksItsExitCode()
+    {
+        var script = UpdateRelaunchScript.Build(SampleSpec());
+
+        Assert.Contains("-Wait -PassThru", script);
+
+        // The guard wraps the property ACCESS, not merely the null object: reading
+        // ExitCode can itself throw, and an unreadable code must degrade to today's
+        // behaviour rather than be reported as a failure nobody measured.
+        int readIndex = script.IndexOf("$installerProcess.ExitCode", StringComparison.Ordinal);
+        Assert.True(readIndex > 0, "the exit code must be read");
+        int tryIndex = script.LastIndexOf("try {", readIndex, StringComparison.Ordinal);
+        Assert.True(tryIndex >= 0 && tryIndex < readIndex, "the exit-code read must be guarded");
+
+        // BOTH conditions, deliberately: an unknown code is never a failure.
+        Assert.Contains("$installerExitKnown -eq 1 -and $installerExitCode -ne 0", script);
+
+        int launchIndex = script.IndexOf("-Wait -PassThru", StringComparison.Ordinal);
+        int checkIndex = script.IndexOf("$installerExitKnown -eq 1", StringComparison.Ordinal);
+        Assert.True(launchIndex < checkIndex, "the check must follow the launch");
+        Assert.True(checkIndex < OuterCatchIndex(script), "the check must sit inside the try");
+    }
+
+    /// <summary>Index of the OUTER catch, which is the only one at column zero.</summary>
+    /// <remarks>
+    /// A bare <c>IndexOf("} catch {")</c> matches the INNER catch that guards the
+    /// exit-code read, because the outer form is a substring of the indented one. That is
+    /// the same mistake as <see cref="Build_PlacesRelaunchInsideFinallyBlock"/>'s search
+    /// for the first "finally", which resolves to the inner SHA-256 disposal - and it was
+    /// made again here, in a test written to avoid it. Anchor on the line start.
+    /// </remarks>
+    private static int OuterCatchIndex(string script)
+    {
+        int index = script.IndexOf(
+            Environment.NewLine + "} catch {",
+            StringComparison.Ordinal);
+        Assert.True(index > 0, "the script must contain an outer catch at column zero");
+        return index;
+    }
+
+    /// <remarks>
+    /// Write-Error under ErrorActionPreference Stop is a TERMINATING error: it abandons
+    /// the rest of the catch. A record write placed after it is dead code, and any text
+    /// assertion would still find both substrings present in a plausible order. This
+    /// pins the order; the execution harness is what proves the statement is reached.
+    /// </remarks>
+    [Fact]
+    public void Build_WritesTheFailureRecordBeforeWriteError()
+    {
+        var script = UpdateRelaunchScript.Build(
+            SampleSpec(failureRecordPath: FailureRecordPath));
+
+        int catchIndex = OuterCatchIndex(script);
+        int writeIndex = script.IndexOf("[System.IO.File]::WriteAllText", StringComparison.Ordinal);
+        int errorIndex = script.IndexOf("Write-Error", StringComparison.Ordinal);
+
+        Assert.True(writeIndex > catchIndex, "the record write must sit inside the catch");
+        Assert.True(writeIndex < errorIndex, "the record write must precede Write-Error");
+
+        // No free text reaches the record: a closed-vocabulary token and two integers.
+        // A field that could carry an exception message or a path is a field that can
+        // produce malformed JSON on the one run that matters.
+        Assert.Contains("$updateStage", script);
+        Assert.Contains("$installerExitKnown", script);
+        Assert.DoesNotContain("ConvertTo-Json", script);
+    }
+
+    [Fact]
+    public void Build_WithoutFailureRecordPath_EmitsNoRecordWrite()
+    {
+        var script = UpdateRelaunchScript.Build(SampleSpec(failureRecordPath: null));
+
+        // Mirrors Build_WithoutLogPath_EmitsNoTranscript: the field stays genuinely
+        // optional, so the emission before this change remains reachable and diffable.
+        Assert.DoesNotContain("WriteAllText", script);
     }
 
     [Fact]
