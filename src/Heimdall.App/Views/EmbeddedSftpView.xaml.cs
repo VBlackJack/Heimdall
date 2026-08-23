@@ -19,6 +19,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Heimdall.App.Services;
+using Heimdall.App.Services.CloseGuard;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -98,6 +99,18 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private bool _disposed;
     private bool _inlineEditorSaveInProgress;
+
+    /// <summary>Whether the connection was already dropped to escape a stuck save.</summary>
+    private bool _inlineEditorEscapeAttempted;
+
+    /// <summary>How long to wait for the save flag to clear after dropping the connection.</summary>
+    /// <remarks>
+    /// Its entire product is which sentence the user reads. Generous and human-scale:
+    /// too short only mislabels a drop that worked as one that did not.
+    /// </remarks>
+    private static readonly TimeSpan SaveEscapeSettleBound = TimeSpan.FromSeconds(10);
+
+    private static readonly TimeSpan SaveEscapeSettlePollInterval = TimeSpan.FromMilliseconds(100);
     private bool _toolbarCompact;
 
     /// <summary>
@@ -594,13 +607,111 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     private bool RefuseInlineEditorCloseWhileSaving()
     {
         if (EmbeddedSftpCloseGuard.DescribeEditorSaveRefusal(SampleCloseGuardSnapshot())
-            is not { } reasonKey)
+            is null)
         {
             return false;
         }
 
-        ReportCloseGuardRefusal(reasonKey);
+        switch (EditorSaveEscapeOutcome.Decide(
+            _inlineEditorSaveInProgress,
+            _inlineEditorEscapeAttempted))
+        {
+            case EditorSaveEscapeOutcome.Response.OfferEscape:
+                _ = OfferSaveEscapeAsync();
+                break;
+
+            case EditorSaveEscapeOutcome.Response.ReportOutcome:
+                ShowEditorNotice(
+                    EditorSaveEscapeOutcome.ReportKey(_inlineEditorSaveInProgress));
+                break;
+        }
+
         return true;
+    }
+
+    /// <summary>
+    /// Offers the one act that can reach a save which will not end: dropping the SFTP
+    /// connection under it.
+    /// </summary>
+    /// <remarks>
+    /// This is not a close and not a cancellation. The write cannot be stopped - it is a
+    /// synchronous call inside the SSH library that takes no cancellation token - so the
+    /// only lever is the transport beneath it. Consenting therefore issues exactly the
+    /// disconnect the pane's own toolbar button already issues, and nothing else: the
+    /// view is not disposed, the overlay stays up with the text still in it, and the
+    /// close guard's terminal refusal is untouched.
+    /// <para>
+    /// A user whose file LISTING is wedged has had this button in one click all along.
+    /// The overlay simply hides it, because it lives inside the browser surface that
+    /// showing the editor collapses. So this reveals an escape that every other stuck
+    /// state already has, rather than inventing one.
+    /// </para>
+    /// </remarks>
+    private async Task OfferSaveEscapeAsync()
+    {
+        LocalizationManager? localizer = _localizer;
+        IDialogService? dialogService = _dialogService;
+        IRemoteBrowser? browser = _browser;
+        if (localizer is null || dialogService is null || browser is null)
+        {
+            return;
+        }
+
+        bool drop = await dialogService.ShowConfirmAsync(
+            localizer[SftpCloseGuardLocaleKeys.EditorSaveEscapeTitle],
+            localizer.Format(
+                SftpCloseGuardLocaleKeys.EditorSaveEscapeMessage,
+                DescribeClosePane(),
+                _activeInlineEditorTempPath ?? string.Empty),
+            CloseGuardConfirmSeverity,
+            localizer[SftpCloseGuardLocaleKeys.EditorSaveEscapeConfirm],
+            localizer[SftpCloseGuardLocaleKeys.EditorSaveEscapeKeepWaiting]);
+
+        if (!drop || _disposed)
+        {
+            return;
+        }
+
+        _inlineEditorEscapeAttempted = true;
+        await DisconnectBrowserAsync(browser, CancellationToken.None);
+
+        // The FLAG is the observable, never the disconnect task. On a stalled send the
+        // drop can block on the same lock the write holds, so its task may never
+        // complete - awaiting it would leave the escape silently unreported, which is
+        // the very shape this whole item exists to end.
+        await WaitForSaveToSettleAsync();
+
+        ShowEditorNotice(EditorSaveEscapeOutcome.ReportKey(_inlineEditorSaveInProgress));
+    }
+
+    /// <summary>
+    /// Waits, within a bound, for the save flag to clear after the connection was dropped.
+    /// </summary>
+    /// <remarks>
+    /// The bound produces a sentence and nothing else. It shortens no transfer and
+    /// introduces no operation timeout - it decides only which of two true things the
+    /// user is told.
+    /// </remarks>
+    private async Task WaitForSaveToSettleAsync()
+    {
+        DateTime deadline = DateTime.UtcNow + SaveEscapeSettleBound;
+        while (_inlineEditorSaveInProgress && DateTime.UtcNow < deadline && !_disposed)
+        {
+            await Task.Delay(SaveEscapeSettlePollInterval);
+        }
+    }
+
+    /// <summary>Writes a notice into the editor overlay's own status bar.</summary>
+    private void ShowEditorNotice(string key)
+    {
+        LocalizationManager? localizer = _localizer;
+        if (localizer is null
+            || _activeInlineEditor?.DataContext is not EmbeddedEditorViewModel editorViewModel)
+        {
+            return;
+        }
+
+        editorViewModel.NoticeText = localizer.Format(key, DescribeClosePane());
     }
 
     /// <summary>Shows a close refusal, under the shared close-guard title.</summary>

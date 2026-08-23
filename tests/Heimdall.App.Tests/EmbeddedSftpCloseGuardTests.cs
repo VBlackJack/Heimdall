@@ -253,7 +253,10 @@ public sealed class EmbeddedSftpCloseGuardTests
                 .Select(field => (string)field.GetRawConstantValue()!)
         ];
 
-        Assert.Equal(11, keys.Length);
+        // Five from SftpCloseGuardLocaleKeys plus six for the save-escape offer, plus
+        // six from CloseGuardLocaleKeys. Raised inside the change that added them: a
+        // count discovered by a red CI is a count nobody chose.
+        Assert.Equal(17, keys.Length);
         foreach (string key in keys)
         {
             Assert.NotEqual(key, english[key]);

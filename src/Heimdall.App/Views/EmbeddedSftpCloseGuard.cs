@@ -34,6 +34,24 @@ public static class SftpCloseGuardLocaleKeys
     public const string EditorSaveBlocked = "SftpCloseGuardEditorSaveBlocked";
 
     public const string EditorDirtyMessage = "SftpCloseGuardEditorDirtyMessage";
+
+    /// <summary>Title of the offer the editor overlay makes when a save will not end.</summary>
+    public const string EditorSaveEscapeTitle = "SftpCloseGuardEditorSaveEscapeTitle";
+
+    /// <summary>The offer itself. Operands: the pane label, then the local copy's folder.</summary>
+    public const string EditorSaveEscapeMessage = "SftpCloseGuardEditorSaveEscapeMessage";
+
+    /// <summary>Label of the answer that drops the connection.</summary>
+    public const string EditorSaveEscapeConfirm = "SftpCloseGuardEditorSaveEscapeConfirm";
+
+    /// <summary>Label of the answer that does nothing. Takes both Enter and Escape.</summary>
+    public const string EditorSaveEscapeKeepWaiting = "SftpCloseGuardEditorSaveEscapeKeepWaiting";
+
+    /// <summary>Reported when dropping the connection ended the save.</summary>
+    public const string EditorSaveEscapeDropped = "SftpCloseGuardEditorSaveEscapeDropped";
+
+    /// <summary>Reported when even dropping the connection did not end it.</summary>
+    public const string EditorSaveEscapeStuck = "SftpCloseGuardEditorSaveEscapeStuck";
 }
 
 /// <summary>
