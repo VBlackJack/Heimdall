@@ -128,7 +128,7 @@ public sealed class RdpCertificateTrustTests
     public void Trust_RaisesTrustChangedOnceWithTheWholeSet()
     {
         RdpCertificateTrustStore store = new();
-        List<IReadOnlyCollection<string>> writes = [];
+        List<IReadOnlyCollection<RdpCertificateEntry>> writes = [];
         store.TrustChanged += (_, set) => writes.Add(set);
 
         store.Trust(Profile, FirstDc);
@@ -180,7 +180,7 @@ public sealed class RdpCertificateTrustTests
         store.Trust(Profile, FirstDc);
         store.TrustForSession(Profile, ThirdDc);
 
-        store.LoadFromConfig([(Profile, new[] { SecondDc })]);
+        store.LoadFromConfig([(Profile, new[] { Entry(SecondDc) })]);
 
         // A load is the file speaking, so it replaces what the file owns - and only that.
         // Session trust belongs to the run; dropping it here would re-ask for a machine
@@ -211,6 +211,82 @@ public sealed class RdpCertificateTrustTests
     }
 
     [Fact]
+    public void Trust_StampsWhenTheUserApproved_FromTheInjectedClock()
+    {
+        FakeTimeProvider clock = new(new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
+        RdpCertificateTrustStore store = new(clock);
+
+        store.Trust(Profile, FirstDc);
+
+        // Asserted against a known instant rather than "a stamp exists", which passes
+        // whatever the code writes there.
+        RdpCertificateEntry entry = Assert.Single(store.GetApproved(Profile));
+        Assert.Equal(clock.GetUtcNow(), entry.FirstTrusted);
+    }
+
+    [Fact]
+    public void Trust_ReapprovingTheSameCertificate_KeepsTheOriginalStamp()
+    {
+        FakeTimeProvider clock = new(new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
+        RdpCertificateTrustStore store = new(clock);
+        store.Trust(Profile, FirstDc);
+        DateTimeOffset firstApproval = clock.GetUtcNow();
+
+        clock.Advance(TimeSpan.FromDays(3));
+        store.Trust(Profile, FirstDc);
+
+        // The stamp answers "since when has this been trusted". Refreshing it on every
+        // reconnection would erase the only fact it carries.
+        RdpCertificateEntry entry = Assert.Single(store.GetApproved(Profile));
+        Assert.Equal(firstApproval, entry.FirstTrusted);
+    }
+
+    [Fact]
+    public void LoadFromConfig_RestoresWhatAPreviousRunWrote()
+    {
+        FakeTimeProvider clock = new(new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
+        RdpCertificateTrustStore writer = new(clock);
+        Dictionary<string, IReadOnlyCollection<RdpCertificateEntry>> persisted = [];
+        writer.TrustChanged += (profileId, set) => persisted[profileId] = set;
+
+        writer.Trust(Profile, FirstDc);
+        writer.Trust(Profile, SecondDc);
+
+        RdpCertificateTrustStore reloaded = new(clock);
+        reloaded.LoadFromConfig(persisted.Select(pair => (pair.Key, (IEnumerable<RdpCertificateEntry>)pair.Value)));
+
+        // The whole promise is "asked once per machine, then never again". Without a
+        // round trip that survives a restart, convergence starts over every launch and
+        // the feature is worth nothing.
+        Assert.All(
+            new[] { FirstDc, SecondDc },
+            thumbprint => Assert.Equal(
+                RdpCertificateTrustVerdict.Trusted,
+                reloaded.Evaluate(Profile, thumbprint).Verdict));
+        Assert.Equal(
+            clock.GetUtcNow(),
+            reloaded.GetApproved(Profile).First().FirstTrusted);
+    }
+
+    [Fact]
+    public void TrustChanged_CarriesTheWholeSetSoAWriteCannotNarrowIt()
+    {
+        RdpCertificateTrustStore store = new();
+        List<IReadOnlyCollection<RdpCertificateEntry>> writes = [];
+        store.TrustChanged += (_, set) => writes.Add(set);
+
+        store.Trust(Profile, FirstDc);
+        store.Trust(Profile, SecondDc);
+        store.Remove(Profile, FirstDc);
+
+        // A persister that received a delta could write a narrower set than the one held,
+        // which is the same loss as replacing - just one layer out.
+        Assert.Equal(3, writes.Count);
+        Assert.Equal(2, writes[1].Count);
+        Assert.Equal(SecondDc, Assert.Single(writes[2]).Thumbprint);
+    }
+
+    [Fact]
     public void Decide_CountsEachCertificateOnce_SessionAndDurableTogether()
     {
         RdpCertificateTrustStore store = new();
@@ -221,5 +297,18 @@ public sealed class RdpCertificateTrustTests
         // What the user reads is "you already trust N certificates for this name", so N
         // counts machines, not decisions - the same thumbprint approved twice is one.
         Assert.Equal(2, store.Evaluate(Profile, ThirdDc).AlreadyTrustedCount);
+    }
+
+    private static RdpCertificateEntry Entry(string thumbprint)
+        => new(thumbprint, new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
+
+    /// <summary>A clock the test moves by hand, so no assertion depends on wall time.</summary>
+    private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset _now = now;
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan by) => _now = _now.Add(by);
     }
 }

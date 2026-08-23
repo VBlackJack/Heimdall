@@ -202,6 +202,86 @@ public sealed class AppStartupTests
             "ssh-rsa",
             HostKeySource.UserConfirmed);
 
+    [Fact]
+    public async Task PersistTrustedRdpCertificates_ReloadKeepsEveryCertificateOfTheProfile()
+    {
+        string rootPath = CreateTemporaryRoot();
+        try
+        {
+            const string profileId = "profile-dc-pool";
+            var stamp = new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero);
+            var configManager = new ConfigManager(rootPath);
+            await configManager.InitializeAsync();
+
+            await App.PersistTrustedRdpCertificatesAsync(
+                configManager,
+                profileId,
+                [
+                    new RdpCertificateEntry("SHA256:AA:BB:01", stamp),
+                    new RdpCertificateEntry("SHA256:AA:BB:02", stamp.AddDays(1)),
+                ]);
+
+            // The round trip is the point of this lot. Without it the set is rebuilt from
+            // nothing on every launch, so the question is asked again for every machine of
+            // the pool and the feature is worth nothing.
+            AppSettings reloaded = await ReloadSettingsAsync(rootPath);
+            List<RdpCertificateEntry> stored = reloaded.TrustedRdpCertificates[profileId];
+            Assert.Equal(2, stored.Count);
+            Assert.Contains(stored, entry => entry.Thumbprint == "SHA256:AA:BB:01");
+            Assert.Contains(stored, entry => entry.Thumbprint == "SHA256:AA:BB:02");
+
+            // The stamp survives the file, so a settings screen can say since when.
+            Assert.Equal(
+                stamp,
+                stored.Single(entry => entry.Thumbprint == "SHA256:AA:BB:01").FirstTrusted);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PersistTrustedRdpCertificates_ForgettingTheLastOne_LeavesNoProfileKey()
+    {
+        string rootPath = CreateTemporaryRoot();
+        try
+        {
+            const string profileId = "profile-to-empty";
+            var configManager = new ConfigManager(rootPath);
+            await configManager.InitializeAsync();
+            await App.PersistTrustedRdpCertificatesAsync(
+                configManager,
+                profileId,
+                [new RdpCertificateEntry("SHA256:AA:BB:01", DateTimeOffset.UtcNow)]);
+
+            await App.PersistTrustedRdpCertificatesAsync(configManager, profileId, []);
+
+            // An empty list left behind would be a profile that "has a trust set" holding
+            // nothing - a distinction with no meaning that a settings screen would have to
+            // render as an empty row.
+            AppSettings reloaded = await ReloadSettingsAsync(rootPath);
+            Assert.DoesNotContain(profileId, reloaded.TrustedRdpCertificates);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PersistTrustedRdpCertificates_SwallowsMergeFailures()
+    {
+        var configManager = new ThrowingConfigManager();
+
+        // Failing to remember a trust decision must not take the application down; the
+        // user is asked again next time, which is the safe direction.
+        await App.PersistTrustedRdpCertificatesAsync(
+            configManager,
+            "profile",
+            [new RdpCertificateEntry("SHA256:AA:BB:01", DateTimeOffset.UtcNow)]);
+    }
+
     private static string CreateTemporaryRoot()
     {
         string rootPath = Path.Combine(
