@@ -59,6 +59,7 @@ internal sealed class UpdateInstaller : IUpdateInstaller
 
         string scriptPath = _host.CreateScriptPath(package.StagingDirectory);
         var logPath = _host.CreateLogPath();
+        var failureRecordPath = _host.CreateFailureRecordPath();
 
         var installDir = Path.GetDirectoryName(exe);
         var requiresElevation = installDir is not null && !_host.IsDirectoryWritable(installDir);
@@ -71,7 +72,8 @@ internal sealed class UpdateInstaller : IUpdateInstaller
             ScriptPath: scriptPath,
             StagingDirectory: package.StagingDirectory,
             RequiresElevation: requiresElevation,
-            LogPath: logPath);
+            LogPath: logPath,
+            FailureRecordPath: failureRecordPath);
 
         bool launched;
         try

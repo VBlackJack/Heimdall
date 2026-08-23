@@ -18,6 +18,16 @@ using System.Text.Json;
 
 namespace Heimdall.Core.Updates;
 
+/// <summary>What a previous update attempt left behind, read as one unit.</summary>
+/// <param name="Attempt">What the application intended to become.</param>
+/// <param name="Failure">
+/// What the relauncher recorded, when it got far enough to record anything. Null is
+/// ordinary: the relauncher may have been killed, or the script may never have parsed.
+/// </param>
+public sealed record PendingUpdateOutcome(
+    UpdateAttemptRecord Attempt,
+    UpdateFailureRecord? Failure);
+
 /// <summary>Records what an update attempt intended, across the process boundary.</summary>
 public interface IUpdateOutcomeStore
 {
@@ -28,9 +38,9 @@ public interface IUpdateOutcomeStore
     void Clear();
 
     /// <summary>
-    /// Returns the pending record and removes it, so a given attempt is reported once.
+    /// Returns what is pending and removes it, so a given attempt is reported once.
     /// </summary>
-    UpdateAttemptRecord? TryTakePending();
+    PendingUpdateOutcome? TryTakePending();
 }
 
 /// <summary>
@@ -50,7 +60,25 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
     /// </summary>
     private static readonly TimeSpan MaxAttemptAge = TimeSpan.FromHours(6);
 
+    /// <summary>
+    /// Reading options. Case-insensitive, and that is not a convenience.
+    /// </summary>
+    /// <remarks>
+    /// One of these two files is written by hand-built JSON inside the generated
+    /// PowerShell, in camelCase, while the serializer's default output for these records
+    /// is PascalCase and its default reader is case-SENSITIVE. Without this the failure
+    /// record would parse to null every time and the cause would silently never be
+    /// reported - a writer and a reader disagreeing about one format, which is the shape
+    /// this codebase keeps rediscovering.
+    /// </remarks>
+    private static readonly JsonSerializerOptions ReadOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
     private const string AttemptFileName = "update-attempt.json";
+
+    private const string FailureFileName = "update-failure.json";
 
     private readonly string _directory;
     private readonly TimeProvider _timeProvider;
@@ -63,6 +91,12 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
     }
 
     private string AttemptPath => Path.Combine(_directory, AttemptFileName);
+
+    private string FailurePath => Path.Combine(_directory, FailureFileName);
+
+    /// <summary>Where the relauncher writes what it recorded about a failure.</summary>
+    public static string FailureRecordPathIn(string directory) =>
+        Path.Combine(directory, FailureFileName);
 
     public void WriteAttempt(string attemptedVersion)
     {
@@ -77,6 +111,10 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
         {
             Directory.CreateDirectory(_directory);
             File.WriteAllText(AttemptPath, JsonSerializer.Serialize(record));
+
+            // A previous run's failure record must never be read against this
+            // attempt. It describes something else entirely.
+            File.Delete(FailurePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -92,6 +130,7 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
         try
         {
             File.Delete(AttemptPath);
+            File.Delete(FailurePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -99,51 +138,72 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
         }
     }
 
-    public UpdateAttemptRecord? TryTakePending()
+    public PendingUpdateOutcome? TryTakePending()
     {
-        string path = AttemptPath;
-        string content;
-        try
-        {
-            if (!File.Exists(path))
-            {
-                return null;
-            }
-
-            // Read with ReadAllText so a byte-order mark is stripped; the byte-span
-            // deserializer would throw on one.
-            content = File.ReadAllText(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        string? attemptContent = ReadOrNull(AttemptPath);
+        if (attemptContent is null)
         {
             return null;
         }
+
+        // The failure record is read BEFORE the delete, and only when an attempt exists.
+        // On its own it means nothing: it describes how a relauncher ended, not which
+        // update it belonged to.
+        string? failureContent = ReadOrNull(FailurePath);
 
         // Deleted BEFORE parsing, deliberately. A record that cannot be parsed would
         // otherwise be read again on every launch forever, and two instances starting
         // together would both report the same attempt.
         Clear();
 
-        UpdateAttemptRecord? record;
+        UpdateAttemptRecord? attempt = Parse<UpdateAttemptRecord>(attemptContent);
+        if (attempt is null || attempt.SchemaVersion != UpdateAttemptRecord.CurrentSchemaVersion)
+        {
+            return null;
+        }
+
+        if (_timeProvider.GetUtcNow() - attempt.StartedUtc > MaxAttemptAge)
+        {
+            return null;
+        }
+
+        // A failure record that will not parse costs the CAUSE, never the report. The
+        // attempt alone still supports the statement that the version did not move.
+        UpdateFailureRecord? failure = failureContent is null
+            ? null
+            : Parse<UpdateFailureRecord>(failureContent);
+        if (failure is not null && failure.SchemaVersion != UpdateFailureRecord.CurrentSchemaVersion)
+        {
+            failure = null;
+        }
+
+        return new PendingUpdateOutcome(attempt, failure);
+    }
+
+    private static string? ReadOrNull(string path)
+    {
         try
         {
-            record = JsonSerializer.Deserialize<UpdateAttemptRecord>(content);
+            // ReadAllText so a byte-order mark is stripped; the byte-span deserializer
+            // would throw on one.
+            return File.Exists(path) ? File.ReadAllText(path) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static T? Parse<T>(string content)
+        where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<T>(content, ReadOptions);
         }
         catch (JsonException)
         {
             return null;
         }
-
-        if (record is null || record.SchemaVersion != UpdateAttemptRecord.CurrentSchemaVersion)
-        {
-            return null;
-        }
-
-        if (_timeProvider.GetUtcNow() - record.StartedUtc > MaxAttemptAge)
-        {
-            return null;
-        }
-
-        return record;
     }
 }

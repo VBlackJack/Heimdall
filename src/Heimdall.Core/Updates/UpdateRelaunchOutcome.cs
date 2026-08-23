@@ -26,8 +26,23 @@ public enum UpdateRelaunchOutcome
     Succeeded,
 
     /// <summary>
-    /// An attempt was made and the version did not move. The application came back as
-    /// the version it already was.
+    /// An attempt was made and the version did not move, and nothing more is known.
+    /// The application came back as the version it already was.
     /// </summary>
     NotApplied,
+
+    /// <summary>
+    /// The user stopped it: they cancelled the installer, or declined the elevation
+    /// prompt. Not a failure, and it must not be worded as one.
+    /// </summary>
+    CancelledByUser,
+
+    /// <summary>The installer ran and reported an error.</summary>
+    InstallerFailed,
+
+    /// <summary>
+    /// The downloaded installer was refused before it ran, by the signature or hash
+    /// check at the execution boundary.
+    /// </summary>
+    IntegrityRejected,
 }

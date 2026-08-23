@@ -129,9 +129,10 @@ public partial class UpdateBannerViewModel : ObservableObject
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        UpdateAttemptRecord? attempt = _outcomeStore.TryTakePending();
+        PendingUpdateOutcome? pending = _outcomeStore.TryTakePending();
         UpdateRelaunchOutcome outcome = UpdateOutcomeClassifier.Classify(
-            attempt,
+            pending?.Attempt,
+            pending?.Failure,
             _appVersionProvider.Current);
 
         if (outcome is UpdateRelaunchOutcome.None or UpdateRelaunchOutcome.Succeeded)
@@ -140,8 +141,10 @@ public partial class UpdateBannerViewModel : ObservableObject
         }
 
         Core.Logging.FileLogger.Warn(
-            $"[Updates] previous attempt did not apply: attempted={attempt?.AttemptedVersion} "
-            + $"running={_appVersionProvider.Current?.ToString()}");
+            $"[Updates] previous attempt did not apply: outcome={outcome} "
+            + $"attempted={pending?.Attempt.AttemptedVersion} "
+            + $"running={_appVersionProvider.Current?.ToString()} "
+            + $"stage={pending?.Failure?.Stage} exitCode={pending?.Failure?.InstallerExitCode}");
 
         string? key = UpdateRelaunchOutcomeText.StatusKey(outcome);
         if (key is null)
@@ -149,7 +152,9 @@ public partial class UpdateBannerViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
-        BannerStatusText = _localizer.Format(key, attempt?.AttemptedVersion ?? string.Empty);
+        BannerStatusText = _localizer.Format(
+            key,
+            pending?.Attempt.AttemptedVersion ?? string.Empty);
         IsOutcomeNotice = true;
         IsBannerVisible = true;
         return Task.CompletedTask;

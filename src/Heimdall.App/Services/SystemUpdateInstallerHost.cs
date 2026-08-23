@@ -87,6 +87,17 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
             $"{ScriptPrefix}{DateTime.UtcNow.ToString(LogTimestampFormat, CultureInfo.InvariantCulture)}{LogExtension}");
     }
 
+    /// <summary>
+    /// The relauncher's failure record, in the same directory the application reads it
+    /// from - one definition, so writer and reader cannot point at different files.
+    /// </summary>
+    public string CreateFailureRecordPath()
+    {
+        string updatesDirectory = ApplicationDataPathResolver.GetUpdatesDirectory(_dataRoot);
+        Directory.CreateDirectory(updatesDirectory);
+        return UpdateOutcomeStore.FailureRecordPathIn(updatesDirectory);
+    }
+
     public string ResolvePowerShellExecutable()
     {
         try

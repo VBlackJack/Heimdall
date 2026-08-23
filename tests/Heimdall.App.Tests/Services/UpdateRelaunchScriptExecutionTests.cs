@@ -20,6 +20,7 @@ using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Heimdall.Core.Updates;
 
 namespace Heimdall.App.Tests.Services;
@@ -270,6 +271,64 @@ public sealed class UpdateRelaunchScriptExecutionTests
         await sandbox.WaitForRoleAsync(RelaunchRole);
     }
 
+    /// <remarks>
+    /// The oracle for the whole detection change. Write-Error under ErrorActionPreference
+    /// Stop is a TERMINATING error, so a record write placed after it is dead code that
+    /// still contains every substring a text assertion could search for, in a plausible
+    /// order. Only running the script can tell the two apart.
+    /// <para>
+    /// Informational for the same reason as its neighbours: it launches the installer
+    /// through Start-Process, which goes via ShellExecute, and a runner has no interactive
+    /// window station.
+    /// </para>
+    /// </remarks>
+    [Trait("Category", "CIUnstable")]
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Execute_InstallerExitsNonZero_WritesTheFailureRecordAndStillRelaunches(
+        string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: InnoSetupExitCode.FatalInstallError);
+
+        ScriptRun run = await sandbox.RunAsync(powerShellHost);
+
+        await sandbox.WaitForRoleAsync(InstallerRole);
+
+        string recorded = await File.ReadAllTextAsync(sandbox.FailureRecordPath);
+        UpdateFailureRecord? record = JsonSerializer.Deserialize<UpdateFailureRecord>(
+            recorded,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(record);
+        Assert.Equal(UpdateFailureRecord.CurrentSchemaVersion, record!.SchemaVersion);
+        Assert.Equal(UpdateOutcomeStage.InstallerExit, record.Stage);
+        Assert.Equal(InnoSetupExitCode.FatalInstallError, record.InstallerExitCode);
+        Assert.True(record.HasExitCode);
+
+        // The refusal must not cost the user their application.
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+        Assert.True(run.ExitCode != 0, "a failing installer must not report success");
+    }
+
+    [Trait("Category", "CIUnstable")]
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Execute_InstallerSucceeds_WritesNoFailureRecord(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: InnoSetupExitCode.Success);
+
+        await sandbox.RunAsync(powerShellHost);
+        await sandbox.WaitForRoleAsync(InstallerRole);
+
+        // Guards the over-correction of recording a failure on every run, which the
+        // version check would then have to mop up.
+        Assert.False(
+            File.Exists(sandbox.FailureRecordPath),
+            "a successful install must leave no failure record");
+    }
+
     /// <summary>Resolves the PowerShell hosts the way the production host does.</summary>
     private static IReadOnlyList<string> ResolveHosts()
     {
@@ -438,6 +497,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
             InstallerPath = Path.Combine(StageDirectory, "installer.exe");
             ScriptPath = Path.Combine(StageDirectory, "relaunch.ps1");
             LogPath = Path.Combine(Root, "logs", "transcript.log");
+            FailureRecordPath = Path.Combine(Root, "updates", "update-failure.json");
+            Directory.CreateDirectory(Path.Combine(Root, "updates"));
 
             // Named for the role it reports, because the stand-in identifies itself from
             // its own file name when the script starts it with no arguments at all.
@@ -459,6 +520,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         internal string LogPath { get; }
 
+        internal string FailureRecordPath { get; }
+
         internal string TargetExecutablePath { get; }
 
         internal int InstallerExitCode { get; private set; }
@@ -476,6 +539,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 (nameof(spec.ScriptPath), spec.ScriptPath),
                 (nameof(spec.StagingDirectory), spec.StagingDirectory),
                 (nameof(spec.LogPath), spec.LogPath),
+                (nameof(spec.FailureRecordPath), spec.FailureRecordPath),
             })
             {
                 if (value is null)
@@ -532,7 +596,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 // the script starts the target with no arguments at all.
                 InstallerArguments: $"--role {InstallerRole} --exit-code {InstallerExitCode}",
                 WaitTimeoutSeconds: TestWaitTimeoutSeconds,
-                LogPath: withLog ? LogPath : null);
+                LogPath: withLog ? LogPath : null,
+                FailureRecordPath: FailureRecordPath);
         }
 
         internal async Task<ScriptRun> RunAsync(string powerShellHost)

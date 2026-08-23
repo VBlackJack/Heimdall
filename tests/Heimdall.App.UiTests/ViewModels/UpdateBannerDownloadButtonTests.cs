@@ -233,7 +233,7 @@ public sealed class UpdateBannerDownloadButtonTests
         {
         }
 
-        public UpdateAttemptRecord? TryTakePending() => null;
+        public PendingUpdateOutcome? TryTakePending() => null;
     }
 
 
