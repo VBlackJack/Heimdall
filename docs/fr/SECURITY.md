@@ -186,6 +186,64 @@ nouveau code doit utiliser les API de vérification tenant compte de l'hôte et
 du port, afin que les décisions de confiance restent cantonnées au bon point
 d'accès.
 
+### Confiance envers le certificat de serveur RDP
+
+Windows ne conserve qu'**une seule** empreinte de serveur RDP par nom d'hôte.
+Derrière un même nom il y a pourtant souvent plusieurs machines - un pool de
+contrôleurs de domaine, chacun avec son certificat RDP auto-signé. Chaque
+connexion peut tomber sur un membre différent : l'empreinte stockée est en
+désaccord, Windows redemande, et accepter écrase la précédente. La boucle ne
+converge jamais, et elle se produit aussi avec `mstsc` natif : c'est une
+propriété du stockage à une empreinte par nom, pas un défaut de Heimdall.
+
+Heimdall conserve un **ensemble** d'empreintes approuvées par profil, et c'est
+ce qui fait terminer la boucle. Chaque membre du pool est approuvé une fois, et
+le profil se tait ensuite jusqu'à la reconstruction d'une machine.
+
+**La vérification ne s'exécute que là où rien d'autre ne vérifie.**
+`RdpCertificateGate` ne vérifie que lorsque le niveau `AuthenticationLevel`
+résolu vaut `0`, c'est-à-dire le niveau appliqué quand NLA est désactivé et qui
+n'exige rien du serveur. Aux niveaux 1 et 2, Windows effectue sa propre
+authentification de serveur et affiche son propre avertissement ; une seconde
+question sur le même fait serait une invite de trop, et une invite que
+l'utilisateur apprend à valider sans lire vaut moins que pas d'invite du tout.
+Cela signifie aussi qu'aucune connexion déjà vérifiée ne gagne d'aller-retour
+réseau.
+
+**Toute issue autre qu'un refus explicite laisse passer la connexion.**
+`RdpCertificateProbe` ouvre sa propre connexion TCP, effectue la négociation
+X.224 et lit le certificat présenté par la couche TLS. Si le point de
+terminaison est injoignable, s'il conserve la sécurité RDP standard et ne
+présente aucun certificat, ou si la sonde lève une exception, Heimdall n'a
+**rien** vérifié et la connexion s'ouvre exactement comme elle l'aurait fait
+sans cette fonctionnalité. Refuser sur un point de terminaison invérifiable
+transformerait une étape de vérification en une nouvelle façon d'échouer sur un
+chemin qui fonctionnait avant ; en accepter un comme vérifié serait strictement
+pire que de n'avoir jamais construit tout ceci.
+
+**L'approbation est par profil et par empreinte.** Approuver ajoute à l'ensemble
+et ne remplace jamais ; réapprouver une empreinte conserve son horodatage
+d'origine. "Juste cette fois" vit en mémoire pour la durée de l'exécution et
+n'est jamais écrit sur disque. Les entrées durables vivent dans
+`trustedRdpCertificates` de `settings.json`, indexées par identifiant de profil,
+chacune portant l'empreinte, la date de première approbation, ainsi que le sujet
+et l'émetteur lus par la sonde, afin qu'un futur écran de réglages puisse nommer
+la machine plutôt qu'afficher quarante paires hexadécimales.
+
+**Limitation connue, et raison d'être de l'ensemble.** Rien ne garantit que le
+contrôle ActiveX se reconnecte à la machine que la sonde a inspectée - sur un
+pool multi-membres, c'est le cas normal et non un cas limite. Avec un ensemble,
+c'est inoffensif : chaque membre a été approuvé individuellement, donc quel que
+soit celui qui répond, son certificat a été vu et accepté. Un schéma qui
+approuverait un *pool* plutôt que des certificats individuels rendrait la même
+course nuisible, car la machine réellement jointe pourrait présenter un
+certificat jamais approuvé, seulement supposé appartenir. C'est pourquoi la
+confiance de pool a été rejetée : il n'existe aucun lien cryptographique entre
+deux certificats auto-signés de deux machines différentes, et cette
+fonctionnalité remplace une vérification de Microsoft qui laisse ensuite passer
+des identifiants CredSSP - elle ne peut donc pas être plus permissive que la
+vérification qu'elle désactive.
+
 ### Escalade sudo en SFTP et édition distante
 
 Le repli sudo du SFTP est délibérément étroit. `EmbeddedSftpViewModel` n'escalade
