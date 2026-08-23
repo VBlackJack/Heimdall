@@ -103,6 +103,7 @@ jobs:
           --filter "Category!=CIUnstable&Category!=RequiresDesktop"
           --verbosity normal
           --collect:"XPlat Code Coverage"
+          --logger trx
           --results-directory TestResults
 
       # Informational pass for tests tagged CIUnstable. These pass on dev
@@ -119,6 +120,7 @@ jobs:
           dotnet test Heimdall.slnx --no-build -c Release
           --filter "Category=CIUnstable"
           --verbosity normal
+          --logger trx
           --results-directory TestResults/CIUnstable
 
       # Informational pass for desktop UIAutomation smoke tests. These need a
@@ -132,6 +134,7 @@ jobs:
           dotnet test Heimdall.slnx --no-build -c Release
           --filter "Category=RequiresDesktop"
           --verbosity normal
+          --logger trx
           --results-directory TestResults/RequiresDesktop
 
       - name: Check for vulnerable dependencies
@@ -148,6 +151,20 @@ jobs:
           } else {
             Write-Host "No vulnerable dependencies detected."
           }
+
+      # One file per test assembly. The console stream interleaves assemblies
+      # running in parallel, which tears a failure's name, message and stack
+      # trace apart and glues fragments of one onto another - a failing run
+      # then names the wrong test. These stay readable.
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        continue-on-error: true
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v7
