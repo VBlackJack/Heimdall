@@ -40,6 +40,15 @@ internal static class SshLocalizationKeys
     public const string ErrorPreflightFailed = "ErrorPreflightFailed";
     public const string ErrorPuttyNotConfigured = "ErrorPuttyNotConfigured";
     public const string ErrorSshCancelled = "ErrorSshCancelled";
+
+    /// <summary>Title of the password prompt the SFTP handler raises after a refused connection.</summary>
+    public const string DialogSftpPasswordPromptTitle = "DialogSftpPasswordPromptTitle";
+
+    /// <summary>Asked when nothing usable was sent at all.</summary>
+    public const string DialogSftpPasswordPromptNoCredential = "DialogSftpPasswordPromptNoCredential";
+
+    /// <summary>Asked when something was sent and the server refused it.</summary>
+    public const string DialogSftpPasswordPromptRefused = "DialogSftpPasswordPromptRefused";
     public const string ErrorSshHostKeyUnavailable = "ErrorSshHostKeyUnavailable";
     public const string ErrorSshKeyFileNotFound = "ErrorSshKeyFileNotFound";
     public const string ErrorSshKeyPathInvalid = "ErrorSshKeyPathInvalid";

@@ -79,6 +79,23 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     [JsonIgnore]
     public bool HasWinRmPortField { get; private set; }
 
+    /// <summary>
+    /// Whether this attempt may put a credential question to the user.
+    /// </summary>
+    /// <remarks>
+    /// Transient caller intent for one connect, never serialized, and false by default.
+    /// The other <c>JsonIgnore</c> members on this type are derived values or
+    /// presence flags; this one carries a decision, which is why it says so here.
+    /// <para>
+    /// It exists so a prompt can only appear on a connection the user asked for. Panes
+    /// opened as a side effect - a companion browser alongside a shell, a restored
+    /// session, a split - build their own profiles and leave this false, so they fail
+    /// quietly rather than raising a modal nobody was expecting.
+    /// </para>
+    /// </remarks>
+    [JsonIgnore]
+    public bool AllowCredentialPrompt { get; set; }
+
     public string? WinRmUsername { get; set; }
     public string? WinRmPasswordEncrypted { get; set; }
     public bool WinRmUseSsl { get; set; }

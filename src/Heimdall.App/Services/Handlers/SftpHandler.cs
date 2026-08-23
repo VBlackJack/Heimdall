@@ -38,19 +38,46 @@ internal sealed class SftpHandler : IProtocolHandler
     private readonly LocalizationManager _localizer;
     private readonly HostKeyStore _hostKeyStore;
     private readonly IHostKeyVerifier _hostKeyVerifier;
+    private readonly IDialogService _dialogService;
+    private readonly ConnectBrowserDelegate _connectBrowser;
 
+    /// <summary>How the handler reaches a remote host. Substitutable for tests only.</summary>
+    internal delegate Task ConnectBrowserDelegate(
+        SftpBrowser browser,
+        SshConnectionParams sshParams,
+        HostKeyStore hostKeyStore,
+        IHostKeyVerifier hostKeyVerifier,
+        CancellationToken ct);
+
+    /// <param name="dialogService">
+    /// Non-optional deliberately. An optional dialog service defaulting to null is how a
+    /// feature ships fully tested and completely inert because nothing wired it - the
+    /// shape this repository has already paid for once, with a close guard attached to no
+    /// host for weeks.
+    /// </param>
+    /// <param name="connectBrowser">
+    /// Test seam only, defaulted to the real call. Follows the precedent already used by
+    /// the SSH and WinRM handlers.
+    /// </param>
     public SftpHandler(
         ITunnelService tunnelService,
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer,
         HostKeyStore hostKeyStore,
-        IHostKeyVerifier hostKeyVerifier)
+        IHostKeyVerifier hostKeyVerifier,
+        IDialogService dialogService,
+        ConnectBrowserDelegate? connectBrowser = null)
     {
+        ArgumentNullException.ThrowIfNull(dialogService);
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
         _localizer = localizer;
         _hostKeyStore = hostKeyStore;
         _hostKeyVerifier = hostKeyVerifier;
+        _dialogService = dialogService;
+        _connectBrowser = connectBrowser
+            ?? ((browser, sshParams, store, verifier, token) =>
+                browser.ConnectAsync(sshParams, store, verifier, token));
     }
 
     public string Protocol => "SFTP";
@@ -135,14 +162,18 @@ internal sealed class SftpHandler : IProtocolHandler
             ? null
             : _localizer[capabilityNotice.StatusLocalizationKey];
 
-        var sshParams = new SshConnectionParams
+        // One builder for both attempts. SshConnectionParams is sealed with init-only
+        // members and there is no `with` expression, so a hand-copied retry object is the
+        // one silent bug this change could ship: fourteen properties where thirteen
+        // matching and one drifting would look exactly like a working feature.
+        SshConnectionParams BuildSshParams(string? password) => new()
         {
             Host = targetHost,
             Port = targetPort,
             LogicalHost = usesTunnel ? server.RemoteServer : null,
             LogicalPort = usesTunnel ? port : null,
             Username = server.SshUsername ?? string.Empty,
-            Password = ConnectionHelpers.DecryptPassword(server.SshPasswordEncrypted),
+            Password = password,
             KeyPassphrase = ConnectionHelpers.DecryptPassword(server.SshKeyPassphraseEncrypted),
             KeyPath = string.IsNullOrWhiteSpace(server.SshKeyPath) ? null : server.SshKeyPath,
             SshAgentPreference = settings.SshAgentPreference,
@@ -153,61 +184,162 @@ internal sealed class SftpHandler : IProtocolHandler
             KeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds
         };
 
-        var browser = new SftpBrowser();
-
+        // The tunnel outlives a failed attempt now, and is released once, here. Releasing
+        // it inside a catch was destructive rather than a dereference: the forward is
+        // disposed at zero references, and a profile with no explicit local port would get
+        // a DIFFERENT, OS-assigned port on any re-setup. This also closes a pre-existing
+        // leak - anything throwing between the tunnel setup and the first connect used to
+        // leave it open.
+        bool releaseTunnel = usesTunnel;
         try
         {
-            await browser.ConnectAsync(sshParams, _hostKeyStore, _hostKeyVerifier, ct)
-                .ConfigureAwait(false);
-        }
-        catch (HostKeyRejectedException ex)
-        {
-            browser.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            string? attemptPassword = ConnectionHelpers.DecryptPassword(server.SshPasswordEncrypted);
 
-            if (ex.IsMismatch && !string.IsNullOrWhiteSpace(ex.StoredFingerprint))
+            for (int attempt = 1; attempt <= SftpPasswordPromptPolicy.MaxConnectAttempts; attempt++)
             {
-                var message = BuildHostKeyMismatchMessage(
-                    ex.StoredFingerprint,
-                    ex.PresentedFingerprint);
-                _connectionSm.SetError(server.Id, message);
+                SshConnectionParams sshParams = BuildSshParams(attemptPassword);
+                var browser = new SftpBrowser();
+                SshFailureInfo failure;
+
+                try
+                {
+                    await _connectBrowser(browser, sshParams, _hostKeyStore, _hostKeyVerifier, ct)
+                        .ConfigureAwait(false);
+
+                    _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
+
+                    // The session takes ownership of the tunnel from here.
+                    releaseTunnel = false;
+                    return new ConnectionResult(true, null, new SftpSessionBundle(
+                        browser,
+                        sshParams,
+                        server.SessionLoggingOverride),
+                        Warning: capabilityWarning);
+                }
+                catch (HostKeyRejectedException ex)
+                {
+                    browser.Dispose();
+
+                    if (ex.IsMismatch && !string.IsNullOrWhiteSpace(ex.StoredFingerprint))
+                    {
+                        var message = BuildHostKeyMismatchMessage(
+                            ex.StoredFingerprint,
+                            ex.PresentedFingerprint);
+                        _connectionSm.SetError(server.Id, message);
+                        return new ConnectionResult(
+                            false,
+                            message,
+                            null,
+                            SshSessionDiagnosticFactory.CreateHostKeyMismatchFailure(
+                                ex.StoredFingerprint,
+                                ex.PresentedFingerprint,
+                                ex.Host,
+                                ex.Port));
+                    }
+
+                    var messageCancelled = BuildCancelledMessage();
+                    _connectionSm.SetError(server.Id, messageCancelled);
+                    return new ConnectionResult(
+                        false,
+                        messageCancelled,
+                        null,
+                        SshSessionDiagnosticFactory.FromClassifiedFailure(
+                            new SshFailureInfo(SshFailureCode.Cancelled, messageCancelled, false, ex)));
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // The user's own cancel, not a failure. Without this arm it lands in
+                    // the generic catch and is classified as a timeout, so the user is
+                    // shown an error modal for something they asked for.
+                    browser.Dispose();
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    browser.Dispose();
+                    failure = FailureClassifier.Classify(ex, sshParams);
+                    Core.Logging.FileLogger.Warn($"SFTP connect failed: {failure.Code} - {ex.Message}");
+                }
+
+                bool mayRetype = attempt < SftpPasswordPromptPolicy.MaxConnectAttempts
+                    && server.AllowCredentialPrompt
+                    && SftpPasswordPromptPolicy.AllowsPasswordRetry(failure.Code);
+
+                if (mayRetype)
+                {
+                    // Asked outside the catch: the dialog's own failures must not be
+                    // reclassified as connection failures.
+                    string? typed = await PromptForPasswordAsync(server, attemptPassword, ct)
+                        .ConfigureAwait(false);
+
+                    if (!string.IsNullOrEmpty(typed))
+                    {
+                        attemptPassword = typed;
+                        continue;
+                    }
+                }
+
+                // Localized here, which the SFTP path never did: the classifier's message
+                // is an English literal, and the SSH path routes the same failure through
+                // the catalogue. The same server produced English from one protocol and
+                // French from the other.
+                SshFailureInfo localized = SshFailureLocalizer.Localize(failure, _localizer, targetHost);
+                _connectionSm.SetError(server.Id, localized.Message);
                 return new ConnectionResult(
                     false,
-                    message,
+                    localized.Message,
                     null,
-                    SshSessionDiagnosticFactory.CreateHostKeyMismatchFailure(
-                        ex.StoredFingerprint,
-                        ex.PresentedFingerprint,
-                        ex.Host,
-                        ex.Port));
+                    SshSessionDiagnosticFactory.FromClassifiedFailure(localized));
             }
 
-            var messageCancelled = BuildCancelledMessage();
-            _connectionSm.SetError(server.Id, messageCancelled);
-            return new ConnectionResult(
-                false,
-                messageCancelled,
-                null,
-                SshSessionDiagnosticFactory.FromClassifiedFailure(
-                    new SshFailureInfo(SshFailureCode.Cancelled, messageCancelled, false, ex)));
+            throw new InvalidOperationException(
+                "The SFTP connect loop must return from inside its body.");
         }
-        catch (Exception ex)
+        finally
         {
-            browser.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
-            var failure = FailureClassifier.Classify(ex, sshParams);
-            Core.Logging.FileLogger.Warn($"SFTP connect failed: {failure.Code} - {ex.Message}");
-            _connectionSm.SetError(server.Id, failure.Message);
-            return new ConnectionResult(false, failure.Message, null, SshSessionDiagnosticFactory.FromClassifiedFailure(failure));
+            if (releaseTunnel)
+            {
+                ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            }
         }
-
-        _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
-        return new ConnectionResult(true, null, new SftpSessionBundle(
-            browser,
-            sshParams,
-            server.SessionLoggingOverride),
-            Warning: capabilityWarning);
     }
+
+    /// <summary>
+    /// Offers a password for a connection that has already failed for want of one.
+    /// </summary>
+    /// <remarks>
+    /// The typed value goes into a fresh <see cref="SshConnectionParams"/> and nowhere
+    /// else. It is never written back to the profile, never protected to disk, never
+    /// logged, and never persisted in any form - the handler holds no configuration
+    /// manager, so the write-back path is not merely avoided but unreachable from here.
+    /// It dies with the attempt; the next connection asks again.
+    /// <para>
+    /// The message is chosen on what was actually SENT rather than on the failure code,
+    /// because the classifier's "no supported authentication method" is its default arm
+    /// and can fire with a password present.
+    /// </para>
+    /// </remarks>
+    private Task<string?> PromptForPasswordAsync(
+        ServerProfileDto server,
+        string? attemptedPassword,
+        CancellationToken ct)
+    {
+        // The logical host, not the tunnel endpoint: through a tunnel the latter is a
+        // loopback bind address, which names nothing the user recognizes.
+        string account = string.IsNullOrWhiteSpace(server.SshUsername)
+            ? server.RemoteServer ?? string.Empty
+            : $"{server.SshUsername}@{server.RemoteServer}";
+
+        string messageKey = string.IsNullOrEmpty(attemptedPassword)
+            ? SshLocalizationKeys.DialogSftpPasswordPromptNoCredential
+            : SshLocalizationKeys.DialogSftpPasswordPromptRefused;
+
+        return _dialogService.ShowPasswordInputAsync(
+            _localizer[SshLocalizationKeys.DialogSftpPasswordPromptTitle],
+            _localizer.Format(messageKey, account),
+            ct);
+    }
+
 
     private static bool IsValidSftpHost(string host)
     {

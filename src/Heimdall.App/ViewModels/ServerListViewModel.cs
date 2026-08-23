@@ -758,7 +758,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return false;
         }
 
-        return await ConnectCoreAsync(server, cancellationToken);
+        return await ConnectCoreAsync(
+            server,
+            cancellationToken,
+            RdpModeOverride.UseProfile,
+            allowCredentialPrompt: false);
     }
 
     /// <inheritdoc />
@@ -770,10 +774,17 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         CancellationToken cancellationToken)
         => RestoreServerAsync(originalServerId, cancellationToken);
 
+    /// <param name="allowCredentialPrompt">
+    /// Whether this connection may put a credential question to the user. True for a
+    /// connection someone just asked for; false when the application is reconnecting on
+    /// its own, where a modal would arrive unbidden - and, on a restore of several
+    /// sessions, arrive several times.
+    /// </param>
     private async Task<bool> ConnectCoreAsync(
         ServerItemViewModel server,
         CancellationToken cancellationToken,
-        RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+        RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile,
+        bool allowCredentialPrompt = true)
     {
         // Prevent duplicate connections from rapid double-clicks
         if (!_connectingServerIds.Add(server.Id))
@@ -792,6 +803,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             {
                 return false;
             }
+
+            // Only a connection someone asked for may ask something back. A restore
+            // reconnecting on its own must fail quietly rather than raise a modal - or
+            // several, one per restored session. The copy is detached and never saved.
+            serverDto.AllowCredentialPrompt = allowCredentialPrompt;
 
             var settings = await _configManager.LoadSettingsAsync();
 
