@@ -317,16 +317,27 @@ public sealed class SessionTreeSelectionAutomationTests
                 "The session tree exposes no Selection pattern.");
             FlaUI.Core.Patterns.ISelectionPattern selection = treeElement.Patterns.Selection.Pattern;
 
-            // Second discriminator, and it stays inside the client on purpose. Asking
-            // the rows themselves what they report, before asking the tree for its
-            // selection as a whole, separates a row that never reached the client from a
-            // row the selection call dropped.
+            // READ FIRST, and nothing has enumerated the rows yet. This is what a client
+            // that has just attached actually does: find the tree, ask for its selection.
+            // It has no reason to walk every row beforehand, so the test must not either.
             //
-            // A peer built here instead would answer a different question: it would not
-            // be the peer attached to the tree, and an unattached peer carries no hwnd,
-            // so it marshals to nothing. That is the very defect this test exists for,
-            // and measuring it that way reports zero on a runner while the client sees
-            // rows - measured, on the first attempt at exactly that mistake.
+            // The previous shape asked the rows first, as a diagnostic. That enumeration
+            // builds and connects a peer for every row, which is exactly what the
+            // selection call needs in order to marshal them - so a green could have come
+            // from the probe rather than from the product, and the run that first passed
+            // could not tell the two apart.
+            string[] selectedBeforeAnyEnumeration =
+            [
+                .. selection.Selection.Value
+                    .Select(element => element.Name)
+                    .OrderBy(name => name, StringComparer.Ordinal)
+            ];
+
+            Assert.True(selection.CanSelectMultiple.Value);
+
+            // Now the diagnostic, and a second reading after it. The pair is what makes a
+            // failure legible: if the second reading finds rows the first did not, the
+            // enumeration was load-bearing and the client-visible defect is still there.
             string[] rowsReportingSelected =
             [
                 .. treeElement.FindAllDescendants(condition =>
@@ -336,13 +347,23 @@ public sealed class SessionTreeSelectionAutomationTests
                     .Select(row => row.Name)
                     .OrderBy(name => name, StringComparer.Ordinal)
             ];
+            string[] selectedAfterEnumeration =
+            [
+                .. selection.Selection.Value
+                    .Select(element => element.Name)
+                    .OrderBy(name => name, StringComparer.Ordinal)
+            ];
+
             Assert.Equal(["srv-0", "srv-2"], rowsReportingSelected);
 
-            Assert.True(selection.CanSelectMultiple.Value);
-            Assert.Equal(2, selection.Selection.Value.Length);
-            Assert.Equal(
-                ["srv-0", "srv-2"],
-                selection.Selection.Value.Select(element => element.Name).OrderBy(name => name, StringComparer.Ordinal));
+            // The oracle, on the unassisted reading. The message carries both, so a
+            // failure names which of the two situations it is rather than only that the
+            // numbers differ.
+            Assert.True(
+                selectedBeforeAnyEnumeration.SequenceEqual(["srv-0", "srv-2"]),
+                $"a client that has not walked the rows must still see the whole "
+                + $"selection. before enumeration: [{string.Join(", ", selectedBeforeAnyEnumeration)}], "
+                + $"after: [{string.Join(", ", selectedAfterEnumeration)}]");
         }
         finally
         {

@@ -48,10 +48,40 @@ public class SessionTreeViewAutomationPeer : TreeViewAutomationPeer, ISelectionP
     bool ISelectionProvider.IsSelectionRequired => false;
 
     IRawElementProviderSimple[] ISelectionProvider.GetSelection()
-        => [.. SelectedPeers()
+    {
+        // Build the peer tree before marshalling anything out of it. A container whose
+        // peer does not exist yet gets a freshly created one, and a fresh peer has no
+        // data-item peer hung on it as EventsSource, so it carries no hwnd, marshals to
+        // null, and is dropped by the filter below without a word.
+        //
+        // That made the answer depend on what the CLIENT had already walked. Measured on
+        // a runner with two rows selected: a client that found the tree and asked for its
+        // selection straight away received one row; the same call after the client had
+        // enumerated every row returned both. A screen reader has no reason to walk the
+        // rows first, so it saw half the selection.
+        ConnectDescendantPeers(this);
+
+        return [.. SelectedPeers()
             .Select(ClientVisiblePeerFor)
             .Select(ProviderFromPeer)
             .OfType<IRawElementProviderSimple>()];
+    }
+
+    /// <summary>Creates and attaches every descendant peer below <paramref name="peer"/>.</summary>
+    /// <param name="peer">The peer whose subtree should exist.</param>
+    /// <remarks>
+    /// Asking a peer for its children is what creates the data-item peers and hooks each
+    /// container peer onto one, which is the only way a container peer ever acquires an
+    /// hwnd. Doing it here rather than relying on the client to have done it makes the
+    /// selection the same whoever asks and whenever.
+    /// </remarks>
+    private static void ConnectDescendantPeers(AutomationPeer peer)
+    {
+        foreach (AutomationPeer child in peer.GetChildren() ?? [])
+        {
+            ConnectDescendantPeers(child);
+        }
+    }
 
     /// <summary>The peer a UI Automation client can resolve for a realized row.</summary>
     /// <remarks>
