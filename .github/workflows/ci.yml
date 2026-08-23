@@ -3,8 +3,11 @@ name: CI
 on:
   push:
     branches: [main, master, develop]
+  # Deliberately unfiltered. A `branches:` list here exempts every pull request
+  # whose base is a topic branch, which is how a stack of five review-sized pull
+  # requests ended up with four of them carrying no checks at all. A pull request
+  # that runs nothing is worse than no pull request: it reads as reviewed.
   pull_request:
-    branches: [main, master]
 
 jobs:
   build-and-test:
