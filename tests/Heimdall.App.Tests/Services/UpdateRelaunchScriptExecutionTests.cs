@@ -216,12 +216,27 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// proves only that the outer finally ran.
     /// </para>
     /// <para>
-    /// That is a product defect rather than a harness one, and it is recorded as
+    /// That was a product defect rather than a harness one, and it is recorded as
     /// BL-0091: the application falls back to powershell.exe wherever PowerShell 7 is
-    /// absent, so on such a machine no update can install. Left running rather than
+    /// absent, so on such a machine no update could install. Left running rather than
     /// silenced: it still executes, its failure is still reported, and it is a real
     /// oracle under PowerShell 7 and on a developer machine, where the ordering mutant
     /// is also measured.
+    /// </para>
+    /// <para>
+    /// <b>THAT REASON IS FIXED AND NO LONGER APPLIES.</b> PR #247 made obtaining the
+    /// Authenticode verdict non-fatal, and four independent post-fix CI runs pass 8 of 8
+    /// cases under BOTH hosts, 6 to 7 seconds apiece. The label is kept for a DIFFERENT
+    /// and weaker reason, stated here so nobody mistakes one for the other: on
+    /// 2026-08-23 this class failed once, 1 case of 16, on a 16-core developer machine,
+    /// and the identity of that case was destroyed by re-running before the output was
+    /// captured. Four captured runs afterwards were clean.
+    /// </para>
+    /// <para>
+    /// So removal is blocked on CHARACTERISING that observation, not on its absence -
+    /// see BL-0067, which exists for this family of process-spawning timeouts. Promoting
+    /// these to the blocking lane on the strength of "the old reason is gone" would
+    /// replace one unmeasured claim with another.
     /// </para>
     /// </remarks>
     [Trait("Category", "CIUnstable")]
@@ -297,12 +312,27 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// proves only that the outer finally ran.
     /// </para>
     /// <para>
-    /// That is a product defect rather than a harness one, and it is recorded as
+    /// That was a product defect rather than a harness one, and it is recorded as
     /// BL-0091: the application falls back to powershell.exe wherever PowerShell 7 is
-    /// absent, so on such a machine no update can install. Left running rather than
+    /// absent, so on such a machine no update could install. Left running rather than
     /// silenced: it still executes, its failure is still reported, and it is a real
     /// oracle under PowerShell 7 and on a developer machine, where the ordering mutant
     /// is also measured.
+    /// </para>
+    /// <para>
+    /// <b>THAT REASON IS FIXED AND NO LONGER APPLIES.</b> PR #247 made obtaining the
+    /// Authenticode verdict non-fatal, and four independent post-fix CI runs pass 8 of 8
+    /// cases under BOTH hosts, 6 to 7 seconds apiece. The label is kept for a DIFFERENT
+    /// and weaker reason, stated here so nobody mistakes one for the other: on
+    /// 2026-08-23 this class failed once, 1 case of 16, on a 16-core developer machine,
+    /// and the identity of that case was destroyed by re-running before the output was
+    /// captured. Four captured runs afterwards were clean.
+    /// </para>
+    /// <para>
+    /// So removal is blocked on CHARACTERISING that observation, not on its absence -
+    /// see BL-0067, which exists for this family of process-spawning timeouts. Promoting
+    /// these to the blocking lane on the strength of "the old reason is gone" would
+    /// replace one unmeasured claim with another.
     /// </para>
     /// </remarks>
     [Trait("Category", "CIUnstable")]
@@ -348,10 +378,13 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// still contains every substring a text assertion could search for, in a plausible
     /// order. Only running the script can tell the two apart.
     /// <para>
-    /// Informational for the same reason as its neighbours, which is not the reason
-    /// they used to give: on a GitHub runner it fails under Windows PowerShell 5.1 and
-    /// passes under PowerShell 7, because Microsoft.PowerShell.Security will not import
-    /// there and the script dies at Get-AuthenticodeSignature. See BL-0091.
+    /// Informational for the same reason as its neighbours, and that reason has changed
+    /// twice. It used to fail on a GitHub runner under Windows PowerShell 5.1 because
+    /// Microsoft.PowerShell.Security would not import and the script died at
+    /// Get-AuthenticodeSignature; PR #247 fixed that, and four post-fix runs pass under
+    /// both hosts. What keeps the label now is one uncharacterised local failure - see
+    /// the fuller account on Execute_InstallerSucceeds_RunsInstallerAndRelaunches, and
+    /// BL-0067.
     /// </para>
     /// </remarks>
     [Trait("Category", "CIUnstable")]
