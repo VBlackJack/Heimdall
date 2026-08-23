@@ -38,8 +38,17 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
     private const string LogExtension = ".log";
     private const string WritableProbePrefix = "Heimdall_writeprobe_";
     private const string WritableProbeExtension = ".tmp";
-    private const string PreferredPowerShell = "pwsh.exe";
-    private const string FallbackPowerShell = "powershell.exe";
+    /// <summary>
+    /// The host every supported Windows carries, chosen unconditionally.
+    /// </summary>
+    /// <remarks>
+    /// This used to prefer pwsh.exe when the PATH offered it and fall back here
+    /// otherwise. Nothing in the code gave a reason for the preference, and it had a
+    /// cost that only showed up in support: whether an update behaved one way or the
+    /// other depended on whether the user happened to have installed PowerShell 7.
+    /// One host means one behaviour to reason about and one to test against.
+    /// </remarks>
+    private const string WindowsPowerShell = "powershell.exe";
 
     private readonly string _dataRoot;
 
@@ -98,30 +107,12 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
         return UpdateOutcomeStore.FailureRecordPathIn(updatesDirectory);
     }
 
-    public string ResolvePowerShellExecutable()
-    {
-        try
-        {
-            var pathVariable = Environment.GetEnvironmentVariable("PATH");
-            if (!string.IsNullOrEmpty(pathVariable))
-            {
-                foreach (var directory in pathVariable.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var candidate = Path.Combine(directory.Trim(), PreferredPowerShell);
-                    if (File.Exists(candidate))
-                    {
-                        return PreferredPowerShell;
-                    }
-                }
-            }
-        }
-        catch (Exception ex) when (ex is ArgumentException or IOException or SecurityException or UnauthorizedAccessException)
-        {
-            // Fall through to the always-present Windows PowerShell host.
-        }
-
-        return FallbackPowerShell;
-    }
+    /// <summary>Names the PowerShell host the relauncher runs under.</summary>
+    /// <remarks>
+    /// Always the same one. See <see cref="WindowsPowerShell"/> for why the earlier
+    /// preference for pwsh.exe was dropped rather than kept as a fallback.
+    /// </remarks>
+    public string ResolvePowerShellExecutable() => WindowsPowerShell;
 
     public bool IsDirectoryWritable(string directory)
     {
