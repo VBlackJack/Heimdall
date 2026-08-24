@@ -352,6 +352,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _rdpDefaultCompression = true;
 
     [ObservableProperty]
+    private bool _rdpDefaultHardwareAcceleration;
+
+    [ObservableProperty]
     private int _rdpDefaultAudioMode;
 
     [ObservableProperty]
@@ -1027,6 +1030,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpDefaultAutoReconnect = settings.RdpDefaultAutoReconnect;
         RdpDefaultBitmapCaching = settings.RdpDefaultBitmapCaching;
         RdpDefaultCompression = settings.RdpDefaultCompression;
+        RdpDefaultHardwareAcceleration = settings.RdpDefaultHardwareAcceleration;
         RdpDefaultAudioMode = settings.RdpDefaultAudioMode;
         RdpResolutionPresets = settings.RdpResolutionPresets ?? [];
         RdpDialogAdvancedDefault = settings.RdpDialogAdvancedDefault;
@@ -1315,6 +1319,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.RdpDefaultAutoReconnect = RdpDefaultAutoReconnect;
             settings.RdpDefaultBitmapCaching = RdpDefaultBitmapCaching;
             settings.RdpDefaultCompression = RdpDefaultCompression;
+            settings.RdpDefaultHardwareAcceleration = RdpDefaultHardwareAcceleration;
             settings.RdpDefaultAudioMode = RdpDefaultAudioMode;
             settings.RdpResolutionPresets = RdpResolutionPresets;
             settings.RdpDialogAdvancedDefault = RdpDialogAdvancedDefault;
@@ -1505,6 +1510,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpDefaultAutoReconnect = defaults.RdpDefaultAutoReconnect;
         RdpDefaultBitmapCaching = defaults.RdpDefaultBitmapCaching;
         RdpDefaultCompression = defaults.RdpDefaultCompression;
+        RdpDefaultHardwareAcceleration = defaults.RdpDefaultHardwareAcceleration;
         RdpDefaultAudioMode = defaults.RdpDefaultAudioMode;
         RdpResizeEnableDelayMs = defaults.RdpResizeEnableDelayMs;
         RdpArtifactCleanupDelayMs = defaults.RdpArtifactCleanupDelayMs;

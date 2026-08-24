@@ -973,6 +973,9 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _rdpCompression = true;
 
     [ObservableProperty]
+    private bool _rdpHardwareAcceleration;
+
+    [ObservableProperty]
     private bool _rdpAutoReconnect = true;
 
     [ObservableProperty]
@@ -1831,6 +1834,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             RdpColorDepth = RdpColorDepth,
             RdpBitmapCaching = RdpBitmapCaching,
             RdpCompression = RdpCompression,
+            RdpHardwareAcceleration = RdpHardwareAcceleration,
             RdpAutoReconnect = RdpAutoReconnect,
             RdpAdminMode = RdpAdminMode,
             RdpFullScreen = RdpFullScreen,
@@ -2009,6 +2013,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.RdpColorDepth = dto.RdpColorDepth;
         vm.RdpBitmapCaching = dto.RdpBitmapCaching;
         vm.RdpCompression = dto.RdpCompression;
+        vm.RdpHardwareAcceleration = dto.RdpHardwareAcceleration;
         vm.RdpAutoReconnect = dto.RdpAutoReconnect;
         vm.RdpAdminMode = dto.RdpAdminMode;
         vm.RdpFullScreen = dto.RdpFullScreen;

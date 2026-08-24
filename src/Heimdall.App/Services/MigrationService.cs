@@ -303,6 +303,7 @@ public sealed class MigrationService
         MapInt(legacy, "RdpDefaultColorDepth", v => target.RdpDefaultColorDepth = v);
         MapBool(legacy, "RdpDefaultBitmapCaching", v => target.RdpDefaultBitmapCaching = v);
         MapBool(legacy, "RdpDefaultCompression", v => target.RdpDefaultCompression = v);
+        MapBool(legacy, "RdpDefaultHardwareAcceleration", v => target.RdpDefaultHardwareAcceleration = v);
         MapBool(legacy, "RdpDefaultAutoReconnect", v => target.RdpDefaultAutoReconnect = v);
 
         // Session
@@ -408,6 +409,7 @@ public sealed class MigrationService
         MapInt(legacy, "RdpColorDepth", v => dto.RdpColorDepth = v);
         MapBool(legacy, "RdpBitmapCaching", v => dto.RdpBitmapCaching = v);
         MapBool(legacy, "RdpCompression", v => dto.RdpCompression = v);
+        MapBool(legacy, "RdpHardwareAcceleration", v => dto.RdpHardwareAcceleration = v);
         MapBool(legacy, "RdpAutoReconnect", v => dto.RdpAutoReconnect = v);
         MapNullableString(legacy, "RdpGateway", v => dto.RdpGateway = v);
 

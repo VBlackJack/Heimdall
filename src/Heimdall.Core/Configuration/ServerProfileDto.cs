@@ -286,6 +286,11 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public int RdpColorDepth { get; set; } = 32;
     public bool RdpBitmapCaching { get; set; } = true;
     public bool RdpCompression { get; set; } = true;
+
+    /// <summary>
+    /// Lets the RDP control decode and present through the graphics adapter for this server.
+    /// </summary>
+    public bool RdpHardwareAcceleration { get; set; }
     public bool RdpAutoReconnect { get; set; } = true;
     public bool RdpAdminMode { get; set; }
     public bool RdpFullScreen { get; set; }

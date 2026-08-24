@@ -634,6 +634,7 @@ public partial class ServerDialog : Window
         DlgSrv_AntiIdleCb.Content = _localizer["ServerDialogAntiIdle"];
         DlgSrv_BitmapCacheCb.Content = _localizer["ServerDialogBitmapCaching"];
         DlgSrv_RdpCompressionCb.Content = _localizer["ServerDialogRdpCompressionCb"];
+        DlgSrv_RdpHardwareAccelerationCb.Content = _localizer["ServerDialogRdpHardwareAccelerationCb"];
         DlgSrv_AutoReconnectCb.Content = _localizer["ServerDialogAutoReconnect"];
         DlgSrv_RdpAdminModeCb.Content = _localizer["RdpAdminMode"];
         DlgSrv_RdpFullScreenCb.Content = _localizer["RdpFullScreen"];

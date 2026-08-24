@@ -699,6 +699,7 @@
   "SettingsLabelRdpAutoReconnect": "Reconnexion automatique",
   "SettingsLabelRdpBitmapCache": "Conserver le cache bitmap sur disque",
   "SettingsLabelRdpCompression": "Compression",
+  "SettingsLabelRdpHardwareAcceleration": "Rendu acc\u00e9l\u00e9r\u00e9 par le mat\u00e9riel",
   "SettingsLabelRdpRedirection": "Redirection de p\u00e9riph\u00e9riques par d\u00e9faut",
   "SettingsLabelCredentialGuard": "Exiger Credential Guard",
   "SettingsLabelRequireWindowsHello": "Exiger Windows Hello avant la connexion",
@@ -1102,6 +1103,7 @@
   "RdpBitmapCachingHint": "Conserve le cache bitmap sur disque entre les sessions, pour qu'une reconnexion le r\u00e9utilise au lieu de tout redessiner. Cela ne change rien au cache en m\u00e9moire, et le d\u00e9sactiver ne lib\u00e8re aucune m\u00e9moire. Sans risque \u00e0 laisser activ\u00e9.",
   "RdpCompression": "Compression",
   "RdpCompressionHint": "R\u00e9duit la bande passante au prix d'un l\u00e9ger surco\u00fbt CPU. Recommand\u00e9 sur lien lent.",
+  "RdpHardwareAccelerationHint": "Laisse le contr\u00f4le RDP d\u00e9coder et dessiner via la carte graphique. D\u00e9sactiv\u00e9 par d\u00e9faut : il cr\u00e9e un p\u00e9riph\u00e9rique Direct3D par session, mesur\u00e9 \u00e0 383 Mo de plus sur trois sessions 1920x1080. \u00c0 activer si une session para\u00eet moins fluide.",
   "RdpDefaultNlaHint": "Authentification au niveau r\u00e9seau. Requise par les serveurs Windows r\u00e9cents ; \u00e0 d\u00e9sactiver seulement si la cible la rejette.",
   "RdpStrictServerAuthHint": "Refuse la connexion si l'identit\u00e9 du serveur RDP ne peut pas \u00eatre authentifi\u00e9e. Requiert NLA.",
   "RdpConfirmDisconnectMessage": "Vous allez vous d\u00e9connecter de {0}. Continuer ?",
@@ -2535,6 +2537,7 @@
   "ServerDialogAntiIdle": "Activer le maintien de session",
   "ServerDialogBitmapCaching": "Conserver le cache bitmap sur disque entre les sessions",
   "ServerDialogRdpCompressionCb": "Activer la compression RDP",
+  "ServerDialogRdpHardwareAccelerationCb": "Utiliser le rendu acc\u00e9l\u00e9r\u00e9 par le mat\u00e9riel",
   "ServerDialogAutoReconnect": "Reconnexion automatique",
 
   "ServerDialogSshOptions": "Options SSH",

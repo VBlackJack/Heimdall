@@ -79,6 +79,19 @@ public sealed class RdpRedirectionOptions
     /// <summary>Enable RDP data compression.</summary>
     public bool Compression { get; set; } = true;
 
+    /// <summary>
+    /// Let the RDP control decode and present through the graphics adapter.
+    /// </summary>
+    /// <remarks>
+    /// Off by default because it is expensive: the control builds a Direct3D device and its
+    /// decoding context <b>per control instance</b>, and three concurrent 1920x1080 sessions
+    /// measured 1145.9 MB of private commit with it on against 763.3 MB with it off, for 840
+    /// extra kernel handles (issue #161, 2026-08-24). The cost of turning it off is processor
+    /// decoding, which was not measured under sustained motion; that is why this is a setting
+    /// and not a constant.
+    /// </remarks>
+    public bool HardwareAcceleration { get; set; }
+
     /// <summary>Enable automatic reconnection on network interruption.</summary>
     public bool AutoReconnect { get; set; } = true;
 

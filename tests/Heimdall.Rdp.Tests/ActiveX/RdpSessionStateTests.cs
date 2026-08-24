@@ -143,7 +143,8 @@ public sealed class RdpSessionStateTests
             Usb = true,
             Webcam = true,
             AudioCapture = true,
-            AudioMode = 2
+            AudioMode = 2,
+            HardwareAcceleration = true
         };
         state.MaxAutoReconnectAttempts = 3;
         state.KeepAliveIntervalMs = 15_000;

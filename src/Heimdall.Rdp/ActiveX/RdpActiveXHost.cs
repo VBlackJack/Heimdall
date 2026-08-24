@@ -40,8 +40,18 @@ namespace Heimdall.Rdp.ActiveX;
 /// </summary>
 public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
 {
-    // MsTscAx ActiveX control CLSID — Terminal Services Client 8.0+
+    // MsTscAx ActiveX control CLSID. The registry names this coclass
+    // "Microsoft RDP Client Control - version 2" (ProgID MsTscAx.MsTscAx.2); newer
+    // generations live in the same mstscax.dll under their own CLSIDs. Which generation is
+    // instantiated was measured to have no effect on memory: the CLSID selects a table entry
+    // that points at the same class factory and the same constructor (issue #161).
     public const string DefaultMsTscAxClsid = "7cacbd7b-0d99-468f-ac33-22e495c0afe5";
+
+    /// <summary>
+    /// Name of the <c>IMsRdpExtendedSettings</c> property that decides whether the control
+    /// decodes and presents through the graphics adapter.
+    /// </summary>
+    private const string HardwareModeProperty = "EnableHardwareMode";
 
     private static readonly Guid IidMsRdpExtendedSettings = new("302D8188-0052-4807-806A-362B628F9AC5");
     private static readonly Guid IidMsRdpClientNonScriptable5 = new("4F6996D5-D7B1-412C-B0FF-063718566907");
@@ -1571,6 +1581,46 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         }
     }
 
+    /// <summary>
+    /// Sets an <c>IMsRdpExtendedSettings</c> property whose variant type is <c>VT_BOOL</c>.
+    /// </summary>
+    /// <remarks>
+    /// The scale factors take a numeric variant, but the presenter switches take a boolean one,
+    /// and the control answers <c>E_FAIL</c> rather than coercing. Boxing a <see cref="bool"/>
+    /// marshals as <c>VT_BOOL</c>, which is what those properties expect.
+    /// </remarks>
+    private static bool TrySetExtendedSettingBoolean(object extendedSettings, string propertyName, bool value)
+    {
+        try
+        {
+            if (extendedSettings is not IMsRdpExtendedSettings settings)
+            {
+                Core.Logging.FileLogger.Info(
+                    $"RdpActiveXHost.Property(\"{propertyName}\") set failed: object is not IMsRdpExtendedSettings extendedSettings={DescribeComObject(extendedSettings)}");
+                return false;
+            }
+
+            object variantValue = value;
+            var hr = settings.put_Property(propertyName, ref variantValue);
+            if (hr < 0)
+            {
+                Core.Logging.FileLogger.Info(
+                    $"RdpActiveXHost.Property(\"{propertyName}\") boolean set failed hr=0x{unchecked((uint)hr):X8} value={value} extendedSettings={DescribeComObject(extendedSettings)}");
+                return false;
+            }
+
+            Core.Logging.FileLogger.Info(
+                $"RdpActiveXHost.IMsRdpExtendedSettings.Property[{propertyName}] boolean set value={value} hr=0x{unchecked((uint)hr):X8}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Info(
+                $"RdpActiveXHost.Property(\"{propertyName}\") boolean set threw {FormatExceptionForLog(ex)}");
+            return false;
+        }
+    }
+
     private static bool TrySetExtendedSetting(object extendedSettings, string propertyName, uint value)
     {
         try
@@ -1877,6 +1927,33 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         StripScrollbarStylesRecursive();
     }
 
+    /// <summary>
+    /// Applies the graphics presenter options to the control, before it connects.
+    /// </summary>
+    /// <remarks>
+    /// <c>EnableHardwareMode</c> cannot be written once a connection has started, so it belongs
+    /// on the pre-connect path, and it is written on every connect so a control taken from the
+    /// pool cannot inherit the choice made by the session before it.
+    /// </remarks>
+    private void ApplyPresenterSettings(object extendedSettings)
+    {
+        bool hardwareAcceleration = _session.Redirections.HardwareAcceleration;
+
+        // The property is VT_BOOL; a numeric variant is answered with E_FAIL.
+        bool applied = TrySetExtendedSettingBoolean(
+            extendedSettings, HardwareModeProperty, hardwareAcceleration);
+
+        Core.Logging.FileLogger.Info(
+            $"RdpActiveXHost.ApplyPresenterSettings: {HardwareModeProperty}={hardwareAcceleration} applied={applied}");
+
+        if (!applied)
+        {
+            Core.Logging.FileLogger.Info(
+                $"RdpActiveXHost presenter fallback: {HardwareModeProperty} could not be written; " +
+                "the MsTscAx default remains in effect for this session.");
+        }
+    }
+
     private void ApplyDisplayScaleSettings(object ocx)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -1887,6 +1964,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         {
             desktopSet = TrySetExtendedSetting(extendedSettings, "DesktopScaleFactor", _session.DesktopScaleFactor);
             deviceSet = TrySetExtendedSetting(extendedSettings, "DeviceScaleFactor", _session.DeviceScaleFactor);
+            ApplyPresenterSettings(extendedSettings);
         }
 
         stopwatch.Stop();
