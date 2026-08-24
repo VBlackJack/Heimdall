@@ -12,6 +12,23 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-24: A third of the Remote Desktop memory footprint, given back
+
+Landed after v2026.082301, so it ships with the next release.
+
+- **Hardware-accelerated rendering is now a setting, and it is off by default.** The Remote
+  Desktop control builds a Direct3D device and its decoding context for every control instance,
+  which is why memory grew with the number of sessions and stayed high afterwards. Measured on
+  two Windows Server 2022 targets at 1920x1080 in 32-bit, three concurrent sessions fell from
+  1145.9 MB of private commit and 3898 kernel handles to 763.3 MB and 3058: 383 MB and 840
+  handles, a third of the footprint. The processor cost of decoding in software under sustained
+  motion was not measured, which is why this is a setting, per server or globally, rather than a
+  constant. Reported as issue #161.
+- **Boolean Remote Desktop display properties were never written.** The setter only produced
+  numeric variants, so a property expecting a boolean one was refused with `E_FAIL`, and the
+  refusal was invisible because the return value was never logged. Every write now says whether
+  it landed, and a failure says which default remains in effect instead.
+
 ## 2026-08-24: A bulk connect that was cancelled now says so
 
 Landed after v2026.082301, so it ships with the next release.
