@@ -157,6 +157,15 @@ public sealed class AppSettings
     public int RdpDefaultColorDepth { get; set; } = 32;
     public bool RdpDefaultBitmapCaching { get; set; } = true;
     public bool RdpDefaultCompression { get; set; } = true;
+
+    /// <summary>
+    /// Default for letting the RDP control decode and present through the graphics adapter.
+    /// </summary>
+    /// <remarks>
+    /// Off by default: measured at 383 MB and 840 kernel handles saved across three
+    /// concurrent 1920x1080 sessions (issue #161).
+    /// </remarks>
+    public bool RdpDefaultHardwareAcceleration { get; set; }
     public bool RdpDefaultAutoReconnect { get; set; } = true;
     public bool RdpDialogAdvancedDefault { get; set; }
     public bool RdpConfirmReconnectOnResize { get; set; }

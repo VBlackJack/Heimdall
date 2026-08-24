@@ -76,6 +76,7 @@
     "rdpDefaultColorDepth": 32,
     "rdpDefaultBitmapCaching": true,
     "rdpDefaultCompression": true,
+    "rdpDefaultHardwareAcceleration": false,
     "rdpDefaultAutoReconnect": true,
     "rdpDialogAdvancedDefault": false,
     "rdpRedirectionIndicatorsAlwaysExpanded": false,
