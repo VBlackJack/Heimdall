@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-24: A bulk connect that was cancelled now says so
+
+Landed after v2026.082301, so it ships with the next release.
+
+- **Cancelling a bulk connect no longer loses servers from the summary.** Stopping a run part
+  way reported only what it had managed to do: three servers cancelled after the first read as
+  "Connected 1, failed 0, skipped 0", and fifty cancelled at the third read as "Connected 3,
+  failed 0, skipped 0". The servers the run never reached appeared in no count at all, which
+  made the sentence wrong rather than merely brief. Every selected server is now accounted for,
+  and a run that was cut short says so.
+- **"Nothing to connect" now says how many servers were skipped.** Selecting several servers
+  and having every one of them skipped produced a message announcing an empty selection, which
+  is not what happened. The count is no longer discarded, on all three paths that could show
+  that message.
+
 ## 2026-08-23: Remote Desktop certificates, a way out of a stuck save, and updates that speak
 
 - **Heimdall can now hold the Remote Desktop certificate trust that Windows cannot.** Windows
