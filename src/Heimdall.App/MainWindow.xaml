@@ -2407,10 +2407,15 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
-                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
-                                    <StackPanel>
+                        <TabControl x:Name="Mw_SettingsSshSubTabControl"
+                                    Style="{StaticResource SegmentedTabControlStyle}">
+                            <TabItem x:Name="Mw_SettingsSshSubTabConnection"
+                                     Header="{loc:Translate SettingsSshSubTabConnection}"
+                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                            <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSshTitle" Text="{loc:Translate SettingsSectionSshDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
                                         <TextBlock x:Name="Mw_SettingsPlinkPathLabel" Text="{loc:Translate SettingsLabelPlinkPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                         <DockPanel>
@@ -2472,6 +2477,18 @@
                                             </ComboBox>
                                             <TextBlock Text="{loc:Translate SettingsSshAgentPreferenceHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSshSubTabSession"
+                                     Header="{loc:Translate SettingsSshSubTabSession}"
+                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                            <StackPanel>
                                         <Grid Margin="0,12,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -2514,6 +2531,18 @@
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshAutoReconnectAttemptsLabel}"/>
                                             </StackPanel>
                                         </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSshSubTabSftpX11"
+                                     Header="{loc:Translate SettingsSshSubTabSftpX11}"
+                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                            <StackPanel>
                                         <CheckBox x:Name="Mw_SettingsSftpBrowserEnabled" Content="{loc:Translate SettingsLabelSftpBrowserEnabled}" IsChecked="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"/>
                                         <CheckBox x:Name="Mw_SettingsAutoOpenSftp" Content="{loc:Translate SettingsLabelAutoOpenSftp}" IsChecked="{Binding Settings.SftpAutoOpenOnSsh}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
                                         <CheckBox x:Name="Mw_SettingsSftpFollowSshDirectory" Content="{loc:Translate SettingsLabelSftpFollowSshDirectory}" IsChecked="{Binding Settings.SftpFollowSshDirectory}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0" AutomationProperties.Name="{loc:Translate SettingsLabelSftpFollowSshDirectory}"/>
@@ -2534,10 +2563,16 @@
                                             </DockPanel>
                                         </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsX11AutoStart" Content="{loc:Translate SettingsLabelX11AutoStart}" IsChecked="{Binding Settings.X11AutoStart}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"/>
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
-                                </Border>
-
-                                <!-- Trusted host keys -->
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSshSubTabHostKeys"
+                                     Header="{loc:Translate SettingsSshSubTabHostKeys}"
+                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -2686,8 +2721,14 @@
                                                    Visibility="{Binding Settings.TrustedHostKeys.HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                 </Border>
-
-                                <!-- SSH Gateways -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSshSubTabGateways"
+                                     Header="{loc:Translate SettingsSshSubTabGateways}"
+                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -2730,8 +2771,10 @@
                                         </Grid>
                                     </StackPanel>
                                 </Border>
-                            </StackPanel>
-                        </ScrollViewer>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
                     </TabItem>
 
                     <!-- ═══════ RDP ═══════ -->
