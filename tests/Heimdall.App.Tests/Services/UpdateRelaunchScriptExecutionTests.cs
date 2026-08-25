@@ -53,6 +53,12 @@ public sealed class UpdateRelaunchScriptExecutionTests
     private static readonly TimeSpan ScriptCeiling = TimeSpan.FromSeconds(60);
 
     /// <summary>
+    /// How long the timeout path waits for the already-draining readers once the process
+    /// tree has been killed. Short on purpose: this only collects what is already there.
+    /// </summary>
+    private static readonly TimeSpan DrainAfterKillCeiling = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// How long a marker may take to appear. The relaunch is started without -Wait, so
     /// its marker lands asynchronously, after the host has already exited. Polled to a
     /// deadline rather than slept on: a fixed wall-clock wait on pool-scheduled work is
@@ -568,11 +574,53 @@ public sealed class UpdateRelaunchScriptExecutionTests
         catch (OperationCanceledException)
         {
             process.Kill(entireProcessTree: true);
+
+            // Everything this wait already knows goes into the message. It used to report
+            // the host and nothing else, so the CI failure of 2026-08-24 - two PS 5.1 runs
+            // over the ceiling while a third passed in 7 s - could not be told apart from a
+            // script that never printed a line. The readers are already draining both
+            // streams; killing the tree closes them, so awaiting here returns whatever the
+            // child produced before it was stopped. Bounded, because a reader that does not
+            // complete must not turn a timeout into a hang - and its own failure is
+            // reported rather than swallowed, since "no output" and "could not read the
+            // output" are different findings.
             throw new TimeoutException(
-                $"relauncher script exceeded {ScriptCeiling.TotalSeconds} s under {powerShellHost}");
+                $"relauncher script exceeded {ScriptCeiling.TotalSeconds} s under {powerShellHost}."
+                + $" stdout: {await DrainAfterKillAsync(stdout)}"
+                + $" stderr: {await DrainAfterKillAsync(stderr)}");
         }
 
         return new ScriptRun(process.ExitCode, await stdout, await stderr);
+    }
+
+    /// <summary>
+    /// Returns what a stream reader captured before the process was killed.
+    /// </summary>
+    /// <remarks>
+    /// Never throws: this runs while a <see cref="TimeoutException"/> is already being
+    /// built, and losing the timeout to a secondary failure would replace a diagnosable
+    /// report with a confusing one. What went wrong is reported in place of the text.
+    /// </remarks>
+    internal static async Task<string> DrainAfterKillAsync(Task<string> reader, TimeSpan? ceiling = null)
+    {
+        TimeSpan bound = ceiling ?? DrainAfterKillCeiling;
+        try
+        {
+            Task finished = await Task.WhenAny(reader, Task.Delay(bound));
+            if (!ReferenceEquals(finished, reader))
+            {
+                return "<not readable within "
+                    + bound.TotalSeconds.ToString(CultureInfo.InvariantCulture)
+                    + " s of the kill>";
+            }
+
+            string text = (await reader).Trim();
+            return text.Length == 0 ? "<empty>" : text;
+        }
+        catch (Exception ex)
+        {
+            return $"<unreadable: {ex.GetType().Name}: {ex.Message}>";
+        }
     }
 
     private sealed record ScriptRun(int ExitCode, string StandardOutput, string StandardError);
