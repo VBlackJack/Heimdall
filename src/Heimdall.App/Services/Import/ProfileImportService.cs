@@ -383,7 +383,6 @@ public sealed class ProfileImportService(
                     importedGateways,
                     appliedServers);
                 ApplyGatewayIdMap(appliedServers, gatewayReconciliation.GatewayIdMap);
-                settings.SshGateways.AddRange(gatewayReconciliation.GatewaysToAdd);
             }
 
             return (
@@ -398,12 +397,24 @@ public sealed class ProfileImportService(
                     GatewayMergedCount = gatewayReconciliation.MergedCount,
                     GatewayOrphanCount = gatewayReconciliation.OrphanReferences.Count
                 },
-                SettingsChanged: gatewayReconciliation.GatewaysToAdd.Count > 0);
+                GatewaysToAdd: gatewayReconciliation.GatewaysToAdd);
         });
 
-        if (mutationResult.SettingsChanged)
+        if (mutationResult.GatewaysToAdd.Count > 0)
         {
-            await _configManager.SaveSettingsAsync(settings);
+            // Only the gateways this import created are written, and through a locked
+            // read-modify-write. Saving the whole snapshot taken before the inventory
+            // mutation erased everything another surface had persisted during that window -
+            // since BL-0094 that includes a gateway the user just created from the Add menu.
+            //
+            // The snapshot is still what the reconciler compared against, so a gateway
+            // created concurrently is not considered for MERGING and can end up duplicated
+            // rather than reused. That is a lesser defect than losing it, and closing it
+            // would mean reconciling under the write lock: CommitMigrationAsync offers
+            // exactly that, and was deliberately not used here because its contract obliges
+            // a caller that cannot obtain the capability to refuse the whole import.
+            await _configManager.MergeSettingAsync(
+                settings => settings.SshGateways.AddRange(mutationResult.GatewaysToAdd));
         }
 
         return mutationResult.Result;

@@ -151,7 +151,6 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
             foreach (var gateway in gatewayPlan.CreatedGateways)
             {
                 existingGatewayList.Add(gateway);
-                settings.SshGateways.Add(gateway);
                 createdGateways.Add(gateway);
             }
 
@@ -160,7 +159,13 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
 
         if (createdGateways.Count > 0)
         {
-            await _configManager.SaveSettingsAsync(settings).ConfigureAwait(false);
+            // Only the gateways this import created are written, and through a locked
+            // read-modify-write. Saving the whole snapshot taken at the top of the method
+            // erased everything another surface had persisted while the plan was being
+            // built. The snapshot still seeds the plan, so it is loaded, never written.
+            await _configManager
+                .MergeSettingAsync(current => current.SshGateways.AddRange(createdGateways))
+                .ConfigureAwait(false);
         }
 
         return await _configManager.MutateServersAsync(currentInventory =>

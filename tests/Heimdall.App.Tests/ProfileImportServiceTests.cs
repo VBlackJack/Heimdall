@@ -258,6 +258,77 @@ public sealed class ProfileImportServiceTests
         Assert.Contains("SSH gateways: 0 created, 1 merged, 0 orphan reference(s).", result.UserMessage, StringComparison.Ordinal);
     }
 
+    // BL-0095. The import took a settings snapshot, worked for a while - a whole server
+    // inventory write sits in the middle - then wrote the WHOLE snapshot back. Everything
+    // another surface had persisted meanwhile was erased. Since BL-0094 that includes a
+    // gateway the user has just created from the Add menu, so the window destroys work
+    // rather than merely losing an unsaved draft.
+    [Fact]
+    public async Task ImportFromPathAsync_KeepsAGatewayPersistedWhileTheImportWasWorking()
+    {
+        using var fixture = new ProfileImportFixture();
+        var injected = false;
+        fixture.AfterSettingsLoaded = () =>
+        {
+            if (injected)
+            {
+                return;
+            }
+
+            injected = true;
+            fixture.ConfigManager
+                .MergeSettingAsync(settings => settings.SshGateways.Add(new SshGatewayDto
+                {
+                    Id = "created-during-the-import",
+                    Name = "Created meanwhile",
+                    Host = "meanwhile.example.test",
+                    Port = 22,
+                    User = "ops"
+                }))
+                .GetAwaiter()
+                .GetResult();
+        };
+        ProfileConfigDocument document = new()
+        {
+            Servers =
+            [
+                new ServerProfileDto
+                {
+                    Id = "json-v2-concurrent",
+                    DisplayName = "Json V2 Concurrent",
+                    ConnectionType = "SSH",
+                    RemoteServer = "ssh.example.com",
+                    SshPort = 22,
+                    SshGatewayId = "imported-gateway"
+                }
+            ],
+            Gateways =
+            [
+                new SshGatewayDto
+                {
+                    Id = "imported-gateway",
+                    Name = "Imported Bastion",
+                    Host = "bastion.example.com",
+                    Port = 22,
+                    User = "ops"
+                }
+            ]
+        };
+        string path = await fixture.WriteConfigDocumentAsync("servers-v2-concurrent.json", document);
+
+        ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.True(result.HasChanges);
+        Assert.True(injected, "the concurrent write never ran, so this test measured nothing");
+        AppSettings reloaded = await fixture.ConfigManager.LoadSettingsAsync();
+        Assert.Contains(
+            reloaded.SshGateways,
+            gateway => string.Equals(gateway.Id, "created-during-the-import", StringComparison.Ordinal));
+        Assert.Contains(
+            reloaded.SshGateways,
+            gateway => string.Equals(gateway.Name, "Imported Bastion", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task ImportFromPathAsync_JsonLegacyGatewayReference_WarnsAboutOrphan()
     {
@@ -489,13 +560,23 @@ public sealed class ProfileImportServiceTests
 
         public ProfileImportService Service { get; }
 
+        /// <summary>
+        /// Runs when the service takes its settings snapshot, so a test can persist through
+        /// another surface exactly while the import holds one.
+        /// </summary>
+        public Action? AfterSettingsLoaded { get; set; }
+
         public ProfileImportFixture(long maxImportFileSizeBytes = AppConstants.MaxImportFileSizeBytes)
         {
             Directory.CreateDirectory(RootPath);
             ConfigManager = new ConfigManager(RootPath);
             LocalizationManager localizer = CreateLocalizerAsync().GetAwaiter().GetResult();
             RdpImportService rdpImport = new(ConfigManager, localizer);
-            Service = new ProfileImportService(ConfigManager, localizer, Dialog, rdpImport, maxImportFileSizeBytes);
+            InterceptingConfigManager intercepted = new(ConfigManager)
+            {
+                AfterLoadSettings = () => AfterSettingsLoaded?.Invoke()
+            };
+            Service = new ProfileImportService(intercepted, localizer, Dialog, rdpImport, maxImportFileSizeBytes);
         }
 
         public async Task<string> WriteTextAsync(string fileName, string content)
