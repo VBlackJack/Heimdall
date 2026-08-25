@@ -2107,7 +2107,12 @@
                                               Style="{StaticResource DialogFormCheckBoxStyle}"
                                               Margin="0,14,0,0"/>
                                     <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
                                         <ComboBox x:Name="DlgSrv_GatewayCmb"
+                                                  Grid.Column="0"
                                                   TabIndex="7"
                                                   AutomationProperties.Name="{loc:Translate ServerFieldGateway}"
                                                   ItemsSource="{Binding AvailableGateways}"
@@ -2117,8 +2122,27 @@
                                                   IsEnabled="{Binding CanSelectGateway}"
                                                   AutomationProperties.HelpText="{Binding GatewayComboHelpText}"
                                                   Style="{StaticResource DialogFormComboBoxStyle}"/>
+                                        <Button x:Name="DlgSrv_AddGatewayBtn"
+                                                Grid.Column="1"
+                                                TabIndex="8"
+                                                Margin="8,0,0,0"
+                                                Padding="12,0"
+                                                Content="{loc:Translate BtnAddGateway}"
+                                                AutomationProperties.Name="{loc:Translate BtnAddGateway}"
+                                                Command="{Binding CreateGatewayCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}"/>
                                     </Grid>
                                     <TextBlock Text="{Binding GatewayExplanation}" Style="{StaticResource DialogHintTextStyle}"/>
+                                    <StackPanel Margin="0,10,0,0"
+                                                Visibility="{Binding HasNoGateway, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock x:Name="DlgSrv_GatewayEmptyTitle"
+                                                   Text="{loc:Translate GatewayListEmpty}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   FontWeight="SemiBold"/>
+                                        <TextBlock Text="{loc:Translate GatewayEmptyHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Margin="0,2,0,0"/>
+                                    </StackPanel>
                                 </StackPanel>
 
                                 <!-- Gateway detail card (visible only when gateway selected) -->

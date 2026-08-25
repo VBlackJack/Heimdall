@@ -62,6 +62,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     internal ConnectionService ConnectionService => _connectionService;
     private readonly IDialogService _dialogService;
+
+    /// <summary>
+    /// Shared with the settings panel: both create a gateway from outside that panel, and
+    /// one owner for that sequence is the point.
+    /// </summary>
+    private IGatewayCreationService? _gatewayCreation;
     private bool _disposed;
 
     private List<ServerItemViewModel> _allServers = [];
@@ -2012,9 +2018,27 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
     }
 
-    private static void PopulateServerDialogOptions(ServerDialogViewModel dialogVm, AppSettings settings)
+    private void PopulateServerDialogOptions(ServerDialogViewModel dialogVm, AppSettings settings)
     {
         dialogVm.AvailableGateways = new(BuildGatewayOptions(settings.SshGateways));
+
+        // The tab that CHOOSES a gateway can now create one. The dialog owns no
+        // configuration stack, so the shell hands it the same creation path the Add menu
+        // and the tree context menu use - one owner for the sequence, not a third copy.
+        dialogVm.CreateGatewayRequested = async () =>
+        {
+            _gatewayCreation ??= new GatewayCreationService(_configManager, _dialogService);
+            SshGatewayDto? created = await _gatewayCreation.CreateAsync();
+            if (created is null)
+            {
+                return null;
+            }
+
+            AppSettings refreshed = await _configManager.LoadSettingsAsync();
+            return BuildGatewayOptions(refreshed.SshGateways)
+                .FirstOrDefault(option =>
+                    string.Equals(option.Id, created.Id, StringComparison.OrdinalIgnoreCase));
+        };
 
         // Pre-select the last-used gateway for new servers (not edit mode)
         if (!dialogVm.IsEditMode

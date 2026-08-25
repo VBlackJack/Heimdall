@@ -121,6 +121,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     // Working buffers (mutated by CRUD, flushed to disk on Save)
     private List<SshGatewayDto> _pendingGateways = new();
+
+    /// <summary>
+    /// Shared with the network tab of the server dialog: both create a gateway from outside
+    /// this panel, and one copy of that sequence is the point.
+    /// </summary>
+    private IGatewayCreationService? _gatewayCreation;
     private List<ProjectDto> _pendingProjects = new();
 
     // Projects removed before Save — servers are unassigned on flush
@@ -1965,27 +1971,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [RelayCommand]
     private async Task AddGatewayOutsidePanelAsync(CancellationToken cancellationToken)
     {
-        AppSettings persisted = await _configManager.LoadSettingsAsync();
         cancellationToken.ThrowIfCancellationRequested();
 
-        GatewayDialogViewModel vm = new()
-        {
-            AvailableParents = new ObservableCollection<GatewayOption>(
-                persisted.SshGateways.Select(
-                    gateway => new GatewayOption(gateway.Id, $"{gateway.Name} ({gateway.Host})")))
-        };
-
-        GatewayDialogResult? result = await _dialogService.ShowGatewayDialogAsync(vm);
-        if (result?.Saved != true)
+        _gatewayCreation ??= new GatewayCreationService(_configManager, _dialogService);
+        SshGatewayDto? created = await _gatewayCreation.CreateAsync();
+        if (created is null)
         {
             return;
         }
-
-        SshGatewayDto created = result.Gateway;
-        created.Id = Guid.NewGuid().ToString();
-
-        await _configManager.MergeSettingAsync(
-            settings => settings.SshGateways.Add(CloneGateway(created)));
 
         // The panel keeps its own buffer. Seeding it here keeps an open panel showing what
         // disk holds, and deliberately does NOT raise IsDirty: nothing is pending, the

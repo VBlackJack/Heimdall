@@ -1033,6 +1033,45 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     private ObservableCollection<GatewayOption> _availableGateways = [];
 
+    /// <summary>
+    /// Supplied by the shell so this tab can create a gateway without owning the
+    /// configuration stack. Returns the option to select, or <see langword="null"/> when the
+    /// user cancelled.
+    /// </summary>
+    /// <remarks>
+    /// The tab is where the gateway is chosen, so it is where creating one belongs. Sending
+    /// the user to Settings, and only to Settings, is what made this whole area hard to
+    /// understand: the list offered no way to fill itself, and said nothing when empty.
+    /// </remarks>
+    public Func<Task<GatewayOption?>>? CreateGatewayRequested { get; set; }
+
+    /// <summary>
+    /// True when the protocol tunnels but nothing has ever been configured to tunnel
+    /// through, which is the state that used to be an empty dropdown and no explanation.
+    /// </summary>
+    public bool HasNoGateway => SupportsGateway && AvailableGateways.Count == 0;
+
+    public bool CanCreateGateway => CanSelectGateway && CreateGatewayRequested is not null;
+
+    [RelayCommand(CanExecute = nameof(CanCreateGateway))]
+    private async Task CreateGatewayAsync()
+    {
+        if (CreateGatewayRequested is null)
+        {
+            return;
+        }
+
+        GatewayOption? created = await CreateGatewayRequested();
+        if (created is null)
+        {
+            return;
+        }
+
+        AvailableGateways.Add(created);
+        SelectedGatewayId = created.Id;
+        RaiseDerivedStateChanged();
+    }
+
     // --- Project ---
 
     [ObservableProperty]
@@ -1090,6 +1129,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(OptionsTabErrorCount),
         nameof(FirstInvalidField),
         nameof(AvailableGateways),
+        nameof(HasNoGateway),
+        nameof(CanCreateGateway),
         nameof(AvailableProjects),
         nameof(ConnectionTypeDisplayName),
         nameof(CanUseWinRmSsl),
@@ -2281,6 +2322,9 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(SupportsGateway));
         OnPropertyChanged(nameof(UsesGateway));
         OnPropertyChanged(nameof(CanSelectGateway));
+        OnPropertyChanged(nameof(HasNoGateway));
+        OnPropertyChanged(nameof(CanCreateGateway));
+        CreateGatewayCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(GatewayComboHelpText));
         OnPropertyChanged(nameof(CanEditTunnelPort));
         OnPropertyChanged(nameof(EndpointPort));
