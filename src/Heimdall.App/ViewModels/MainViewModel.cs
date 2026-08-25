@@ -593,6 +593,15 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     {
         _currentSettings = settings;
         SleepPrevention.Enabled = settings.PreventSleepDuringSession;
+
+        // The settings panel seeds its gateway buffer once and nothing reseeds it on the way in,
+        // so a gateway created from a session dialog was on disk and in the tree while the panel
+        // still read "no gateway configured". Absorbing rather than reloading is deliberate: the
+        // panel buffers so that Cancel can discard, and a wholesale reseed here would throw away
+        // edits in progress. Marshalled because Gateways is bound to the UI, and not awaited
+        // because the raiser runs this inline for every subscriber - blocking it on the UI
+        // thread would make an observer's cost the writer's problem.
+        _ = _uiDispatcher.InvokeAsync(() => Settings.AbsorbExternallyCreatedGateways(settings));
     }
 
     private void OnApplicationStatusChanged(ApplicationStatus previous, ApplicationStatus current)

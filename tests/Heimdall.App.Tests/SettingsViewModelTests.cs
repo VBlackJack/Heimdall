@@ -39,6 +39,96 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class SettingsViewModelTests
 {
+    private static SshGatewayDto Gateway(string id, string name) => new()
+    {
+        Id = id,
+        Name = name,
+        Host = name,
+        Port = 22,
+        User = "user"
+    };
+
+    // The settings panel seeds its gateway buffer at LoadFromSettings and nothing reseeds it on
+    // the way in, so a gateway created from a session dialog sat on disk and in the session tree
+    // while this panel still read "no gateway configured". Reported from a live session on
+    // 2026-08-25, immediately after - and distinct from - the missing-badge defect it resembles.
+    [Fact]
+    public void AbsorbExternallyCreatedGateways_ShowsAGatewayCreatedOutsideThePanel()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SshGateways.Add(Gateway("gw-known", "test01"));
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        Assert.Equal("test01", Assert.Single(viewModel.Gateways).Name);
+
+        AppSettings external = new();
+        external.SshGateways.Add(Gateway("gw-known", "test01"));
+        external.SshGateways.Add(Gateway("gw-new", "test02"));
+
+        viewModel.AbsorbExternallyCreatedGateways(external);
+
+        Assert.Contains(viewModel.Gateways, gateway => gateway.Name == "test02");
+        Assert.Equal(2, viewModel.Gateways.Count);
+
+        // Absorbing someone else's write is not a user edit. Arming Save here would invite the
+        // user to write this buffer back over configuration they never touched.
+        Assert.False(viewModel.IsDirty);
+    }
+
+    // Reseeding wholesale would be the obvious fix and it would be worse than the defect: this
+    // panel buffers on purpose so that Cancel can discard, and an unrelated external write must
+    // not destroy an edit in progress.
+    [Fact]
+    public void AbsorbExternallyCreatedGateways_LeavesAnUnsavedEditAlone()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SshGateways.Add(Gateway("gw-known", "test01"));
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+
+        GatewayItemViewModel editing = Assert.Single(viewModel.Gateways);
+        editing.Name = "renamed but not saved";
+
+        AppSettings external = new();
+        external.SshGateways.Add(Gateway("gw-known", "test01"));
+        external.SshGateways.Add(Gateway("gw-new", "test02"));
+
+        viewModel.AbsorbExternallyCreatedGateways(external);
+
+        // Read the edit back OUT OF THE COLLECTION, not off the reference captured above. A
+        // wholesale reseed replaces the collection with fresh items and leaves the old object
+        // untouched, so asserting on `editing` alone passes while the panel shows "test01" - the
+        // exact defect this test exists to catch, surviving vacuously. Caught by a mutant that
+        // reseeded here and killed a different test than this one.
+        GatewayItemViewModel shown = Assert.Single(
+            viewModel.Gateways, gateway => gateway.Id == "gw-known");
+        Assert.Same(editing, shown);
+        Assert.Equal("renamed but not saved", shown.Name);
+        Assert.Contains(viewModel.Gateways, gateway => gateway.Name == "test02");
+    }
+
+    // A gateway staged for deletion is absent from the buffer but still present on disk until
+    // Save runs, which is exactly the shape "not in the buffer" matches. Absorbing on that test
+    // alone would resurrect it under the user's cursor.
+    [Fact]
+    public async Task AbsorbExternallyCreatedGateways_DoesNotResurrectOneStagedForDeletion()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SshGateways.Add(Gateway("gw-doomed", "test01"));
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.SelectedGateway = Assert.Single(viewModel.Gateways);
+        await viewModel.DeleteGatewayCommand.ExecuteAsync(null);
+        Assert.Empty(viewModel.Gateways);
+
+        // Disk still holds it - Save has not run.
+        viewModel.AbsorbExternallyCreatedGateways(config.Settings);
+
+        Assert.Empty(viewModel.Gateways);
+    }
+
     [Fact]
     public void ExportJsonOptions_StripsCredentialFieldsFromServerProfiles()
     {

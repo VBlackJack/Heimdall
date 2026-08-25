@@ -1987,6 +1987,46 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         Gateways.Add(CreateGatewayItem(created));
     }
 
+    /// <summary>
+    /// Takes in gateways that appeared on disk while this panel was open, without disturbing
+    /// anything the user has edited here but not yet saved.
+    /// </summary>
+    /// <remarks>
+    /// The panel seeds its buffer once, at <c>LoadFromSettings</c>, which runs at startup, on a
+    /// full configuration reload, on Discard and on Reset - and on none of those does simply
+    /// walking to the Settings tab count. So a gateway created from a session dialog reached the
+    /// disk and the session tree correctly and was still absent from this list, which read
+    /// "no gateway configured" over a file that had one. Reported from a live session on
+    /// 2026-08-25, right after the missing-badge defect it looks like but is not.
+    ///
+    /// Reseeding wholesale would be the obvious fix and it would be wrong: this panel buffers on
+    /// purpose, because its Save button is the contract and Cancel must still discard. Throwing
+    /// the buffer away on an unrelated external write would silently destroy edits in progress -
+    /// a worse defect than the one being fixed. So this only ADDS ids the buffer has never seen,
+    /// never touches an entry already held, and skips anything staged for deletion.
+    ///
+    /// It deliberately leaves <see cref="IsDirty"/> alone: absorbing someone else's write is not
+    /// a user edit, and arming Save here would invite the user to write the buffer back.
+    /// </remarks>
+    internal void AbsorbExternallyCreatedGateways(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        foreach (SshGatewayDto gateway in settings.SshGateways)
+        {
+            if (string.IsNullOrWhiteSpace(gateway.Id)
+                || _deletedGatewayIds.Contains(gateway.Id)
+                || _pendingGateways.Any(pending => string.Equals(
+                    pending.Id, gateway.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            _pendingGateways.Add(CloneGateway(gateway));
+            Gateways.Add(CreateGatewayItem(gateway));
+        }
+    }
+
     private static GatewayItemViewModel CreateGatewayItem(SshGatewayDto gateway) =>
         new()
         {
