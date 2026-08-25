@@ -639,7 +639,7 @@ public sealed class ContextMenuFactory
             inputGestureText: "Ctrl+N"));
         menu.Items.Add(CreateMenuItem(
             vm.Localize("BtnAddGateway"),
-            vm.Settings.AddGatewayCommand));
+            vm.Settings.AddGatewayOutsidePanelCommand));
 
         // New root folder
         var newFolderItem = new MenuItem { Header = vm.Localize("TreeCtxNewGroup") };

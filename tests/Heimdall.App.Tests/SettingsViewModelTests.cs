@@ -258,6 +258,128 @@ public sealed class SettingsViewModelTests
         Assert.Equal("gw-draft", refreshedMissing.GatewayId);
     }
 
+    // A2 of BL-0094. The panel commits gateways by wholesale replacement from the
+    // snapshot taken at LoadFromSettings, and SettingsChanged never reseeds that
+    // snapshot. A gateway persisted by any other surface while the panel is open is
+    // therefore erased by the next Save, even when the panel never touched gateways.
+    [Fact]
+    public async Task Save_KeepsGatewayPersistedByAnotherSurfaceWhilePanelWasOpen()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                SshGateways = [CreateGateway("gw-panel", "Known to the panel")]
+            }
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        // Another surface - the Add menu, the tree context menu, a profile import -
+        // persists a gateway through the config manager while the panel is open.
+        await config.MergeSettingAsync(settings =>
+            settings.SshGateways.Add(CreateGateway("gw-outside", "Added outside the panel")));
+
+        // The panel saves an unrelated preference. It never touched the gateway list.
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        Assert.Contains(
+            config.Settings.SshGateways,
+            gateway => string.Equals(gateway.Id, "gw-outside", StringComparison.Ordinal));
+        Assert.Contains(
+            config.Settings.SshGateways,
+            gateway => string.Equals(gateway.Id, "gw-panel", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ReconcileGateways_KeepsGatewayAddedElsewhereAndLetsThePanelEditWin()
+    {
+        SshGatewayDto storedShared = CreateGateway("gw-shared", "Stored name");
+        SshGatewayDto storedElsewhere = CreateGateway("gw-outside", "Added outside the panel");
+        SshGatewayDto editedShared = CreateGateway("GW-SHARED", "Renamed in the panel");
+        SshGatewayDto createdInPanel = CreateGateway("gw-new", "Created in the panel");
+
+        List<SshGatewayDto> reconciled = SettingsViewModel.ReconcileGateways(
+            [storedShared, storedElsewhere],
+            [editedShared, createdInPanel],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Equal(
+            ["GW-SHARED", "gw-outside", "gw-new"],
+            reconciled.Select(gateway => gateway.Id));
+        Assert.Equal("Renamed in the panel", reconciled[0].Name);
+    }
+
+    // The parent fixup runs on the reconciled list, not on the panel buffer: before A2 of
+    // BL-0094 a gateway persisted elsewhere never reached that pass, so deleting its parent
+    // in the panel left it pointing at an id that no longer existed.
+    [Fact]
+    public void ReconcileGateways_DropsDeletedGatewayAndClearsParentOfGatewayAddedElsewhere()
+    {
+        SshGatewayDto storedParent = CreateGateway("gw-parent", "Parent");
+        SshGatewayDto addedElsewhere = CreateGateway("gw-outside", "Added outside the panel");
+        addedElsewhere.ParentGatewayId = "GW-PARENT";
+
+        List<SshGatewayDto> reconciled = SettingsViewModel.ReconcileGateways(
+            [storedParent, addedElsewhere],
+            [],
+            new HashSet<string>(["gw-parent"], StringComparer.OrdinalIgnoreCase));
+
+        SshGatewayDto survivor = Assert.Single(reconciled);
+        Assert.Equal("gw-outside", survivor.Id);
+        Assert.Null(survivor.ParentGatewayId);
+    }
+
+    // A1 of BL-0094. The doors outside the panel own no Save button, so they write through
+    // MergeSettingAsync. LoadSettingsAsync is exactly what AddServerAsync calls when the
+    // server dialog opens, so what this reads is what that dialog is handed.
+    [Fact]
+    public async Task AddGatewayOutsidePanel_PersistsImmediatelyAndLeavesThePanelClean()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new()
+        {
+            GatewayDialogResultToReturn = new GatewayDialogResult(CreateGateway("unused", "Bastion"), true)
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.AddGatewayOutsidePanelCommand.ExecuteAsync(null);
+
+        SshGatewayDto persisted = Assert.Single((await config.LoadSettingsAsync()).SshGateways);
+        Assert.Equal("Bastion", persisted.Name);
+        Assert.NotEqual("unused", persisted.Id);
+        Assert.Equal(1, config.MergeSettingCallCount);
+        Assert.False(viewModel.IsDirty);
+        Assert.Single(viewModel.Gateways);
+    }
+
+    // The asymmetry between the two doors is deliberate: inside the panel the Save button
+    // is the contract and Cancel must still discard. Frozen here so nobody unifies them by
+    // accident while tidying.
+    [Fact]
+    public async Task AddGateway_FromInsideThePanel_StillBuffersUntilSave()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new()
+        {
+            GatewayDialogResultToReturn = new GatewayDialogResult(CreateGateway("gw-draft", "Draft"), true)
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.AddGatewayCommand.ExecuteAsync(null);
+
+        Assert.Empty((await config.LoadSettingsAsync()).SshGateways);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.True(viewModel.IsDirty);
+    }
+
     [Fact]
     public async Task DeleteGateway_ReferencedByGroupDefault_IncludedInImpact()
     {

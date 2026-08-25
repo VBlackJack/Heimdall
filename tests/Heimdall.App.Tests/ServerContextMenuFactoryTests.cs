@@ -18,6 +18,7 @@ using System.IO;
 using System.Windows.Controls;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 
@@ -509,6 +510,36 @@ public sealed partial class SessionCoordinatorPreMountTests
             Assert.Equal(
                 serversBeforeRefusal,
                 File.ReadAllBytes(harness.Main.ConfigManager.ServersPath));
+        });
+    }
+
+    // A1 of BL-0094, and it crosses the junction deliberately: a command that persists and
+    // a menu item that exists can both be green while nothing binds one to the other - the
+    // shape that left the SFTP close guard attached to no host.
+    //
+    // The binding is asserted by IDENTITY and the command is deliberately not executed
+    // here. RunOnStaThread installs no Dispatcher and no SynchronizationContext, so an
+    // awaited command resumes on the thread pool, and the MenuItem still subscribed to its
+    // CanExecuteChanged is then touched from the wrong thread - which killed the entire
+    // test host, passing in isolation and crashing the full run. Production invokes it on
+    // the UI dispatcher, where the continuation comes back. What the command DOES is
+    // measured off-STA by AddGatewayOutsidePanel_PersistsImmediatelyAndLeavesThePanelClean.
+    [Fact]
+    public void EmptyAreaContextMenu_AddGateway_IsBoundToTheCommandThatPersists()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+
+            ContextMenuFactory factory = new(new ExternalToolProviderService());
+            ContextMenu menu = factory.CreateTreeContextMenu(
+                null,
+                harness.Main,
+                new RecordingContextMenuCallbacks());
+
+            MenuItem addGateway = Assert.IsType<MenuItem>(
+                FindMenuItem(menu, harness.Main.Localize("BtnAddGateway")));
+            Assert.Same(harness.Main.Settings.AddGatewayOutsidePanelCommand, addGateway.Command);
         });
     }
 

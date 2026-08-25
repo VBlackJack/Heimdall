@@ -185,6 +185,52 @@ public sealed class ServerDialogOriginPreservationTests
         Assert.Equal(configuredMode, persisted.SshMode);
     }
 
+    // Lot 2 of BL-0094, and it crosses the wiring rather than assuming it: the creation path
+    // is attached where the dialog options are built, so a dialog opened by the shell must
+    // come out able to create a gateway. Before this, the tab could only choose from a list
+    // it had no way to fill.
+    [Fact]
+    public async Task ServerListViewModel_AddServer_NetworkTabCreatesAndSelectsAGateway()
+    {
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(new ServerProfileDto
+        {
+            DisplayName = "New SSH server",
+            RemoteServer = "new.example.com",
+            ConnectionType = "SSH"
+        });
+        fixture.DialogService.GatewayDialogResultToReturn = new GatewayDialogResult(
+            new SshGatewayDto
+            {
+                Name = "Bastion",
+                Host = "bastion.example.test",
+                Port = 22,
+                User = "ops"
+            },
+            true);
+
+        await fixture.ViewModel.AddServerCommand.ExecuteAsync(null);
+
+        ServerDialogViewModel dialogVm = Assert.IsType<ServerDialogViewModel>(
+            fixture.DialogService.LastServerDialogViewModel);
+        dialogVm.ConnectionType = "SSH";
+        Assert.Empty(dialogVm.AvailableGateways);
+        Assert.True(dialogVm.HasNoGateway);
+        Assert.True(dialogVm.CanCreateGateway);
+
+        await dialogVm.CreateGatewayCommand.ExecuteAsync(null);
+
+        GatewayOption offered = Assert.Single(dialogVm.AvailableGateways);
+        Assert.Equal(offered.Id, dialogVm.SelectedGatewayId);
+        Assert.False(dialogVm.HasNoGateway);
+
+        // Persisted by the same path the Add menu uses, so it survives without anyone
+        // opening the settings panel.
+        SshGatewayDto persisted = Assert.Single(
+            (await fixture.ConfigManager.LoadSettingsAsync()).SshGateways);
+        Assert.Equal(offered.Id, persisted.Id);
+        Assert.Equal("Bastion", persisted.Name);
+    }
+
     [Fact]
     public async Task ServerListViewModel_OnConnectionStateChanged_PostsViaDispatcher()
     {
@@ -428,7 +474,9 @@ public sealed class ServerDialogOriginPreservationTests
             return Task.FromResult<ServerDialogResult?>(new ServerDialogResult(submittedServer, true));
         }
 
-        public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null) => Task.FromResult<GatewayDialogResult?>(null);
+        public GatewayDialogResult? GatewayDialogResultToReturn { get; set; }
+
+        public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null) => Task.FromResult(GatewayDialogResultToReturn);
 
         public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null) => Task.FromResult<ProjectDialogResult?>(null);
 

@@ -476,7 +476,7 @@
                                                     <MenuItem x:Name="Mw_AddMenuSession" Header="{loc:Translate AddMenuSession}" Command="{Binding ServerList.AddServerCommand}"/>
                                                     <MenuItem x:Name="Mw_AddMenuTool" Header="{loc:Translate AddMenuTool}" Click="OnAddToolMenuClick"/>
                                                     <Separator/>
-                                                    <MenuItem x:Name="Mw_AddMenuGateway" Header="{loc:Translate AddMenuGateway}" Command="{Binding Settings.AddGatewayCommand}"/>
+                                                    <MenuItem x:Name="Mw_AddMenuGateway" Header="{loc:Translate AddMenuGateway}" Command="{Binding Settings.AddGatewayOutsidePanelCommand}"/>
                                                     <MenuItem x:Name="Mw_AddMenuFolder" Header="{loc:Translate AddMenuFolder}" Click="OnAddFolderFromMenu"/>
                                                 </ContextMenu>
                                             </Button.ContextMenu>
@@ -2699,7 +2699,8 @@
                                                 <Button x:Name="Mw_SettingsGatewaysDeleteBtn" Content="{loc:Translate GatewaysBtnDelete}" Command="{Binding Settings.DeleteGatewayCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate AccessGatewaysDelete}"/>
                                             </StackPanel>
                                         </DockPanel>
-                                        <ListBox ItemsSource="{Binding Settings.Gateways}" SelectedItem="{Binding Settings.SelectedGateway}" MinHeight="80" MaxHeight="200" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                        <Grid>
+                                            <ListBox ItemsSource="{Binding Settings.Gateways}" SelectedItem="{Binding Settings.SelectedGateway}" MinHeight="80" MaxHeight="200" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" Margin="4,2">
@@ -2711,7 +2712,22 @@
                                                     </StackPanel>
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
-                                        </ListBox>
+                                            </ListBox>
+                                            <StackPanel IsHitTestVisible="False" Margin="10,10,10,0" VerticalAlignment="Top">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Settings.Gateways.Count}" Value="0">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+                                                <TextBlock Text="{loc:Translate GatewayListEmpty}" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{loc:Translate GatewayEmptyHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
