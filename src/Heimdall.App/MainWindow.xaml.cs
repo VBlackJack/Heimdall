@@ -1605,12 +1605,19 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     // ── Sidebar Tab Selector (Servers / Tools) ──────────────────────────
 
     /// <summary>
-    /// Switches the sidebar to the Tools tab. Wired from the empty-state
-    /// "Explore tools" link button.
+    /// Opens the Tools tab. Wired from the empty-state "Explore tools" button.
     /// </summary>
+    /// <remarks>
+    /// This used to flip the sidebar only. The panel the user had just clicked was unchanged -
+    /// same heading, same subtitle, same three buttons - and the one thing that moved was a
+    /// 260px strip on the far left. Clicking again did nothing at all, since the sidebar was
+    /// already on Tools, so the natural second try confirmed the button was dead. Checking
+    /// TabTools runs OnToolsTabChecked, which is what the nav rail does: it switches the main
+    /// area and populates the card browser.
+    /// </remarks>
     private void OnEmptyExploreToolsClick(object sender, RoutedEventArgs e)
     {
-        (DataContext as MainViewModel)?.Sidebar.SetActiveTab(isTools: true);
+        TabTools.IsChecked = true;
     }
 
     // ── Sidebar Tools tab — view-layer glue (state lives in SidebarViewModel) ──
@@ -1779,10 +1786,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         TabSessions.IsChecked = true;
         SwitchToTab(ShellTab.Sessions);
 
-        // Switch to Tools tab via the VM. The OneWay binding propagates the
-        // change back to the RadioButton group and the VM persists the choice.
+        // The sidebar has to follow the same intent. It used to be switched to Tools here,
+        // which left the tour ending on the right centre panel and the wrong side panel: the
+        // user read "Add a session, import your existing connections..." while the list their
+        // session would land in had been replaced by the tools tree. SetActiveTab persists the
+        // choice, so the next launch opened the same way and the session they had just created
+        // was still nowhere they could see it. Fires on all three exits - Next, Skip, Escape.
         if (DataContext is MainViewModel vm)
-            vm.Sidebar.SetActiveTab(isTools: true);
+            vm.Sidebar.SetActiveTab(isTools: false);
 
         if (_onboardingVm is not null)
         {

@@ -12,6 +12,37 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-25: First contact, and gateways that stop lying
+
+The first person other than the author tried Heimdall and struggled with gateways. Everything
+here came out of walking that path with them rather than reading the code.
+
+- **The gateway list gave the wrong reason for being unavailable.** One message covered two
+  disjoint causes and was wrong on both: gateways were never SSH-only, since SFTP, RDP and WinRM
+  tunnel too, and ticking "Direct connection" greys the list for a reason unrelated to the
+  protocol. Two causes, two messages.
+- **A gateway can be created from the session's Network tab**, and is selected immediately.
+- **A gateway created outside the Settings panel now reaches disk.** It previously landed in a
+  buffer nothing wrote, so no session saw it and the next reload erased it silently.
+- **A gateway created while the session dialog was open no longer reads as missing.** The three
+  dialog paths captured a settings snapshot to populate the dialog and rebuilt the row from it
+  afterwards, which was correct until the dialog itself gained the power to write settings. The
+  re-read also refreshes the long-lived field, without which the badge returned on the next
+  inline rename. Nothing was ever lost: the writes go through the locked read-modify-write paths.
+- **The Settings panel takes in gateways created elsewhere.** It seeds its buffer at startup and
+  on a full reload, and navigating to the tab is neither. Absorption adds unseen entries only,
+  because reseeding wholesale would discard edits in progress.
+- **SSH and SFTP settings are grouped into sub-tabs** - Connection, Session, SFTP and X11, Host
+  keys, Gateways - mirroring what the Remote Desktop page already did. Gateways getting a named
+  tab is the point: it was the last card of the longest page and the reporter never found it.
+- **The welcome tour ends on the session list.** It used to switch the sidebar to Tools as its
+  last act and persist that choice, so a new user added a first session that appeared nowhere
+  they could see, on that launch and every one after.
+- **"Explore Tools" on the welcome panel opens the tools.** It flipped a 260px strip and nothing
+  else, so the panel looked unchanged and a second click did nothing at all.
+- **A rejected SSH password is reported as a rejected password**, not as a missing PuTTY
+  installation, when the plink fallback cannot be resolved.
+
 ## 2026-08-24: A third of the Remote Desktop memory footprint, given back
 
 Landed after v2026.082301, so it ships with the next release.

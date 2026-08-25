@@ -231,6 +231,79 @@ public sealed class ServerDialogOriginPreservationTests
         Assert.Equal("Bastion", persisted.Name);
     }
 
+    // A gateway created from the Network tab is written to disk immediately, so the settings
+    // snapshot taken to POPULATE the dialog is already out of date by the time the dialog
+    // returns. Everything the list rebuilds afterwards - the gateway map, the project map, the
+    // lookup collections - resolves against that snapshot, so the freshly chosen gateway
+    // resolves to nothing and the row reports "gateway missing (<guid>)" over data that is
+    // perfectly intact on disk. Reported from a live session on 2026-08-25.
+    //
+    // The sibling test above cannot catch this: it creates the gateway AFTER the add command
+    // has finished, so no rebuild ever runs against a stale snapshot. Persisting correctly and
+    // displaying correctly are two sides of a junction, and both were green while the junction
+    // itself was broken.
+    [Fact]
+    public async Task ServerListViewModel_GatewayCreatedWhileTheDialogIsOpen_ResolvesOnTheSavedRow()
+    {
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(new ServerProfileDto
+        {
+            DisplayName = "Server behind a bastion",
+            RemoteServer = "target.example.com",
+            ConnectionType = "SSH"
+        });
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+        fixture.DialogService.GatewayDialogResultToReturn = new GatewayDialogResult(
+            new SshGatewayDto
+            {
+                Name = "Bastion",
+                Host = "bastion.example.test",
+                Port = 22,
+                User = "ops"
+            },
+            true);
+
+        // What the user does: opens the dialog, goes to the Network tab, creates a gateway
+        // there, then saves the session - all without the dialog ever closing.
+        fixture.DialogService.DuringServerDialogAsync = async dialogVm =>
+        {
+            dialogVm.DisplayName = "Server behind a bastion";
+            dialogVm.RemoteServer = "target.example.com";
+            dialogVm.ConnectionType = "SSH";
+            await dialogVm.CreateGatewayCommand.ExecuteAsync(null);
+        };
+
+        await fixture.ViewModel.AddServerCommand.ExecuteAsync(null);
+
+        SshGatewayDto persisted = Assert.Single(
+            (await fixture.ConfigManager.LoadSettingsAsync()).SshGateways);
+        Assert.Equal("Bastion", persisted.Name);
+
+        ServerItemViewModel saved = Assert.Single(
+            fixture.ViewModel.Servers,
+            candidate => string.Equals(
+                candidate.DisplayName, "Server behind a bastion", StringComparison.Ordinal));
+
+        // The whole point: the row must resolve the gateway it was just given, not report it
+        // as missing. Asserting the id alone would pass while the badge stayed red.
+        Assert.False(saved.IsGatewayMissing);
+        Assert.Contains("Bastion", saved.GatewayDetailText, StringComparison.Ordinal);
+
+        // Renaming inline re-renders the row from _currentSettings, a field this view model
+        // keeps for the session and never refreshes from SettingsChanged. Re-reading only into
+        // a local would leave that field holding the pre-dialog snapshot, so the badge would
+        // come back on the next F2 - correct on the path the fix was written for, broken one
+        // keystroke away. The folder rename path and the bulk path already refresh the field;
+        // this one read what nobody updated.
+        ServerProfileDto renamed = Assert.Single(
+            await fixture.ConfigManager.LoadServersAsync(),
+            candidate => string.Equals(candidate.Id, saved.Id, StringComparison.Ordinal));
+        renamed.DisplayName = "Renamed after the gateway existed";
+        fixture.ViewModel.ApplyInlineServerRename(saved, renamed);
+
+        Assert.False(saved.IsGatewayMissing);
+        Assert.Contains("Bastion", saved.GatewayDetailText, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ServerListViewModel_OnConnectionStateChanged_PostsViaDispatcher()
     {
@@ -451,6 +524,17 @@ public sealed class ServerDialogOriginPreservationTests
 
         public bool ReturnSubmittedViewModel { get; set; }
 
+        /// <summary>
+        /// Runs while the server dialog is still open, before it reports its result.
+        /// </summary>
+        /// <remarks>
+        /// The dialog stopped being read-only with respect to settings once its Network tab
+        /// gained the ability to create a gateway. Without a hook here a test can only act
+        /// before the dialog or after it, and the window that matters is the one in between -
+        /// configuration changing underneath a snapshot the caller has already taken.
+        /// </remarks>
+        public Func<ServerDialogViewModel, Task>? DuringServerDialogAsync { get; set; }
+
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info") => Task.FromResult(false);
 
         public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message) => Task.FromResult<bool?>(null);
@@ -465,13 +549,19 @@ public sealed class ServerDialogOriginPreservationTests
 
         public Task<string?> ShowBulkEditPasswordAsync(int count, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 
-        public Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null)
+        public async Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null)
         {
             LastServerDialogViewModel = editVm;
+
+            if (DuringServerDialogAsync is not null && editVm is not null)
+            {
+                await DuringServerDialogAsync(editVm);
+            }
+
             ServerProfileDto submittedServer = ReturnSubmittedViewModel && editVm is not null
                 ? editVm.ToDto()
                 : dialogServer;
-            return Task.FromResult<ServerDialogResult?>(new ServerDialogResult(submittedServer, true));
+            return new ServerDialogResult(submittedServer, true);
         }
 
         public GatewayDialogResult? GatewayDialogResultToReturn { get; set; }

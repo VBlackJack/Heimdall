@@ -317,7 +317,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         targetPort,
                         usesTunnel,
                         failure.Code,
-                        ct)
+                        ct,
+                        localizedFailure.Message)
                     .ConfigureAwait(false);
             }
 
@@ -528,7 +529,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         int targetPort,
         bool usesTunnel,
         SshFailureCode? originalFailure,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? originalFailureMessage = null)
     {
         bool releaseTunnel = usesTunnel;
         try
@@ -536,9 +538,26 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             string? plinkPath = ConnectionHelpers.ResolvePlinkPath(settings.PlinkPath);
             if (string.IsNullOrWhiteSpace(plinkPath) || !File.Exists(plinkPath))
             {
-                string msg = originalFailure is not null
-                    ? _localizer.Format(SshLocalizationKeys.ErrorPlinkNotConfiguredWithReason, originalFailure)
-                    : _localizer[SshLocalizationKeys.ErrorPlinkNotConfigured];
+                // Report the cause, not the retry that could not be attempted. This used to say
+                // "SSH.NET failed (PasswordRejected), but Plink is not found. Set the path in
+                // Settings." - an unlocalized enum plus an instruction that fixes nothing,
+                // because the password was simply wrong. Plink is an internal retry strategy;
+                // its absence belongs in the log, not in front of the user.
+                //
+                // How often this fires: rarely, and the claim that it was common is refuted.
+                // plink.exe is vendored at Assets/Tools and innosetup ships the tree recursively,
+                // so ResolvePlinkPath normally finds the embedded copy and this branch never
+                // runs. It is reachable when that copy is gone - a portable extraction, an
+                // antivirus quarantine, a manual delete. Worth fixing because the message is
+                // wrong whenever it does appear, not because it appears often.
+                string msg = !string.IsNullOrWhiteSpace(originalFailureMessage)
+                    ? originalFailureMessage
+                    : originalFailure is not null
+                        ? _localizer.Format(SshLocalizationKeys.ErrorPlinkNotConfiguredWithReason, originalFailure)
+                        : _localizer[SshLocalizationKeys.ErrorPlinkNotConfigured];
+                Core.Logging.FileLogger.Info(
+                    $"Plink fallback unavailable (path '{settings.PlinkPath}' unresolved); "
+                    + $"reporting the original failure {originalFailure} instead.");
                 _connectionSm.SetError(server.Id, msg);
                 return new ConnectionResult(
                     false,
