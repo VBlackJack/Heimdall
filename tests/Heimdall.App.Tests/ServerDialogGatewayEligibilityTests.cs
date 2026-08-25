@@ -174,6 +174,53 @@ public sealed class ServerDialogGatewayEligibilityTests
         Assert.Equal("", viewModel.SelectedGatewayId);
     }
 
+    // Lot 3 of BL-0094. One message for two disjoint causes, and it named the wrong one in
+    // both directions: the checkbox has nothing to do with the protocol, and gateways were
+    // never SSH-only. This is what a screen reader reads out, so it is the whole feature.
+    [Fact]
+    public async Task GatewayComboHelpText_NamesTheCauseThatActuallyDisabledTheDropdown()
+    {
+        LocalizationManager localizer = await CreateEnglishLocalizerAsync();
+        ServerDialogViewModel enabled = new() { Localizer = localizer, ConnectionType = "SSH", DirectConnection = false };
+        ServerDialogViewModel direct = new() { Localizer = localizer, ConnectionType = "SSH", DirectConnection = true };
+        ServerDialogViewModel unsupported = new() { Localizer = localizer, ConnectionType = "TELNET", DirectConnection = false };
+
+        Assert.Equal("", enabled.GatewayComboHelpText);
+        Assert.Equal(
+            localizer["ServerDialogGatewayDisabledDirectHint"],
+            direct.GatewayComboHelpText);
+        Assert.Equal(
+            localizer["ServerDialogGatewayDisabledProtocolHint"],
+            unsupported.GatewayComboHelpText);
+        Assert.NotEqual(direct.GatewayComboHelpText, unsupported.GatewayComboHelpText);
+    }
+
+    // The wording is the deliverable here, so it is asserted rather than left to a key
+    // lookup that would stay green over a message saying the wrong thing again.
+    [Fact]
+    public async Task GatewayDisabledHints_SayWhatIsTrue()
+    {
+        LocalizationManager localizer = await CreateEnglishLocalizerAsync();
+        string protocolHint = localizer["ServerDialogGatewayDisabledProtocolHint"];
+        string directHint = localizer["ServerDialogGatewayDisabledDirectHint"];
+
+        foreach (string supported in new[] { "SSH", "SFTP", "RDP", "WinRM" })
+        {
+            Assert.Contains(supported, protocolHint, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.DoesNotContain("protocol", directHint, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual("ServerDialogGatewayDisabledProtocolHint", protocolHint);
+        Assert.NotEqual("ServerDialogGatewayDisabledDirectHint", directHint);
+    }
+
+    private static async Task<LocalizationManager> CreateEnglishLocalizerAsync()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
+    }
+
     // The XAML half of the same junction: a command nobody binds is a command nobody runs.
     [Fact]
     public void Dialog_NetworkTab_BindsTheAddButtonAndTheEmptyState()

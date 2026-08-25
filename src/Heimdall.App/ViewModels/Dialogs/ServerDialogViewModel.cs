@@ -1298,9 +1298,21 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     public bool CanSelectGateway => SupportsGateway && !DirectConnection;
 
+    /// <summary>
+    /// Says why the gateway dropdown is disabled, and says the right thing.
+    /// </summary>
+    /// <remarks>
+    /// Two disjoint causes used to be fused into one message - "Gateway selection requires
+    /// SSH protocol" - which was wrong on both counts: the direct-connection checkbox has
+    /// nothing to do with the protocol, and gateways were never SSH-only. A screen reader
+    /// user asking why the control is dead was told to change something that was already
+    /// correct.
+    /// </remarks>
     public string GatewayComboHelpText => CanSelectGateway
         ? ""
-        : L("ServerDialogGatewayDisabledHint");
+        : SupportsGateway
+            ? L("ServerDialogGatewayDisabledDirectHint")
+            : L("ServerDialogGatewayDisabledProtocolHint");
 
     public bool CanEditTunnelPort => UsesGateway && !UseAutomaticTunnelPort;
 

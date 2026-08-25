@@ -2403,7 +2403,8 @@
   "ServerDialogGatewayRouting": "Routage par passerelle",
   "ServerDialogGatewayRoutingDesc": "Utilisez une passerelle SSH lorsque le serveur cible n'est accessible que via un bastion ou un serveur de rebond.",
   "ServerDialogDirectConnect": "Connexion directe sans passerelle SSH",
-  "ServerDialogGatewayDisabledHint": "La s\u00e9lection de passerelle n\u00e9cessite le protocole SSH",
+  "ServerDialogGatewayDisabledProtocolHint": "Les passerelles sont disponibles pour SSH, SFTP, RDP et WinRM.",
+  "ServerDialogGatewayDisabledDirectHint": "La connexion directe est s\u00e9lectionn\u00e9e. D\u00e9cochez-la pour faire passer cette session par une passerelle.",
 
   "ServerDialogConnectionPath": "Chemin de connexion",
   "ServerDialogNodeYourPc": "Votre PC",

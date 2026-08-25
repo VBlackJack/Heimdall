@@ -2403,7 +2403,8 @@
   "ServerDialogGatewayRouting": "Gateway routing",
   "ServerDialogGatewayRoutingDesc": "Use an SSH gateway when the target server is only reachable through a bastion or jump host.",
   "ServerDialogDirectConnect": "Connect directly without an SSH gateway",
-  "ServerDialogGatewayDisabledHint": "Gateway selection requires SSH protocol",
+  "ServerDialogGatewayDisabledProtocolHint": "Gateways are available for SSH, SFTP, RDP and WinRM.",
+  "ServerDialogGatewayDisabledDirectHint": "Direct connection is selected. Clear it to route this session through a gateway.",
 
   "ServerDialogConnectionPath": "Connection path",
   "ServerDialogNodeYourPc": "Your PC",
