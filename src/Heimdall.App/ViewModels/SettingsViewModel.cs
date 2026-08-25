@@ -1944,21 +1944,68 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         {
             result.Gateway.Id = Guid.NewGuid().ToString();
             _pendingGateways.Add(result.Gateway);
-
-            Gateways.Add(new GatewayItemViewModel
-            {
-                Id = result.Gateway.Id,
-                Name = result.Gateway.Name,
-                Host = result.Gateway.Host,
-                Port = result.Gateway.Port,
-                User = result.Gateway.User,
-                HasKey = !string.IsNullOrEmpty(result.Gateway.KeyPath),
-                HasPassword = !string.IsNullOrEmpty(result.Gateway.SshPasswordEncrypted)
-            });
+            Gateways.Add(CreateGatewayItem(result.Gateway));
 
             IsDirty = true;
         }
     }
+
+    /// <summary>
+    /// Adds a gateway from outside the settings panel and persists it immediately.
+    /// </summary>
+    /// <remarks>
+    /// The panel's own Add buffers into the pending list because the panel owns a Save
+    /// button. The Add menu and the tree context menu own no such button: buffering there
+    /// produced a gateway that no session could select and that the next configuration
+    /// reload discarded without a word. This path writes through
+    /// <see cref="IConfigManager.MergeSettingAsync"/> - reload from disk, mutate, atomic
+    /// write - so the server dialog, which reads settings afresh every time it opens,
+    /// offers the gateway at once.
+    /// </remarks>
+    [RelayCommand]
+    private async Task AddGatewayOutsidePanelAsync(CancellationToken cancellationToken)
+    {
+        AppSettings persisted = await _configManager.LoadSettingsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        GatewayDialogViewModel vm = new()
+        {
+            AvailableParents = new ObservableCollection<GatewayOption>(
+                persisted.SshGateways.Select(
+                    gateway => new GatewayOption(gateway.Id, $"{gateway.Name} ({gateway.Host})")))
+        };
+
+        GatewayDialogResult? result = await _dialogService.ShowGatewayDialogAsync(vm);
+        if (result?.Saved != true)
+        {
+            return;
+        }
+
+        SshGatewayDto created = result.Gateway;
+        created.Id = Guid.NewGuid().ToString();
+
+        await _configManager.MergeSettingAsync(
+            settings => settings.SshGateways.Add(CloneGateway(created)));
+
+        // The panel keeps its own buffer. Seeding it here keeps an open panel showing what
+        // disk holds, and deliberately does NOT raise IsDirty: nothing is pending, the
+        // write already happened.
+        _pendingGateways.Add(CloneGateway(created));
+        Gateways.Add(CreateGatewayItem(created));
+    }
+
+    private static GatewayItemViewModel CreateGatewayItem(SshGatewayDto gateway) =>
+        new()
+        {
+            Id = gateway.Id,
+            Name = gateway.Name,
+            Host = gateway.Host,
+            Port = gateway.Port,
+            User = gateway.User,
+            HasKey = !string.IsNullOrEmpty(gateway.KeyPath),
+            HasPassword = !string.IsNullOrEmpty(gateway.SshPasswordEncrypted),
+            ParentGatewayId = gateway.ParentGatewayId
+        };
 
     private bool CanEditGateway() => SelectedGateway is not null;
 

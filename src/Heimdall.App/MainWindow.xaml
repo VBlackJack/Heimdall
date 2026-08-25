@@ -476,7 +476,7 @@
                                                     <MenuItem x:Name="Mw_AddMenuSession" Header="{loc:Translate AddMenuSession}" Command="{Binding ServerList.AddServerCommand}"/>
                                                     <MenuItem x:Name="Mw_AddMenuTool" Header="{loc:Translate AddMenuTool}" Click="OnAddToolMenuClick"/>
                                                     <Separator/>
-                                                    <MenuItem x:Name="Mw_AddMenuGateway" Header="{loc:Translate AddMenuGateway}" Command="{Binding Settings.AddGatewayCommand}"/>
+                                                    <MenuItem x:Name="Mw_AddMenuGateway" Header="{loc:Translate AddMenuGateway}" Command="{Binding Settings.AddGatewayOutsidePanelCommand}"/>
                                                     <MenuItem x:Name="Mw_AddMenuFolder" Header="{loc:Translate AddMenuFolder}" Click="OnAddFolderFromMenu"/>
                                                 </ContextMenu>
                                             </Button.ContextMenu>

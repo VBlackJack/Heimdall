@@ -333,6 +333,53 @@ public sealed class SettingsViewModelTests
         Assert.Null(survivor.ParentGatewayId);
     }
 
+    // A1 of BL-0094. The doors outside the panel own no Save button, so they write through
+    // MergeSettingAsync. LoadSettingsAsync is exactly what AddServerAsync calls when the
+    // server dialog opens, so what this reads is what that dialog is handed.
+    [Fact]
+    public async Task AddGatewayOutsidePanel_PersistsImmediatelyAndLeavesThePanelClean()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new()
+        {
+            GatewayDialogResultToReturn = new GatewayDialogResult(CreateGateway("unused", "Bastion"), true)
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.AddGatewayOutsidePanelCommand.ExecuteAsync(null);
+
+        SshGatewayDto persisted = Assert.Single((await config.LoadSettingsAsync()).SshGateways);
+        Assert.Equal("Bastion", persisted.Name);
+        Assert.NotEqual("unused", persisted.Id);
+        Assert.Equal(1, config.MergeSettingCallCount);
+        Assert.False(viewModel.IsDirty);
+        Assert.Single(viewModel.Gateways);
+    }
+
+    // The asymmetry between the two doors is deliberate: inside the panel the Save button
+    // is the contract and Cancel must still discard. Frozen here so nobody unifies them by
+    // accident while tidying.
+    [Fact]
+    public async Task AddGateway_FromInsideThePanel_StillBuffersUntilSave()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new()
+        {
+            GatewayDialogResultToReturn = new GatewayDialogResult(CreateGateway("gw-draft", "Draft"), true)
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.AddGatewayCommand.ExecuteAsync(null);
+
+        Assert.Empty((await config.LoadSettingsAsync()).SshGateways);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.True(viewModel.IsDirty);
+    }
+
     [Fact]
     public async Task DeleteGateway_ReferencedByGroupDefault_IncludedInImpact()
     {
