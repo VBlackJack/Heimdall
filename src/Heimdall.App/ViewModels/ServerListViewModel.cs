@@ -1390,6 +1390,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        settings = await RereadSettingsAfterDialogAsync();
+
         // Persist the selected gateway as last-used for future Add Server dialogs
         var savedGatewayId = result.Server.SshGatewayId;
         if (!string.Equals(settings.LastUsedGatewayId, savedGatewayId, StringComparison.Ordinal))
@@ -1446,6 +1448,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             return;
         }
+
+        settings = await RereadSettingsAfterDialogAsync();
 
         var savedGatewayId = result.Server.SshGatewayId;
         if (!string.Equals(settings.LastUsedGatewayId, savedGatewayId, StringComparison.Ordinal))
@@ -1550,6 +1554,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         result.Server.Id = serverDto.Id;
+
+        settings = await RereadSettingsAfterDialogAsync();
 
         // Persist the selected gateway as last-used for future Add Server dialogs
         var savedGatewayId = result.Server.SshGatewayId;
@@ -2015,6 +2021,39 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 .Select(server => server.Group)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Re-reads settings after a server dialog closes, because the dialog may have changed them.
+    /// </summary>
+    /// <remarks>
+    /// The snapshot taken to POPULATE the dialog stops describing the configuration the moment
+    /// the dialog can write to it, and its Network tab has been able to create a gateway since
+    /// 2026-08-25. Everything rebuilt afterwards resolves ids against that snapshot, so a gateway
+    /// chosen inside the dialog resolved to nothing and the row read "gateway missing (guid)"
+    /// over data that was intact on disk. Found in a live session the same day.
+    ///
+    /// This guards DISPLAY only. The writes on these paths go through MergeSettingAsync and
+    /// MutateServersAsync, which re-read under a lock and were never at risk - which is why the
+    /// defect lost nothing and still looked like data loss.
+    ///
+    /// It exists as one named method rather than three inline reloads so the three dialog paths
+    /// share the decision instead of three copies of it.
+    ///
+    /// It refreshes <see cref="_currentSettings"/> as well as returning the fresh instance, and
+    /// that second half is not incidental. Reloading only into a local would fix the row the
+    /// dialog just saved and leave the field a session-long copy of the pre-dialog state, because
+    /// this view model does not subscribe to <c>SettingsChanged</c>. Renaming that same server
+    /// inline reads the field (<c>ApplyInlineServerRename</c>), so the badge would come back on
+    /// the next F2 - a fix that looks right on the path it was tested on and reappears elsewhere.
+    /// The folder rename path and the bulk path already assign the field; only the server rename
+    /// path read one nobody refreshed.
+    /// </remarks>
+    private async Task<AppSettings> RereadSettingsAfterDialogAsync()
+    {
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        _currentSettings = settings;
+        return settings;
     }
 
     private void PopulateServerDialogOptions(ServerDialogViewModel dialogVm, AppSettings settings)
