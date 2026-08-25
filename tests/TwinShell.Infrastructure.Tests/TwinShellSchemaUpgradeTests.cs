@@ -22,10 +22,13 @@ using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
 using TwinShell.Persistence;
+using TwinShell.Persistence.Entities;
+using TwinShell.Persistence.Repositories;
 using TwinShell.Persistence.Schema;
 
 namespace TwinShell.Infrastructure.Tests;
@@ -49,7 +52,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -66,7 +69,7 @@ public sealed class TwinShellSchemaUpgradeTests
     }
 
     [Fact]
-    public async Task UpgradeAsync_FreshDatabase_MarksSchemaVersionThree()
+    public async Task UpgradeAsync_FreshDatabase_MarksTerminalSchemaVersion()
     {
         await using TempTwinShellDatabase database = new TempTwinShellDatabase();
         await database.Context.Database.EnsureCreatedAsync();
@@ -74,7 +77,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -104,7 +107,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -146,7 +149,7 @@ public sealed class TwinShellSchemaUpgradeTests
     }
 
     [Fact]
-    public async Task BootstrapperInitializationPath_FreshDatabase_ReachesVersionThree()
+    public async Task BootstrapperInitializationPath_FreshDatabase_ReachesTerminalSchemaVersion()
     {
         await using TempTwinShellDatabase database = new TempTwinShellDatabase();
         ServiceCollection services = new ServiceCollection();
@@ -163,7 +166,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
     }
 
     // Producer: TwinShellSchema step 2
@@ -178,7 +181,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
 
         // Windows system template: single double-quoted placeholder is unwrapped.
         string windowsSystemPattern = await ReadCommandPatternAsync(database.Context, "tpl-system-windows");
@@ -211,7 +214,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
 
         string windowsAfterSecond = await ReadCommandPatternAsync(database.Context, "tpl-system-windows");
         string linuxAfterSecond = await ReadCommandPatternAsync(database.Context, "tpl-system-linux");
@@ -235,7 +238,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
 
         Dictionary<string, TemplateRow> afterRows = await ReadCommandTemplateRowsAsync(database.Context);
         int updatedRows = afterRows.Count(row => beforeRows[row.Key] != row.Value);
@@ -291,10 +294,79 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(3);
+        userVersion.Should().Be(4);
 
         Dictionary<string, TemplateRow> rowsAfterSecond = await ReadCommandTemplateRowsAsync(database.Context);
         rowsAfterSecond.Should().Equal(rowsAfterFirst);
+    }
+
+    // BL-0093. EnsureCreated only writes a schema when the file is ABSENT, so on an updated
+    // installation it is a no-op and every model column added since first launch must arrive
+    // through a schema step. Two did not, and the command library opened empty.
+    //
+    // The projection here is the one that actually threw for the user - favorites through the
+    // EF stack, which selects every Action column - and not a hand-written SELECT over a
+    // subset, which would have passed while the application still failed.
+    [Fact]
+    public async Task UpgradeAsync_DatabaseMissingPlatformExampleColumns_LetsTheFavoritesProjectionRun()
+    {
+        await using TempTwinShellDatabase database = new TempTwinShellDatabase();
+        await database.CreateSchemaMissingPlatformExampleColumnsAsync();
+
+        await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
+
+        FavoritesRepository repository = new FavoritesRepository(
+            database.Context,
+            NullLogger<FavoritesRepository>.Instance);
+        IEnumerable<UserFavorite> favorites = await repository.GetAllAsync();
+
+        favorites.Should().ContainSingle();
+        (await TableHasColumnAsync(database.Context, "Actions", "WindowsExamplesJson")).Should().BeTrue();
+        (await TableHasColumnAsync(database.Context, "Actions", "LinuxExamplesJson")).Should().BeTrue();
+
+        // The default has to match the entity initializer: a NULL here would throw on
+        // materialisation of a non-nullable string, which is the same failure one step later.
+        IReadOnlyList<string> windowsExamples =
+            await ReadActionColumnAsync(database.Context, "WindowsExamplesJson");
+        IReadOnlyList<string> linuxExamples =
+            await ReadActionColumnAsync(database.Context, "LinuxExamplesJson");
+        windowsExamples.Should().OnlyContain(value => value == "[]");
+        linuxExamples.Should().OnlyContain(value => value == "[]");
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadActionColumnAsync(
+        TwinShellDbContext context,
+        string columnName)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        bool openedConnection = connection.State != ConnectionState.Open;
+
+        try
+        {
+            if (openedConnection)
+            {
+                await connection.OpenAsync();
+            }
+
+            await using DbCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT " + columnName + " FROM Actions";
+
+            List<string> values = new List<string>();
+            await using DbDataReader reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                values.Add(reader.IsDBNull(0) ? "<null>" : reader.GetString(0));
+            }
+
+            return values;
+        }
+        finally
+        {
+            if (openedConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
     }
 
     private static async Task<string> ReadCommandPatternAsync(
@@ -645,6 +717,41 @@ public sealed class TwinShellSchemaUpgradeTests
                     "INSERT INTO " + tableName + " (Id) VALUES ('" + tableName + "-2')");
             }
 
+            await ExecuteNonQueryAsync(Context, "PRAGMA user_version = 0");
+        }
+
+        // Builds the shape a user who UPDATED actually has: the schema EnsureCreated wrote at
+        // their first launch, which is every column the model carried THEN. Reproduced by
+        // creating today's schema and dropping the two columns added since, so the fixture
+        // keeps tracking the model instead of freezing a hand-written CREATE that would drift
+        // in its turn. Rows are seeded through EF before the drop, while the table still
+        // matches the model.
+        internal async Task CreateSchemaMissingPlatformExampleColumnsAsync()
+        {
+            await Context.Database.EnsureCreatedAsync();
+
+            ActionEntity action = new()
+            {
+                Id = "act-legacy",
+                Title = "Legacy action",
+                Description = "Seeded before the platform example columns existed",
+                Category = "system",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            Context.Actions.Add(action);
+            Context.UserFavorites.Add(new UserFavoriteEntity
+            {
+                Id = "fav-legacy",
+                ActionId = action.Id,
+                CreatedAt = DateTime.UtcNow,
+                DisplayOrder = 0
+            });
+            await Context.SaveChangesAsync();
+            Context.ChangeTracker.Clear();
+
+            await ExecuteNonQueryAsync(Context, "ALTER TABLE Actions DROP COLUMN WindowsExamplesJson");
+            await ExecuteNonQueryAsync(Context, "ALTER TABLE Actions DROP COLUMN LinuxExamplesJson");
             await ExecuteNonQueryAsync(Context, "PRAGMA user_version = 0");
         }
 
