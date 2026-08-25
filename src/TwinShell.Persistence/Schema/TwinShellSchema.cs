@@ -40,13 +40,36 @@ public static class TwinShellSchema
     private const string UuidSql =
         "lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))";
 
+    private const string ActionsTableName = "Actions";
+
     private static readonly string[] PublicIdTables =
     [
-        "Actions",
+        ActionsTableName,
         "CommandBatches",
         "CustomCategories",
         "CommandTemplates"
     ];
+
+    // Added to ActionEntity without a schema step, so updated databases never got them:
+    // EnsureCreated writes a schema only when the file is absent. Default '[]' matches the
+    // entity initializers, so a row that predates them materialises instead of throwing on a
+    // NULL for a non-nullable string.
+    private static readonly string[] PlatformExampleColumns =
+    [
+        "WindowsExamplesJson",
+        "LinuxExamplesJson"
+    ];
+
+    // Every identifier this file concatenates into SQL, and nothing else. pragma_table_info
+    // takes no parameter for the table name, so the allow-list is the guard.
+    private static readonly IReadOnlyDictionary<string, string[]> KnownColumns =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            [ActionsTableName] = [PublicIdColumnName, "WindowsExamplesJson", "LinuxExamplesJson"],
+            ["CommandBatches"] = [PublicIdColumnName],
+            ["CustomCategories"] = [PublicIdColumnName],
+            ["CommandTemplates"] = [PublicIdColumnName]
+        };
 
     private static readonly IReadOnlyList<SchemaStep> SchemaSteps = new List<SchemaStep>
     {
@@ -58,7 +81,11 @@ public static class TwinShellSchema
         new SchemaStep(
             3,
             "D2 Lot B distribute quoting modes, drive-letter type, unwrapped affixes and Defender fixes to system command templates",
-            ApplyD2LotBAsync)
+            ApplyD2LotBAsync),
+        new SchemaStep(
+            4,
+            "Per-platform example columns on Actions",
+            ApplyPlatformExampleColumnsAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -74,6 +101,44 @@ public static class TwinShellSchema
                 connection,
                 transaction,
                 tableName,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Adds the per-platform example columns to <c>Actions</c> when they are missing.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent by existence test rather than by catching a duplicate-column error, so a
+    /// second run leaves both the schema and <c>user_version</c> untouched. The column is
+    /// added, never backfilled: the DEFAULT covers existing rows, and the aggregated
+    /// <c>ExamplesJson</c> that predates the split is left where it is - splitting it by
+    /// platform would be a guess about content, which a schema step has no business making.
+    /// </remarks>
+    private static async Task ApplyPlatformExampleColumnsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        foreach (string columnName in PlatformExampleColumns)
+        {
+            bool exists = await ColumnExistsAsync(
+                connection,
+                transaction,
+                ActionsTableName,
+                columnName,
+                cancellationToken);
+
+            if (exists)
+            {
+                continue;
+            }
+
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                "ALTER TABLE " + ActionsTableName + " ADD COLUMN " + columnName
+                + " TEXT NOT NULL DEFAULT '[]'",
                 cancellationToken);
         }
     }
@@ -460,10 +525,11 @@ public static class TwinShellSchema
     {
         EnsureKnownPublicIdTable(tableName);
 
-        bool exists = await PublicIdColumnExistsAsync(
+        bool exists = await ColumnExistsAsync(
             connection,
             transaction,
             tableName,
+            PublicIdColumnName,
             cancellationToken);
 
         if (exists)
@@ -497,20 +563,44 @@ public static class TwinShellSchema
         }
     }
 
-    private static async Task<bool> PublicIdColumnExistsAsync(
+    /// <summary>
+    /// Reports whether a column already exists, so a step can be re-run without harm.
+    /// </summary>
+    /// <remarks>
+    /// Generalised from the PublicId-only check when the per-platform example columns needed
+    /// the same test: two copies of an existence probe is how one of them ends up guarding a
+    /// different table than it names. Both identifiers are checked against
+    /// <see cref="KnownColumns"/> before reaching the command text, because
+    /// <c>pragma_table_info</c> accepts no parameter for them.
+    /// </remarks>
+    private static async Task<bool> ColumnExistsAsync(
         DbConnection connection,
         DbTransaction transaction,
         string tableName,
+        string columnName,
         CancellationToken cancellationToken)
     {
+        EnsureKnownColumn(tableName, columnName);
+
         await using DbCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('" + tableName + "') WHERE name = '"
-            + PublicIdColumnName + "'";
+            + columnName + "'";
 
         object? result = await command.ExecuteScalarAsync(cancellationToken);
         int existingColumnCount = Convert.ToInt32(result, CultureInfo.InvariantCulture);
         return existingColumnCount > 0;
+    }
+
+    private static void EnsureKnownColumn(string tableName, string columnName)
+    {
+        if (!KnownColumns.TryGetValue(tableName, out string[]? columns)
+            || !columns.Contains(columnName, StringComparer.Ordinal))
+        {
+            throw new ArgumentException(
+                "Invalid schema identifier: " + tableName + "." + columnName,
+                nameof(columnName));
+        }
     }
 
     private static async Task ExecuteNonQueryAsync(
