@@ -15,6 +15,7 @@
  */
 
 using System.Text.RegularExpressions;
+using Heimdall.Core.Models;
 
 namespace Heimdall.Core.Configuration;
 
@@ -292,8 +293,45 @@ public static partial class SchemaValidator
             MinColorDepth, MaxColorDepth, nameof(server.RdpColorDepth));
         ValidateRange(errors, server.RdpAudioMode, 0, 2, nameof(server.RdpAudioMode));
         ValidateRdpResolutionProfile(errors, server);
+        ValidateWinRmTransport(errors, server);
 
         return new ValidationResult(errors.Count == 0, errors);
+    }
+
+    /// <summary>
+    /// Reports a WinRM profile that speaks TLS to the plaintext port.
+    /// </summary>
+    /// <remarks>
+    /// The server dialog moves the port when TLS is ticked, so a profile made in the
+    /// interface is already coherent. Every other boundary keeps an explicit port exactly as
+    /// written - the deserializer derives one only when the field is absent, and the launch
+    /// builder honours an explicit port whether or not TLS is on. An imported or hand-edited
+    /// profile therefore connected with TLS to 5985 and nothing said so.
+    /// <para>
+    /// Reported rather than corrected, and here rather than in a fourth place that silently
+    /// rewrites the value. An explicit port must keep winning over a default - that part was
+    /// never the defect - and a listener deliberately serving TLS on 5985 is unusual rather
+    /// than impossible. What was missing is saying it. Load turns this into a warning, so a
+    /// profile already on disk still opens.
+    /// </para>
+    /// </remarks>
+    private static void ValidateWinRmTransport(List<string> errors, ServerProfileDto server)
+    {
+        // Only a WinRM profile makes a transport claim. Every other profile carries the same
+        // fields at their defaults, and reading them would report a defect on servers that
+        // never speak WinRM.
+        if (!string.Equals(server.ConnectionType, "WINRM", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (server.WinRmUseSsl && server.WinRmPort == DefaultPorts.WinRmHttp)
+        {
+            errors.Add(
+                $"{nameof(server.WinRmPort)}: TLS is enabled but the port is the plaintext "
+                + $"default {DefaultPorts.WinRmHttp}; WinRM over TLS listens on "
+                + $"{DefaultPorts.WinRmHttps}.");
+        }
     }
 
     private static void ValidateRdpResolutionProfile(List<string> errors, ServerProfileDto server)
