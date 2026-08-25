@@ -395,7 +395,7 @@ public partial class ServerListViewModel
 
         if (plan.ConnectableCount <= 0)
         {
-            StatusMessageRequested?.Invoke(ComposeNothingToConnectStatus(plan.SkippedCount));
+            StatusMessageRequested?.Invoke(ComposeNothingToConnectStatus(plan.Skips));
             return;
         }
 
@@ -1208,7 +1208,7 @@ public partial class ServerListViewModel
         var settings = await _configManager.LoadSettingsAsync();
         if (selectedServers.Count == 0)
         {
-            return new BulkConnectPlan(settings, [], 0);
+            return new BulkConnectPlan(settings, [], new BulkConnectSkipTally());
         }
 
         // The Windows Hello gate lives here, in the one method every bulk connect passes through,
@@ -1219,20 +1219,20 @@ public partial class ServerListViewModel
         // a caller cannot arrive here without passing it.
         if (!await EnsureWindowsHelloAsync(settings, cancellationToken))
         {
-            return new BulkConnectPlan(settings, [], 0, Refused: true);
+            return new BulkConnectPlan(settings, [], new BulkConnectSkipTally(), Refused: true);
         }
 
         var serverDtos = await _configManager.LoadServersAsync();
         var dtoMap = serverDtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
         var candidates = new List<BulkConnectCandidate>(selectedServers.Count);
-        var skippedCount = 0;
+        BulkConnectSkipTally skips = new BulkConnectSkipTally();
         var credentialGuardMessageShown = false;
 
         foreach (var server in selectedServers)
         {
             if (IsToolEntry(server))
             {
-                skippedCount++;
+                skips.Add(BulkConnectSkipReason.ToolEntry);
                 Core.Logging.FileLogger.Info(
                     $"ConnectServersBulkCoreAsync skipped tool entry '{server.DisplayName}'.");
                 continue;
@@ -1240,7 +1240,7 @@ public partial class ServerListViewModel
 
             if (_connectingServerIds.Contains(server.Id))
             {
-                skippedCount++;
+                skips.Add(BulkConnectSkipReason.AlreadyConnecting);
                 Core.Logging.FileLogger.Info(
                     $"ConnectServersBulkCoreAsync skipped already-connecting item '{server.DisplayName}'.");
                 continue;
@@ -1248,7 +1248,7 @@ public partial class ServerListViewModel
 
             if (!dtoMap.TryGetValue(server.Id, out var serverDto))
             {
-                skippedCount++;
+                skips.Add(BulkConnectSkipReason.ProfileMissing);
                 Core.Logging.FileLogger.Warn(
                     $"ConnectServersBulkCoreAsync skipped missing DTO for id={server.Id}.");
                 continue;
@@ -1262,7 +1262,7 @@ public partial class ServerListViewModel
                     showMessage: !credentialGuardMessageShown))
             {
                 credentialGuardMessageShown = true;
-                skippedCount++;
+                skips.Add(BulkConnectSkipReason.CredentialGuardRefused);
                 continue;
             }
 
@@ -1281,7 +1281,7 @@ public partial class ServerListViewModel
                 skipOnFailure: true);
             if (skippedForCredentials)
             {
-                skippedCount++;
+                skips.Add(BulkConnectSkipReason.ExternalCredentialsUnresolved);
                 Core.Logging.FileLogger.Info(
                     $"ConnectServersBulkCoreAsync skipped '{server.DisplayName}' because credentials could not be resolved silently.");
                 continue;
@@ -1290,7 +1290,7 @@ public partial class ServerListViewModel
             candidates.Add(new BulkConnectCandidate(server, serverDto));
         }
 
-        return new BulkConnectPlan(settings, candidates, skippedCount);
+        return new BulkConnectPlan(settings, candidates, skips);
     }
 
     internal async Task ConnectServersBulkCoreAsync(
@@ -1309,13 +1309,13 @@ public partial class ServerListViewModel
 
         if (plan.ConnectableCount <= 0)
         {
-            StatusMessageRequested?.Invoke(ComposeNothingToConnectStatus(plan.SkippedCount));
+            StatusMessageRequested?.Invoke(ComposeNothingToConnectStatus(plan.Skips));
             return;
         }
 
+        BulkConnectSkipTally skips = plan.Skips;
         var connectedCount = 0;
         var failedCount = 0;
-        var skippedCount = plan.SkippedCount;
         var cancelled = false;
 
         for (var i = 0; i < plan.Candidates.Count; i++)
@@ -1336,7 +1336,7 @@ public partial class ServerListViewModel
 
             if (!_connectingServerIds.Add(candidate.Server.Id))
             {
-                skippedCount++;
+                skips.Add(BulkConnectSkipReason.AlreadyConnecting);
                 Core.Logging.FileLogger.Info(
                     $"ConnectServersBulkCoreAsync skipped already-connecting item '{candidate.Server.DisplayName}' at execution time.");
                 continue;
@@ -1346,7 +1346,7 @@ public partial class ServerListViewModel
             {
                 if (IsToolConnectionType(candidate.ServerDto.ConnectionType))
                 {
-                    skippedCount++;
+                    skips.Add(BulkConnectSkipReason.ToolEntry);
                     continue;
                 }
 
@@ -1374,10 +1374,6 @@ public partial class ServerListViewModel
                         failedCount++;
                         Core.Logging.FileLogger.Warn(
                             $"ConnectServersBulkCoreAsync failed for '{candidate.Server.DisplayName}': {outcome.ErrorMessage}");
-                        break;
-
-                    case BulkConnectOutcomeStatus.Skipped:
-                        skippedCount++;
                         break;
 
                     case BulkConnectOutcomeStatus.Cancelled:
@@ -1413,7 +1409,7 @@ public partial class ServerListViewModel
             selected: plan.ConnectableCount + plan.SkippedCount,
             connected: connectedCount,
             failed: failedCount,
-            skipped: skippedCount,
+            skipped: skips.Total,
             cancelled: cancelled);
 
         var summary = _localizer.Format(
@@ -1421,6 +1417,11 @@ public partial class ServerListViewModel
             tally.Connected,
             tally.Failed,
             tally.Skipped);
+
+        // Says WHY servers were skipped rather than only how many. Counts by reason, never
+        // names: this TextBlock has neither wrapping nor trimming and carries an automation
+        // name on a polite live region.
+        summary += BulkConnectSummary.DescribeSkips(skips, _localizer);
 
         // Without this, a run cancelled part way reported only what it managed to do and
         // the rest vanished from the arithmetic - three servers cancelled after the first
@@ -1436,12 +1437,15 @@ public partial class ServerListViewModel
     }
 
     /// <summary>The message shown when a bulk connect finds nothing it can attempt.</summary>
-    /// <param name="skippedCount">Selected servers skipped before any attempt.</param>
-    internal string ComposeNothingToConnectStatus(int skippedCount)
+    /// <param name="skips">Selected servers skipped before any attempt, by reason.</param>
+    internal string ComposeNothingToConnectStatus(BulkConnectSkipTally skips)
     {
+        ArgumentNullException.ThrowIfNull(skips);
+
+        int skippedCount = skips.Total;
         var key = BulkConnectSummary.NothingToConnectKey(skippedCount);
         return skippedCount > 0
-            ? _localizer.Format(key, skippedCount)
+            ? _localizer.Format(key, skippedCount) + BulkConnectSummary.DescribeSkips(skips, _localizer)
             : _localizer[key];
     }
     private async Task<bool> MoveServersToGroupCoreAsync(
@@ -1823,10 +1827,13 @@ public partial class ServerListViewModel
     internal sealed record BulkConnectPlan(
         AppSettings Settings,
         IReadOnlyList<BulkConnectCandidate> Candidates,
-        int SkippedCount,
+        BulkConnectSkipTally Skips,
         bool Refused = false)
     {
         public int ConnectableCount => Candidates.Count;
+
+        /// <summary>How many were skipped, summed from the reasons rather than counted apart.</summary>
+        public int SkippedCount => Skips.Total;
     }
 
     internal sealed record BulkConnectCandidate(

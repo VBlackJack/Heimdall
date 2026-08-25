@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Localization;
+
 namespace Heimdall.App.ViewModels;
 
 /// <summary>
@@ -60,10 +62,115 @@ internal readonly record struct BulkConnectTally(
 }
 
 /// <summary>
+/// Why a selected server was never attempted.
+/// </summary>
+/// <remarks>
+/// Measured on the bulk connect paths rather than assumed: five reasons reach the counter,
+/// two of them from two moments each - once while the plan is built, once again at execution
+/// time for a server that started connecting in between. A sixth candidate,
+/// <c>BulkConnectOutcomeStatus.Skipped</c>, was declared and consumed but produced by nothing,
+/// and is gone: an unreachable arm is a false assurance that the enumeration covers the
+/// domain.
+/// </remarks>
+internal enum BulkConnectSkipReason
+{
+    /// <summary>A tool entry, which has no session to open.</summary>
+    ToolEntry,
+
+    /// <summary>A session for this server was already being opened.</summary>
+    AlreadyConnecting,
+
+    /// <summary>The stored profile behind the selected row could not be found.</summary>
+    ProfileMissing,
+
+    /// <summary>The credential guard refused the connection.</summary>
+    CredentialGuardRefused,
+
+    /// <summary>An external credential provider could not answer without prompting.</summary>
+    ExternalCredentialsUnresolved
+}
+
+/// <summary>
+/// Counts skipped servers by reason for one bulk connect.
+/// </summary>
+/// <remarks>
+/// <b>There is no separate total.</b> <see cref="Total"/> is the sum of the reasons, so a
+/// branch that forgets to record one cannot leave the breakdown disagreeing with the number
+/// beside it - the same shape that made <c>NotAttempted</c> derived rather than counted.
+/// Ordering is the declaration order of the enumeration so a run reports its reasons the same
+/// way twice.
+/// </remarks>
+internal sealed class BulkConnectSkipTally
+{
+    private readonly Dictionary<BulkConnectSkipReason, int> _counts = [];
+
+    /// <summary>Records one skipped server.</summary>
+    internal void Add(BulkConnectSkipReason reason)
+    {
+        _counts[reason] = _counts.TryGetValue(reason, out int current) ? current + 1 : 1;
+    }
+
+    /// <summary>How many servers were skipped, all reasons together.</summary>
+    internal int Total => _counts.Values.Sum();
+
+    /// <summary>The reasons that actually occurred, in declaration order.</summary>
+    /// <remarks>
+    /// Reasons at zero are left out. The two-reason precedent this follows -
+    /// <c>ToastImportKnownHostsResult</c> - can afford to print every counter; five of them,
+    /// four reading "0", would bury the one that happened.
+    /// </remarks>
+    internal IReadOnlyList<KeyValuePair<BulkConnectSkipReason, int>> Occurred =>
+        Enum.GetValues<BulkConnectSkipReason>()
+            .Where(reason => _counts.ContainsKey(reason))
+            .Select(reason => new KeyValuePair<BulkConnectSkipReason, int>(reason, _counts[reason]))
+            .ToList();
+}
+
+/// <summary>
 /// Builds the end-of-run tally for a bulk connect.
 /// </summary>
 internal static class BulkConnectSummary
 {
+    private static readonly IReadOnlyDictionary<BulkConnectSkipReason, string> SkipReasonKeys =
+        new Dictionary<BulkConnectSkipReason, string>
+        {
+            [BulkConnectSkipReason.ToolEntry] = "StatusBulkConnectSkipReasonToolEntry",
+            [BulkConnectSkipReason.AlreadyConnecting] = "StatusBulkConnectSkipReasonAlreadyConnecting",
+            [BulkConnectSkipReason.ProfileMissing] = "StatusBulkConnectSkipReasonProfileMissing",
+            [BulkConnectSkipReason.CredentialGuardRefused] = "StatusBulkConnectSkipReasonCredentialGuard",
+            [BulkConnectSkipReason.ExternalCredentialsUnresolved] =
+                "StatusBulkConnectSkipReasonCredentialsUnresolved"
+        };
+
+    /// <summary>
+    /// Spells out why servers were skipped, or returns an empty string when none were.
+    /// </summary>
+    /// <remarks>
+    /// Counts by reason, never names. The status bar's <c>TextBlock</c> has neither wrapping
+    /// nor trimming, so a list of servers is cut off without an ellipsis, and it carries an
+    /// automation name on a polite live region - fifty names would be read aloud on every
+    /// update. Naming elements has a precedent in this repository and it is a dialog with a
+    /// cap, not this line.
+    /// </remarks>
+    internal static string DescribeSkips(BulkConnectSkipTally skips, LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(skips);
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        IReadOnlyList<KeyValuePair<BulkConnectSkipReason, int>> occurred = skips.Occurred;
+        if (occurred.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        IEnumerable<string> parts = occurred.Select(entry => localizer.Format(
+            "StatusBulkConnectSkipItem",
+            entry.Value,
+            localizer[SkipReasonKeys[entry.Key]]));
+
+        return localizer.Format("StatusBulkConnectSkipBreakdown", string.Join(", ", parts));
+    }
+
     /// <summary>Tallies one run.</summary>
     /// <param name="selected">Servers the user selected, skipped ones included.</param>
     /// <param name="connected">Servers that opened a session.</param>

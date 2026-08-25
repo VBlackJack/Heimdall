@@ -654,7 +654,12 @@ public sealed class ServerListBulkActionTests
         await fixture.ViewModel.ConnectSelectedCommand.ExecuteAsync(null);
 
         Assert.Equal("Connect to all 2 sessions in this group?", fixture.DialogService.LastConfirmMessage);
-        Assert.Equal("Connected 2, failed 0, skipped 1.", fixture.LastStatusMessage);
+        // BL-0082(b): the count alone said something had been left out and nothing about
+        // whether the user could act on it. The reason is named; the server is not.
+        Assert.Equal(
+            "Connected 2, failed 0, skipped 1. Skipped: 1 (tool entry).",
+            fixture.LastStatusMessage);
+        Assert.DoesNotContain("chmod", fixture.LastStatusMessage!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -749,7 +754,11 @@ public sealed class ServerListBulkActionTests
         await fixture.ViewModel.ConnectSelectedCommand.ExecuteAsync(null);
 
         Assert.Equal("Connect to all 2 sessions in this group?", fixture.DialogService.LastConfirmMessage);
-        Assert.Equal("Connected 2, failed 0, skipped 1.", fixture.LastStatusMessage);
+        // The actionable family: an external credential provider that could not answer
+        // silently now reads differently from a tool entry, which it did not before.
+        Assert.Equal(
+            "Connected 2, failed 0, skipped 1. Skipped: 1 (credentials not resolved).",
+            fixture.LastStatusMessage);
         Assert.Equal(0, fixture.DialogService.WarningCallCount);
         Assert.Equal(0, fixture.DialogService.ErrorCallCount);
     }
@@ -816,7 +825,7 @@ public sealed class ServerListBulkActionTests
         // connect." names an empty selection, which is not what happened: this path used to
         // discard the skip count entirely.
         Assert.Equal(
-            "Nothing to connect: 3 selected server(s) were skipped.",
+            "Nothing to connect: 3 selected server(s) were skipped. Skipped: 3 (tool entry).",
             fixture.LastStatusMessage);
         Assert.Equal(0, fixture.DialogService.ConfirmCallCount);
     }
