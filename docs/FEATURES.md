@@ -42,7 +42,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 ### SSH Terminal
 - Embedded terminal via WebView2 + xterm.js (full VT100/xterm rendering)
 - Pipe mode transport for correct arrow keys, colors, and escape sequences
-- **Multi-agent support**: Pageant (PuTTY) and Windows OpenSSH Agent (named pipe `\\.\pipe\openssh-ssh-agent`) behind a common `ISshAgent` abstraction. User-configurable priority in `Settings > SSH & SFTP > SSH agent preference` (default: OpenSSH first, Pageant second). RSA keys negotiate SHA-2 automatically so modern servers with `ssh-rsa` disabled still accept cached agent keys.
+- **Multi-agent support**: Pageant (PuTTY) and Windows OpenSSH Agent (named pipe `\\.\pipe\openssh-ssh-agent`) behind a common `ISshAgent` abstraction. User-configurable priority in `Settings > SSH & SFTP > Connection > SSH agent preference` (default: OpenSSH first, Pageant second). RSA keys negotiate SHA-2 automatically so modern servers with `ssh-rsa` disabled still accept cached agent keys.
 - **Separate key passphrase field**: distinct from the login password, both persisted encrypted. Enables key-with-fallback-password workflows without the field ambiguity of legacy setups.
 - **OpenSSH config import with ProxyJump**: single-hop and multi-hop chains auto-mapped to Heimdall's gateway model with `ParentGatewayId` links. Unsupported forms (ProxyCommand, `%h`/`%p` tokens, cycles) rejected with explicit diagnostics rather than silently mis-imported.
 - SSH keepalive heartbeat (prevents TMOUT disconnects)
@@ -225,7 +225,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - 19 themed control styles with complete hover/pressed/focused/disabled states
 - 5 terminal color schemes: Dracula, Solarized Dark, Monokai, Nord, Default - Dracula also applied to Notes Milkdown editor
 - Configurable terminal font family and size
-- Settings panel with 6 left-navigation sub-tabs (General, Terminal, SSH & SFTP, RDP, Security, Advanced); the RDP sub-tab now exposes the previously hidden `RdpResolutionPresets` array as an editable multi-line list and the `RdpDialogAdvancedDefault` flag as a checkbox
+- Settings panel with 6 left-navigation sub-tabs (General, Terminal, SSH & SFTP, RDP, Security, Advanced); the RDP sub-tab now exposes the previously hidden `RdpResolutionPresets` array as an editable multi-line list and the `RdpDialogAdvancedDefault` flag as a checkbox. The RDP and `SSH & SFTP` sub-tabs each group their options behind a segmented control - RDP into Display & Audio / Devices / Performance / Behavior, `SSH & SFTP` into Connection / Session / SFTP & X11 / Host keys / Gateways
 - Server Dialog: a two-step flow - protocol card selection, then a **four-tab editor** (General / Options / Network / Info) with a persistent protocol badge in the header, per-tab error badges, per-protocol tab visibility, and validation focus that jumps to the first invalid field across tabs. The window is freely resizable with native mouse-wheel scrolling. The RDP Options tab keeps a four-chip mini-toc (Display / Audio / Devices / Performance); its Display section offers a `Common resolutions` ComboBox to pre-fill Width/Height in Fixed mode and a dedicated `Enable multi-monitor` toggle
 - TreeView hierarchy: Project > Group > Server with category-colored tool icons and status dots
 - Command Palette (Ctrl+K): protocol icons, status dots, endpoint hints, Ctrl+Enter for split
@@ -271,7 +271,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Centralized `HostKeyTrustService` with per-entry metadata (first seen, last seen, algorithm, source) - production paths require host-key verifier dependencies at compile time; no silent auto-accept fallbacks in release code
 - Compile-time non-null host-key dependencies on SSH/SFTP/tunnel/sudo entry points; `RejectingHostKeyVerifier` is the safe fail-closed verifier and `AutoAcceptHostKeyVerifier` is test-only
 - Mid-session host-key mismatch events propagate through `SshSessionSecurityEvent` / `HostKeyRotatedDuringUpload` instead of being collapsed into generic disconnect text
-- `Settings > SSH & SFTP > Trusted host keys` sub-panel: dense auditable grid of every trusted host key with source provenance, import from `~/.ssh/known_hosts`, export to it, explicit per-row conflict resolution ("Keep existing" default), and copy/remove row actions
+- `Settings > SSH & SFTP > Host keys` sub-tab: dense auditable grid of every trusted host key with source provenance, import from `~/.ssh/known_hosts`, export to it, explicit per-row conflict resolution ("Keep existing" default), and copy/remove row actions
 - Opt-in `known_hosts` synchronization at startup so Heimdall, OpenSSH CLI, and Plink share one view of trust
 - Plink fallback sessions enforce pinned `-hostkey` fingerprints from the shared trust store and refuse to launch when Heimdall cannot resolve a pinned/probed fingerprint safely
 - Credential broker autofill requires an RDP host-title match before injecting passwords
