@@ -527,7 +527,7 @@ public sealed class ContextMenuFactory
 
             if (plan.ConnectableCount <= 0)
             {
-                vm.StatusText = vm.ServerList.ComposeNothingToConnectStatus(plan.SkippedCount);
+                vm.StatusText = vm.ServerList.ComposeNothingToConnectStatus(plan.Skips);
                 return;
             }
 

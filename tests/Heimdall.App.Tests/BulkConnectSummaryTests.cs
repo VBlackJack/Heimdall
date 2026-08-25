@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.ViewModels;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Tests;
 
@@ -121,4 +123,92 @@ public sealed class BulkConnectSummaryTests
         => Assert.Equal(
             "StatusBulkConnectNothingToConnect",
             BulkConnectSummary.NothingToConnectKey(0));
+
+    // BL-0082(b). Five reasons used to arrive in one counter, so "skipped 2" told a user
+    // that something had been left out and nothing about whether they could do anything
+    // about it - a tool entry in the selection and a credential provider that refused read
+    // exactly alike.
+    [Fact]
+    public void SkipTotal_IsTheSumOfTheReasons_NotACounterOfItsOwn()
+    {
+        BulkConnectSkipTally skips = new BulkConnectSkipTally();
+        skips.Add(BulkConnectSkipReason.ToolEntry);
+        skips.Add(BulkConnectSkipReason.ToolEntry);
+        skips.Add(BulkConnectSkipReason.CredentialGuardRefused);
+
+        Assert.Equal(3, skips.Total);
+        Assert.Equal(skips.Occurred.Sum(entry => entry.Value), skips.Total);
+    }
+
+    [Fact]
+    public void SkipTally_ReportsOnlyTheReasonsThatOccurred_InDeclarationOrder()
+    {
+        BulkConnectSkipTally skips = new BulkConnectSkipTally();
+        skips.Add(BulkConnectSkipReason.ExternalCredentialsUnresolved);
+        skips.Add(BulkConnectSkipReason.ToolEntry);
+        skips.Add(BulkConnectSkipReason.ExternalCredentialsUnresolved);
+
+        Assert.Equal(
+            [BulkConnectSkipReason.ToolEntry, BulkConnectSkipReason.ExternalCredentialsUnresolved],
+            skips.Occurred.Select(entry => entry.Key));
+        Assert.Equal([1, 2], skips.Occurred.Select(entry => entry.Value));
+    }
+
+    [Fact]
+    public async Task DescribeSkips_NamesEveryReasonThatOccurredWithItsCount()
+    {
+        LocalizationManager localizer = await CreateEnglishLocalizerAsync();
+        BulkConnectSkipTally skips = new BulkConnectSkipTally();
+        skips.Add(BulkConnectSkipReason.ToolEntry);
+        skips.Add(BulkConnectSkipReason.ToolEntry);
+        skips.Add(BulkConnectSkipReason.AlreadyConnecting);
+
+        string description = BulkConnectSummary.DescribeSkips(skips, localizer);
+
+        Assert.Contains("2 (tool entry)", description, StringComparison.Ordinal);
+        Assert.Contains("1 (already connecting)", description, StringComparison.Ordinal);
+        // Reasons that did not occur stay out: five counters, four of them "0", would bury
+        // the one that happened.
+        Assert.DoesNotContain("profile not found", description, StringComparison.Ordinal);
+        Assert.DoesNotContain("credentials not resolved", description, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DescribeSkips_SaysNothingWhenNothingWasSkipped()
+    {
+        LocalizationManager localizer = await CreateEnglishLocalizerAsync();
+
+        Assert.Equal(string.Empty, BulkConnectSummary.DescribeSkips(new BulkConnectSkipTally(), localizer));
+    }
+
+    // Every reason must have a string. A missing key would surface to the user as the key
+    // itself, which is the failure this whole item is about: a message that does not say
+    // what it means.
+    // Enumerated rather than listed one by one, so a reason added later is covered without
+    // anyone remembering to add a case here.
+    [Fact]
+    public async Task EveryReason_HasATranslatedLabel()
+    {
+        LocalizationManager localizer = await CreateEnglishLocalizerAsync();
+
+        foreach (BulkConnectSkipReason reason in Enum.GetValues<BulkConnectSkipReason>())
+        {
+            BulkConnectSkipTally skips = new BulkConnectSkipTally();
+            skips.Add(reason);
+
+            string description = BulkConnectSummary.DescribeSkips(skips, localizer);
+
+            // An unresolved key surfaces as the key itself, which is precisely the failure
+            // this item is about: a message that does not say what it means.
+            Assert.DoesNotContain("StatusBulkConnectSkip", description, StringComparison.Ordinal);
+            Assert.Contains("1 (", description, StringComparison.Ordinal);
+        }
+    }
+
+    private static async Task<LocalizationManager> CreateEnglishLocalizerAsync()
+    {
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
+    }
 }

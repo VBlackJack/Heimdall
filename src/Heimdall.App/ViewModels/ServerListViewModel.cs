@@ -916,7 +916,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     outcome.ErrorMessage ?? _localizer["ErrorConnectionFailed"]),
                 BulkConnectOutcomeStatus.Cancelled => false,
                 BulkConnectOutcomeStatus.UnsupportedType => false,
-                BulkConnectOutcomeStatus.Skipped => false,
                 _ => false
             };
         }
@@ -2361,7 +2360,6 @@ internal enum BulkConnectOutcomeStatus
     PreflightFailed,
     ConnectionFailed,
     Cancelled,
-    Skipped,
     UnsupportedType
 }
 
