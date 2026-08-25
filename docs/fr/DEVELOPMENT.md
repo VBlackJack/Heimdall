@@ -100,6 +100,34 @@ Les sorties de build sont ignorées par Git et écrites sous :
 - `Dist/release/`
 - `Dist/installers/`
 
+## Nommage des branches
+
+Une branche porte le nom de **ce que change le travail**, jamais celui de qui ou de quoi l'a
+produit.
+
+```
+<type>/<description-courte-en-kebab>
+```
+
+`<type>` reprend le vocabulaire deja utilise par les sujets de commit, pour qu'une branche et ses
+commits s'accordent : `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `ci`, `build`, `style`,
+`chore`, `release`.
+
+```
+feat/rdp-hardware-rendering-setting
+fix/bulk-connect-summary-truth
+docs/rdp-memory-measured
+test/credential-protector-isolation
+```
+
+Ne prefixez **pas** une branche du nom d'un outil ou d'un assistant. `claude/...` et `codex/...`
+ont ete utilises jusqu'au 2026-08-25 et ont disparu : ils disaient qui avait tape, ce dont
+personne n'a besoin, et masquaient ce qui changeait, ce dont tout le monde a besoin. Devant une
+liste de trente branches, on doit pouvoir dire a quoi sert chacune sans l'ouvrir.
+
+Il n'y a volontairement pas de `add/`. Il veut dire la meme chose que `feat/`, et deux prefixes
+pour un seul sens, c'est ainsi qu'une convention pourrit.
+
 ## Standards de code
 
 - Licence : Apache 2.0, auteur "Julien Bombled" sur les nouveaux fichiers.

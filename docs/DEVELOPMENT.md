@@ -96,6 +96,33 @@ Build outputs are ignored and written under:
 - `Dist/release/`
 - `Dist/installers/`
 
+## Branch Naming
+
+A branch is named after **what the change is**, never after who or what produced it.
+
+```
+<type>/<short-kebab-description>
+```
+
+`<type>` is the same vocabulary the commit subjects already use, so a branch and its commits
+agree: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `ci`, `build`, `style`, `chore`,
+`release`.
+
+```
+feat/rdp-hardware-rendering-setting
+fix/bulk-connect-summary-truth
+docs/rdp-memory-measured
+test/credential-protector-isolation
+```
+
+Do **not** prefix a branch with the name of a tool or an assistant. `claude/...` and `codex/...`
+were used until 2026-08-25 and are gone: they said who typed, which nobody needs, and hid what
+changed, which everybody does. A reader listing thirty branches should be able to tell what each
+one is for without opening it.
+
+There is deliberately no `add/`. It means the same thing as `feat/`, and two prefixes for one
+meaning is how a convention rots.
+
 ## Code Standards
 
 - License: Apache 2.0, author "Julien Bombled" on new files.
