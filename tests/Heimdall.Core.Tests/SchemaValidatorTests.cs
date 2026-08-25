@@ -15,6 +15,7 @@
  */
 
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Models;
 
 namespace Heimdall.Core.Tests;
 
@@ -1021,6 +1022,109 @@ public class SchemaValidatorTests
 
         Assert.DoesNotContain(result.Errors, e => e.Contains("SshMode"));
         Assert.DoesNotContain(result.Errors, e => e.Contains("RdpMode"));
+    }
+
+    // ── ValidateServer: WinRM transport coherence ─────────────────────
+
+    // WINRM-011. The dialog moves the port when TLS is ticked, so a profile made in the
+    // interface is coherent. Every other boundary keeps an explicit port as written: the
+    // deserializer only derives one when the field is ABSENT, the launch builder honours an
+    // explicit port whether or not TLS is on, and nothing validated the pair. An imported or
+    // hand-edited profile therefore spoke TLS to the plaintext port and said nothing.
+    [Fact]
+    public void ValidateServer_WinRmOverTlsOnThePlaintextPort_IsReported()
+    {
+        var server = new ServerProfileDto
+        {
+            Id = "srv-winrm-tls",
+            DisplayName = "Imported WinRM",
+            RemoteServer = "winrm.example.com",
+            ConnectionType = "WINRM",
+            SshMode = "External",
+            RdpMode = "External",
+            RdpAspectRatio = "Auto",
+            WinRmUseSsl = true,
+            WinRmPort = DefaultPorts.WinRmHttp
+        };
+
+        var result = SchemaValidator.ValidateServer(server);
+
+        Assert.Contains(result.Errors, error => error.Contains(nameof(server.WinRmPort), StringComparison.Ordinal));
+    }
+
+    // The pair is only wrong together. Neither half alone is a defect, and flagging one of
+    // them would put a warning on every ordinary profile.
+    [Theory]
+    [InlineData(true, 5986)]
+    [InlineData(false, 5985)]
+    [InlineData(false, 5986)]
+    public void ValidateServer_CoherentWinRmTransport_IsAccepted(bool useSsl, int port)
+    {
+        var server = new ServerProfileDto
+        {
+            Id = "srv-winrm-ok",
+            DisplayName = "WinRM",
+            RemoteServer = "winrm.example.com",
+            ConnectionType = "WINRM",
+            SshMode = "External",
+            RdpMode = "External",
+            RdpAspectRatio = "Auto",
+            WinRmUseSsl = useSsl,
+            WinRmPort = port
+        };
+
+        var result = SchemaValidator.ValidateServer(server);
+
+        Assert.DoesNotContain(result.Errors, error => error.Contains(nameof(server.WinRmPort), StringComparison.Ordinal));
+    }
+
+    // A non-WinRM profile carries a WinRmPort like any other field. Reading it as a transport
+    // choice would report a defect on profiles that never speak WinRM at all.
+    [Fact]
+    public void ValidateServer_NonWinRmProfileCarryingTheSamePair_IsLeftAlone()
+    {
+        var server = new ServerProfileDto
+        {
+            Id = "srv-ssh",
+            DisplayName = "SSH box",
+            RemoteServer = "ssh.example.com",
+            ConnectionType = "SSH",
+            SshMode = "External",
+            RdpMode = "External",
+            RdpAspectRatio = "Auto",
+            WinRmUseSsl = true,
+            WinRmPort = DefaultPorts.WinRmHttp
+        };
+
+        var result = SchemaValidator.ValidateServer(server);
+
+        Assert.DoesNotContain(result.Errors, error => error.Contains(nameof(server.WinRmPort), StringComparison.Ordinal));
+    }
+
+    // Load reports it, and does not refuse the profile. A deliberate listener with TLS on
+    // 5985 is unusual, not impossible, and this arrives on databases already written.
+    [Fact]
+    public void DiagnoseServerLoad_WinRmOverTlsOnThePlaintextPort_WarnsWithoutBlocking()
+    {
+        var server = new ServerProfileDto
+        {
+            Id = "srv-winrm-tls",
+            DisplayName = "Imported WinRM",
+            RemoteServer = "winrm.example.com",
+            ConnectionType = "WINRM",
+            SshMode = "External",
+            RdpMode = "External",
+            RdpAspectRatio = "Auto",
+            WinRmUseSsl = true,
+            WinRmPort = DefaultPorts.WinRmHttp
+        };
+
+        var diagnostics = SchemaValidator.DiagnoseServerLoad(server).Diagnostics;
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Message.Contains(nameof(server.WinRmPort), StringComparison.Ordinal)
+                && diagnostic.Severity == ValidationSeverity.Warning);
     }
 
     // ── ValidateGateway: valid inputs ─────────────────────────────────
