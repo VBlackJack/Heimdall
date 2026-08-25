@@ -26,7 +26,7 @@ namespace Heimdall.App.ViewModels;
 /// Represents a folder node in the TreeView. Folders can contain sub-folders
 /// and servers with unlimited nesting depth. Replaces the old Project + Group model.
 /// </summary>
-public partial class FolderViewModel : ObservableObject, IInlineRenameNode
+public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAccessibleItemViewModel
 {
     private readonly LocalizationManager? _localizer;
     private bool _suppressChildInvalidation;

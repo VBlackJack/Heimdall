@@ -21,8 +21,17 @@ namespace Heimdall.App.ViewModels.CommandPalette;
 /// Command Palette drill-in list. The localized <see cref="DisplayLabel"/> is
 /// built by the view-model from the underlying <see cref="SnippetVariant"/>.
 /// </summary>
-public sealed class SnippetVariantDisplayItem
+public sealed class SnippetVariantDisplayItem : IAccessibleItemViewModel
 {
+    /// <summary>
+    /// The label is what identifies the variant; the preview command below it carries its
+    /// own automation peer, so repeating it here would only make the row read twice.
+    /// </summary>
+    public string AccessibleName => DisplayLabel;
+
+    /// <inheritdoc/>
+    public string? AccessibleHelpText => null;
+
     /// <summary>Localized, human-readable label for this variant.</summary>
     public string DisplayLabel { get; init; } = string.Empty;
 

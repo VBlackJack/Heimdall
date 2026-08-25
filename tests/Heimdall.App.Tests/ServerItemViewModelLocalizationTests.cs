@@ -458,7 +458,7 @@ public sealed class ServerItemViewModelLocalizationTests
     }
 
     [Fact]
-    public void ServerTreeNode_BindsAccessibleNameToAutomationName()
+    public void ServerTreeNode_NamesTheContainer_NotTheInertTemplateBinding()
     {
         string repositoryRoot = FindRepositoryRoot();
         string xaml = File.ReadAllText(Path.Combine(
@@ -467,8 +467,17 @@ public sealed class ServerItemViewModelLocalizationTests
             "Heimdall.App",
             "MainWindow.xaml"));
 
-        Assert.Contains(
+        // The binding this used to demand sits on a Border, which has no automation peer, so
+        // it never reached a screen reader. Asserting its presence made a source-level oracle
+        // that stayed green for the whole life of the defect. What is asserted now is its
+        // absence, plus the setter that actually names the container.
+        Assert.DoesNotContain(
             "AutomationProperties.Name=\"{Binding AccessibleName}\"",
+            xaml,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "behaviors:ItemContainerAccessibilityBehavior.IsEnabled",
             xaml,
             StringComparison.Ordinal);
     }
