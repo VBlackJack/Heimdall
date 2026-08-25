@@ -28,7 +28,7 @@ namespace Heimdall.App.ViewModels;
 /// ViewModel representing a single server item in the server list.
 /// Maps from <see cref="ServerProfileDto"/> for UI binding.
 /// </summary>
-public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
+public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, IAccessibleItemViewModel
 {
     [ObservableProperty]
     private string _id = "";
@@ -253,6 +253,12 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode
         StatusShowsConnectionState
             ? ConnectionStateDisplayName
             : HealthTooltipText);
+
+    /// <summary>
+    /// No keyboard guidance to announce for a server row. Folders carry one because they
+    /// expand and collapse; a server row does nothing a screen reader needs told in advance.
+    /// </summary>
+    public string? AccessibleHelpText => null;
 
     public string ConnectionTypeBadge => ConnectionType.ToUpperInvariant() switch
     {

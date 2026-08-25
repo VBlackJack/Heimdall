@@ -666,11 +666,6 @@
 
                                 <!-- Server leaf node template -->
                                 <DataTemplate DataType="{x:Type vm:ServerItemViewModel}">
-                                    <!-- The AutomationProperties.Name below is inert and shadowed: a Border has no
-                                         automation peer, so it never reached a screen reader. Believing otherwise is
-                                         what left server rows announcing their view-model class name. The name a
-                                         client actually reads is set on the TreeViewItem container by
-                                         SessionTreeItemAccessibilityBehavior. Do not rely on this line. -->
                                     <Border x:Name="ServerSelectionChrome"
                                             Margin="0,0,4,0"
                                             HorizontalAlignment="Stretch"
@@ -680,7 +675,6 @@
                                             BorderThickness="3,0,0,0"
                                             BorderBrush="Transparent"
                                             Background="Transparent"
-                                            AutomationProperties.Name="{Binding AccessibleName}"
                                             ToolTip="{Binding DisplayName}"
                                             ToolTipService.InitialShowDelay="150">
                                         <Grid>
@@ -808,7 +802,7 @@
                                        BasedOn="{StaticResource ThemedTreeViewItemStyle}">
                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                     <Setter Property="Focusable" Value="True"/>
-                                    <Setter Property="behaviors:SessionTreeItemAccessibilityBehavior.IsEnabled" Value="True"/>
+                                    <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
                                     <Setter Property="Padding" Value="1,1"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                     <Setter Property="HorizontalAlignment" Value="Left"/>
@@ -4288,6 +4282,7 @@
                         </ListBox.ItemTemplate>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
+                                <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
                                 <Setter Property="Padding" Value="0"/>
                                 <Setter Property="Margin" Value="2,0"/>
                                 <Setter Property="Background" Value="Transparent"/>

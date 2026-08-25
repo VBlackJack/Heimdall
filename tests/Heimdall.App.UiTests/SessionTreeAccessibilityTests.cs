@@ -210,7 +210,7 @@ public sealed class SessionTreeAccessibilityTests
             var itemStyle = new Style(typeof(TreeViewItem));
             itemStyle.Setters.Add(new Setter(UIElement.FocusableProperty, true));
             itemStyle.Setters.Add(new Setter(
-                SessionTreeItemAccessibilityBehavior.IsEnabledProperty,
+                ItemContainerAccessibilityBehavior.IsEnabledProperty,
                 true));
             tree.ItemContainerStyle = itemStyle;
 
@@ -278,7 +278,7 @@ public sealed class SessionTreeAccessibilityTests
             var itemStyle = new Style(typeof(TreeViewItem));
             itemStyle.Setters.Add(new Setter(UIElement.FocusableProperty, true));
             itemStyle.Setters.Add(new Setter(
-                SessionTreeItemAccessibilityBehavior.IsEnabledProperty,
+                ItemContainerAccessibilityBehavior.IsEnabledProperty,
                 true));
             tree.ItemContainerStyle = itemStyle;
 
