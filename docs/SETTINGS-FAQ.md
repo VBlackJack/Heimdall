@@ -89,16 +89,23 @@ the entry in Heimdall.
 
 ## RDP and memory
 
+**Hardware-accelerated rendering** - **off by default since v2026.082401, and the setting that
+matters most.** With it on, the RDP control builds a Direct3D device and a decoding context for
+every session you open. Three concurrent sessions at 1920x1080 measured 1146 MB with it on and
+763 MB with it off, a third of the footprint and 840 fewer Windows handles. The trade is that
+decoding moves to the processor: no difference was measurable on idle desktops or scrolling text,
+and a session showing video was not measured. Switch it back on, globally or for one server, if a
+session feels less smooth.
+
 **Keep bitmap cache on disk** - this checkbox used to be called "Bitmap caching", which was
 misleading, so it was renamed. It decides whether the bitmap cache is written **to disk** between
 sessions, so a reconnection can reuse it instead of redrawing. **It does not control the in-memory
-cache**, and no setting in Heimdall does. Turning it off frees no memory and costs you the disk
-cache. Leave it on.
+cache.** Turning it off frees no memory and costs you the disk cache. Leave it on.
 
 **Color depth** - 32-bit by default. Lowering it to 16-bit saved no measurable memory in
 testing. Lower it if you are short of bandwidth, not if you are short of memory.
 
-**Resolution mode, Width, Height** - the only settings measured to change memory use. A smaller
+**Resolution mode, Width, Height** - the other settings measured to change memory use. A smaller
 session costs about 86 MB less than 1920x1080. `Auto` follows the Heimdall window, `Fixed` pins
 the size you choose.
 

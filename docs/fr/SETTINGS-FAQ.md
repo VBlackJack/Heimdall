@@ -94,17 +94,26 @@ coffre ne porte pas exactement le même nom que celle de Heimdall.
 
 ## RDP et mémoire
 
+**Rendu accéléré par le matériel** - **désactivé par défaut depuis la v2026.082401, et c'est le
+réglage qui compte le plus.** Quand il est actif, le contrôle RDP construit un périphérique
+Direct3D et son contexte de décodage pour chaque session ouverte. Trois sessions simultanées en
+1920x1080 ont mesuré 1146 Mo avec, 763 Mo sans : un tiers de l'empreinte et 840 handles Windows
+de moins. La contrepartie est que le décodage passe sur le processeur : aucune différence n'a été
+mesurable sur des bureaux immobiles ni sur du texte qui défile, et une session affichant de la
+vidéo n'a pas été mesurée. Réactivez-le, globalement ou pour un seul serveur, si une session
+paraît moins fluide.
+
 **Conserver le cache bitmap sur disque - à lire.** Cette case s'appelait "Cache bitmap", un nom
 qui induisait en erreur, elle a donc été renommée. Elle décide si le cache bitmap est écrit
 **sur disque** entre deux sessions, pour qu'une reconnexion le réutilise au lieu de tout
-redessiner. **Elle ne pilote pas le cache en mémoire**, et aucun réglage de Heimdall ne le fait.
-La décocher ne libère aucune mémoire et vous coûte le cache disque. Laissez-la active.
+redessiner. **Elle ne pilote pas le cache en mémoire.** La décocher ne libère aucune mémoire et
+vous coûte le cache disque. Laissez-la active.
 
 **Profondeur de couleur** - 32 bits par défaut. La baisser à 16 bits n'a économisé aucune
 mémoire mesurable. Baissez-la si vous manquez de bande passante, pas si vous manquez de
 mémoire.
 
-**Mode de résolution, Largeur, Hauteur** - les seuls réglages dont l'effet sur la mémoire a été
+**Mode de résolution, Largeur, Hauteur** - les autres réglages dont l'effet sur la mémoire a été
 mesuré. Une session plus petite coûte environ 86 Mo de moins qu'en 1920x1080. `Auto` suit la
 fenêtre de Heimdall, `Fixed` fige la taille choisie.
 
