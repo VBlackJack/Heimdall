@@ -137,6 +137,57 @@ public sealed class OpenSshConfigImporterTests
         Assert.Equal(gateway.Id, server.SshGatewayId);
     }
 
+    // BL-0095. Same defect as the profile importer, different order: here the settings write
+    // comes BEFORE the server mutation. The snapshot is still taken at the start and written
+    // back whole, so anything persisted meanwhile is erased.
+    [Fact]
+    public async Task ImportSelectedAsync_KeepsAGatewayPersistedWhileTheImportWasWorking()
+    {
+        using var fixture = new OpenSshImportFixture();
+        var injected = false;
+        fixture.AfterSettingsLoaded = () =>
+        {
+            if (injected)
+            {
+                return;
+            }
+
+            injected = true;
+            fixture.ConfigManager
+                .MergeSettingAsync(settings => settings.SshGateways.Add(new SshGatewayDto
+                {
+                    Id = "created-during-the-import",
+                    Name = "Created meanwhile",
+                    Host = "meanwhile.example.test",
+                    Port = 22,
+                    User = "ops"
+                }))
+                .GetAwaiter()
+                .GetResult();
+        };
+
+        var outcome = await fixture.Importer.ImportSelectedAsync(
+        [
+            new OpenSshImportCandidate
+            {
+                Alias = "prod",
+                HostName = "prod.example.com",
+                SourceLineNumber = 1,
+                ProxyJumpChain = [Hop("bastion.example.com", user: "ops", port: 2222)]
+            }
+        ]);
+
+        Assert.Equal(1, outcome.ImportedCount);
+        Assert.True(injected, "the concurrent write never ran, so this test measured nothing");
+        var settings = await fixture.ConfigManager.LoadSettingsAsync();
+        Assert.Contains(
+            settings.SshGateways,
+            gateway => string.Equals(gateway.Id, "created-during-the-import", StringComparison.Ordinal));
+        Assert.Contains(
+            settings.SshGateways,
+            gateway => string.Equals(gateway.Host, "bastion.example.com", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task ImportSelectedAsync_MultiHopProxyJump_CreatesParentLinks()
     {
@@ -359,8 +410,18 @@ public sealed class OpenSshConfigImporterTests
             RootPath = Path.Combine(Path.GetTempPath(), "heimdall-b60-tests", Guid.NewGuid().ToString("N"));
             ConfigManager = new ConfigManager(RootPath);
             ConfigManager.InitializeAsync().GetAwaiter().GetResult();
-            Importer = new OpenSshConfigImporter(ConfigManager);
+            InterceptingConfigManager intercepted = new(ConfigManager)
+            {
+                AfterLoadSettings = () => AfterSettingsLoaded?.Invoke()
+            };
+            Importer = new OpenSshConfigImporter(intercepted);
         }
+
+        /// <summary>
+        /// Runs when the importer takes its settings snapshot, so a test can persist through
+        /// another surface exactly while the importer holds one.
+        /// </summary>
+        public Action? AfterSettingsLoaded { get; set; }
 
         public string RootPath { get; }
 

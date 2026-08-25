@@ -15,6 +15,7 @@
  */
 
 using System.Windows;
+using Heimdall.App.Services;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
@@ -432,14 +433,13 @@ public partial class ServerDialog : Window
         if (gwDialog.ShowDialog() == true)
         {
             var updated = gwVm.ToDto();
-            updated.Id = gwDto.Id;
-            var idx = settings.SshGateways.FindIndex(
-                g => string.Equals(g.Id, gwDto.Id, StringComparison.OrdinalIgnoreCase));
-            if (idx >= 0)
-            {
-                settings.SshGateways[idx] = updated;
-                await _configManager.SaveSettingsAsync(settings);
-            }
+
+            // The dialog above is modal, so the snapshot loaded before it opened can be
+            // minutes old. Writing it back whole erased everything persisted in between.
+            // The position is resolved against the list this callback receives, which
+            // MergeSettingAsync reloads under the write lock.
+            await _configManager.MergeSettingAsync(
+                current => GatewayEditCommit.Apply(current, gwDto.Id, updated));
         }
     }
 
