@@ -1236,17 +1236,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                         defaults.SshGatewayId = null;
                     }
                 }
-
-                foreach (SshGatewayDto gateway in sshGateways)
-                {
-                    if (gateway.ParentGatewayId is not null &&
-                        deletedGatewayIds.Contains(gateway.ParentGatewayId))
-                    {
-                        gateway.ParentGatewayId = null;
-                    }
-                }
-
-                sshGateways.RemoveAll(gateway => deletedGatewayIds.Contains(gateway.Id));
             }
 
             // General
@@ -1366,8 +1355,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.FileShareEnableTftp = FileShareEnableTftp;
             settings.ExternalTools = externalTools;
 
-            // Flush buffered gateways and projects
-            settings.SshGateways = sshGateways;
+            // Flush buffered gateways and projects. Gateways RECONCILE against what was
+            // just read from disk instead of replacing it: the buffer is a snapshot taken
+            // at LoadFromSettings, nothing reseeds it afterwards, and assigning it wholesale
+            // erased every gateway another surface had persisted meanwhile.
+            settings.SshGateways = ReconcileGateways(
+                settings.SshGateways,
+                sshGateways,
+                deletedGatewayIds);
             settings.Projects = projects;
         });
 
@@ -2115,6 +2110,82 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 refreshedServers,
                 refreshedSettings.GroupDefaults);
         }
+    }
+
+    /// <summary>
+    /// Merges the panel's gateway buffer into the list just read from disk.
+    /// </summary>
+    /// <remarks>
+    /// Entries the panel knows about are replaced by its own version: it carries the edit
+    /// the user just typed. Entries it never saw - persisted by the Add menu, the tree
+    /// context menu, or a profile import while the panel was open - are preserved, and
+    /// entries the panel deleted are dropped wherever they appear. Deleting a gateway also
+    /// clears the parent reference of anything that pointed at it, on the reconciled list
+    /// rather than on the buffer, so a gateway added elsewhere cannot keep a dangling
+    /// parent.
+    /// </remarks>
+    internal static List<SshGatewayDto> ReconcileGateways(
+        IEnumerable<SshGatewayDto> persisted,
+        IEnumerable<SshGatewayDto> pending,
+        IReadOnlySet<string> deletedGatewayIds)
+    {
+        ArgumentNullException.ThrowIfNull(persisted);
+        ArgumentNullException.ThrowIfNull(pending);
+        ArgumentNullException.ThrowIfNull(deletedGatewayIds);
+
+        List<SshGatewayDto> pendingList = pending.ToList();
+        Dictionary<string, SshGatewayDto> pendingById = pendingList
+            .Where(gateway => !string.IsNullOrWhiteSpace(gateway.Id))
+            .GroupBy(gateway => gateway.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+
+        List<SshGatewayDto> reconciled = [];
+        HashSet<string> takenFromPending = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (SshGatewayDto stored in persisted)
+        {
+            if (string.IsNullOrWhiteSpace(stored.Id))
+            {
+                reconciled.Add(stored);
+                continue;
+            }
+
+            if (deletedGatewayIds.Contains(stored.Id))
+            {
+                continue;
+            }
+
+            if (pendingById.TryGetValue(stored.Id, out SshGatewayDto? edited))
+            {
+                reconciled.Add(edited);
+                takenFromPending.Add(stored.Id);
+                continue;
+            }
+
+            reconciled.Add(stored);
+        }
+
+        foreach (SshGatewayDto buffered in pendingList)
+        {
+            if (!string.IsNullOrWhiteSpace(buffered.Id)
+                && (takenFromPending.Contains(buffered.Id) || deletedGatewayIds.Contains(buffered.Id)))
+            {
+                continue;
+            }
+
+            reconciled.Add(buffered);
+        }
+
+        foreach (SshGatewayDto gateway in reconciled)
+        {
+            if (gateway.ParentGatewayId is not null
+                && deletedGatewayIds.Contains(gateway.ParentGatewayId))
+            {
+                gateway.ParentGatewayId = null;
+            }
+        }
+
+        return reconciled;
     }
 
     internal static bool HaveSameGatewayIds(
