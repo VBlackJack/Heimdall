@@ -23,6 +23,46 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class ServerDialogViewModelRdpOptionsTests
 {
+    // The domain is forwarded verbatim as a separate MSTSCAX property, so " CORP " reaches the
+    // far end with its spaces and is not CORP. Nothing else in the product normalises this value:
+    // no Trim, no case fold, no validation on any path between the box and the control. A user
+    // who pastes a domain from a wiki page brings the whitespace with it.
+    [Theory]
+    [InlineData("  CORP  ", "CORP")]
+    [InlineData("\tcorp.example.com\r\n", "corp.example.com")]
+    [InlineData("CORP", "CORP")]
+    public void ToDto_TrimsTheDomain(string typed, string expected)
+    {
+        ServerDialogViewModel vm = new()
+        {
+            DisplayName = "RDP host",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpDomain = typed
+        };
+
+        Assert.Equal(expected, vm.ToDto().RdpDomain);
+    }
+
+    // Whitespace-only must stay null rather than become an empty string: an empty domain is a
+    // real instruction to the resolver, which then derives one from the username instead.
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void ToDto_WhitespaceOnlyDomain_StaysNull(string? typed)
+    {
+        ServerDialogViewModel vm = new()
+        {
+            DisplayName = "RDP host",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpDomain = typed!
+        };
+
+        Assert.Null(vm.ToDto().RdpDomain);
+    }
+
     [Fact]
     public void Default_values_for_external_mode_fields_are_false()
     {

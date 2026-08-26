@@ -1855,7 +1855,9 @@ public partial class ServerDialogViewModel : ObservableValidator
                 ? ExistingTelnetPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(TelnetPassword),
             RdpUsername = string.IsNullOrWhiteSpace(RdpUsername) ? null : RdpUsername,
-            RdpDomain = string.IsNullOrWhiteSpace(RdpDomain) ? null : RdpDomain,
+            // Trimmed, because the value is forwarded verbatim as a separate MSTSCAX property
+            // and " CORP " is not CORP to the far end. Nothing else normalises it on the way out.
+            RdpDomain = string.IsNullOrWhiteSpace(RdpDomain) ? null : RdpDomain.Trim(),
             RdpPasswordEncrypted = string.IsNullOrEmpty(RdpPassword)
                 ? ExistingRdpPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(RdpPassword),

@@ -754,6 +754,13 @@
                                                  ToolTip="{loc:Translate ServerDialogRdpDomainHint}"
                                                  Text="{Binding RdpDomain, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource WatermarkTextBoxStyle}"/>
+                                        <!-- The watermark vanishes on the first keystroke, which is
+                                             exactly where a format mistake lives, so the example has
+                                             to survive typing. Same treatment the RD Gateway box gets. -->
+                                        <TextBlock x:Name="DlgSrv_BasicRdpDomainHint"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Text="{loc:Translate ServerDialogRdpDomainFormatHint}"
+                                                   Margin="0,4,0,0"/>
                                         <TextBlock x:Name="DlgSrv_BasicRdpPasswordLabel" Style="{StaticResource LabelStyle}" Margin="0,12,0,4"/>
                                         <PasswordBox x:Name="RdpPasswordBox" TabIndex="12"
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
