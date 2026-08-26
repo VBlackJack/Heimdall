@@ -16,6 +16,7 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.ViewModels.Shell;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
@@ -43,8 +44,55 @@ namespace Heimdall.App.ViewModels.Onboarding;
 /// </remarks>
 public sealed partial class OnboardingFlowViewModel : ObservableObject
 {
+    /// <summary>
+    /// One step of the tour: what it says, and what it points at.
+    /// </summary>
+    /// <param name="TitleKey">Locale key for the heading.</param>
+    /// <param name="BodyKey">Locale key for the body text.</param>
+    /// <param name="TargetElementName">
+    /// The <c>x:Name</c> of the control to spotlight in the shell, or null for a centred card
+    /// with no target. Resolved by name at display time; a step whose target cannot be found
+    /// degrades to a centred card rather than pointing at nothing.
+    /// </param>
+    /// <param name="ShellTab">
+    /// The top-level tab to open BEFORE the step is shown. A spotlight on a control inside a
+    /// closed tab would highlight empty space, so navigation has to happen first - the previous
+    /// flow navigated AFTER a step was completed, which is why its text described tabs the user
+    /// was not looking at while they read it.
+    /// </param>
+    public sealed record Step(
+        string TitleKey,
+        string BodyKey,
+        string? TargetElementName,
+        string? ShellTab);
+
+    /// <summary>
+    /// The tour, in order.
+    /// </summary>
+    /// <remarks>
+    /// Built from where first-time users were measured to stumble rather than from a tour of the
+    /// interface: the session list they could not find their first server in, the button that
+    /// creates one, the search they did not know existed, the tools tab, the palette, and the
+    /// settings page - which is also where the tour can be replayed, so the last step teaches the
+    /// way back.
+    ///
+    /// A table rather than a switch, because a step now has to answer "what does this point at"
+    /// as well as "what does it say", and because adding one should not mean editing three places.
+    /// </remarks>
+    public static readonly IReadOnlyList<Step> Steps =
+    [
+        new("OnboardingStep1Title", "OnboardingStep1Desc", "SessionTreeView", ShellTab.Sessions),
+        new("OnboardingStepAddTitle", "OnboardingStepAddDesc", "AddButton", ShellTab.Sessions),
+        new("OnboardingStepSearchTitle", "OnboardingStepSearchDesc", "Mw_FilterBox", ShellTab.Sessions),
+        new("OnboardingStep2Title", "OnboardingStep2Desc", "TabTools", null),
+        // Points at the magnifier rather than only naming the shortcut: a step that teaches a
+        // keystroke and nothing else leaves anyone who misses it with no way in.
+        new("OnboardingStep3Title", "OnboardingStep3Desc", "QuickConnectButton", null),
+        new("OnboardingStepSettingsTitle", "OnboardingStepSettingsDesc", "TabSettings", null),
+    ];
+
     /// <summary>Total number of steps in the onboarding flow.</summary>
-    public const int StepCount = 3;
+    public static int StepCount => Steps.Count;
 
     private readonly LocalizationManager _localizer;
     private readonly IConfigManager _configManager;
@@ -65,6 +113,7 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
     /// <summary>Zero-based index of the currently displayed step.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StepIndicatorStates))]
+    [NotifyPropertyChangedFor(nameof(CurrentStepDefinition))]
     private int _currentStep;
 
     /// <summary>Localized title of the current step.</summary>
@@ -232,22 +281,16 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
         RefreshLabels();
     }
 
+    /// <summary>The step currently displayed, or null while the index is out of range.</summary>
+    public Step? CurrentStepDefinition =>
+        CurrentStep >= 0 && CurrentStep < Steps.Count ? Steps[CurrentStep] : null;
+
     private void RefreshLabels()
     {
-        switch (CurrentStep)
+        if (CurrentStepDefinition is { } step)
         {
-            case 0:
-                TitleText = _localizer["OnboardingStep1Title"];
-                SubtitleText = _localizer["OnboardingStep1Desc"];
-                break;
-            case 1:
-                TitleText = _localizer["OnboardingStep2Title"];
-                SubtitleText = _localizer["OnboardingStep2Desc"];
-                break;
-            case 2:
-                TitleText = _localizer["OnboardingStep3Title"];
-                SubtitleText = _localizer["OnboardingStep3Desc"];
-                break;
+            TitleText = _localizer[step.TitleKey];
+            SubtitleText = _localizer[step.BodyKey];
         }
 
         SkipLabel = _localizer["OnboardingBtnSkip"];

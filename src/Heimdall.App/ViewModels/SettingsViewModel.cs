@@ -710,6 +710,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     public event Action<string>? AccentTintChanged;
 
+    /// <summary>
+    /// Raised when the user asks to see the welcome tour again.
+    /// </summary>
+    /// <remarks>
+    /// The overlay lives in the shell, not here, so this panel asks rather than shows. Before
+    /// this there was no way back into the tour at all: Skip and Escape both persist
+    /// OnboardingCompleted, and that flag had exactly one reader - the first-launch check - so a
+    /// single reflex keystroke ended the only orientation the product offers, permanently.
+    /// </remarks>
+    public event Action? ReplayOnboardingRequested;
+
+    [RelayCommand]
+    private void ReplayOnboarding() => ReplayOnboardingRequested?.Invoke();
+
     public SettingsViewModel(
         IConfigManager configManager,
         LocalizationManager localizer,

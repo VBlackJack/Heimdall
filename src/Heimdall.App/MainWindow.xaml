@@ -2160,6 +2160,40 @@
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                <!-- Replaying the tour is the only way back into it. One reflex
+                                     Escape used to end it permanently: Skip and Escape both call
+                                     CompleteAsync, which persists OnboardingCompleted, and that
+                                     flag had exactly one reader - the first-launch check. Nothing
+                                     anywhere offered to show it again. -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsOnboardingTitle"
+                                                   Text="{loc:Translate SettingsSectionOnboarding}"
+                                                   FontSize="{StaticResource FontSizeSubtitle}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   Margin="0,0,0,8"/>
+                                        <!-- Styled inline, not via DialogHintTextStyle: that key
+                                             lives in Themes/DialogCommonStyles.xaml, which is
+                                             merged by the dialogs and NOT by this window. A
+                                             StaticResource is resolved when the tree loads, so
+                                             the compiler cannot see the miss - it throws at
+                                             startup instead. -->
+                                        <TextBlock Text="{loc:Translate SettingsOnboardingReplayHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12"/>
+                                        <Button x:Name="Mw_SettingsReplayOnboardingBtn"
+                                                HorizontalAlignment="Left"
+                                                MinWidth="180"
+                                                Content="{loc:Translate SettingsOnboardingReplayButton}"
+                                                Command="{Binding Settings.ReplayOnboardingCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                AutomationProperties.Name="{loc:Translate SettingsOnboardingReplayButton}"
+                                                AutomationProperties.HelpText="{loc:Translate SettingsOnboardingReplayHint}"/>
+                                    </StackPanel>
+                                </Border>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -4570,17 +4604,33 @@
         <!-- ============================================================ -->
         <!-- ONBOARDING OVERLAY (first launch)                             -->
         <!-- ============================================================ -->
-        <Border x:Name="OnboardingOverlay"
-                Grid.Row="0" Grid.RowSpan="3"
-                Panel.ZIndex="500"
-                Focusable="True"
-                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}"
-                Background="{DynamicResource OverlayBackground}"
-                AutomationProperties.Name="{loc:Translate A11yOnboardingOverlay}">
-            <Border.InputBindings>
+        <!-- A Grid rather than a plain Border, because the dimming is now a Path with a hole
+             cut in it: the step points at a real control instead of describing where to find it.
+             The scrim, the ring and the card are siblings so the card can be moved out of the
+             way of whatever it is pointing at. -->
+        <Grid x:Name="OnboardingOverlay"
+              Grid.Row="0" Grid.RowSpan="3"
+              Panel.ZIndex="500"
+              Focusable="True"
+              SizeChanged="OnOnboardingOverlaySizeChanged"
+              Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}"
+              AutomationProperties.Name="{loc:Translate A11yOnboardingOverlay}">
+            <Grid.InputBindings>
                 <KeyBinding Key="Escape" Command="{Binding EscapeCommand}"/>
-            </Border.InputBindings>
-            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+            </Grid.InputBindings>
+            <!-- EvenOdd over two figures: the whole surface, minus the target rectangle. -->
+            <Path x:Name="OnboardingScrim"
+                  Fill="{DynamicResource OverlayBackground}"
+                  IsHitTestVisible="True"/>
+            <Border x:Name="OnboardingSpotlightRing"
+                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Visibility="Collapsed"
+                    IsHitTestVisible="False"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="2"
+                    CornerRadius="{StaticResource CornerRadiusSm}"/>
+            <Border x:Name="OnboardingCard"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
                     MinWidth="480" MaxWidth="560"
                     Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
@@ -4659,7 +4709,7 @@
                     </DockPanel>
                 </StackPanel>
             </Border>
-        </Border>
+        </Grid>
 
         <!-- ═══════ WORKSPACE LOCK OVERLAY ═══════ -->
         <!-- Covers the whole window when the master-password workspace is locked. The

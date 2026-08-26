@@ -39,6 +39,59 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class SettingsViewModelTests
 {
+    // There has to be a way back into the welcome tour. One reflex Escape used to end it
+    // permanently: SkipAsync and EscapeAsync are both bare calls to CompleteAsync, which persists
+    // OnboardingCompleted, and that flag had exactly one reader in the product - the first-launch
+    // check. No menu item, no setting and no help entry offered to show it again, so the only
+    // orientation Heimdall provides could be destroyed by the keystroke every user reaches for on
+    // an overlay they did not ask for.
+    //
+    // The panel raises rather than shows, because the overlay belongs to the shell. That seam is
+    // what these pin: a command that fires nothing leaves a dead button, which is the shape this
+    // repo has already been caught by twice - a close guard attached to no host, and an
+    // empty-state button that changed nothing where the user was looking.
+    [Fact]
+    public void ReplayOnboarding_RaisesTheRequest()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        int raised = 0;
+        viewModel.ReplayOnboardingRequested += () => raised++;
+
+        viewModel.ReplayOnboardingCommand.Execute(null);
+
+        Assert.Equal(1, raised);
+    }
+
+    // A user who leaves the tour twice must be able to come back twice. Nothing about the request
+    // is one-shot, and a stale guard would be indistinguishable from a dead button.
+    [Fact]
+    public void ReplayOnboarding_CanBeRaisedRepeatedly()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        int raised = 0;
+        viewModel.ReplayOnboardingRequested += () => raised++;
+
+        viewModel.ReplayOnboardingCommand.Execute(null);
+        viewModel.ReplayOnboardingCommand.Execute(null);
+        viewModel.ReplayOnboardingCommand.Execute(null);
+
+        Assert.Equal(3, raised);
+    }
+
+    // The panel can exist before the shell has wired itself up.
+    [Fact]
+    public void ReplayOnboarding_WithNoSubscriber_DoesNotThrow()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        viewModel.ReplayOnboardingCommand.Execute(null);
+    }
+
     private static SshGatewayDto Gateway(string id, string name) => new()
     {
         Id = id,
