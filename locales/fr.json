@@ -3161,7 +3161,7 @@
   "ServerDialogRdpTestTcpTimeout": "Le connect TCP a expir\u00e9 (h\u00f4te : {0}). L'h\u00f4te est peut-\u00eatre \u00e9teint, inaccessible, ou le port est bloqu\u00e9.",
   "ServerDialogRdpTestTcpFailed": "Impossible de se connecter \u00e0 {0} : {1}",
   "ServerDialogRdpTestCancelled": "Test annul\u00e9.",
-  "ServerDialogRdpUsernameHint": "Saisissez le compte Windows dans l'un de ces formats : nom d'utilisateur seul, DOMAINE\\utilisateur (NetBIOS) ou user@domaine.com (UPN). Un domaine indiqué ici est aussi repris dans le champ Domaine ci-dessous ; le nom d'utilisateur lui-même reste entier.",
+  "ServerDialogRdpUsernameHint": "Saisissez le compte Windows dans l'un de ces formats : nom d'utilisateur seul, DOMAINE\\utilisateur (NetBIOS) ou user@domaine.com (UPN). Un domaine indiqué ici est utilisé à la connexion ; le nom d'utilisateur lui-même reste entier.",
   "ServerDialogRdpUsernameWatermark": "utilisateur, DOMAINE\\utilisateur ou user@domaine",
   "ServerDialogRdpDomainHint": "Domaine RDP explicite. Lorsqu'il est renseign\u00e9, il est prioritaire ; laissez-le vide pour d\u00e9duire le domaine depuis un nom d'utilisateur DOMAINE\\utilisateur ou user@domaine.",
   "ServerDialogRdpDomainWatermark": "CORP ou corp.example.com",
