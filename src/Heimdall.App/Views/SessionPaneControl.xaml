@@ -76,9 +76,12 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,4,0,16"/>
+                <!-- The header has its own key. It borrowed a column label from the network
+                     map tool, so one string served two unrelated surfaces and neither could be
+                     reworded without moving the other. -->
                 <Expander x:Name="FailureDetailsExpander"
                           AutomationProperties.AutomationId="SessionTab.FailureDetailsExpander"
-                          Header="{loc:Translate ToolNetMapColDetails}"
+                          Header="{loc:Translate SessionPaneFailureDetailsHeader}"
                           Style="{StaticResource ThemedExpanderStyle}"
                           Visibility="{Binding HasFailureDetails, Converter={StaticResource BoolToVisibilityConverter}}"
                           Margin="0,0,0,16">
@@ -141,6 +144,28 @@
                             AutomationProperties.Name="{loc:Translate SplitReconnectSecondary}"
                             Content="{loc:Translate SessionPaneBtnReconnectShort}"
                             ToolTip="{loc:Translate SplitReconnectSecondary}"
+                            Margin="3,3"
+                            MinWidth="108"
+                            Padding="10,5"/>
+                    <!-- The way out of the dead end. Reconnect repeats whatever just failed, so
+                         on a wrong username, a wrong port or a missing key the only two buttons
+                         here were "do it again" and "give up". Editing the profile is what the
+                         user actually needs, and it existed - wired only on the RDP overlay, the
+                         one surface a first-time user is least likely to reach first. -->
+                    <Button x:Name="EditProfileButton"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            AutomationProperties.Name="{loc:Translate A11yEditProfileOverlay}"
+                            Content="{loc:Translate BtnEditProfileOverlay}"
+                            ToolTip="{loc:Translate TooltipEditProfileOverlay}"
+                            Visibility="Collapsed"
+                            Margin="3,3"
+                            MinWidth="108"
+                            Padding="10,5"/>
+                    <Button x:Name="CopyErrorButton"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            AutomationProperties.Name="{loc:Translate A11yCopyErrorOverlay}"
+                            Content="{loc:Translate BtnCopyErrorOverlay}"
+                            ToolTip="{loc:Translate TooltipCopyErrorOverlay}"
                             Margin="3,3"
                             MinWidth="108"
                             Padding="10,5"/>

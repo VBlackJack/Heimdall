@@ -4821,6 +4821,7 @@
   "ToolNetMapColOs": "OS",
   "ToolNetMapColDetails": "Details",
   "SessionDiagnosticLabelStage": "Stage",
+  "SessionPaneFailureDetailsHeader": "Diagnostic details",
   "SessionDiagnosticLabelCode": "Code",
   "SessionDiagnosticLabelDetail": "Detail",
   "SessionFailureStageSshGateway": "SSH gateway",

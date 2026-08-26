@@ -42,6 +42,8 @@ public partial class SessionPaneControl : UserControl
         Unloaded += OnUnloaded;
         ReconnectButton.Click += OnReconnectClick;
         ClosePaneButton.Click += OnClosePaneClick;
+        EditProfileButton.Click += OnEditProfileClick;
+        CopyErrorButton.Click += OnCopyErrorClick;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -156,6 +158,10 @@ public partial class SessionPaneControl : UserControl
                     ))
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        // Recomputed with the overlay rather than once at load: the owning session is found by
+        // walking the split tree, which is not populated yet when this control is first created.
+        UpdateEditProfileAvailability();
     }
 
     // ── Overlay button handlers (route to MainViewModel) ─────────
@@ -193,12 +199,111 @@ public partial class SessionPaneControl : UserControl
         _ = vm.ClosePaneAsync(session, _model.PaneId);
     }
 
+    /// <summary>
+    /// Opens the profile whose settings just failed to connect.
+    /// </summary>
+    /// <remarks>
+    /// This route did not exist here. Reconnect repeats whatever failed, so on a wrong username,
+    /// a wrong port or a missing key the pane offered only "do it again" and "give up" - and a
+    /// newcomer presses Reconnect two or three times before concluding the app cannot connect.
+    /// The way to the field that is actually wrong existed already, wired to the RDP overlay
+    /// alone: the one failure surface a first-time user is least likely to meet first, since SSH
+    /// and SFTP are where they start.
+    /// </remarks>
+    private void OnEditProfileClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryFindOwningSession(out MainViewModel? vm, out SessionTabViewModel? session))
+        {
+            return;
+        }
+
+        string serverId = session.ProfileLookupServerId;
+        if (string.IsNullOrEmpty(serverId))
+        {
+            return;
+        }
+
+        _ = vm.ServerList.EditServerByIdAsync(serverId, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Puts the failure on the clipboard, so it can be pasted into a ticket or a message.
+    /// </summary>
+    /// <remarks>
+    /// Built from the bound diagnostic rather than by scraping rendered TextBlocks the way the
+    /// RDP overlay does: reading the model gives the same text on every protocol, and does not
+    /// silently change meaning when the layout does.
+    /// </remarks>
+    private void OnCopyErrorClick(object sender, RoutedEventArgs e)
+    {
+        if (_model is null)
+        {
+            return;
+        }
+
+        List<string> lines = [];
+
+        if (!string.IsNullOrWhiteSpace(_model.Title))
+        {
+            lines.Add(_model.Title);
+        }
+
+        if (_model.FailureDetails is { } failure)
+        {
+            lines.Add($"{L("SessionDiagnosticLabelStage")} {failure.Stage}");
+
+            if (failure.Code is { } code)
+            {
+                lines.Add($"{L("SessionDiagnosticLabelCode")} {code}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(failure.Detail))
+            {
+                lines.Add($"{L("SessionDiagnosticLabelDetail")} {failure.Detail}");
+            }
+        }
+
+        if (lines.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, lines));
+        }
+        catch (System.Runtime.InteropServices.ExternalException ex)
+        {
+            // Another process owns the clipboard. Not worth a dialog over a copy button.
+            Heimdall.Core.Logging.FileLogger.Warn($"[SessionPane] copy error failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Offers the profile edit only when there is a stored profile behind this pane.
+    /// </summary>
+    /// <remarks>
+    /// An ad-hoc session has no saved profile to open, so the button would do nothing - which is
+    /// the defect this change removes, one button over.
+    /// </remarks>
+    private void UpdateEditProfileAvailability()
+    {
+        bool editable = TryFindOwningSession(out _, out SessionTabViewModel? session)
+            && !string.IsNullOrEmpty(session.ProfileLookupServerId);
+
+        EditProfileButton.Visibility = editable ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void ApplyLocalization()
     {
         ReconnectButton.ToolTip = L("TooltipReconnectPane");
         ClosePaneButton.ToolTip = L("TooltipClosePane");
+        EditProfileButton.ToolTip = L("TooltipEditProfileOverlay");
+        CopyErrorButton.ToolTip = L("TooltipCopyErrorOverlay");
         System.Windows.Automation.AutomationProperties.SetName(ReconnectButton, L("A11yReconnectPane"));
         System.Windows.Automation.AutomationProperties.SetName(ClosePaneButton, L("A11yClosePane"));
+        System.Windows.Automation.AutomationProperties.SetName(EditProfileButton, L("A11yEditProfileOverlay"));
+        System.Windows.Automation.AutomationProperties.SetName(CopyErrorButton, L("A11yCopyErrorOverlay"));
     }
 
     private string L(string key)
