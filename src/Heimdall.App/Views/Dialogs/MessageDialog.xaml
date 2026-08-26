@@ -18,8 +18,16 @@
         </Grid.RowDefinitions>
 
         <!-- Icon + Title -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+        <!-- DockPanel, not a horizontal StackPanel: the latter measures its children with
+             infinite width, so TitleText's TextWrapping never fires and a long title is clipped
+             at the window edge instead of wrapping. The window is Width="460" with
+             SizeToContent="Height", so the width never grows to rescue it. Titles are
+             caller-supplied and unbounded - EmbeddedSftpViewModel passes a remote file name into
+             SftpPropertiesTitle. Same defect a user reported on the connection-test chip, where
+             it silently ate eight characters out of the middle of a sentence. -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="True">
             <TextBlock x:Name="IconText"
+                       DockPanel.Dock="Left"
                        FontFamily="Segoe MDL2 Assets"
                        FontSize="{StaticResource FontSizeHeadline}"
                        VerticalAlignment="Center"
@@ -30,7 +38,7 @@
                        Foreground="{DynamicResource TextPrimaryBrush}"
                        VerticalAlignment="Center"
                        TextWrapping="Wrap"/>
-        </StackPanel>
+        </DockPanel>
 
         <!-- Message -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">

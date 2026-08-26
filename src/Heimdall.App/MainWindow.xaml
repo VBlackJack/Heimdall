@@ -3880,8 +3880,15 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <!-- File sharing status -->
+                    <!-- MaxWidth is what makes TextWrapping work at all in here. This vertical
+                         StackPanel sits inside a HORIZONTAL one, which measures it at infinite
+                         width and passes that straight through, so the wrapping warning below
+                         laid out as a single long line and pushed the tunnel and session badges
+                         off the right edge instead of wrapping. A real width bound is the only
+                         thing that gives Wrap something to wrap against. -->
                     <StackPanel x:Name="Mw_SharingStatusPanel"
                                 Margin="0,4,12,4"
+                                MaxWidth="360"
                                 VerticalAlignment="Center"
                                 Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal"

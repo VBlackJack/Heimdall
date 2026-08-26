@@ -746,8 +746,17 @@
                                                 BorderThickness="1"
                                                 HorizontalAlignment="Left"
                                                 Style="{StaticResource SshTestChipBorderStyle}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource SshTestChipIconStyle}"
+                                            <!-- DockPanel, not a horizontal StackPanel. A horizontal
+                                                 StackPanel measures its children with infinite width, so a
+                                                 wrapping TextBlock inside one lays out at its own MaxWidth
+                                                 and the surplus is CLIPPED by the real width rather than
+                                                 wrapped. That silently ate eight characters out of the
+                                                 middle of a failure message. DockPanel hands the last child
+                                                 the width that actually remains, so wrapping happens where
+                                                 the text really ends. -->
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Left"
+                                                           Style="{StaticResource SshTestChipIconStyle}"
                                                            FontSize="{StaticResource FontSizeBodyLarge}"
                                                            Margin="0,0,6,0"
                                                            VerticalAlignment="Center"/>
@@ -755,9 +764,8 @@
                                                            FontSize="{StaticResource FontSizeCaption}"
                                                            VerticalAlignment="Center"
                                                            TextWrapping="Wrap"
-                                                           MaxWidth="500"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            </StackPanel>
+                                            </DockPanel>
                                         </Border>
                                     </StackPanel>
                                 </Border>
