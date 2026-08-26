@@ -63,20 +63,19 @@ public partial class ServerListViewModel
             seenGroups.Add(string.Empty);
         }
 
-        foreach (var projectId in selectedItems
-                     .Select(item => item.ProjectId ?? string.Empty)
-                     .Distinct(StringComparer.Ordinal))
+        // One pass over every folder. This used to iterate the distinct projects of the selection
+        // and union their folders, so a bulk move offered a different set of folders depending on
+        // what happened to be selected, with nothing on screen explaining the difference. Project
+        // is gone and that narrowing goes with it.
+        foreach (var group in GetGroupTargets(includeNoGroup: false))
         {
-            foreach (var group in GetGroupTargets(projectId, includeNoGroup: false))
+            var normalizedGroup = NormalizeGroupForPersistence(group.GroupName) ?? string.Empty;
+            if (!seenGroups.Add(normalizedGroup))
             {
-                var normalizedGroup = NormalizeGroupForPersistence(group.GroupName) ?? string.Empty;
-                if (!seenGroups.Add(normalizedGroup))
-                {
-                    continue;
-                }
-
-                targets.Add(group);
+                continue;
             }
+
+            targets.Add(group);
         }
 
         return targets;

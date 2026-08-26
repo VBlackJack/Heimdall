@@ -460,9 +460,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
     }
 
-    public IReadOnlyList<GroupTarget> GetGroupTargets(string? projectId, bool includeNoGroup)
+    /// <summary>
+    /// Every folder a server can be moved into.
+    /// </summary>
+    /// <remarks>
+    /// This used to take a project id and return only the folders already used by servers in that
+    /// project. Nothing on screen said so, so "Move to folder" quietly omitted folders the user
+    /// could see in the tree, with no way to tell why. That was the one behavioural effect Project
+    /// ever had, and it was invisible - which is a large part of why nobody could say what a
+    /// project was for. The concept is gone; the narrowing goes with it.
+    /// </remarks>
+    public IReadOnlyList<GroupTarget> GetGroupTargets(bool includeNoGroup)
     {
-        var normalizedProjectId = projectId ?? string.Empty;
         var targets = new List<GroupTarget>();
 
         if (includeNoGroup)
@@ -474,7 +483,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         var groupTargets = _allServers
-            .Where(s => string.Equals(s.ProjectId, normalizedProjectId, StringComparison.Ordinal))
             .Where(s => !string.IsNullOrWhiteSpace(s.Group))
             .Select(s => s.Group)
             .Distinct(StringComparer.OrdinalIgnoreCase)

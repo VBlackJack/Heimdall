@@ -703,20 +703,70 @@
                                                    Style="{StaticResource DialogHintTextStyle}"
                                                    Margin="0,4,0,0"
                                                    TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Project -->
-                                <Border Style="{StaticResource DialogSectionCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock x:Name="DlgSrv_ProjectLabel" Style="{StaticResource LabelStyle}"/>
-                                        <ComboBox x:Name="DlgSrv_ProjectCmb" TabIndex="6"
-                                                  AutomationProperties.Name="{loc:Translate ServerDialogLabelProject}"
-                                                  ItemsSource="{Binding AvailableProjects}"
-                                                  SelectedValue="{Binding SelectedProjectId}"
-                                                  SelectedValuePath="Id"
-                                                  DisplayMemberPath="Name"
-                                                  Style="{StaticResource DialogFormComboBoxStyle}"/>
+                                        <!-- One test, beside the two fields it measures. It used to be two
+                                             buttons with two labels, both inside a credentials card, which is
+                                             why a first-time user read "Test connection" as validating his
+                                             password. There is deliberately no credentials button next to it:
+                                             the only way to learn a password is wrong is to submit it, and
+                                             every submission is a counted failed logon against a real account. -->
+                                        <DockPanel Margin="0,12,0,0" LastChildFill="False"
+                                                   Visibility="{Binding SupportsReachabilityTest, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <Button x:Name="DlgSrv_TestReachabilityBtn"
+                                                    DockPanel.Dock="Left"
+                                                    MinWidth="140"
+                                                    Content="{loc:Translate ServerDialogReachabilityButton}"
+                                                    Command="{Binding TestReachabilityCommand}"
+                                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                                    AutomationProperties.Name="{loc:Translate ServerDialogReachabilityButton}"
+                                                    AutomationProperties.HelpText="{loc:Translate ServerDialogReachabilityHint}"/>
+                                            <Button x:Name="DlgSrv_CancelReachabilityBtn"
+                                                    DockPanel.Dock="Left"
+                                                    MinWidth="90"
+                                                    Margin="6,0,0,0"
+                                                    Content="{loc:Translate ServerDialogReachabilityCancel}"
+                                                    Command="{Binding CancelReachabilityTestCommand}"
+                                                    Style="{DynamicResource GhostButtonStyle}"
+                                                    Visibility="{Binding IsTestingReachability, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                    AutomationProperties.Name="{loc:Translate ServerDialogReachabilityCancel}"/>
+                                        </DockPanel>
+                                        <!-- Visible, not a tooltip. The scope has to be readable BEFORE the
+                                             click; a disclaimer that only appears in the result arrives after
+                                             the user has already formed the wrong expectation. -->
+                                        <TextBlock x:Name="DlgSrv_TestReachabilityHint"
+                                                   Text="{loc:Translate ServerDialogReachabilityHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Margin="0,4,0,0"
+                                                   TextWrapping="Wrap"
+                                                   MaxWidth="500"
+                                                   HorizontalAlignment="Left"
+                                                   Visibility="{Binding SupportsReachabilityTest, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <Border Margin="0,6,0,0"
+                                                CornerRadius="{StaticResource CornerRadiusSm}"
+                                                Padding="8,4"
+                                                BorderThickness="1"
+                                                HorizontalAlignment="Left"
+                                                Style="{StaticResource SshTestChipBorderStyle}">
+                                            <!-- DockPanel, not a horizontal StackPanel. A horizontal
+                                                 StackPanel measures its children with infinite width, so a
+                                                 wrapping TextBlock inside one lays out at its own MaxWidth
+                                                 and the surplus is CLIPPED by the real width rather than
+                                                 wrapped. That silently ate eight characters out of the
+                                                 middle of a failure message. DockPanel hands the last child
+                                                 the width that actually remains, so wrapping happens where
+                                                 the text really ends. -->
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Left"
+                                                           Style="{StaticResource SshTestChipIconStyle}"
+                                                           FontSize="{StaticResource FontSizeBodyLarge}"
+                                                           Margin="0,0,6,0"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding TestChipText}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           VerticalAlignment="Center"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            </DockPanel>
+                                        </Border>
                                     </StackPanel>
                                 </Border>
 
@@ -754,48 +804,18 @@
                                                  ToolTip="{loc:Translate ServerDialogRdpDomainHint}"
                                                  Text="{Binding RdpDomain, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource WatermarkTextBoxStyle}"/>
+                                        <!-- The watermark vanishes on the first keystroke, which is
+                                             exactly where a format mistake lives, so the example has
+                                             to survive typing. Same treatment the RD Gateway box gets. -->
+                                        <TextBlock x:Name="DlgSrv_BasicRdpDomainHint"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Text="{loc:Translate ServerDialogRdpDomainFormatHint}"
+                                                   Margin="0,4,0,0"/>
                                         <TextBlock x:Name="DlgSrv_BasicRdpPasswordLabel" Style="{StaticResource LabelStyle}" Margin="0,12,0,4"/>
                                         <PasswordBox x:Name="RdpPasswordBox" TabIndex="12"
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
                                                      PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
-                                        <DockPanel Margin="0,8,0,0"
-                                                   LastChildFill="False">
-                                            <Button DockPanel.Dock="Left"
-                                                    MinWidth="140"
-                                                    Content="{loc:Translate ServerDialogRdpTestButton}"
-                                                    Command="{Binding TestRdpConnectionCommand}"
-                                                    Style="{DynamicResource SecondaryButtonStyle}"
-                                                    AutomationProperties.Name="{loc:Translate ServerDialogRdpTestButton}"/>
-                                            <Button DockPanel.Dock="Left"
-                                                    MinWidth="90"
-                                                    Margin="6,0,0,0"
-                                                    Content="{loc:Translate ServerDialogRdpTestCancel}"
-                                                    Command="{Binding CancelRdpTestCommand}"
-                                                    Style="{DynamicResource GhostButtonStyle}"
-                                                    Visibility="{Binding IsTestingRdpConnection, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                    AutomationProperties.Name="{loc:Translate ServerDialogRdpTestCancel}"/>
-                                        </DockPanel>
-                                        <Border Margin="0,6,0,0"
-                                                CornerRadius="{StaticResource CornerRadiusSm}"
-                                                Padding="8,4"
-                                                BorderThickness="1"
-                                                HorizontalAlignment="Left"
-                                                Style="{StaticResource SshTestChipBorderStyle}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource SshTestChipIconStyle}"
-                                                           FontSize="{StaticResource FontSizeBodyLarge}"
-                                                           Margin="0,0,6,0"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding TestChipText}"
-                                                           FontSize="{StaticResource FontSizeCaption}"
-                                                           VerticalAlignment="Center"
-                                                           TextWrapping="Wrap"
-                                                           MaxWidth="500"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                                           AutomationProperties.LiveSetting="Polite"/>
-                                            </StackPanel>
-                                        </Border>
                                     </StackPanel>
                                 </Border>
 
@@ -906,34 +926,6 @@
                                         <TextBlock x:Name="DlgSrv_BasicSshAuthHint" Text="{Binding SshAuthHint}"
                                                    Style="{StaticResource DialogHintTextStyle}" Margin="0,8,0,0"
                                                    TextWrapping="Wrap"/>
-                                        <DockPanel Margin="0,8,0,0"
-                                                   LastChildFill="False">
-                                            <Button DockPanel.Dock="Left"
-                                                    MinWidth="120"
-                                                    Content="{loc:Translate ServerDialogTestConnectionButton}"
-                                                    Command="{Binding TestSshConnectionCommand}"
-                                                    Style="{DynamicResource SecondaryButtonStyle}"
-                                                    AutomationProperties.Name="{loc:Translate ServerDialogTestConnectionButton}"/>
-                                        </DockPanel>
-                                        <Border Margin="0,6,0,0"
-                                                CornerRadius="{StaticResource CornerRadiusSm}"
-                                                Padding="8,4"
-                                                BorderThickness="1"
-                                                HorizontalAlignment="Left"
-                                                Style="{StaticResource SshTestChipBorderStyle}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource SshTestChipIconStyle}"
-                                                           FontSize="{StaticResource FontSizeBodyLarge}"
-                                                           Margin="0,0,6,0"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding TestChipText}"
-                                                           FontSize="{StaticResource FontSizeCaption}"
-                                                           VerticalAlignment="Center"
-                                                           TextWrapping="Wrap"
-                                                           MaxWidth="500"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            </StackPanel>
-                                        </Border>
                                         <Border x:Name="DlgSrv_SshAgentChip"
                                                 Margin="0,8,0,0"
                                                 CornerRadius="{StaticResource CornerRadiusSm}"

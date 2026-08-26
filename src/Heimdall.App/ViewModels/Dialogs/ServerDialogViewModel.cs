@@ -369,6 +369,9 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _isTestingRdpConnection;
 
     [ObservableProperty]
+    private bool _isTestingReachability;
+
+    [ObservableProperty]
     private string _postConnectCommand = "";
 
     [ObservableProperty]
@@ -469,121 +472,114 @@ public partial class ServerDialogViewModel : ObservableValidator
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanTestSshConnection))]
-    private async Task TestSshConnectionAsync(CancellationToken ct)
+    /// <summary>
+    /// Checks that the address and port answer. Deliberately never touches credentials.
+    /// </summary>
+    /// <remarks>
+    /// One control for one act, beside the fields it measures. Before this there were TWO test
+    /// buttons with TWO labels - a bare "Test" as the last control of the SSH credentials card,
+    /// directly under the password box and under a sentence about how those credentials would be
+    /// used, and "Test connection" in the RDP credentials card. Neither authenticated anything.
+    /// A first-time user read the RDP one as validating his credentials, which was the only
+    /// reading its label and its neighbours offered, and the SSH chip said "Server reachable"
+    /// with no mention of what had not been checked.
+    ///
+    /// The reason there is no credentials button beside this one is measured, not stylistic: the
+    /// only way to learn a password is wrong is to submit it, and every submission is a counted
+    /// failed logon. On SSH the stacked auth methods make one press two PAM failures, so a
+    /// mistyped password locks the account on the second click under a common faillock policy.
+    /// This repo already refused that shape once - see SftpPasswordPromptPolicy, which caps
+    /// retries because replaying "is precisely the shape that walks an account into a lockout
+    /// rather than away from one". A free-to-click button is that loop with the cap removed.
+    ///
+    /// AuthPreflightChecker is deliberately NOT called here any more. It answers a credentials
+    /// question - is a key file present, does an agent hold identities - and it was run with a
+    /// hardcoded isTunnelMode: true that the real connect path never applies, so an interactive
+    /// SSH profile was told "No SSH authentication agent is running" by a rule that does not
+    /// govern it. That belongs to the credentials hint, not to a reachability probe.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanTestReachability))]
+    private async Task TestReachabilityAsync(CancellationToken ct)
     {
+        IsTestingReachability = true;
         TestChipState = SshTestChipState.InProgress;
-        TestChipText = L("ServerDialogTestChipInProgress");
+        TestChipText = L("ServerDialogReachabilityChipRunning");
 
         try
         {
-            Heimdall.Ssh.PreflightResult preflight = Heimdall.Ssh.AuthPreflightChecker.Check(
-                BuildTestConnectionParams(),
-                isTunnelMode: true);
-            if (!preflight.Success)
-            {
-                TestChipState = SshTestChipState.Failure;
-                TestChipText = string.Format(
-                    CultureInfo.CurrentCulture,
-                    L("ServerDialogTestChipFailure"),
-                    ResolvePreflightMessage(preflight));
-                return;
-            }
-
-            SshConnectionProbe.ProbeResult probe = await SshConnectionProbe.ProbeAsync(
-                    RemoteServer,
-                    SshPort,
-                    timeoutMs: 5000,
-                    ct)
-                .ConfigureAwait(true);
-
-            if (probe.Success)
-            {
-                TestChipState = SshTestChipState.Success;
-                TestChipText = string.Format(
-                    CultureInfo.CurrentCulture,
-                    L("ServerDialogTestChipSuccess"),
-                    probe.Banner ?? "?");
-                return;
-            }
-
-            TestChipState = SshTestChipState.Failure;
-            TestChipText = string.Format(
-                CultureInfo.CurrentCulture,
-                L("ServerDialogTestChipFailure"),
-                ResolveSshProbeMessage(probe));
-        }
-        catch (OperationCanceledException)
-        {
-            TestChipState = SshTestChipState.Hidden;
-            TestChipText = "";
-        }
-        catch (Exception ex)
-        {
-            FileLogger.Warn($"[ServerDialog] test connection failed: {ex.Message}");
-            TestChipState = SshTestChipState.Failure;
-            TestChipText = string.Format(
-                CultureInfo.CurrentCulture,
-                L("ServerDialogTestChipFailure"),
-                ex.Message);
-        }
-    }
-
-    private bool CanTestSshConnection()
-        => IsSshFamilyConnection
-           && !string.IsNullOrWhiteSpace(RemoteServer)
-           && SshPort is > 0 and <= 65535;
-
-    [RelayCommand(CanExecute = nameof(CanTestRdpConnection))]
-    private async Task TestRdpConnectionAsync(CancellationToken ct)
-    {
-        IsTestingRdpConnection = true;
-        TestChipState = SshTestChipState.InProgress;
-        TestChipText = L("ServerDialogTestChipInProgress");
-
-        try
-        {
-            RdpConnectivityTester tester = new RdpConnectivityTester();
+            RdpConnectivityTester tester = new();
             RdpConnectivityTestResult result = await tester.TestAsync(
                     RemoteServer,
-                    RemotePort,
+                    EndpointPort,
                     TimeSpan.FromSeconds(5),
                     ct)
                 .ConfigureAwait(true);
 
-            ApplyRdpTestResult(result);
+            // On the SSH family a banner read costs nothing extra and answers a question TCP
+            // alone cannot: something is listening, but is it an SSH server? It is a refinement
+            // of the same verdict, never a second one - and it still authenticates nothing.
+            if (result.Outcome == RdpConnectivityTestOutcome.Success && IsSshFamilyConnection)
+            {
+                SshConnectionProbe.ProbeResult probe = await SshConnectionProbe.ProbeAsync(
+                        RemoteServer,
+                        EndpointPort,
+                        timeoutMs: 5000,
+                        ct)
+                    .ConfigureAwait(true);
+
+                if (probe.Success)
+                {
+                    TestChipState = SshTestChipState.Success;
+                    TestChipText = string.Format(
+                        CultureInfo.CurrentCulture,
+                        L("ServerDialogReachabilityChipSuccessSsh"),
+                        probe.Banner ?? "?");
+                    return;
+                }
+            }
+
+            ApplyReachabilityResult(result);
         }
         catch (OperationCanceledException)
         {
-            ApplyRdpTestResult(RdpConnectivityTestResult.Cancelled());
+            ApplyReachabilityResult(RdpConnectivityTestResult.Cancelled());
         }
         catch (Exception ex)
         {
-            FileLogger.Warn($"[ServerDialog] RDP test connection failed: {ex.Message}");
+            FileLogger.Warn($"[ServerDialog] reachability test failed: {ex.Message}");
             TestChipState = SshTestChipState.Failure;
             TestChipText = string.Format(
                 CultureInfo.CurrentCulture,
-                L("ServerDialogTestChipFailure"),
+                L("ServerDialogReachabilityChipFailure"),
                 ex.Message);
         }
         finally
         {
-            IsTestingRdpConnection = false;
+            IsTestingReachability = false;
         }
     }
 
     [RelayCommand]
-    private void CancelRdpTest()
-    {
-        TestRdpConnectionCommand.Cancel();
-    }
+    private void CancelReachabilityTest() => TestReachabilityCommand.Cancel();
 
-    private bool CanTestRdpConnection()
-        => IsRdpConnection
+    /// <summary>
+    /// Whether this protocol has an address to reach at all.
+    /// </summary>
+    /// <remarks>
+    /// Governs whether the control is offered, not merely whether it is enabled. Local Shell has
+    /// no address; Citrix reaches its StoreFront by URL rather than by host and port, which is
+    /// why its Server/Port row is deliberately collapsed. Offering a dead button on those two
+    /// would re-create, one protocol over, the same "what does this actually do" question this
+    /// change exists to answer.
+    /// </remarks>
+    public bool SupportsReachabilityTest => !IsLocalConnection && !IsCitrixConnection;
+
+    private bool CanTestReachability()
+        => SupportsReachabilityTest
            && !string.IsNullOrWhiteSpace(RemoteServer)
-           && RemotePort is > 0 and <= 65535;
+           && EndpointPort is > 0 and <= 65535;
 
-    private void ApplyRdpTestResult(RdpConnectivityTestResult result)
+    private void ApplyReachabilityResult(RdpConnectivityTestResult result)
     {
         TestChipState = result.Outcome switch
         {
@@ -592,17 +588,25 @@ public partial class ServerDialogViewModel : ObservableValidator
             _ => SshTestChipState.Failure
         };
 
-        string wrapperKey = result.Outcome == RdpConnectivityTestOutcome.Success
-            ? "ServerDialogTestChipSuccess"
-            : result.Outcome == RdpConnectivityTestOutcome.Cancelled
-                ? "{0}"
-                : "ServerDialogTestChipFailure";
-
         string detail = FormatRdpTestResult(result);
-        TestChipText = string.Equals(wrapperKey, "{0}", StringComparison.Ordinal)
-            ? detail
-            : string.Format(CultureInfo.CurrentCulture, L(wrapperKey), detail);
+
+        TestChipText = result.Outcome switch
+        {
+            RdpConnectivityTestOutcome.Cancelled => detail,
+            RdpConnectivityTestOutcome.Success => string.Format(
+                CultureInfo.CurrentCulture,
+                L("ServerDialogReachabilityChipSuccess"),
+                result.ResolvedAddress ?? "?",
+                (int)Math.Round(result.TcpElapsed?.TotalMilliseconds ?? 0)),
+            _ => string.Format(
+                CultureInfo.CurrentCulture,
+                L("ServerDialogReachabilityChipFailure"),
+                detail)
+        };
     }
+
+
+
 
     private string FormatRdpTestResult(RdpConnectivityTestResult result)
     {
@@ -635,70 +639,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         };
     }
 
-    private Heimdall.Ssh.SshConnectionParams BuildTestConnectionParams()
-    {
-        return new Heimdall.Ssh.SshConnectionParams
-        {
-            Host = RemoteServer,
-            Port = SshPort,
-            Username = string.IsNullOrWhiteSpace(SshUsername) ? "user" : SshUsername,
-            KeyPath = string.IsNullOrWhiteSpace(SshKeyPath) ? null : SshKeyPath,
-            Password = !string.IsNullOrEmpty(SshPassword)
-                ? SshPassword
-                : !string.IsNullOrEmpty(ExistingSshPasswordEncrypted)
-                    ? "__preserved__"
-                    : null,
-            KeyPassphrase = !string.IsNullOrEmpty(SshKeyPassphrase)
-                ? SshKeyPassphrase
-                : !string.IsNullOrEmpty(ExistingSshKeyPassphraseEncrypted)
-                    ? "__preserved__"
-                    : null,
-            SshAgentPreference = _sshAgentPreference,
-            AgentForwarding = SshAgentForwarding,
-            Compression = SshCompression,
-            X11Forwarding = SshX11Forwarding,
-            ConnectTimeout = TimeSpan.FromSeconds(5)
-        };
-    }
 
-    private string ResolvePreflightMessage(Heimdall.Ssh.PreflightResult preflight)
-    {
-        string message = preflight.Message ?? L("ErrorSshTestConnectionFailed");
-        if (message.StartsWith("Error", StringComparison.Ordinal) && Localizer is not null)
-        {
-            string resolved = Localizer[message];
-            if (!string.Equals(resolved, message, StringComparison.Ordinal))
-            {
-                return resolved;
-            }
-        }
 
-        return message;
-    }
-
-    private string ResolveSshProbeMessage(SshConnectionProbe.ProbeResult probe)
-    {
-        if (string.IsNullOrWhiteSpace(probe.MessageKey) || Localizer is null)
-        {
-            return L("ErrorSshTestConnectionFailed");
-        }
-
-        string template = Localizer[probe.MessageKey];
-        if (string.Equals(template, probe.MessageKey, StringComparison.Ordinal))
-        {
-            return L("ErrorSshTestConnectionFailed");
-        }
-
-        if (probe.MessageArguments.Count == 0)
-        {
-            return template;
-        }
-
-        return string.Format(
-            CultureInfo.CurrentCulture,
-            template,
-            probe.MessageArguments.ToArray());
-    }
 
     private void ResetTestChip()
     {
@@ -708,8 +650,6 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     private void RaiseTestCommandCanExecuteChanged()
     {
-        TestSshConnectionCommand.NotifyCanExecuteChanged();
-        TestRdpConnectionCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
@@ -1855,7 +1795,9 @@ public partial class ServerDialogViewModel : ObservableValidator
                 ? ExistingTelnetPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(TelnetPassword),
             RdpUsername = string.IsNullOrWhiteSpace(RdpUsername) ? null : RdpUsername,
-            RdpDomain = string.IsNullOrWhiteSpace(RdpDomain) ? null : RdpDomain,
+            // Trimmed, because the value is forwarded verbatim as a separate MSTSCAX property
+            // and " CORP " is not CORP to the far end. Nothing else normalises it on the way out.
+            RdpDomain = string.IsNullOrWhiteSpace(RdpDomain) ? null : RdpDomain.Trim(),
             RdpPasswordEncrypted = string.IsNullOrEmpty(RdpPassword)
                 ? ExistingRdpPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(RdpPassword),
@@ -2331,6 +2273,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(WinRmUseSslHelpText));
         OnPropertyChanged(nameof(IsLocalConnection));
         OnPropertyChanged(nameof(IsSshFamilyConnection));
+        OnPropertyChanged(nameof(SupportsReachabilityTest));
+        TestReachabilityCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SupportsGateway));
         OnPropertyChanged(nameof(UsesGateway));
         OnPropertyChanged(nameof(CanSelectGateway));

@@ -272,8 +272,13 @@
                             <ItemsControl ItemsSource="{Binding Findings}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type vm:SmbFindingViewItem}">
-                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
-                                            <TextBlock Text="{Binding Severity, Converter={StaticResource SmbSeverityIcon}}"
+                                        <!-- DockPanel: a horizontal StackPanel would measure the
+                                             finding text at infinite width, so Wrap would never
+                                             fire and a long finding would be clipped rather than
+                                             wrapped - silently, since the string itself is fine. -->
+                                        <DockPanel Margin="0,2,0,2" LastChildFill="True">
+                                            <TextBlock DockPanel.Dock="Left"
+                                                       Text="{Binding Severity, Converter={StaticResource SmbSeverityIcon}}"
                                                        FontFamily="Segoe MDL2 Assets"
                                                        FontSize="{StaticResource FontSizeBody}"
                                                        Foreground="{Binding Severity, Converter={StaticResource SmbSeverityBrush}}"
@@ -285,7 +290,7 @@
                                                        TextWrapping="Wrap"
                                                        VerticalAlignment="Center"
                                                        AutomationProperties.Name="{Binding Text}"/>
-                                        </StackPanel>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

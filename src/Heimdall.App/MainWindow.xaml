@@ -1463,22 +1463,6 @@
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Project -->
-                                        <TextBlock x:Name="Mw_DetailProjectLabel" Grid.Row="0" Grid.Column="0"
-                                                   Text="{loc:Translate DetailLabelProject}" FontSize="{StaticResource FontSizeCaption}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   Margin="0,2,12,2" VerticalAlignment="Center"
-                                                   Visibility="{Binding ServerList.SelectedServer.ProjectName, Converter={StaticResource NullToVisibilityConverter}}"/>
-                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal"
-                                                    Visibility="{Binding ServerList.SelectedServer.ProjectName, Converter={StaticResource NullToVisibilityConverter}}"
-                                                    Margin="0,2,0,2">
-                                            <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center"
-                                                     Fill="{Binding ServerList.SelectedServer.ProjectColor, Converter={StaticResource StringToBrushConverter}, TargetNullValue={StaticResource AccentBrush}}"/>
-                                            <TextBlock Text="{Binding ServerList.SelectedServer.ProjectName}"
-                                                       FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                        </StackPanel>
-
                                         <!-- Username -->
                                         <TextBlock x:Name="Mw_DetailUsernameLabel" Grid.Row="1" Grid.Column="0"
                                                    Text="{loc:Translate DetailLabelUsername}" FontSize="{StaticResource FontSizeCaption}"
@@ -3896,8 +3880,15 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <!-- File sharing status -->
+                    <!-- MaxWidth is what makes TextWrapping work at all in here. This vertical
+                         StackPanel sits inside a HORIZONTAL one, which measures it at infinite
+                         width and passes that straight through, so the wrapping warning below
+                         laid out as a single long line and pushed the tunnel and session badges
+                         off the right edge instead of wrapping. A real width bound is the only
+                         thing that gives Wrap something to wrap against. -->
                     <StackPanel x:Name="Mw_SharingStatusPanel"
                                 Margin="0,4,12,4"
+                                MaxWidth="360"
                                 VerticalAlignment="Center"
                                 Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal"
@@ -4184,10 +4175,6 @@
                                                        FontSize="{StaticResource FontSizeCaption}"
                                                        Foreground="{DynamicResource TextDisabledBrush}"
                                                        Visibility="{Binding Username, Converter={StaticResource NullToVisibilityConverter}}"/>
-                                            <TextBlock Text="{Binding ProjectName, StringFormat={}  ·  {0}}"
-                                                       FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource AccentBrush}"
-                                                       Visibility="{Binding ProjectName, Converter={StaticResource NullToVisibilityConverter}}"/>
 <!-- group now rendered as a section header above the row, suffix removed -->
                                         </StackPanel>
                                     </StackPanel>

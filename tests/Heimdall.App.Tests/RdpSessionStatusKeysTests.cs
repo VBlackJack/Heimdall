@@ -405,8 +405,6 @@ public sealed class RdpSessionStatusKeysTests
     }
 
     [Theory]
-    [InlineData("ServerDialogRdpTestButton")]
-    [InlineData("ServerDialogRdpTestCancel")]
     [InlineData("ServerDialogRdpTestSuccess")]
     [InlineData("ServerDialogRdpTestInvalidAddress")]
     [InlineData("ServerDialogRdpTestInvalidPort")]
@@ -426,8 +424,6 @@ public sealed class RdpSessionStatusKeysTests
     }
 
     [Theory]
-    [InlineData("ServerDialogRdpTestButton")]
-    [InlineData("ServerDialogRdpTestCancel")]
     [InlineData("ServerDialogRdpTestSuccess")]
     [InlineData("ServerDialogRdpTestInvalidAddress")]
     [InlineData("ServerDialogRdpTestInvalidPort")]
