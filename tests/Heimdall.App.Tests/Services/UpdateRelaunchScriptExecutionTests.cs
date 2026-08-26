@@ -440,6 +440,37 @@ public sealed class UpdateRelaunchScriptExecutionTests
             "a successful install must leave no failure record");
     }
 
+    /// <summary>
+    /// The recorded sequence stays readable while a stand-in still owns the write handle.
+    /// </summary>
+    /// <remarks>
+    /// A Windows handle outlives the process that opened it by a moment, so a read taken the
+    /// instant a stand-in exits can still meet the writer. Opening with the default share mode
+    /// then throws - not because the sequence is wrong, but because someone else is holding it -
+    /// and the run fails on the reading of a result it had already produced correctly (CI,
+    /// 2026-08-26). This pins the sharing rather than the timing: it is deterministic, and it
+    /// goes red the moment any of those reads goes back to the default.
+    /// </remarks>
+    [Fact]
+    public void TheRecordedSequence_IsReadable_WhileAWriterStillHoldsTheHandle()
+    {
+        using UpdateScriptSandbox sandbox = new();
+        File.WriteAllText(sandbox.SequencePath, $"{InstallerRole}|0{Environment.NewLine}");
+
+        // The handle a PowerShell child keeps for a moment after it has exited. Its own share
+        // mode is permissive: what decides the outcome is the share mode the reader asks for.
+        using FileStream stillHeld = new(
+            sandbox.SequencePath,
+            FileMode.Append,
+            FileAccess.Write,
+            FileShare.ReadWrite | FileShare.Delete);
+
+        Assert.True(
+            sandbox.SequenceContainsRole(InstallerRole),
+            "the sequence was recorded, so reading it must not depend on whether the writer has "
+            + "let go of the file yet");
+    }
+
     /// <summary>Resolves the PowerShell hosts the way the production host does.</summary>
     private static IReadOnlyList<string> ResolveHosts()
     {
@@ -733,7 +764,27 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         internal bool SequenceContainsRole(string role) =>
             File.Exists(SequencePath)
-            && File.ReadAllText(SequencePath).Contains($"{role}|", StringComparison.Ordinal);
+            && ReadSharedText(SequencePath).Contains($"{role}|", StringComparison.Ordinal);
+
+        /// <summary>
+        /// Reads a file one of the stand-ins may still hold open.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="File.ReadAllText(string)"/> asks for <see cref="FileShare.Read"/>, so it
+        /// throws the moment a writer still owns the handle - and a PowerShell child releases its
+        /// handle some time after it exits, not at the instant it does. <see cref="WaitForRoleAsync"/>
+        /// learned that and swallows the exception, but the lesson never travelled to the three
+        /// other reads of the same file: on 2026-08-26 a run that had already recorded the right
+        /// sequence failed on the reading of it. Sharing the handle removes the race instead of
+        /// retrying around it.
+        /// </remarks>
+        private static string ReadSharedText(string path)
+        {
+            using FileStream stream = new(
+                path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using StreamReader reader = new(stream);
+            return reader.ReadToEnd();
+        }
 
         internal UpdateRelaunchSpec CreateSpec(bool requiresElevation = false, bool withLog = true)
         {
@@ -820,11 +871,11 @@ public sealed class UpdateRelaunchScriptExecutionTests
             sb.AppendLine($"installer still present: {File.Exists(InstallerPath)}");
             sb.AppendLine($"script still present: {File.Exists(ScriptPath)}");
             sb.AppendLine(
-                $"sequence file: {(File.Exists(SequencePath) ? File.ReadAllText(SequencePath) : "absent")}");
+                $"sequence file: {(File.Exists(SequencePath) ? ReadSharedText(SequencePath) : "absent")}");
             sb.AppendLine(
                 $"marker directory: {string.Join(", ", Directory.GetFiles(MarkerDirectory))}");
             sb.AppendLine(
-                $"transcript: {(File.Exists(LogPath) ? File.ReadAllText(LogPath) : "absent")}");
+                $"transcript: {(File.Exists(LogPath) ? ReadSharedText(LogPath) : "absent")}");
             return sb.ToString();
         }
 
