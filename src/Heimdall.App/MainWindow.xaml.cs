@@ -1766,27 +1766,177 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         _onboardingVm.Attach(settings);
         _onboardingVm.StepCompleted += OnOnboardingStepCompleted;
         _onboardingVm.Completed += OnOnboardingCompleted;
+        _onboardingVm.PropertyChanged += OnOnboardingPropertyChanged;
         OnboardingOverlay.DataContext = _onboardingVm;
         _onboardingVm.Start();
+        ApplyOnboardingStep();
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
             () => OnboardingNextBtn.Focus());
     }
 
     private void OnOnboardingStepCompleted(object? sender, int stepIndex)
     {
-        switch (stepIndex)
+        // Navigation now happens BEFORE a step is shown, in ApplyOnboardingStep, because a
+        // spotlight has to point at something the user can see. This handler stays because the
+        // view-model's contract still raises it, and because the final step's landing is decided
+        // in OnOnboardingCompleted once persistence has succeeded.
+    }
+
+    private void OnOnboardingPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OnboardingFlowViewModel.CurrentStep))
         {
-            case 0: // Step 1 done → navigate to Sessions tab
+            ApplyOnboardingStep();
+        }
+    }
+
+    private void OnOnboardingOverlaySizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        // A spotlight that drifts is worse than none, so the geometry is recomputed rather than
+        // cached. Resizing, maximising and a DPI change all land here.
+        ApplyOnboardingStep();
+    }
+
+    /// <summary>
+    /// Opens whatever tab the current step needs, then cuts the scrim around its target.
+    /// </summary>
+    /// <remarks>
+    /// Order matters and it is the whole point: navigate first, measure second. The previous flow
+    /// navigated after a step was completed, so its text described a tab the reader was not
+    /// looking at - which is exactly the complaint that produced this change.
+    ///
+    /// A step whose target cannot be resolved degrades to a plain centred card. That is the
+    /// honest failure: a ring around empty space would tell the user to look at nothing.
+    /// </remarks>
+    private void ApplyOnboardingStep()
+    {
+        if (_onboardingVm is not { IsVisible: true } vm)
+        {
+            return;
+        }
+
+        OnboardingFlowViewModel.Step? step = vm.CurrentStepDefinition;
+
+        if (step?.ShellTab is { } tab)
+        {
+            if (string.Equals(tab, ShellTab.Sessions, StringComparison.Ordinal))
+            {
                 TabSessions.IsChecked = true;
                 SwitchToTab(ShellTab.Sessions);
-                break;
-            case 1: // Step 2 done → navigate to Tools tab
+            }
+            else if (string.Equals(tab, ShellTab.Tools, StringComparison.Ordinal))
+            {
                 TabTools.IsChecked = true;
                 SwitchToTab(ShellTab.Tools);
-                break;
-                // Step 3 (index 2): sidebar switch happens in OnOnboardingCompleted
-                // once persistence has succeeded.
+            }
         }
+
+        // Let the layout settle after a tab switch, otherwise the target is measured at the
+        // position it had before the switch, or at zero size because it has not been arranged yet.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => SpotlightOnboardingTarget(step)));
+    }
+
+    private void SpotlightOnboardingTarget(OnboardingFlowViewModel.Step? step)
+    {
+        Rect surface = new(0, 0, OnboardingOverlay.ActualWidth, OnboardingOverlay.ActualHeight);
+        if (surface.Width <= 0 || surface.Height <= 0)
+        {
+            return;
+        }
+
+        Rect? target = ResolveOnboardingTargetRect(step?.TargetElementName, surface);
+
+        if (target is not { } hole)
+        {
+            OnboardingScrim.Data = new RectangleGeometry(surface);
+            OnboardingSpotlightRing.Visibility = Visibility.Collapsed;
+            OnboardingCard.HorizontalAlignment = System.Windows.HorizontalAlignment.Center;
+            OnboardingCard.VerticalAlignment = System.Windows.VerticalAlignment.Center;
+            OnboardingCard.Margin = new Thickness(0);
+            return;
+        }
+
+        const double Pad = 6;
+        Rect padded = new(
+            hole.X - Pad,
+            hole.Y - Pad,
+            hole.Width + (Pad * 2),
+            hole.Height + (Pad * 2));
+
+        GeometryGroup scrim = new() { FillRule = FillRule.EvenOdd };
+        scrim.Children.Add(new RectangleGeometry(surface));
+        scrim.Children.Add(new RectangleGeometry(padded, 4, 4));
+        OnboardingScrim.Data = scrim;
+
+        OnboardingSpotlightRing.Visibility = Visibility.Visible;
+        OnboardingSpotlightRing.Width = padded.Width;
+        OnboardingSpotlightRing.Height = padded.Height;
+        OnboardingSpotlightRing.Margin = new Thickness(padded.X, padded.Y, 0, 0);
+
+        PlaceOnboardingCard(padded, surface);
+    }
+
+    /// <summary>
+    /// Resolves a named control's rectangle in overlay coordinates.
+    /// </summary>
+    /// <remarks>
+    /// Returns null rather than a guess whenever the control is missing, collapsed, not yet
+    /// arranged, or lies outside the visible surface. Each of those would otherwise put a ring
+    /// somewhere the user cannot act, which is worse than no ring at all.
+    /// </remarks>
+    private Rect? ResolveOnboardingTargetRect(string? elementName, Rect surface)
+    {
+        if (string.IsNullOrWhiteSpace(elementName))
+        {
+            return null;
+        }
+
+        if (FindName(elementName) is not FrameworkElement element
+            || !element.IsVisible
+            || element.ActualWidth <= 0
+            || element.ActualHeight <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            GeneralTransform transform = element.TransformToVisual(OnboardingOverlay);
+            Rect bounds = transform.TransformBounds(
+                new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+
+            return surface.IntersectsWith(bounds) ? bounds : null;
+        }
+        catch (InvalidOperationException)
+        {
+            // Not connected to the same visual tree yet. No ring rather than a wrong one.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Keeps the card clear of what it is pointing at.
+    /// </summary>
+    private void PlaceOnboardingCard(Rect target, Rect surface)
+    {
+        OnboardingCard.HorizontalAlignment = System.Windows.HorizontalAlignment.Center;
+        OnboardingCard.VerticalAlignment = System.Windows.VerticalAlignment.Top;
+
+        double cardHeight = OnboardingCard.ActualHeight > 0 ? OnboardingCard.ActualHeight : 220;
+        const double Gap = 24;
+
+        double below = target.Bottom + Gap;
+        double above = target.Top - Gap - cardHeight;
+
+        // Below when it fits, above when it does not, and centred when neither does - a card
+        // that covers its own target explains nothing.
+        double top = below + cardHeight <= surface.Height
+            ? below
+            : above >= 0
+                ? above
+                : Math.Max(0, (surface.Height - cardHeight) / 2);
+
+        OnboardingCard.Margin = new Thickness(0, top, 0, 0);
     }
 
     private void OnOnboardingCompleted(object? sender, EventArgs e)
@@ -1811,6 +1961,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             _onboardingVm.StepCompleted -= OnOnboardingStepCompleted;
             _onboardingVm.Completed -= OnOnboardingCompleted;
+            _onboardingVm.PropertyChanged -= OnOnboardingPropertyChanged;
             _onboardingVm = null;
         }
     }
