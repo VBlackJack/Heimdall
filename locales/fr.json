@@ -4820,6 +4820,7 @@
   "ToolNetMapColOs": "SE",
   "ToolNetMapColDetails": "D\u00e9tails",
   "SessionDiagnosticLabelStage": "\u00c9tape",
+  "SessionPaneFailureDetailsHeader": "Détails du diagnostic",
   "SessionDiagnosticLabelCode": "Code",
   "SessionDiagnosticLabelDetail": "D\u00e9tail",
   "SessionFailureStageSshGateway": "Passerelle SSH",
