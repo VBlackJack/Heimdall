@@ -12,6 +12,39 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-26: The five first-contact blockers, closed
+
+A first-time user reported three more confusions, and a walk through the paths a newcomer takes
+turned up the rest. None of these was a bug: every surface did exactly what its code said. They
+were gaps between what a label promised and what the thing did, visible only to someone who did
+not already know the answer.
+
+- **One test control, beside the address, that names its own limit.** There were two buttons under
+  two labels, both inside credentials cards, and neither authenticated anything. A user read
+  "Test connection" as validating his password. It now says what it checks and, on every success,
+  what it did not. It covers every protocol with an address, so WinRM, Telnet, VNC and FTP gain a
+  test they never had. There is deliberately no credentials button: the only way to learn a
+  password is wrong is to submit it, and on SSH the stacked auth methods make one press two PAM
+  failures, so a mistyped password locks the account on the second click under a common policy.
+- **The Domain field says what to type.** Its watermark and tooltip both described what happens
+  when you leave it empty. It now carries a real example, plus a hint that survives the first
+  keystroke, and trims on save.
+- **The SSH username is marked required, where it actually is.** SFTP always; SSH only in Embedded
+  mode, because External hands off to PuTTY, which asks for the login name itself.
+- **The failure pane offers a way forward.** It had Reconnect and Close - "do it again" and "give
+  up". Edit profile and Copy error existed already, wired to the RDP overlay alone, which is the
+  surface a newcomer meets last.
+- **The welcome tour points instead of describing**, spotlighting the real control and navigating
+  before each step rather than after, in six steps drawn from where users were measured to
+  stumble. It can be replayed from Settings, so one reflex Escape no longer ends it for good.
+- **Project is gone from every reachable surface.** Measured, it was a colour label: not a tree
+  level, granting nothing at connect time, and creatable by no user action. Its one behavioural
+  effect was invisible - "Move to folder" silently listed only folders used by the same project.
+- **Text is wrapped instead of clipped.** A horizontal StackPanel measures its children at
+  infinite width, so wrapping text laid out past the visible edge and was cut. Eight characters
+  vanished from the middle of a failure message, silently. Four sites, including the title of
+  every message dialog.
+
 ## 2026-08-25: First contact, and gateways that stop lying
 
 The first person other than the author tried Heimdall and struggled with gateways. Everything

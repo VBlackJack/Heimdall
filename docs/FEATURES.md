@@ -194,7 +194,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Swap panes, toggle orientation (Ctrl+Shift+O), detach any pane to floating window
 - Unsplit restores panes as independent tabs with all metadata preserved
 - **Dedicated SplitService**: split/merge orchestration in a dedicated service with per-session cancellation tokens (deferred CTS dispose), CancellationToken propagated to all protocol handlers, centralized `CloseAllPanes` tab teardown
-- Per-pane disconnect overlay with Reconnect and Close buttons (accessible labels for screen readers)
+- Per-pane disconnect overlay with Reconnect, **Edit profile**, **Copy error** and Close (accessible labels for screen readers). Edit profile opens the stored profile that failed, and is hidden for ad-hoc sessions, which have none; Copy error puts the message, stage, code and detail on the clipboard
 - Pane-scoped failure disclosure for SSH and RDP with structured stage/code/detail diagnostics
 - Loading overlay with spinner during pane connection
 - **Minimum pane size enforcement**: 120×80px prevents splitter from collapsing panes to unusable size
@@ -236,7 +236,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Tabbed sidebar** (Sessions / Tools): full-height tool browser with collapsible categories, an always-present Favorites section, single-click launch, and right-click favorite management without accidental tool launch. Ctrl+Shift+T toggles the active sidebar tab
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
-- **First-launch onboarding**: 3-step guided introduction overlay with skip/next/get started
+- **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
 - Bilingual interface: English and French (6,054 i18n keys per language, exact EN/FR parity)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
