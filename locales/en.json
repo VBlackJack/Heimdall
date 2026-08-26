@@ -3164,7 +3164,7 @@
   "ServerDialogRdpTestTcpTimeout": "TCP connect timed out (host: {0}). The host may be off, unreachable, or the port may be blocked.",
   "ServerDialogRdpTestTcpFailed": "Could not connect to {0}: {1}",
   "ServerDialogRdpTestCancelled": "Test cancelled.",
-  "ServerDialogRdpUsernameHint": "Enter the Windows account in any of these formats: bare username, NetBIOS DOMAIN\\username, or UPN user@domain.com. A domain you include here is also read into the Domain field below; the username itself is kept whole.",
+  "ServerDialogRdpUsernameHint": "Enter the Windows account in any of these formats: bare username, NetBIOS DOMAIN\\username, or UPN user@domain.com. A domain included here is used when connecting; the username itself is kept whole.",
   "ServerDialogRdpUsernameWatermark": "username, DOMAIN\\username, or user@domain",
   "ServerDialogRdpDomainHint": "Explicit RDP domain. When set it takes precedence; leave empty to derive the domain from a DOMAIN\\user or user@domain username.",
   "ServerDialogRdpDomainWatermark": "CORP or corp.example.com",
