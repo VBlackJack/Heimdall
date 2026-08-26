@@ -494,8 +494,6 @@ public partial class ServerDialog : Window
         DlgSrv_ServerLabel.Text = _localizer["ServerDialogLabelServer"] + " *";
 
         // Project + Gateway routing (essential section)
-        DlgSrv_ProjectLabel.Text = _localizer["ServerDialogLabelProject"];
-        System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_ProjectCmb, DlgSrv_ProjectLabel);
         DlgSrv_GatewayRoutingTitle.Text = _localizer["ServerDialogGatewayRouting"];
         DlgSrv_GatewayRoutingDesc.Text = _localizer["ServerDialogGatewayRoutingDesc"];
         DlgSrv_DirectConnectCb.Content = _localizer["ServerDialogDirectConnect"];

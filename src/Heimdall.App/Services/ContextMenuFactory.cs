@@ -106,7 +106,6 @@ public sealed class ContextMenuFactory
             vm.ServerList.DuplicateServerCommand,
             server));
         menu.Items.Add(new Separator());
-        menu.Items.Add(CreateMoveToProjectMenu(vm, server));
         menu.Items.Add(CreateMoveToGroupMenu(vm, server));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem(
@@ -209,7 +208,6 @@ public sealed class ContextMenuFactory
             vm.ServerList.DuplicateSelectedCommand));
         menu.Items.Add(CreateBulkEditMenu(vm, bulkContext));
         menu.Items.Add(new Separator());
-        menu.Items.Add(CreateBulkMoveToProjectMenu(vm, bulkContext));
         menu.Items.Add(CreateBulkMoveToGroupMenu(vm, bulkContext));
         menu.Items.Add(new Separator());
 
@@ -395,7 +393,6 @@ public sealed class ContextMenuFactory
         menu.Items.Add(new Separator());
 
         // Move to Project / Group (tools can be organized just like servers)
-        menu.Items.Add(CreateMoveToProjectMenu(vm, tool));
         menu.Items.Add(CreateMoveToGroupMenu(vm, tool));
 
         menu.Items.Add(new Separator());
@@ -686,32 +683,6 @@ public sealed class ContextMenuFactory
     }
 
     /// <summary>
-    /// Builds the "Move to Project" submenu listing every registered project
-    /// (plus a "no project" entry) as a move target.
-    /// </summary>
-    private static MenuItem CreateMoveToProjectMenu(MainViewModel vm, ServerItemViewModel server)
-    {
-        var item = new MenuItem
-        {
-            Header = vm.Localize("TreeCtxMoveToProject")
-        };
-
-        foreach (var project in vm.ServerList.GetProjectTargets(includeNoProject: true))
-        {
-            var targetProjectId = string.IsNullOrWhiteSpace(project.Id) ? null : project.Id;
-            var child = CreateMenuItem(
-                project.Name,
-                vm.ServerList.MoveToProjectCommand,
-                new ServerMoveToProjectRequest(server, targetProjectId),
-                !string.Equals(server.ProjectId, project.Id, StringComparison.Ordinal));
-
-            item.Items.Add(child);
-        }
-
-        return item;
-    }
-
-    /// <summary>
     /// Builds the "Move to Group" submenu listing every existing group within
     /// the server's current project (plus a "no group" entry).
     /// </summary>
@@ -722,7 +693,7 @@ public sealed class ContextMenuFactory
             Header = vm.Localize("TreeCtxMoveToGroup")
         };
 
-        foreach (var group in vm.ServerList.GetGroupTargets(server.ProjectId, includeNoGroup: true))
+        foreach (var group in vm.ServerList.GetGroupTargets(includeNoGroup: true))
         {
             var targetGroupName = string.IsNullOrWhiteSpace(group.GroupName) ? null : group.GroupName;
             var child = CreateMenuItem(
@@ -734,43 +705,6 @@ public sealed class ContextMenuFactory
             item.Items.Add(child);
         }
 
-        return item;
-    }
-
-    /// <summary>
-    /// Builds the bulk "Move to Project" submenu from the full list of project
-    /// targets, disabling entries only when every selected item is already in the
-    /// requested project.
-    /// </summary>
-    private static MenuItem CreateBulkMoveToProjectMenu(
-        MainViewModel vm,
-        BulkSelectionContext bulkContext)
-    {
-        var item = new MenuItem
-        {
-            Header = vm.Localize("TreeCtxBulkMoveToProject")
-        };
-
-        var enabledChildren = 0;
-        foreach (var project in vm.ServerList.GetProjectTargets(includeNoProject: true))
-        {
-            var targetProjectId = string.IsNullOrWhiteSpace(project.Id) ? null : project.Id;
-            var isEnabled = vm.ServerList.IsBulkMoveProjectTargetEnabled(bulkContext.Items, targetProjectId);
-            if (isEnabled)
-            {
-                enabledChildren++;
-            }
-
-            var child = CreateMenuItem(
-                project.Name,
-                vm.ServerList.MoveSelectedToProjectCommand,
-                new BulkMoveToProjectRequest(targetProjectId),
-                isEnabled);
-
-            item.Items.Add(child);
-        }
-
-        item.IsEnabled = enabledChildren > 0;
         return item;
     }
 

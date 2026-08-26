@@ -330,7 +330,6 @@ public sealed partial class SessionCoordinatorPreMountTests
                 [
                     harness.Main.Localize("TreeCtxOpenToolInTab"),
                     "<separator>",
-                    harness.Main.Localize("TreeCtxMoveToProject"),
                     harness.Main.Localize("TreeCtxMoveToGroup"),
                     "<separator>",
                     harness.Main.Localize("TreeCtxRename"),
@@ -370,7 +369,6 @@ public sealed partial class SessionCoordinatorPreMountTests
                     harness.Main.Localize("TreeCtxEdit"),
                     harness.Main.Localize("TreeCtxDuplicate"),
                     "<separator>",
-                    harness.Main.Localize("TreeCtxMoveToProject"),
                     harness.Main.Localize("TreeCtxMoveToGroup"),
                     "<separator>",
                     harness.Main.Localize("TreeCtxCopyHostname"),

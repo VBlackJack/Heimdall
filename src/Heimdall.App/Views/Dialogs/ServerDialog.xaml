@@ -762,20 +762,6 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Project -->
-                                <Border Style="{StaticResource DialogSectionCardStyle}">
-                                    <StackPanel>
-                                        <TextBlock x:Name="DlgSrv_ProjectLabel" Style="{StaticResource LabelStyle}"/>
-                                        <ComboBox x:Name="DlgSrv_ProjectCmb" TabIndex="6"
-                                                  AutomationProperties.Name="{loc:Translate ServerDialogLabelProject}"
-                                                  ItemsSource="{Binding AvailableProjects}"
-                                                  SelectedValue="{Binding SelectedProjectId}"
-                                                  SelectedValuePath="Id"
-                                                  DisplayMemberPath="Name"
-                                                  Style="{StaticResource DialogFormComboBoxStyle}"/>
-                                    </StackPanel>
-                                </Border>
-
                                 <!-- ================================================================ -->
                                 <!-- AUTHENTICATION (always visible, per-protocol)                    -->
                                 <!-- ================================================================ -->

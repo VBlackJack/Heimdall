@@ -227,7 +227,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Configurable terminal font family and size
 - Settings panel with 6 left-navigation sub-tabs (General, Terminal, SSH & SFTP, RDP, Security, Advanced); the RDP sub-tab now exposes the previously hidden `RdpResolutionPresets` array as an editable multi-line list and the `RdpDialogAdvancedDefault` flag as a checkbox. The RDP and `SSH & SFTP` sub-tabs each group their options behind a segmented control - RDP into Display & Audio / Devices / Performance / Behavior, `SSH & SFTP` into Connection / Session / SFTP & X11 / Host keys / Gateways
 - Server Dialog: a two-step flow - protocol card selection, then a **four-tab editor** (General / Options / Network / Info) with a persistent protocol badge in the header, per-tab error badges, per-protocol tab visibility, and validation focus that jumps to the first invalid field across tabs. The window is freely resizable with native mouse-wheel scrolling. The RDP Options tab keeps a four-chip mini-toc (Display / Audio / Devices / Performance); its Display section offers a `Common resolutions` ComboBox to pre-fill Width/Height in Fixed mode and a dedicated `Enable multi-monitor` toggle
-- TreeView hierarchy: Project > Group > Server with category-colored tool icons and status dots
+- TreeView hierarchy: Folder > Server, with nested folders, category-colored tool icons and status dots
 - Command Palette (Ctrl+K): protocol icons, status dots, endpoint hints, Ctrl+Enter for split
 - Connection inheritance: group-level defaults for gateway, SSH username, key path
 - Empty states: tool views show guidance before first query, welcome panel with import CTA
