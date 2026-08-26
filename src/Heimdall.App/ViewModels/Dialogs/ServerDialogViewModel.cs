@@ -351,6 +351,8 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _sshAgentForwarding;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RequiresSshUsername))]
+    [NotifyPropertyChangedFor(nameof(SshUsernameLabel))]
     private string _sshMode = "Embedded";
 
     [ObservableProperty]
@@ -1057,6 +1059,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(ValidationError),
         nameof(DisplayNameError),
         nameof(RemoteServerError),
+        nameof(SshUsernameError),
         nameof(EndpointPortError),
         nameof(LocalPortError),
         nameof(AudioModeError),
@@ -1110,6 +1113,9 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     private string? _remoteServerError;
+
+    [ObservableProperty]
+    private string? _sshUsernameError;
 
     [ObservableProperty]
     private string? _endpointPortError;
@@ -1224,6 +1230,38 @@ public partial class ServerDialogViewModel : ObservableValidator
         : L("ServerDialogWinRmUseSslHint");
 
     public bool IsSshFamilyConnection => IsSshConnection || IsSftpConnection;
+
+    /// <summary>
+    /// Whether a blank login name makes this profile unable to connect.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors <c>ConnectionHelpers.RequiresUsernameToConnect</c> and the order of the guards
+    /// that consume it, so the asterisk states what the connect path actually enforces.
+    ///
+    /// SFTP: always. Its handler says so in as many words - it has no external launcher to fall
+    /// back on, so a blank login name is always fatal.
+    ///
+    /// SSH: only in Embedded mode. The External path hands off to PuTTY before the guard is ever
+    /// reached, and PuTTY asks for the login name itself; the plink fallback likewise tolerates a
+    /// key-only profile without one. Marking the field required there would put a false statement
+    /// on screen, which is the same defect class this change exists to remove.
+    /// </remarks>
+    public bool RequiresSshUsername =>
+        IsSftpConnection
+        || (IsSshConnection && !string.Equals(SshMode, "External", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The username label, carrying the required marker only when it is true.
+    /// </summary>
+    /// <remarks>
+    /// Computed rather than set in ApplyLocalization like its two unconditionally-required
+    /// siblings, for two reasons: the code-behind runs before DataContext exists, and this
+    /// marker has to appear and disappear as the user switches between Embedded and External
+    /// SSH. A static asterisk would be a false statement half the time.
+    /// </remarks>
+    public string SshUsernameLabel => RequiresSshUsername
+        ? L("ServerDialogLabelUsername") + " *"
+        : L("ServerDialogLabelUsername");
 
     public bool RequiresNetworkEndpoint =>
         !string.Equals(ConnectionType, "Local", StringComparison.OrdinalIgnoreCase)
@@ -1376,6 +1414,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         ClearErrors();
         DisplayNameError = null;
         RemoteServerError = null;
+        SshUsernameError = null;
         EndpointPortError = null;
         LocalPortError = null;
         AudioModeError = null;
@@ -1392,11 +1431,12 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     private void RefreshValidationSummary()
     {
-        ValidationError = DisplayNameError ?? RemoteServerError ?? EndpointPortError
+        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? EndpointPortError
             ?? LocalPortError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
+            + (SshUsernameError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
         NetworkTabErrorCount = LocalPortError is not null ? 1 : 0;
         OptionsTabErrorCount = (AudioModeError is not null ? 1 : 0)
@@ -1444,6 +1484,12 @@ public partial class ServerDialogViewModel : ObservableValidator
         // Per-field inline errors (localized, ConnectionType-aware)
         DisplayNameError = GetLocalizedFieldError(nameof(DisplayName));
         RemoteServerError = RequiresNetworkEndpoint ? GetLocalizedFieldError(nameof(RemoteServer)) : null;
+        // The key was already translated in both locales and referenced nowhere in src/,
+        // which is the marker of a half-shipped surface: the product knew what to say about
+        // this field and never said it.
+        SshUsernameError = RequiresSshUsername && string.IsNullOrWhiteSpace(SshUsername)
+            ? L("ValidationInlineSshUserRequired")
+            : null;
         EndpointPortError = RequiresNetworkEndpoint ? GetEndpointPortError() : null;
         LocalPortError = UsesGateway ? GetLocalizedFieldError(nameof(LocalPort)) : null;
 
@@ -1465,6 +1511,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         // Tab error counts
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
+            + (SshUsernameError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
         NetworkTabErrorCount = LocalPortError is not null ? 1 : 0;
         OptionsTabErrorCount = (AudioModeError is not null ? 1 : 0)
@@ -1486,7 +1533,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             : null;
 
         // Aggregate summary
-        ValidationError = DisplayNameError ?? RemoteServerError ?? EndpointPortError
+        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? EndpointPortError
             ?? LocalPortError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
     }
@@ -2097,6 +2144,19 @@ public partial class ServerDialogViewModel : ObservableValidator
         }
     }
 
+    partial void OnSshUsernameChanged(string value)
+    {
+        // Clear as the user fixes it, the way the server address already does. Without this
+        // the error would sit under a field that is no longer wrong until the next Save.
+        if (SshUsernameError is not null)
+        {
+            SshUsernameError = RequiresSshUsername && string.IsNullOrWhiteSpace(value)
+                ? L("ValidationInlineSshUserRequired")
+                : null;
+            RefreshValidationSummary();
+        }
+    }
+
     partial void OnRemoteServerChanged(string value)
     {
         if (RemoteServerError is not null)
@@ -2273,6 +2333,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(WinRmUseSslHelpText));
         OnPropertyChanged(nameof(IsLocalConnection));
         OnPropertyChanged(nameof(IsSshFamilyConnection));
+        OnPropertyChanged(nameof(RequiresSshUsername));
+        OnPropertyChanged(nameof(SshUsernameLabel));
         OnPropertyChanged(nameof(SupportsReachabilityTest));
         TestReachabilityCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SupportsGateway));

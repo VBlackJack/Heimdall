@@ -892,13 +892,16 @@
                                                    Text="{loc:Translate ServerDialogSshCredentialsDesc}"
                                                    Style="{StaticResource DialogSectionDescriptionStyle}"/>
                                         <TextBlock x:Name="DlgSrv_BasicSshUsernameLabel"
-                                                   Text="{loc:Translate ServerDialogLabelUsername}"
+                                                   Text="{Binding SshUsernameLabel}"
                                                    Style="{StaticResource LabelStyle}"
                                                    Margin="0,14,0,4"/>
                                         <TextBox x:Name="DlgSrv_BasicSshUsernameBox" TabIndex="10"
-                                                 AutomationProperties.Name="{loc:Translate ServerDialogLabelUsername}"
+                                                 AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicSshUsernameLabel}"
                                                  Text="{Binding SshUsername, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                        <TextBlock Text="{Binding SshUsernameError}"
+                                                   Style="{StaticResource FieldValidationErrorStyle}"
+                                                   Visibility="{Binding SshUsernameError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                         <TextBlock x:Name="DlgSrv_BasicSshKeyLabel"
                                                    Text="{loc:Translate ServerDialogLabelSshKey}"
                                                    Style="{StaticResource LabelStyle}"
