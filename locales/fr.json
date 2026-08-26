@@ -2290,6 +2290,9 @@
   "ScheduledEmptyAddButton": "Cr\u00e9er une t\u00e2che",
 
   "SettingsSectionAppearance": "Apparence",
+  "SettingsSectionOnboarding": "Visite guidée",
+  "SettingsOnboardingReplayButton": "Revoir la visite",
+  "SettingsOnboardingReplayHint": "Rejoue la courte introduction affichée au premier lancement. Vous pouvez la quitter à tout moment et revenir ici.",
   "SettingsLabelLanguage": "Langue",
   "SettingsLabelTheme": "Th\u00e8me",
   "ThemeDracula": "Dracula",

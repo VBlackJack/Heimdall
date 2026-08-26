@@ -2160,6 +2160,33 @@
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                <!-- Replaying the tour is the only way back into it. One reflex
+                                     Escape used to end it permanently: Skip and Escape both call
+                                     CompleteAsync, which persists OnboardingCompleted, and that
+                                     flag had exactly one reader - the first-launch check. Nothing
+                                     anywhere offered to show it again. -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsOnboardingTitle"
+                                                   Text="{loc:Translate SettingsSectionOnboarding}"
+                                                   FontSize="{StaticResource FontSizeSubtitle}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   Margin="0,0,0,8"/>
+                                        <TextBlock Text="{loc:Translate SettingsOnboardingReplayHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12"/>
+                                        <Button x:Name="Mw_SettingsReplayOnboardingBtn"
+                                                HorizontalAlignment="Left"
+                                                MinWidth="180"
+                                                Content="{loc:Translate SettingsOnboardingReplayButton}"
+                                                Command="{Binding Settings.ReplayOnboardingCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                AutomationProperties.Name="{loc:Translate SettingsOnboardingReplayButton}"
+                                                AutomationProperties.HelpText="{loc:Translate SettingsOnboardingReplayHint}"/>
+                                    </StackPanel>
+                                </Border>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>

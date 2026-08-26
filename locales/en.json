@@ -2290,6 +2290,9 @@
   "ScheduledEmptyAddButton": "Create Task",
 
   "SettingsSectionAppearance": "Appearance",
+  "SettingsSectionOnboarding": "Welcome tour",
+  "SettingsOnboardingReplayButton": "Show the tour again",
+  "SettingsOnboardingReplayHint": "Replays the short introduction shown on first launch. You can leave it at any time and come back here.",
   "SettingsLabelLanguage": "Language",
   "SettingsLabelTheme": "Theme",
   "ThemeDracula": "Dracula",

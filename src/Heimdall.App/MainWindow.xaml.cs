@@ -271,6 +271,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 ShowOnboardingOverlay(viewModel.CurrentSettings);
             }
 
+            // And on demand afterwards. The settings panel asks rather than shows, because the
+            // overlay belongs to the shell. Re-reading the settings at that moment rather than
+            // capturing them here matters: the user may have changed the locale, imported a
+            // configuration, or completed the tour since startup.
+            viewModel.Settings.ReplayOnboardingRequested += () =>
+            {
+                if (viewModel.CurrentSettings is { } current)
+                {
+                    ShowOnboardingOverlay(current);
+                }
+            };
+
             // Reports a previous update attempt that did not apply. A sibling of the
             // startup check rather than a step inside it: that check returns early when
             // updates are disabled and again inside its throttle window, which is exactly
