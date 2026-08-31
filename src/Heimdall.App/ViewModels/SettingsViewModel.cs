@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -31,6 +32,7 @@ using Heimdall.App.ViewModels.Settings;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Rdp;
 using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Updates;
@@ -151,6 +153,21 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [Range(1, 20, ErrorMessage = "Max embedded sessions must be between 1 and 20.")]
     private int _maxEmbeddedSessions = 10;
 
+    /// <summary>Text of the field that edits <see cref="MaxEmbeddedSessions"/>.</summary>
+    /// <remarks>
+    /// The field on screen binds to this text, not to the number. Bound to the number, a text that
+    /// does not convert was dropped by the binding before any setter ran, so the save guard, the
+    /// validation banner and the tab badge never learned the user had typed anything: the save was
+    /// reported as done while the old number was still what got written.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _maxEmbeddedSessionsText = string.Empty;
+
+    partial void OnMaxEmbeddedSessionsTextChanged(string value)
+        => CommitNumericText(value, parsed => MaxEmbeddedSessions = parsed);
+
     [ObservableProperty]
     private bool _preventSleepDuringSession = true;
 
@@ -173,6 +190,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [NotifyDataErrorInfo]
     [Range(1, 8760, ErrorMessage = "Update check interval must be between 1 and 8760 hours.")]
     private int _updateCheckIntervalHours = 24;
+
+    /// <summary>Text of the field that edits <see cref="UpdateCheckIntervalHours"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _updateCheckIntervalHoursText = string.Empty;
+
+    partial void OnUpdateCheckIntervalHoursTextChanged(string value)
+        => CommitNumericText(value, parsed => UpdateCheckIntervalHours = parsed);
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CheckNowCommand))]
@@ -211,6 +237,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [Range(8, 72, ErrorMessage = "Terminal font size must be between 8 and 72.")]
     private int _terminalFontSize = 14;
 
+    /// <summary>Text of the field that edits <see cref="TerminalFontSize"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _terminalFontSizeText = string.Empty;
+
+    partial void OnTerminalFontSizeTextChanged(string value)
+        => CommitNumericText(value, parsed => TerminalFontSize = parsed);
+
     [ObservableProperty]
     private string _terminalColorScheme = "Dracula";
 
@@ -236,10 +271,28 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [Range(0, 3600, ErrorMessage = "Anti-idle interval must be between 0 and 3600 seconds.")]
     private int _antiIdleInterval = 60;
 
+    /// <summary>Text of the field that edits <see cref="AntiIdleInterval"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _antiIdleIntervalText = string.Empty;
+
+    partial void OnAntiIdleIntervalTextChanged(string value)
+        => CommitNumericText(value, parsed => AntiIdleInterval = parsed);
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(0, 3600, ErrorMessage = "SSH TMOUT reset interval must be between 0 and 3600 seconds.")]
     private int _sshTmoutResetInterval = 240;
+
+    /// <summary>Text of the field that edits <see cref="SshTmoutResetInterval"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sshTmoutResetIntervalText = string.Empty;
+
+    partial void OnSshTmoutResetIntervalTextChanged(string value)
+        => CommitNumericText(value, parsed => SshTmoutResetInterval = parsed);
 
     [ObservableProperty]
     private bool _sshAutoReconnect;
@@ -248,6 +301,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [NotifyDataErrorInfo]
     [Range(1, 10, ErrorMessage = "SSH auto-reconnect attempts must be between 1 and 10.")]
     private int _sshAutoReconnectAttempts = 3;
+
+    /// <summary>Text of the field that edits <see cref="SshAutoReconnectAttempts"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sshAutoReconnectAttemptsText = string.Empty;
+
+    partial void OnSshAutoReconnectAttemptsTextChanged(string value)
+        => CommitNumericText(value, parsed => SshAutoReconnectAttempts = parsed);
 
     [ObservableProperty]
     private bool _sftpBrowserEnabled = true;
@@ -300,11 +362,37 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     // --- RDP defaults ---
 
+    // The bounds are the ones SchemaValidator already enforces on these two settings. A width this
+    // screen accepted and the schema refused would be written here and rejected on the next load.
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(RdpDisplayLimits.MinimumSessionResolution, RdpDisplayLimits.MaximumSessionResolution,
+        ErrorMessage = RdpDisplayLimits.DefaultResolutionWidthRangeMessage)]
     private int _defaultResolutionWidth = 1920;
 
+    /// <summary>Text of the field that edits <see cref="DefaultResolutionWidth"/>.</summary>
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _defaultResolutionWidthText = string.Empty;
+
+    partial void OnDefaultResolutionWidthTextChanged(string value)
+        => CommitNumericText(value, parsed => DefaultResolutionWidth = parsed);
+
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(RdpDisplayLimits.MinimumSessionResolution, RdpDisplayLimits.MaximumSessionResolution,
+        ErrorMessage = RdpDisplayLimits.DefaultResolutionHeightRangeMessage)]
     private int _defaultResolutionHeight = 1080;
+
+    /// <summary>Text of the field that edits <see cref="DefaultResolutionHeight"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _defaultResolutionHeightText = string.Empty;
+
+    partial void OnDefaultResolutionHeightTextChanged(string value)
+        => CommitNumericText(value, parsed => DefaultResolutionHeight = parsed);
 
     [ObservableProperty]
     private string _rdpDefaultMode = "Embedded";
@@ -515,11 +603,37 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _requireWindowsHelloOnConnect;
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(0, 1440, ErrorMessage = "Windows Hello grace period must be between 0 and 1440 minutes.")]
     private int _windowsHelloGraceMinutes = AppSettings.DefaultWindowsHelloGraceMinutes;
 
-    /// <summary>Idle auto-lock threshold (minutes) for the vault workspace; 0 disables it.</summary>
+    /// <summary>Text of the field that edits <see cref="WindowsHelloGraceMinutes"/>.</summary>
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _windowsHelloGraceMinutesText = string.Empty;
+
+    partial void OnWindowsHelloGraceMinutesTextChanged(string value)
+        => CommitNumericText(value, parsed => WindowsHelloGraceMinutes = parsed);
+
+    /// <summary>Idle auto-lock threshold (minutes) for the vault workspace; 0 disables it.</summary>
+    /// <remarks>
+    /// Bounded because it is a security control the user cannot verify by looking: a threshold that
+    /// never reached the setting leaves the workspace unlocked exactly as if none had been asked for.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Range(0, 1440, ErrorMessage = "Idle auto-lock threshold must be between 0 and 1440 minutes.")]
     private int _autoLockIdleMinutes;
+
+    /// <summary>Text of the field that edits <see cref="AutoLockIdleMinutes"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _autoLockIdleMinutesText = string.Empty;
+
+    partial void OnAutoLockIdleMinutesTextChanged(string value)
+        => CommitNumericText(value, parsed => AutoLockIdleMinutes = parsed);
 
     /// <summary>Whether locking the workspace also disconnects active sessions (D3).</summary>
     [ObservableProperty]
@@ -611,40 +725,112 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [Range(0, 30000, ErrorMessage = "Tunnel establishment delay must be between 0 and 30000 ms.")]
     private int _tunnelEstablishmentDelayMs = 2500;
 
+    /// <summary>Text of the field that edits <see cref="TunnelEstablishmentDelayMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _tunnelEstablishmentDelayMsText = string.Empty;
+
+    partial void OnTunnelEstablishmentDelayMsTextChanged(string value)
+        => CommitNumericText(value, parsed => TunnelEstablishmentDelayMs = parsed);
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [CustomValidation(typeof(SettingsViewModel), nameof(ValidateRdpConnectWatchdogTimeoutMsValue))]
     private int _rdpConnectWatchdogTimeoutMs = 45000;
+
+    /// <summary>Text of the field that edits <see cref="RdpConnectWatchdogTimeoutMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpConnectWatchdogTimeoutMsText = string.Empty;
+
+    partial void OnRdpConnectWatchdogTimeoutMsTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpConnectWatchdogTimeoutMs = parsed);
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(5000, 600000, ErrorMessage = "External tool timeout must be between 5000 and 600000 ms.")]
     private int _externalToolTimeoutMs = 60000;
 
+    /// <summary>Text of the field that edits <see cref="ExternalToolTimeoutMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _externalToolTimeoutMsText = string.Empty;
+
+    partial void OnExternalToolTimeoutMsTextChanged(string value)
+        => CommitNumericText(value, parsed => ExternalToolTimeoutMs = parsed);
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [CustomValidation(typeof(SettingsViewModel), nameof(ValidateRdpResizeEnableDelayMsValue))]
     private int _rdpResizeEnableDelayMs = 10000;
+
+    /// <summary>Text of the field that edits <see cref="RdpResizeEnableDelayMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpResizeEnableDelayMsText = string.Empty;
+
+    partial void OnRdpResizeEnableDelayMsTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpResizeEnableDelayMs = parsed);
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(1000, 60000, ErrorMessage = "RDP artifact cleanup delay must be between 1000 and 60000 ms.")]
     private int _rdpArtifactCleanupDelayMs = 10000;
 
+    /// <summary>Text of the field that edits <see cref="RdpArtifactCleanupDelayMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpArtifactCleanupDelayMsText = string.Empty;
+
+    partial void OnRdpArtifactCleanupDelayMsTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpArtifactCleanupDelayMs = parsed);
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(5000, 300000, ErrorMessage = "RDP credential autofill timeout must be between 5000 and 300000 ms.")]
     private int _rdpCredentialAutofillTimeoutMs = 90000;
+
+    /// <summary>Text of the field that edits <see cref="RdpCredentialAutofillTimeoutMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpCredentialAutofillTimeoutMsText = string.Empty;
+
+    partial void OnRdpCredentialAutofillTimeoutMsTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpCredentialAutofillTimeoutMs = parsed);
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(1, AppSettings.DefaultRdpAutoReconnectMaxAttempts, ErrorMessage = "RDP auto-reconnect maximum attempts must be between 1 and 20.")]
     private int _rdpAutoReconnectMaxAttempts = AppSettings.DefaultRdpAutoReconnectMaxAttempts;
 
+    /// <summary>Text of the field that edits <see cref="RdpAutoReconnectMaxAttempts"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpAutoReconnectMaxAttemptsText = string.Empty;
+
+    partial void OnRdpAutoReconnectMaxAttemptsTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpAutoReconnectMaxAttempts = parsed);
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(5000, 300000, ErrorMessage = "RDP keep-alive interval must be between 5000 and 300000 ms.")]
     private int _rdpKeepAliveIntervalMs = 60000;
+
+    /// <summary>Text of the field that edits <see cref="RdpKeepAliveIntervalMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpKeepAliveIntervalMsText = string.Empty;
+
+    partial void OnRdpKeepAliveIntervalMsTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpKeepAliveIntervalMs = parsed);
 
     // --- Session Health Monitor ---
 
@@ -656,15 +842,42 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [Range(15, 3600, ErrorMessage = "Health check interval must be between 15 and 3600 seconds.")]
     private int _sessionHealthCheckIntervalSeconds = 60;
 
+    /// <summary>Text of the field that edits <see cref="SessionHealthCheckIntervalSeconds"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sessionHealthCheckIntervalSecondsText = string.Empty;
+
+    partial void OnSessionHealthCheckIntervalSecondsTextChanged(string value)
+        => CommitNumericText(value, parsed => SessionHealthCheckIntervalSeconds = parsed);
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(250, 30000, ErrorMessage = "Probe timeout must be between 250 and 30000 ms.")]
     private int _sessionHealthProbeTimeoutMs = 2000;
 
+    /// <summary>Text of the field that edits <see cref="SessionHealthProbeTimeoutMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sessionHealthProbeTimeoutMsText = string.Empty;
+
+    partial void OnSessionHealthProbeTimeoutMsTextChanged(string value)
+        => CommitNumericText(value, parsed => SessionHealthProbeTimeoutMs = parsed);
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(1, 50, ErrorMessage = "Max concurrent probes must be between 1 and 50.")]
     private int _sessionHealthMaxConcurrent = 10;
+
+    /// <summary>Text of the field that edits <see cref="SessionHealthMaxConcurrent"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sessionHealthMaxConcurrentText = string.Empty;
+
+    partial void OnSessionHealthMaxConcurrentTextChanged(string value)
+        => CommitNumericText(value, parsed => SessionHealthMaxConcurrent = parsed);
 
     // --- Collections ---
 
@@ -750,6 +963,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _profileImportService = profileImportService;
         _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
         TrustedHostKeys = trustedHostKeys;
+
+        // A view model that is constructed and never loaded still has to show its numbers.
+        SyncNumericTexts();
+        IsDirty = false;
     }
 
     private bool CanCheckNow() => !IsCheckingUpdate && !IsInstallingUpdate;
@@ -1133,8 +1350,44 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _deletedProjectIds.Clear();
         _deletedGatewayIds.Clear();
 
+        SyncNumericTexts();
+
         TrustedHostKeys.Refresh();
         IsDirty = false;
+    }
+
+    /// <summary>
+    /// Seeds the text of every number field from the number that field edits.
+    /// </summary>
+    /// <remarks>
+    /// There is no handler going the other way. Rewriting a box from its number on every change
+    /// would move the caret while the user is still typing, so the text follows the number only
+    /// where the number is assigned from outside the fields: the load, which the factory reset
+    /// routes through, and the constructor.
+    /// </remarks>
+    private void SyncNumericTexts()
+    {
+        MaxEmbeddedSessionsText = MaxEmbeddedSessions.ToString(CultureInfo.InvariantCulture);
+        UpdateCheckIntervalHoursText = UpdateCheckIntervalHours.ToString(CultureInfo.InvariantCulture);
+        TerminalFontSizeText = TerminalFontSize.ToString(CultureInfo.InvariantCulture);
+        AntiIdleIntervalText = AntiIdleInterval.ToString(CultureInfo.InvariantCulture);
+        SshTmoutResetIntervalText = SshTmoutResetInterval.ToString(CultureInfo.InvariantCulture);
+        SshAutoReconnectAttemptsText = SshAutoReconnectAttempts.ToString(CultureInfo.InvariantCulture);
+        TunnelEstablishmentDelayMsText = TunnelEstablishmentDelayMs.ToString(CultureInfo.InvariantCulture);
+        RdpConnectWatchdogTimeoutMsText = RdpConnectWatchdogTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        ExternalToolTimeoutMsText = ExternalToolTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        RdpResizeEnableDelayMsText = RdpResizeEnableDelayMs.ToString(CultureInfo.InvariantCulture);
+        RdpArtifactCleanupDelayMsText = RdpArtifactCleanupDelayMs.ToString(CultureInfo.InvariantCulture);
+        RdpCredentialAutofillTimeoutMsText = RdpCredentialAutofillTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        RdpAutoReconnectMaxAttemptsText = RdpAutoReconnectMaxAttempts.ToString(CultureInfo.InvariantCulture);
+        RdpKeepAliveIntervalMsText = RdpKeepAliveIntervalMs.ToString(CultureInfo.InvariantCulture);
+        SessionHealthCheckIntervalSecondsText = SessionHealthCheckIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+        SessionHealthProbeTimeoutMsText = SessionHealthProbeTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        SessionHealthMaxConcurrentText = SessionHealthMaxConcurrent.ToString(CultureInfo.InvariantCulture);
+        DefaultResolutionWidthText = DefaultResolutionWidth.ToString(CultureInfo.InvariantCulture);
+        DefaultResolutionHeightText = DefaultResolutionHeight.ToString(CultureInfo.InvariantCulture);
+        WindowsHelloGraceMinutesText = WindowsHelloGraceMinutes.ToString(CultureInfo.InvariantCulture);
+        AutoLockIdleMinutesText = AutoLockIdleMinutes.ToString(CultureInfo.InvariantCulture);
     }
 
     [RelayCommand]
@@ -1535,6 +1788,25 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpDialogAdvancedDefault = defaults.RdpDialogAdvancedDefault;
         RdpResolutionPresets = defaults.RdpResolutionPresets;
         RdpConnectWatchdogTimeoutMs = defaults.RdpConnectWatchdogTimeoutMs;
+
+        // The factory reset routes through LoadFromSettings, which reseeds every box. This one does
+        // not, and the boxes are bound to the text: without the line below they would go on showing
+        // the values being reset away from, Save would write numbers the screen never displayed, and
+        // the next keystroke in any of them would commit that stale text back over the default.
+        SyncRdpDefaultNumericTexts();
+    }
+
+    /// <summary>Seeds the text of every number field <see cref="ApplyRdpDefaults"/> assigns.</summary>
+    private void SyncRdpDefaultNumericTexts()
+    {
+        DefaultResolutionWidthText = DefaultResolutionWidth.ToString(CultureInfo.InvariantCulture);
+        DefaultResolutionHeightText = DefaultResolutionHeight.ToString(CultureInfo.InvariantCulture);
+        RdpResizeEnableDelayMsText = RdpResizeEnableDelayMs.ToString(CultureInfo.InvariantCulture);
+        RdpArtifactCleanupDelayMsText = RdpArtifactCleanupDelayMs.ToString(CultureInfo.InvariantCulture);
+        RdpCredentialAutofillTimeoutMsText = RdpCredentialAutofillTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        RdpAutoReconnectMaxAttemptsText = RdpAutoReconnectMaxAttempts.ToString(CultureInfo.InvariantCulture);
+        RdpKeepAliveIntervalMsText = RdpKeepAliveIntervalMs.ToString(CultureInfo.InvariantCulture);
+        RdpConnectWatchdogTimeoutMsText = RdpConnectWatchdogTimeoutMs.ToString(CultureInfo.InvariantCulture);
     }
 
     [RelayCommand]
@@ -2734,7 +3006,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             or nameof(TerminalTabErrorCount) or nameof(HasTerminalTabErrors)
             or nameof(SshTabErrorCount) or nameof(HasSshTabErrors)
             or nameof(AdvancedTabErrorCount) or nameof(HasAdvancedTabErrors)
-            or nameof(RdpTabErrorCount) or nameof(HasRdpTabErrors)))
+            or nameof(RdpTabErrorCount) or nameof(HasRdpTabErrors)
+            or nameof(SecurityTabErrorCount) or nameof(HasSecurityTabErrors)))
         {
             IsDirty = true;
         }
@@ -2761,6 +3034,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private int _rdpTabErrorCount;
 
+    [ObservableProperty]
+    private int _securityTabErrorCount;
+
     public bool HasGeneralTabErrors => GeneralTabErrorCount > 0;
 
     public bool HasTerminalTabErrors => TerminalTabErrorCount > 0;
@@ -2771,6 +3047,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     public bool HasRdpTabErrors => RdpTabErrorCount > 0;
 
+    public bool HasSecurityTabErrors => SecurityTabErrorCount > 0;
+
     partial void OnGeneralTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasGeneralTabErrors));
 
     partial void OnTerminalTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasTerminalTabErrors));
@@ -2778,6 +3056,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnSshTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasSshTabErrors));
 
     partial void OnAdvancedTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasAdvancedTabErrors));
+
+    // The badge shows on Has<Tab>TabErrors, which is computed and so says nothing unless the count
+    // that feeds it announces the change. The RDP badge had the count and not this line, so it
+    // stayed hidden no matter how many errors its tab held.
+    partial void OnRdpTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasRdpTabErrors));
+
+    partial void OnSecurityTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasSecurityTabErrors));
 
     /// <summary>
     /// Validates the global RDP resize lockout delay while preserving zero as the explicit disable value.
@@ -2833,8 +3118,64 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             "RDP connection watchdog timeout must be zero or between 5000 and 600000 ms.");
     }
 
+    /// <summary>
+    /// Validates the text of a settings field that edits a whole number.
+    /// </summary>
+    /// <param name="value">The text currently in the field.</param>
+    /// <param name="context">The validation context supplied by the data annotations pipeline.</param>
+    /// <returns>A validation error when the text is not a whole number.</returns>
+    /// <remarks>
+    /// The bounds are deliberately not checked here. The number the text commits to keeps its own
+    /// range attribute and its own translated message, so a value that is merely out of range still
+    /// names the bound it missed instead of being reported as not a number at all.
+    /// </remarks>
+    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateWholeNumberText(
+        string? value,
+        ValidationContext context)
+    {
+        _ = context;
+
+        if (TryParseWholeNumber(value, out _))
+        {
+            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
+        }
+
+        return new System.ComponentModel.DataAnnotations.ValidationResult(
+            "This setting must be a whole number.");
+    }
+
+    /// <summary>Parses the text of a settings field that edits a whole number.</summary>
+    /// <remarks>
+    /// <see cref="NumberStyles.Integer"/> against the invariant culture is what the binding's own
+    /// Int32 converter accepted before the fields were bound to text: a sign and surrounding space,
+    /// no group separators. Nothing the fields took then is refused now.
+    /// </remarks>
+    private static bool TryParseWholeNumber(string? text, out int value) =>
+        int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+
+    /// <summary>
+    /// Assigns the number a field's text commits to, and leaves the number alone when the text is
+    /// not one.
+    /// </summary>
+    /// <remarks>
+    /// Holding the last good number is half of keeping the two error channels apart, and only half:
+    /// the last good number can itself be out of range, because the box commits on every keystroke
+    /// and "24h" reaches this method as "24" on the way in. What makes a field raise one error
+    /// rather than two is <see cref="GetLocalizedFieldError"/>, which holds the number's error back
+    /// while the text does not parse.
+    /// </remarks>
+    private static void CommitNumericText(string? text, Action<int> assign)
+    {
+        if (TryParseWholeNumber(text, out int value))
+        {
+            assign(value);
+        }
+    }
+
     private static readonly Dictionary<string, string> SettingsValidationKeyMap = new(StringComparer.Ordinal)
     {
+        // Not per-field: every number field raises this one when its text is not a number at all.
+        ["This setting must be a whole number."] = "ValidationSettingsWholeNumber",
         ["Max embedded sessions must be between 1 and 20."] = "ValidationSettingsMaxSessions",
         ["Update check interval must be between 1 and 8760 hours."] = "ValidationSettingsUpdateCheckInterval",
         ["RDP keep-alive interval must be between 5000 and 300000 ms."] = "ValidationSettingsRdpKeepAlive",
@@ -2848,6 +3189,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ["RDP artifact cleanup delay must be between 1000 and 60000 ms."] = "ValidationSettingsRdpArtifactCleanupDelay",
         ["RDP credential autofill timeout must be between 5000 and 300000 ms."] = "ValidationSettingsRdpCredentialAutofillTimeout",
         ["RDP auto-reconnect maximum attempts must be between 1 and 20."] = "ValidationSettingsRdpAutoReconnectMaxAttempts",
+        [RdpDisplayLimits.DefaultResolutionWidthRangeMessage] = "ValidationSettingsRdpWidth",
+        [RdpDisplayLimits.DefaultResolutionHeightRangeMessage] = "ValidationSettingsRdpHeight",
+        ["Windows Hello grace period must be between 0 and 1440 minutes."] = "ValidationSettingsWindowsHelloGrace",
+        ["Idle auto-lock threshold must be between 0 and 1440 minutes."] = "ValidationSettingsAutoLockIdle",
         ["External tool timeout must be between 5000 and 600000 ms."] = "ValidationSettingsExtToolTimeout",
         ["Health check interval must be between 15 and 3600 seconds."] = "ValidationSettingsHealthCheckInterval",
         ["Probe timeout must be between 250 and 30000 ms."] = "ValidationSettingsHealthProbeTimeout",
@@ -2857,29 +3202,41 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private static readonly string[] GeneralValidatedSettingPropertyNames =
     [
         nameof(MaxEmbeddedSessions),
+        nameof(MaxEmbeddedSessionsText),
         nameof(UpdateCheckIntervalHours),
+        nameof(UpdateCheckIntervalHoursText),
     ];
 
     private static readonly string[] TerminalValidatedSettingPropertyNames =
     [
         nameof(TerminalFontSize),
+        nameof(TerminalFontSizeText),
     ];
 
     private static readonly string[] SshValidatedSettingPropertyNames =
     [
         nameof(AntiIdleInterval),
+        nameof(AntiIdleIntervalText),
         nameof(SshTmoutResetInterval),
+        nameof(SshTmoutResetIntervalText),
         nameof(SshAutoReconnectAttempts),
+        nameof(SshAutoReconnectAttemptsText),
     ];
 
     private static readonly string[] AdvancedValidatedSettingPropertyNames =
     [
         nameof(TunnelEstablishmentDelayMs),
+        nameof(TunnelEstablishmentDelayMsText),
         nameof(RdpConnectWatchdogTimeoutMs),
+        nameof(RdpConnectWatchdogTimeoutMsText),
         nameof(ExternalToolTimeoutMs),
+        nameof(ExternalToolTimeoutMsText),
         nameof(SessionHealthCheckIntervalSeconds),
+        nameof(SessionHealthCheckIntervalSecondsText),
         nameof(SessionHealthProbeTimeoutMs),
+        nameof(SessionHealthProbeTimeoutMsText),
         nameof(SessionHealthMaxConcurrent),
+        nameof(SessionHealthMaxConcurrentText),
     ];
 
     /// <summary>
@@ -2894,14 +3251,92 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private static readonly string[] RdpValidatedSettingPropertyNames =
     [
         nameof(RdpResizeEnableDelayMs),
+        nameof(RdpResizeEnableDelayMsText),
         nameof(RdpArtifactCleanupDelayMs),
+        nameof(RdpArtifactCleanupDelayMsText),
         nameof(RdpCredentialAutofillTimeoutMs),
+        nameof(RdpCredentialAutofillTimeoutMsText),
         nameof(RdpAutoReconnectMaxAttempts),
+        nameof(RdpAutoReconnectMaxAttemptsText),
         nameof(RdpKeepAliveIntervalMs),
+        nameof(RdpKeepAliveIntervalMsText),
+        nameof(DefaultResolutionWidth),
+        nameof(DefaultResolutionWidthText),
+        nameof(DefaultResolutionHeight),
+        nameof(DefaultResolutionHeightText),
     ];
 
+    /// <summary>
+    /// The validated settings whose fields live on the Security tab.
+    /// </summary>
+    /// <remarks>
+    /// This tab had no badge because nothing on it validated. Both of its number fields were bound
+    /// straight to their int, so a text that did not convert was dropped before any setter ran and
+    /// nothing anywhere recorded it. On an idle auto-lock threshold that is a security timeout the
+    /// user believes is set and is not.
+    /// </remarks>
+    private static readonly string[] SecurityValidatedSettingPropertyNames =
+    [
+        nameof(WindowsHelloGraceMinutes),
+        nameof(WindowsHelloGraceMinutesText),
+        nameof(AutoLockIdleMinutes),
+        nameof(AutoLockIdleMinutesText),
+    ];
+
+    private static readonly string[][] AllValidatedSettingPropertyNames =
+    [
+        GeneralValidatedSettingPropertyNames,
+        TerminalValidatedSettingPropertyNames,
+        SshValidatedSettingPropertyNames,
+        RdpValidatedSettingPropertyNames,
+        SecurityValidatedSettingPropertyNames,
+        AdvancedValidatedSettingPropertyNames,
+    ];
+
+    /// <summary>The numbers a field edits through its text, read off the badge arrays above.</summary>
+    /// <remarks>
+    /// Derived rather than written out again: a third list of the same fields is a third place to
+    /// forget one, and a field forgotten in a list of exactly these fields is what the badge defect
+    /// was.
+    /// </remarks>
+    private static readonly HashSet<string> NumbersEditedThroughText = BuildNumbersEditedThroughText();
+
+    private static HashSet<string> BuildNumbersEditedThroughText()
+    {
+        const string suffix = "Text";
+        HashSet<string> numbers = new(StringComparer.Ordinal);
+
+        foreach (string[] tab in AllValidatedSettingPropertyNames)
+        {
+            foreach (string name in tab)
+            {
+                if (name.EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    numbers.Add(name[..^suffix.Length]);
+                }
+            }
+        }
+
+        return numbers;
+    }
+
+    /// <summary>The localized error to report for one property, or null when it has none to report.</summary>
+    /// <remarks>
+    /// A field is a number plus the text that edits it, and the text is what the user is looking at.
+    /// Committing on every keystroke, "24h" typed into a field bounded at 20 passes through "24":
+    /// the number takes it and latches its range error, then the text stops parsing while that error
+    /// stays behind. Reported as well, one field counts as two errors and the banner names a bound
+    /// the box does not show. So while the text does not parse, the number's error waits for it. The
+    /// save is refused either way - that guard reads HasErrors, which still sees both.
+    /// </remarks>
     private string? GetLocalizedFieldError(string propertyName)
     {
+        if (NumbersEditedThroughText.Contains(propertyName)
+            && GetErrors(propertyName + "Text").Any())
+        {
+            return null;
+        }
+
         var error = GetErrors(propertyName)
             .OfType<System.ComponentModel.DataAnnotations.ValidationResult>()
             .FirstOrDefault();
@@ -2923,11 +3358,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SshTabErrorCount = CountValidationErrors(SshValidatedSettingPropertyNames);
         AdvancedTabErrorCount = CountValidationErrors(AdvancedValidatedSettingPropertyNames);
         RdpTabErrorCount = CountValidationErrors(RdpValidatedSettingPropertyNames);
+        SecurityTabErrorCount = CountValidationErrors(SecurityValidatedSettingPropertyNames);
 
         string? firstError = GetFirstLocalizedFieldError(GeneralValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(TerminalValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(SshValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(RdpValidatedSettingPropertyNames)
+            ?? GetFirstLocalizedFieldError(SecurityValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(AdvancedValidatedSettingPropertyNames);
 
         ValidationSummary = firstError;

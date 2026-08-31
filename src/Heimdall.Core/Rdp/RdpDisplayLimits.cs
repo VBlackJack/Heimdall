@@ -77,6 +77,31 @@ public static class RdpDisplayLimits
     public const string FixedHeightRangeMessage =
         "RDP fixed height must be between 200 and 4320.";
 
+    /// <summary>Smallest default screen size a session may request, in pixels.</summary>
+    /// <remarks>
+    /// A session's default screen size is a DIFFERENT decision from a fixed desktop, and
+    /// these members stay separate from <see cref="MinimumFixedDimension" /> and
+    /// <see cref="MaximumFixedWidth" /> even though the upper bound holds the same number
+    /// today. They live here anyway because the decision itself had grown three holders -
+    /// the schema validator and both default-resolution fields on the settings panel - which
+    /// is the situation this type exists to end.
+    /// </remarks>
+    public const int MinimumSessionResolution = 640;
+
+    /// <summary>Largest default screen size a session may request, in pixels.</summary>
+    /// <remarks>See <see cref="MinimumSessionResolution" />.</remarks>
+    public const int MaximumSessionResolution = 7680;
+
+    /// <summary>Validation message for an out-of-range default screen width.</summary>
+    /// <remarks>Guarded by the same test as <see cref="FixedWidthRangeMessage" />.</remarks>
+    public const string DefaultResolutionWidthRangeMessage =
+        "Default resolution width must be between 640 and 7680 pixels.";
+
+    /// <summary>Validation message for an out-of-range default screen height.</summary>
+    /// <remarks>Guarded by the same test as <see cref="FixedWidthRangeMessage" />.</remarks>
+    public const string DefaultResolutionHeightRangeMessage =
+        "Default resolution height must be between 640 and 7680 pixels.";
+
     /// <summary>
     /// Brings a requested fixed width inside <see cref="MinimumFixedDimension" />
     /// and <see cref="MaximumFixedWidth" />.

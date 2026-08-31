@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
@@ -1281,6 +1282,7 @@ public sealed class SettingsViewModelTests
             ("Terminal", viewModel.TerminalTabErrorCount, viewModel.HasTerminalTabErrors),
             ("Ssh", viewModel.SshTabErrorCount, viewModel.HasSshTabErrors),
             ("Rdp", viewModel.RdpTabErrorCount, viewModel.HasRdpTabErrors),
+            ("Security", viewModel.SecurityTabErrorCount, viewModel.HasSecurityTabErrors),
             ("Advanced", viewModel.AdvancedTabErrorCount, viewModel.HasAdvancedTabErrors),
         ];
 
@@ -1299,6 +1301,262 @@ public sealed class SettingsViewModelTests
                 Assert.False(has, $"the {name} badge should not be showing");
             }
         }
+    }
+
+    /// <summary>Types into a settings field the way the binding delivers what the user typed.</summary>
+    /// <remarks>
+    /// UpdateSourceTrigger=PropertyChanged hands the view model the whole content of the box on
+    /// every keystroke, so "24h" arrives as "2", then "24", then "24h". Assigned in one shot the
+    /// number never sees the prefix that a real user cannot avoid typing, and an oracle written
+    /// that way certifies a state no user can reach: that shortcut is how this file came to
+    /// document as a guarantee an invariant the product did not hold.
+    /// </remarks>
+    private static void TypeInto(Action<string> field, string text)
+    {
+        for (int length = 1; length <= text.Length; length++)
+        {
+            field(text[..length]);
+        }
+    }
+
+    // A number field used to bind straight to its int. A text that did not convert was dropped by
+    // the binding before the setter ran, so no error was recorded, nothing was marked dirty, the
+    // banner and the badge stayed empty and TrySaveAsync had nothing to refuse: the old number was
+    // written and the box went on showing what the user had typed.
+    [Fact]
+    public async Task TrySaveAsync_NonNumericTextInANumberField_IsRefusedWithABannerAndABadge()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        TypeInto(text => viewModel.MaxEmbeddedSessionsText = text, "24h");
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Null(config.SavedSettings);
+        Assert.True(viewModel.HasValidationErrors);
+        Assert.True(viewModel.IsDirty, "typing in a settings field must raise the unsaved marker");
+
+        // One field, one error, naming what the box shows. "24" was a whole number on the way to
+        // "24h", so it committed and stayed - above the bound, and reported by nothing, because the
+        // user is not looking at 24 and cannot act on being told about it. Counting it as well made
+        // the badge read 2 for one field and put the range message in the banner.
+        Assert.Equal("ValidationSettingsWholeNumber", viewModel.ValidationSummary);
+        AssertOnlyBadgeLit(viewModel, "General");
+        Assert.Equal(24, viewModel.MaxEmbeddedSessions);
+    }
+
+    // Emptying the box needs its own oracle rather than a row on the one above: the obvious "do not
+    // nag about an empty field" validator would pass that one and leave this one silent, and an
+    // emptied field is exactly what the user who selected the contents and pressed Delete has.
+    [Fact]
+    public async Task TrySaveAsync_EmptiedNumberField_IsRefusedTheSameWay()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        // Two backspaces on a field that reads "24", one keystroke at a time.
+        viewModel.UpdateCheckIntervalHoursText = "2";
+        viewModel.UpdateCheckIntervalHoursText = string.Empty;
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Null(config.SavedSettings);
+        Assert.Equal("ValidationSettingsWholeNumber", viewModel.ValidationSummary);
+        AssertOnlyBadgeLit(viewModel, "General");
+        Assert.Equal(2, viewModel.UpdateCheckIntervalHours);
+    }
+
+    // Reporting the error is only half of it. A text property that validated but never assigned
+    // would pass the two oracles above while freezing every number field at the value it loaded
+    // with, which is worse than the defect being fixed.
+    [Fact]
+    public async Task NumberFieldText_ValidValue_ReachesThePersistedSetting()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        TypeInto(text => viewModel.MaxEmbeddedSessionsText = text, "12");
+
+        Assert.Equal(12, viewModel.MaxEmbeddedSessions);
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        AppSettings persisted = Assert.IsType<AppSettings>(config.SavedSettings);
+        Assert.Equal(12, persisted.MaxEmbeddedSessions);
+    }
+
+    // The whole-number check must not swallow the range check: a value that is a number but out of
+    // bounds still names the bound it missed, in the message that is already translated for it.
+    // The single lit badge is the other half of the claim - a text failure that also poisoned the
+    // number, or a text check that duplicated the range, would count the same field twice.
+    [Fact]
+    public async Task NumberFieldText_OutOfRange_StillReportsTheFieldsOwnRangeMessage()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        TypeInto(text => viewModel.MaxEmbeddedSessionsText = text, "99");
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Null(config.SavedSettings);
+        Assert.Equal("ValidationSettingsMaxSessions", viewModel.ValidationSummary);
+        AssertOnlyBadgeLit(viewModel, "General");
+    }
+
+    // The counterweight to holding the number's error back: it is held back only while the text
+    // does not parse. A text that parses to an out-of-range number is the user's actual mistake and
+    // must still be named, or the fix above would trade one wrong message for a missing one.
+    [Theory]
+    // The four fields the conversion missed, each driven through its own tab's badge. Two of them
+    // validated nothing at all before, so a mistyped value reached no surface anywhere - and on an
+    // idle auto-lock threshold that is a security timeout the user believes is set and is not.
+    [InlineData(nameof(SettingsViewModel.AutoLockIdleMinutesText), "15m", "Security")]
+    [InlineData(nameof(SettingsViewModel.WindowsHelloGraceMinutesText), "5m", "Security")]
+    [InlineData(nameof(SettingsViewModel.DefaultResolutionWidthText), "1920px", "Rdp")]
+    [InlineData(nameof(SettingsViewModel.DefaultResolutionHeightText), "1080px", "Rdp")]
+    public async Task TrySaveAsync_NonNumericTextInALateConvertedField_IsRefusedTheSameWay(
+        string textProperty,
+        string typed,
+        string expectedBadge)
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        PropertyInfo property = typeof(SettingsViewModel).GetProperty(textProperty)!;
+
+        TypeInto(text => property.SetValue(viewModel, text), typed);
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Null(config.SavedSettings);
+        Assert.True(viewModel.HasValidationErrors);
+        Assert.Equal("ValidationSettingsWholeNumber", viewModel.ValidationSummary);
+        AssertOnlyBadgeLit(viewModel, expectedBadge);
+    }
+
+    // The bounds on this screen and the bounds the schema enforces are one decision written in two
+    // places. Let them drift and a value the screen accepts is written and refused on the next
+    // load, with the complaint attached to a file rather than to the box that produced it.
+    [Theory]
+    [InlineData(nameof(SettingsViewModel.DefaultResolutionWidth))]
+    [InlineData(nameof(SettingsViewModel.DefaultResolutionHeight))]
+    [InlineData(nameof(SettingsViewModel.WindowsHelloGraceMinutes))]
+    [InlineData(nameof(SettingsViewModel.AutoLockIdleMinutes))]
+    public void LateConvertedFieldBounds_AreTheBoundsTheSchemaEnforces(string propertyName)
+    {
+        FieldInfo? backing = typeof(SettingsViewModel).GetField(
+            "_" + char.ToLowerInvariant(propertyName[0]) + propertyName[1..],
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(backing);
+
+        var range = backing!
+            .GetCustomAttribute<System.ComponentModel.DataAnnotations.RangeAttribute>();
+        Assert.NotNull(range);
+
+        int minimum = (int)range!.Minimum;
+        int maximum = (int)range.Maximum;
+
+        Assert.True(SchemaAccepts(propertyName, minimum), $"the schema refuses {propertyName} = {minimum}");
+        Assert.True(SchemaAccepts(propertyName, maximum), $"the schema refuses {propertyName} = {maximum}");
+        Assert.False(
+            SchemaAccepts(propertyName, minimum - 1),
+            $"the schema accepts {propertyName} = {minimum - 1}, which this screen refuses");
+        Assert.False(
+            SchemaAccepts(propertyName, maximum + 1),
+            $"the schema accepts {propertyName} = {maximum + 1}, which this screen refuses");
+    }
+
+    private static bool SchemaAccepts(string propertyName, int value)
+    {
+        AppSettings settings = new();
+        typeof(AppSettings).GetProperty(propertyName)!.SetValue(settings, value);
+
+        return !SchemaValidator.ValidateSettings(settings).Errors
+            .Any(error => error.StartsWith(propertyName + ":", StringComparison.Ordinal));
+    }
+
+    // The badge is bound to Has<Tab>TabErrors, which is computed and so changes nothing on screen
+    // unless the count that feeds it announces itself. The RDP badge had the count and no such
+    // line, so it stayed hidden however many errors its tab held - and every assertion in this file
+    // reads the property directly, which is why they all passed over it.
+    [Fact]
+    public void EveryTabErrorCountAnnouncesItsBadge()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        const string suffix = "TabErrorCount";
+
+        PropertyInfo[] counts =
+        [
+            .. typeof(SettingsViewModel)
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(property => property.PropertyType == typeof(int)
+                    && property.Name.EndsWith(suffix, StringComparison.Ordinal))
+                .OrderBy(property => property.Name, StringComparer.Ordinal)
+        ];
+
+        Assert.True(
+            counts.Length >= 6,
+            $"only {counts.Length} tab error counts were found, so the scan is no longer reading "
+                + "what it thinks it is");
+
+        List<string> silent = [];
+        foreach (PropertyInfo count in counts)
+        {
+            string badge = "Has" + count.Name[..^suffix.Length] + "TabErrors";
+            List<string> raised = [];
+            void OnChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+                => raised.Add(e.PropertyName ?? string.Empty);
+
+            viewModel.PropertyChanged += OnChanged;
+            count.SetValue(viewModel, (int)count.GetValue(viewModel)! + 1);
+            viewModel.PropertyChanged -= OnChanged;
+
+            if (!raised.Contains(badge))
+            {
+                silent.Add(
+                    $"{count.Name} changed and {badge} was not raised, so that tab's badge never "
+                        + "appears");
+            }
+        }
+
+        Assert.True(silent.Count == 0, string.Join("\n", silent));
+    }
+
+    // The text follows the number only where the number is assigned from outside the fields. Miss
+    // one field there and its box keeps showing a value the product is not using, which is the same
+    // lie as the defect, told the other way round.
+    [Fact]
+    public void LoadFromSettings_ReseedsEveryNumberFieldText()
+    {
+        IReadOnlyList<(PropertyInfo Number, PropertyInfo Text)> pairs = SettingsNumericFields.Pairs();
+
+        Assert.True(
+            pairs.Count >= 21,
+            $"only {pairs.Count} number fields were found on the view model, so nothing was checked");
+
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        foreach ((_, PropertyInfo text) in pairs)
+        {
+            text.SetValue(viewModel, "1");
+        }
+
+        viewModel.LoadFromSettings(new AppSettings());
+
+        List<string> stale = [];
+        foreach ((PropertyInfo number, PropertyInfo text) in pairs)
+        {
+            string expected = ((int)number.GetValue(viewModel)!).ToString(CultureInfo.InvariantCulture);
+            string actual = (string)text.GetValue(viewModel)!;
+            if (!string.Equals(actual, expected, StringComparison.Ordinal))
+            {
+                stale.Add($"{text.Name} shows \"{actual}\" while {number.Name} is {expected}");
+            }
+        }
+
+        Assert.True(stale.Count == 0, string.Join("\n", stale));
+        Assert.False(viewModel.IsDirty, "loading settings must not leave the view model dirty");
     }
 
     [Theory]
@@ -1627,6 +1885,51 @@ public sealed class SettingsViewModelTests
         var expected = await LoadExpectedFactoryDefaultsAsync();
         AssertRdpDefaultsMatch(viewModel, expected);
         Assert.True(viewModel.IsDirty);
+    }
+
+    // The confirmed RDP reset is the second place a number is assigned from outside the fields,
+    // and the only one that does not route through the load. Without a reseed the boxes went on
+    // showing the values being reset away from: Save wrote numbers the screen never displayed, and
+    // one keystroke in any of those boxes committed the stale text back over the default.
+    [Fact]
+    public async Task ResetRdpDefaultsCommand_ReseedsTheTextOfEveryFieldItResets()
+    {
+        IReadOnlyList<(PropertyInfo Number, PropertyInfo Text)> pairs = SettingsNumericFields.Pairs();
+        Assert.True(
+            pairs.Count >= 21,
+            $"only {pairs.Count} number fields were found on the view model, so nothing was checked");
+
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(new FakeConfigManager(), dialog);
+
+        // Move every box off its current value through the text, the way a user does, so that any
+        // field the reset touches has something visibly stale to leave behind.
+        foreach ((PropertyInfo number, PropertyInfo text) in pairs)
+        {
+            int typed = (int)number.GetValue(viewModel)! + 1;
+            text.SetValue(viewModel, typed.ToString(CultureInfo.InvariantCulture));
+            Assert.Equal(typed, (int)number.GetValue(viewModel)!);
+        }
+
+        await viewModel.ResetRdpDefaultsCommand.ExecuteAsync(null);
+
+        // The premise: the reset really did move a field back. Without this the scan below would
+        // pass on a reset that did nothing at all.
+        AppSettings expected = await LoadExpectedFactoryDefaultsAsync();
+        Assert.Equal(expected.RdpKeepAliveIntervalMs, viewModel.RdpKeepAliveIntervalMs);
+
+        List<string> stale = [];
+        foreach ((PropertyInfo number, PropertyInfo text) in pairs)
+        {
+            string shown = (string)text.GetValue(viewModel)!;
+            string held = ((int)number.GetValue(viewModel)!).ToString(CultureInfo.InvariantCulture);
+            if (!string.Equals(shown, held, StringComparison.Ordinal))
+            {
+                stale.Add($"{text.Name} shows \"{shown}\" while {number.Name} is {held}");
+            }
+        }
+
+        Assert.True(stale.Count == 0, string.Join("\n", stale));
     }
 
     [Fact]

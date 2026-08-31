@@ -27,8 +27,8 @@ public static partial class SchemaValidator
 {
     private const int MinPort = 1;
     private const int MaxPort = 65535;
-    private const int MinResolution = 640;
-    private const int MaxResolution = 7680;
+    private const int MinResolution = RdpDisplayLimits.MinimumSessionResolution;
+    private const int MaxResolution = RdpDisplayLimits.MaximumSessionResolution;
     private const int MinRdpFixedDimension = RdpDisplayLimits.MinimumFixedDimension;
     private const int MaxRdpFixedWidth = RdpDisplayLimits.MaximumFixedWidth;
     private const int MaxRdpFixedHeight = RdpDisplayLimits.MaximumFixedHeight;

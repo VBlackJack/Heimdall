@@ -42,9 +42,11 @@ public sealed class SettingsValidationBadgeCoverageTests
 {
     /// <summary>Which settings tab each name array is the badge source for.</summary>
     /// <remarks>
-    /// The Security tab is absent on purpose: it holds no validated setting today and so has no
-    /// badge. If one is added there this test fails rather than passing quietly, which is the
-    /// intended outcome - a validated field with no badge is exactly the defect being frozen out.
+    /// The Security tab was absent here while it held nothing that validated, and this test is what
+    /// made that absence cost something: the moment the idle auto-lock threshold and the Windows
+    /// Hello grace period started validating, it failed rather than passing quietly, because a
+    /// validated field whose tab has no badge is exactly the defect being frozen out. Its badge and
+    /// its array were added in answer to that failure.
     /// </remarks>
     private static readonly (string Array, string Tab)[] ArrayToTab =
     [
@@ -52,6 +54,7 @@ public sealed class SettingsValidationBadgeCoverageTests
         ("TerminalValidatedSettingPropertyNames", "Mw_SettingsTabTerminal"),
         ("SshValidatedSettingPropertyNames", "Mw_SettingsTabSsh"),
         ("RdpValidatedSettingPropertyNames", "Mw_SettingsTabRdp"),
+        ("SecurityValidatedSettingPropertyNames", "Mw_SettingsTabSecurity"),
         ("AdvancedValidatedSettingPropertyNames", "Mw_SettingsTabAdvanced"),
     ];
 
@@ -99,7 +102,7 @@ public sealed class SettingsValidationBadgeCoverageTests
         // Guarding the guard: a markup scan that matched nothing, or reflection that found no
         // validated property, would report success having checked nothing at all.
         Assert.True(
-            checkedProperties >= 15,
+            checkedProperties >= 21,
             $"only {checkedProperties} validated settings were matched to a tab, so the scan is no "
                 + "longer reading what it thinks it is");
 
@@ -117,10 +120,9 @@ public sealed class SettingsValidationBadgeCoverageTests
         List<string> problems = [];
         int messages = 0;
 
-        foreach (Match match in Regex.Matches(source, @"ErrorMessage\s*=\s*""([^""]+)"""))
+        foreach (string message in ValidationMessages(source))
         {
             messages++;
-            string message = match.Groups[1].Value;
             if (!messageToKey.TryGetValue(message, out string? key))
             {
                 problems.Add($"no localization key for the validation message: \"{message}\"");
@@ -138,7 +140,7 @@ public sealed class SettingsValidationBadgeCoverageTests
             }
         }
 
-        Assert.True(messages >= 15, $"only {messages} validation messages found, so nothing was checked");
+        Assert.True(messages >= 22, $"only {messages} validation messages found, so nothing was checked");
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
@@ -174,6 +176,42 @@ public sealed class SettingsValidationBadgeCoverageTests
         ];
 
         Assert.True(duplicates.Count == 0, string.Join("\n", duplicates));
+    }
+
+    /// <summary>
+    /// Every validation message the settings view model can produce, however it is written.
+    /// </summary>
+    /// <remarks>
+    /// Reading the range attributes alone left the messages built by hand in the custom validators
+    /// unchecked. Those resolve today only because they happen to sit in the key map; nothing said
+    /// they had to, so the next one could reach the banner as raw English on a French install.
+    /// </remarks>
+    private static IEnumerable<string> ValidationMessages(string source)
+    {
+        foreach (Match match in Regex.Matches(source, @"ErrorMessage\s*=\s*""([^""]+)"""))
+        {
+            yield return match.Groups[1].Value;
+        }
+
+        // A message that moved into a shared constant is still a message. Reading only string
+        // literals made this scan blind the moment two bounds were shared with the schema
+        // validator, and a scan that goes blind reports a smaller census rather than a
+        // failure - which is how a guard starts certifying a subset of itself.
+        foreach (Match match in Regex.Matches(
+            source, @"ErrorMessage\s*=\s*([A-Za-z_][\w.]*)"))
+        {
+            if (ResolveConstant(match.Groups[1].Value) is { } resolved)
+            {
+                yield return resolved;
+            }
+        }
+
+        foreach (Match match in Regex.Matches(
+            source,
+            @"new\s+(?:System\.ComponentModel\.DataAnnotations\.)?ValidationResult\(\s*""([^""]+)"""))
+        {
+            yield return match.Groups[1].Value;
+        }
     }
 
     private static IReadOnlyList<string> ValidatedPropertyNames()
@@ -275,7 +313,52 @@ public sealed class SettingsValidationBadgeCoverageTests
             map[match.Groups[1].Value] = match.Groups[2].Value;
         }
 
+        // Same reason as in ValidationMessages: the dictionary keys the message text, and
+        // some of that text now arrives as a constant.
+        foreach (Match match in Regex.Matches(
+            source, @"\[([A-Za-z_][\w.]*)\]\s*=\s*""(\w+)"""))
+        {
+            if (ResolveConstant(match.Groups[1].Value) is { } resolved)
+            {
+                map[resolved] = match.Groups[2].Value;
+            }
+        }
+
         return map;
+    }
+
+    /// <summary>
+    /// Resolves a <c>Type.Member</c> reference to the string constant behind it, so a message
+    /// shared between projects is still counted. Returns <see langword="null" /> for anything
+    /// that is not a public string constant, which is every reference this scan should ignore.
+    /// </summary>
+    private static string? ResolveConstant(string reference)
+    {
+        int split = reference.LastIndexOf('.');
+        if (split <= 0)
+        {
+            return null;
+        }
+
+        string typeName = reference[..split];
+        string memberName = reference[(split + 1)..];
+
+        foreach (var assembly in new[]
+        {
+            typeof(Heimdall.Core.Rdp.RdpDisplayLimits).Assembly,
+            typeof(Heimdall.App.ViewModels.SettingsViewModel).Assembly,
+        })
+        {
+            var type = assembly.GetTypes()
+                .FirstOrDefault(t => t.Name == typeName || t.FullName == typeName);
+
+            if (type?.GetField(memberName)?.GetRawConstantValue() is string value)
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 
     private static string ReadViewModelSource() => File.ReadAllText(Path.Combine(

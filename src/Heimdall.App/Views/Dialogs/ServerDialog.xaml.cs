@@ -164,6 +164,24 @@ public partial class ServerDialog : Window
         });
     }
 
+    /// <summary>
+    /// Empties the password box of the credential card whose Clear button was pressed.
+    /// </summary>
+    /// <remarks>
+    /// The command behind the same button empties the view model, and the visual tree keeps its
+    /// own copy of what was typed: <see cref="OnSaveClick"/> reads every PasswordBox back over the
+    /// view model on the way out. Without this the card announced the removal, hid the "password
+    /// saved" row, and still saved the text left in the box - the trust failure the removal button
+    /// exists to end. A PasswordBox exposes no bindable Password, so the view model cannot reach
+    /// it and the code-behind has to. Wiping the box is part of the removal the command already
+    /// marked as an edit, not a second edit of its own.
+    /// </remarks>
+    private void OnClearStoredCredentialClick(object sender, RoutedEventArgs e)
+    {
+        RunWithoutCredentialDirtyTracking(() =>
+            ServerDialogCredentialBoxes.ClearTaggedBox(sender, FindName));
+    }
+
     private void ClearSshKeyPassphraseInput()
     {
         RunWithoutCredentialDirtyTracking(() =>
@@ -805,5 +823,31 @@ public partial class ServerDialog : Window
 
         System.Windows.Automation.AutomationProperties.SetName(
             DlgSrv_ElevationModeCmb, _localizer["ServerDialogElevationMode"]);
+    }
+}
+
+/// <summary>
+/// Empties the credential box that a card's Clear button names in its <c>Tag</c>.
+/// </summary>
+/// <remarks>
+/// Kept apart from the dialog so the rule can be exercised on its own: a ServerDialog cannot be
+/// built without a WPF <see cref="Application"/>, of which a process gets exactly one.
+/// </remarks>
+internal static class ServerDialogCredentialBoxes
+{
+    /// <summary>
+    /// Clears the PasswordBox named by the Tag of <paramref name="clearButton"/>.
+    /// </summary>
+    /// <param name="clearButton">The pressed Clear button, naming its card's box in its Tag.</param>
+    /// <param name="findName">Name resolver of the scope the box lives in.</param>
+    public static void ClearTaggedBox(object? clearButton, Func<string, object?> findName)
+    {
+        ArgumentNullException.ThrowIfNull(findName);
+
+        if (clearButton is System.Windows.Controls.Button { Tag: string passwordBoxName }
+            && findName(passwordBoxName) is System.Windows.Controls.PasswordBox passwordBox)
+        {
+            passwordBox.Clear();
+        }
     }
 }

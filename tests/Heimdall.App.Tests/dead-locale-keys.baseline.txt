@@ -458,9 +458,7 @@ GatewayFieldPortHint
 GatewayFieldUser
 GatewayFieldUserHint
 GatewayNoneDirect
-GatewayPasswordClear
 GatewayPasswordEditHint
-GatewayPasswordSaved
 GatewaySectionAuthentication
 GatewaySectionConnection
 GatewaySectionIdentity

@@ -162,7 +162,7 @@ public partial class MainWindow
         Mw_ToolDetailOpenBtn.Content = vm.Localize("DetailBtnOpenInTab");
     }
 
-    // ── Double-click → connect / open tool ───────────────────────────
+    // ── Activation (double-click / Enter) → connect / open tool ──────
 
     /// <summary>
     /// Handles double-click on a server item in the TreeView to initiate a connection.
@@ -187,20 +187,10 @@ public partial class MainWindow
             vm.ServerList.SelectedServer);
         if (server is null) return;
 
-        if (ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType))
-        {
-            var toolId = ConnectionTypeCatalog.StripToolPrefix(server.ConnectionType);
-            vm.TrackRecentTool(toolId.ToUpperInvariant());
-            var context = new Core.Models.ToolContext(
-                TargetHost: server.RemoteServer,
-                TargetPort: server.RemotePort > 0 ? (int?)server.RemotePort : null,
-                Argument: server.RemoteServer);
-            _ = vm.OpenToolTabAsync(toolId, server.DisplayName, context);
-        }
-        else if (vm.ServerList.ConnectCommand.CanExecute(server))
-        {
-            vm.ServerList.ConnectCommand.Execute(server);
-        }
+        ApplyTreeActivation(
+            server,
+            target => OpenSessionTreeToolTab(vm, target),
+            target => ConnectSessionTreeServer(vm, target));
     }
 
     /// <summary>
@@ -214,6 +204,105 @@ public partial class MainWindow
         ServerItemViewModel? selectedServer)
     {
         return hitTarget as ServerItemViewModel;
+    }
+
+    /// <summary>
+    /// Resolves the session an activation key press acts on, without reading global keyboard state.
+    /// </summary>
+    /// <param name="key">The key raised by the sessions tree.</param>
+    /// <param name="modifiers">The exact modifier combination for the gesture.</param>
+    /// <param name="isInlineRenameEditorSource">Whether the event originated inside the rename editor.</param>
+    /// <param name="isRepeat">Whether the key press comes from keyboard auto-repeat.</param>
+    /// <param name="focusedNode">The data context of the container owning keyboard focus.</param>
+    /// <param name="selectedItem">The tree's native selection, used only when nothing holds focus.</param>
+    /// <param name="isSelected">Reports whether a session belongs to the current selection.</param>
+    /// <returns>The session to activate, or <see langword="null"/> when the gesture does nothing.</returns>
+    internal static ServerItemViewModel? ResolveTreeActivationTarget(
+        Key key,
+        ModifierKeys modifiers,
+        bool isInlineRenameEditorSource,
+        bool isRepeat,
+        object? focusedNode,
+        object? selectedItem,
+        Func<ServerItemViewModel, bool> isSelected)
+    {
+        ArgumentNullException.ThrowIfNull(isSelected);
+
+        if (key != Key.Enter || modifiers != ModifierKeys.None || isInlineRenameEditorSource)
+        {
+            return null;
+        }
+
+        // A held Enter repeats about thirty times a second. Connecting absorbs that through
+        // ConnectCommand.CanExecute, but the tool branch reaches AddSession, which counts
+        // nothing and caps nothing, so one held key would fill the workspace with tabs.
+        if (isRepeat)
+        {
+            return null;
+        }
+
+        // The fallback is on the node, not on the cast: focus parked on a folder
+        // must resolve to nothing rather than activate a server selected elsewhere.
+        if ((focusedNode ?? selectedItem) is not ServerItemViewModel candidate)
+        {
+            return null;
+        }
+
+        // Ctrl+Space and Ctrl+click leave keyboard focus on the row they have just removed
+        // from the selection, so the focused row is not always the highlighted one. The help
+        // this gesture exists to honour promises the selected server, never the focused one.
+        return isSelected(candidate) ? candidate : null;
+    }
+
+    /// <summary>
+    /// Routes a resolved activation target to the tool tab or to the connect command.
+    /// </summary>
+    /// <param name="server">The session to activate, or null when the gesture resolved to nothing.</param>
+    /// <param name="openTool">Opens the tool tab for a tool session.</param>
+    /// <param name="connect">Connects a remote session.</param>
+    /// <returns>True when the gesture acted and must be consumed.</returns>
+    internal static bool ApplyTreeActivation(
+        ServerItemViewModel? server,
+        Action<ServerItemViewModel> openTool,
+        Action<ServerItemViewModel> connect)
+    {
+        if (server is null)
+        {
+            return false;
+        }
+
+        if (ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType))
+        {
+            openTool(server);
+        }
+        else
+        {
+            connect(server);
+        }
+
+        return true;
+    }
+
+    private static void OpenSessionTreeToolTab(MainViewModel vm, ServerItemViewModel server)
+    {
+        var toolId = ConnectionTypeCatalog.StripToolPrefix(server.ConnectionType);
+        vm.TrackRecentTool(toolId.ToUpperInvariant());
+        var context = new Core.Models.ToolContext(
+            TargetHost: server.RemoteServer,
+            TargetPort: server.RemotePort > 0 ? (int?)server.RemotePort : null,
+            Argument: server.RemoteServer);
+        _ = vm.OpenToolTabAsync(toolId, server.DisplayName, context);
+    }
+
+    private static void ConnectSessionTreeServer(MainViewModel vm, ServerItemViewModel server)
+    {
+        // ConnectAsync disallows concurrent execution, so CanExecute is false while a
+        // connect is already in flight; asking first keeps a second activation, from the
+        // tree or from anywhere else, from restarting a connection that is under way.
+        if (vm.ServerList.ConnectCommand.CanExecute(server))
+        {
+            vm.ServerList.ConnectCommand.Execute(server);
+        }
     }
 
     private void OnSessionTreeViewItemPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -442,6 +531,26 @@ public partial class MainWindow
                 FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext
                 ?? SessionTreeView.SelectedItem;
             e.Handled = BeginSessionTreeInlineRename(focusedNode);
+            return;
+        }
+
+        // The cheap key test keeps the visual-tree walk below off every other keystroke.
+        // Leaving the event unhandled lets it tunnel on to the rename editor, which
+        // commits the pending edit in OnInlineRenameEditorPreviewKeyDown.
+        if (e.Key == Key.Enter && DataContext is MainViewModel activationViewModel)
+        {
+            ServerItemViewModel? activationTarget = ResolveTreeActivationTarget(
+                e.Key,
+                modifiers,
+                IsInlineRenameEditorSource(e.OriginalSource as DependencyObject),
+                e.IsRepeat,
+                FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext,
+                SessionTreeView.SelectedItem,
+                activationViewModel.ServerList.SelectedItems.Contains);
+            e.Handled = ApplyTreeActivation(
+                activationTarget,
+                target => OpenSessionTreeToolTab(activationViewModel, target),
+                target => ConnectSessionTreeServer(activationViewModel, target));
             return;
         }
 

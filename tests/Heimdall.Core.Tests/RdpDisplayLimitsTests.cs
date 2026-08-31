@@ -41,6 +41,35 @@ public sealed class RdpDisplayLimitsTests
         Assert.Equal(
             RdpDisplayLimits.FixedHeightRangeMessage,
             $"RDP fixed height must be between {min} and {maxHeight}.");
+
+        string minSession =
+            RdpDisplayLimits.MinimumSessionResolution.ToString(CultureInfo.InvariantCulture);
+        string maxSession =
+            RdpDisplayLimits.MaximumSessionResolution.ToString(CultureInfo.InvariantCulture);
+
+        Assert.Equal(
+            RdpDisplayLimits.DefaultResolutionWidthRangeMessage,
+            $"Default resolution width must be between {minSession} and {maxSession} pixels.");
+
+        Assert.Equal(
+            RdpDisplayLimits.DefaultResolutionHeightRangeMessage,
+            $"Default resolution height must be between {minSession} and {maxSession} pixels.");
+    }
+
+    /// <summary>
+    /// The session bounds and the fixed-desktop bounds share their upper number today and
+    /// are still separate decisions. This pins that they are declared separately, so a
+    /// later change to one cannot silently move the other.
+    /// </summary>
+    [Fact]
+    public void SessionAndFixedBounds_AreDeclaredSeparately()
+    {
+        Assert.NotEqual(
+            RdpDisplayLimits.MinimumFixedDimension,
+            RdpDisplayLimits.MinimumSessionResolution);
+
+        Assert.Equal(640, RdpDisplayLimits.MinimumSessionResolution);
+        Assert.Equal(200, RdpDisplayLimits.MinimumFixedDimension);
     }
 
     [Theory]
