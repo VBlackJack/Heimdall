@@ -109,8 +109,6 @@ A11ySnippetPalette
 A11yStatusConnected
 A11yStatusDisconnected
 A11yStatusDotActive
-A11yStatusDotScheduledDisabled
-A11yStatusDotScheduledEnabled
 A11yTaskEnabled
 A11yToggleKeyVisibility
 A11yToggleSidebar

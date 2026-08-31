@@ -103,6 +103,21 @@
                   BorderBrush="{DynamicResource BorderBrush}"
                   HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
                   FontSize="{StaticResource FontSizeBody}">
+            <DataGrid.RowStyle>
+                <Style TargetType="{x:Type DataGridRow}"
+                       BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                    <Setter Property="AutomationProperties.Name">
+                        <Setter.Value>
+                            <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yRouteTableRow]"/>
+                                <Binding Path="Destination"/>
+                                <Binding Path="Mask"/>
+                                <Binding Path="Gateway"/>
+                            </MultiBinding>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
                 <DataGridTextColumn x:Name="ColDest"
                                     Binding="{Binding Destination}"

@@ -16,6 +16,7 @@
 <UserControl x:Class="Heimdall.App.Views.Tools.BannerGrabberView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Heimdall.App.Localization"
              Background="{DynamicResource BackgroundBrush}">
     <Grid Margin="0">
         <Grid.RowDefinitions>
@@ -211,9 +212,22 @@
                       HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
                       ColumnHeaderStyle="{StaticResource ThemedDataGridColumnHeaderStyle}"
                       CellStyle="{StaticResource ThemedDataGridCellStyle}"
-                      RowStyle="{StaticResource ThemedDataGridRowStyle}"
                       TabIndex="9"
                       AutomationProperties.LiveSetting="Polite">
+                <DataGrid.RowStyle>
+                    <Style TargetType="{x:Type DataGridRow}"
+                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                        <Setter Property="AutomationProperties.Name">
+                            <Setter.Value>
+                                <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yBannerResultRow]"/>
+                                    <Binding Path="Port"/>
+                                    <Binding Path="Service"/>
+                                </MultiBinding>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </DataGrid.RowStyle>
                 <DataGrid.Columns>
                     <DataGridTextColumn x:Name="ColPort" Binding="{Binding Port}" Width="80"
                                         Foreground="{DynamicResource TextPrimaryBrush}"/>

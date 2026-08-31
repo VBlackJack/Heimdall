@@ -16,6 +16,7 @@
 <UserControl x:Class="Heimdall.App.Views.Tools.SnmpWalkerView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Heimdall.App.Localization"
              Background="{DynamicResource BackgroundBrush}">
     <Grid Margin="0">
         <Grid.RowDefinitions>
@@ -201,9 +202,23 @@
                       HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
                       ColumnHeaderStyle="{StaticResource ThemedDataGridColumnHeaderStyle}"
                       CellStyle="{StaticResource ThemedDataGridCellStyle}"
-                      RowStyle="{StaticResource ThemedDataGridRowStyle}"
                       TabIndex="10"
                       AutomationProperties.LiveSetting="Polite">
+                <DataGrid.RowStyle>
+                    <Style TargetType="{x:Type DataGridRow}"
+                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                        <Setter Property="AutomationProperties.Name">
+                            <Setter.Value>
+                                <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySnmpEntryRow]"/>
+                                    <Binding Path="Oid"/>
+                                    <Binding Path="Name"/>
+                                    <Binding Path="Type"/>
+                                </MultiBinding>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </DataGrid.RowStyle>
                 <DataGrid.Columns>
                     <DataGridTextColumn x:Name="ColOid" Binding="{Binding Oid}" Width="260"
                                         Foreground="{DynamicResource TextPrimaryBrush}"/>

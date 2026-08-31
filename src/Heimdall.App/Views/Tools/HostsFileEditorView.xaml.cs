@@ -23,6 +23,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using Heimdall.App.Localization;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
@@ -444,8 +445,27 @@ public sealed class HostEntry : INotifyPropertyChanged
     public bool Enabled
     {
         get => _enabled;
-        set { _enabled = value; OnPropertyChanged(nameof(Enabled)); }
+        set
+        {
+            _enabled = value;
+            OnPropertyChanged(nameof(Enabled));
+            OnPropertyChanged(nameof(EnabledDisplay));
+        }
     }
+
+    /// <summary>
+    /// <see cref="Enabled" /> as a word, for the row's accessible name.
+    /// </summary>
+    /// <remarks>
+    /// Binding the boolean directly would put an English literal into every locale:
+    /// <see cref="bool" /> does not implement <see cref="IFormattable" />, so
+    /// <see cref="string.Format(IFormatProvider, string, object?[])" /> falls through to
+    /// <c>Boolean.ToString()</c>, which ignores the format provider and always returns the
+    /// invariant "True" or "False". The visible column is a checkbox, so this word exists
+    /// only for a screen reader and has to carry its own translation.
+    /// </remarks>
+    public string EnabledDisplay => LocalizationSource.Instance[
+        _enabled ? "A11yStatusDotScheduledEnabled" : "A11yStatusDotScheduledDisabled"];
 
     public string IpAddress
     {
