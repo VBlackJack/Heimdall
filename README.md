@@ -134,3 +134,6 @@ including release builds and installers, is in [DEVELOPMENT.md](docs/DEVELOPMENT
 Copyright 2026 Julien Bombled
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+
+Heimdall redistributes third-party components under their own licences. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
