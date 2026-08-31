@@ -105,6 +105,7 @@ and **Ctrl+K** to jump straight to a machine by name or address.
 | [RDP memory tuning](docs/RDP-PERFORMANCE.md) | What a session costs, and the one setting that changes it |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Specific failures, written for a technical reader |
 | [Security](SECURITY.md) | How credentials are protected, and how to report a problem |
+| [Code signing policy](docs/CODE-SIGNING-POLICY.md) | Who approves a signature, and what is signed |
 | [Development](docs/DEVELOPMENT.md) | Building, testing, contributing |
 | [Architecture](docs/ARCHITECTURE.md) | How it is put together |
 | [Changelog](docs/CHANGELOG.md) | What changed, and when |
