@@ -59,6 +59,9 @@ namespace Heimdall.App;
 public partial class App : System.Windows.Application
 {
     private ServiceProvider? _serviceProvider;
+
+    /// <summary>Held for the process lifetime while this instance owns the data root.</summary>
+    private SingleInstanceGuard? _singleInstanceGuard;
     private MainViewModel? _mainViewModel;
     private string? _dataRoot;
     private string? _notesStoragePath;
@@ -126,6 +129,33 @@ public partial class App : System.Windows.Application
         _dataRoot = ApplicationDataPathResolver.Resolve();
         InitializeLogging(_dataRoot);
         Heimdall.Core.Logging.FileLogger.Info("Heimdall starting");
+
+        // Before any configuration is read. Two instances sharing one data root both
+        // load servers.json and both write it back, and the second write discards the
+        // first one's edits without a word - ConfigManager's write lock is
+        // process-local and says so itself.
+        switch (SingleInstanceGuard.TryAcquire(
+            _dataRoot, RequestActivationFromSecondInstance, out var instanceGuard))
+        {
+            case SingleInstanceOutcome.AlreadyRunning:
+                Heimdall.Core.Logging.FileLogger.Info(
+                    "Another Heimdall owns this configuration directory; handing over to it."
+                    + $" (root={_dataRoot}, pid {Environment.ProcessId})");
+                Heimdall.Core.Logging.FileLogger.Flush();
+                Shutdown();
+                return;
+
+            case SingleInstanceOutcome.Owner:
+                _singleInstanceGuard = instanceGuard;
+                Heimdall.Core.Logging.FileLogger.Info(
+                    $"[SingleInstance] owning {_dataRoot} (pid {Environment.ProcessId})");
+                break;
+
+            case SingleInstanceOutcome.Unavailable:
+                // Already logged by the guard. Starting is the lesser failure.
+                break;
+        }
+
         LogMsTscAxRegistration();
 
         // Register Windows-1252 codepage for MobaXterm .ini import
@@ -1154,6 +1184,43 @@ public partial class App : System.Windows.Application
                 _dataRoot ?? ApplicationDataPathResolver.Resolve());
     }
 
+    /// <summary>
+    /// Brings this instance forward when a later launch asks for it.
+    /// </summary>
+    /// <remarks>
+    /// Runs on a thread-pool thread, so every touch of the window is marshalled.
+    /// <see cref="Window.MainWindow" /> is read inside the dispatcher callback and
+    /// not captured at registration time, because the guard is acquired before any
+    /// window exists.
+    /// </remarks>
+    private void RequestActivationFromSecondInstance()
+    {
+        try
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (MainWindow is not { } window)
+                {
+                    return;
+                }
+
+                if (window.WindowState == WindowState.Minimized)
+                {
+                    window.WindowState = WindowState.Normal;
+                }
+
+                window.Show();
+                window.Activate();
+            });
+        }
+        catch (Exception ex)
+        {
+            // A failure to surface must not take down the instance that is working.
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SingleInstance] could not surface the existing window: {ex.Message}");
+        }
+    }
+
     private void ShowUnhandledException(Exception exception)
     {
         // Written here rather than at the three call sites: this is the chokepoint every
@@ -1216,6 +1283,9 @@ public partial class App : System.Windows.Application
         // closing has completed. Keep the shutdown guard armed for those
         // late Unloaded broadcasts as well.
         IsShuttingDown = true;
+
+        _singleInstanceGuard?.Dispose();
+        _singleInstanceGuard = null;
 
         if (_serviceProvider is not null)
         {
