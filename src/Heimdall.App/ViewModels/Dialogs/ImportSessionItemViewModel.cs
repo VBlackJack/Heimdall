@@ -23,7 +23,7 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// <summary>
 /// Shared row ViewModel used by import preview dialogs.
 /// </summary>
-public sealed partial class ImportSessionItemViewModel : ObservableObject
+public sealed partial class ImportSessionItemViewModel : ObservableObject, IAccessibleItemViewModel
 {
     public ImportSessionItemViewModel(
         object sourceCandidate,
@@ -52,6 +52,8 @@ public sealed partial class ImportSessionItemViewModel : ObservableObject
             _ => status.ToString()
         };
         IsSelectable = status != ImportCandidateStatus.Invalid;
+        AccessibleName = localizer.Format(
+            "A11yImportSessionRow", Alias, HostName, StatusDisplay);
         _isSelected = status == ImportCandidateStatus.New;
     }
 
@@ -77,6 +79,13 @@ public sealed partial class ImportSessionItemViewModel : ObservableObject
     public string StatusDisplay { get; }
 
     public bool IsSelectable { get; }
+
+    /// <inheritdoc />
+    public string AccessibleName { get; }
+
+    /// <inheritdoc />
+    public string? AccessibleHelpText => null;
+
 
     partial void OnIsSelectedChanged(bool value)
     {

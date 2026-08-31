@@ -50,7 +50,12 @@ public sealed partial class ImportKnownHostsConflictDialogViewModel : Observable
         ReplaceLabel = localizer["OptImportConflictReplace"];
 
         Items = new ObservableCollection<ImportKnownHostsConflictRowViewModel>(
-            conflicts.Select(conflict => new ImportKnownHostsConflictRowViewModel(conflict)));
+            conflicts.Select(conflict => new ImportKnownHostsConflictRowViewModel(
+                conflict,
+                localizer.Format(
+                    "A11yImportConflictRow",
+                    HostKeyFormats.MakeKey(conflict.Host, conflict.Port),
+                    conflict.Algorithm))));
     }
 
     public event Action<bool>? CloseRequested;
@@ -93,9 +98,11 @@ public sealed partial class ImportKnownHostsConflictDialogViewModel : Observable
     }
 }
 
-public sealed partial class ImportKnownHostsConflictRowViewModel : ObservableObject
+public sealed partial class ImportKnownHostsConflictRowViewModel : ObservableObject, IAccessibleItemViewModel
 {
-    internal ImportKnownHostsConflictRowViewModel(KnownHostsImportConflict conflict)
+    internal ImportKnownHostsConflictRowViewModel(
+        KnownHostsImportConflict conflict,
+        string accessibleName)
     {
         Host = conflict.Host;
         Port = conflict.Port;
@@ -105,6 +112,7 @@ public sealed partial class ImportKnownHostsConflictRowViewModel : ObservableObj
         ExistingFingerprintDisplay = TruncateFingerprint(conflict.ExistingFingerprint);
         ImportedFingerprintDisplay = TruncateFingerprint(conflict.ImportedFingerprint);
         Algorithm = conflict.Algorithm;
+        AccessibleName = accessibleName;
     }
 
     public string Host { get; }
@@ -122,6 +130,13 @@ public sealed partial class ImportKnownHostsConflictRowViewModel : ObservableObj
     public string ImportedFingerprintDisplay { get; }
 
     public string Algorithm { get; }
+
+    /// <inheritdoc />
+    public string AccessibleName { get; }
+
+    /// <inheritdoc />
+    public string? AccessibleHelpText => null;
+
 
     public bool KeepExisting
     {

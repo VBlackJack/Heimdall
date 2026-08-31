@@ -131,7 +131,12 @@ public partial class ImportKnownHostsDialogViewModel(
                 row.Candidate.Fingerprint,
                 row.Status,
                 GetStatusDisplay(row.Status),
-                notes);
+                notes,
+                _localizer.Format(
+                    "A11yImportKnownHostRow",
+                    row.Candidate.Host,
+                    row.Candidate.Port,
+                    GetStatusDisplay(row.Status)));
             item.PropertyChanged += OnItemPropertyChanged;
             Items.Add(item);
         }
@@ -245,7 +250,7 @@ public partial class ImportKnownHostsDialogViewModel(
     }
 }
 
-public sealed partial class KnownHostItemViewModel : ObservableObject
+public sealed partial class KnownHostItemViewModel : ObservableObject, IAccessibleItemViewModel
 {
     public KnownHostItemViewModel(
         KnownHostsImportCandidate candidate,
@@ -254,7 +259,8 @@ public sealed partial class KnownHostItemViewModel : ObservableObject
         string fingerprint,
         KnownHostsCandidateStatus status,
         string statusDisplay,
-        string notes)
+        string notes,
+        string accessibleName)
     {
         Candidate = candidate;
         Host = host;
@@ -264,6 +270,7 @@ public sealed partial class KnownHostItemViewModel : ObservableObject
         Status = status;
         StatusDisplay = statusDisplay;
         Notes = notes;
+        AccessibleName = accessibleName;
         _isSelected = status == KnownHostsCandidateStatus.New;
     }
 
@@ -285,6 +292,17 @@ public sealed partial class KnownHostItemViewModel : ObservableObject
     public string StatusDisplay { get; }
 
     public string Notes { get; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Composed by the parent, which owns the localizer, exactly as
+    /// <see cref="StatusDisplay" /> and <see cref="Notes" /> already are.
+    /// </remarks>
+    public string AccessibleName { get; }
+
+    /// <inheritdoc />
+    public string? AccessibleHelpText => null;
+
 
     public bool IsSelectable => Status == KnownHostsCandidateStatus.New;
 

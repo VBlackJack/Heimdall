@@ -68,6 +68,17 @@
                       SelectionMode="Single"
                       SelectionUnit="FullRow"
                       RowHeaderWidth="0">
+                <!-- The row container announces the item, not its class name. Enabled
+                     here rather than bound in a cell template: a template would set the
+                     name on an element that has no automation peer of its own, leaving
+                     the row to fall back to ToString() of the bound view model. -->
+                <DataGrid.RowStyle>
+                    <Style TargetType="{x:Type DataGridRow}"
+                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                        <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled"
+                                Value="True"/>
+                    </Style>
+                </DataGrid.RowStyle>
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="{Binding ImportColumnHeader, Mode=OneWay}"
                                             Width="80">
