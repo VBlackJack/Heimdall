@@ -111,7 +111,6 @@ public sealed class ToolRegistry
             Entry("SERVICES", ToolCategory.System,   "ToolCategorySystem",   "PaletteToolServices", "PaletteToolServicesWith", ["services","svc","systemctl"],        false, () => new Views.Tools.ServiceStatusView(),  "Geo.Tool.ServiceStatusDashboard"),
             Entry("NOTES",    ToolCategory.System,   "ToolCategorySystem",   "PaletteToolNotes",    "PaletteToolNotesWith",    ["notes","note","markdown","md","confluence"], false, () => new Views.Tools.NotesToolView(), "Geo.Tool.Notes"),
             Entry("DIAGRAM",  ToolCategory.System,   "ToolCategorySystem",   "PaletteToolDiagram",  "PaletteToolDiagramWith",  ["diagram","drawio","schema"],         false, () => new Views.Tools.DiagramEditorView(),  "Geo.Tool.Diagram"),
-            Entry("HACKERSIM",ToolCategory.System,   "ToolCategorySystem",   "PaletteToolHackerSim","PaletteToolHackerSimWith",["hacker","matrix","hackersim"],        false, () => new Views.Tools.HackerSimulatorView(),"Geo.Tool.HackerSimulator"),
             Entry(CommandLibraryToolId, ToolCategory.System, "ToolCategorySystem", "PaletteToolCmdLib", "PaletteToolCmdLibWith", ["cmd","command","library","snippet","twinshell","cheat","cheatsheet","powershell","bash"], false, () => new Views.Tools.CommandLibraryView(), "Geo.Tool.CommandLibrary"),
             Entry("PRIVLAUNCH", ToolCategory.System, "ToolCategorySystem", "PaletteToolPrivLaunch", null, ["privlaunch","sudo","nsudo","elevate","system","trustedinstaller"], false, () => new Views.Tools.PrivilegeLauncherView(), "Geo.Tool.PrivilegeLauncher"),
 
@@ -275,7 +274,6 @@ public sealed class ToolRegistry
         ["SERVICES"] = "Geo.Tool.ServiceStatusDashboard",
         ["NOTES"] = "Geo.Tool.Notes",
         ["DIAGRAM"] = "Geo.Tool.Diagram",
-        ["HACKERSIM"] = "Geo.Tool.HackerSimulator",
         ["CMDLIB"] = "Geo.Tool.CommandLibrary",
         ["PRIVLAUNCH"] = "Geo.Tool.PrivilegeLauncher",
         ["WOL"] = "Geo.Tool.WakeOnLan",
@@ -338,7 +336,6 @@ public sealed class ToolRegistry
         ["SERVICES"] = "ToolSystemBrush",
         ["NOTES"] = "ToolSystemBrush",
         ["DIAGRAM"] = "ToolSystemBrush",
-        ["HACKERSIM"] = "ToolSystemBrush",
         ["CMDLIB"] = "ToolSystemBrush",
         ["PRIVLAUNCH"] = "ToolSystemBrush",
         ["WOL"] = "ToolExternalBrush",

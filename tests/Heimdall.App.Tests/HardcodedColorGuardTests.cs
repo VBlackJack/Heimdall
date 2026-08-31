@@ -40,7 +40,7 @@ public sealed class HardcodedColorGuardTests
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             // Theme definition file: the bridge itself defines fixed slots
-            // (hacker-simulator retro palette, overlay scrim).
+            // (overlay scrim).
             [@"Themes\HeimdallThemeBridge.xaml"] = "theme bridge definition",
             // Syntax/diff/markdown highlighting palettes — content, not chrome.
             [@"Themes\DraculaSyntaxPalette.cs"] = "fixed Dracula syntax palette",
@@ -50,10 +50,6 @@ public sealed class HardcodedColorGuardTests
             [@"Views\Tools\TextDiffView.xaml.cs"] = "diff highlighting palette",
             // Terminal color schemes (Dracula/Solarized/Monokai/Nord).
             [@"Views\EmbeddedSshView.xaml.cs"] = "terminal color schemes",
-            // Hacker-simulator fixed retro-terminal look.
-            [@"Views\Tools\HackerSimulatorView.xaml"] = "hacker simulator palette",
-            [@"Views\Tools\HackerSimulatorView.xaml.cs"] = "hacker simulator palette",
-            [@"Views\Tools\HackerSimulatorView.Registry.cs"] = "hacker simulator palette",
             // Exported HTML/CSS styling (rendered outside the app).
             [@"Services\EphemeralFileServer.cs"] = "exported HTML/CSS",
             [@"Services\HtmlReportGenerator.cs"] = "exported HTML/CSS",

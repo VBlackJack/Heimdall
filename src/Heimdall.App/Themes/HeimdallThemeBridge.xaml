@@ -94,19 +94,4 @@
     <SolidColorBrush x:Key="BroadcastActiveBrush" Color="{DynamicResource RedColor}" Opacity="0.27" />
 
     <!-- Hacker Simulator fixed retro-terminal brushes -->
-    <SolidColorBrush x:Key="HackerSimBackgroundBrush" Color="#0F0F0F" />
-    <SolidColorBrush x:Key="HackerSimSurfaceBrush" Color="#151515" />
-    <SolidColorBrush x:Key="HackerSimToolbarBrush" Color="#0F0F0F" />
-    <SolidColorBrush x:Key="HackerSimBorderBrush" Color="#222222" />
-    <SolidColorBrush x:Key="HackerSimInputBorderBrush" Color="#333333" />
-    <SolidColorBrush x:Key="HackerSimTextPrimaryBrush" Color="#D4FFD9" />
-    <SolidColorBrush x:Key="HackerSimTextSecondaryBrush" Color="#6FAF7C" />
-    <SolidColorBrush x:Key="HackerSimTextMutedBrush" Color="#555555" />
-    <SolidColorBrush x:Key="HackerSimButtonForegroundBrush" Color="#777777" />
-    <SolidColorBrush x:Key="HackerSimButtonBackgroundBrush" Color="#1A1A1A" />
-    <SolidColorBrush x:Key="HackerSimAccentBrush" Color="#00FF41" />
-    <SolidColorBrush x:Key="HackerSimHighlightBrush" Color="#FFD700" />
-    <SolidColorBrush x:Key="HackerSimGlowBrush" Color="#1000FF41" />
-    <SolidColorBrush x:Key="HackerSimGlowStrongBrush" Color="#2200FF41" />
-    <SolidColorBrush x:Key="HackerSimOverlayBrush" Color="#16FFFFFF" />
 </ResourceDictionary>

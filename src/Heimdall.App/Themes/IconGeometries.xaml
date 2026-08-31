@@ -286,7 +286,6 @@
     <Geometry x:Key="Geo.Tool.CommandLibrary">M1,2 L11,2 L11,14 L1,14 Z M3,5 L5,5 M6,5 L9,5 M3,7 L9,7 M3,9 L7,9 M3,11 L9,11 M12,4 L15,4 L15,13 L11,13 M12,4 L12,13</Geometry>
 
     <!-- Hacker Simulator: monitor with falling code columns -->
-    <Geometry x:Key="Geo.Tool.HackerSimulator">M2,1 L14,1 L14,10 L2,10 Z M6,12 L10,12 M7,10 L7,12 M9,10 L9,12 M4,3 L4,8 M7,4 L7,9 M10,2.5 L10,7.5 M12.5,3.5 L12.5,6.5</Geometry>
 
     <!-- SecNumCloud Audit: shield with checklist -->
     <Geometry x:Key="Geo.Tool.SecNumCloud">M8,1 L14,4 L14,9 C14,12 11,14.5 8,15.5 C5,14.5 2,12 2,9 L2,4 Z M5,7 L6.5,7 M7.5,7 L11,7 M5,9.5 L6.5,9.5 M7.5,9.5 L11,9.5 M5,12 L6.5,12 M7.5,12 L11,12</Geometry>

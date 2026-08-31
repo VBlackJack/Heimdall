@@ -17,7 +17,7 @@ d'outils externes et l'infrastructure d'hébergement des outils.
 
 ## Vue d'ensemble
 
-Heimdall embarque 59 outils intégrés enregistrés par `ToolRegistry`. Le jeton
+Heimdall embarque 58 outils intégrés enregistrés par `ToolRegistry`. Le jeton
 brut `Entry(` apparaît plus souvent dans `ToolRegistry.cs` parce qu'il
 correspond aussi au record interne `ToolEntry`, au chemin d'enregistrement
 dynamique des outils externes et à la méthode d'aide privée. Le nombre effectif
@@ -32,7 +32,7 @@ le constructeur :
 
 Les outils issus des fournisseurs externes sont détectés à l'exécution et
 ajoutés au registre après les scans de démarrage. Ils ne font pas partie du
-décompte des 59 outils intégrés.
+décompte des 58 outils intégrés.
 
 ## Catalogue des outils intégrés
 
@@ -109,7 +109,6 @@ panneaux divisés et la recherche d'outils.
 | `SERVICES` | Service Status Dashboard |
 | `NOTES` | Notes |
 | `DIAGRAM` | Diagram Editor |
-| `HACKERSIM` | Hacker Simulator |
 | `CMDLIB` | Command Library |
 | `PRIVLAUNCH` | Privilege Launcher |
 

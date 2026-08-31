@@ -2450,8 +2450,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
             // Check for any ancestor that has its own context menu
             if (FindAncestor<Views.EmbeddedSftpView>(clickSource) is not null
-                || FindAncestor<Views.LocalFileBrowserView>(clickSource) is not null
-                || FindAncestor<Views.Tools.HackerSimulatorView>(clickSource) is not null)
+                || FindAncestor<Views.LocalFileBrowserView>(clickSource) is not null)
             {
                 return;
             }

@@ -58,12 +58,6 @@
     <Content Include="..\..\config\servers.default.json" Link="config\servers.default.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\config\hacker-simulator.scenarios.default.json" Link="config\hacker-simulator.scenarios.default.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\config\hacker-simulator.playlists.default.json" Link="config\hacker-simulator.playlists.default.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="..\..\locales\en.json" Link="locales\en.json" Condition="Exists('..\..\locales\en.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

@@ -85,21 +85,6 @@ public sealed class HeimdallThemeBridgeTests
         "FileExecutableBrush",
         "FileImageBrush",
         "BroadcastActiveBrush",
-        "HackerSimBackgroundBrush",
-        "HackerSimSurfaceBrush",
-        "HackerSimToolbarBrush",
-        "HackerSimBorderBrush",
-        "HackerSimInputBorderBrush",
-        "HackerSimTextPrimaryBrush",
-        "HackerSimTextSecondaryBrush",
-        "HackerSimTextMutedBrush",
-        "HackerSimButtonForegroundBrush",
-        "HackerSimButtonBackgroundBrush",
-        "HackerSimAccentBrush",
-        "HackerSimHighlightBrush",
-        "HackerSimGlowBrush",
-        "HackerSimGlowStrongBrush",
-        "HackerSimOverlayBrush",
     ];
 
     [Fact]
@@ -129,7 +114,7 @@ public sealed class HeimdallThemeBridgeTests
             .ToList();
 
         Assert.Empty(duplicateKeys);
-        Assert.Equal(77, brushKeys.Count);
+        Assert.Equal(62, brushKeys.Count);
         Assert.Equal(
             ExpectedBrushKeys.OrderBy(key => key, StringComparer.Ordinal),
             brushKeys.OrderBy(key => key, StringComparer.Ordinal));

@@ -17,7 +17,7 @@ providers, and tool-hosting infrastructure.
 
 ## Overview
 
-Heimdall ships 59 built-in tools registered by `ToolRegistry`. The raw
+Heimdall ships 58 built-in tools registered by `ToolRegistry`. The raw
 `Entry(` token appears more often in `ToolRegistry.cs` because it also matches
 the internal `ToolEntry` record, the dynamic external-tool registration path,
 and the private helper method. The effective built-in count is the set of
@@ -30,7 +30,7 @@ registry entries in the constructor:
 - External native tools: 6
 
 External provider tools are detected at runtime and appended to the registry
-after startup scans. They are not part of the 59 built-in count.
+after startup scans. They are not part of the 58 built-in count.
 
 ## Built-In Tool Catalog
 
@@ -106,7 +106,6 @@ keys used by command palette, tabs, split panes, and tool lookup.
 | `SERVICES` | Service Status Dashboard |
 | `NOTES` | Notes |
 | `DIAGRAM` | Diagram Editor |
-| `HACKERSIM` | Hacker Simulator |
 | `CMDLIB` | Command Library |
 | `PRIVLAUNCH` | Privilege Launcher |
 
