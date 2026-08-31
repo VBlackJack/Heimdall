@@ -24,6 +24,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
+using Heimdall.Core.Rdp;
 using Heimdall.Core.Ssh;
 using Heimdall.Rdp;
 using Heimdall.Rdp.Display;
@@ -878,12 +879,14 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(200, 7680, ErrorMessage = "RDP fixed width must be between 200 and 7680.")]
+    [Range(RdpDisplayLimits.MinimumFixedDimension, RdpDisplayLimits.MaximumFixedWidth,
+        ErrorMessage = RdpDisplayLimits.FixedWidthRangeMessage)]
     private int _rdpFixedWidth = DefaultRdpFixedWidth;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(200, 4320, ErrorMessage = "RDP fixed height must be between 200 and 4320.")]
+    [Range(RdpDisplayLimits.MinimumFixedDimension, RdpDisplayLimits.MaximumFixedHeight,
+        ErrorMessage = RdpDisplayLimits.FixedHeightRangeMessage)]
     private int _rdpFixedHeight = DefaultRdpFixedHeight;
 
     [ObservableProperty]
@@ -2379,8 +2382,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         ["WinRM port must be between 1 and 65535."] = "ValidationWinRmPortRange",
         ["Audio mode must be 0 (disabled), 1 (local), or 2 (remote)."] = "ValidationAudioMode",
         ["Color depth must be between 8 and 32."] = "ValidationColorDepth",
-        ["RDP fixed width must be between 200 and 7680."] = "ValidationRdpFixedWidthRange",
-        ["RDP fixed height must be between 200 and 4320."] = "ValidationRdpFixedHeightRange",
+        [RdpDisplayLimits.FixedWidthRangeMessage] = "ValidationRdpFixedWidthRange",
+        [RdpDisplayLimits.FixedHeightRangeMessage] = "ValidationRdpFixedHeightRange",
         ["RDP resize delay must be inherited, zero, or between 1000 and 60000 ms."] = "ValidationRdpResizeEnableDelayRange",
         ["FTP port must be between 1 and 65535."] = "ValidationFtpPortRange",
         ["VNC port must be between 1 and 65535."] = "ValidationVncPortRange",

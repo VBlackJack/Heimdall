@@ -1,0 +1,93 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+namespace Heimdall.Core.Rdp;
+
+/// <summary>
+/// The single definition of how large a fixed-resolution RDP desktop may be.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Five places used to carry their own copy of the pair 7680 x 4320: the schema
+/// validator, the external-session profile resolver, the server dialog's range
+/// attributes, the range messages that repeat the numbers in prose, and an
+/// inline pattern in the custom-resolution parser. They agreed only because
+/// nobody had changed one of them yet.
+/// </para>
+/// <para>
+/// This type lives in <c>Heimdall.Core</c> deliberately. Core carries no project
+/// reference of its own, so it is visible from <c>Heimdall.App</c> and from
+/// <c>Heimdall.Rdp</c> alike. That is what makes a shared limit possible at all:
+/// an earlier attempt put the clamp in <c>Heimdall.Rdp</c> and had to duplicate
+/// the constants there, because <c>Heimdall.Rdp</c> cannot reference
+/// <c>Heimdall.App</c>.
+/// </para>
+/// <para>
+/// The members are <see langword="const" /> rather than <see langword="static" />
+/// <see langword="readonly" /> because two consumers need compile-time constants:
+/// the <c>[Range]</c> attributes on the server dialog, and the relational
+/// patterns in the custom-resolution parser.
+/// </para>
+/// <para>
+/// <c>SchemaValidator.MaxResolution</c> is a different decision that happens to
+/// hold the same number today - it bounds a session's screen size, not a fixed
+/// desktop - so it is deliberately not folded in here. Sharing text that merely
+/// matches would couple two rules that are free to diverge.
+/// </para>
+/// </remarks>
+public static class RdpDisplayLimits
+{
+    /// <summary>Smallest width or height a fixed RDP desktop may request, in pixels.</summary>
+    public const int MinimumFixedDimension = 200;
+
+    /// <summary>Largest width a fixed RDP desktop may request, in pixels (8K).</summary>
+    public const int MaximumFixedWidth = 7680;
+
+    /// <summary>Largest height a fixed RDP desktop may request, in pixels (8K).</summary>
+    public const int MaximumFixedHeight = 4320;
+
+    /// <summary>Validation message for an out-of-range fixed width.</summary>
+    /// <remarks>
+    /// The numbers are spelled out rather than interpolated from the constants
+    /// above: a <see langword="const" /> interpolated string accepts only constant
+    /// <see cref="string" /> operands, and these bounds are integers. The message
+    /// must stay a compile-time constant because it is the <c>ErrorMessage</c> of a
+    /// <c>[Range]</c> attribute and the key of the localization lookup that maps it.
+    /// <c>RdpDisplayLimitsTests.RangeMessages_QuoteTheEnforcedBounds</c> fails if a
+    /// bound changes and the prose does not follow.
+    /// </remarks>
+    public const string FixedWidthRangeMessage =
+        "RDP fixed width must be between 200 and 7680.";
+
+    /// <summary>Validation message for an out-of-range fixed height.</summary>
+    /// <remarks>Guarded by the same test as <see cref="FixedWidthRangeMessage" />.</remarks>
+    public const string FixedHeightRangeMessage =
+        "RDP fixed height must be between 200 and 4320.";
+
+    /// <summary>
+    /// Brings a requested fixed width inside <see cref="MinimumFixedDimension" />
+    /// and <see cref="MaximumFixedWidth" />.
+    /// </summary>
+    public static int ClampFixedWidth(int width) =>
+        Math.Clamp(width, MinimumFixedDimension, MaximumFixedWidth);
+
+    /// <summary>
+    /// Brings a requested fixed height inside <see cref="MinimumFixedDimension" />
+    /// and <see cref="MaximumFixedHeight" />.
+    /// </summary>
+    public static int ClampFixedHeight(int height) =>
+        Math.Clamp(height, MinimumFixedDimension, MaximumFixedHeight);
+}

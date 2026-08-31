@@ -16,6 +16,7 @@
 
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Rdp;
 using Heimdall.Rdp;
 using Heimdall.Rdp.Display;
 using DrawingSize = System.Drawing.Size;
@@ -42,9 +43,9 @@ internal static class RdpProfileResolver
 {
     private const int FallbackWidth = 1920;
     private const int FallbackHeight = 1080;
-    private const int MinimumFixedSize = 200;
-    private const int MaximumFixedWidth = 7680;
-    private const int MaximumFixedHeight = 4320;
+    private const int MinimumFixedSize = RdpDisplayLimits.MinimumFixedDimension;
+    private const int MaximumFixedWidth = RdpDisplayLimits.MaximumFixedWidth;
+    private const int MaximumFixedHeight = RdpDisplayLimits.MaximumFixedHeight;
 
     /// <summary>
     /// Resolves the username/domain pair used for RDP credential injection.

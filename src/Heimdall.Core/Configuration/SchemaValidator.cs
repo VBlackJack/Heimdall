@@ -16,6 +16,7 @@
 
 using System.Text.RegularExpressions;
 using Heimdall.Core.Models;
+using Heimdall.Core.Rdp;
 
 namespace Heimdall.Core.Configuration;
 
@@ -28,9 +29,9 @@ public static partial class SchemaValidator
     private const int MaxPort = 65535;
     private const int MinResolution = 640;
     private const int MaxResolution = 7680;
-    private const int MinRdpFixedDimension = 200;
-    private const int MaxRdpFixedWidth = 7680;
-    private const int MaxRdpFixedHeight = 4320;
+    private const int MinRdpFixedDimension = RdpDisplayLimits.MinimumFixedDimension;
+    private const int MaxRdpFixedWidth = RdpDisplayLimits.MaximumFixedWidth;
+    private const int MaxRdpFixedHeight = RdpDisplayLimits.MaximumFixedHeight;
     private const int MinColorDepth = 8;
     private const int MaxColorDepth = 32;
     private const int DisabledRdpResizeDelayMs = 0;
