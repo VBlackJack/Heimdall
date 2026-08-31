@@ -20,6 +20,7 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using Heimdall.App.Behaviors;
 using Heimdall.App.UiTests.Infrastructure;
+using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
 
 namespace Heimdall.App.UiTests;
@@ -153,6 +154,71 @@ public sealed class ItemContainerAutomationIdentityTests
         {
             WpfTestHost.Invoke(() => window!.Close());
         }
+    }
+
+    /// <summary>
+    /// The behaviour's own remarks name <c>DataGridRow</c> as a qualifying container, but
+    /// nothing measured it until the three import dialogs started relying on it. A DataGrid
+    /// generates its rows through a different path from a ListBox, so "it works for
+    /// ListBoxItem" is a resemblance argument, not evidence.
+    /// </summary>
+    [StaFact]
+    public void DataGridRowContainer_AnnouncesTheItemName_NotItsClassName()
+    {
+        var row = new AccessibleRow("Known host build-01 port 22, New");
+
+        DataGrid? grid = null;
+        Window? window = null;
+        IntPtr windowHandle = IntPtr.Zero;
+
+        WpfTestHost.Invoke(() =>
+        {
+            grid = new DataGrid
+            {
+                Width = 320,
+                Height = 240,
+                AutoGenerateColumns = false,
+                ItemsSource = new[] { row }
+            };
+            var rowStyle = new Style(typeof(DataGridRow));
+            rowStyle.Setters.Add(new Setter(
+                ItemContainerAccessibilityBehavior.IsEnabledProperty,
+                true));
+            grid.RowStyle = rowStyle;
+
+            window = Show(grid);
+            grid.UpdateLayout();
+            var container = Assert.IsType<DataGridRow>(
+                grid.ItemContainerGenerator.ContainerFromItem(row));
+            AutomationProperties.SetAutomationId(container, "GridRow");
+            windowHandle = new WindowInteropHelper(window).Handle;
+        });
+
+        try
+        {
+            AutomationElement root = AutomationElement.FromHandle(windowHandle);
+            AutomationElement? element = root.FindFirst(
+                TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.AutomationIdProperty, "GridRow"));
+
+            Assert.NotNull(element);
+
+            string name = element!.Current.Name;
+
+            Assert.DoesNotContain(nameof(AccessibleRow), name, StringComparison.Ordinal);
+            Assert.Equal("Known host build-01 port 22, New", name);
+        }
+        finally
+        {
+            WpfTestHost.Invoke(() => window!.Close());
+        }
+    }
+
+    private sealed class AccessibleRow(string accessibleName) : IAccessibleItemViewModel
+    {
+        public string AccessibleName { get; } = accessibleName;
+
+        public string? AccessibleHelpText => null;
     }
 
     private static Window Show(UIElement content)

@@ -80,7 +80,8 @@ public sealed class ImportKnownHostsDialogViewModelTests
             fullFingerprint,
             KnownHostsCandidateStatus.New,
             "New",
-            string.Empty);
+            string.Empty,
+            "Known host host port 22, New");
 
         Assert.Equal(fullFingerprint, item.Fingerprint);
         Assert.Equal("SHA256:abcdefghij…789ABCDEF=", item.FingerprintDisplay);

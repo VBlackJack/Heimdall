@@ -111,6 +111,14 @@ public static class WpfTestHost
                 return;
             }
 
+            // This host builds the real application, so its startup takes the
+            // single-instance guard on the developer's own data root. Left engaged, the
+            // test process owns the directory and the end-to-end test that launches the
+            // product finds it taken and exits at once. Set before the App is built, and
+            // inherited by every process the tests launch.
+            Environment.SetEnvironmentVariable(
+                Heimdall.App.Services.SingleInstanceGuard.DisableEnvironmentVariable, "0");
+
             using var ready = new ManualResetEventSlim(false);
             _thread = new Thread(() =>
             {
