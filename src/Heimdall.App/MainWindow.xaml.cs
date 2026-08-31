@@ -641,26 +641,24 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     }
 
     /// <summary>
-    /// Prompts the user to discard unsaved settings changes when navigating away.
+    /// Asks what to do about unsaved settings before leaving the Settings tab.
     /// Returns true if navigation should proceed, false if it should be cancelled.
     /// </summary>
+    /// <remarks>
+    /// This used to ask its own question, and the question was wrong: a yes/no confirm
+    /// whose title read "Apply them before leaving?" and whose yes called
+    /// <c>DiscardChangesAsync</c>. There was no answer that applied the changes, and the
+    /// one that read like apply was the one that destroyed them. The three-way dialog was
+    /// already in the product on the view model's own navigation path; the two paths now
+    /// share the one decision rather than each owning a copy of it.
+    /// </remarks>
     private async Task<bool> CheckUnsavedSettingsAsync()
     {
         if (DataContext is not MainViewModel vm) return true;
         if (vm.SelectedTab != ShellTab.Settings) return true;
         if (!vm.Settings.IsDirty) return true;
 
-        var discard = await vm.DialogService.ShowConfirmAsync(
-            vm.Localize("SettingsUnsavedWarningTitle"),
-            vm.Localize("SettingsUnsavedWarning"),
-            "warning");
-
-        if (discard)
-        {
-            await vm.Settings.DiscardChangesAsync();
-        }
-
-        return discard;
+        return await vm.ResolveUnsavedSettingsAsync();
     }
 
     private async void OnAddFolderFromMenu(object sender, RoutedEventArgs e)

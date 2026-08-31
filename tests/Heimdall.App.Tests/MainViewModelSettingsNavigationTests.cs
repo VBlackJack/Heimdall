@@ -325,6 +325,84 @@ public sealed class MainViewModelSettingsNavigationTests
         Throw
     }
 
+    /// <summary>
+    /// The decision both ways of leaving the Settings tab now share.
+    /// </summary>
+    /// <remarks>
+    /// The shell's tab buttons used to run a second copy of this rule in the code-behind: a
+    /// yes/no confirm titled "Apply them before leaving?" whose yes called DiscardChangesAsync.
+    /// No answer applied the changes, and the one that read like apply destroyed them. These
+    /// tests pin the shared method so a copy cannot come back and disagree quietly.
+    /// </remarks>
+    [Fact]
+    public async Task ResolveUnsavedSettings_Save_SavesAndLetsTheCallerLeave()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        harness.Main.SelectedTab = "Settings";
+        harness.Main.Settings.IsDirty = true;
+        harness.Dialog.SaveDiscardAnswer = true;
+
+        bool mayLeave = await harness.Main.ResolveUnsavedSettingsAsync();
+
+        Assert.True(mayLeave);
+        Assert.False(harness.Main.Settings.IsDirty);
+        Assert.Equal(1, harness.Dialog.SavePromptCount);
+    }
+
+    [Fact]
+    public async Task ResolveUnsavedSettings_Discard_LetsTheCallerLeave()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        harness.Main.SelectedTab = "Settings";
+        harness.Main.Settings.IsDirty = true;
+        harness.Dialog.SaveDiscardAnswer = false;
+
+        bool mayLeave = await harness.Main.ResolveUnsavedSettingsAsync();
+
+        Assert.True(mayLeave);
+        Assert.Equal(1, harness.Dialog.SavePromptCount);
+    }
+
+    [Fact]
+    public async Task ResolveUnsavedSettings_Cancel_HoldsTheCaller()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        harness.Main.SelectedTab = "Settings";
+        harness.Main.Settings.IsDirty = true;
+        harness.Dialog.SaveDiscardAnswer = null;
+
+        bool mayLeave = await harness.Main.ResolveUnsavedSettingsAsync();
+
+        Assert.False(mayLeave);
+        // Cancel means stay AND keep the edits: a cancel that discarded would be the same
+        // defect this replaced, wearing the opposite label.
+        Assert.True(harness.Main.Settings.IsDirty);
+    }
+
+    /// <summary>
+    /// The regression oracle. The defect was not a wrong branch, it was the wrong QUESTION:
+    /// a two-answer confirm standing in for a three-answer decision. Asserting on the outcome
+    /// alone would pass again the day somebody reintroduces a yes/no prompt that happens to
+    /// save on yes.
+    /// </summary>
+    [Fact]
+    public async Task ResolveUnsavedSettings_NeverAsksATwoAnswerQuestion()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        harness.Main.SelectedTab = "Settings";
+        harness.Main.Settings.IsDirty = true;
+
+        foreach (bool? answer in new bool?[] { true, false, null })
+        {
+            harness.Main.Settings.IsDirty = true;
+            harness.Dialog.SaveDiscardAnswer = answer;
+            await harness.Main.ResolveUnsavedSettingsAsync();
+        }
+
+        Assert.Equal(0, harness.Dialog.ConfirmPromptCount);
+        Assert.Equal(3, harness.Dialog.SavePromptCount);
+    }
+
     private sealed class TestHarness : IDisposable
     {
         private readonly string _rootPath;
@@ -599,16 +677,25 @@ public sealed class MainViewModelSettingsNavigationTests
     {
         public int SavePromptCount { get; private set; }
 
+        /// <summary>Counts the yes/no dialog the unsaved-settings guard must never ask.</summary>
+        public int ConfirmPromptCount { get; private set; }
+
+        /// <summary>What the user answers to save / discard / cancel.</summary>
+        public bool? SaveDiscardAnswer { get; set; } = true;
+
         public Task<bool> ShowConfirmAsync(
             string title,
             string message,
-            string severity = "info") =>
-            Task.FromResult(true);
+            string severity = "info")
+        {
+            ConfirmPromptCount++;
+            return Task.FromResult(true);
+        }
 
         public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)
         {
             SavePromptCount++;
-            return Task.FromResult<bool?>(true);
+            return Task.FromResult(SaveDiscardAnswer);
         }
 
         public Task<string?> ShowInputAsync(
