@@ -144,3 +144,6 @@ tests. Tout le reste, y compris les compilations de release et les installeurs, 
 Copyright 2026 Julien Bombled
 
 Distribué sous licence Apache 2.0. Voir [LICENSE](LICENSE) pour les détails.
+
+Heimdall redistribue des composants tiers sous leurs propres licences. Voir
+[THIRD-PARTY-NOTICES.fr.md](THIRD-PARTY-NOTICES.fr.md).
