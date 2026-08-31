@@ -77,12 +77,24 @@ public partial class ServerDialogViewModel : ObservableValidator
     private int _screenCount;
 
     /// <summary>
+    /// Saved monitor indices this machine has no screen for, kept aside so that saving from a
+    /// laptop does not delete the screens the profile was configured with at a desk.
+    /// </summary>
+    private int[] _selectedMonitorIndicesNotAttached = [];
+
+    /// <summary>
     /// Localizer for translating validation error messages. Set by the dialog service.
     /// </summary>
+    /// <remarks>
+    /// The dialog service assigns this on every open, after the caller has finished hydrating.
+    /// Everything the assignment raises is a re-read of the same state in another language, so it
+    /// runs with dirty tracking suspended: without that the unsaved-changes guard fired on a
+    /// dialog the user had not touched, and taught them to dismiss it unread.
+    /// </remarks>
     public LocalizationManager? Localizer
     {
         get => _localizer;
-        set
+        set => RunWithoutDirtyTracking(() =>
         {
             _localizer = value;
             OnPropertyChanged(nameof(ConnectionTypeDisplayName));
@@ -95,22 +107,30 @@ public partial class ServerDialogViewModel : ObservableValidator
             OnPropertyChanged(nameof(RdpResizeEnableDelayPlaceholder));
             RefreshAvailableMonitors();
             RefreshAgentChipIfNeeded();
-        }
+        });
     }
 
     /// <summary>Application settings for configurable defaults.</summary>
+    /// <remarks>
+    /// Suspends dirty tracking for the same reason as <see cref="Localizer"/>: this carries the
+    /// application's defaults into the dialog, never the user's intent.
+    /// </remarks>
     public AppSettings? Settings
     {
         set
         {
             if (value is null) return;
-            _defaultRdpTunnelPort = value.DefaultRdpTunnelPort;
-            _defaultSshTunnelPort = value.DefaultSshTunnelPort;
-            _defaultRdpResizeEnableDelayMs = value.RdpResizeEnableDelayMs;
-            _sshAgentPreference = value.SshAgentPreference;
-            ApplyRdpDialogAdvancedDefault(value.RdpDialogAdvancedDefault);
-            OnPropertyChanged(nameof(RdpResizeEnableDelayPlaceholder));
-            RefreshAgentChipIfNeeded();
+            AppSettings settings = value;
+            RunWithoutDirtyTracking(() =>
+            {
+                _defaultRdpTunnelPort = settings.DefaultRdpTunnelPort;
+                _defaultSshTunnelPort = settings.DefaultSshTunnelPort;
+                _defaultRdpResizeEnableDelayMs = settings.RdpResizeEnableDelayMs;
+                _sshAgentPreference = settings.SshAgentPreference;
+                ApplyRdpDialogAdvancedDefault(settings.RdpDialogAdvancedDefault);
+                OnPropertyChanged(nameof(RdpResizeEnableDelayPlaceholder));
+                RefreshAgentChipIfNeeded();
+            });
         }
     }
 
@@ -318,6 +338,24 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     public string? ExistingWinRmPasswordEncrypted { get; set; }
 
+    /// <summary>Whether a WinRM password is stored for this profile.</summary>
+    public bool HasStoredWinRmPassword => !string.IsNullOrEmpty(ExistingWinRmPasswordEncrypted);
+
+    /// <summary>Forgets the stored WinRM password.</summary>
+    /// <remarks>
+    /// An empty box means "keep what is stored", so emptying the box cannot be the gesture that
+    /// removes a secret, and nothing else in this dialog could. A user who wanted to stop storing
+    /// a credential cleared the field, saved, and kept the credential without being told.
+    /// </remarks>
+    [RelayCommand]
+    private void ClearStoredWinRmPassword()
+    {
+        ExistingWinRmPasswordEncrypted = null;
+        WinRmPassword = "";
+        OnPropertyChanged(nameof(HasStoredWinRmPassword));
+        IsDirty = true;
+    }
+
     // --- SSH settings ---
 
     [ObservableProperty]
@@ -341,6 +379,36 @@ public partial class ServerDialogViewModel : ObservableValidator
     public string? ExistingSshPasswordEncrypted { get; set; }
     public string? ExistingSshKeyPassphraseEncrypted { get; set; }
     public string? ExistingRdpPasswordEncrypted { get; set; }
+
+    /// <summary>Whether an SSH password is stored for this profile.</summary>
+    public bool HasStoredSshPassword => !string.IsNullOrEmpty(ExistingSshPasswordEncrypted);
+
+    /// <summary>Whether an RDP password is stored for this profile.</summary>
+    public bool HasStoredRdpPassword => !string.IsNullOrEmpty(ExistingRdpPasswordEncrypted);
+
+    /// <summary>Forgets the stored SSH password.</summary>
+    [RelayCommand]
+    private void ClearStoredSshPassword()
+    {
+        ExistingSshPasswordEncrypted = null;
+        SshPassword = "";
+        OnPropertyChanged(nameof(HasStoredSshPassword));
+
+        // The authentication hint reads the field this command just emptied, and would otherwise
+        // go on promising password authentication for a secret that no longer exists.
+        OnPropertyChanged(nameof(SshAuthHint));
+        IsDirty = true;
+    }
+
+    /// <summary>Forgets the stored RDP password.</summary>
+    [RelayCommand]
+    private void ClearStoredRdpPassword()
+    {
+        ExistingRdpPasswordEncrypted = null;
+        RdpPassword = "";
+        OnPropertyChanged(nameof(HasStoredRdpPassword));
+        IsDirty = true;
+    }
 
     [ObservableProperty]
     private bool _sshCompression;
@@ -785,6 +853,19 @@ public partial class ServerDialogViewModel : ObservableValidator
     // Existing encrypted FTP password (preserved on edit if user doesn't change it)
     public string? ExistingFtpPasswordEncrypted { get; set; }
 
+    /// <summary>Whether an FTP password is stored for this profile.</summary>
+    public bool HasStoredFtpPassword => !string.IsNullOrEmpty(ExistingFtpPasswordEncrypted);
+
+    /// <summary>Forgets the stored FTP password.</summary>
+    [RelayCommand]
+    private void ClearStoredFtpPassword()
+    {
+        ExistingFtpPasswordEncrypted = null;
+        FtpPassword = "";
+        OnPropertyChanged(nameof(HasStoredFtpPassword));
+        IsDirty = true;
+    }
+
     // --- Telnet settings ---
 
     [ObservableProperty]
@@ -818,6 +899,19 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     // Existing encrypted VNC password (preserved on edit if user doesn't change it)
     public string? ExistingVncPasswordEncrypted { get; set; }
+
+    /// <summary>Whether a VNC password is stored for this profile.</summary>
+    public bool HasStoredVncPassword => !string.IsNullOrEmpty(ExistingVncPasswordEncrypted);
+
+    /// <summary>Forgets the stored VNC password.</summary>
+    [RelayCommand]
+    private void ClearStoredVncPassword()
+    {
+        ExistingVncPasswordEncrypted = null;
+        VncPassword = "";
+        OnPropertyChanged(nameof(HasStoredVncPassword));
+        IsDirty = true;
+    }
 
     // --- RDP settings ---
 
@@ -1092,6 +1186,15 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(CanRemoveSelectedPostConnectStep),
         nameof(CanMoveSelectedPostConnectStepUp),
         nameof(CanMoveSelectedPostConnectStepDown),
+
+        // Read-only diagnostics. None of them is persisted by ToDto, so running the reachability
+        // test or letting the agent chip probe must not claim the profile was edited.
+        nameof(AgentChipState),
+        nameof(AgentChipText),
+        nameof(TestChipState),
+        nameof(TestChipText),
+        nameof(IsTestingReachability),
+        nameof(IsTestingRdpConnection),
     };
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
@@ -1103,6 +1206,31 @@ public partial class ServerDialogViewModel : ObservableValidator
         if (DirtyExcludedProperties.Contains(e.PropertyName)) return;
 
         IsDirty = true;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="apply"/> with dirty tracking suspended.
+    /// </summary>
+    /// <remarks>
+    /// Reuses the class's own suppression flag rather than inventing a second mechanism, and
+    /// saves and restores it so a nested call cannot re-arm tracking half-way through an outer
+    /// one. Same shape as <c>LoadPostConnectSteps</c>.
+    /// <para>Preferred over enumerating the derived names in <c>DirtyExcludedProperties</c>: that
+    /// list is a blacklist which rots, and letting it fall behind is exactly how the dialog came
+    /// to open dirty.</para>
+    /// </remarks>
+    private void RunWithoutDirtyTracking(Action apply)
+    {
+        bool wasInitializing = _isInitializing;
+        _isInitializing = true;
+        try
+        {
+            apply();
+        }
+        finally
+        {
+            _isInitializing = wasInitializing;
+        }
     }
 
     // --- Validation ---
@@ -1197,6 +1325,17 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     public bool ShowRdpSelectedMonitors =>
         ShowRdpMultimonNote && IsMultimonAvailable;
+
+    /// <summary>
+    /// Whether to say that saved monitors this machine cannot show are being kept.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not gated on <see cref="IsMultimonAvailable"/>. On a single-screen machine the
+    /// picker is not rendered at all, and that is precisely the case where the user needs telling
+    /// that the screens they chose at their desk survived the visit.
+    /// </remarks>
+    public bool ShowUnavailableSelectedMonitors =>
+        ShowRdpMultimonNote && _selectedMonitorIndicesNotAttached.Length > 0;
 
     public string RdpResizeEnableDelayPlaceholder =>
         string.Format(
@@ -1681,20 +1820,31 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(ShowRdpResizeEnableDelay));
         OnPropertyChanged(nameof(ShowRdpMultimonNote));
         OnPropertyChanged(nameof(ShowRdpSelectedMonitors));
+        OnPropertyChanged(nameof(ShowUnavailableSelectedMonitors));
     }
 
+    /// <remarks>
+    /// Re-enumerating the screens reads the machine; it never edits the profile. What ToDto keeps
+    /// is the union of the ticked monitors and the ones this machine has no screen for, and a
+    /// rebuild carries both halves across unchanged, so there is nothing here for the guard to
+    /// protect. Left tracked, the derived names the rebuild raises armed the unsaved-changes
+    /// prompt on a dialog nobody had edited.
+    /// </remarks>
     [RelayCommand]
     private void RefreshMonitors()
     {
-        RefreshAvailableMonitors();
+        RunWithoutDirtyTracking(() => RefreshAvailableMonitors());
     }
 
     private void RefreshAvailableMonitors(IEnumerable<int>? preferredSelection = null)
     {
+        // Without the carried indices the rebuild is what erases them: they have no checkbox to
+        // read them back from, so a second refresh would drop what the first one preserved.
         HashSet<int> selectedIndices = preferredSelection is null
             ? AvailableMonitors
                 .Where(monitor => monitor.IsSelected)
                 .Select(monitor => monitor.Index)
+                .Concat(_selectedMonitorIndicesNotAttached)
                 .ToHashSet()
             : preferredSelection.ToHashSet();
 
@@ -1702,14 +1852,61 @@ public partial class ServerDialogViewModel : ObservableValidator
             .OrderBy(monitor => monitor.Index)
             .ToArray();
 
+        // Recomputed on every rebuild rather than on hydration alone, so unplugging a screen while
+        // the dialog is open preserves the selection the same way opening it undocked does.
+        _selectedMonitorIndicesNotAttached =
+        [
+            .. selectedIndices
+                .Where(index => !monitors.Any(monitor => monitor.Index == index))
+                .Order()
+        ];
+
+        foreach (MonitorChoiceViewModel existing in AvailableMonitors)
+        {
+            DetachMonitorChoice(existing);
+        }
+
         AvailableMonitors.Clear();
         foreach (MonitorInfo monitor in monitors)
         {
-            AvailableMonitors.Add(CreateMonitorChoice(monitor, selectedIndices.Contains(monitor.Index)));
+            MonitorChoiceViewModel choice = CreateMonitorChoice(monitor, selectedIndices.Contains(monitor.Index));
+            AttachMonitorChoice(choice);
+            AvailableMonitors.Add(choice);
         }
 
         _screenCount = AvailableMonitors.Count;
         RaiseRdpResolutionProfileStateChanged();
+    }
+
+    private void AttachMonitorChoice(MonitorChoiceViewModel choice)
+    {
+        choice.PropertyChanged += OnMonitorChoicePropertyChanged;
+    }
+
+    private void DetachMonitorChoice(MonitorChoiceViewModel choice)
+    {
+        choice.PropertyChanged -= OnMonitorChoicePropertyChanged;
+    }
+
+    /// <remarks>
+    /// Ticking a monitor is an edit that never passes through this view model's own
+    /// PropertyChanged, so nothing armed the unsaved-changes guard for it. That went unnoticed
+    /// while the dialog opened dirty regardless; now that it opens clean, an untracked tick would
+    /// be discarded on Escape without a word. Mirrors the post-connect step wiring.
+    /// </remarks>
+    private void OnMonitorChoicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        if (!string.Equals(e.PropertyName, nameof(MonitorChoiceViewModel.IsSelected), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        IsDirty = true;
     }
 
     private MonitorChoiceViewModel CreateMonitorChoice(MonitorInfo monitor, bool isSelected)
@@ -1740,6 +1937,23 @@ public partial class ServerDialogViewModel : ObservableValidator
             label,
             isSelected);
     }
+
+    /// <summary>
+    /// The monitor selection to persist: what is ticked now, plus what this machine cannot show.
+    /// </summary>
+    /// <remarks>
+    /// An index with no attached screen was never offered to the user, so its absence from the
+    /// picker is not a deselection. Projecting the picker alone meant that opening a three-screen
+    /// profile on an undocked laptop and pressing Save deleted two of its three screens - and with
+    /// one display the picker is not rendered at all, so nothing on the way said so.
+    /// </remarks>
+    private int[] ComposeSelectedMonitorIndices()
+        => [.. AvailableMonitors
+            .Where(monitor => monitor.IsSelected)
+            .Select(monitor => monitor.Index)
+            .Concat(_selectedMonitorIndicesNotAttached)
+            .Distinct()
+            .Order()];
 
     private int ComposePerformanceFlags()
     {
@@ -1864,9 +2078,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             RdpAudioMode = RdpAudioMode,
             RdpAudioCapture = RdpAudioCapture,
             RdpMultiMonitor = RdpResolutionMode == RdpResolutionMode.Multimon,
-            RdpSelectedMonitorIndices = [.. AvailableMonitors
-                .Where(monitor => monitor.IsSelected)
-                .Select(monitor => monitor.Index)],
+            RdpSelectedMonitorIndices = ComposeSelectedMonitorIndices(),
             RdpDynamicResolution = RdpDynamicResolution,
             RdpResolutionMode = RdpResolutionMode,
             RdpFixedWidth = snappedRdpFixedWidth,
@@ -2076,6 +2288,12 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm._isInitializing = false;
         vm.CoerceWinRmSslForGateway();
         vm.RaiseDerivedStateChanged();
+
+        // Hydration is not an edit. The two calls above run with tracking already re-armed, and
+        // the caller has no better moment than this one to say so: it is this method that filled
+        // the dialog. Without it every visit to an existing session ended on the unsaved-changes
+        // prompt, whether or not anything had been touched.
+        vm.IsDirty = false;
         return vm;
     }
 
@@ -2269,9 +2487,17 @@ public partial class ServerDialogViewModel : ObservableValidator
         RaiseDerivedStateChanged();
     }
 
+    /// <remarks>
+    /// Replacing the option list is the shell handing the dialog its choices, never the user
+    /// making one, and it raises the whole derived-state set - forty-odd names, none of them
+    /// excluded. The shell assigns it on every open, after hydration, so without the suspension
+    /// every edit dialog opens dirty. Choosing a gateway writes SelectedGatewayId, which stays
+    /// tracked, and creating one from here adds to the existing collection rather than replacing
+    /// it, so neither real edit passes through this method.
+    /// </remarks>
     partial void OnAvailableGatewaysChanged(ObservableCollection<GatewayOption> value)
     {
-        RaiseDerivedStateChanged();
+        RunWithoutDirtyTracking(RaiseDerivedStateChanged);
     }
 
     private GatewayOption? SelectedGateway =>

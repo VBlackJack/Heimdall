@@ -816,6 +816,29 @@
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
                                                      PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                        <!-- An empty box means "keep the stored password", so without this row
+                                             the card cannot tell a saved secret from no secret at all, and
+                                             nothing in the dialog removes one. -->
+                                        <StackPanel Orientation="Horizontal"
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding HasStoredRdpPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Translate GatewayPasswordSaved}"
+                                                       Style="{StaticResource DialogHintTextStyle}"
+                                                       VerticalAlignment="Center"/>
+                                            <Button Content="{loc:Translate GatewayPasswordClear}"
+                                                    Command="{Binding ClearStoredRdpPasswordCommand}"
+                                                    x:Name="DlgSrv_ClearRdpPasswordBtn"
+                                                    Click="OnClearStoredCredentialClick"
+                                                    Tag="RdpPasswordBox"
+                                                    ToolTip="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    AutomationProperties.Name="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    Style="{StaticResource GhostButtonStyle}"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    Padding="8,2"
+                                                    MinHeight="0"
+                                                    Margin="8,0,0,0"
+                                                    VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 
@@ -865,6 +888,26 @@
                                                          AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicWinRmPasswordLabel}"
                                                          PasswordChanged="OnCredentialPasswordChanged"
                                                          Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                            <StackPanel Orientation="Horizontal"
+                                                        Margin="0,8,0,0"
+                                                        Visibility="{Binding HasStoredWinRmPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="{loc:Translate GatewayPasswordSaved}"
+                                                           Style="{StaticResource DialogHintTextStyle}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button Content="{loc:Translate GatewayPasswordClear}"
+                                                        Command="{Binding ClearStoredWinRmPasswordCommand}"
+                                                        x:Name="DlgSrv_ClearWinRmPasswordBtn"
+                                                        Click="OnClearStoredCredentialClick"
+                                                        Tag="WinRmPasswordBox"
+                                                        ToolTip="{loc:Translate ServerDialogClearStoredPassword}"
+                                                        AutomationProperties.Name="{loc:Translate ServerDialogClearStoredPassword}"
+                                                        Style="{StaticResource GhostButtonStyle}"
+                                                        FontSize="{StaticResource FontSizeCaption}"
+                                                        Padding="8,2"
+                                                        MinHeight="0"
+                                                        Margin="8,0,0,0"
+                                                        VerticalAlignment="Center"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -926,6 +969,26 @@
                                                      AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicSshPasswordLabel}"
                                                      PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding HasStoredSshPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Translate GatewayPasswordSaved}"
+                                                       Style="{StaticResource DialogHintTextStyle}"
+                                                       VerticalAlignment="Center"/>
+                                            <Button Content="{loc:Translate GatewayPasswordClear}"
+                                                    Command="{Binding ClearStoredSshPasswordCommand}"
+                                                    x:Name="DlgSrv_ClearSshPasswordBtn"
+                                                    Click="OnClearStoredCredentialClick"
+                                                    Tag="SshPasswordBox"
+                                                    ToolTip="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    AutomationProperties.Name="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    Style="{StaticResource GhostButtonStyle}"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    Padding="8,2"
+                                                    MinHeight="0"
+                                                    Margin="8,0,0,0"
+                                                    VerticalAlignment="Center"/>
+                                        </StackPanel>
                                         <TextBlock x:Name="DlgSrv_BasicSshAuthHint" Text="{Binding SshAuthHint}"
                                                    Style="{StaticResource DialogHintTextStyle}" Margin="0,8,0,0"
                                                    TextWrapping="Wrap"/>
@@ -992,6 +1055,26 @@
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
                                                      PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding HasStoredVncPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Translate GatewayPasswordSaved}"
+                                                       Style="{StaticResource DialogHintTextStyle}"
+                                                       VerticalAlignment="Center"/>
+                                            <Button Content="{loc:Translate GatewayPasswordClear}"
+                                                    Command="{Binding ClearStoredVncPasswordCommand}"
+                                                    x:Name="DlgSrv_ClearVncPasswordBtn"
+                                                    Click="OnClearStoredCredentialClick"
+                                                    Tag="VncPasswordBox"
+                                                    ToolTip="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    AutomationProperties.Name="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    Style="{StaticResource GhostButtonStyle}"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    Padding="8,2"
+                                                    MinHeight="0"
+                                                    Margin="8,0,0,0"
+                                                    VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 
@@ -1021,6 +1104,26 @@
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelPassword}"
                                                      PasswordChanged="OnCredentialPasswordChanged"
                                                      Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding HasStoredFtpPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Translate GatewayPasswordSaved}"
+                                                       Style="{StaticResource DialogHintTextStyle}"
+                                                       VerticalAlignment="Center"/>
+                                            <Button Content="{loc:Translate GatewayPasswordClear}"
+                                                    Command="{Binding ClearStoredFtpPasswordCommand}"
+                                                    x:Name="DlgSrv_ClearFtpPasswordBtn"
+                                                    Click="OnClearStoredCredentialClick"
+                                                    Tag="FtpPasswordBox"
+                                                    ToolTip="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    AutomationProperties.Name="{loc:Translate ServerDialogClearStoredPassword}"
+                                                    Style="{StaticResource GhostButtonStyle}"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    Padding="8,2"
+                                                    MinHeight="0"
+                                                    Margin="8,0,0,0"
+                                                    VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 
@@ -1407,6 +1510,14 @@
                                                                                Margin="0,12,0,0"
                                                                                Visibility="{Binding ShowRdpMultimonNote, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
+                                                                    <!-- On a machine with fewer screens the picker below is not rendered
+                                                                         at all, so this line is the only place the preservation is stated. -->
+                                                                    <TextBlock Text="{loc:Translate ServerDialogSelectedMonitorsOfflineKept}"
+                                                                               Style="{StaticResource DialogHintTextStyle}"
+                                                                               TextWrapping="Wrap"
+                                                                               Margin="0,8,0,0"
+                                                                               Visibility="{Binding ShowUnavailableSelectedMonitors, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
                                                                     <Border Style="{StaticResource InsetCardStyle}"
                                                                             Margin="0,12,0,0"
                                                                             Visibility="{Binding ShowRdpSelectedMonitors, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -1685,14 +1796,21 @@
                                                        Text="{loc:Translate ServerDialogPostConnectStepsHint}"
                                                        TextWrapping="Wrap"
                                                        Margin="0,0,0,8"/>
-                                            <ListView ItemsSource="{Binding PostConnectSteps}"
+                                            <!-- Two rows, not seven columns. Horizontal scrolling is disabled here,
+                                                 so every fixed column on the command's row is taken straight out of
+                                                 the field the user types in: at the dialog's declared width the
+                                                 492 px of controls beside it left the command a sliver. Everything
+                                                 but the enabled checkbox now sits on a second, wrapping row. -->
+                                            <ListView x:Name="DlgSrv_PostConnectStepsList"
+                                                      ItemsSource="{Binding PostConnectSteps}"
                                                       SelectedItem="{Binding SelectedPostConnectStep}"
                                                       MinHeight="150"
-                                                      MaxHeight="240"
+                                                      MaxHeight="320"
                                                       TabIndex="84"
                                                       Background="{DynamicResource CardBrush}"
                                                       BorderBrush="{DynamicResource BorderBrush}"
                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                      HorizontalContentAlignment="Stretch"
                                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate DataType="{x:Type vm:PostConnectStepItemViewModel}">
@@ -1700,17 +1818,17 @@
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="32"/>
                                                                 <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="88"/>
-                                                                <ColumnDefinition Width="132"/>
-                                                                <ColumnDefinition Width="78"/>
-                                                                <ColumnDefinition Width="78"/>
-                                                                <ColumnDefinition Width="84"/>
                                                             </Grid.ColumnDefinitions>
-                                                            <CheckBox Grid.Column="0"
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <CheckBox Grid.Row="0"
+                                                                      Grid.Column="0"
                                                                       IsChecked="{Binding Enabled}"
                                                                       VerticalAlignment="Center"
                                                                       AutomationProperties.Name="{loc:Translate ServerDialogPostConnectEnabled}"/>
-                                                            <Grid Grid.Column="1" Margin="8,0,8,0">
+                                                            <Grid Grid.Row="0" Grid.Column="1" Margin="8,0,8,0">
                                                                 <TextBox VerticalAlignment="Center"
                                                                          Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}"
                                                                          AutomationProperties.Name="{loc:Translate ServerDialogPostConnectInput}">
@@ -1763,71 +1881,76 @@
                                                                     </StackPanel>
                                                                 </Border>
                                                             </Grid>
-                                                            <TextBox Grid.Column="2"
-                                                                     Margin="0,0,8,0"
-                                                                     Text="{Binding DelayMs, UpdateSourceTrigger=PropertyChanged}"
-                                                                     VerticalAlignment="Center"
-                                                                     Style="{StaticResource DialogFormTextBoxStyle}"
-                                                                     AutomationProperties.Name="{loc:Translate ServerDialogPostConnectDelay}"/>
-                                                            <ComboBox Grid.Column="3"
-                                                                      ItemsSource="{Binding DataContext.PostConnectFailureOptions, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                      DisplayMemberPath="Label"
-                                                                      SelectedValuePath="Value"
-                                                                       SelectedValue="{Binding OnFailure}"
-                                                                       VerticalAlignment="Center"
-                                                                       Style="{StaticResource DialogFormComboBoxStyle}"
-                                                                       AutomationProperties.Name="{loc:Translate ServerDialogPostConnectOnFailure}"/>
-                                                            <Button Grid.Column="4"
-                                                                    Content="{loc:Translate BtnPostConnectLinkLibrary}"
-                                                                    Command="{Binding DataContext.LinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Margin="8,0,0,0"
-                                                                    AutomationProperties.Name="{loc:Translate BtnPostConnectLinkLibrary}">
-                                                                <Button.Style>
-                                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Button.Style>
-                                                            </Button>
-                                                            <Button Grid.Column="5"
-                                                                    Content="{loc:Translate BtnPostConnectChangeLibrary}"
-                                                                    Command="{Binding DataContext.ChangeCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Margin="8,0,0,0"
-                                                                    AutomationProperties.Name="{loc:Translate A11yPostConnectChangeLibrary}">
-                                                                <Button.Style>
-                                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Button.Style>
-                                                            </Button>
-                                                            <Button Grid.Column="6"
-                                                                    Content="{loc:Translate BtnPostConnectUnlinkLibrary}"
-                                                                    Command="{Binding DataContext.UnlinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Margin="8,0,0,0"
-                                                                    AutomationProperties.Name="{loc:Translate BtnPostConnectUnlinkLibrary}">
-                                                                <Button.Style>
-                                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Button.Style>
-                                                            </Button>
+                                                            <!-- WrapPanel rather than a second column set: at the window's
+                                                                 MinWidth these controls must fold onto another line, because
+                                                                 horizontal scrolling would never bring them back into view. -->
+                                                            <WrapPanel Grid.Row="1" Grid.Column="1" Margin="8,6,8,0">
+                                                                <TextBox Width="72"
+                                                                         Margin="0,0,8,4"
+                                                                         Text="{Binding DelayMs, UpdateSourceTrigger=PropertyChanged}"
+                                                                         VerticalAlignment="Center"
+                                                                         Style="{StaticResource DialogFormTextBoxStyle}"
+                                                                         ToolTip="{loc:Translate ServerDialogPostConnectDelay}"
+                                                                         AutomationProperties.Name="{loc:Translate ServerDialogPostConnectDelay}"/>
+                                                                <ComboBox Width="132"
+                                                                          Margin="0,0,8,4"
+                                                                          ItemsSource="{Binding DataContext.PostConnectFailureOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                          DisplayMemberPath="Label"
+                                                                          SelectedValuePath="Value"
+                                                                           SelectedValue="{Binding OnFailure}"
+                                                                           VerticalAlignment="Center"
+                                                                           Style="{StaticResource DialogFormComboBoxStyle}"
+                                                                           ToolTip="{loc:Translate ServerDialogPostConnectOnFailure}"
+                                                                           AutomationProperties.Name="{loc:Translate ServerDialogPostConnectOnFailure}"/>
+                                                                <Button Content="{loc:Translate BtnPostConnectLinkLibrary}"
+                                                                        Command="{Binding DataContext.LinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Margin="0,0,8,4"
+                                                                        AutomationProperties.Name="{loc:Translate BtnPostConnectLinkLibrary}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                                <Button Content="{loc:Translate BtnPostConnectChangeLibrary}"
+                                                                        Command="{Binding DataContext.ChangeCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Margin="0,0,8,4"
+                                                                        AutomationProperties.Name="{loc:Translate A11yPostConnectChangeLibrary}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                                <Button Content="{loc:Translate BtnPostConnectUnlinkLibrary}"
+                                                                        Command="{Binding DataContext.UnlinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Margin="0,0,8,4"
+                                                                        AutomationProperties.Name="{loc:Translate BtnPostConnectUnlinkLibrary}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                            </WrapPanel>
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ListView.ItemTemplate>

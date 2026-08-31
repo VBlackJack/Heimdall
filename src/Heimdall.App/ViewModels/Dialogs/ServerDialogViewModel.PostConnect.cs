@@ -365,24 +365,33 @@ public partial class ServerDialogViewModel
             .Where(action => linkedIds.Contains(action.Id, StringComparer.Ordinal))
             .ToDictionary(action => action.Id, action => action.Title, StringComparer.Ordinal);
 
-        foreach (var step in PostConnectSteps.Where(step => step.IsLinked))
+        // Resolving the titles is the dialog reading the command library, not the user editing the
+        // session: neither LinkedActionTitle nor IsBroken is written by ToModel, and both are
+        // assigned on every open. Tracked, they reached OnPostConnectStepPropertyChanged and armed
+        // the unsaved-changes guard before the window was shown, on every session with a linked
+        // step - the same defect the reset in FromDto was meant to end, through the one open-path
+        // call that runs after it.
+        RunWithoutDirtyTracking(() =>
         {
-            if (step.CommandLibraryId is null)
+            foreach (var step in PostConnectSteps.Where(step => step.IsLinked))
             {
-                continue;
-            }
+                if (step.CommandLibraryId is null)
+                {
+                    continue;
+                }
 
-            if (actions.TryGetValue(step.CommandLibraryId, out var title))
-            {
-                step.LinkedActionTitle = title;
-                step.IsBroken = false;
+                if (actions.TryGetValue(step.CommandLibraryId, out var title))
+                {
+                    step.LinkedActionTitle = title;
+                    step.IsBroken = false;
+                }
+                else
+                {
+                    step.LinkedActionTitle = null;
+                    step.IsBroken = true;
+                }
             }
-            else
-            {
-                step.LinkedActionTitle = null;
-                step.IsBroken = true;
-            }
-        }
+        });
     }
 }
 

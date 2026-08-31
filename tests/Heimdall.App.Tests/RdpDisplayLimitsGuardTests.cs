@@ -56,12 +56,17 @@ public sealed class RdpDisplayLimitsGuardTests
         RegexOptions.Compiled);
 
     /// <summary>
-    /// <c>SchemaValidator.MaxResolution</c> bounds a session's screen size, not a
-    /// fixed desktop. It holds the same number today by coincidence and is free to
-    /// diverge, so it is exempt by line rather than the whole file being exempt.
+    /// Nothing is exempt any more.
     /// </summary>
-    private static bool IsUnrelatedDecision(string line) =>
-        line.Contains("MaxResolution", StringComparison.Ordinal);
+    /// <remarks>
+    /// <c>SchemaValidator.MaxResolution</c> used to be, on the grounds that a session's
+    /// screen size is a different decision from a fixed desktop that happens to share a
+    /// number. That is still true, but the decision grew two more holders on the settings
+    /// panel, so it earned its own pair of constants beside the fixed ones and the
+    /// validator now derives from them. An exemption that no longer covers anything can
+    /// only hide the next regression.
+    /// </remarks>
+    private static bool IsUnrelatedDecision(string line) => false;
 
     [Fact]
     public void Sources_DoNotRepeatTheFixedResolutionBounds()

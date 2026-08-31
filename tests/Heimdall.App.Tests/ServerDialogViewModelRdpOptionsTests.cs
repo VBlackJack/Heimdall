@@ -425,6 +425,229 @@ public sealed class ServerDialogViewModelRdpOptionsTests
         Assert.Equal(2, vm.AvailableMonitors.Count);
     }
 
+    // The defect: the picker is rebuilt from the physically attached screens, so a profile edited
+    // on an undocked laptop used to save back only the screens that machine happens to have.
+    [Fact]
+    public void Rdp_multimon_selection_survives_an_edit_on_a_machine_with_fewer_screens()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Three screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Multimon,
+            RdpSelectedMonitorIndices = [0, 1, 2]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(dto, new FakeMonitorEnumerator(
+            [
+                new MonitorInfo(0, 1920, 1080, true, @"\\.\DISPLAY1")
+            ]));
+
+        Assert.Equal(new[] { 0, 1, 2 }, vm.ToDto().RdpSelectedMonitorIndices);
+    }
+
+    // The counterweight: preserving what the machine cannot show must not preserve what the user
+    // deliberately unticked. A union with the seed's whole list would pass the test above and
+    // silently ignore every deselection.
+    [Fact]
+    public void Rdp_multimon_unticking_a_connected_monitor_still_removes_it()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Three screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Multimon,
+            RdpSelectedMonitorIndices = [0, 1, 2]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(dto, new FakeMonitorEnumerator(
+            [
+                new MonitorInfo(0, 1920, 1080, true, @"\\.\DISPLAY1"),
+                new MonitorInfo(1, 1920, 1080, false, @"\\.\DISPLAY2"),
+                new MonitorInfo(2, 2560, 1440, false, @"\\.\DISPLAY3")
+            ]));
+
+        vm.AvailableMonitors[1].IsSelected = false;
+
+        Assert.Equal(new[] { 0, 2 }, vm.ToDto().RdpSelectedMonitorIndices);
+    }
+
+    // Pins where the bookkeeping lives: computing it in FromDto alone would lose the screen that
+    // was unplugged while the dialog sat open.
+    [Fact]
+    public void Rdp_multimon_selection_survives_a_screen_unplugged_while_the_dialog_is_open()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Three screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Multimon,
+            RdpSelectedMonitorIndices = [0, 1, 2]
+        };
+
+        // Three snapshots: the constructor takes the first, FromDto's hydration the second, and
+        // the refresh below sees the third.
+        MonitorInfo[] docked =
+        [
+            new MonitorInfo(0, 1920, 1080, true, @"\\.\DISPLAY1"),
+            new MonitorInfo(1, 1920, 1080, false, @"\\.\DISPLAY2"),
+            new MonitorInfo(2, 2560, 1440, false, @"\\.\DISPLAY3")
+        ];
+        MonitorInfo[] undocked =
+        [
+            new MonitorInfo(0, 1920, 1080, true, @"\\.\DISPLAY1"),
+            new MonitorInfo(1, 1920, 1080, false, @"\\.\DISPLAY2")
+        ];
+
+        var vm = ServerDialogViewModel.FromDto(
+            dto,
+            new FakeMonitorEnumerator([docked, docked, undocked]));
+
+        vm.RefreshMonitorsCommand.Execute(null);
+
+        Assert.Equal(new[] { 0, 1, 2 }, vm.ToDto().RdpSelectedMonitorIndices);
+    }
+
+    // A carried index has no checkbox to be read back from, so a rebuild that recomputes the
+    // carried set from the picker alone would preserve it once and drop it on the next refresh.
+    [Fact]
+    public void Rdp_multimon_selection_survives_repeated_refreshes()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Three screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Multimon,
+            RdpSelectedMonitorIndices = [0, 1, 2]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(dto, new FakeMonitorEnumerator(
+            [
+                new MonitorInfo(0, 1920, 1080, true, @"\\.\DISPLAY1")
+            ]));
+
+        vm.RefreshMonitorsCommand.Execute(null);
+        vm.RefreshMonitorsCommand.Execute(null);
+
+        Assert.Equal(new[] { 0, 1, 2 }, vm.ToDto().RdpSelectedMonitorIndices);
+    }
+
+    [Theory]
+    [InlineData(1, RdpResolutionMode.Multimon, true)]
+    [InlineData(3, RdpResolutionMode.Multimon, false)]
+    [InlineData(1, RdpResolutionMode.Auto, false)]
+    public void ShowUnavailableSelectedMonitors_OnlyWhenAMultimonProfileHasScreensThisMachineLacks(
+        int screenCount,
+        RdpResolutionMode mode,
+        bool expected)
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Three screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = mode,
+            RdpSelectedMonitorIndices = [0, 1, 2]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(
+            dto,
+            new FakeMonitorEnumerator(CreateMonitors(screenCount)));
+
+        Assert.Equal(expected, vm.ShowUnavailableSelectedMonitors);
+    }
+
+    // The dialog now opens clean, so an edit that never reaches the view model's own
+    // PropertyChanged would be discarded on Escape without a word. Ticking a monitor was one.
+    [Fact]
+    public void Ticking_a_monitor_arms_the_unsaved_changes_guard()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Two screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Multimon,
+            RdpSelectedMonitorIndices = [0]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(
+            dto,
+            new FakeMonitorEnumerator(CreateMonitors(2)));
+
+        Assert.False(vm.IsDirty);
+
+        vm.AvailableMonitors[1].IsSelected = true;
+
+        Assert.True(vm.IsDirty);
+    }
+
+    // The other half of the same rule: a read of the machine is not an edit of the profile. The
+    // button re-enumerates the screens and raises the whole derived resolution state, none of it
+    // saved by ToDto, so pressing it on a dialog nobody touched used to end on the unsaved-changes
+    // prompt.
+    [Fact]
+    public void Refreshing_the_monitor_list_is_not_an_edit()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Two screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Multimon,
+            RdpSelectedMonitorIndices = [0]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(
+            dto,
+            new FakeMonitorEnumerator(CreateMonitors(2)));
+
+        Assert.False(vm.IsDirty);
+
+        vm.RefreshMonitorsCommand.Execute(null);
+
+        // The refresh really ran: a rebuilt list is what raises the names that used to dirty.
+        Assert.Equal(2, vm.AvailableMonitors.Count);
+        Assert.True(vm.AvailableMonitors[0].IsSelected);
+        Assert.False(vm.IsDirty);
+    }
+
+    // A refresh that finds a screen gone must still not claim an edit - and must not lose the
+    // monitor it can no longer show, which is what ToDto would then drop.
+    [Fact]
+    public void Refreshing_after_a_screen_is_unplugged_is_not_an_edit()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "Two screens",
+            RemoteServer = "host.example.com",
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Multimon,
+            RdpSelectedMonitorIndices = [0, 1]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(
+            dto,
+            new FakeMonitorEnumerator([CreateMonitors(2), CreateMonitors(1)]));
+
+        Assert.False(vm.IsDirty);
+
+        vm.RefreshMonitorsCommand.Execute(null);
+
+        Assert.Single(vm.AvailableMonitors);
+        Assert.Equal(new[] { 0, 1 }, vm.ToDto().RdpSelectedMonitorIndices);
+        Assert.False(vm.IsDirty);
+    }
+
+    private static MonitorInfo[] CreateMonitors(int count)
+        => [.. Enumerable
+            .Range(0, count)
+            .Select(index => new MonitorInfo(index, 1920, 1080, index == 0, $@"\\.\DISPLAY{index + 1}"))];
+
     [Theory]
     [InlineData(RdpResolutionMode.Auto, false, false, false, false)]
     [InlineData(RdpResolutionMode.Fixed, true, true, true, false)]
