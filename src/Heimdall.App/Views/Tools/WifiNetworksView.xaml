@@ -112,11 +112,25 @@
                       HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
                       ColumnHeaderStyle="{StaticResource ThemedDataGridColumnHeaderStyle}"
                       CellStyle="{StaticResource ThemedDataGridCellStyle}"
-                      RowStyle="{StaticResource ThemedDataGridRowStyle}"
                       TabIndex="1"
                       ItemsSource="{Binding Networks}"
                       AutomationProperties.Name="{loc:Translate ToolWifiTitle}"
                       AutomationProperties.LiveSetting="Polite">
+                <DataGrid.RowStyle>
+                    <Style TargetType="{x:Type DataGridRow}"
+                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                        <Setter Property="AutomationProperties.Name">
+                            <Setter.Value>
+                                <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yWifiNetworkRow]"/>
+                                    <Binding Path="Ssid"/>
+                                    <Binding Path="Bssid"/>
+                                    <Binding Path="Channel"/>
+                                </MultiBinding>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </DataGrid.RowStyle>
                 <DataGrid.Columns>
                     <DataGridTextColumn x:Name="ColSsid" Binding="{Binding Ssid}" Width="180"
                                         Header="{loc:Translate ToolWifiColSsid}"

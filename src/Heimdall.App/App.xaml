@@ -28,6 +28,7 @@
             <converters:ResourceKeyToGeometryConverter x:Key="ResourceKeyToGeometryConverter"/>
             <converters:TunnelBadgeVisibilityConverter x:Key="TunnelBadgeVisibilityConverter"/>
             <converters:TunnelBadgeStateToBrushConverter x:Key="TunnelBadgeStateToBrushConverter"/>
+            <converters:AccessibleRowNameConverter x:Key="AccessibleRowNameConverter"/>
             <converters:BoolToLocalizedKeyConverter x:Key="ShareFolderLabelConverter"
                                                     FalseKey="ToolsShareFolder"
                                                     TrueKey="ToolsStopSharing"/>

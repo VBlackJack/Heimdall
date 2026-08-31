@@ -197,6 +197,21 @@
                                   TabIndex="3"
                                   ItemsSource="{Binding CronEntries}"
                                   SelectedItem="{Binding SelectedCronEntry, Mode=TwoWay}">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="{x:Type DataGridRow}"
+                                       BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                                    <Setter Property="AutomationProperties.Name">
+                                        <Setter.Value>
+                                            <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yCronJobEntryRow]"/>
+                                                <Binding Path="Schedule"/>
+                                                <Binding Path="Command"/>
+                                                <Binding Path="Description"/>
+                                            </MultiBinding>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </DataGrid.RowStyle>
                             <DataGrid.Columns>
                                 <DataGridTextColumn x:Name="ColCronSchedule"
                                                     Binding="{Binding Schedule}"
@@ -317,6 +332,21 @@
                                   AutomationProperties.LiveSetting="Polite"
                                   TabIndex="5"
                                   ItemsSource="{Binding TaskEntries}">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="{x:Type DataGridRow}"
+                                       BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                                    <Setter Property="AutomationProperties.Name">
+                                        <Setter.Value>
+                                            <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yCronJobWindowsTaskRow]"/>
+                                                <Binding Path="Name"/>
+                                                <Binding Path="Status"/>
+                                                <Binding Path="LastResult"/>
+                                            </MultiBinding>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </DataGrid.RowStyle>
                             <DataGrid.Columns>
                                 <DataGridTextColumn x:Name="ColTaskName"
                                                     Binding="{Binding Name}"

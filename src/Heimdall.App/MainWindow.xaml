@@ -1760,11 +1760,25 @@
                                           Style="{DynamicResource ThemedDataGridStyle}"
                                           ColumnHeaderStyle="{DynamicResource ThemedDataGridColumnHeaderStyle}"
                                           CellStyle="{DynamicResource ThemedDataGridCellStyle}"
-                                          RowStyle="{DynamicResource ThemedDataGridRowStyle}"
                                           HeadersVisibility="Column"
                                           GridLinesVisibility="None"
                                           RowHeight="24"
                                           FontSize="{StaticResource FontSizeCaption}">
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="{x:Type DataGridRow}"
+                                               BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                                            <Setter Property="AutomationProperties.Name">
+                                                <Setter.Value>
+                                                    <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                                        <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yTunnelRow]"/>
+                                                        <Binding Path="ServerName"/>
+                                                        <Binding Path="LocalPort"/>
+                                                        <Binding Path="RemoteHost"/>
+                                                    </MultiBinding>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </DataGrid.RowStyle>
                                     <DataGrid.ContextMenu>
                                         <ContextMenu>
                                             <MenuItem x:Name="Mw_TpCtxClose"
@@ -1889,8 +1903,22 @@
                               Margin="16,0,16,8"
                               Style="{DynamicResource ThemedDataGridStyle}"
                               ColumnHeaderStyle="{DynamicResource ThemedDataGridColumnHeaderStyle}"
-                              CellStyle="{DynamicResource ThemedDataGridCellStyle}"
-                              RowStyle="{DynamicResource ThemedDataGridRowStyle}">
+                              CellStyle="{DynamicResource ThemedDataGridCellStyle}">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="{x:Type DataGridRow}"
+                                   BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                                <Setter Property="AutomationProperties.Name">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yTunnelRow]"/>
+                                            <Binding Path="ServerName"/>
+                                            <Binding Path="LocalPort"/>
+                                            <Binding Path="RemoteHost"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="" Width="28">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -1968,8 +1996,22 @@
                               MouseDoubleClick="OnScheduledTaskDoubleClick"
                               Style="{DynamicResource ThemedDataGridStyle}"
                               ColumnHeaderStyle="{DynamicResource ThemedDataGridColumnHeaderStyle}"
-                              CellStyle="{DynamicResource ThemedDataGridCellStyle}"
-                              RowStyle="{DynamicResource ThemedDataGridRowStyle}">
+                              CellStyle="{DynamicResource ThemedDataGridCellStyle}">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="{x:Type DataGridRow}"
+                                   BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                                <Setter Property="AutomationProperties.Name">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yScheduledTaskRow]"/>
+                                            <Binding Path="ServerName"/>
+                                            <Binding Path="ConnectionType"/>
+                                            <Binding Path="Schedule"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
                             <DataGridCheckBoxColumn x:Name="Mw_ScheduledColEnabled" Header="{loc:Translate ScheduledColEnabled}" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="40"/>
                             <DataGridTextColumn x:Name="Mw_ScheduledColServer" Header="{loc:Translate ScheduledColServer}" Binding="{Binding ServerName}" Width="*" IsReadOnly="True"/>
@@ -2656,6 +2698,21 @@
                                                       Sorting="OnTrustedHostKeysSorting"
                                                       Visibility="{Binding Settings.TrustedHostKeys.HasRows, Converter={StaticResource BoolToVisibilityConverter}}"
                                                       AutomationProperties.Name="{loc:Translate A11yTrustedHostKeysGrid}">
+                                                <DataGrid.RowStyle>
+                                                    <Style TargetType="{x:Type DataGridRow}"
+                                                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                                                        <Setter Property="AutomationProperties.Name">
+                                                            <Setter.Value>
+                                                                <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yTrustedHostKeyRow]"/>
+                                                                    <Binding Path="HostPort"/>
+                                                                    <Binding Path="Algorithm"/>
+                                                                    <Binding Path="SourceDisplay"/>
+                                                                </MultiBinding>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </DataGrid.RowStyle>
                                                 <DataGrid.InputBindings>
                                                     <KeyBinding Key="Enter" Command="{Binding Settings.TrustedHostKeys.ShowSelectedDetailsCommand}"/>
                                                     <KeyBinding Key="Delete" Command="{Binding Settings.TrustedHostKeys.RemoveSelectedCommand}"/>
