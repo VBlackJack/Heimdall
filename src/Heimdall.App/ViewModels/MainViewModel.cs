@@ -200,6 +200,38 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// </summary>
     private async Task HandleUnsavedSettingsGuardAsync(string targetTab)
     {
+        if (!await ResolveUnsavedSettingsAsync())
+        {
+            return;
+        }
+
+        // Navigate to the originally intended tab
+        _suppressTabChangeGuard = true;
+        SelectedTab = targetTab;
+        _suppressTabChangeGuard = false;
+    }
+
+    /// <summary>
+    /// Asks what to do about unsaved settings, acts on the answer, and reports whether
+    /// the caller may now navigate away.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Extracted so the two ways of leaving the Settings tab cannot answer the question
+    /// differently. They already did: this method's caller has always shown a three-way
+    /// save / discard / cancel dialog, while the shell's own tab buttons went through a
+    /// second copy in the code-behind that asked a yes/no question titled "Apply them
+    /// before leaving?" and threw the changes away on yes. Two surfaces owning one rule
+    /// is how that survived: each was correct on its own terms and nothing compared them.
+    /// </para>
+    /// <para>
+    /// Returns <see langword="true" /> when the user chose Discard, or chose Save and the
+    /// save succeeded; <see langword="false" /> on Cancel, and on a save that failed - in
+    /// which case the user has been told why they are being held.
+    /// </para>
+    /// </remarks>
+    internal async Task<bool> ResolveUnsavedSettingsAsync()
+    {
         var title = _localizer["SettingsUnsavedWarningTitle"];
         var message = _localizer["SettingsUnsavedWarning"];
         var result = await _dialogService.ShowSaveDiscardCancelAsync(title, message);
@@ -207,7 +239,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         if (result is null)
         {
             // Cancel: stay on Settings (already reverted)
-            return;
+            return false;
         }
 
         if (result == true)
@@ -216,25 +248,21 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             bool settingsSaved = await Settings.TrySaveAsync();
             if (!settingsSaved)
             {
-                // Returning here holds the user on the Settings tab. Without this they
-                // are held there with no statement of why, and every further attempt to
-                // leave repeats the same silent refusal.
+                // Holding the user on the Settings tab. Without this they are held there
+                // with no statement of why, and every further attempt to leave repeats
+                // the same silent refusal.
                 _dialogService.ShowWarning(
                     Localize("SettingsCloseSaveFailedTitle"),
                     Localize("SettingsCloseSaveFailedMessage"));
-                return;
+                return false;
             }
-        }
-        else
-        {
-            // Discard
-            await Settings.DiscardChangesAsync();
+
+            return true;
         }
 
-        // Navigate to the originally intended tab
-        _suppressTabChangeGuard = true;
-        SelectedTab = targetTab;
-        _suppressTabChangeGuard = false;
+        // Discard
+        await Settings.DiscardChangesAsync();
+        return true;
     }
 
     /// <summary>
