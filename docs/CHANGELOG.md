@@ -12,6 +12,59 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-09-01: Two data-loss paths, and the interface stops saying untrue things
+
+Driven by a user-experience audit of the session tree, the General settings tab and the
+per-session dialog, plus an accessibility sweep of every grid in the product. Each audit finding
+was handed to a review whose job was to refute it rather than confirm it.
+
+### Two ways work was being destroyed
+
+- **Two Heimdall instances sharing one configuration directory silently discarded each other's
+  edits.** Both read `servers.json` at startup and wrote it back on exit, and the later write won.
+  A second launch now brings the running instance forward and exits. `ConfigManager` still
+  serializes writes with a process-local lock; this removes the situation rather than the symptom,
+  and cross-process CAS remains unimplemented.
+- **Leaving the Settings tab with unsaved changes asked "Apply them before leaving?" and threw
+  them away on Yes.** No answer applied the changes. The three-way save / discard / cancel dialog
+  already existed on the view model's own navigation path; the shell's tab buttons ran a second
+  copy of the rule that asked a two-answer question. Both paths now share one decision.
+
+### The interface said things that were not true
+
+- A settings number field whose text would not convert was discarded in silence: no dirty marker,
+  no error, and Save reported success. Twenty-one fields now raise a real validation error.
+- A saved password was invisible and could not be removed, because an empty box means "keep".
+- Saving a multi-monitor RDP profile from a machine with fewer screens destroyed the monitor
+  selection, with the list not even rendered to show what was erased.
+- The unsaved-changes guard fired on every visit to the session dialog, teaching users to dismiss
+  it unread.
+- Enter did nothing in the session tree, although the F1 help said it connects.
+- An out-of-range RDP fixed resolution reached the embedded ActiveX control unbounded; the clamp
+  existed but its only caller fed the external `mstsc.exe` path.
+
+### Accessibility
+
+- Every DataGrid in the product announced its view-model type name to a screen reader instead of
+  its data: 21 grids, of which 17 in the tools. Row types owned by the application implement
+  `IAccessibleItemViewModel`; row types declared in `Heimdall.Core` - which holds no project
+  reference and so cannot see that interface - are named from the row style through a converter.
+  A guard now fails on any grid that leaves its rows unnamed.
+
+### Project
+
+- Third-party notices and a code signing policy are published, in English and French. They are
+  prerequisites for code signing, and the notices name WebView2 as the single non-OSI component
+  Heimdall ships rather than leaving it to be discovered.
+
+### On the verification
+
+An adversarial pass over the first version of the UX lot found four blockers on a tree that was
+already green and formatted: a test that never reached the handler it was written for, a guard
+blind to the population it named, a regression the lot itself introduced, and a defect reported
+fixed that was not. All four are closed, and every oracle here has been run against the mutant it
+claims to catch. That the suite was green proved none of it.
+
 ## 2026-08-31: Hacker Simulator removed
 
 - **The Hacker Simulator is no longer part of Heimdall.** Its WPF views, scenario and playlist
