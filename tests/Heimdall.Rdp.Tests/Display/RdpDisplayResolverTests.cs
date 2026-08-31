@@ -16,6 +16,7 @@
 
 using System.Drawing;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Rdp;
 using Heimdall.Rdp.Display;
 
 namespace Heimdall.Rdp.Tests.Display;
@@ -140,6 +141,43 @@ public sealed class RdpDisplayResolverTests
 
         Assert.Equal(1024, result.Width);
         Assert.Equal(768, result.Height);
+    }
+
+    /// <summary>
+    /// A hand-edited, imported or synchronised profile can carry an out-of-range
+    /// fixed size: the schema validator downgrades the range error to a warning and
+    /// loads the server anyway. The clamp on the external mstsc path is never
+    /// called for the embedded control, so the bound has to hold here.
+    /// </summary>
+    [Fact]
+    public void Resolve_Fixed_OversizedDimensions_ClampsToMaximum()
+    {
+        var result = Resolve(
+            RdpResolutionMode.Fixed,
+            Host(),
+            [],
+            configuredWidthPx: 20000,
+            configuredHeightPx: 20000);
+
+        Assert.Equal(RdpDisplayLimits.MaximumFixedWidth, result.Width);
+        Assert.Equal(RdpDisplayLimits.MaximumFixedHeight, result.Height);
+    }
+
+    /// <summary>
+    /// The lower bound needs its own case: width is floored to the desktop minimum
+    /// regardless, so only height can show that the clamp's minimum is applied.
+    /// </summary>
+    [Fact]
+    public void Resolve_Fixed_UndersizedHeight_ClampsToMinimum()
+    {
+        var result = Resolve(
+            RdpResolutionMode.Fixed,
+            Host(),
+            [],
+            configuredWidthPx: 1024,
+            configuredHeightPx: 10);
+
+        Assert.Equal(RdpDisplayLimits.MinimumFixedDimension, result.Height);
     }
 
     [Fact]

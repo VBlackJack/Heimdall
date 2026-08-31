@@ -16,6 +16,7 @@
 
 using System.Drawing;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Rdp;
 using Heimdall.Rdp;
 
 namespace Heimdall.Rdp.Display;
@@ -51,9 +52,15 @@ public static class RdpDisplayResolver
             RdpResolutionMode.Fixed => Create(
                 configuredMode,
                 RdpResolutionMode.Fixed,
+                // A profile can reach here unbounded: the schema validator downgrades an
+                // out-of-range dimension to a warning and loads the server anyway, and the
+                // clamp on the external mstsc path (RdpProfileResolver) is never called for
+                // the embedded control. Bound it here, against the shared Core limits.
                 new Size(
-                    configuredWidthPx.GetValueOrDefault(DefaultSize.Width),
-                    configuredHeightPx.GetValueOrDefault(DefaultSize.Height)),
+                    RdpDisplayLimits.ClampFixedWidth(
+                        configuredWidthPx.GetValueOrDefault(DefaultSize.Width)),
+                    RdpDisplayLimits.ClampFixedHeight(
+                        configuredHeightPx.GetValueOrDefault(DefaultSize.Height))),
                 desktopScaleFactor,
                 deviceScaleFactor,
                 smartSizing: false,

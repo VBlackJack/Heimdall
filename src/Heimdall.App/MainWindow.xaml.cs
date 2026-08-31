@@ -36,6 +36,7 @@ using Heimdall.App.ViewModels.Onboarding;
 using Heimdall.App.ViewModels.Shell;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
+using Heimdall.Core.Rdp;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 
@@ -2525,7 +2526,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return false;
         }
 
-        if (parsed.Width is < 200 or > 7680 || parsed.Height is < 200 or > 4320)
+        if (parsed.Width is < RdpDisplayLimits.MinimumFixedDimension or > RdpDisplayLimits.MaximumFixedWidth
+            || parsed.Height is < RdpDisplayLimits.MinimumFixedDimension or > RdpDisplayLimits.MaximumFixedHeight)
         {
             return false;
         }
