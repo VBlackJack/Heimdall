@@ -5355,8 +5355,6 @@
   "ServerDialogCitrixAdvanced": "Advanced Citrix options",
   "ServerDialogCitrixAdvancedDesc": "ICA file, seamless mode, and single sign-on settings.",
 
-  "_comment_hacker_simulator": "",
-
   "PaletteToolCmdLib": "Command Library",
   "PaletteToolCmdLibWith": "Command Library: {0}",
   "ToolDescCMDLIB": "Searchable library of 500+ PowerShell and Bash commands with parameterized generation",

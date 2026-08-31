@@ -93,5 +93,4 @@
     <!-- Broadcast feedback brush -->
     <SolidColorBrush x:Key="BroadcastActiveBrush" Color="{DynamicResource RedColor}" Opacity="0.27" />
 
-    <!-- Hacker Simulator fixed retro-terminal brushes -->
 </ResourceDictionary>

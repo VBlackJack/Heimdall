@@ -12,6 +12,16 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-08-31: Hacker Simulator removed
+
+- **The Hacker Simulator is no longer part of Heimdall.** Its WPF views, scenario and playlist
+  catalogs, localized strings, persisted settings, tool registry routes, icon, theme resources,
+  and packaging declarations have been removed. The built-in tool inventory is now 58, and new
+  builds no longer carry the simulated attack transcripts or their external JSON catalogs.
+- A reported Windows Defender alert motivated the removal, but it was not reproduced and no
+  causal link was established. This entry therefore records the product decision without claiming
+  an antivirus verdict.
+
 ## 2026-08-26: The five first-contact blockers, closed
 
 A first-time user reported three more confusions, and a walk through the paths a newcomer takes

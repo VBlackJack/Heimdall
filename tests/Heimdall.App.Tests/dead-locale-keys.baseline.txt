@@ -1378,7 +1378,6 @@ WorkspaceSaved
 _comment_dirty_guards
 _comment_external_tool_provider
 _comment_external_tools_category
-_comment_hacker_simulator
 _comment_server_dialog_basic_auth
 _comment_tool_traceroute
 _comment_ux_a11y

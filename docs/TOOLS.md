@@ -26,7 +26,7 @@ registry entries in the constructor:
 - Network: 17
 - Security: 15
 - Encoding: 6
-- System: 15
+- System: 14
 - External native tools: 6
 
 External provider tools are detected at runtime and appended to the registry

@@ -172,16 +172,16 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - HTTP: directory listing, MIME types, path traversal protection
 - TFTP: RFC 1350 read-only implementation
 
-### Built-in Sysops Toolbox (59 tools)
+### Built-in Sysops Toolbox (58 tools)
 
 All tools open as session tabs (split with any session or tool, detach, reorder). Accessible via **dedicated Tools tab**, **Ctrl+K** palette, the **sidebar Tools tab** (Sessions/Tools toggle at the top of the left panel, **Ctrl+Shift+T**), or **"+" → Add Tool** menu. The tabbed sidebar hosts the session `TreeView` and a full-height tool browser side by side - the Tools tab displays a collapsible `TreeView` of categories (Network, Security, Encoding, System, External) populated from `ToolRegistry`, with a filter box matching on name + aliases and an always-present **Favorites** section at the top. Right-click any sidebar tool leaf to pin or unpin it without launching the tool; the same persisted `FavoriteToolIds` feed both the sidebar Favorites section and the dedicated Tools tab, while favorites stay sorted alphabetically by localized display name and filtered like every other category. Tools can be saved in the session `TreeView` alongside real sessions. Centralized `ToolRegistry` with vector icons, categories, and command aliases. **Favorites** (pin/unpin with persistence) and **recently used** tools remain available on the dedicated Tools tab as well. Singleton behavior for context-free tools. Built-in help system with usage examples (? button). Dedicated detail panel for tools with descriptions. Password Generator supports saveable custom presets (JSON persistence), optional clipboard auto-clear, and 3 generation modes (Random, Syllable, Passphrase). Cross-tool navigation via right-click context menus (IP → Port Scanner → Cert Inspector). Network tools support scanning via SSH tunnel ("Route via" gateway selector). **First-launch onboarding** overlay with guided introduction.
 
 | Category | Tools |
 |----------|-------|
 | **Network** | **Network Cartography** (ARP seeding + multi-probe discovery [reverse DNS, NetBIOS, TCP], ping sweep + OS fingerprinting, port scan, banner grab, HTTP/HTTPS header analysis, TLS cert inspection, NetBIOS NBSTAT probe, SNMPv2c query + enterprise OID classifier [Cisco/Juniper/Fortinet/Palo Alto/MikroTik/VMware], mDNS/Bonjour discovery, 300+ OUI MAC lookup, multi-source role classification, VLAN detection, MAC address + latency columns, Draw.io topology export, scan history/diff, remote subnet auto-detection via SSH gateway, **persistent Knowledge Base with TTL-based cache acceleration**, **tunnel scan with remote ping sweep + ARP discovery + parallel port probes**), **Ping Monitor** (continuous latency graph + gateway routing via SSH), DNS Lookup (custom server + via tunnel), SSL Cert Inspector (chain + TLS version + via tunnel), Port Scanner (progress + banner grab + via tunnel), Subnet Calculator (IPv4 + IPv6), IP Converter, HTTP Status Codes, Whois Lookup, Network Calculator (supernet + VLAN planner) |
-| **Security** | Password Generator (crack time + history + saveable presets), SSH Key Generator (RSA + Ed25519), Hash Generator (SHA3 + progress), HMAC Generator, JWT Parser (HMAC signature verify), Certificate Generator (self-signed + CA/leaf), TOTP Generator (RFC 6238), **SecNumCloud Audit** (ANSSI v3.2 compliance across Network/Crypto/Access/Ops with CIDR auto-detection + gateway routing + HTML/CSV/Draw.io export), **Hacker Simulator** (Hollywood-style terminal with 25 scenarios, playlists, vintage CRT mode) |
+| **Security** | Password Generator (crack time + history + saveable presets), SSH Key Generator (RSA + Ed25519), Hash Generator (SHA3 + progress), HMAC Generator, JWT Parser (HMAC signature verify), Certificate Generator (self-signed + CA/leaf), TOTP Generator (RFC 6238), **SecNumCloud Audit** (ANSSI v3.2 compliance across Network/Crypto/Access/Ops with CIDR auto-detection + gateway routing + HTML/CSV/Draw.io export) |
 | **Encoding** | Base64 Encoder (URL-safe RFC 4648), URL Encoder, JSON Formatter (error position), Regex Tester (match highlighting), Text Diff (word-level), Text Case Converter (8 formats) |
-| **System** | Chmod Calculator, Crontab Builder, DateTime Converter (timezone + relative), UUID Generator (v4 + v7), Hosts File Editor, SSH Config Generator, Log Viewer / Tail (regex filter), Cron Job Manager (crontab + Windows tasks), Service Status Dashboard, **Notes** (Obsidian-style Markdown editor with Milkdown WYSIWYG + Dracula theme, collapsible sidebar with persisted width, right-click formatting menu, localized templates EN/FR, TreeView file explorer, accent-insensitive `[[wiki-links]]`, tags, drag-and-drop, Confluence/HTML export), **Diagram Editor** (draw.io embedded offline, New/Open/Save/Export PNG) |
+| **System** | Chmod Calculator, Crontab Builder, DateTime Converter (timezone + relative), UUID Generator (v4 + v7), ULID Generator, Hosts File Editor, SSH Config Generator, Log Viewer / Tail (regex filter), Cron Job Manager (crontab + Windows tasks), Service Status Dashboard, **Notes** (Obsidian-style Markdown editor with Milkdown WYSIWYG + Dracula theme, collapsible sidebar with persisted width, right-click formatting menu, localized templates EN/FR, TreeView file explorer, accent-insensitive `[[wiki-links]]`, tags, drag-and-drop, Confluence/HTML export), **Diagram Editor** (draw.io embedded offline, New/Open/Save/Export PNG), **Command Library**, **Privilege Launcher** |
 
 ### Session Management
 - Tabbed sessions with drag-to-reorder
@@ -231,7 +231,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Command Palette (Ctrl+K): protocol icons, status dots, endpoint hints, Ctrl+Enter for split
 - Connection inheritance: group-level defaults for gateway, SSH username, key path
 - Empty states: tool views show guidance before first query, welcome panel with import CTA
-- Built-in help button ("?") on all 59 tools with localized usage instructions
+- Built-in help button ("?") on all 58 tools with localized usage instructions
 - Tab busy indicator: pulsing accent dot on tabs during long-running tool operations
 - **Tabbed sidebar** (Sessions / Tools): full-height tool browser with collapsible categories, an always-present Favorites section, single-click launch, and right-click favorite management without accidental tool launch. Ctrl+Shift+T toggles the active sidebar tab
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
@@ -311,7 +311,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 | Citrix | StoreBrowse CLI integration |
 | Crypto | System.Security.Cryptography.ProtectedData (DPAPI) |
 | Testing | xUnit (7,900+ passing tests across 8 projects) |
-| Built-in Tools | 59 sysops tools (Ctrl+K → `tools` or Ctrl+Shift+T) |
+| Built-in Tools | 58 sysops tools (Ctrl+K → `tools` or Ctrl+Shift+T) |
 | Serialization | System.Text.Json |
 
 ---

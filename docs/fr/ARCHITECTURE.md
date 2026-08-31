@@ -12,7 +12,7 @@
 
 # Architecture
 
-Heimdall est une application WPF .NET 10 organisée en solution multi-projets, avec des frontières de dépendances strictes. Elle prend en charge les types de connexion RDP, SSH, SFTP, FTP, VNC, Telnet, Citrix et Local Shell, avec environ 5 491 clés i18n par langue (EN/FR), 59 outils sysops intégrés dotés d'une aide contextuelle, une navigation croisée entre outils, et 5 578 tests automatisés (5 578 verts, 0 ignoré dans la baseline CI actuelle). Le moniteur de santé interroge en parallèle (Task.WhenAll), les importateurs XML sont durcis contre XXE, et tous les Debug.WriteLine ont été remplacés par FileLogger. Design System conforme WCAG AA avec 45 design tokens (typographie de 11 px minimum, espacements, rayons d'angle, opacités, tailles d'icônes, famille de police), micro-animations, FocusIndicatorBrush pour l'accessibilité clavier, système d'icônes unifié à deux niveaux (géométries vectorielles + MDL2), code couleur par catégorie d'outil, i18n déclarative via l'extension de balisage `{loc:Translate}` et ServerDialog à divulgation progressive.
+Heimdall est une application WPF .NET 10 organisée en solution multi-projets, avec des frontières de dépendances strictes. Elle prend en charge les types de connexion RDP, SSH, SFTP, FTP, VNC, Telnet, Citrix et Local Shell, avec environ 5 491 clés i18n par langue (EN/FR), 58 outils sysops intégrés dotés d'une aide contextuelle, une navigation croisée entre outils, et 5 578 tests automatisés (5 578 verts, 0 ignoré dans la baseline CI actuelle). Le moniteur de santé interroge en parallèle (Task.WhenAll), les importateurs XML sont durcis contre XXE, et tous les Debug.WriteLine ont été remplacés par FileLogger. Design System conforme WCAG AA avec 45 design tokens (typographie de 11 px minimum, espacements, rayons d'angle, opacités, tailles d'icônes, famille de police), micro-animations, FocusIndicatorBrush pour l'accessibilité clavier, système d'icônes unifié à deux niveaux (géométries vectorielles + MDL2), code couleur par catégorie d'outil, i18n déclarative via l'extension de balisage `{loc:Translate}` et ServerDialog à divulgation progressive.
 
 ## Structure de la solution
 
@@ -31,7 +31,7 @@ Heimdall.slnx (14 projects)
 │       ├── Views: MainWindow, SessionPaneControl, SplitContainerControl,
 │       │          EmbeddedRdpView, EmbeddedSshView, EmbeddedSftpView,
 │       │          EmbeddedCitrixView, EmbeddedVncView, FloatingSessionWindow
-│       ├── Views/Tools: 59 built-in sysops tools (IToolView interface)
+│       ├── Views/Tools: 58 built-in sysops tools (IToolView interface)
 │       └── Services: ConnectionService (.Rdp/.Ssh/.Sftp/.Ftp/.Vnc/.Telnet/.Citrix/.Local/.Tunnel),
 │                     SplitService, SessionWindowService, EmbeddedSessionManager, ToolRegistry,
 │                     TaskSchedulerService, MacroService, EphemeralFileServer, FileShareService,
@@ -794,7 +794,7 @@ Editions de build :
 
 ### ToolRegistry (source unique de vérité)
 
-Les 59 outils intégrés sont enregistrés dans `ToolRegistry` (singleton). Chaque outil est décrit par un enregistrement `ToolDescriptor` :
+Les 58 outils intégrés sont enregistrés dans `ToolRegistry` (singleton). Chaque outil est décrit par un enregistrement `ToolDescriptor` :
 
 ```csharp
 public record ToolDescriptor(
@@ -958,14 +958,14 @@ Navigateur pleine page sur le rail de navigation principal, indépendant de l'on
 
 **Piège des design tokens** : `SpacingRowGap` est un `sys:Double` (pour Margin/Height). `RowDefinition.Height` exige un `GridLength` - utiliser `SpacingRowGapGrid` pour les espaceurs de lignes de grille.
 
-### Catégories d'outils (49 outils)
+### Catégories d'outils (52 outils)
 
 | Catégorie | Nombre | Outils |
 |----------|-------|-------|
-| **Réseau** | 16 | **Network Cartography** (balayage ping, scan de ports, capture de bannière, inspection de certificat TLS, empreinte d'OS à partir de 5 sources (TTL/bannière/ports/SNMP/NTLM), **extraction du challenge NTLM SMB2** (nom d'hôte/domaine/build d'OS/GUID/uptime), **empreinte HASSH SSH**, **hachage de favicon compatible Shodan** (plus de 30 équipements connus), **sondage d'URL produit HTTP** (13 chemins d'éditeurs), **détection de framework par cookie/page d'erreur**, requête SNMPv2c sur 6 OID + décodage du PEN IANA de l'éditeur, NetBIOS NBSTAT, mDNS/Bonjour, **SSDP + récupération de UPnP rootDesc.xml**, plus de 320 OUI MAC + détection d'adresse MAC aléatoire, plus de 50 motifs de rôle + plus de 100 empreintes de bannière + 6 règles de conflit, détection dynamique de VLAN par CIDR, export de topologie Draw.io, historique de scan avec diff typé, scan de sous-réseau distant via passerelle SSH (sondes groupées), **base de connaissances persistante avec cache par TTL + backfill KB**, **scan par tunnel : balayage ping + découverte ARP + sondes `/dev/tcp` parallèles avec délai par sonde**), Ping, DNS (serveur personnalisé, via tunnel), Cert Inspector (chaîne + TLS, via tunnel), Port Scanner (capture de bannière, via tunnel), Subnet (IPv4+IPv6), IP Converter, HTTP Status, Whois, HTTP Header Analyzer, Banner Grabber, TCP Traceroute, SNMP Walker, ARP Monitor, Firewall Rule Tester, Network Calculator (supernet + VLAN) |
-| **Sécurité** | 15 | Password (3 modes, temps de cassage, historique, préréglages personnalisés, effacement automatique du presse-papiers), SSH Key (RSA+Ed25519), Hash (SHA3 + progression), HMAC, JWT (vérification de signature), Certificate Generator (CA + feuille), TOTP (RFC 6238), Password Policy Checker, SSH Key Auditor, SSL/TLS Auditor, DNS Security Checker (SPF/DKIM/DMARC), SMB Enumerator, Default Credential Scanner, CVE Lookup, **SecNumCloud Audit** (15 contrôles, 4 chapitres, constructeur `Func<string,string> localize`, export HTML/CSV/Draw.io), **Security Audit** (25 scénarios, packs JSON, playlists, mode CRT) |
+| **Réseau** | 17 | **Network Cartography** (balayage ping, scan de ports, capture de bannière, inspection de certificat TLS, empreinte d'OS à partir de 5 sources (TTL/bannière/ports/SNMP/NTLM), **extraction du challenge NTLM SMB2** (nom d'hôte/domaine/build d'OS/GUID/uptime), **empreinte HASSH SSH**, **hachage de favicon compatible Shodan** (plus de 30 équipements connus), **sondage d'URL produit HTTP** (13 chemins d'éditeurs), **détection de framework par cookie/page d'erreur**, requête SNMPv2c sur 6 OID + décodage du PEN IANA de l'éditeur, NetBIOS NBSTAT, mDNS/Bonjour, **SSDP + récupération de UPnP rootDesc.xml**, plus de 320 OUI MAC + détection d'adresse MAC aléatoire, plus de 50 motifs de rôle + plus de 100 empreintes de bannière + 6 règles de conflit, détection dynamique de VLAN par CIDR, export de topologie Draw.io, historique de scan avec diff typé, scan de sous-réseau distant via passerelle SSH (sondes groupées), **base de connaissances persistante avec cache par TTL + backfill KB**, **scan par tunnel : balayage ping + découverte ARP + sondes `/dev/tcp` parallèles avec délai par sonde**), Ping, DNS (serveur personnalisé, via tunnel), Cert Inspector (chaîne + TLS, via tunnel), Port Scanner (capture de bannière, via tunnel), Subnet (IPv4+IPv6), IP Converter, HTTP Status, Whois, HTTP Header Analyzer, Banner Grabber, TCP Traceroute, SNMP Walker, ARP Monitor, Firewall Rule Tester, Network Calculator (supernet + VLAN) |
+| **Sécurité** | 15 | Password (3 modes, temps de cassage, historique, préréglages personnalisés, effacement automatique du presse-papiers), SSH Key (RSA+Ed25519), Hash (SHA3 + progression), HMAC, JWT (vérification de signature), Certificate Generator (CA + feuille), TOTP (RFC 6238), Password Policy Checker, SSH Key Auditor, SSL/TLS Auditor, DNS Security Checker (SPF/DKIM/DMARC), SMB Enumerator, Default Credential Scanner, CVE Lookup, **SecNumCloud Audit** (15 contrôles, 4 chapitres, constructeur `Func<string,string> localize`, export HTML/CSV/Draw.io) |
 | **Encodage** | 6 | Base64 (variante URL-safe), URL Encoder, JSON (position d'erreur), Regex (surlignage des correspondances), Text Diff (au mot près), Text Case (8 formats) |
-| **Système** | 12 | Chmod, Crontab Builder, DateTime (fuseau horaire + relatif), UUID (v4+v7), Hosts Editor, SSH Config Generator, Log Viewer/Tail, Cron Job Manager, Service Status Dashboard, **Notes** (Markdown façon Obsidian), **Diagram Editor** (draw.io embarqué hors ligne), **Hacker Simulator** |
+| **Système** | 14 | Chmod, Crontab Builder, DateTime (fuseau horaire + relatif), UUID (v4+v7), ULID, Hosts Editor, SSH Config Generator, Log Viewer/Tail, Cron Job Manager, Service Status Dashboard, **Notes** (Markdown façon Obsidian), **Diagram Editor** (draw.io embarqué hors ligne), **Command Library**, **Privilege Launcher** |
 
 ### i18n déclarative (extension de balisage `{loc:Translate}`)
 
