@@ -22,6 +22,40 @@ using Heimdall.App.ViewModels;
 namespace Heimdall.App.Services;
 
 /// <summary>
+/// The sessions a drag out of the session tree carries.
+/// </summary>
+/// <remarks>
+/// The payload used to be the single pressed session, which is why dragging a multi-selection into
+/// a folder moved one row and left the other seven where they were. Carrying the set - even when it
+/// holds one - keeps the drop from having to guess whether the selection was meant.
+/// </remarks>
+public sealed class TreeServerDragPayload
+{
+    /// <summary>The drag-and-drop format name this payload travels under.</summary>
+    public const string DataFormat = "HeimdallServer";
+
+    /// <summary>Creates a payload for a drag started on <paramref name="source"/>.</summary>
+    /// <param name="source">The session the pointer went down on.</param>
+    /// <param name="servers">Every session the drag carries, including the source.</param>
+    public TreeServerDragPayload(
+        ServerItemViewModel source,
+        IReadOnlyList<ServerItemViewModel> servers)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(servers);
+
+        Source = source;
+        Servers = servers.Count == 0 ? [source] : servers;
+    }
+
+    /// <summary>The session the pointer went down on.</summary>
+    public ServerItemViewModel Source { get; }
+
+    /// <summary>Every session the drag carries, in selection order.</summary>
+    public IReadOnlyList<ServerItemViewModel> Servers { get; }
+}
+
+/// <summary>
 /// Holds transient state for the session <see cref="TreeView"/> interactions
 /// in <c>MainWindow</c>: drag-drop tracking and right-click /
 /// keyboard-context-menu targeting. Also exposes a pure static helper for
@@ -33,6 +67,7 @@ public sealed class TreeInteractionState
 {
     private TreeViewItem? _dragSourceContainer;
     private ServerItemViewModel? _dragSourceServer;
+    private ServerItemViewModel? _deferredSingleSelection;
 
     /// <summary>Mouse position captured on left button down — start of a potential drag.</summary>
     public System.Windows.Point DragStartPoint { get; set; }
@@ -105,13 +140,43 @@ public sealed class TreeInteractionState
         return true;
     }
 
+    /// <summary>
+    /// Records the session a plain press decided not to select yet, so the release can select it.
+    /// </summary>
+    /// <param name="server">The session under the pointer when the button went down.</param>
+    internal void DeferSingleSelection(ServerItemViewModel server)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        _deferredSingleSelection = server;
+    }
+
+    /// <summary>
+    /// Hands back the deferred session once, and only once.
+    /// </summary>
+    /// <param name="server">The session the release must select, when there is one.</param>
+    /// <returns><see langword="true"/> when a deferral was pending.</returns>
+    internal bool TryTakeDeferredSingleSelection(out ServerItemViewModel? server)
+    {
+        server = _deferredSingleSelection;
+        _deferredSingleSelection = null;
+        return server is not null;
+    }
+
     /// <summary>Clears every transient value associated with a pointer drag.</summary>
+    /// <remarks>
+    /// The deferred selection is cleared here, alongside the drag candidate, because every caller
+    /// of this method is a point where the pointer gesture restarts or ends: a new press, a move
+    /// that no longer qualifies, and the return of DoDragDrop. That last one is what makes a drag
+    /// cancelled mid-flight leave the selection alone - the deferral dies with the drag instead of
+    /// being applied later by a release the drag loop has already swallowed.
+    /// </remarks>
     internal void ResetDrag()
     {
         DragStartPoint = default;
         DragInProgress = false;
         _dragSourceContainer = null;
         _dragSourceServer = null;
+        _deferredSingleSelection = null;
     }
 
     /// <summary>

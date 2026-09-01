@@ -260,6 +260,54 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// </summary>
     public string? AccessibleHelpText => null;
 
+    /// <summary>
+    /// Hover text for the row, or <see langword="null"/> when the row already shows everything
+    /// there is to say.
+    /// </summary>
+    /// <remarks>
+    /// It used to be bound straight to <see cref="DisplayName"/>, which is the one thing the row
+    /// is already printing, so hovering answered a question nobody had. What the row does not
+    /// print is where the session actually goes: the host and port, who it signs in as, and which
+    /// protocol the coloured icon stands for.
+    ///
+    /// <para>
+    /// The health verdict is deliberately left out. The status dot carries its own tooltip and is
+    /// the only place that verdict is spelled out; repeating it here would make the dot's tooltip
+    /// redundant, and the row is the larger hover target, so the version people would actually see
+    /// is the one attached to the wrong control. The verdict already reaches assistive technology
+    /// through <see cref="AccessibleName"/>.
+    /// </para>
+    /// </remarks>
+    public string? RowTooltipText
+    {
+        get
+        {
+            List<string> lines = [];
+
+            if (!string.IsNullOrWhiteSpace(Endpoint))
+            {
+                lines.Add(Format("SessionTreeRowTooltipHost", Endpoint));
+            }
+
+            if (!string.IsNullOrWhiteSpace(Username))
+            {
+                lines.Add(Format("SessionTreeRowTooltipUser", Username));
+            }
+
+            // A tool row has no protocol to name - its "connection type" is the tool id.
+            if (!ConnectionTypeCatalog.IsToolConnectionType(ConnectionType))
+            {
+                lines.Add(Format(
+                    "SessionTreeRowTooltipProtocol",
+                    ConnectionType.ToUpperInvariant()));
+            }
+
+            return lines.Count == 0
+                ? null
+                : string.Join(System.Environment.NewLine, lines);
+        }
+    }
+
     public string ConnectionTypeBadge => ConnectionType.ToUpperInvariant() switch
     {
         "RDP" => "RDP",
@@ -348,8 +396,11 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     {
         OnPropertyChanged(nameof(ConnectionTypeBadge));
         OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(RowTooltipText));
         InvalidateSearchTextCache();
     }
+
+    partial void OnEndpointChanged(string value) => OnPropertyChanged(nameof(RowTooltipText));
 
     partial void OnDisplayNameChanged(string value)
     {
@@ -391,7 +442,11 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     partial void OnProjectNameChanged(string value) => InvalidateSearchTextCache();
 
-    partial void OnUsernameChanged(string value) => InvalidateSearchTextCache();
+    partial void OnUsernameChanged(string value)
+    {
+        OnPropertyChanged(nameof(RowTooltipText));
+        InvalidateSearchTextCache();
+    }
 
     partial void OnTagsChanged(string value) => InvalidateSearchTextCache();
 
@@ -418,6 +473,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         OnPropertyChanged(nameof(ConnectionStateTooltip));
         OnPropertyChanged(nameof(StatusTooltipText));
         OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(RowTooltipText));
     }
 
     private static string FormatEndpoint(ServerProfileDto dto)
@@ -523,6 +579,9 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionAuthNoneSaved" => "No saved credentials",
         "SessionAuthCurrentUser" => "Current user",
         "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
+        "SessionTreeRowTooltipHost" => "Host: {0}",
+        "SessionTreeRowTooltipUser" => "User: {0}",
+        "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
         "SessionStatusConnected" => "Connected",
         "StatusLaunchedExternalClient" => "External client launched",
         "StatusLaunchedExternalClientTooltip" => "The external client was launched.",

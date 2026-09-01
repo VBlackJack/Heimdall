@@ -25,12 +25,45 @@ namespace Heimdall.App.ViewModels;
 
 public partial class ServerListViewModel
 {
-    public bool ShouldOpenBulkContextMenu(ServerItemViewModel? target)
+    public bool ShouldOpenBulkContextMenu(ServerItemViewModel? target) =>
+        IsWithinMultiSelection(target);
+
+    /// <summary>
+    /// Reports whether a plain press on a row must leave the selection untouched until the button
+    /// comes back up.
+    /// </summary>
+    /// <param name="target">The session under the pointer, or null for a non-session row.</param>
+    /// <returns><see langword="true"/> when the press must not narrow the selection.</returns>
+    public bool ShouldDeferSingleSelection(ServerItemViewModel? target) =>
+        IsWithinMultiSelection(target);
+
+    /// <summary>
+    /// Resolves the sessions a drag started on <paramref name="source"/> carries.
+    /// </summary>
+    /// <param name="source">The session the pointer went down on.</param>
+    /// <returns>The whole selection when the drag starts inside it, otherwise the source alone.</returns>
+    public IReadOnlyList<ServerItemViewModel> ResolveDragSelection(ServerItemViewModel source)
     {
-        return target is not null
-            && SelectionCount > 1
-            && SelectedItems.Contains(target);
+        ArgumentNullException.ThrowIfNull(source);
+
+        return IsWithinMultiSelection(source)
+            ? SelectedItems.ToList()
+            : [source];
     }
+
+    /// <summary>
+    /// The one question behind three gestures: does this row belong to a selection of more than one
+    /// session?
+    /// </summary>
+    /// <remarks>
+    /// The right-click menu, the deferred left press and the drag payload all turn on it, and they
+    /// have to agree: a gesture that lands inside a multi-selection acts on the whole of it, so
+    /// none of the three may shrink the selection before the other two have read it.
+    /// </remarks>
+    private bool IsWithinMultiSelection(ServerItemViewModel? target) =>
+        target is not null
+        && SelectionCount > 1
+        && SelectedItems.Contains(target);
 
     public BulkSelectionContext? CreateBulkSelectionContext()
     {
@@ -170,6 +203,44 @@ public partial class ServerListViewModel
 
         await MoveServersToGroupCoreAsync(selectedItems, request.GroupName, cancellationToken);
     }
+
+    /// <summary>
+    /// Moves an explicit set of sessions to one folder through the same single transaction the
+    /// bulk menu uses, and reports how many of them actually changed folder.
+    /// </summary>
+    /// <param name="servers">The sessions to move; those already in the target are left alone.</param>
+    /// <param name="targetGroup">Destination folder path, null or whitespace for the root.</param>
+    /// <param name="cancellationToken">Cancels before the mutation is built.</param>
+    /// <returns>The number of sessions moved, or zero when nothing was written.</returns>
+    public async Task<int> MoveServersToGroupAsync(
+        IReadOnlyList<ServerItemViewModel> servers,
+        string? targetGroup,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(servers);
+
+        // Counted here from the same predicate the core filters on, rather than from the size of
+        // the request: dragging eight rows into the folder three of them already sit in moves five.
+        var normalizedTarget = NormalizeGroupForPersistence(targetGroup);
+        int candidateCount = NormalizeSelection(servers)
+            .Count(server => IsGroupMoveCandidate(server, normalizedTarget));
+        if (candidateCount == 0)
+        {
+            return 0;
+        }
+
+        bool moved = await MoveServersToGroupCoreAsync(servers, targetGroup, cancellationToken);
+        return moved ? candidateCount : 0;
+    }
+
+    /// <summary>
+    /// Whether moving <paramref name="server"/> to a folder would change anything.
+    /// </summary>
+    private static bool IsGroupMoveCandidate(ServerItemViewModel server, string? normalizedTarget) =>
+        !string.Equals(
+            NormalizeGroupForPersistence(server.Group),
+            normalizedTarget,
+            StringComparison.OrdinalIgnoreCase);
 
     [RelayCommand(CanExecute = nameof(CanMoveSelectedToProject))]
     private async Task MoveSelectedToProjectAsync(BulkMoveToProjectRequest? request, CancellationToken cancellationToken)
@@ -1463,10 +1534,7 @@ public partial class ServerListViewModel
         }
 
         var moveCandidates = selectedServers
-            .Where(server => !string.Equals(
-                NormalizeGroupForPersistence(server.Group),
-                normalizedTarget,
-                StringComparison.OrdinalIgnoreCase))
+            .Where(server => IsGroupMoveCandidate(server, normalizedTarget))
             .ToList();
 
         if (moveCandidates.Count == 0)

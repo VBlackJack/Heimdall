@@ -50,6 +50,90 @@ public sealed class WindowClosingFlowTests
         Assert.Equal(0, windowStateSaveCount);
     }
 
+    /// <summary>
+    /// Discarding on the way out has to undo what was already applied on screen.
+    /// </summary>
+    /// <remarks>
+    /// Theme, accent and language take effect the moment they are picked, so a discard that only
+    /// drops the pending write leaves the user looking at edits they abandoned. This flow does not
+    /// always end in a closed window either: declining the connected-sessions prompt keeps the
+    /// application running, which is how an abandoned language survives a close that never
+    /// happened.
+    /// </remarks>
+    [Fact]
+    public async Task Close_DirtySettingsDiscarded_UndoesTheAppliedEdits()
+    {
+        int discardCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: true,
+            connectedSessionCount: 0,
+            () => Task.FromResult<bool?>(false),
+            () => throw new InvalidOperationException("Save must not run on a discard."),
+            () => Task.FromResult(true),
+            () => Task.CompletedTask,
+            () => Task.CompletedTask,
+            () => throw new InvalidOperationException("Warning must not run."),
+            () =>
+            {
+                discardCount++;
+                return Task.CompletedTask;
+            });
+
+        Assert.True(canClose);
+        Assert.Equal(1, discardCount);
+    }
+
+    [Fact]
+    public async Task Close_DirtySettingsDiscardedThenSessionsDeclined_StillUndidTheEdits()
+    {
+        int discardCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: true,
+            connectedSessionCount: 3,
+            () => Task.FromResult<bool?>(false),
+            () => throw new InvalidOperationException("Save must not run on a discard."),
+            () => Task.FromResult(false),
+            () => Task.CompletedTask,
+            () => throw new InvalidOperationException("Window state must not be saved."),
+            () => throw new InvalidOperationException("Warning must not run."),
+            () =>
+            {
+                discardCount++;
+                return Task.CompletedTask;
+            });
+
+        // The window stays open, so the undo is the only thing standing between the user and a
+        // settings panel showing edits they said to throw away.
+        Assert.False(canClose);
+        Assert.Equal(1, discardCount);
+    }
+
+    [Fact]
+    public async Task Close_DirtySettingsSaved_DoesNotUndoWhatItJustSaved()
+    {
+        int discardCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: true,
+            connectedSessionCount: 0,
+            () => Task.FromResult<bool?>(true),
+            () => Task.FromResult(true),
+            () => Task.FromResult(true),
+            () => Task.CompletedTask,
+            () => Task.CompletedTask,
+            () => throw new InvalidOperationException("Warning must not run."),
+            () =>
+            {
+                discardCount++;
+                return Task.CompletedTask;
+            });
+
+        Assert.True(canClose);
+        Assert.Equal(0, discardCount);
+    }
+
     [Fact]
     public async Task Close_DirtySettingsAndConnectedSessions_UsesDeterministicPromptOrder()
     {

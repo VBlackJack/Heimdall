@@ -33,6 +33,22 @@
                 <Setter Property="FontWeight" Value="SemiBold"/>
             </Style>
 
+            <!-- The shared watermark style is based on the bare TextBox, so on its own it renders
+                 a field one size smaller than every other field on the same form. -->
+            <Style x:Key="DialogFormWatermarkTextBoxStyle" TargetType="TextBox"
+                   BasedOn="{StaticResource WatermarkTextBoxStyle}">
+                <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+            </Style>
+
+            <!-- Caption sitting directly above a control inside a post-connect row. Repeated on
+                 every row, so it is deliberately quieter than LabelStyle: it has to name a field
+                 without competing with the command the user is reading. -->
+            <Style x:Key="PostConnectFieldCaptionStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
+                <Setter Property="Margin" Value="0,0,0,2"/>
+            </Style>
+
             <Style x:Key="InsetCardStyle" TargetType="Border">
                 <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
@@ -1843,160 +1859,203 @@
                                                  the field the user types in: at the dialog's declared width the
                                                  492 px of controls beside it left the command a sliver. Everything
                                                  but the enabled checkbox now sits on a second, wrapping row. -->
-                                            <ListView x:Name="DlgSrv_PostConnectStepsList"
-                                                      ItemsSource="{Binding PostConnectSteps}"
-                                                      SelectedItem="{Binding SelectedPostConnectStep}"
-                                                      MinHeight="150"
-                                                      MaxHeight="320"
-                                                      TabIndex="84"
-                                                      Background="{DynamicResource CardBrush}"
-                                                      BorderBrush="{DynamicResource BorderBrush}"
-                                                      Foreground="{DynamicResource TextPrimaryBrush}"
-                                                      HorizontalContentAlignment="Stretch"
-                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                                <ListView.ItemTemplate>
-                                                    <DataTemplate DataType="{x:Type vm:PostConnectStepItemViewModel}">
-                                                        <Grid Margin="0,0,0,6">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="32"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <CheckBox Grid.Row="0"
-                                                                      Grid.Column="0"
-                                                                      IsChecked="{Binding Enabled}"
-                                                                      VerticalAlignment="Center"
-                                                                      AutomationProperties.Name="{loc:Translate ServerDialogPostConnectEnabled}"/>
-                                                            <Grid Grid.Row="0" Grid.Column="1" Margin="8,0,8,0">
-                                                                <TextBox VerticalAlignment="Center"
-                                                                         Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}"
-                                                                         AutomationProperties.Name="{loc:Translate ServerDialogPostConnectInput}">
-                                                                    <TextBox.Style>
-                                                                        <Style TargetType="TextBox" BasedOn="{StaticResource DialogFormTextBoxStyle}">
-                                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </TextBox.Style>
-                                                                </TextBox>
-                                                                <Border Padding="8,6"
-                                                                        CornerRadius="{StaticResource CornerRadiusMd}"
-                                                                        Background="{DynamicResource SurfaceBrush}"
-                                                                        BorderBrush="{DynamicResource BorderBrush}"
-                                                                        BorderThickness="1"
-                                                                        Visibility="Collapsed"
-                                                                        ToolTip="{loc:Translate TooltipPostConnectLinkedHint}">
-                                                                    <Border.Style>
-                                                                        <Style TargetType="Border">
-                                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            <Setter Property="ToolTip" Value="{loc:Translate TooltipPostConnectLinkedHint}"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                                </DataTrigger>
-                                                                                <DataTrigger Binding="{Binding IsBroken}" Value="True">
-                                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
-                                                                                    <Setter Property="ToolTip" Value="{loc:Translate TooltipPostConnectLibraryBroken}"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </Border.Style>
-                                                                    <StackPanel Orientation="Horizontal">
-                                                                        <TextBlock Text="{loc:Translate LabelPostConnectLibraryLinkedPrefix}"
-                                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                                        <TextBlock Text="{Binding DisplayInput}"
-                                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                                                   FontWeight="SemiBold"
-                                                                                   TextTrimming="CharacterEllipsis"/>
-                                                                        <TextBlock Text=" · "
-                                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                                                   Visibility="{Binding IsBroken, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                                                        <TextBlock Text="{loc:Translate LabelPostConnectLibraryBroken}"
-                                                                                   Foreground="{DynamicResource ErrorTextBrush}"
-                                                                                   Visibility="{Binding IsBroken, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <Grid>
+                                                <ListView x:Name="DlgSrv_PostConnectStepsList"
+                                                          ItemsSource="{Binding PostConnectSteps}"
+                                                          SelectedItem="{Binding SelectedPostConnectStep}"
+                                                          MinHeight="150"
+                                                          MaxHeight="320"
+                                                          TabIndex="84"
+                                                          Background="{DynamicResource CardBrush}"
+                                                          BorderBrush="{DynamicResource BorderBrush}"
+                                                          Foreground="{DynamicResource TextPrimaryBrush}"
+                                                          HorizontalContentAlignment="Stretch"
+                                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                                    <ListView.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type vm:PostConnectStepItemViewModel}">
+                                                            <Grid Margin="0,0,0,6">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="32"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                </Grid.RowDefinitions>
+                                                                <!-- The one control here that keeps a hover label instead of
+                                                                     a visible one. Its column is 32 px and it shares the
+                                                                     command's row, where every fixed pixel is taken out of the
+                                                                     field the user types in: a word does not fit, and widening
+                                                                     the column would spend the command's width budget on a
+                                                                     caption. -->
+                                                                <CheckBox Grid.Row="0"
+                                                                          Grid.Column="0"
+                                                                          IsChecked="{Binding Enabled}"
+                                                                          VerticalAlignment="Center"
+                                                                          ToolTip="{loc:Translate ServerDialogPostConnectEnabled}"
+                                                                          AutomationProperties.Name="{loc:Translate ServerDialogPostConnectEnabled}"/>
+                                                                <Grid Grid.Row="0" Grid.Column="1" Margin="8,0,8,0">
+                                                                    <!-- The command carries a placeholder rather than a caption
+                                                                         above it: a caption would cost a line on every row of a
+                                                                         list that is already two lines tall, and the placeholder
+                                                                         shows exactly when the field is empty, which is the only
+                                                                         moment its content does not say what it is. -->
+                                                                    <TextBox VerticalAlignment="Center"
+                                                                             Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}"
+                                                                             Tag="{loc:Translate ServerDialogPostConnectInputPlaceholder}"
+                                                                             AutomationProperties.Name="{loc:Translate ServerDialogPostConnectInput}">
+                                                                        <TextBox.Style>
+                                                                            <Style TargetType="TextBox" BasedOn="{StaticResource DialogFormWatermarkTextBoxStyle}">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBox.Style>
+                                                                    </TextBox>
+                                                                    <Border Padding="8,6"
+                                                                            CornerRadius="{StaticResource CornerRadiusMd}"
+                                                                            Background="{DynamicResource SurfaceBrush}"
+                                                                            BorderBrush="{DynamicResource BorderBrush}"
+                                                                            BorderThickness="1"
+                                                                            Visibility="Collapsed"
+                                                                            ToolTip="{loc:Translate TooltipPostConnectLinkedHint}">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Setter Property="ToolTip" Value="{loc:Translate TooltipPostConnectLinkedHint}"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding IsBroken}" Value="True">
+                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                                                        <Setter Property="ToolTip" Value="{loc:Translate TooltipPostConnectLibraryBroken}"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <TextBlock Text="{loc:Translate LabelPostConnectLibraryLinkedPrefix}"
+                                                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                            <TextBlock Text="{Binding DisplayInput}"
+                                                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                                       FontWeight="SemiBold"
+                                                                                       TextTrimming="CharacterEllipsis"/>
+                                                                            <TextBlock Text=" · "
+                                                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                                       Visibility="{Binding IsBroken, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                            <TextBlock Text="{loc:Translate LabelPostConnectLibraryBroken}"
+                                                                                       Foreground="{DynamicResource ErrorTextBrush}"
+                                                                                       Visibility="{Binding IsBroken, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </Grid>
+                                                                <!-- WrapPanel rather than a second column set: at the window's
+                                                                     MinWidth these controls must fold onto another line, because
+                                                                     horizontal scrolling would never bring them back into view. -->
+                                                                <WrapPanel Grid.Row="1" Grid.Column="1" Margin="8,6,8,0">
+                                                                    <!-- Each caption is stacked with its own control inside one
+                                                                         panel, so the pair is laid out as a single item and a
+                                                                         wrap can never leave a label at the end of one line and
+                                                                         its field at the start of the next. A header row above
+                                                                         the list cannot do that: it would have to align with
+                                                                         controls whose position depends on the dialog width. -->
+                                                                    <StackPanel Margin="0,0,8,4">
+                                                                        <TextBlock Style="{StaticResource PostConnectFieldCaptionStyle}"
+                                                                                   Text="{loc:Translate ServerDialogPostConnectDelay}"/>
+                                                                        <TextBox Width="72"
+                                                                                 HorizontalAlignment="Left"
+                                                                                 Text="{Binding DelayMs, UpdateSourceTrigger=PropertyChanged}"
+                                                                                 Style="{StaticResource DialogFormTextBoxStyle}"
+                                                                                 AutomationProperties.Name="{loc:Translate ServerDialogPostConnectDelay}"/>
                                                                     </StackPanel>
-                                                                </Border>
+                                                                    <StackPanel Margin="0,0,8,4">
+                                                                        <TextBlock Style="{StaticResource PostConnectFieldCaptionStyle}"
+                                                                                   Text="{loc:Translate ServerDialogPostConnectOnFailure}"/>
+                                                                        <ComboBox Width="132"
+                                                                                  HorizontalAlignment="Left"
+                                                                                  ItemsSource="{Binding DataContext.PostConnectFailureOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                  DisplayMemberPath="Label"
+                                                                                  SelectedValuePath="Value"
+                                                                                  SelectedValue="{Binding OnFailure}"
+                                                                                  Style="{StaticResource DialogFormComboBoxStyle}"
+                                                                                  AutomationProperties.Name="{loc:Translate ServerDialogPostConnectOnFailure}"/>
+                                                                    </StackPanel>
+                                                                    <Button Content="{loc:Translate BtnPostConnectLinkLibrary}"
+                                                                            Command="{Binding DataContext.LinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Margin="0,0,8,4"
+                                                                            VerticalAlignment="Bottom"
+                                                                            AutomationProperties.Name="{loc:Translate BtnPostConnectLinkLibrary}">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
+                                                                    <Button Content="{loc:Translate BtnPostConnectChangeLibrary}"
+                                                                            Command="{Binding DataContext.ChangeCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Margin="0,0,8,4"
+                                                                            VerticalAlignment="Bottom"
+                                                                            AutomationProperties.Name="{loc:Translate A11yPostConnectChangeLibrary}">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
+                                                                    <Button Content="{loc:Translate BtnPostConnectUnlinkLibrary}"
+                                                                            Command="{Binding DataContext.UnlinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Margin="0,0,8,4"
+                                                                            VerticalAlignment="Bottom"
+                                                                            AutomationProperties.Name="{loc:Translate BtnPostConnectUnlinkLibrary}">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsLinked}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
+                                                                </WrapPanel>
                                                             </Grid>
-                                                            <!-- WrapPanel rather than a second column set: at the window's
-                                                                 MinWidth these controls must fold onto another line, because
-                                                                 horizontal scrolling would never bring them back into view. -->
-                                                            <WrapPanel Grid.Row="1" Grid.Column="1" Margin="8,6,8,0">
-                                                                <TextBox Width="72"
-                                                                         Margin="0,0,8,4"
-                                                                         Text="{Binding DelayMs, UpdateSourceTrigger=PropertyChanged}"
-                                                                         VerticalAlignment="Center"
-                                                                         Style="{StaticResource DialogFormTextBoxStyle}"
-                                                                         ToolTip="{loc:Translate ServerDialogPostConnectDelay}"
-                                                                         AutomationProperties.Name="{loc:Translate ServerDialogPostConnectDelay}"/>
-                                                                <ComboBox Width="132"
-                                                                          Margin="0,0,8,4"
-                                                                          ItemsSource="{Binding DataContext.PostConnectFailureOptions, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                          DisplayMemberPath="Label"
-                                                                          SelectedValuePath="Value"
-                                                                           SelectedValue="{Binding OnFailure}"
-                                                                           VerticalAlignment="Center"
-                                                                           Style="{StaticResource DialogFormComboBoxStyle}"
-                                                                           ToolTip="{loc:Translate ServerDialogPostConnectOnFailure}"
-                                                                           AutomationProperties.Name="{loc:Translate ServerDialogPostConnectOnFailure}"/>
-                                                                <Button Content="{loc:Translate BtnPostConnectLinkLibrary}"
-                                                                        Command="{Binding DataContext.LinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Margin="0,0,8,4"
-                                                                        AutomationProperties.Name="{loc:Translate BtnPostConnectLinkLibrary}">
-                                                                    <Button.Style>
-                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </Button.Style>
-                                                                </Button>
-                                                                <Button Content="{loc:Translate BtnPostConnectChangeLibrary}"
-                                                                        Command="{Binding DataContext.ChangeCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Margin="0,0,8,4"
-                                                                        AutomationProperties.Name="{loc:Translate A11yPostConnectChangeLibrary}">
-                                                                    <Button.Style>
-                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </Button.Style>
-                                                                </Button>
-                                                                <Button Content="{loc:Translate BtnPostConnectUnlinkLibrary}"
-                                                                        Command="{Binding DataContext.UnlinkCommandLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Margin="0,0,8,4"
-                                                                        AutomationProperties.Name="{loc:Translate BtnPostConnectUnlinkLibrary}">
-                                                                    <Button.Style>
-                                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsLinked}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </Button.Style>
-                                                                </Button>
-                                                            </WrapPanel>
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ListView.ItemTemplate>
-                                            </ListView>
+                                                        </DataTemplate>
+                                                    </ListView.ItemTemplate>
+                                                </ListView>
+                                                <!-- Inside the list box rather than under it: the thing that needs
+                                                     explaining is the 150 px of blank card, so the sentence has to
+                                                     be where the user is already looking. Hit testing stays off so
+                                                     the first click still lands on the list. -->
+                                                <TextBlock x:Name="DlgSrv_PostConnectEmptyState"
+                                                           Text="{loc:Translate ServerDialogPostConnectEmpty}"
+                                                           Margin="24,0"
+                                                           TextAlignment="Center"
+                                                           TextWrapping="Wrap"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           FontSize="{StaticResource FontSizeBody}"
+                                                           IsHitTestVisible="False"
+                                                           Visibility="{Binding HasNoPostConnectSteps, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </Grid>
                                             <Grid Margin="0,8,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
@@ -2654,16 +2713,23 @@
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
                                             <TextBlock x:Name="DlgSrv_FolderLabel" Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"/>
+                                            <!-- The field is free text and the separator is the only thing that turns
+                                                 it into a tree, so the convention is taught twice: by an example in
+                                                 the empty field, and by a sentence that survives the first keystroke. -->
                                             <TextBox x:Name="DlgSrv_FolderBox" Grid.Row="1" Grid.Column="0"
                                                      TabIndex="100"
                                                      AutomationProperties.Name="{loc:Translate ServerDialogLabelFolder}"
                                                      Text="{Binding Group, UpdateSourceTrigger=PropertyChanged}"
-                                                     Style="{StaticResource DialogFormTextBoxStyle}"/>
-                                            <TextBlock x:Name="DlgSrv_EnvironmentLabel" Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}" Margin="0,14,0,4"/>
-                                            <TextBlock x:Name="DlgSrv_FavoriteLabel" Grid.Row="2" Grid.Column="1" Style="{StaticResource LabelStyle}" Margin="12,14,0,4"/>
-                                            <ComboBox x:Name="DlgSrv_EnvironmentCmb" Grid.Row="3" Grid.Column="0"
+                                                     Tag="{loc:Translate ServerDialogFolderPlaceholder}"
+                                                     Style="{StaticResource DialogFormWatermarkTextBoxStyle}"/>
+                                            <TextBlock x:Name="DlgSrv_FolderHint" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                                       Style="{StaticResource DialogHintTextStyle}"/>
+                                            <TextBlock x:Name="DlgSrv_EnvironmentLabel" Grid.Row="3" Grid.Column="0" Style="{StaticResource LabelStyle}" Margin="0,14,0,4"/>
+                                            <TextBlock x:Name="DlgSrv_FavoriteLabel" Grid.Row="3" Grid.Column="1" Style="{StaticResource LabelStyle}" Margin="12,14,0,4"/>
+                                            <ComboBox x:Name="DlgSrv_EnvironmentCmb" Grid.Row="4" Grid.Column="0"
                                                       TabIndex="101"
                                                       AutomationProperties.Name="{loc:Translate ServerDialogLabelEnvironment}"
                                                       SelectedValue="{Binding Environment}"
@@ -2675,7 +2741,7 @@
                                                 <ComboBoxItem x:Name="DlgSrv_EnvLab" Content="" Tag="Lab"/>
                                                 <ComboBoxItem x:Name="DlgSrv_EnvPersonal" Content="" Tag="Personal"/>
                                             </ComboBox>
-                                            <CheckBox Grid.Row="3" Grid.Column="1"
+                                            <CheckBox Grid.Row="4" Grid.Column="1"
                                                       Margin="12,2,0,0"
                                                       x:Name="DlgSrv_MarkFavoriteCb"
                                                       TabIndex="102"

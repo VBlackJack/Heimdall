@@ -723,6 +723,7 @@ public partial class ServerDialog : Window
         DlgSrv_OrgTitle.Text = _localizer["ServerDialogOrganization"];
         DlgSrv_OrgDesc.Text = _localizer["ServerDialogOrganizationDesc"];
         DlgSrv_FolderLabel.Text = _localizer["ServerDialogLabelFolder"];
+        DlgSrv_FolderHint.Text = _localizer["ServerDialogFolderHint"];
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_FolderBox, DlgSrv_FolderLabel);
         DlgSrv_EnvironmentLabel.Text = _localizer["ServerDialogLabelEnvironment"];
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_EnvironmentCmb, DlgSrv_EnvironmentLabel);

@@ -69,7 +69,8 @@ internal static class WindowClosingFlow
         Func<Task<bool>> promptCloseConnectedSessionsAsync,
         Func<Task> flushExpandStateAsync,
         Func<Task> persistWindowStateAsync,
-        Action warnSaveFailed)
+        Action warnSaveFailed,
+        Func<Task>? discardSettingsAsync = null)
     {
         ArgumentNullException.ThrowIfNull(promptSaveDiscardCancelAsync);
         ArgumentNullException.ThrowIfNull(trySaveSettingsAsync);
@@ -92,6 +93,16 @@ internal static class WindowClosingFlow
                 {
                     warnSaveFailed();
                     return false;
+                }
+
+                // Discard has to undo the settings that were already applied on screen, not
+                // only the ones waiting to be written. Theme, accent and now language take
+                // effect the moment they are picked, and this flow does not always end in a
+                // closed window: declining the connected-sessions prompt below leaves the
+                // application running, with edits the user just abandoned still in force.
+                if (choice == false && discardSettingsAsync is not null)
+                {
+                    await discardSettingsAsync();
                 }
             }
         }
