@@ -121,6 +121,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _originalTheme = "";
     private string _originalAccentTint = "Default";
 
+    /// <summary>
+    /// The external-tool verdict from the last save attempt, or null when there was none.
+    /// </summary>
+    /// <remarks>
+    /// External tools are validated by hand rather than through data annotations, so this message
+    /// is absent from the error set the summary is otherwise rebuilt from. Kept here so a refresh
+    /// driven by an unrelated field cannot erase it.
+    /// </remarks>
+    private string? _externalToolsValidationError;
+
+    // Set only for the length of the sweep inside a save, where the summary is recomputed once at
+    // the end anyway and the per-property notifications would otherwise repeat it dozens of times.
+    private bool _suppressValidationSummaryRefresh;
+
     // Working buffers (mutated by CRUD, flushed to disk on Save)
     private List<SshGatewayDto> _pendingGateways = new();
 
@@ -888,6 +902,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private ExternalToolItemViewModel? _selectedExternalTool;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RevertChangesCommand))]
     private bool _isDirty;
 
     [ObservableProperty]
@@ -964,9 +979,35 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
         TrustedHostKeys = trustedHostKeys;
 
+        // The banner and the tab badges are derived from the error set, so they have to follow it
+        // rather than hold the shape it had when Save was last pressed.
+        ErrorsChanged += OnValidationErrorsChanged;
+
         // A view model that is constructed and never loaded still has to show its numbers.
         SyncNumericTexts();
         IsDirty = false;
+    }
+
+    /// <summary>
+    /// Keeps the validation banner and the tab error badges on the live error set.
+    /// </summary>
+    /// <remarks>
+    /// The refresh is deliberately not unconditional. Raising the banner from a keystroke would
+    /// flash it over a box the user is halfway through emptying, and the box already reports its
+    /// own error through the adorner; the aggregate indicators are a consequence of pressing Save.
+    /// Once they are on screen, though, they have to track what they claim, or correcting the very
+    /// field the banner names leaves the banner asserting an error that is gone.
+    /// </remarks>
+    private void OnValidationErrorsChanged(
+        object? sender,
+        System.ComponentModel.DataErrorsChangedEventArgs e)
+    {
+        if (_suppressValidationSummaryRefresh || !HasValidationErrors)
+        {
+            return;
+        }
+
+        RefreshValidationSummary();
     }
 
     private bool CanCheckNow() => !IsCheckingUpdate && !IsInstallingUpdate;
@@ -1415,7 +1456,18 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// </returns>
     public async Task<bool> TrySaveAsync(CancellationToken cancellationToken = default)
     {
-        ValidateAllProperties();
+        _suppressValidationSummaryRefresh = true;
+        try
+        {
+            ValidateAllProperties();
+        }
+        finally
+        {
+            _suppressValidationSummaryRefresh = false;
+        }
+
+        // Dropped before the tools are measured again, so a fixed tool stops being reported.
+        _externalToolsValidationError = null;
         RefreshValidationSummary();
 
         if (HasErrors)
@@ -1427,8 +1479,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         string? extToolError = ValidateExternalTools();
         if (extToolError is not null)
         {
-            ValidationSummary = extToolError;
-            HasValidationErrors = true;
+            _externalToolsValidationError = extToolError;
+            RefreshValidationSummary();
             return false;
         }
 
@@ -1659,6 +1711,30 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         {
             FileLogger.Error("Settings change notification failed", ex);
         }
+    }
+
+    private bool CanRevertChanges() => IsDirty;
+
+    /// <summary>
+    /// Abandons the pending edits and reloads the panel from the persisted settings.
+    /// </summary>
+    /// <remarks>
+    /// Until this existed the only visible way out of an unwanted edit was Reset Defaults, which
+    /// loads the factory values over all six tabs - a far larger act than the one being asked for.
+    /// The confirmation is not ceremony: this button stands one place away from that one, and it
+    /// is the only one of the two whose effect cannot be undone by declining to save.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanRevertChanges))]
+    private async Task RevertChangesAsync()
+    {
+        bool confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer["SettingsRevertChangesConfirmTitle"],
+            _localizer["SettingsRevertChangesConfirmBody"],
+            "warning");
+
+        if (!confirmed) return;
+
+        await DiscardChangesAsync();
     }
 
     [RelayCommand]
@@ -2987,12 +3063,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         base.OnPropertyChanged(e);
 
-        // Mark dirty when any settings property changes, excluding non-settings properties
+        // Mark dirty when any settings property changes, excluding non-settings properties.
+        // LegacyMigrationReofferAvailable belongs in that exclusion: the command that clears it
+        // has already written the decision to disk through the config manager, outside the
+        // pending-edit buffer, so raising the dirty flag would prompt the user about a change
+        // that neither Save nor Discard can act on.
         if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
             or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
             or nameof(CredentialGuardStatusText)
             or nameof(IsInstallingUpdate) or nameof(DownloadProgress) or nameof(IsUpdateAvailable)
             or nameof(IsUpdateReleaseAvailable)
+            or nameof(LegacyMigrationReofferAvailable)
             or nameof(SelectedGateway) or nameof(SelectedProject)
             or nameof(SelectedExternalTool) or nameof(HasValidationErrors)
             or nameof(IsPinConfigured) or nameof(PinStatusText)
@@ -3367,8 +3448,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             ?? GetFirstLocalizedFieldError(SecurityValidatedSettingPropertyNames)
             ?? GetFirstLocalizedFieldError(AdvancedValidatedSettingPropertyNames);
 
-        ValidationSummary = firstError;
-        HasValidationErrors = firstError is not null;
+        // Field errors keep precedence: a save never reaches the external tools while one stands.
+        ValidationSummary = firstError ?? _externalToolsValidationError;
+        HasValidationErrors = ValidationSummary is not null;
     }
 
     private int CountValidationErrors(string[] propertyNames)

@@ -386,6 +386,9 @@ public partial class ServerDialogViewModel : ObservableValidator
     /// <summary>Whether an RDP password is stored for this profile.</summary>
     public bool HasStoredRdpPassword => !string.IsNullOrEmpty(ExistingRdpPasswordEncrypted);
 
+    /// <summary>Whether an SSH key passphrase is stored for this profile.</summary>
+    public bool HasStoredSshKeyPassphrase => !string.IsNullOrEmpty(ExistingSshKeyPassphraseEncrypted);
+
     /// <summary>Forgets the stored SSH password.</summary>
     [RelayCommand]
     private void ClearStoredSshPassword()
@@ -397,6 +400,22 @@ public partial class ServerDialogViewModel : ObservableValidator
         // The authentication hint reads the field this command just emptied, and would otherwise
         // go on promising password authentication for a secret that no longer exists.
         OnPropertyChanged(nameof(SshAuthHint));
+        IsDirty = true;
+    }
+
+    /// <summary>Forgets the stored SSH key passphrase.</summary>
+    /// <remarks>
+    /// The passphrase rides the same empty-means-keep rule as the passwords, while its own hint
+    /// invites the user to leave the box blank when the key has none - so the one gesture that
+    /// looks like a removal is the gesture that keeps the secret. Its only other way out was to
+    /// clear the key path, which discards the key along with it.
+    /// </remarks>
+    [RelayCommand]
+    private void ClearStoredSshKeyPassphrase()
+    {
+        ExistingSshKeyPassphraseEncrypted = null;
+        SshKeyPassphrase = "";
+        OnPropertyChanged(nameof(HasStoredSshKeyPassphrase));
         IsDirty = true;
     }
 
@@ -491,6 +510,11 @@ public partial class ServerDialogViewModel : ObservableValidator
         {
             SshKeyPassphrase = "";
             ExistingSshKeyPassphraseEncrypted = null;
+
+            // The saved-passphrase line hides with the field, but it survives a key path that is
+            // cleared and typed again; without this raise it comes back announcing a secret this
+            // branch has already dropped.
+            OnPropertyChanged(nameof(HasStoredSshKeyPassphrase));
         }
     }
 
@@ -601,10 +625,10 @@ public partial class ServerDialogViewModel : ObservableValidator
                 if (probe.Success)
                 {
                     TestChipState = SshTestChipState.Success;
-                    TestChipText = string.Format(
+                    TestChipText = ScopeToDirectRoute(string.Format(
                         CultureInfo.CurrentCulture,
                         L("ServerDialogReachabilityChipSuccessSsh"),
-                        probe.Banner ?? "?");
+                        probe.Banner ?? "?"));
                     return;
                 }
             }
@@ -619,10 +643,10 @@ public partial class ServerDialogViewModel : ObservableValidator
         {
             FileLogger.Warn($"[ServerDialog] reachability test failed: {ex.Message}");
             TestChipState = SshTestChipState.Failure;
-            TestChipText = string.Format(
+            TestChipText = ScopeToDirectRoute(string.Format(
                 CultureInfo.CurrentCulture,
                 L("ServerDialogReachabilityChipFailure"),
-                ex.Message);
+                ex.Message));
         }
         finally
         {
@@ -650,7 +674,13 @@ public partial class ServerDialogViewModel : ObservableValidator
            && !string.IsNullOrWhiteSpace(RemoteServer)
            && EndpointPort is > 0 and <= 65535;
 
-    private void ApplyReachabilityResult(RdpConnectivityTestResult result)
+    /// <summary>
+    /// Turns a probe result into the chip the user reads.
+    /// </summary>
+    /// <remarks>
+    /// Internal so what a verdict says can be measured without opening a socket.
+    /// </remarks>
+    internal void ApplyReachabilityResult(RdpConnectivityTestResult result)
     {
         TestChipState = result.Outcome switch
         {
@@ -664,20 +694,48 @@ public partial class ServerDialogViewModel : ObservableValidator
         TestChipText = result.Outcome switch
         {
             RdpConnectivityTestOutcome.Cancelled => detail,
-            RdpConnectivityTestOutcome.Success => string.Format(
+            RdpConnectivityTestOutcome.Success => ScopeToDirectRoute(string.Format(
                 CultureInfo.CurrentCulture,
                 L("ServerDialogReachabilityChipSuccess"),
                 result.ResolvedAddress ?? "?",
-                (int)Math.Round(result.TcpElapsed?.TotalMilliseconds ?? 0)),
-            _ => string.Format(
+                (int)Math.Round(result.TcpElapsed?.TotalMilliseconds ?? 0))),
+            _ => ScopeToDirectRoute(string.Format(
                 CultureInfo.CurrentCulture,
                 L("ServerDialogReachabilityChipFailure"),
-                detail)
+                detail))
         };
     }
 
 
 
+
+    /// <summary>
+    /// Appends the routing clause to a verdict while this profile connects through a gateway.
+    /// </summary>
+    /// <remarks>
+    /// The probe dials the address from this machine, and a profile carries a gateway precisely
+    /// because that is not the route the session takes. A flat "the address did not answer"
+    /// about a host nobody expected to answer directly states something the test never measured
+    /// - the same shape the credentials disclaimer already answers one field over. It scopes the
+    /// verdict rather than withdrawing the button, because whether the direct route is still
+    /// dead is a question some users ask on purpose.
+    ///
+    /// A cancelled test is left alone: it reports no verdict, so it has no limit to name.
+    /// </remarks>
+    private string ScopeToDirectRoute(string verdict)
+    {
+        if (!UsesGateway)
+        {
+            return verdict;
+        }
+
+        return verdict
+            + " "
+            + string.Format(
+                CultureInfo.CurrentCulture,
+                L("ServerDialogReachabilityChipDirectScope"),
+                SelectedGateway?.EffectiveName ?? L("ServerDialogTunnelSummaryFallbackGw"));
+    }
 
     private string FormatRdpTestResult(RdpConnectivityTestResult result)
     {
@@ -1662,9 +1720,13 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (RdpFixedHeightError is not null ? 1 : 0)
             + (RdpResizeEnableDelayMsError is not null ? 1 : 0);
 
-        // First invalid field for auto-focus
+        // First invalid field for auto-focus. The order mirrors ValidationError below so the
+        // summary line and the focused box always name the same error, and every name here needs
+        // its case in ServerDialog.xaml.cs: a name with no case leaves Save refusing while
+        // nothing on screen moves, which is the failure this chain exists to prevent.
         FirstInvalidField = DisplayNameError is not null ? nameof(DisplayName)
             : RemoteServerError is not null ? nameof(RemoteServer)
+            : SshUsernameError is not null ? nameof(SshUsername)
             : EndpointPortError is not null ? "EndpointPort"
             : LocalPortError is not null ? nameof(LocalPort)
             : AudioModeError is not null ? nameof(RdpAudioMode)

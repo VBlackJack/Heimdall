@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -31,8 +32,9 @@ namespace Heimdall.App;
 /// Partial of <see cref="MainWindow"/> hosting the session
 /// <see cref="TreeView"/> interaction handlers: selection, double-click,
 /// right-click pre-selection, keyboard context menu, and drag-drop between
-/// folders or to the no-group root target. All transient state lives in the <c>_treeState</c> field
-/// (<see cref="TreeInteractionState"/>); this file only contains the WPF
+/// folders or to the no-group root target. Transient state lives in the <c>_treeState</c> field
+/// (<see cref="TreeInteractionState"/>) and, for the selection warm-up alone, in
+/// <c>_dnsWarmupGate</c>; this file only contains the WPF
 /// event handlers that mutate that state and poke the named XAML elements
 /// (<c>SessionTreeView</c>, <c>SessionTreeNoGroupDropZone</c>,
 /// <c>SessionDetailPanel</c>, <c>ToolDetailPanel</c>, <c>Mw_Detail*</c>,
@@ -40,6 +42,7 @@ namespace Heimdall.App;
 /// </summary>
 public partial class MainWindow
 {
+    private readonly DnsWarmupGate _dnsWarmupGate = new();
     private IInlineRenameNode? _inlineRenameNode;
     private bool _inlineRenameCommitInProgress;
 
@@ -556,15 +559,72 @@ public partial class MainWindow
 
         if (e.Key != Key.Delete
             || modifiers != ModifierKeys.None
-            || DataContext is not MainViewModel vm
-            || vm.ServerList.SelectionCount <= 1
-            || !vm.ServerList.DeleteSelectedCommand.CanExecute(null))
+            || DataContext is not MainViewModel vm)
         {
             return;
         }
 
+        (bool deleteHandled, bool deleteSelection) = ResolveTreeDeletion(
+            e.Key,
+            modifiers,
+            FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext,
+            vm.ServerList.SelectionCount);
+
+        if (!deleteHandled
+            || (deleteSelection && !vm.ServerList.DeleteSelectedCommand.CanExecute(null)))
+        {
+            return;
+        }
+
+        // Consumed before the branch that acts on nothing returns: an unhandled press reaches
+        // the window-level Delete shortcut, which deletes the selected session.
         e.Handled = true;
+
+        if (!deleteSelection)
+        {
+            return;
+        }
+
         await vm.ServerList.DeleteSelectedCommand.ExecuteAsync(null);
+    }
+
+    /// <summary>
+    /// Resolves what a Delete press does, without reading global keyboard state.
+    /// </summary>
+    /// <param name="key">The key raised by the sessions tree.</param>
+    /// <param name="modifiers">The exact modifier combination for the gesture.</param>
+    /// <param name="focusedNode">The data context of the container owning keyboard focus.</param>
+    /// <param name="selectionCount">How many sessions the view model reports as selected.</param>
+    /// <returns>
+    /// Whether the tree consumes the press, and whether it deletes the current selection.
+    /// </returns>
+    internal static (bool Handled, bool DeleteSelection) ResolveTreeDeletion(
+        Key key,
+        ModifierKeys modifiers,
+        object? focusedNode,
+        int selectionCount)
+    {
+        if (key != Key.Delete || modifiers != ModifierKeys.None)
+        {
+            return default;
+        }
+
+        // Clicking a folder never changes the selection - OnTreeViewSelectedItemChanged pushes
+        // the container's IsSelected back to false - so the session selected before the click
+        // keeps the highlight and the detail panel while the folder keeps only the focus ring.
+        // Enter already refuses to act on a session the focus ring is not on
+        // (ResolveTreeActivationTarget); Delete is the destructive half of the same gesture and
+        // resolving it by a different rule is what makes it surprising.
+        if (focusedNode is FolderViewModel)
+        {
+            return (true, false);
+        }
+
+        // A single selection stays with the window-level shortcut, which owns the confirmation
+        // and the Ctrl+Del gesture the help documents.
+        return selectionCount > 1
+            ? (true, true)
+            : default;
     }
 
     /// <summary>
@@ -1104,9 +1164,9 @@ public partial class MainWindow
         Mw_DetailHostPort.Visibility = Visibility.Visible;
     }
 
-    private static void WarmDns(ServerItemViewModel server)
+    private void WarmDns(ServerItemViewModel server)
     {
-        if (string.IsNullOrWhiteSpace(server.RemoteServer))
+        if (!_dnsWarmupGate.ShouldWarm(server.RemoteServer))
         {
             return;
         }
@@ -1281,5 +1341,42 @@ public partial class MainWindow
         }
 
         return null;
+    }
+}
+
+/// <summary>
+/// Remembers the host the sessions tree last pre-warmed, so re-showing the same selection does
+/// not resolve it again.
+/// </summary>
+/// <remarks>
+/// The warm-up hangs off <c>ShowTreeSelection</c>, which also runs when a folder row is clicked
+/// and when a right-click pre-selects a row. Neither moves the selection, so both re-resolved the
+/// host of a session that was already warmed - a network call whose answer was already in the
+/// resolver cache.
+/// </remarks>
+internal sealed class DnsWarmupGate
+{
+    private string? _lastWarmedHost;
+
+    /// <summary>
+    /// Reports whether <paramref name="host"/> still needs a warm-up, and records it when it does.
+    /// </summary>
+    /// <param name="host">The host of the session being shown.</param>
+    /// <returns><see langword="true"/> when the caller should resolve the host.</returns>
+    public bool ShouldWarm([NotNullWhen(true)] string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return false;
+        }
+
+        // Host names are case-insensitive, so two spellings of one host are one warm-up.
+        if (string.Equals(host, _lastWarmedHost, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        _lastWarmedHost = host;
+        return true;
     }
 }

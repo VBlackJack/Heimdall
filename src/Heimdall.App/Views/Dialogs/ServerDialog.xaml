@@ -1025,6 +1025,30 @@
                                                          AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicSshKeyPassphraseLabel}"
                                                          PasswordChanged="OnCredentialPasswordChanged"
                                                          Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                            <!-- An empty box means "keep what is stored", so emptying it cannot be the
+                                                 gesture that forgets the passphrase, and clearing the key path takes the
+                                                 key with it. Worded apart from the password row above it: two identical
+                                                 "Password saved" lines in one card would not say which secret they mean. -->
+                                            <StackPanel Orientation="Horizontal"
+                                                        Margin="0,8,0,0"
+                                                        Visibility="{Binding HasStoredSshKeyPassphrase, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="{loc:Translate ServerDialogKeyPassphraseSaved}"
+                                                           Style="{StaticResource DialogHintTextStyle}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button Content="{loc:Translate GatewayPasswordClear}"
+                                                        Command="{Binding ClearStoredSshKeyPassphraseCommand}"
+                                                        x:Name="DlgSrv_ClearSshKeyPassphraseBtn"
+                                                        Click="OnClearStoredCredentialClick"
+                                                        Tag="SshKeyPassphraseBox"
+                                                        ToolTip="{loc:Translate ServerDialogClearStoredKeyPassphrase}"
+                                                        AutomationProperties.Name="{loc:Translate ServerDialogClearStoredKeyPassphrase}"
+                                                        Style="{StaticResource GhostButtonStyle}"
+                                                        FontSize="{StaticResource FontSizeCaption}"
+                                                        Padding="8,2"
+                                                        MinHeight="0"
+                                                        Margin="8,0,0,0"
+                                                        VerticalAlignment="Center"/>
+                                            </StackPanel>
                                             <TextBlock x:Name="DlgSrv_BasicSshKeyPassphraseHint"
                                                        Text="{Binding SshKeyPassphraseHint}"
                                                        Style="{StaticResource DialogHintTextStyle}"
@@ -1268,7 +1292,25 @@
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource DialogHintTextStyle}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Setter Property="Margin" Value="0,4,0,8"/>
+                                                    <Setter Property="Margin" Value="0,4,0,0"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding RdpUseGlobalDefaults}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <!-- The panel below greys out but stays populated, and what it shows is this
+                                             server's own saved options rather than the global ones the session runs on.
+                                             Saying so is what keeps unticking the box from changing behaviour with no
+                                             visible control moving. -->
+                                        <TextBlock Text="{loc:Translate ServerDialogRdpGlobalDefaultsValuesNotInEffect}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DialogHintTextStyle}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Setter Property="Margin" Value="0,2,0,8"/>
+                                                    <Setter Property="TextWrapping" Value="Wrap"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding RdpUseGlobalDefaults}" Value="True">
                                                             <Setter Property="Visibility" Value="Visible"/>

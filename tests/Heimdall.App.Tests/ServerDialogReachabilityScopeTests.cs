@@ -16,7 +16,9 @@
 
 using System.IO;
 using System.Text.Json;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Tests;
 
@@ -165,6 +167,109 @@ public sealed class ServerDialogReachabilityScopeTests
         }
     }
 
+    // Routing is the credentials rule one field over. A profile only carries a gateway
+    // because the direct route is not the one the session takes, so a flat "the address did
+    // not answer" states something this probe never measured. Asserting the two verdicts
+    // differ AND that the gatewayless one is the prefix pins both halves: dropping the
+    // clause makes them equal, adding it unconditionally breaks the prefix.
+    [Fact]
+    public async Task UnderAGateway_TheFailedVerdictNamesTheRouteItDidNotTake()
+    {
+        ServerDialogViewModel direct = await AddressedProfileAsync();
+        ServerDialogViewModel throughGateway = await AddressedProfileAsync(GatewayName);
+
+        RdpConnectivityTestResult refused =
+            RdpConnectivityTestResult.TcpTimeout("203.0.113.10", TimeSpan.FromSeconds(5));
+
+        direct.ApplyReachabilityResult(refused);
+        throughGateway.ApplyReachabilityResult(refused);
+
+        Assert.NotEqual(direct.TestChipText, throughGateway.TestChipText);
+        Assert.StartsWith(direct.TestChipText, throughGateway.TestChipText, StringComparison.Ordinal);
+        Assert.Contains(GatewayName, throughGateway.TestChipText, StringComparison.Ordinal);
+    }
+
+    // A success is scoped for the same reason: what answered is the direct route, which is
+    // not the one this profile connects over.
+    [Fact]
+    public async Task UnderAGateway_TheSuccessfulVerdictNamesTheRouteItTook()
+    {
+        ServerDialogViewModel direct = await AddressedProfileAsync();
+        ServerDialogViewModel throughGateway = await AddressedProfileAsync(GatewayName);
+
+        RdpConnectivityTestResult answered = RdpConnectivityTestResult.Success(
+            "203.0.113.10",
+            TimeSpan.FromMilliseconds(4),
+            TimeSpan.FromMilliseconds(11));
+
+        direct.ApplyReachabilityResult(answered);
+        throughGateway.ApplyReachabilityResult(answered);
+
+        Assert.StartsWith(direct.TestChipText, throughGateway.TestChipText, StringComparison.Ordinal);
+        Assert.Contains(GatewayName, throughGateway.TestChipText, StringComparison.Ordinal);
+    }
+
+    // A cancelled test states no verdict, so it has no limit to name. Deliberate, and
+    // asserted so that "scope everything" is not applied here by resemblance.
+    [Fact]
+    public async Task ACancelledTest_SaysNothingAboutTheRoute()
+    {
+        ServerDialogViewModel direct = await AddressedProfileAsync();
+        ServerDialogViewModel throughGateway = await AddressedProfileAsync(GatewayName);
+
+        RdpConnectivityTestResult cancelled = RdpConnectivityTestResult.Cancelled();
+
+        direct.ApplyReachabilityResult(cancelled);
+        throughGateway.ApplyReachabilityResult(cancelled);
+
+        Assert.Equal(direct.TestChipText, throughGateway.TestChipText);
+    }
+
+    // The clause has to be able to say WHICH gateway; a routing disclaimer that cannot name
+    // one sends the reader back to the Network tab to work out what was skipped.
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    public void TheRoutingClause_CanNameTheGateway(string locale)
+    {
+        using JsonDocument document = LoadLocale(locale);
+
+        Assert.True(
+            document.RootElement.TryGetProperty(
+                "ServerDialogReachabilityChipDirectScope",
+                out JsonElement value),
+            $"'ServerDialogReachabilityChipDirectScope' is missing from {locale}.json");
+        Assert.Contains("{0}", value.GetString() ?? "", StringComparison.Ordinal);
+    }
+
+    private const string GatewayName = "bastion-01";
+
+    // The verdicts are read from the shipped locale rather than from a stub: a bare
+    // LocalizationManager loads nothing and returns key names, under which a clause with a
+    // missing placeholder would still look like a clause.
+    private static async Task<ServerDialogViewModel> AddressedProfileAsync(string? gateway = null)
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(RepoRoot(), "locales"), "en");
+
+        ServerDialogViewModel vm = new()
+        {
+            DisplayName = "Host",
+            RemoteServer = "host.example.com",
+            ConnectionType = "SSH"
+        };
+
+        if (gateway is not null)
+        {
+            vm.AvailableGateways = [new GatewayOption("gw-1", gateway)];
+            vm.SelectedGatewayId = "gw-1";
+            Assert.True(vm.UsesGateway, "The fixture failed to put the profile behind a gateway.");
+        }
+
+        vm.Localizer = localizer;
+        return vm;
+    }
+
     private static JsonDocument LoadLocale(string locale)
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
@@ -177,6 +282,19 @@ public sealed class ServerDialogReachabilityScopeTests
         Assert.NotNull(directory);
         return JsonDocument.Parse(
             File.ReadAllText(Path.Combine(directory!.FullName, "locales", $"{locale}.json")));
+    }
+
+    private static string RepoRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null
+            && !File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory!.FullName;
     }
 
     [Fact]

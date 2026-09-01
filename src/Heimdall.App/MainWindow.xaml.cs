@@ -661,25 +661,89 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         return await vm.ResolveUnsavedSettingsAsync();
     }
 
+    /// <summary>
+    /// What a folder creation request resolves to.
+    /// </summary>
+    internal enum FolderCreationOutcome
+    {
+        Cancelled,
+        Created,
+        Duplicate
+    }
+
+    /// <summary>
+    /// Decides what a folder creation request does, given the folder paths already in use.
+    /// </summary>
+    /// <param name="requestedName">The name the user typed, or null when the dialog was cancelled.</param>
+    /// <param name="existingPaths">Every folder path already in use, whatever holds it.</param>
+    /// <returns>The outcome and the trimmed path the request resolves to.</returns>
+    /// <remarks>
+    /// Existence is decided by <see cref="FolderPath.IsSelfOrDescendant"/>, the predicate the
+    /// rename path already uses for its sibling collision, so the two answers cannot drift.
+    /// A folder that exists only because sessions carry its path has no entry of its own, so an
+    /// equality test against the stored empty-folder list reports an occupied name as free.
+    /// </remarks>
+    internal static (FolderCreationOutcome Outcome, string Path) ResolveFolderCreation(
+        string? requestedName,
+        IEnumerable<string?> existingPaths)
+    {
+        ArgumentNullException.ThrowIfNull(existingPaths);
+
+        string path = requestedName?.Trim() ?? string.Empty;
+        if (path.Length == 0)
+        {
+            return (FolderCreationOutcome.Cancelled, string.Empty);
+        }
+
+        foreach (string? candidate in existingPaths)
+        {
+            if (!string.IsNullOrWhiteSpace(candidate)
+                && FolderPath.IsSelfOrDescendant(candidate, path))
+            {
+                return (FolderCreationOutcome.Duplicate, path);
+            }
+        }
+
+        return (FolderCreationOutcome.Created, path);
+    }
+
     private async void OnAddFolderFromMenu(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
 
-        var name = await vm.DialogService.ShowInputAsync(
-            vm.Localize("TreeCtxNewGroup"),
-            vm.Localize("ServerFieldGroup"));
+        string? name = await vm.DialogService.ShowInputAsync(
+            vm.Localize("NewGroupDialogTitle"),
+            vm.Localize("NewGroupFieldName"));
 
-        if (!string.IsNullOrWhiteSpace(name))
+        AppSettings settings = await vm.ConfigManager.LoadSettingsAsync();
+        List<ServerProfileDto> servers = await vm.ConfigManager.LoadServersAsync();
+        List<string?> existingPaths =
+            [.. settings.EmptyGroups, .. servers.Select(server => server.Group)];
+
+        (FolderCreationOutcome outcome, string path) = ResolveFolderCreation(name, existingPaths);
+        switch (outcome)
         {
-            var settings = await vm.ConfigManager.LoadSettingsAsync();
-            var path = name.Trim();
-            if (!settings.EmptyGroups.Contains(path, StringComparer.OrdinalIgnoreCase))
-            {
+            case FolderCreationOutcome.Created:
                 settings.EmptyGroups.Add(path);
                 await vm.ConfigManager.SaveSettingsAsync(settings);
-                var servers = await vm.ConfigManager.LoadServersAsync();
                 vm.ServerList.LoadServers(servers, settings);
-            }
+                vm.StatusText = string.Format(vm.Localize("StatusGroupCreated"), path);
+                break;
+
+            case FolderCreationOutcome.Duplicate:
+                // The tree is unchanged and the folder holding the name can be anywhere in
+                // it, so saying nothing here is indistinguishable from a button that failed.
+                vm.DialogService.ShowWarning(
+                    vm.Localize("NewGroupDialogTitle"),
+                    vm.Localize("RenameGroupErrorSiblingCollision"));
+                break;
+
+            case FolderCreationOutcome.Cancelled:
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Unexpected folder creation outcome: {outcome}.");
         }
     }
 
@@ -988,7 +1052,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         RdpImportDropOverlay.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private sealed record SettingsSearchEntry(FrameworkElement Target, TabItem TopTab, TabItem? SubTab);
+    internal sealed record SettingsSearchEntry(FrameworkElement Target, TabItem TopTab, TabItem? SubTab);
 
     private List<SettingsSearchEntry>? _settingsSearchIndex;
 
@@ -1030,15 +1094,101 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
+    /// <summary>
+    /// A keyboard gesture the settings search box answers.
+    /// </summary>
+    internal enum SettingsSearchGesture
+    {
+        None,
+        StepForward,
+        StepBack,
+        Clear
+    }
+
+    /// <summary>
+    /// Resolves a settings-search gesture without reading global keyboard state.
+    /// </summary>
+    /// <param name="key">The key raised by the search box.</param>
+    /// <param name="modifiers">The exact modifier combination for the gesture.</param>
+    /// <param name="matchCount">How many settings the current query matches.</param>
+    /// <param name="hasQuery">Whether the box holds text.</param>
+    internal static SettingsSearchGesture ResolveSettingsSearchGesture(
+        Key key,
+        ModifierKeys modifiers,
+        int matchCount,
+        bool hasQuery)
+    {
+        if (key == Key.Escape)
+        {
+            // An empty box has nothing to dismiss, so the key is left to the shell rather
+            // than consumed here.
+            return hasQuery ? SettingsSearchGesture.Clear : SettingsSearchGesture.None;
+        }
+
+        if (key != Key.Enter || matchCount == 0)
+        {
+            return SettingsSearchGesture.None;
+        }
+
+        return modifiers.HasFlag(ModifierKeys.Shift)
+            ? SettingsSearchGesture.StepBack
+            : SettingsSearchGesture.StepForward;
+    }
+
+    /// <summary>
+    /// Steps the settings-search walk one match in the requested direction, wrapping at both ends.
+    /// </summary>
+    /// <param name="currentIndex">The match the walk stands on, or -1 before the first step.</param>
+    /// <param name="matchCount">How many settings the current query matches.</param>
+    /// <param name="stepBack">True to walk towards the previous match.</param>
+    internal static int ResolveSettingsSearchMatchIndex(
+        int currentIndex,
+        int matchCount,
+        bool stepBack)
+    {
+        if (matchCount <= 0)
+        {
+            return -1;
+        }
+
+        if (!stepBack)
+        {
+            return (currentIndex + 1) % matchCount;
+        }
+
+        // Modular arithmetic on the -1 that means "not walking yet" would land two positions
+        // before the start. A first backward step belongs on the last match, which is also
+        // where a wrap from the first one belongs.
+        return currentIndex <= 0 ? matchCount - 1 : currentIndex - 1;
+    }
+
     private void OnSettingsSearchKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || _settingsSearchMatches.Count == 0)
+        SettingsSearchGesture gesture = ResolveSettingsSearchGesture(
+            e.Key,
+            Keyboard.Modifiers,
+            _settingsSearchMatches.Count,
+            !string.IsNullOrEmpty(Mw_SettingsSearchBox.Text));
+
+        if (gesture == SettingsSearchGesture.None)
         {
             return;
         }
 
-        _settingsSearchMatchIndex = (_settingsSearchMatchIndex + 1) % _settingsSearchMatches.Count;
+        if (gesture == SettingsSearchGesture.Clear)
+        {
+            // TextChanged drops the matches, hides the hint and hides the clear button.
+            Mw_SettingsSearchBox.Text = string.Empty;
+            e.Handled = true;
+            return;
+        }
+
+        _settingsSearchMatchIndex = ResolveSettingsSearchMatchIndex(
+            _settingsSearchMatchIndex,
+            _settingsSearchMatches.Count,
+            gesture == SettingsSearchGesture.StepBack);
         SettingsSearchEntry entry = _settingsSearchMatches[_settingsSearchMatchIndex];
+        FrameworkElement jumpTarget = ResolveSettingsSearchJumpTarget(entry.Target);
         Mw_SettingsSubTabControl.SelectedItem = entry.TopTab;
         if (entry.SubTab is not null)
         {
@@ -1051,14 +1201,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             {
                 entry.TopTab.UpdateLayout();
                 entry.SubTab?.UpdateLayout();
-                entry.Target.UpdateLayout();
+                jumpTarget.UpdateLayout();
                 Rect targetArea = new(
                     0,
                     0,
-                    Math.Max(entry.Target.ActualWidth, 1),
-                    Math.Max(entry.Target.ActualHeight, 1) + 72);
-                entry.Target.BringIntoView(targetArea);
-                HighlightSettingsSearchTarget(entry.Target);
+                    Math.Max(jumpTarget.ActualWidth, 1),
+                    Math.Max(jumpTarget.ActualHeight, 1) + 72);
+                jumpTarget.BringIntoView(targetArea);
+                HighlightSettingsSearchTarget(jumpTarget);
             }));
 
         e.Handled = true;
@@ -1094,7 +1244,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         return _settingsSearchIndex;
     }
 
-    private static void AddSettingsSearchEntries(
+    internal static void AddSettingsSearchEntries(
         DependencyObject node,
         TabItem topTab,
         TabItem? subTab,
@@ -1119,6 +1269,20 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
+        // A control whose Content is a plain string puts no TextBlock in the logical tree,
+        // so the walk below can never reach its label and the search answers "no matching
+        // settings" for words the user is reading. Only string Content is taken here: a
+        // button wrapping a TextBlock is still indexed through that TextBlock, and the list
+        // of types stays explicit so the index does not swell with template-level controls.
+        if (node is ContentControl { Content: string } contentControl
+            && contentControl is System.Windows.Controls.Button
+                or System.Windows.Controls.RadioButton
+                or ComboBoxItem)
+        {
+            entries.Add(new SettingsSearchEntry(contentControl, topTab, subTab));
+            return;
+        }
+
         foreach (object child in LogicalTreeHelper.GetChildren(node))
         {
             if (child is DependencyObject dependencyObject)
@@ -1128,19 +1292,52 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
-    private static string GetSettingsSearchEntryText(SettingsSearchEntry entry)
+    internal static string GetSettingsSearchEntryText(SettingsSearchEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+
         if (entry.Target is TextBlock textBlock)
         {
             return textBlock.Text ?? string.Empty;
         }
 
-        if (entry.Target is System.Windows.Controls.CheckBox { Content: string text })
+        if (entry.Target is ContentControl { Content: string text })
         {
             return text;
         }
 
         return string.Empty;
+    }
+
+    /// <summary>
+    /// Resolves the element a match jumps to, which is not always the element that matched.
+    /// </summary>
+    /// <remarks>
+    /// A ComboBoxItem lives in a popup that is closed when the jump happens: it has no
+    /// rendered size to bring into view and no visible background to highlight. The owning
+    /// ComboBox is the thing on screen, so the jump lands there. The walk is logical because
+    /// a closed popup gives the item no visual parent.
+    /// </remarks>
+    internal static FrameworkElement ResolveSettingsSearchJumpTarget(FrameworkElement target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        if (target is not ComboBoxItem)
+        {
+            return target;
+        }
+
+        for (DependencyObject? node = LogicalTreeHelper.GetParent(target);
+            node is not null;
+            node = LogicalTreeHelper.GetParent(node))
+        {
+            if (node is System.Windows.Controls.ComboBox comboBox)
+            {
+                return comboBox;
+            }
+        }
+
+        return target;
     }
 
     private void HighlightSettingsSearchTarget(FrameworkElement target)
@@ -1334,7 +1531,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             Mw_FilterBox.Focus();
             Mw_FilterBox.SelectAll();
-        }, canExecute: () => !IsTerminalFocusedContext());
+        }, canExecute: () => CanFocusServerFilter(IsTerminalFocusedContext(), Mw_FilterBox.IsVisible));
 
         // Ctrl+B: toggle sidebar
         _keyboardShortcutService.Register(Key.B, ModifierKeys.Control,
@@ -1458,6 +1655,20 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 OpenTreeViewKeyboardContextMenu(vm);
         }, canExecute: () => !IsTerminalFocusedContext());
     }
+
+    /// <summary>
+    /// Decides whether Ctrl+F can hand keyboard focus to the sessions filter box.
+    /// </summary>
+    /// <param name="terminalFocused">Whether embedded session content owns focus.</param>
+    /// <param name="filterVisible">Whether the filter box is on screen.</param>
+    /// <remarks>
+    /// The filter box lives inside the sessions-tab subtree, so it is collapsed on every other
+    /// tab, and a collapsed TextBox cannot take keyboard focus. The shortcut service consumes
+    /// the key for any binding whose canExecute passes, so without the visibility term the
+    /// shortcut claims a keystroke it cannot act on.
+    /// </remarks>
+    internal static bool CanFocusServerFilter(bool terminalFocused, bool filterVisible)
+        => !terminalFocused && filterVisible;
 
     private MainViewModel? GetMainVm() => DataContext as MainViewModel;
 

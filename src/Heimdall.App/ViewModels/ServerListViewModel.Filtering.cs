@@ -84,9 +84,15 @@ public partial class ServerListViewModel
     {
         foreach (string protocol in _connectionService.RegisteredProtocols)
         {
+            // One name, two channels. The accessible name quotes what the row shows, so a
+            // voice-control user speaking the visible label reaches the control they meant.
+            string? displayKey = ConnectionTypeCatalog.GetDisplayNameKey(protocol);
+            string displayName = displayKey is null ? protocol : _localizer[displayKey];
+
             ProtocolFilters.Add(new ProtocolFilterOptionViewModel(
                 protocol,
-                _localizer.Format("FilterProtocolAutomationName", protocol),
+                displayName,
+                _localizer.Format("FilterProtocolAutomationName", displayName),
                 ApplyDiscreteFilter));
         }
     }

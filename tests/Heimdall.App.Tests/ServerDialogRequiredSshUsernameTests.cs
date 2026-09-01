@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.IO;
+using System.Text.RegularExpressions;
 using Heimdall.App.ViewModels.Dialogs;
 
 namespace Heimdall.App.Tests;
@@ -146,5 +148,78 @@ public sealed class ServerDialogRequiredSshUsernameTests
 
         Assert.False(vm.RequiresSshUsername);
         Assert.DoesNotContain("*", vm.SshUsernameLabel, StringComparison.Ordinal);
+    }
+
+    // Being counted by ValidationError is what refuses the Save; being named by
+    // FirstInvalidField is what moves the dialog to the box. The field had the first and
+    // not the second, so Enter from the Network or Options tab refused to close and left
+    // the user on a tab that does not show the offending field.
+    [Fact]
+    public void WithoutIt_TheRefusedSaveKnowsWhereToGo()
+    {
+        ServerDialogViewModel vm = Profile("SSH");
+        vm.SshUsername = "";
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.Equal(vm.SshUsernameError, vm.ValidationError);
+        Assert.Equal(nameof(ServerDialogViewModel.SshUsername), vm.FirstInvalidField);
+    }
+
+    // Position, not mere presence. The focused box and the summary line have to name the
+    // same error, and the summary puts the address ahead of the login name.
+    [Fact]
+    public void AMissingAddress_StillOutranksTheMissingUsername()
+    {
+        ServerDialogViewModel vm = Profile("SSH");
+        vm.RemoteServer = "";
+        vm.SshUsername = "";
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.Equal(nameof(ServerDialogViewModel.RemoteServer), vm.FirstInvalidField);
+        Assert.Equal(vm.RemoteServerError, vm.ValidationError);
+    }
+
+    // The two halves fail independently: a name in the chain with no case in the switch
+    // leaves FocusFirstInvalidField selecting nothing and focusing nothing, which is the
+    // state this closes and is indistinguishable from the defect at the view-model level.
+    [Fact]
+    public void TheFocusSwitch_CarriesTheMatchingCase()
+    {
+        string focusMethod = FocusFirstInvalidFieldSource();
+
+        Assert.Matches(
+            new Regex(
+                @"case nameof\(ServerDialogViewModel\.SshUsername\):\s*"
+                + @"MainTabControl\.SelectedItem = DlgSrv_TabGeneral;\s*"
+                + @"target = DlgSrv_BasicSshUsernameBox;"),
+            focusMethod);
+    }
+
+    private static string FocusFirstInvalidFieldSource()
+    {
+        string repoRoot = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        string path = Path.Combine(
+            repoRoot,
+            "src",
+            "Heimdall.App",
+            "Views",
+            "Dialogs",
+            "ServerDialog.xaml.cs");
+
+        Assert.True(File.Exists(path), $"Server dialog code-behind not found: {path}");
+        string source = File.ReadAllText(path);
+
+        int start = source.IndexOf(
+            "private void FocusFirstInvalidField(",
+            StringComparison.Ordinal);
+        Assert.True(start >= 0, "FocusFirstInvalidField is gone; this guard measures nothing.");
+
+        int end = source.IndexOf("SelectEnclosingTabItems(", start, StringComparison.Ordinal);
+        Assert.True(end > start, "The focus method no longer ends where this guard expects.");
+
+        return source[start..end];
     }
 }

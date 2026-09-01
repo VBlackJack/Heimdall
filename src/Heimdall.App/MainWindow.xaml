@@ -437,11 +437,19 @@
                                                               ItemsSource="{Binding ServerList.ProtocolFilters}">
                                                         <MenuItem.ItemContainerStyle>
                                                             <Style TargetType="{x:Type MenuItem}">
-                                                                <Setter Property="Header" Value="{Binding Protocol}"/>
+                                                                <!-- DisplayName falls back to the raw handler key, so a protocol
+                                                                     registered without a name is still offered rather than blank. -->
+                                                                <Setter Property="Header" Value="{Binding DisplayName}"/>
                                                                 <Setter Property="IsCheckable" Value="True"/>
                                                                 <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=TwoWay}"/>
                                                                 <Setter Property="StaysOpenOnClick" Value="True"/>
                                                                 <Setter Property="AutomationProperties.Name" Value="{Binding AccessibilityName}"/>
+                                                                <Style.Triggers>
+                                                                    <!-- This checklist was the one place on the sidebar that showed
+                                                                         the internal token: LOCAL and WINRM name nothing a reader
+                                                                         recognises. The names below are the ones the Connect-as
+                                                                         submenu already renders for the very rows this narrows. -->
+                                                                </Style.Triggers>
                                                             </Style>
                                                         </MenuItem.ItemContainerStyle>
                                                     </MenuItem>
@@ -558,7 +566,7 @@
                                         DragLeave="OnTreeViewDragLeave"
                                         Drop="OnTreeViewDrop"
                                         Visibility="{Binding ServerList.ShowNoGroupDropZone, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        ToolTip="{loc:Translate TreeNodeNoGroup}"
+                                        ToolTip="{loc:Translate TreeNoGroupDropZoneHint}"
                                         AutomationProperties.Name="{loc:Translate TreeNodeNoGroup}">
                                     <Border.Style>
                                         <Style TargetType="{x:Type Border}">
@@ -2132,8 +2140,15 @@
                         </Grid>
                         <WrapPanel Orientation="Horizontal">
                             <Button x:Name="Mw_SettingsSaveBtn" Content="{loc:Translate SettingsBtnSaveSettings}" Command="{Binding Settings.SaveCommand}"
-                                    Style="{DynamicResource PrimaryButtonStyle}" MinWidth="130" Margin="0,0,16,4"
+                                    Style="{DynamicResource PrimaryButtonStyle}" MinWidth="130" Margin="0,0,8,4"
                                     AutomationProperties.Name="{loc:Translate AccessSettingsSave}"/>
+                            <!-- Grouped with Save because it acts on the same pending edits, and given a
+                                 quieter style than Reset Defaults: the two must never read as the same
+                                 offer, since one throws away this visit's edits and the other loads the
+                                 factory values over every tab. -->
+                            <Button x:Name="Mw_SettingsRevertBtn" Content="{loc:Translate SettingsBtnRevertChanges}" Command="{Binding Settings.RevertChangesCommand}"
+                                    Style="{DynamicResource GhostButtonStyle}" MinWidth="130" Margin="0,0,16,4"
+                                    AutomationProperties.Name="{loc:Translate SettingsBtnRevertChanges}"/>
                             <Button x:Name="Mw_SettingsResetBtn" Content="{loc:Translate SettingsBtnResetDefaults}" Command="{Binding Settings.ResetToDefaultsCommand}"
                                     Style="{DynamicResource SecondaryButtonStyle}" MinWidth="130" Margin="0,0,8,4"
                                     AutomationProperties.Name="{loc:Translate AccessSettingsReset}"/>
@@ -2247,10 +2262,13 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                                 <TextBlock x:Name="Mw_SettingsLanguageLabel" Text="{loc:Translate SettingsLabelLanguage}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                                <ComboBox SelectedValue="{Binding Settings.DefaultLocale}" SelectedValuePath="Content"
+                                                <!-- Tag carries the locale code the setting is persisted as, so the
+                                                     visible text is free to be a language name. Naming a language in
+                                                     its own words is what a language picker is expected to do. -->
+                                                <ComboBox SelectedValue="{Binding Settings.DefaultLocale}" SelectedValuePath="Tag"
                                                           AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLanguageLabel}">
-                                                    <ComboBoxItem Content="en"/>
-                                                    <ComboBoxItem Content="fr"/>
+                                                    <ComboBoxItem x:Name="Mw_LanguageEnglish" Content="{loc:Translate LanguageEnglish}" Tag="en" AutomationProperties.Name="{loc:Translate LanguageEnglish}"/>
+                                                    <ComboBoxItem x:Name="Mw_LanguageFrench" Content="{loc:Translate LanguageFrench}" Tag="fr" AutomationProperties.Name="{loc:Translate LanguageFrench}"/>
                                                 </ComboBox>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Margin="8,0,8,0">
@@ -2320,7 +2338,7 @@
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsUpdatesTitle" Text="{loc:Translate SettingsSectionUpdates}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
                                         <CheckBox x:Name="Mw_SettingsUpdateCheckEnabled" Content="{loc:Translate SettingsLabelUpdateCheckEnabled}" IsChecked="{Binding Settings.UpdateCheckEnabled}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UpdateCheckEnabled}">
                                             <TextBlock x:Name="Mw_SettingsUpdateIntervalLabel" Text="{loc:Translate SettingsLabelUpdateInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <TextBox Text="{Binding Settings.UpdateCheckIntervalHoursText, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left"
                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsUpdateIntervalLabel}"/>
@@ -2373,6 +2391,17 @@
                                                 Style="{DynamicResource SecondaryButtonStyle}"
                                                 HorizontalAlignment="Left"
                                                 AutomationProperties.Name="{loc:Translate SettingsLegacyMigrationReofferButton}"/>
+                                        <!-- The button above is uncommandable on any profile that never declined an
+                                             offer, which is most of them, and the description says when the offer
+                                             would reappear rather than what makes the button pressable. Without this
+                                             line the card reads as a broken feature. -->
+                                        <TextBlock x:Name="Mw_SettingsLegacyMigrationUnavailableHint"
+                                                   Text="{loc:Translate SettingsLegacyMigrationReofferUnavailableHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,8,0,0"
+                                                   Visibility="{Binding Settings.LegacyMigrationReofferAvailable, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
                                     </StackPanel>
                                 </Border>
 

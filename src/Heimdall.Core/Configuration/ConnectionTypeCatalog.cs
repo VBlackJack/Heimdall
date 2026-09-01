@@ -46,6 +46,43 @@ public static class ConnectionTypeCatalog
         CanonicalMappings.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Localization keys naming each protocol the way the product names it to a user.
+    /// </summary>
+    /// <remarks>
+    /// It lives beside <see cref="CanonicalTypes" /> so a protocol cannot be added to one
+    /// without meeting the other. The sidebar's protocol checklist used to render the raw
+    /// handler key, which named nothing a reader recognises for LOCAL and WINRM.
+    /// </remarks>
+    private static readonly IReadOnlyDictionary<string, string> DisplayNameKeys =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CITRIX"] = "ConnectionTypeCitrix",
+            ["FTP"] = "ConnectionTypeFtp",
+            ["LOCAL"] = "ConnectionTypeLocal",
+            ["RDP"] = "ConnectionTypeRdp",
+            ["SFTP"] = "ConnectionTypeSftp",
+            ["SSH"] = "ConnectionTypeSsh",
+            ["TELNET"] = "ConnectionTypeTelnet",
+            ["VNC"] = "ConnectionTypeVnc",
+            ["WINRM"] = "ConnectionTypeWinRm",
+        };
+
+    /// <summary>
+    /// The localization key naming <paramref name="connectionType" /> to a user, or
+    /// <see langword="null" /> when the product has no name for it and the raw type is the
+    /// only honest thing to show.
+    /// </summary>
+    public static string? GetDisplayNameKey(string? connectionType)
+    {
+        if (string.IsNullOrWhiteSpace(connectionType))
+        {
+            return null;
+        }
+
+        return DisplayNameKeys.TryGetValue(connectionType, out string? key) ? key : null;
+    }
+
+    /// <summary>
     /// Returns whether a persisted type is known, including non-empty dynamic TOOL entries.
     /// </summary>
     public static bool IsKnown(string? connectionType)

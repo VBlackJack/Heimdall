@@ -566,6 +566,47 @@ public sealed class ServerListBulkActionTests
         Assert.Contains(targets, target => string.Equals(target.GroupName, "ops/shared", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// A folder created from the tree is written to settings.EmptyGroups and stays there once a
+    /// session moves in, so the two sources this method reads overlap. Appending one after the
+    /// other listed such a folder twice - two identical, interchangeable rows carrying the same
+    /// destination - and left the folders that really are empty at the bottom of the submenu in
+    /// settings order instead of in place.
+    /// </summary>
+    [Fact]
+    public async Task GetGroupTargets_ListsAPopulatedFolderOnceEvenWhenSettingsStillCallItEmpty()
+    {
+        await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        var settings = new AppSettings();
+        settings.EmptyGroups.AddRange(["Prod/DB", "Prod/Archive"]);
+        await fixture.LoadServersAsync(settings, CreateServer("alpha", "Alpha", "Prod/DB"));
+
+        var targets = fixture.ViewModel.GetGroupTargets(includeNoGroup: true);
+
+        Assert.Equal(
+            [string.Empty, "Prod/Archive", "Prod/DB"],
+            targets.Select(target => target.GroupName).ToArray());
+        Assert.True(targets[0].IsVirtualGroup);
+    }
+
+    /// <summary>
+    /// Folder paths are matched case-insensitively everywhere else a move is decided
+    /// (IsBulkMoveTargetEnabled, MoveServersToGroupCoreAsync), so two spellings of one folder are
+    /// one destination here too. The sessions' own spelling is the one the tree displays.
+    /// </summary>
+    [Fact]
+    public async Task GetGroupTargets_TreatsACaseVariantAsTheSameFolder()
+    {
+        await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
+        var settings = new AppSettings();
+        settings.EmptyGroups.Add("prod/db");
+        await fixture.LoadServersAsync(settings, CreateServer("alpha", "Alpha", "Prod/DB"));
+
+        var targets = fixture.ViewModel.GetGroupTargets(includeNoGroup: false);
+
+        Assert.Equal(["Prod/DB"], targets.Select(target => target.GroupName).ToArray());
+    }
+
     [Fact]
     public async Task ShouldOpenBulkContextMenu_RequiresClickedItemInCurrentMultiSelection()
     {
@@ -581,6 +622,55 @@ public sealed class ServerListBulkActionTests
 
         Assert.True(fixture.ViewModel.ShouldOpenBulkContextMenu(fixture.ServerById("alpha")));
         Assert.False(fixture.ViewModel.ShouldOpenBulkContextMenu(fixture.ServerById("gamma")));
+    }
+
+    /// <summary>
+    /// The tree entry that reaches this command on a tool says "Remove", and a tool is not a
+    /// connection profile: nothing is stored for it beyond the row. Asking whether to delete a
+    /// session named a kind of object the user had not clicked, so the safe reading was that
+    /// they had hit the wrong entry and were about to destroy a connection.
+    /// </summary>
+    [Fact]
+    public async Task DeleteServerAsync_ForATool_AsksAboutRemovingTheTool()
+    {
+        await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: false);
+        await fixture.LoadServersAsync(new AppSettings(), CreateTool("base64", "Base64", "ops"));
+        LocalizationManager localizer = await CreateLocalizerAsync();
+
+        await fixture.ViewModel.DeleteServerCommand.ExecuteAsync(fixture.ServerById("base64"));
+
+        // Two wordings that read alike would satisfy the equalities below while showing the user
+        // the very sentence this test exists to reject.
+        Assert.NotEqual(localizer["DialogTitleDeleteServer"], localizer["DialogTitleRemoveTool"]);
+        Assert.NotEqual(
+            localizer.Format("ConfirmDeleteServer", "Base64"),
+            localizer.Format("ConfirmRemoveTool", "Base64"));
+        Assert.Equal(1, fixture.DialogService.ConfirmCallCount);
+        Assert.Equal(localizer["DialogTitleRemoveTool"], fixture.DialogService.LastConfirmTitle);
+        Assert.Equal(
+            localizer.Format("ConfirmRemoveTool", "Base64"),
+            fixture.DialogService.LastConfirmMessage);
+        Assert.Contains("Base64", fixture.DialogService.LastConfirmMessage, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The other half of the branch: a connection profile is still a session, and the bulk path
+    /// stays kind-neutral, so nothing else may drift onto the tool wording.
+    /// </summary>
+    [Fact]
+    public async Task DeleteServerAsync_ForASession_StillAsksAboutDeletingTheSession()
+    {
+        await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: false);
+        await fixture.LoadServersAsync(new AppSettings(), CreateServer("alpha", "Alpha", "ops"));
+        LocalizationManager localizer = await CreateLocalizerAsync();
+
+        await fixture.ViewModel.DeleteServerCommand.ExecuteAsync(fixture.ServerById("alpha"));
+
+        Assert.Equal(1, fixture.DialogService.ConfirmCallCount);
+        Assert.Equal(localizer["DialogTitleDeleteServer"], fixture.DialogService.LastConfirmTitle);
+        Assert.Equal(
+            localizer.Format("ConfirmDeleteServer", "Alpha"),
+            fixture.DialogService.LastConfirmMessage);
     }
 
     [Fact]
@@ -2349,6 +2439,13 @@ public sealed class ServerListBulkActionTests
                 .PropertyType
                 .GetGenericArguments()
                 .Single());
+    }
+
+    private static async Task<LocalizationManager> CreateLocalizerAsync()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
     }
 
     private static ServerProfileDto CreateServer(

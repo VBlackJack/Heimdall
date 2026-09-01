@@ -549,28 +549,7 @@ public sealed class ContextMenuFactory
 
         // Add sub-folder (via input dialog)
         var addSubItem = new MenuItem { Header = vm.Localize("TreeCtxNewGroup") };
-        addSubItem.Click += async (_, _) =>
-        {
-            var name = await vm.DialogService.ShowInputAsync(
-                vm.Localize("TreeCtxNewGroup"),
-                vm.Localize("ServerFieldGroup"));
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                string newPath = string.IsNullOrEmpty(folder.FullPath)
-                    ? name.Trim()
-                    : $"{folder.FullPath}/{name.Trim()}";
-
-                var settings = await vm.ConfigManager.LoadSettingsAsync();
-                if (!settings.EmptyGroups.Contains(newPath, StringComparer.OrdinalIgnoreCase))
-                {
-                    settings.EmptyGroups.Add(newPath);
-                    await vm.ConfigManager.SaveSettingsAsync(settings);
-                    var servers = await vm.ConfigManager.LoadServersAsync();
-                    vm.ServerList.LoadServers(servers, settings);
-                }
-            }
-        };
+        addSubItem.Click += async (_, _) => await CreateFolderFromMenuAsync(vm, folder.FullPath);
         menu.Items.Add(addSubItem);
         menu.Items.Add(CreateAddToolMenuItem(vm, callbacks, folder.FullPath));
 
@@ -640,25 +619,7 @@ public sealed class ContextMenuFactory
 
         // New root folder
         var newFolderItem = new MenuItem { Header = vm.Localize("TreeCtxNewGroup") };
-        newFolderItem.Click += async (_, _) =>
-        {
-            var name = await vm.DialogService.ShowInputAsync(
-                vm.Localize("TreeCtxNewGroup"),
-                vm.Localize("ServerFieldGroup"));
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                var settings = await vm.ConfigManager.LoadSettingsAsync();
-                var path = name.Trim();
-                if (!settings.EmptyGroups.Contains(path, StringComparer.OrdinalIgnoreCase))
-                {
-                    settings.EmptyGroups.Add(path);
-                    await vm.ConfigManager.SaveSettingsAsync(settings);
-                    var servers = await vm.ConfigManager.LoadServersAsync();
-                    vm.ServerList.LoadServers(servers, settings);
-                }
-            }
-        };
+        newFolderItem.Click += async (_, _) => await CreateFolderFromMenuAsync(vm, parentPath: null);
         menu.Items.Add(newFolderItem);
 
         menu.Items.Add(new Separator());
@@ -672,6 +633,61 @@ public sealed class ContextMenuFactory
     /// <see cref="IContextMenuCallbacks.AddToolFromMenu"/> with the supplied
     /// folder path as the target group.
     /// </summary>
+    /// <summary>
+    /// Creates a folder from a context menu, asking the same question and giving the same answers
+    /// as the Add menu.
+    /// </summary>
+    /// <remarks>
+    /// Both call sites used to inline their own rule: an EmptyGroups membership test with no else
+    /// branch, so a name that already existed produced a closed dialog and nothing else - and the
+    /// test was narrow enough to miss a folder that exists only because sessions carry its path.
+    /// The rule now lives once, in MainWindow.ResolveFolderCreation, and all three entry points
+    /// share it. Three copies of one decision is how they came to disagree.
+    /// </remarks>
+    private static async Task CreateFolderFromMenuAsync(MainViewModel vm, string? parentPath)
+    {
+        string? name = await vm.DialogService.ShowInputAsync(
+            vm.Localize("NewGroupDialogTitle"),
+            vm.Localize("NewGroupFieldName"));
+
+        string? requested = string.IsNullOrWhiteSpace(name)
+            ? name
+            : string.IsNullOrEmpty(parentPath)
+                ? name.Trim()
+                : $"{parentPath}/{name.Trim()}";
+
+        AppSettings settings = await vm.ConfigManager.LoadSettingsAsync();
+        List<ServerProfileDto> servers = await vm.ConfigManager.LoadServersAsync();
+        List<string?> existingPaths =
+            [.. settings.EmptyGroups, .. servers.Select(server => server.Group)];
+
+        (MainWindow.FolderCreationOutcome outcome, string path) =
+            MainWindow.ResolveFolderCreation(requested, existingPaths);
+
+        switch (outcome)
+        {
+            case MainWindow.FolderCreationOutcome.Created:
+                settings.EmptyGroups.Add(path);
+                await vm.ConfigManager.SaveSettingsAsync(settings);
+                vm.ServerList.LoadServers(servers, settings);
+                vm.StatusText = string.Format(vm.Localize("StatusGroupCreated"), path);
+                break;
+
+            case MainWindow.FolderCreationOutcome.Duplicate:
+                vm.DialogService.ShowWarning(
+                    vm.Localize("NewGroupDialogTitle"),
+                    vm.Localize("RenameGroupErrorSiblingCollision"));
+                break;
+
+            case MainWindow.FolderCreationOutcome.Cancelled:
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Unexpected folder creation outcome: {outcome}.");
+        }
+    }
+
     private static MenuItem CreateAddToolMenuItem(
         MainViewModel vm,
         IContextMenuCallbacks callbacks,

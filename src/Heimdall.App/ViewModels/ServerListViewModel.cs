@@ -482,27 +482,21 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 IsVirtualGroup: true));
         }
 
+        // One row per folder, from both sources at once. A folder created in the tree is written
+        // to EmptyGroups and stays there once a session moves into it, so the two sources overlap
+        // and appending one after the other listed the same path twice, in two interchangeable
+        // rows with nothing to tell them apart. Distinct keeps the first spelling seen, which is a
+        // session's own - the one the tree displays - and sorting the union rather than only the
+        // in-use half stops empty folders from piling up at the bottom in settings order.
         var groupTargets = _allServers
-            .Where(s => !string.IsNullOrWhiteSpace(s.Group))
-            .Select(s => s.Group)
+            .Select(server => server.Group)
+            .Concat(_currentSettings?.EmptyGroups ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .Select(name => new GroupTarget(name, name))
-            .ToList();
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .Select(path => new GroupTarget(path, path));
 
         targets.AddRange(groupTargets);
-
-        // Also include empty folders from settings
-        if (_currentSettings?.EmptyGroups is not null)
-        {
-            foreach (var path in _currentSettings.EmptyGroups)
-            {
-                if (!string.IsNullOrWhiteSpace(path))
-                {
-                    targets.Add(new GroupTarget(path, path));
-                }
-            }
-        }
 
         return targets;
     }
@@ -1625,9 +1619,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        // A tool entry is not a connection profile, and the menu item that gets here says
+        // "Remove", not "Delete". Asking whether to delete a session names something the user
+        // did not click and cannot see, which reads as having hit the wrong entry.
+        bool isTool = ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType);
         var confirmed = await _dialogService.ShowConfirmAsync(
-            _localizer["DialogTitleDeleteServer"],
-            _localizer.Format("ConfirmDeleteServer", server.DisplayName),
+            _localizer[isTool ? "DialogTitleRemoveTool" : "DialogTitleDeleteServer"],
+            _localizer.Format(
+                isTool ? "ConfirmRemoveTool" : "ConfirmDeleteServer",
+                server.DisplayName),
             "danger");
 
         if (!confirmed)
