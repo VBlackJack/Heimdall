@@ -615,7 +615,7 @@ function Open-SelectedTreeItemContextMenu {
 
         $menuOpened = $false
         try {
-            $null = Find-UiaMenuItemByName -Name 'Move to group' -TimeoutSeconds 2
+            $null = Find-UiaMenuItemByName -Name 'Move to folder' -TimeoutSeconds 2
             $menuOpened = $true
         } catch {
             $menuOpened = $false
@@ -629,7 +629,7 @@ function Open-SelectedTreeItemContextMenu {
         Invoke-UiaRightClick -Element $TreeItem
         Start-Sleep -Milliseconds 250
         try {
-            $null = Find-UiaMenuItemByName -Name 'Move to group' -TimeoutSeconds 2
+            $null = Find-UiaMenuItemByName -Name 'Move to folder' -TimeoutSeconds 2
             return
         } catch {
         }
@@ -837,12 +837,12 @@ try {
     $serverOneTreeItem = Find-UiaTreeItemByName -Root $mainWindow -Name 'Server One'
 
     Open-SelectedTreeItemContextMenu -TreeItem $serverOneTreeItem -Process $process
-    $moveToGroupMenu = Find-UiaMenuItemByName -Name 'Move to group'
+    $moveToGroupMenu = Find-UiaMenuItemByName -Name 'Move to folder'
     Expand-MenuItem -Item $moveToGroupMenu
-    $knownMoveTargets = @('Alpha', 'Beta', '(No Group)')
-    $rawMoveTargets = @(Get-VisibleSubmenuItemNames -ParentName 'Move to group')
+    $knownMoveTargets = @('Alpha', 'Beta', '(No Folder)')
+    $rawMoveTargets = @(Get-VisibleSubmenuItemNames -ParentName 'Move to folder')
     $filteredMoveTargets = @($rawMoveTargets | Where-Object { $_ -in $knownMoveTargets } | Select-Object -Unique)
-    $menuHasNoGroupTarget = ($filteredMoveTargets -contains '(No Group)')
+    $menuHasNoGroupTarget = ($filteredMoveTargets -contains '(No Folder)')
     $menuRejectsCrossProjectTarget = ($filteredMoveTargets -notcontains 'Gamma')
     $treeFolderNames = @('Alpha', 'Beta', 'Gamma') | Where-Object {
         $null -ne (Find-UiaTextByName -Root $mainWindow -Name $_)
@@ -856,9 +856,9 @@ try {
     $report.S4_Sample = "Submenu offers [$($filteredMoveTargets -join ', ')]; cross-project Gamma absent; no ambient entries after name-based filtering"
 
     $report.S5a_NoGroupOffered = if ($menuHasNoGroupTarget) { 'Green' } else { 'Red' }
-    $report.S5a_Sample = '(No Group) found in Move to group submenu'
+    $report.S5a_Sample = '(No Folder) found in Move to folder submenu'
 
-    $betaMenuItem = Find-UiaSubmenuItemByName -ParentName 'Move to group' -ChildName 'Beta'
+    $betaMenuItem = Find-UiaSubmenuItemByName -ParentName 'Move to folder' -ChildName 'Beta'
     Invoke-UiaClick -Element $betaMenuItem
     Start-Sleep -Milliseconds 500
 
@@ -902,9 +902,9 @@ try {
 
     # Skipped: second context-menu pass unreliable under UIA.
     # Open-SelectedTreeItemContextMenu -TreeItem (Find-UiaTreeItemByName -Root $mainWindow -Name 'Server One') -Process $process
-    # $moveToGroupMenu = Find-UiaMenuItemByName -Name 'Move to group'
+    # $moveToGroupMenu = Find-UiaMenuItemByName -Name 'Move to folder'
     # Expand-MenuItem -Item $moveToGroupMenu
-    # Invoke-UiaClick -Element (Find-UiaSubmenuItemByName -ParentName 'Move to group' -ChildName '(No Group)')
+    # Invoke-UiaClick -Element (Find-UiaSubmenuItemByName -ParentName 'Move to folder' -ChildName '(No Folder)')
     # Start-Sleep -Milliseconds 500
 
     $statuses = @(

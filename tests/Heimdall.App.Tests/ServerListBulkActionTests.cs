@@ -743,7 +743,7 @@ public sealed class ServerListBulkActionTests
 
         await fixture.ViewModel.ConnectSelectedCommand.ExecuteAsync(null);
 
-        Assert.Equal("Connect to all 2 sessions in this group?", fixture.DialogService.LastConfirmMessage);
+        Assert.Equal("Connect to all 2 sessions in this folder?", fixture.DialogService.LastConfirmMessage);
         // BL-0082(b): the count alone said something had been left out and nothing about
         // whether the user could act on it. The reason is named; the server is not.
         Assert.Equal(
@@ -843,7 +843,7 @@ public sealed class ServerListBulkActionTests
 
         await fixture.ViewModel.ConnectSelectedCommand.ExecuteAsync(null);
 
-        Assert.Equal("Connect to all 2 sessions in this group?", fixture.DialogService.LastConfirmMessage);
+        Assert.Equal("Connect to all 2 sessions in this folder?", fixture.DialogService.LastConfirmMessage);
         // The actionable family: an external credential provider that could not answer
         // silently now reads differently from a tool entry, which it did not before.
         Assert.Equal(
