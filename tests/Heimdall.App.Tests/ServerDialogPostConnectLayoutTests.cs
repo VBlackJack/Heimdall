@@ -74,20 +74,21 @@ public sealed class ServerDialogPostConnectLayoutTests
             + "an overflowing row back into view.");
     }
 
-    // Stretch is what sizes a row from the list rather than from the row's own desired width, so
-    // the command field grows with the dialog instead of settling on whatever the controls
-    // beneath it happen to need. It is NOT what makes the field usable: the desktop measurement
-    // in Heimdall.App.UiTests still cleared its threshold with the attribute removed, which is
-    // why that measurement, and not this attribute, is the oracle for the user-visible outcome.
+    // The premise of the budget above: with scrolling enabled a wide row would simply scroll,
+    // and the star column would stop being the thing that protects the command field.
+    //
+    // This method used to open on HorizontalContentAlignment="Stretch" as well. That assertion
+    // was dropped: the desktop measurement cleared its threshold with the attribute removed,
+    // so no mutant failed it for a reason anyone can feel, and it would have broken a later
+    // change that dropped the attribute for a good reason. The user-visible outcome is owned by
+    // TheCommandFieldIsUsableAtTheDialogsDefaultWidth in
+    // tests/Heimdall.App.UiTests/Dialogs/ServerDialogPostConnectLayoutTests.cs, which measures
+    // the command field at the dialog's declared width against a 240 px floor.
     [Fact]
-    public void TheStepsListStretchesItsRowsToTheListWidth()
+    public void TheStepsListRefusesHorizontalScrolling()
     {
         XElement list = PostConnectStepsList();
 
-        Assert.Equal("Stretch", list.Attribute("HorizontalContentAlignment")?.Value);
-
-        // The premise of the budget above: with scrolling enabled a wide row would simply scroll,
-        // and the star column would stop being the thing that protects the command field.
         Assert.Equal(
             "Disabled",
             list.Attribute("ScrollViewer.HorizontalScrollBarVisibility")?.Value);

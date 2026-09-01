@@ -131,6 +131,78 @@ public sealed class ServerDialogStoredPasswordTests
                     == $"{{Binding ClearStored{credential}PasswordCommand}}");
     }
 
+    // The passphrase is the sixth stored secret and was the last one with no way out. It
+    // cannot join the theories above: its card is the SSH one, whose Border already carries
+    // the SSH password's own state line, so an extra InlineData would bind to that row and
+    // pass without ever looking at the passphrase.
+    [Fact]
+    public void ClearingTheStoredKeyPassphrase_RemovesItFromTheSavedProfile()
+    {
+        ServerDialogViewModel vm = ServerDialogViewModel.FromDto(SeedWithStoredKeyPassphrase());
+
+        Assert.True(vm.HasStoredSshKeyPassphrase);
+
+        vm.ClearStoredSshKeyPassphraseCommand.Execute(null);
+
+        Assert.False(vm.HasStoredSshKeyPassphrase);
+        Assert.True(string.IsNullOrEmpty(vm.ToDto().SshKeyPassphraseEncrypted));
+        Assert.True(vm.IsDirty);
+    }
+
+    // The counterweight, same as for the passwords: an untouched box still means "keep".
+    [Fact]
+    public void ToDto_KeepsTheStoredKeyPassphrase_WhenTheUserClearsNothing()
+    {
+        ServerDialogViewModel vm = ServerDialogViewModel.FromDto(SeedWithStoredKeyPassphrase());
+
+        Assert.Equal(StoredCipher, vm.ToDto().SshKeyPassphraseEncrypted);
+    }
+
+    // Scoped to the passphrase field's own group rather than to the card, for the reason
+    // above. The state line is asserted by its own key too: reusing the password wording
+    // would put two identical "Password saved" rows in one card, neither saying which
+    // secret it means.
+    [Fact]
+    public void TheKeyPassphraseFieldOffersTheRemoval()
+    {
+        XDocument document = LoadServerDialogXaml();
+
+        XElement passphraseBox = Assert.Single(
+            document.Descendants(),
+            element => element.Name.LocalName == "PasswordBox"
+                && element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Name"
+                    && attribute.Value == "SshKeyPassphraseBox"));
+
+        XElement group = Assert.IsType<XElement>(passphraseBox.Parent);
+
+        Assert.Contains(
+            group.Descendants(),
+            element => element.Attribute("Visibility")?.Value
+                == "{Binding HasStoredSshKeyPassphrase, Converter={StaticResource BoolToVisibilityConverter}}");
+
+        Assert.Contains(
+            group.Descendants(),
+            element => element.Name.LocalName == "Button"
+                && element.Attribute("Command")?.Value
+                    == "{Binding ClearStoredSshKeyPassphraseCommand}");
+
+        Assert.Contains(
+            group.Descendants(),
+            element => element.Name.LocalName == "TextBlock"
+                && element.Attribute("Text")?.Value
+                    == "{loc:Translate ServerDialogKeyPassphraseSaved}");
+    }
+
+    private static ServerProfileDto SeedWithStoredKeyPassphrase() => new()
+    {
+        DisplayName = "Session",
+        RemoteServer = "host.example.com",
+        ConnectionType = "SSH",
+        SshKeyPath = @"C:\keys\id_ed25519",
+        SshKeyPassphraseEncrypted = StoredCipher
+    };
+
     private static ServerProfileDto SeedWithStoredPassword(string credential)
     {
         ServerProfileDto dto = new()

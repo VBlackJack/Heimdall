@@ -1873,6 +1873,147 @@ public sealed class SettingsViewModelTests
         Assert.Equal("SettingsLegacyMigrationReofferFailed", message);
     }
 
+    // The scheduling is written to disk by the command itself, through the config manager and
+    // outside the pending-edit buffer. Marking the panel dirty for it raised the amber dot and,
+    // on leaving Settings, a Save/Discard/Cancel prompt about a change neither answer can reach -
+    // Discard reads as undoing the scheduling and does not, because nothing was ever pending.
+    [Fact]
+    public async Task ReofferLegacyMigrationNextStartupCommand_LeavesThePanelClean()
+    {
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                LegacyMigrationDeclinedOfferVersion = 2,
+                LegacyMigrationDeclinedSourceFingerprint = "ABC123",
+            },
+        };
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.False(viewModel.IsDirty);
+
+        await viewModel.ReofferLegacyMigrationNextStartupCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsDirty);
+    }
+
+    // The banner and the tab badge were computed inside Save and nowhere else, so correcting the
+    // very field the banner named left both on screen asserting an error that no longer existed,
+    // with no way to clear them but pressing Save again.
+    [Fact]
+    public async Task ValidationBanner_ClearsWhenTheFieldItNamesIsCorrected()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.MaxEmbeddedSessionsText = "50";
+
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.True(viewModel.HasValidationErrors);
+        Assert.True(viewModel.HasGeneralTabErrors);
+        Assert.Equal(1, viewModel.GeneralTabErrorCount);
+
+        viewModel.MaxEmbeddedSessionsText = "15";
+
+        Assert.False(viewModel.HasValidationErrors);
+        Assert.Null(viewModel.ValidationSummary);
+        Assert.False(viewModel.HasGeneralTabErrors);
+        Assert.Equal(0, viewModel.GeneralTabErrorCount);
+    }
+
+    // A live refresh rebuilds the summary from the annotation error set, which the external-tool
+    // verdict is not part of: without carrying it, the first keystroke in an unrelated field would
+    // wipe a message about a tool that is still incomplete.
+    [Fact]
+    public async Task ValidationBanner_TracksTheLiveErrorSetWithoutLosingTheExternalToolVerdict()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.ExternalTools.Add(new ExternalToolItemViewModel());
+
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.Equal("ValidationExtToolIncomplete", viewModel.ValidationSummary);
+
+        // A field error takes the banner over while it stands: a save never reaches the tools.
+        viewModel.MaxEmbeddedSessionsText = "50";
+
+        Assert.Equal("ValidationSettingsMaxSessions", viewModel.ValidationSummary);
+
+        // and hands it back rather than clearing it, because the tool is still incomplete.
+        viewModel.MaxEmbeddedSessionsText = "15";
+
+        Assert.Equal("ValidationExtToolIncomplete", viewModel.ValidationSummary);
+        Assert.True(viewModel.HasValidationErrors);
+    }
+
+    // Abandoning an unwanted edit had no control of its own: the only visible way back was Reset
+    // Defaults, which loads the factory values over all six tabs. Reverting must reload what is on
+    // disk, not what the factory ships.
+    [Fact]
+    public async Task RevertChangesCommand_ReloadsThePersistedValuesAndLeavesThePanelClean()
+    {
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings { MaxEmbeddedSessions = 7, DefaultTheme = "Carmilla" },
+        };
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.MaxEmbeddedSessions = 19;
+        viewModel.DefaultTheme = "Wormwood";
+        Assert.True(viewModel.IsDirty);
+
+        await viewModel.RevertChangesCommand.ExecuteAsync(null);
+
+        Assert.Equal(7, viewModel.MaxEmbeddedSessions);
+        Assert.Equal("Carmilla", viewModel.DefaultTheme);
+        Assert.False(viewModel.IsDirty);
+        Assert.Equal(0, config.SaveSettingsCallCount);
+    }
+
+    // Revert sits one place away from Reset Defaults and is the only one of the two whose effect
+    // cannot be taken back by declining to save, so a declined confirmation has to change nothing.
+    [Fact]
+    public async Task RevertChangesCommand_CancelledConfirmationKeepsTheEdits()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.MaxEmbeddedSessions = 19;
+
+        await viewModel.RevertChangesCommand.ExecuteAsync(null);
+
+        Assert.Equal(19, viewModel.MaxEmbeddedSessions);
+        Assert.True(viewModel.IsDirty);
+        (string title, string message, string severity) = Assert.Single(dialog.ConfirmCalls);
+        Assert.Equal("SettingsRevertChangesConfirmTitle", title);
+        Assert.Equal("SettingsRevertChangesConfirmBody", message);
+        Assert.Equal("warning", severity);
+    }
+
+    // A command whose availability nothing announces is a button that stays greyed out while it
+    // could be pressed, which is the shape this repository has already shipped twice.
+    [Fact]
+    public void RevertChangesCommand_AnnouncesItselfAsSoonAsThereIsSomethingToRevert()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.LoadFromSettings(new AppSettings());
+
+        Assert.False(viewModel.RevertChangesCommand.CanExecute(null));
+
+        int announced = 0;
+        viewModel.RevertChangesCommand.CanExecuteChanged += (_, _) => announced++;
+
+        viewModel.MaxEmbeddedSessions = 19;
+
+        Assert.True(viewModel.RevertChangesCommand.CanExecute(null));
+        Assert.True(
+            announced > 0,
+            "the command never told the button it had become available, so the button stays "
+                + "greyed out until something unrelated pokes the command manager");
+    }
+
     [Fact]
     public async Task ResetRdpDefaultsCommand_RestoresRdpDefaults()
     {

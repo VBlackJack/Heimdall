@@ -98,17 +98,31 @@ public partial class ProtocolFilterOptionViewModel : ObservableObject
 
     public ProtocolFilterOptionViewModel(
         string protocol,
+        string displayName,
         string accessibilityName,
         Action selectionChanged)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(accessibilityName);
         ArgumentNullException.ThrowIfNull(selectionChanged);
 
         Protocol = protocol;
+        DisplayName = displayName;
         AccessibilityName = accessibilityName;
         _selectionChanged = selectionChanged;
     }
+
+    /// <summary>
+    /// What the checklist shows for this protocol, and what its accessible name quotes.
+    /// </summary>
+    /// <remarks>
+    /// The two must come from one place. Translating the visible header alone left the
+    /// accessible name quoting the raw handler key, so a voice-control user saying the label
+    /// they could see no longer matched the control, and the name spoke a token that appears
+    /// nowhere on screen.
+    /// </remarks>
+    public string DisplayName { get; }
 
     public string Protocol { get; }
 

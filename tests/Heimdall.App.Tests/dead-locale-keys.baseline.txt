@@ -228,9 +228,6 @@ ConfirmTunnelCloseMessage
 ConfirmTunnelCloseTitle
 ConnectionHistoryConnect
 ConnectionHistoryDisconnect
-ConnectionTypeCitrix
-ConnectionTypeFtp
-ConnectionTypeLocal
 CredentialsSectionTitle
 CtxMenuCopyPath
 CtxMenuDelete
@@ -755,8 +752,6 @@ NetworkScannerColHostname
 NetworkScannerColIp
 NetworkScannerColLatency
 NetworkScannerColPorts
-NewGroupDialogTitle
-NewGroupFieldName
 OnboardingWelcomeSubtitle
 OnboardingWelcomeTitle
 PaletteModeMerge
@@ -1067,7 +1062,6 @@ StatusGatewayAdded
 StatusGatewayDeleted
 StatusGatewaySetDefault
 StatusGatewayUpdated
-StatusGroupCreated
 StatusImportSuccess
 StatusMovedToProject
 StatusMultiSelection
