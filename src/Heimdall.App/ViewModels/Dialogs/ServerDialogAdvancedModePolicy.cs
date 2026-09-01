@@ -16,78 +16,22 @@
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
+/// <summary>
+/// Scopes the "open the server dialog in advanced mode" preference to the moments where it means
+/// something. It answers when, never whether: a preference the dialog can overrule on a judgement
+/// of its own is a preference the user cannot predict, and a checkbox that promises behaviour the
+/// product does not deliver is worse than no checkbox at all.
+/// </summary>
 internal static class ServerDialogAdvancedModePolicy
 {
+    /// <summary>
+    /// The advanced surface lives entirely in the RDP options, and in add mode it does not exist
+    /// until a protocol has been picked, so applying the preference any earlier would settle the
+    /// state of a control the dialog has not built yet.
+    /// </summary>
     public static bool ShouldApplyRdpDefault(string? connectionType, bool isEditMode, bool isProtocolSelected)
     {
         return IsRdp(connectionType) && (isEditMode || isProtocolSelected);
-    }
-
-    public static bool ShouldPersistRdpDefault(
-        string? connectionType,
-        bool isEditMode,
-        bool isProtocolSelected,
-        bool isApplyingDefault)
-    {
-        return !isApplyingDefault
-            && IsRdp(connectionType)
-            && (isEditMode || isProtocolSelected);
-    }
-
-    /// <summary>
-    /// Snapshot of the advanced RDP fields the dialog tracks. <c>true</c>
-    /// means a value diverges from the conservative defaults baked into the
-    /// app, so the dialog should keep the Advanced expander open. When all
-    /// fields are at their defaults, the Advanced toggle can be reset to
-    /// <c>false</c> on the next open of a saved profile.
-    /// </summary>
-    public readonly record struct AdvancedRdpSnapshot(
-        bool UseGlobalDefaults,
-        bool AntiIdle,
-        bool BitmapCaching,
-        bool Compression,
-        bool AutoReconnect,
-        bool AdminMode,
-        bool FullScreen);
-
-    /// <summary>
-    /// Returns true when the user has tweaked at least one advanced RDP field
-    /// away from the conservative defaults (UseGlobalDefaults off, AntiIdle
-    /// off, BitmapCaching on, Compression on, AutoReconnect on, AdminMode off,
-    /// FullScreen off).
-    /// </summary>
-    public static bool IsAdvancedRdpCustomized(AdvancedRdpSnapshot snapshot)
-        => snapshot.UseGlobalDefaults
-        || snapshot.AntiIdle
-        || !snapshot.BitmapCaching
-        || !snapshot.Compression
-        || !snapshot.AutoReconnect
-        || snapshot.AdminMode
-        || snapshot.FullScreen;
-
-    /// <summary>
-    /// Decides whether to honor the persisted "open dialog in advanced mode"
-    /// preference for an edit-mode visit of an existing RDP profile. The
-    /// preference is suppressed when the profile has no advanced
-    /// customizations, so the dialog auto-collapses Advanced for cleanly
-    /// configured profiles even when the global preference is true.
-    /// </summary>
-    public static bool ResolveAdvancedDefault(
-        bool persistedDefault,
-        bool isEditMode,
-        AdvancedRdpSnapshot snapshot)
-    {
-        if (!persistedDefault)
-        {
-            return false;
-        }
-
-        if (isEditMode && !IsAdvancedRdpCustomized(snapshot))
-        {
-            return false;
-        }
-
-        return true;
     }
 
     private static bool IsRdp(string? connectionType)

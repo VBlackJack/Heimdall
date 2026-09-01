@@ -260,26 +260,44 @@ public sealed class ServerDialogViewModelRdpOptionsTests
         Assert.False(vm.IsAdvancedMode);
     }
 
-    [Theory]
-    [InlineData("RDP", false, true, false, true)]
-    [InlineData("RDP", true, false, false, true)]
-    [InlineData("RDP", false, true, true, false)]
-    [InlineData("SSH", false, true, false, false)]
-    [InlineData("RDP", false, false, false, false)]
-    public void Rdp_advanced_default_persistence_policy_is_scoped_to_user_driven_rdp_changes(
-        string connectionType,
-        bool isEditMode,
-        bool isProtocolSelected,
-        bool isApplyingDefault,
-        bool expected)
+    // The preference is the whole contract. A saved profile whose advanced fields all sit at
+    // their conservative defaults used to cancel it, on a judgement the user could neither see
+    // nor predict: ticking the box and getting a plain dialog back taught them the box was a lie.
+    [Fact]
+    public void Rdp_advanced_default_applies_to_a_saved_profile_with_no_advanced_customisation()
     {
-        var actual = ServerDialogAdvancedModePolicy.ShouldPersistRdpDefault(
-            connectionType,
-            isEditMode,
-            isProtocolSelected,
-            isApplyingDefault);
+        var vm = ServerDialogViewModel.FromDto(new ServerProfileDto { ConnectionType = "RDP" });
+        vm.RdpUseGlobalDefaults = false;
+        vm.RdpAntiIdle = false;
+        vm.RdpBitmapCaching = true;
+        vm.RdpCompression = true;
+        vm.RdpAutoReconnect = true;
+        vm.RdpAdminMode = false;
+        vm.RdpFullScreen = false;
+        vm.RdpResolutionMode = RdpResolutionMode.Auto;
 
-        Assert.Equal(expected, actual);
+        vm.Settings = new AppSettings { RdpDialogAdvancedDefault = true };
+
+        Assert.True(vm.IsAdvancedMode);
+    }
+
+    // Every resolution field lives inside the Advanced expander, so a profile saved with a mode
+    // other than Auto has to open it even when the preference is off. Collapsed, the resolution
+    // section would say nothing at all about the resolution the profile is configured with.
+    [Fact]
+    public void Rdp_advanced_mode_opens_for_a_non_auto_resolution_profile_without_the_preference()
+    {
+        var vm = ServerDialogViewModel.FromDto(new ServerProfileDto
+        {
+            ConnectionType = "RDP",
+            RdpResolutionMode = RdpResolutionMode.Fixed,
+            RdpFixedWidth = 1600,
+            RdpFixedHeight = 900
+        });
+
+        vm.Settings = new AppSettings { RdpDialogAdvancedDefault = false };
+
+        Assert.True(vm.IsAdvancedMode);
     }
 
     [Fact]

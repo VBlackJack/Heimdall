@@ -100,19 +100,13 @@ public partial class ServerDialog : Window
 
         if (_configManager is null) return;
 
-        if (e.PropertyName == nameof(ServerDialogViewModel.IsAdvancedMode))
-        {
-            if (!ServerDialogAdvancedModePolicy.ShouldPersistRdpDefault(
-                    vm.ConnectionType,
-                    vm.IsEditMode,
-                    vm.IsProtocolSelected,
-                    vm.IsApplyingRdpDialogAdvancedDefault))
-            {
-                return;
-            }
-
-            _ = _configManager.MergeSettingAsync(s => s.RdpDialogAdvancedDefault = vm.IsAdvancedMode);
-        }
+        // The preference travels one way, into the dialog. It used to travel back: collapsing
+        // a sub-section pushed IsAdvancedMode false and merged it straight into the settings
+        // file, immediately and with no dirty flag, so the write outlived a Cancel and a
+        // settings panel left open went on displaying a value the file no longer held. The
+        // whole point of making this preference real was that it should stop changing state
+        // the user did not touch; a gesture-triggered surprise is the same surprise as the
+        // machine-judged one it replaced.
     }
 
     // ------------------------------------------------------------------

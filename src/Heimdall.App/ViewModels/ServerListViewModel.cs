@@ -1857,7 +1857,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     /// <summary>
     /// Tracks expand/collapse state changes on folder nodes and schedules
-    /// a debounced save of TreeExpandedNodes to settings.
+    /// a debounced save of TreeExpandedNodes to settings. Only a toggle the
+    /// user made with no filter on screen reaches that save.
     /// </summary>
     private void OnFolderExpandedChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -1866,7 +1867,36 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        if (_applyingFilterExpansion)
+        {
+            // The filter pass opened or restored this branch. It ends with its own selection
+            // synchronisation, and none of what it did belongs in the saved state.
+            return;
+        }
+
         var key = folder.ExpansionKey;
+        if (!folder.IsExpanded)
+        {
+            SynchronizeSelection(null);
+        }
+
+        if (AppliedFilterSpec.IsActive)
+        {
+            // Every branch on screen is open because the filter opened it, so closing one says
+            // something about the filtered view, not about the tree the user returns to. Honour it
+            // until the filter clears, then forget it.
+            if (folder.IsExpanded)
+            {
+                _filterCollapsedFolders.Remove(key);
+            }
+            else
+            {
+                _filterCollapsedFolders.Add(key);
+            }
+
+            return;
+        }
+
         if (folder.IsExpanded)
         {
             _expandedNodes.Add(key);
@@ -1874,14 +1904,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         else
         {
             _expandedNodes.Remove(key);
-            SynchronizeSelection(null);
         }
 
         ScheduleExpandStateSave();
     }
 
     /// <summary>
-    /// Debounced save of TreeExpandedNodes — waits 500ms after last toggle
+    /// Debounced save of TreeExpandedNodes - waits 500ms after last toggle
     /// before writing to disk, to avoid spamming settings.json on rapid clicks.
     /// </summary>
     private void ScheduleExpandStateSave()

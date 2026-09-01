@@ -238,6 +238,23 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
         }
     }
 
+    // Producer: the Advanced expander in ServerDialog.xaml, the single control
+    // RdpDialogAdvancedDefault exists to open. A OneTime binding cannot carry a preference that
+    // is read after the dialog is built, which is how this setting spent its life inert.
+    [Fact]
+    public void RdpDialogAdvancedDefault_ReachesTheServerDialogAdvancedExpander()
+    {
+        string xaml = ReadRepoFile(
+            "src", "Heimdall.App", "Views", "Dialogs", "ServerDialog.xaml");
+        string startTag = SliceElementStartTag(xaml, "DlgSrv_AdvancedResolutionExpander");
+
+        Assert.Contains(
+            "IsExpanded=\"{Binding IsAdvancedMode, Mode=OneWay}\"",
+            startTag,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("OneTime", startTag, StringComparison.Ordinal);
+    }
+
     // Producer: RdpDisableUdp and RdpDisableUdpHint describe the exact behavior wired
     // by the RDP ActiveX host without promising a transport policy.
     [Fact]
@@ -289,6 +306,22 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
         }
 
         throw new DirectoryNotFoundException("Could not locate the Heimdall repository root.");
+    }
+
+    /// <summary>
+    /// Returns the opening tag of the element carrying <paramref name="elementName"/>, so a
+    /// binding assertion cannot be satisfied by an unrelated element elsewhere in the view.
+    /// </summary>
+    private static string SliceElementStartTag(string source, string elementName)
+    {
+        int named = source.IndexOf($"x:Name=\"{elementName}\"", StringComparison.Ordinal);
+        Assert.True(named >= 0, $"Missing element: {elementName}");
+
+        int start = source.LastIndexOf('<', named);
+        int end = source.IndexOf('>', named);
+        Assert.True(start >= 0 && end > start, $"Unterminated start tag: {elementName}");
+
+        return source[start..(end + 1)];
     }
 
     private static string SliceMethodBody(string source, string signature)

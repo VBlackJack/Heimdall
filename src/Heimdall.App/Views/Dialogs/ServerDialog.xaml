@@ -1434,7 +1434,7 @@
 
                                                             <Expander x:Name="DlgSrv_AdvancedResolutionExpander"
                                                                       Header="{loc:Translate ServerDialogResolutionMoreOptions}"
-                                                                      IsExpanded="{Binding IsAdvancedResolutionExpanded, Mode=OneTime}"
+                                                                      IsExpanded="{Binding IsAdvancedMode, Mode=OneWay}"
                                                                       Margin="0"
                                                                       AutomationProperties.Name="{loc:Translate ServerDialogResolutionMoreOptions}"
                                                                       Style="{DynamicResource ThemedExpanderStyle}">
