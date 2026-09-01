@@ -12,6 +12,51 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-09-01 (second release of the day): the rest of the UX audit, and nineteen decisions
+
+The previous entry covered the two defects that destroyed work. This one covers everything else
+the audit found, plus the nineteen items its triage refused to classify as defects because closing
+them meant choosing rather than fixing.
+
+### One word for the session tree's containers
+
+The product alternated between "folder" and "group" by screen, at one point inside a single
+window: an Add-menu item called "New Folder" opened a dialog titled "New group" asking for a
+"Group:". The user-facing vocabulary is now folder, in both languages and in the public docs.
+
+Three boundaries held. Locale VALUES changed, keys did not - `TreeCtxNewGroup` is an identifier
+nobody reads. Seven keys carrying the word mean something else and were left alone: the Unix
+permission class in chmod, the SFTP owning group, regex capture groups, the Windows workgroup in
+the network tools. And the persisted shape did not move: `ServerProfileDto.Group` and
+`AppSettings.EmptyGroups` are on disk in every profile.
+
+### Nineteen decisions, taken one at a time
+
+The triage separated defects from decisions, and refused nineteen. Each was then taken on its own
+merits, with the rejected option recorded beside it. Some ended in "leave it": the validation
+banner still does not name the field at fault, because naming it needs a 23-entry label map in two
+languages that must keep agreeing with what each tab displays - a new drift surface guarded by
+nothing, for a gain the tab badge and the red border already mostly deliver.
+
+Others reversed a first instinct. The DNS warm-up was to be debounced; a debounce needs a delay
+chosen and would have stopped warming the click-then-connect case the feature exists for.
+Cancellation gives the same benefit at neither cost.
+
+### What verification found, again
+
+Two rounds of adversarial review found blockers on trees that were already green and formatted.
+Worth naming, because they are the same shape three times over:
+
+- Translating the protocol checklist split the visible label from the accessible name. The fix for
+  a label CREATED the defect it was fixing, one channel over.
+- A locale rename broke four exact-name lookups in `scripts/smoke/move-to-group-smoke.ps1`, one on
+  an unguarded line. Every `dotnet test` lane stayed green, because no lane runs that script.
+- Making the advanced-mode preference real revived a dead write-back: collapsing a sub-section
+  merged the preference into the settings file immediately, and the write outlived pressing
+  Cancel.
+
+Guards now cross each of those junctions, and each was proved to fail on the mutant it names.
+
 ## 2026-09-01: Two data-loss paths, and the interface stops saying untrue things
 
 Driven by a user-experience audit of the session tree, the General settings tab and the
