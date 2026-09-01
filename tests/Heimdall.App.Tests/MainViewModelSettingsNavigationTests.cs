@@ -363,6 +363,30 @@ public sealed class MainViewModelSettingsNavigationTests
         Assert.Equal(1, harness.Dialog.SavePromptCount);
     }
 
+    // The tab guard's Discard runs through the settings panel's own DiscardChangesAsync, and the
+    // language is now applied the moment it is picked. Leaving the tab therefore has to hand the
+    // product back the language it was speaking, or declining an edit leaves the whole shell -
+    // not just the panel - in a language the user did not keep.
+    [Fact]
+    public async Task ResolveUnsavedSettings_Discard_PutsTheLanguageBack()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        harness.Main.Settings.LoadFromSettings(await harness.Config.LoadSettingsAsync());
+        harness.Main.SelectedTab = "Settings";
+
+        harness.Main.Settings.DefaultLocale = "fr";
+        await harness.Main.Settings.WhenLocaleAppliedAsync();
+        Assert.Equal("fr", harness.Localizer.CurrentLocale);
+
+        harness.Dialog.SaveDiscardAnswer = false;
+
+        bool mayLeave = await harness.Main.ResolveUnsavedSettingsAsync();
+
+        Assert.True(mayLeave);
+        Assert.Equal("en", harness.Localizer.CurrentLocale);
+        Assert.Equal("en", harness.Main.Settings.DefaultLocale);
+    }
+
     [Fact]
     public async Task ResolveUnsavedSettings_Cancel_HoldsTheCaller()
     {

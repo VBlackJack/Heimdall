@@ -2014,6 +2014,218 @@ public sealed class SettingsViewModelTests
                 + "greyed out until something unrelated pokes the command manager");
     }
 
+    // The language box answered a pick with nothing at all until Save, while the theme box
+    // beside it repainted the window on the spot. A newcomer picks a language, watches the panel
+    // stay in English, and concludes the setting is broken.
+    [Fact]
+    public async Task PickingALanguage_AppliesItWithoutWaitingForSave()
+    {
+        LocalizationManager localizer = await CreateProductLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.DefaultLocale = "fr";
+        await viewModel.WhenLocaleAppliedAsync();
+
+        Assert.Equal("fr", localizer.CurrentLocale);
+
+        // A preview, not a commitment: the pick is on screen and still nowhere on disk.
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.True(viewModel.IsDirty);
+    }
+
+    // The reason applying live was worth being careful about. The language is the only setting
+    // that can be seen before it is kept, so a discard has to be able to take it back - and this
+    // is the path where the reseed cannot do it: the reload throws, so the panel is never
+    // reseeded, and only an explicit restore stands between the user and a settings screen in a
+    // language they did not choose and may not be able to navigate out of.
+    [Fact]
+    public async Task DiscardChanges_PutsTheLanguageBackEvenWhenTheReloadFails()
+    {
+        LocalizationManager localizer = await CreateProductLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.DefaultLocale = "fr";
+        await viewModel.WhenLocaleAppliedAsync();
+        Assert.Equal("fr", localizer.CurrentLocale);
+
+        config.FailOnLoadSettings = true;
+
+        await Assert.ThrowsAsync<IOException>(viewModel.DiscardChangesAsync);
+
+        Assert.Equal("en", localizer.CurrentLocale);
+        Assert.Equal("en", viewModel.DefaultLocale);
+    }
+
+    // The one path that reloads the panel without leaving it. Reset Defaults calls
+    // LoadFromSettings, which reseeds the restore point from what is on screen - and by then that
+    // may be a language the user has only previewed. Without holding the original across the
+    // reload, Reset makes the abandoned language the one Discard returns to, which is the parked
+    // risk of applying the locale live arriving through a side door.
+    [Fact]
+    public async Task ResetDefaultsBetweenAPreviewAndADiscard_StillReturnsToTheOriginalLanguage()
+    {
+        LocalizationManager localizer = await CreateProductLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.DefaultLocale = "fr";
+        await viewModel.WhenLocaleAppliedAsync();
+        Assert.Equal("fr", localizer.CurrentLocale);
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+
+        // The reload is broken on purpose: it is what stops the reseed from covering for a lost
+        // restore point, and it is the state DiscardChanges_PutsTheLanguageBackEvenWhenTheReloadFails
+        // already established a discard has to survive.
+        config.FailOnLoadSettings = true;
+        await Assert.ThrowsAsync<IOException>(viewModel.DiscardChangesAsync);
+
+        Assert.Equal("en", localizer.CurrentLocale);
+    }
+
+    // The revert a user actually presses. The language is read with no drain in between: a
+    // discard that returns while the switch is still in flight reports the edit abandoned before
+    // it is, and every caller downstream - the tab guard included - reads a stale language.
+    [Fact]
+    public async Task RevertChangesCommand_PutsTheLanguageBack()
+    {
+        LocalizationManager localizer = await CreateProductLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.DefaultLocale = "fr";
+        await viewModel.WhenLocaleAppliedAsync();
+        Assert.Equal("fr", localizer.CurrentLocale);
+
+        await viewModel.RevertChangesCommand.ExecuteAsync(null);
+
+        Assert.Equal("en", localizer.CurrentLocale);
+        Assert.Equal("en", viewModel.DefaultLocale);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    // Saving moves the point a later discard comes back to. Without that, abandoning a second
+    // edit would undo the first one as well - and here the reload cannot paper over it, so the
+    // panel has to be holding the right answer rather than able to look it up.
+    [Fact]
+    public async Task Saving_MakesTheSavedLanguageTheOneADiscardComesBackTo()
+    {
+        LocalizationManager localizer = await CreateProductLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.DefaultLocale = "fr";
+        Assert.True(await viewModel.TrySaveAsync());
+        Assert.Equal("fr", localizer.CurrentLocale);
+
+        viewModel.DefaultLocale = "en";
+        await viewModel.WhenLocaleAppliedAsync();
+        Assert.Equal("en", localizer.CurrentLocale);
+
+        config.FailOnLoadSettings = true;
+
+        await Assert.ThrowsAsync<IOException>(viewModel.DiscardChangesAsync);
+
+        Assert.Equal("fr", localizer.CurrentLocale);
+        Assert.Equal("fr", viewModel.DefaultLocale);
+    }
+
+    // An installation missing a locale file must not leave the box naming the language it could
+    // not load. The box is what Save writes, and the next launch reads that value before there is
+    // any panel to correct it from.
+    [Fact]
+    public async Task PickingALanguageWhoseFileIsMissing_PutsTheBoxBackAndSaysSo()
+    {
+        string localesPath = CreateEnglishOnlyLocalesDirectory();
+        try
+        {
+            LocalizationManager localizer = new();
+            await localizer.LoadAsync(localesPath, "en");
+            FakeConfigManager config = new();
+            FakeDialogService dialog = new();
+            SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+            viewModel.LoadFromSettings(config.Settings);
+
+            viewModel.DefaultLocale = "fr";
+            await viewModel.WhenLocaleAppliedAsync();
+
+            Assert.Equal("en", localizer.CurrentLocale);
+            Assert.Equal("en", viewModel.DefaultLocale);
+
+            // Resolved through the localizer rather than written out, so the assertion keeps
+            // measuring the key once these two keys have translations.
+            (string title, string message) = Assert.Single(dialog.WarningCalls);
+            Assert.Equal(localizer["SettingsLanguageApplyFailedTitle"], title);
+            Assert.Equal(localizer.Format("SettingsLanguageApplyFailedMessage", "fr"), message);
+        }
+        finally
+        {
+            Directory.Delete(localesPath, recursive: true);
+        }
+    }
+
+    // The switch used to happen inside the save, after the write, and its exception was caught by
+    // the same handler that reports a persistence failure - so a missing locale file made Save
+    // announce that it had failed to write settings it had in fact just written.
+    [Fact]
+    public async Task Saving_DoesNotReportFailureBecauseALanguageCouldNotBeLoaded()
+    {
+        string localesPath = CreateEnglishOnlyLocalesDirectory();
+        try
+        {
+            LocalizationManager localizer = new();
+            await localizer.LoadAsync(localesPath, "en");
+            FakeConfigManager config = new();
+            FakeDialogService dialog = new();
+            SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+            viewModel.LoadFromSettings(config.Settings);
+
+            viewModel.DefaultLocale = "fr";
+            await viewModel.WhenLocaleAppliedAsync();
+
+            Assert.True(await viewModel.TrySaveAsync());
+            Assert.False(viewModel.IsDirty);
+            Assert.Equal("en", config.Settings.DefaultLocale);
+        }
+        finally
+        {
+            Directory.Delete(localesPath, recursive: true);
+        }
+    }
+
+    private static async Task<LocalizationManager> CreateProductLocalizerAsync()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
+    }
+
+    /// <summary>
+    /// A locales directory holding English alone, standing in for an installation whose other
+    /// locale file did not survive the copy.
+    /// </summary>
+    private static string CreateEnglishOnlyLocalesDirectory()
+    {
+        string path = Path.Combine(
+            Path.GetTempPath(),
+            nameof(SettingsViewModelTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "locales", "en.json"),
+            Path.Combine(path, "en.json"));
+        return path;
+    }
+
     [Fact]
     public async Task ResetRdpDefaultsCommand_RestoresRdpDefaults()
     {
@@ -2926,6 +3138,8 @@ public sealed class SettingsViewModelTests
 
         public bool FailOnMergeSetting { get; set; }
 
+        public bool FailOnLoadSettings { get; set; }
+
         public TaskCompletionSource? MergeSettingStarted { get; set; }
 
         public Task? MergeSettingRelease { get; set; }
@@ -2946,7 +3160,9 @@ public sealed class SettingsViewModelTests
 
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(CloneSettings(Settings));
+        public Task<AppSettings> LoadSettingsAsync() => FailOnLoadSettings
+            ? Task.FromException<AppSettings>(new IOException("Simulated LoadSettingsAsync failure"))
+            : Task.FromResult(CloneSettings(Settings));
 
         public Task SaveSettingsAsync(AppSettings settings)
         {

@@ -77,6 +77,12 @@ public partial class ServerDialogViewModel
         new(PostConnectFailurePolicy.Stop, L("ServerDialogPostConnectFailureStop"))
     ];
 
+    /// <summary>
+    /// Drives the sentence shown over the empty list. An empty post-connect sequence is the
+    /// normal case, so the blank card is what most users see first and it has to say something.
+    /// </summary>
+    public bool HasNoPostConnectSteps => PostConnectSteps.Count == 0;
+
     public bool HasLegacyPostConnectCommand => !string.IsNullOrWhiteSpace(PostConnectCommand);
 
     public string LegacyPostConnectCommandText => PostConnectCommand;
@@ -273,6 +279,12 @@ public partial class ServerDialogViewModel
 
     private void OnPostConnectStepsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        // Announced before either guard below. The empty-state sentence is a property of what the
+        // list holds, not of who changed it, and opening a saved session is both the only path
+        // that fills the list with no user gesture and the one both guards drop: it runs under
+        // _isInitializing, and it empties the list through Clear, which reports Reset.
+        OnPropertyChanged(nameof(HasNoPostConnectSteps));
+
         if (_isInitializing)
         {
             return;

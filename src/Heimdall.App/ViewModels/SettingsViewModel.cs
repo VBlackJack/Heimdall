@@ -122,6 +122,39 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _originalAccentTint = "Default";
 
     /// <summary>
+    /// The language the interface was speaking when this panel was last seeded from settings.
+    /// </summary>
+    /// <remarks>
+    /// The language box applies its pick straight away, like the theme box beside it, so the
+    /// language is the only setting that can be seen before it is kept. That makes the way back
+    /// the part that matters: every path that abandons the edits has to come back to this
+    /// language, or the user is left reading a settings panel in a language they did not choose
+    /// and may not be able to navigate out of.
+    /// </remarks>
+    private string _originalLocale = "en";
+
+    /// <summary>Guards <see cref="_localeApplyChain"/>.</summary>
+    private readonly object _localeApplyGate = new();
+
+    /// <summary>
+    /// Every language switch this panel has asked for, queued end to end.
+    /// </summary>
+    /// <remarks>
+    /// A combo box that is arrowed through raises one selection change per key, and loading a
+    /// locale file is asynchronous, so two switches started together can finish in the opposite
+    /// order and leave the product speaking a language the box no longer names. Queueing also
+    /// keeps concurrent callers off <see cref="LocalizationManager"/>, which replaces its whole
+    /// string table on each load.
+    /// </remarks>
+    private Task _localeApplyChain = Task.CompletedTask;
+
+    /// <summary>
+    /// Set while the panel is putting the language box back to the language actually loaded, so
+    /// that correction is not taken for a new pick.
+    /// </summary>
+    private bool _suppressLocaleApply;
+
+    /// <summary>
     /// The external-tool verdict from the last save attempt, or null when there was none.
     /// </summary>
     /// <remarks>
@@ -1224,7 +1257,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// </summary>
     public void LoadFromSettings(AppSettings settings)
     {
-        // General
+        // General. The language on screen is read before the box is reseeded, because reseeding
+        // the box is itself capable of changing it.
+        _originalLocale = _localizer.CurrentLocale;
         DefaultLocale = settings.DefaultLocale;
         DefaultTheme = settings.DefaultTheme;
         AccentTint = settings.AccentTint;
@@ -1697,10 +1732,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _originalTheme = DefaultTheme;
         _originalAccentTint = AccentTint;
 
-        if (!string.Equals(_localizer.CurrentLocale, DefaultLocale, StringComparison.OrdinalIgnoreCase))
-        {
-            await _localizer.SwitchLocaleAsync(DefaultLocale);
-        }
+        // The saved language is already on screen - it was applied when it was picked. What
+        // saving adds is that it becomes the language a later discard has to come back to.
+        // Silent, because this runs inside the window close guard as well, and a blocking
+        // modal raised from a Closing handler is a shape this repository has been bitten by.
+        await QueueLocaleApplyAsync(DefaultLocale, announceFailure: false);
+        _originalLocale = _localizer.CurrentLocale;
 
         IsDirty = false;
         try
@@ -1759,11 +1796,19 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         List<string> keptDeletedProjectIds = _deletedProjectIds.ToList();
         List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
 
+        // The language the user can still get back to. LoadFromSettings reseeds the restore
+        // point from whatever is on screen, and by this point that may be a language the user
+        // only previewed - so a reset between the preview and a discard would make the
+        // abandoned language the one Discard returns to. This is the parked risk of applying
+        // the locale live, arriving through the one path that reloads without leaving.
+        string localeToReturnTo = _originalLocale;
+
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         defaults.SshGateways = keptGateways;
         defaults.Projects = keptProjects;
 
         LoadFromSettings(defaults);
+        _originalLocale = localeToReturnTo;
 
         _deletedProjectIds.AddRange(keptDeletedProjectIds);
         foreach (string gatewayId in keptDeletedGatewayIds)
@@ -3011,12 +3056,128 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         AccentTintChanged?.Invoke(value);
     }
 
+    /// <summary>
+    /// Applies the picked language at once, the way the theme box beside it applies a theme.
+    /// </summary>
+    /// <remarks>
+    /// Applying only on Save made this the one control on the panel that answered a pick with
+    /// nothing at all, which reads as a broken setting rather than as a deferred one.
+    /// </remarks>
+    partial void OnDefaultLocaleChanged(string value)
+    {
+        _ = QueueLocaleApplyAsync(value);
+    }
+
+    /// <summary>
+    /// Applies <paramref name="locale"/> to the running interface behind every switch already
+    /// queued, and returns the task that completes when the queue has drained.
+    /// </summary>
+    /// <param name="announceFailure">
+    /// Whether a language that cannot be loaded is worth a dialog. True where the user has just
+    /// picked one and is owed an answer; false where the switch is a confirmation of a language
+    /// already on screen and the caller may be a close handler.
+    /// </param>
+    private Task QueueLocaleApplyAsync(string locale, bool announceFailure = true)
+    {
+        if (_suppressLocaleApply)
+        {
+            return Task.CompletedTask;
+        }
+
+        lock (_localeApplyGate)
+        {
+            _localeApplyChain = ApplyLocaleAfterAsync(_localeApplyChain, locale, announceFailure);
+            return _localeApplyChain;
+        }
+    }
+
+    /// <summary>
+    /// Completes once every language switch this panel has asked for has been applied.
+    /// </summary>
+    internal Task WhenLocaleAppliedAsync()
+    {
+        lock (_localeApplyGate)
+        {
+            return _localeApplyChain;
+        }
+    }
+
+    private async Task ApplyLocaleAfterAsync(Task pending, string locale, bool announceFailure)
+    {
+        try
+        {
+            await pending;
+        }
+        catch
+        {
+            // A switch that failed has already reported itself where it happened. It must not
+            // take the switches queued behind it down as well, or one bad pick would leave the
+            // language box inert for the rest of the session.
+        }
+
+        if (string.IsNullOrWhiteSpace(locale)
+            || string.Equals(_localizer.CurrentLocale, locale, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            await _localizer.SwitchLocaleAsync(locale);
+        }
+        catch (Exception ex)
+        {
+            // The string table is swapped only once the new file has parsed, so what is on
+            // screen is still coherent - it is simply not what the box now says. Leaving the
+            // pick standing would offer to persist a locale that cannot be loaded, and the next
+            // launch reads that value before there is any panel to correct it from.
+            FileLogger.Error($"Applying locale '{locale}' failed.", ex);
+            RestoreLanguageSelection();
+            if (announceFailure)
+            {
+                _dialogService.ShowWarning(
+                    _localizer["SettingsLanguageApplyFailedTitle"],
+                    _localizer.Format("SettingsLanguageApplyFailedMessage", locale));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Puts the language box back to the language that is actually loaded.
+    /// </summary>
+    private void RestoreLanguageSelection()
+    {
+        _suppressLocaleApply = true;
+        try
+        {
+            DefaultLocale = _localizer.CurrentLocale;
+        }
+        finally
+        {
+            _suppressLocaleApply = false;
+        }
+    }
+
+    /// <summary>
+    /// Abandons the pending edits and reloads the panel from the persisted settings.
+    /// </summary>
+    /// <remarks>
+    /// The language is put back here rather than left to the reseed below. The reseed does ask
+    /// for the same switch, but nothing waits for it - so this method would report the edit
+    /// abandoned while the product was still speaking the previewed language - and it does not
+    /// run at all if the reload throws, which is the one case where being left in a language
+    /// nobody chose cannot be undone from inside the panel.
+    /// </remarks>
     public async Task DiscardChangesAsync()
     {
         DefaultTheme = _originalTheme;
         AccentTint = _originalAccentTint;
+        DefaultLocale = _originalLocale;
+        await WhenLocaleAppliedAsync();
+
         var settings = await _configManager.LoadSettingsAsync();
         LoadFromSettings(settings);
+        await WhenLocaleAppliedAsync();
     }
 
     private void SubscribeExternalToolTracking()

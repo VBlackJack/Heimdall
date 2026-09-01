@@ -607,6 +607,7 @@
                                   SelectedItemChanged="OnTreeViewSelectedItemChanged"
                                   MouseDoubleClick="OnTreeViewDoubleClick"
                                   PreviewMouseLeftButtonDown="OnTreeViewDragStart"
+                                  PreviewMouseLeftButtonUp="OnSessionTreeViewPreviewMouseLeftButtonUp"
                                   PreviewMouseMove="OnTreeViewDragMove"
                                   DragOver="OnTreeViewDragOver"
                                   DragLeave="OnTreeViewDragLeave"
@@ -683,7 +684,7 @@
                                             BorderThickness="3,0,0,0"
                                             BorderBrush="Transparent"
                                             Background="Transparent"
-                                            ToolTip="{Binding DisplayName}"
+                                            ToolTip="{Binding RowTooltipText}"
                                             ToolTipService.InitialShowDelay="150">
                                         <Grid>
                                             <Grid.ColumnDefinitions>

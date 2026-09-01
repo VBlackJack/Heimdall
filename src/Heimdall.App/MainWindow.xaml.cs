@@ -3728,7 +3728,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                     "warning"),
                 () => vm.ServerList.FlushExpandStateForCloseAsync(),
                 () => SaveWindowBoundsAsync(vm),
-                () => vm.DialogService.ShowWarning(warningTitle, warningMessage));
+                () => vm.DialogService.ShowWarning(warningTitle, warningMessage),
+                () => vm.Settings.DiscardChangesAsync());
 
             if (!prepared)
             {

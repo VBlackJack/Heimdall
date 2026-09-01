@@ -178,11 +178,15 @@ public sealed class TreeDragSourceTests
                 MainWindow.ExecuteTreeDrag(
                     state,
                     Assert.IsType<TreeViewItem>(resolvedContainer),
-                    Assert.IsType<ServerItemViewModel>(resolvedServer),
+                    new TreeServerDragPayload(
+                        Assert.IsType<ServerItemViewModel>(resolvedServer),
+                        [Assert.IsType<ServerItemViewModel>(resolvedServer)]),
                     (source, data) =>
                     {
                         Assert.Same(pressedContainer, source);
-                        Assert.Same(pressedServer, data.GetData("HeimdallServer"));
+                        TreeServerDragPayload payload = Assert.IsType<TreeServerDragPayload>(
+                            data.GetData(TreeServerDragPayload.DataFormat));
+                        Assert.Same(pressedServer, payload.Source);
                         throw new InvalidOperationException("drag failed");
                     }));
 
@@ -196,6 +200,41 @@ public sealed class TreeDragSourceTests
                 out _,
                 out _);
             Assert.False(staleStarted);
+        });
+    }
+
+    /// <summary>
+    /// A drag that starts on one of eight selected rows has to hand the drop all eight. The payload
+    /// used to be the pressed session on its own, so the drop moved one row and the user was told
+    /// nothing about the seven that stayed.
+    /// </summary>
+    [Fact]
+    public void ExecuteTreeDrag_CarriesEverySessionTheDragWasGiven()
+    {
+        RunOnSta(() =>
+        {
+            TreeInteractionState state = new();
+            TreeViewItem pressedContainer = Container("pressed");
+            ServerItemViewModel pressedServer = Assert.IsType<ServerItemViewModel>(
+                pressedContainer.DataContext);
+            ServerItemViewModel second = Assert.IsType<ServerItemViewModel>(
+                Container("second").DataContext);
+            ServerItemViewModel third = Assert.IsType<ServerItemViewModel>(
+                Container("third").DataContext);
+            TreeServerDragPayload? delivered = null;
+
+            MainWindow.ExecuteTreeDrag(
+                state,
+                pressedContainer,
+                new TreeServerDragPayload(pressedServer, [second, pressedServer, third]),
+                (_, data) => delivered =
+                    data.GetData(TreeServerDragPayload.DataFormat) as TreeServerDragPayload);
+
+            Assert.NotNull(delivered);
+            Assert.Same(pressedServer, delivered.Source);
+            Assert.Equal(
+                ["second", "pressed", "third"],
+                delivered.Servers.Select(server => server.Id).ToArray());
         });
     }
 

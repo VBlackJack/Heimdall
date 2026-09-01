@@ -358,8 +358,92 @@ public partial class MainWindow
             return;
         }
 
-        _treeState.SuppressSelectedItemSync = false;
+        if (ApplyTreePlainPress(
+                _treeState,
+                server,
+                vm.ServerList.ShouldDeferSingleSelection(server),
+                vm.ServerList.SelectSingle))
+        {
+            // Consumed so the native TreeView never moves its selection onto the row: doing so
+            // raises SelectedItemChanged, whose unsuppressed branch is the SelectSingle this press
+            // has just decided against. Focus still has to land on the row, which is exactly what
+            // the Ctrl-toggle path already does.
+            SynchronizeNativeTreeSelection(_treeState, treeViewItem);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Decides what a plain, unmodified press on a session row does.
+    /// </summary>
+    /// <remarks>
+    /// Pressing a row that is one of several selected ones used to collapse the selection there and
+    /// then, so a drag begun from that press carried a single session and the other seven were
+    /// silently left behind. The press now defers, and the release applies the same single
+    /// selection it always did. Only presses that land inside a multi-selection are deferred: a
+    /// press anywhere else selects on the way down exactly as before, which is what keeps the
+    /// detail panel, the DNS warm-up and the double-click path on their existing timing.
+    /// </remarks>
+    /// <param name="treeState">The transient TreeView interaction state.</param>
+    /// <param name="pressedServer">The session under the pointer.</param>
+    /// <param name="deferSelection">Whether the press lands inside a multi-selection.</param>
+    /// <param name="selectSingle">Replaces the selection with a single session.</param>
+    /// <returns>True when the press must be consumed and the selection left for the release.</returns>
+    internal static bool ApplyTreePlainPress(
+        TreeInteractionState treeState,
+        ServerItemViewModel pressedServer,
+        bool deferSelection,
+        Action<ServerItemViewModel> selectSingle)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(pressedServer);
+        ArgumentNullException.ThrowIfNull(selectSingle);
+
+        if (deferSelection)
+        {
+            treeState.DeferSingleSelection(pressedServer);
+            return true;
+        }
+
+        treeState.SuppressSelectedItemSync = false;
+        selectSingle(pressedServer);
+        return false;
+    }
+
+    /// <summary>
+    /// Applies the selection a press deferred, once the button comes back up over the tree.
+    /// </summary>
+    private void OnSessionTreeViewPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm
+            || !_treeState.TryTakeDeferredSingleSelection(out ServerItemViewModel? server)
+            || server is null)
+        {
+            return;
+        }
+
         vm.ServerList.SelectSingle(server);
+
+        // The press was consumed, so the native selection never followed the pointer. Put it on the
+        // row now - Enter, F2 and the keyboard context menu all fall back to TreeView.SelectedItem -
+        // with the sync suppressed, because the view model has just been told and letting the
+        // notification answer again would reroute the decision through whichever modifier keys
+        // happen to be held down at release time.
+        TreeViewItem? container = GetOrRealizeSessionTreeItem(server);
+        if (container is not null)
+        {
+            _treeState.SuppressSelectedItemSync = true;
+            try
+            {
+                container.IsSelected = true;
+            }
+            finally
+            {
+                _treeState.SuppressSelectedItemSync = false;
+            }
+        }
+
+        ShowTreeSelection(vm, server);
     }
 
     /// <summary>
@@ -1094,6 +1178,14 @@ public partial class MainWindow
 
     private void OnTreeViewDragMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        // Asked before TryStartDrag, not after: TryStartDrag marks the drag in progress as it
+        // returns, and it refuses every later gesture while that flag is set, so a bail-out
+        // between the two would leave the tree unable to start a drag at all.
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
         bool hasDisallowedModifiers =
             (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None;
         if (!_treeState.TryStartDrag(
@@ -1111,7 +1203,9 @@ public partial class MainWindow
         ExecuteTreeDrag(
             _treeState,
             sourceContainer,
-            sourceServer,
+            new TreeServerDragPayload(
+                sourceServer,
+                vm.ServerList.ResolveDragSelection(sourceServer)),
             static (container, data) =>
                 DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
     }
@@ -1119,15 +1213,15 @@ public partial class MainWindow
     internal static void ExecuteTreeDrag(
         TreeInteractionState treeState,
         TreeViewItem sourceContainer,
-        ServerItemViewModel sourceServer,
+        TreeServerDragPayload payload,
         Action<TreeViewItem, System.Windows.DataObject> executeDrag)
     {
         ArgumentNullException.ThrowIfNull(treeState);
         ArgumentNullException.ThrowIfNull(sourceContainer);
-        ArgumentNullException.ThrowIfNull(sourceServer);
+        ArgumentNullException.ThrowIfNull(payload);
         ArgumentNullException.ThrowIfNull(executeDrag);
 
-        System.Windows.DataObject data = new("HeimdallServer", sourceServer);
+        System.Windows.DataObject data = new(TreeServerDragPayload.DataFormat, payload);
         try
         {
             executeDrag(sourceContainer, data);
@@ -1136,6 +1230,19 @@ public partial class MainWindow
         {
             treeState.ResetDrag();
         }
+    }
+
+    /// <summary>
+    /// Reads the session payload out of a drag, when the drag is one of ours.
+    /// </summary>
+    private static bool TryGetTreeDragPayload(
+        System.Windows.IDataObject data,
+        [NotNullWhen(true)] out TreeServerDragPayload? payload)
+    {
+        payload = data.GetDataPresent(TreeServerDragPayload.DataFormat)
+            ? data.GetData(TreeServerDragPayload.DataFormat) as TreeServerDragPayload
+            : null;
+        return payload is not null;
     }
 
     private void ShowTreeSelection(MainViewModel vm, ServerItemViewModel? server)
@@ -1206,8 +1313,7 @@ public partial class MainWindow
     {
         e.Effects = System.Windows.DragDropEffects.None;
 
-        if (!e.Data.GetDataPresent("HeimdallServer")
-            || e.Data.GetData("HeimdallServer") is not ServerItemViewModel serverItem
+        if (!TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload)
             || DataContext is not MainViewModel vm)
         {
             ClearDropHighlight();
@@ -1218,7 +1324,8 @@ public partial class MainWindow
         ClearDropHighlight();
 
         var resolved = TryResolveTreeGroupDropTarget(sender, e, vm, out var targetContainer, out var targetGroup, out _);
-        var allowed = resolved && IsAllowedTreeGroupDrop(vm.ServerList, serverItem, targetGroup);
+        var allowed = resolved
+            && vm.ServerList.IsBulkMoveTargetEnabled(payload.Servers, targetGroup);
 
         if (!resolved || !allowed)
         {
@@ -1246,33 +1353,39 @@ public partial class MainWindow
     {
         ClearDropHighlight();
 
-        if (!e.Data.GetDataPresent("HeimdallServer"))
-        {
-            return;
-        }
-
-        if (e.Data.GetData("HeimdallServer") is not ServerItemViewModel serverItem
+        if (!TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload)
             || DataContext is not MainViewModel vm)
         {
             return;
         }
 
         var resolved = TryResolveTreeGroupDropTarget(sender, e, vm, out _, out var targetGroup, out var targetDisplayName);
-        var allowed = resolved && IsAllowedTreeGroupDrop(vm.ServerList, serverItem, targetGroup);
+        var allowed = resolved
+            && vm.ServerList.IsBulkMoveTargetEnabled(payload.Servers, targetGroup);
 
         if (!resolved || !allowed)
         {
             return;
         }
 
-        var moved = await vm.ServerList.MoveServerToGroupAsync(serverItem, targetGroup);
-        if (moved)
+        int moved = await vm.ServerList.MoveServersToGroupAsync(payload.Servers, targetGroup);
+        if (moved <= 0)
         {
-            vm.StatusText = string.Format(
-                vm.Localize("StatusMovedToGroup"),
-                serverItem.DisplayName,
-                targetDisplayName);
+            return;
         }
+
+        // The single-session wording is kept for a drag that carried one row, so the message a
+        // one-row drag has always produced is unchanged; the count is only spelled out when there
+        // was a set to lose track of.
+        vm.StatusText = payload.Servers.Count == 1
+            ? string.Format(
+                vm.Localize("StatusMovedToGroup"),
+                payload.Servers[0].DisplayName,
+                targetDisplayName)
+            : string.Format(
+                vm.Localize("StatusMovedSessionsToGroup"),
+                moved,
+                targetDisplayName);
     }
 
     private bool TryResolveTreeGroupDropTarget(
@@ -1309,23 +1422,6 @@ public partial class MainWindow
         }
 
         return true;
-    }
-
-    private static bool IsAllowedTreeGroupDrop(
-        ServerListViewModel serverList,
-        ServerItemViewModel server,
-        string? targetGroup)
-    {
-        var normalizedTarget = NormalizeGroupTargetKey(targetGroup);
-        var normalizedCurrent = NormalizeGroupTargetKey(server.Group);
-        return !string.Equals(normalizedCurrent, normalizedTarget, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string NormalizeGroupTargetKey(string? groupPath)
-    {
-        return string.IsNullOrWhiteSpace(groupPath)
-            ? string.Empty
-            : groupPath.Replace('\\', '/');
     }
 
     private static TreeViewItem? FindAncestorFolderTreeViewItem(DependencyObject? current)
