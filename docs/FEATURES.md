@@ -206,7 +206,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Deferred state machine cleanup**: reconnect releases old tunnel/state only after new connection succeeds or definitively fails
 - **Merge feedback**: status bar message when a busy tool blocks a merge operation
 - Command Palette renders as a WPF `Popup` (own HWND) above RDP/VNC ActiveX surfaces
-- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/group, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog), and **bulk edit SSH gateway** (credential-free, four explicit outcomes - preserve / force direct / inherit / specific - skipping protocols that do not support gateways)
+- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/folder, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog), and **bulk edit SSH gateway** (credential-free, four explicit outcomes - preserve / force direct / inherit / specific - skipping protocols that do not support gateways)
 - **Inline rename**: F2 or Ctrl+E renames sessions and folders directly in the tree, without opening a dialog, and stays correct under virtualization
 - **Structured tree filters**: filter the session tree by protocol/type, favorite, and connected state, combined with the debounced text search through one versioned pass over stable nodes; a colored dot on the filter button signals an active filter
 - **Virtualized session tree**: recycling virtualization keeps the tree smooth at thousands of sessions and "Expand all" no longer freezes; long names show in full with an automatic horizontal scrollbar when they exceed the pane, and search now expands folders that contain a match and highlights the matched text
@@ -225,11 +225,11 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - 19 themed control styles with complete hover/pressed/focused/disabled states
 - 5 terminal color schemes: Dracula, Solarized Dark, Monokai, Nord, Default - Dracula also applied to Notes Milkdown editor
 - Configurable terminal font family and size
-- Settings panel with 6 left-navigation sub-tabs (General, Terminal, SSH & SFTP, RDP, Security, Advanced); the RDP sub-tab now exposes the previously hidden `RdpResolutionPresets` array as an editable multi-line list and the `RdpDialogAdvancedDefault` flag as a checkbox. The RDP and `SSH & SFTP` sub-tabs each group their options behind a segmented control - RDP into Display & Audio / Devices / Performance / Behavior, `SSH & SFTP` into Connection / Session / SFTP & X11 / Host keys / Gateways
+- Settings panel with 6 left-navigation sub-tabs (General, Terminal, SSH & SFTP, RDP, Security, Advanced); the RDP sub-tab now exposes the previously hidden `RdpResolutionPresets` array as an editable multi-line list and the `RdpDialogAdvancedDefault` flag as a checkbox. The RDP and `SSH & SFTP` sub-tabs each gather their options behind a segmented control - RDP into Display & Audio / Devices / Performance / Behavior, `SSH & SFTP` into Connection / Session / SFTP & X11 / Host keys / Gateways
 - Server Dialog: a two-step flow - protocol card selection, then a **four-tab editor** (General / Options / Network / Info) with a persistent protocol badge in the header, per-tab error badges, per-protocol tab visibility, and validation focus that jumps to the first invalid field across tabs. The window is freely resizable with native mouse-wheel scrolling. The RDP Options tab keeps a four-chip mini-toc (Display / Audio / Devices / Performance); its Display section offers a `Common resolutions` ComboBox to pre-fill Width/Height in Fixed mode and a dedicated `Enable multi-monitor` toggle
 - TreeView hierarchy: Folder > Server, with nested folders, category-colored tool icons and status dots
 - Command Palette (Ctrl+K): protocol icons, status dots, endpoint hints, Ctrl+Enter for split
-- Connection inheritance: group-level defaults for gateway, SSH username, key path
+- Connection inheritance: folder-level defaults for gateway, SSH username, key path
 - Empty states: tool views show guidance before first query, welcome panel with import CTA
 - Built-in help button ("?") on all 58 tools with localized usage instructions
 - Tab busy indicator: pulsing accent dot on tabs during long-running tool operations

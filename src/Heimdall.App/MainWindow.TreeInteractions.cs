@@ -34,7 +34,7 @@ namespace Heimdall.App;
 /// right-click pre-selection, keyboard context menu, and drag-drop between
 /// folders or to the no-group root target. Transient state lives in the <c>_treeState</c> field
 /// (<see cref="TreeInteractionState"/>) and, for the selection warm-up alone, in
-/// <c>_dnsWarmupGate</c>; this file only contains the WPF
+/// <c>_dnsWarmupGate</c> and <c>_dnsWarmupCancellation</c>; this file only contains the WPF
 /// event handlers that mutate that state and poke the named XAML elements
 /// (<c>SessionTreeView</c>, <c>SessionTreeNoGroupDropZone</c>,
 /// <c>SessionDetailPanel</c>, <c>ToolDetailPanel</c>, <c>Mw_Detail*</c>,
@@ -43,6 +43,7 @@ namespace Heimdall.App;
 public partial class MainWindow
 {
     private readonly DnsWarmupGate _dnsWarmupGate = new();
+    private readonly DnsWarmupCancellation _dnsWarmupCancellation = new();
     private IInlineRenameNode? _inlineRenameNode;
     private bool _inlineRenameCommitInProgress;
 
@@ -1273,30 +1274,98 @@ public partial class MainWindow
 
     private void WarmDns(ServerItemViewModel server)
     {
-        if (!_dnsWarmupGate.ShouldWarm(server.RemoteServer))
+        if (!TryBeginDnsWarmup(
+                _dnsWarmupGate,
+                _dnsWarmupCancellation,
+                server.RemoteServer,
+                out CancellationToken cancellationToken))
         {
             return;
         }
 
-        _ = WarmDnsAsync(server.RemoteServer);
+        _ = WarmDnsAsync(server.RemoteServer, cancellationToken);
     }
 
     /// <summary>
-    /// Best-effort DNS cache pre-warm so a later connect resolves faster. Hosts
-    /// reachable only through a gateway will not resolve here; that is expected
-    /// and handled (logged at Debug) rather than left as an unobserved task
-    /// exception.
+    /// Decides whether showing a selection starts a lookup, and hands the lookup it starts the
+    /// token the next warm-up will cancel.
     /// </summary>
-    private static async System.Threading.Tasks.Task WarmDnsAsync(string host)
+    /// <remarks>
+    /// The gate and the cancellation answer two different questions and both are needed: the gate
+    /// asks whether this host is already warmed, the cancellation asks whether a lookup is still
+    /// wanted. The cancellation is taken behind the gate and never in front of it, because a show
+    /// that warms nothing - a folder row, a right-click on the row already warmed - must leave the
+    /// lookup the user is actually waiting on running.
+    /// </remarks>
+    /// <param name="gate">Remembers the host that was last warmed.</param>
+    /// <param name="cancellation">Owns the token of the warm-up in flight.</param>
+    /// <param name="host">The host of the session being shown.</param>
+    /// <param name="cancellationToken">The token the lookup about to start must be given.</param>
+    /// <returns><see langword="true"/> when the caller must resolve <paramref name="host"/>.</returns>
+    internal static bool TryBeginDnsWarmup(
+        DnsWarmupGate gate,
+        DnsWarmupCancellation cancellation,
+        string? host,
+        out CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(gate);
+        ArgumentNullException.ThrowIfNull(cancellation);
+
+        if (!gate.ShouldWarm(host))
+        {
+            cancellationToken = CancellationToken.None;
+            return false;
+        }
+
+        cancellationToken = cancellation.Begin();
+        return true;
+    }
+
+    /// <summary>
+    /// Best-effort DNS cache pre-warm so a later connect resolves faster.
+    /// </summary>
+    private static Task WarmDnsAsync(string host, CancellationToken cancellationToken)
+        => WarmDnsAsync(
+            host,
+            System.Net.Dns.GetHostEntryAsync,
+            Heimdall.Core.Logging.FileLogger.Debug,
+            cancellationToken);
+
+    /// <summary>
+    /// Runs one pre-warm, keeping the two outcomes that are not failures out of the log.
+    /// </summary>
+    /// <remarks>
+    /// Hosts reachable only through a gateway will not resolve here; that is expected and logged
+    /// at Debug rather than left as an unobserved task exception. A cancelled lookup is not even
+    /// that: an arrow-key scan abandons a row the instant the next one is shown, so cancellation
+    /// is what ordinary navigation looks like, and reporting it would bury the gateway case under
+    /// one line per row travelled.
+    /// </remarks>
+    /// <param name="host">The host to resolve.</param>
+    /// <param name="resolve">Resolves the host, honouring the cancellation token.</param>
+    /// <param name="log">Records a host that did not resolve.</param>
+    /// <param name="cancellationToken">Cancelled as soon as another session is shown.</param>
+    internal static async Task WarmDnsAsync(
+        string host,
+        Func<string, CancellationToken, Task> resolve,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(resolve);
+        ArgumentNullException.ThrowIfNull(log);
+
         try
         {
-            _ = await System.Net.Dns.GetHostEntryAsync(host).ConfigureAwait(false);
+            await resolve(host, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // The selection moved on before the answer came back. Nothing failed, so nothing is
+            // reported: this is the expected outcome of scanning the list, not an error.
         }
         catch (Exception ex)
         {
-            Heimdall.Core.Logging.FileLogger.Debug(
-                $"WarmDns: '{host}' did not resolve ({ex.GetType().Name}).");
+            log($"WarmDns: '{host}' did not resolve ({ex.GetType().Name}).");
         }
     }
 
@@ -1474,5 +1543,51 @@ internal sealed class DnsWarmupGate
 
         _lastWarmedHost = host;
         return true;
+    }
+}
+
+/// <summary>
+/// Owns the cancellation token of the sessions tree's DNS pre-warm, so that each warm-up abandons
+/// the one before it.
+/// </summary>
+/// <remarks>
+/// Arrow-key navigation shows one selection per row, and every show used to start a lookup nobody
+/// could stop: scanning twenty rows started twenty resolutions and let all twenty run to the end.
+/// A debounce would have needed a delay picked for everyone, and it would have stopped warming the
+/// click-then-connect case the pre-warm exists for. Cancelling costs no delay: a deliberate click
+/// still resolves immediately, while a scan starts and abandons lookups as it goes and only the
+/// row the user rests on completes.
+/// </remarks>
+internal sealed class DnsWarmupCancellation
+{
+    private CancellationTokenSource? _current;
+
+    /// <summary>
+    /// Cancels the warm-up in flight and returns the token of the one that replaces it.
+    /// </summary>
+    /// <returns>The token the lookup about to start must be given.</returns>
+    public CancellationToken Begin()
+    {
+        CancellationTokenSource next = new();
+
+        // Read before publishing: the moment the source is in the field the next Begin owns it and
+        // may dispose it, and reading Token from a disposed source throws.
+        CancellationToken token = next.Token;
+
+        // One atomic swap, so two calls that overlap displace two different sources and no source
+        // is cancelled or disposed twice. The lookup never disposes the source it was given, for
+        // the same reason: a lookup returning at the same instant as the next arrow key would race
+        // the Cancel below, and cancelling a disposed source throws.
+        CancellationTokenSource? previous = Interlocked.Exchange(ref _current, next);
+        if (previous is not null)
+        {
+            // Cancel first, dispose second. Cancel runs the waiting lookup's registered callbacks
+            // to completion before it returns, so a lookup that is already returning is done with
+            // the source by the time it goes away.
+            previous.Cancel();
+            previous.Dispose();
+        }
+
+        return token;
     }
 }
