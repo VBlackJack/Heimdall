@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Heimdall.App.Tests" />
+    <!-- The UI test project needs the same reach: some rules can only be exercised against
+         a live WPF control, and that project is the one with an STA dispatcher. -->
+    <InternalsVisibleTo Include="Heimdall.App.UiTests" />
   </ItemGroup>
 
   <ItemGroup>

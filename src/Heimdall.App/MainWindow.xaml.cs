@@ -1561,6 +1561,19 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.Session.ToggleBroadcastCommand.Execute(null);
         });
 
+        // ── Settings panel ───────────────────────────────────────────
+        // Ctrl+S: save the settings panel (terminal-gated, Settings tab only)
+        RegisterSaveSettingsShortcut(
+            _keyboardShortcutService,
+            IsTerminalFocusedContext,
+            () => GetMainVm()?.IsSettingsTabSelected == true,
+            () =>
+            {
+                CommitPendingEdit(Keyboard.FocusedElement);
+                if (GetMainVm() is { } vm)
+                    TryExecute(vm.Settings.SaveCommand);
+            });
+
         // ── Ctrl+Shift combos (NOT terminal-gated) ───────────────────
         // Ctrl+Shift+S: screenshot active session
         _keyboardShortcutService.Register(Key.S, ModifierKeys.Control | ModifierKeys.Shift, () =>
@@ -1654,6 +1667,72 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             if (GetMainVm() is { } vm)
                 OpenTreeViewKeyboardContextMenu(vm);
         }, canExecute: () => !IsTerminalFocusedContext());
+    }
+
+    /// <summary>
+    /// Registers Ctrl+S on the settings panel's Save.
+    /// </summary>
+    /// <param name="service">Dispatcher the binding is added to.</param>
+    /// <param name="isTerminalFocused">Whether embedded session content owns focus.</param>
+    /// <param name="isSettingsTabSelected">Whether the settings panel is the visible tab.</param>
+    /// <param name="save">Runs the settings panel's Save.</param>
+    /// <remarks>
+    /// <para>
+    /// Both gates decide who owns the keystroke, not merely when saving would be useful. A
+    /// shell binds Ctrl+S itself, so a user typing inside a session keeps it; and the shortcut
+    /// service marks the event handled for any binding whose canExecute passes, so away from
+    /// the settings panel this binding would swallow a key it has nothing to do with.
+    /// </para>
+    /// <para>
+    /// The exact Control mask is what keeps the binding clear of Ctrl+Shift+S (session
+    /// screenshot), which the service matches by modifier equality. A
+    /// <see cref="ModifierKeys.None"/> registration would be laxist there and would also
+    /// claim every bare "s" typed into a settings field.
+    /// </para>
+    /// <para>
+    /// Taken as parameters rather than read from this window so the gates can be exercised
+    /// without one.
+    /// </para>
+    /// </remarks>
+    internal static void RegisterSaveSettingsShortcut(
+        KeyboardShortcutService service,
+        Func<bool> isTerminalFocused,
+        Func<bool> isSettingsTabSelected,
+        Action save)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(isTerminalFocused);
+        ArgumentNullException.ThrowIfNull(isSettingsTabSelected);
+        ArgumentNullException.ThrowIfNull(save);
+
+        service.Register(
+            Key.S,
+            ModifierKeys.Control,
+            save,
+            canExecute: () => !isTerminalFocused() && isSettingsTabSelected());
+    }
+
+    /// <summary>
+    /// Pushes the focused text box's pending edit into its binding source.
+    /// </summary>
+    /// <remarks>
+    /// Clicking Save works without this because the button takes keyboard focus, so the box
+    /// fires LostFocus and commits before the command runs. A keystroke moves no focus, so
+    /// ten settings boxes bound with the default LostFocus trigger would have been saved at
+    /// their pre-edit value - and the dirty flag cleared anyway, so every unsaved-changes
+    /// signal in the shell would then say there was nothing pending. A save gesture that
+    /// drops the field being typed into is worse than no shortcut at all.
+    /// <para>Takes the focused element as a parameter so the rule can be exercised without
+    /// a window.</para>
+    /// </remarks>
+    internal static void CommitPendingEdit(IInputElement? focused)
+    {
+        if (focused is System.Windows.Controls.TextBox box)
+        {
+            System.Windows.Data.BindingOperations
+                .GetBindingExpression(box, System.Windows.Controls.TextBox.TextProperty)
+                ?.UpdateSource();
+        }
     }
 
     /// <summary>

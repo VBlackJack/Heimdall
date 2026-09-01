@@ -2531,8 +2531,8 @@
   "SettingsSshSubTabGateways": "Gateways",
   "ServerDialogProtocolChipChangeTooltip": "Click to change the protocol",
   "SettingsSectionRdpDialog": "Server dialog",
-  "SettingsLabelRdpDialogAdvancedDefault": "Open Server dialog in advanced mode by default",
-  "SettingsLabelRdpDialogAdvancedDefaultHint": "When checked, the server profile dialog opens with the Advanced expander already expanded.",
+  "SettingsLabelRdpDialogAdvancedDefault": "Start with display options expanded",
+  "SettingsLabelRdpDialogAdvancedDefaultHint": "When checked, the \"More display options\" section of a session's RDP settings opens expanded instead of collapsed.",
   "SettingsLabelRdpResolutionPresets": "Resolution presets",
   "SettingsRdpResolutionPresetsHint": "One preset per line, format WIDTHxHEIGHT (e.g. 1920x1080). Invalid lines are ignored.",
   "SettingsRdpResolutionPresetsReset": "Reset to defaults",
@@ -3445,7 +3445,7 @@
   "RdpDisconnectedMessage": "The Remote Desktop session has ended.",
 
   "HelpShortcutsTitle": "Keyboard Shortcuts",
-  "HelpShortcutsContent": "Navigation\n  Ctrl+N\tAdd new server\n  Ctrl+E\tEdit selected server\n  Ctrl+Del\tDelete selected server\n  Ctrl+F\tSearch servers\n  Ctrl+B\tToggle sidebar\n  F11\tToggle fullscreen\n  Ctrl+Shift+F11\tToggle fullscreen over embedded sessions\n\nConnections\n  Ctrl+K\tQuick Connect\n  Enter\tConnect to selected server\n\nSession\n  Ctrl+W\tClose current tab\n  Ctrl+Tab\tNext tab\n  Ctrl+Shift+Tab\tPrevious tab\n  Ctrl+Shift+S\tCapture screenshot\n  Ctrl+Shift+N\tNetwork scanner\n  Ctrl+Shift+O\tToggle split orientation\n  Ctrl+Shift+T\tToggle tools panel\n\nGeneral\n  F1\tShow this help\n  Esc\tExit fullscreen / close palette",
+  "HelpShortcutsContent": "Navigation\n  Ctrl+N\tAdd new server\n  Ctrl+E\tEdit selected server\n  Ctrl+Del\tDelete selected server\n  Ctrl+F\tSearch servers\n  Ctrl+B\tToggle sidebar\n  F11\tToggle fullscreen\n  Ctrl+Shift+F11\tToggle fullscreen over embedded sessions\n\nConnections\n  Ctrl+K\tQuick Connect\n  Enter\tConnect to selected server\n\nSession\n  Ctrl+W\tClose current tab\n  Ctrl+Tab\tNext tab\n  Ctrl+Shift+Tab\tPrevious tab\n  Ctrl+Shift+S\tCapture screenshot\n  Ctrl+Shift+N\tNetwork scanner\n  Ctrl+Shift+O\tToggle split orientation\n  Ctrl+Shift+T\tToggle tools panel\n\nSettings\n  Ctrl+S\tSave settings\n\nGeneral\n  F1\tShow this help\n  Esc\tExit fullscreen / close palette",
 
   "BtnYes": "Yes",
   "BtnNo": "No",

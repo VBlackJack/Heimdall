@@ -20,138 +20,28 @@ namespace Heimdall.App.Tests;
 
 public sealed class ServerDialogAdvancedModePolicyTests
 {
-    /// <summary>
-    /// Conservative defaults — every advanced field at its repo-wide
-    /// default value (UseGlobalDefaults off, AntiIdle off, BitmapCaching
-    /// on, Compression on, AutoReconnect on, AdminMode off, FullScreen
-    /// off). Used as the baseline by the "smart Advanced reset" path.
-    /// </summary>
-    private static ServerDialogAdvancedModePolicy.AdvancedRdpSnapshot DefaultSnapshot() =>
-        new(
-            UseGlobalDefaults: false,
-            AntiIdle: false,
-            BitmapCaching: true,
-            Compression: true,
-            AutoReconnect: true,
-            AdminMode: false,
-            FullScreen: false);
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_DefaultSnapshot_ReturnsFalse()
+    // The advanced surface is RDP-only, and in add mode the dialog has not built it until a
+    // protocol is picked. Applying the preference outside those moments would settle the state
+    // of a control that is not on screen, and in add mode it would do so while the user is
+    // still looking at the protocol chooser.
+    [Theory]
+    [InlineData("RDP", true, false, true)]
+    [InlineData("RDP", false, true, true)]
+    [InlineData("RDP", false, false, false)]
+    [InlineData("SSH", true, true, false)]
+    [InlineData("Telnet", false, true, false)]
+    [InlineData(null, true, true, false)]
+    public void ShouldApplyRdpDefault_OnlyOnceAnRdpFormIsOnScreen(
+        string? connectionType,
+        bool isEditMode,
+        bool isProtocolSelected,
+        bool expected)
     {
-        var snapshot = DefaultSnapshot();
+        bool actual = ServerDialogAdvancedModePolicy.ShouldApplyRdpDefault(
+            connectionType,
+            isEditMode,
+            isProtocolSelected);
 
-        Assert.False(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_UseGlobalDefaultsOn_ReturnsTrue()
-    {
-        var snapshot = DefaultSnapshot() with { UseGlobalDefaults = true };
-
-        Assert.True(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_AntiIdleOn_ReturnsTrue()
-    {
-        var snapshot = DefaultSnapshot() with { AntiIdle = true };
-
-        Assert.True(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_BitmapCachingOff_ReturnsTrue()
-    {
-        var snapshot = DefaultSnapshot() with { BitmapCaching = false };
-
-        Assert.True(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_CompressionOff_ReturnsTrue()
-    {
-        var snapshot = DefaultSnapshot() with { Compression = false };
-
-        Assert.True(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_AutoReconnectOff_ReturnsTrue()
-    {
-        var snapshot = DefaultSnapshot() with { AutoReconnect = false };
-
-        Assert.True(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_AdminModeOn_ReturnsTrue()
-    {
-        var snapshot = DefaultSnapshot() with { AdminMode = true };
-
-        Assert.True(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void IsAdvancedRdpCustomized_FullScreenOn_ReturnsTrue()
-    {
-        var snapshot = DefaultSnapshot() with { FullScreen = true };
-
-        Assert.True(ServerDialogAdvancedModePolicy.IsAdvancedRdpCustomized(snapshot));
-    }
-
-    [Fact]
-    public void ResolveAdvancedDefault_PersistedFalse_AlwaysReturnsFalse()
-    {
-        Assert.False(ServerDialogAdvancedModePolicy.ResolveAdvancedDefault(
-            persistedDefault: false,
-            isEditMode: false,
-            DefaultSnapshot()));
-
-        Assert.False(ServerDialogAdvancedModePolicy.ResolveAdvancedDefault(
-            persistedDefault: false,
-            isEditMode: true,
-            DefaultSnapshot() with { AdminMode = true }));
-    }
-
-    [Fact]
-    public void ResolveAdvancedDefault_AddMode_HonoursPersistedDefaultRegardlessOfSnapshot()
-    {
-        // In add mode (new profile) the snapshot is the default factory state;
-        // persisted=true should always open in advanced mode for a fresh profile.
-        Assert.True(ServerDialogAdvancedModePolicy.ResolveAdvancedDefault(
-            persistedDefault: true,
-            isEditMode: false,
-            DefaultSnapshot()));
-
-        Assert.True(ServerDialogAdvancedModePolicy.ResolveAdvancedDefault(
-            persistedDefault: true,
-            isEditMode: false,
-            DefaultSnapshot() with { AdminMode = true }));
-    }
-
-    [Fact]
-    public void ResolveAdvancedDefault_EditMode_AutoCollapsesWhenSnapshotIsDefault()
-    {
-        // The whole point of RDP-PROF-09: an existing profile with no
-        // advanced customizations should re-open with Advanced collapsed
-        // even when the global preference is "open in advanced mode".
-        var resolved = ServerDialogAdvancedModePolicy.ResolveAdvancedDefault(
-            persistedDefault: true,
-            isEditMode: true,
-            DefaultSnapshot());
-
-        Assert.False(resolved);
-    }
-
-    [Fact]
-    public void ResolveAdvancedDefault_EditMode_HonoursPersistedDefaultWhenSnapshotIsCustomized()
-    {
-        var resolved = ServerDialogAdvancedModePolicy.ResolveAdvancedDefault(
-            persistedDefault: true,
-            isEditMode: true,
-            DefaultSnapshot() with { AdminMode = true });
-
-        Assert.True(resolved);
+        Assert.Equal(expected, actual);
     }
 }

@@ -147,7 +147,6 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     private bool _isAdvancedMode;
 
-    internal bool IsApplyingRdpDialogAdvancedDefault { get; private set; }
 
     internal void ApplyRdpDialogAdvancedDefault(bool advancedDefault)
     {
@@ -1361,7 +1360,12 @@ public partial class ServerDialogViewModel : ObservableValidator
     public bool IsMultimonAvailable =>
         IsRdpConnection && RdpDisplayCapabilities.IsMultimonAvailable(_screenCount);
 
-    public bool IsAdvancedResolutionExpanded =>
+    /// <summary>
+    /// Whether the profile cannot be read with the Advanced expander closed: outside Auto every
+    /// resolution field lives inside it, so a collapsed expander would say nothing at all about
+    /// the resolution the profile is configured with.
+    /// </summary>
+    public bool RequiresAdvancedMode =>
         IsRdpConnection && RdpResolutionMode != RdpResolutionMode.Auto;
 
     public bool CanSwitchToAuto =>
@@ -1875,7 +1879,6 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         OnPropertyChanged(nameof(IsAutoResolutionMode));
         OnPropertyChanged(nameof(IsMultimonAvailable));
-        OnPropertyChanged(nameof(IsAdvancedResolutionExpanded));
         OnPropertyChanged(nameof(CanSwitchToAuto));
         OnPropertyChanged(nameof(ShowRdpFixedResolutionFields));
         OnPropertyChanged(nameof(ShowRdpInitialSmartSizing));
@@ -2382,6 +2385,11 @@ public partial class ServerDialogViewModel : ObservableValidator
         RaiseTestCommandCanExecuteChanged();
     }
 
+    /// <summary>
+    /// Settles the Advanced expander once, as soon as the dialog knows both the protocol and the
+    /// stored preference. The preference is taken at its word; the dialog never re-decides
+    /// whether a given profile has earned it.
+    /// </summary>
     private void TryApplyRdpDialogAdvancedDefault()
     {
         if (_hasAppliedRdpDialogAdvancedDefault
@@ -2391,29 +2399,15 @@ public partial class ServerDialogViewModel : ObservableValidator
             return;
         }
 
-        ServerDialogAdvancedModePolicy.AdvancedRdpSnapshot snapshot = new ServerDialogAdvancedModePolicy.AdvancedRdpSnapshot(
-            UseGlobalDefaults: RdpUseGlobalDefaults,
-            AntiIdle: RdpAntiIdle,
-            BitmapCaching: RdpBitmapCaching,
-            Compression: RdpCompression,
-            AutoReconnect: RdpAutoReconnect,
-            AdminMode: RdpAdminMode,
-            FullScreen: RdpFullScreen);
-
-        bool resolved = ServerDialogAdvancedModePolicy.ResolveAdvancedDefault(
-            _rdpDialogAdvancedDefault.Value,
-            IsEditMode,
-            snapshot);
-
-        IsApplyingRdpDialogAdvancedDefault = true;
+        // Hydration is not the user reaching for the toggle. Without this flag the dialog writes
+        // the value it has just read straight back over the setting it came from.
         try
         {
-            IsAdvancedMode = resolved;
+            IsAdvancedMode = _rdpDialogAdvancedDefault.Value || RequiresAdvancedMode;
             _hasAppliedRdpDialogAdvancedDefault = true;
         }
         finally
         {
-            IsApplyingRdpDialogAdvancedDefault = false;
         }
     }
 

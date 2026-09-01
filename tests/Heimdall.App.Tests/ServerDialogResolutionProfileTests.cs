@@ -70,7 +70,7 @@ public sealed class ServerDialogResolutionProfileTests
     [InlineData(RdpResolutionMode.FitWindow, true)]
     [InlineData(RdpResolutionMode.SmartSizing, true)]
     [InlineData(RdpResolutionMode.Multimon, true)]
-    public void IsAdvancedResolutionExpanded_FalseOnlyForAuto(RdpResolutionMode mode, bool expected)
+    public void RequiresAdvancedMode_FalseOnlyForAuto(RdpResolutionMode mode, bool expected)
     {
         var vm = new ServerDialogViewModel
         {
@@ -78,7 +78,7 @@ public sealed class ServerDialogResolutionProfileTests
             RdpResolutionMode = mode
         };
 
-        Assert.Equal(expected, vm.IsAdvancedResolutionExpanded);
+        Assert.Equal(expected, vm.RequiresAdvancedMode);
     }
 
     [Theory]
@@ -124,7 +124,7 @@ public sealed class ServerDialogResolutionProfileTests
         };
 
         Assert.False(vm.IsAutoResolutionMode);
-        Assert.False(vm.IsAdvancedResolutionExpanded);
+        Assert.False(vm.RequiresAdvancedMode);
         Assert.False(vm.CanSwitchToAuto);
     }
 

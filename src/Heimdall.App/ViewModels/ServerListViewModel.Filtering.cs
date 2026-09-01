@@ -30,6 +30,20 @@ public partial class ServerListViewModel
         new(StringComparer.OrdinalIgnoreCase);
     private List<ServerItemViewModel> _stableServerOrder = [];
 
+    /// <summary>
+    /// Set while a filter pass drives <see cref="FolderViewModel.IsExpanded"/> itself, so the
+    /// expand-state handler can tell a branch the filter opened from one the user toggled.
+    /// </summary>
+    private bool _applyingFilterExpansion;
+
+    /// <summary>
+    /// Branches the user closed by hand while a filter was on screen. Later passes of the same
+    /// filter leave them closed instead of reopening them under the user's fingers; clearing the
+    /// filter discards the set along with the rest of the filter-time expansion.
+    /// </summary>
+    private readonly HashSet<string> _filterCollapsedFolders =
+        new(StringComparer.OrdinalIgnoreCase);
+
     public ObservableCollection<ProtocolFilterOptionViewModel> ProtocolFilters { get; } = [];
 
     [ObservableProperty]
@@ -204,14 +218,32 @@ public partial class ServerListViewModel
         var matches = new HashSet<ServerItemViewModel>(
             filteredServers,
             ReferenceEqualityComparer.Instance);
+        bool wasFilterActive = AppliedFilterSpec.IsActive;
         var visibleRootFolders = new List<FolderViewModel>(_stableTreeRoot.Children.Count);
-        foreach (StableFolderNode child in _stableTreeRoot.Children)
+        _applyingFilterExpansion = true;
+        try
         {
-            int descendantCount = ApplyFolderMembership(child, matches, spec.IsActive);
-            if (!spec.IsActive || descendantCount > 0)
+            foreach (StableFolderNode child in _stableTreeRoot.Children)
             {
-                visibleRootFolders.Add(child.ViewModel!);
+                int descendantCount = ApplyFolderMembership(child, matches, spec.IsActive);
+                if (!spec.IsActive || descendantCount > 0)
+                {
+                    visibleRootFolders.Add(child.ViewModel!);
+                }
             }
+
+            if (!spec.IsActive)
+            {
+                _filterCollapsedFolders.Clear();
+                if (wasFilterActive)
+                {
+                    RestoreUserExpansionState();
+                }
+            }
+        }
+        finally
+        {
+            _applyingFilterExpansion = false;
         }
 
         SynchronizeCollection(GroupedServers, visibleRootFolders);
@@ -235,7 +267,7 @@ public partial class ServerListViewModel
         !_disposed
         && version == System.Threading.Volatile.Read(ref _searchFilterVersion);
 
-    private static int ApplyFolderMembership(
+    private int ApplyFolderMembership(
         StableFolderNode node,
         HashSet<ServerItemViewModel> matches,
         bool filterActive)
@@ -256,8 +288,36 @@ public partial class ServerListViewModel
             }
         }
 
-        node.ViewModel!.SynchronizeVisibleChildren(visibleFolders, visibleServers);
+        FolderViewModel viewModel = node.ViewModel!;
+        viewModel.SynchronizeVisibleChildren(visibleFolders, visibleServers);
+
+        // A branch that survives the filter holds a match, and a match inside a closed branch is
+        // a result the user is told about but cannot see. Opening every surviving branch needs no
+        // ceiling: whatever the inventory size, a filter only ever leaves its own results standing.
+        if (filterActive
+            && descendantCount > 0
+            && !_filterCollapsedFolders.Contains(viewModel.ExpansionKey))
+        {
+            viewModel.IsExpanded = true;
+        }
+
         return descendantCount;
+    }
+
+    /// <summary>
+    /// Puts every branch back to the arrangement the user last chose with no filter on screen.
+    /// </summary>
+    /// <remarks>
+    /// Filter-time expansion never reaches the persisted expand-state set, so that set still holds
+    /// the arrangement the filter interrupted and is the only thing worth restoring from.
+    /// </remarks>
+    private void RestoreUserExpansionState()
+    {
+        foreach (StableFolderNode node in EnumerateStableFolders(_stableTreeRoot))
+        {
+            FolderViewModel folder = node.ViewModel!;
+            folder.IsExpanded = _expandedNodes.Contains(folder.ExpansionKey);
+        }
     }
 
     /// <summary>
