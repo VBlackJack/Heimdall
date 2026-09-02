@@ -35,6 +35,16 @@ public static class CredentialManagerHelper
     internal const string DomainCredentialOwnershipPrefix = "Heimdall:RDP:";
     internal const int ErrorNotFound = 1168;
     private const int ErrorInvalidData = 13;
+    private const char OwnershipMarkerFieldSeparator = ':';
+    private const int OwnershipMarkerFieldCount = 3;
+
+    /// <summary>
+    /// Window during which a marker written by this process still describes a launch that
+    /// may not have read the credential yet. Above the 60 s ceiling the settings schema
+    /// allows for the RDP artifact cleanup delay, so a launch whose deferred cleanup is
+    /// still pending is never mistaken for an abandoned entry.
+    /// </summary>
+    internal static readonly TimeSpan LiveLaunchMarkerWindow = TimeSpan.FromSeconds(90);
 
     #endregion
 
@@ -96,18 +106,74 @@ public static class CredentialManagerHelper
     #endregion
 
     /// <summary>
-    /// Creates a per-launch marker used to prove ownership of an RDP credential.
+    /// Creates a per-launch marker used to prove ownership of an RDP credential. The marker
+    /// carries the writing process and the instant of the write so a later launch can tell
+    /// an abandoned Heimdall entry from one a launch still in flight depends on.
     /// </summary>
     public static string CreateDomainCredentialOwnershipMarker()
     {
-        return $"{DomainCredentialOwnershipPrefix}{Guid.NewGuid():N}";
+        return CreateDomainCredentialOwnershipMarker(Environment.ProcessId, DateTime.UtcNow);
+    }
+
+    internal static string CreateDomainCredentialOwnershipMarker(int processId, DateTime utcNow)
+    {
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{DomainCredentialOwnershipPrefix}{processId}{OwnershipMarkerFieldSeparator}{utcNow.Ticks}{OwnershipMarkerFieldSeparator}{Guid.NewGuid():N}");
+    }
+
+    /// <summary>
+    /// Decides whether a stored ownership marker still describes a launch of this very
+    /// process that may not have consumed the credential yet. Markers written by another
+    /// process - including an earlier, crashed Heimdall - and markers in the pre-existing
+    /// single-field format are reported as reclaimable, which preserves the previous
+    /// behaviour for every case except two overlapping launches of the running instance.
+    /// </summary>
+    internal static bool IsLiveLaunchMarker(string? marker, int currentProcessId, DateTime utcNow)
+    {
+        if (marker is null ||
+            !marker.StartsWith(DomainCredentialOwnershipPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string[] fields = marker[DomainCredentialOwnershipPrefix.Length..]
+            .Split(OwnershipMarkerFieldSeparator);
+        if (fields.Length != OwnershipMarkerFieldCount)
+        {
+            return false;
+        }
+
+        if (!int.TryParse(
+                fields[0],
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out int processId) ||
+            processId != currentProcessId)
+        {
+            return false;
+        }
+
+        if (!long.TryParse(
+                fields[1],
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out long ticks) ||
+            ticks < 0 ||
+            ticks > DateTime.MaxValue.Ticks)
+        {
+            return false;
+        }
+
+        TimeSpan age = utcNow - new DateTime(ticks, DateTimeKind.Utc);
+        return age >= TimeSpan.Zero && age < LiveLaunchMarkerWindow;
     }
 
     /// <summary>
     /// Stores a DOMAIN_PASSWORD credential (CRED_TYPE=2) recognized by mstsc.exe / RDP
     /// only when the target is absent or already carries a Heimdall ownership marker.
     /// Target must follow the TERMSRV/host format for RDP auto-login.
-    /// Persist is set to Session — credential lives only until logoff and is cleaned
+    /// Persist is set to Session - credential lives only until logoff and is cleaned
     /// up by the caller after the RDP session launches (defense-in-depth).
     /// </summary>
     public static bool WriteDomainCredential(
@@ -163,6 +229,31 @@ public static class CredentialManagerHelper
         out bool credentialWritten,
         out string? error)
     {
+        return WriteDomainCredential(
+            targetName,
+            username,
+            password,
+            ownershipMarker,
+            probeCredential,
+            writeCredential,
+            Environment.ProcessId,
+            DateTime.UtcNow,
+            out credentialWritten,
+            out error);
+    }
+
+    internal static bool WriteDomainCredential(
+        string targetName,
+        string username,
+        string password,
+        string ownershipMarker,
+        Func<string, string, CredentialProbeResult> probeCredential,
+        CredentialWriteOperation writeCredential,
+        int currentProcessId,
+        DateTime utcNow,
+        out bool credentialWritten,
+        out string? error)
+    {
         credentialWritten = false;
         error = null;
 
@@ -191,6 +282,14 @@ public static class CredentialManagerHelper
 
         if (probe.Exists && !probe.MarkerMatches)
         {
+            return true;
+        }
+
+        if (probe.Exists && IsLiveLaunchMarker(probe.Comment, currentProcessId, utcNow))
+        {
+            // The entry belongs to a launch of this process that may not have read it yet.
+            // Overwriting it would hand that session this profile's account instead of its
+            // own, so treat it exactly like a foreign entry and leave it in place.
             return true;
         }
 
@@ -274,7 +373,8 @@ public static class CredentialManagerHelper
         bool Success,
         bool Exists,
         bool MarkerMatches,
-        string? Error);
+        string? Error,
+        string? Comment = null);
 
     internal readonly record struct CredentialDeleteResult(bool Success, int ErrorCode);
 
@@ -315,7 +415,7 @@ public static class CredentialManagerHelper
             bool markerMatches = exactMarker
                 ? string.Equals(comment, marker, StringComparison.Ordinal)
                 : comment?.StartsWith(marker, StringComparison.Ordinal) == true;
-            return new CredentialProbeResult(true, true, markerMatches, null);
+            return new CredentialProbeResult(true, true, markerMatches, null, comment);
         }
         finally
         {

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
 using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -26,6 +27,12 @@ namespace Heimdall.App.Tests;
 
 public sealed class RdpHandlerTests
 {
+    /// <summary>Budget for observing a detached autofill task reach - or not reach - its fake.</summary>
+    private static readonly TimeSpan AutofillObservationBudget = TimeSpan.FromSeconds(5);
+
+    /// <summary>Budget for observing the deferred cleanup task run - or stay put.</summary>
+    private static readonly TimeSpan CleanupObservationBudget = TimeSpan.FromSeconds(5);
+
     [Fact]
     public async Task ConnectAsync_ForceEmbeddedUsesEmbeddedPathWithoutMutatingProfile()
     {
@@ -192,13 +199,16 @@ public sealed class RdpHandlerTests
         LocalizationManager localizer = new LocalizationManager();
         await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
         int autofillCalls = 0;
+        TaskCompletionSource autofillEntered =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         RdpHandler handler = CreateHandler(
             launcher,
             credentialManager,
             localizer,
             (_, _, _, _, _) =>
             {
-                autofillCalls++;
+                Interlocked.Increment(ref autofillCalls);
+                autofillEntered.TrySetResult();
                 return Task.FromResult(true);
             });
         ServerProfileDto server = CreateCredentialedServer();
@@ -222,9 +232,162 @@ public sealed class RdpHandlerTests
         Assert.Equal(0, credentialManager.DeleteCalls);
         Assert.Equal(1, launcher.LaunchCalls);
 
-        await Task.Delay(100);
+        // Assert-absence. Its positive control is
+        // ConnectAsync_OwnCredential_InvokesTheAutofillDelegate, which proves this very
+        // fake is reached well inside the same budget when the credential is Heimdall's.
+        Task settled = await Task.WhenAny(autofillEntered.Task, Task.Delay(AutofillObservationBudget));
 
-        Assert.Equal(0, autofillCalls);
+        Assert.NotSame(autofillEntered.Task, settled);
+        Assert.Equal(0, Volatile.Read(ref autofillCalls));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_OwnCredential_InvokesTheAutofillDelegate()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        int autofillCalls = 0;
+        TaskCompletionSource autofillEntered =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            (_, _, _, _, _) =>
+            {
+                Interlocked.Increment(ref autofillCalls);
+                autofillEntered.TrySetResult();
+                return Task.FromResult(true);
+            });
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+
+        await autofillEntered.Task.WaitAsync(AutofillObservationBudget);
+
+        Assert.Equal(1, Volatile.Read(ref autofillCalls));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ExternalClientExits_CancelsTheAutofillWatcher()
+    {
+        FakeLaunchedRdpClientProcess process = new FakeLaunchedRdpClientProcess(4242);
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = process
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        CancellationToken observedToken = default;
+        TaskCompletionSource autofillEntered =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            async (_, _, _, _, token) =>
+            {
+                observedToken = token;
+                autofillEntered.TrySetResult();
+                // Model the real watcher: it polls until its own deadline and only stops
+                // early when the token it was handed is cancelled.
+                await Task.Delay(Timeout.Infinite, token);
+                return true;
+            });
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 90000
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        await autofillEntered.Task.WaitAsync(AutofillObservationBudget);
+
+        process.RaiseExited();
+
+        Assert.True(
+            await WaitForCancellationAsync(observedToken, AutofillObservationBudget),
+            "The autofill watcher kept a token that the external client's exit cannot cancel.");
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ConnectTokenCancelledAfterLaunch_DoesNotBringCleanupForward()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        RdpHandler handler = CreateHandler(launcher, credentialManager, new LocalizationManager());
+        ServerProfileDto server = CreateCredentialedServer();
+        using CancellationTokenSource connectCancellation = new CancellationTokenSource();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        try
+        {
+            ConnectionResult result = await handler.ConnectAsync(
+                server,
+                settings,
+                connectCancellation.Token,
+                RdpModeOverride.ForceExternal);
+
+            Assert.True(result.Success);
+
+            // The command's own CTS is cancelled as soon as the user launches anything else.
+            connectCancellation.Cancel();
+
+            // Assert-absence. Its positive control is
+            // ConnectAsync_Success_TransfersCredentialToDelayedCleanup, which proves the
+            // very same cleanup path does fire once the configured delay elapses.
+            Task settled = await Task.WhenAny(
+                credentialManager.DeleteObserved.Task,
+                Task.Delay(CleanupObservationBudget));
+
+            Assert.NotSame(credentialManager.DeleteObserved.Task, settled);
+            Assert.Equal(0, credentialManager.DeleteCalls);
+            Assert.True(File.Exists(launcher.LastRdpFilePath));
+        }
+        finally
+        {
+            // The 60 s cleanup outlives this test: the artifact is ours to remove.
+            if (launcher.LastRdpFilePath is not null && File.Exists(launcher.LastRdpFilePath))
+            {
+                File.Delete(launcher.LastRdpFilePath);
+            }
+        }
     }
 
     [Fact]
@@ -266,9 +429,19 @@ public sealed class RdpHandlerTests
         {
             CredentialWritten = true
         };
-        RdpHandler handler = CreateHandler(launcher, credentialManager, new LocalizationManager());
+        TaskCompletionSource cleanupDelayElapsed =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        TimeSpan? requestedDelay = null;
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            artifactCleanupDelay: delay =>
+            {
+                requestedDelay = delay;
+                return cleanupDelayElapsed.Task;
+            });
         ServerProfileDto server = CreateCredentialedServer();
-        using CancellationTokenSource cleanupCancellation = new CancellationTokenSource();
         AppSettings settings = new AppSettings
         {
             RdpArtifactCleanupDelayMs = 60000,
@@ -278,15 +451,16 @@ public sealed class RdpHandlerTests
         ConnectionResult result = await handler.ConnectAsync(
             server,
             settings,
-            cleanupCancellation.Token,
+            CancellationToken.None,
             RdpModeOverride.ForceExternal);
 
         Assert.True(result.Success);
         Assert.Equal(0, credentialManager.DeleteCalls);
 
-        cleanupCancellation.Cancel();
-        await credentialManager.DeleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cleanupDelayElapsed.SetResult();
+        await credentialManager.DeleteObserved.Task.WaitAsync(CleanupObservationBudget);
 
+        Assert.Equal(TimeSpan.FromMilliseconds(60000), requestedDelay);
         Assert.Equal(1, credentialManager.DeleteCalls);
         Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
     }
@@ -462,6 +636,8 @@ public sealed class RdpHandlerTests
         };
         TaskCompletionSource deleteObserved =
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource cleanupDelayElapsed =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         string? deletedPath = null;
         RdpHandler handler = CreateHandler(
             launcher,
@@ -472,9 +648,9 @@ public sealed class RdpHandlerTests
                 deletedPath = path;
                 File.Delete(path);
                 deleteObserved.TrySetResult();
-            });
+            },
+            artifactCleanupDelay: _ => cleanupDelayElapsed.Task);
         ServerProfileDto server = CreateCredentialedServer();
-        using CancellationTokenSource cleanupCancellation = new CancellationTokenSource();
         AppSettings settings = new AppSettings
         {
             RdpArtifactCleanupDelayMs = 60000,
@@ -484,7 +660,7 @@ public sealed class RdpHandlerTests
         ConnectionResult result = await handler.ConnectAsync(
             server,
             settings,
-            cleanupCancellation.Token,
+            CancellationToken.None,
             RdpModeOverride.ForceExternal);
 
         Assert.True(result.Success);
@@ -493,9 +669,9 @@ public sealed class RdpHandlerTests
         Assert.Null(deletedPath);
         Assert.Equal(0, credentialManager.DeleteCalls);
 
-        cleanupCancellation.Cancel();
-        await deleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await credentialManager.DeleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cleanupDelayElapsed.SetResult();
+        await deleteObserved.Task.WaitAsync(CleanupObservationBudget);
+        await credentialManager.DeleteObserved.Task.WaitAsync(CleanupObservationBudget);
 
         Assert.Equal(launcher.LastRdpFilePath, deletedPath);
         Assert.False(File.Exists(launcher.LastRdpFilePath));
@@ -634,6 +810,160 @@ public sealed class RdpHandlerTests
         Assert.Equal(53389, tunnelService.ReleasedLocalPort);
     }
 
+    [Fact]
+    public void CreateStartInfo_ResolvesMstscUnderTheSystemDirectoryWithAnExplicitWorkingDirectory()
+    {
+        string systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        Assert.False(
+            string.IsNullOrEmpty(systemDirectory),
+            "This assertion documents the precondition: the system directory must be known.");
+
+        ProcessStartInfo startInfo = MstscRdpExternalClientLauncher.CreateStartInfo(
+            @"C:\Temp\heimdall_srv_0.rdp");
+
+        Assert.True(
+            Path.IsPathFullyQualified(startInfo.FileName),
+            $"mstsc.exe must not be resolved through the CreateProcess search order: '{startInfo.FileName}'.");
+        Assert.Equal(
+            Path.Combine(systemDirectory, MstscRdpExternalClientLauncher.MstscExecutableName),
+            startInfo.FileName);
+        Assert.Equal(systemDirectory, startInfo.WorkingDirectory);
+        Assert.False(startInfo.UseShellExecute);
+        Assert.Equal("\"C:\\Temp\\heimdall_srv_0.rdp\"", startInfo.Arguments);
+    }
+
+    [Fact]
+    public void SweepStaleRdpArtifacts_DeletesOnlyTheOrphansOlderThanTheThreshold()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall-sweep-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            DateTime utcNow = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
+            string stale = WriteArtifact(directory, "heimdall_srv_stale.rdp", utcNow.AddHours(-2));
+            string fresh = WriteArtifact(directory, "heimdall_srv_fresh.rdp", utcNow.AddSeconds(-30));
+            string foreign = WriteArtifact(directory, "someone_else.rdp", utcNow.AddHours(-2));
+            string otherKind = WriteArtifact(directory, "heimdall_ssh_pw_old.tmp", utcNow.AddHours(-2));
+            List<string> deleted = [];
+
+            int count = RdpHandler.SweepStaleRdpArtifacts(
+                directory,
+                RdpHandler.StaleRdpArtifactMaxAge,
+                utcNow,
+                path =>
+                {
+                    deleted.Add(path);
+                    File.Delete(path);
+                });
+
+            Assert.Equal(1, count);
+            Assert.Equal([stale], deleted);
+            Assert.False(File.Exists(stale));
+            Assert.True(File.Exists(fresh));
+            Assert.True(File.Exists(foreign));
+            Assert.True(File.Exists(otherKind));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SweepStaleRdpArtifacts_MissingDirectory_ReportsNothingSweptWithoutThrowing()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"heimdall-absent-{Guid.NewGuid():N}");
+        bool deleteCalled = false;
+
+        int count = RdpHandler.SweepStaleRdpArtifacts(
+            directory,
+            RdpHandler.StaleRdpArtifactMaxAge,
+            DateTime.UtcNow,
+            _ => deleteCalled = true);
+
+        Assert.Equal(0, count);
+        Assert.False(deleteCalled);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ForceExternal_SweepsStaleArtifactsBeforeCreatingTheNewOne()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        int sweepCalls = 0;
+        bool artifactExistedAtSweep = true;
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            deleteRdpFile: File.Delete,
+            artifactCleanupDelay: _ => Task.CompletedTask,
+            sweepStaleRdpArtifacts: () =>
+            {
+                sweepCalls++;
+                artifactExistedAtSweep = launcher.LastRdpFilePath is not null;
+            });
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, sweepCalls);
+        Assert.False(artifactExistedAtSweep);
+        Assert.NotNull(launcher.LastRdpFilePath);
+        Assert.Matches(
+            "^heimdall_.*\\.rdp$",
+            Path.GetFileName(launcher.LastRdpFilePath!));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ForceEmbedded_DoesNotSweep()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher();
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager();
+        int sweepCalls = 0;
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            sweepStaleRdpArtifacts: () => sweepCalls++);
+        ServerProfileDto server = CreateCredentialedServer();
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None,
+            RdpModeOverride.ForceEmbedded);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, sweepCalls);
+    }
+
+    private static string WriteArtifact(string directory, string fileName, DateTime lastWriteUtc)
+    {
+        string path = Path.Combine(directory, fileName);
+        File.WriteAllText(path, "full address:s:127.0.0.1");
+        File.SetLastWriteTimeUtc(path, lastWriteUtc);
+        return path;
+    }
+
     [Theory]
     [InlineData("External", RdpModeOverride.UseProfile, "External")]
     [InlineData("Embedded", RdpModeOverride.ForceExternal, "External")]
@@ -680,7 +1010,9 @@ public sealed class RdpHandlerTests
         IRdpCredentialManager credentialManager,
         LocalizationManager localizer,
         RdpCredentialAutofillOperation? credentialAutofill = null,
-        Action<string>? deleteRdpFile = null)
+        Action<string>? deleteRdpFile = null,
+        Func<TimeSpan, Task>? artifactCleanupDelay = null,
+        Action? sweepStaleRdpArtifacts = null)
     {
         return new RdpHandler(
             new PassThroughTunnelService(),
@@ -690,7 +1022,30 @@ public sealed class RdpHandlerTests
             credentialManager: credentialManager,
             decryptPassword: _ => "password",
             credentialAutofill: credentialAutofill,
-            deleteRdpFile: deleteRdpFile);
+            deleteRdpFile: deleteRdpFile,
+            artifactCleanupDelay: artifactCleanupDelay,
+            sweepStaleRdpArtifacts: sweepStaleRdpArtifacts);
+    }
+
+    /// <summary>
+    /// Completes when the token is cancelled. Returns false immediately for a token no
+    /// source can ever cancel, so a watcher wired to CancellationToken.None is reported as
+    /// uncancellable rather than as a slow cancellation.
+    /// </summary>
+    private static async Task<bool> WaitForCancellationAsync(CancellationToken token, TimeSpan budget)
+    {
+        if (!token.CanBeCanceled)
+        {
+            return false;
+        }
+
+        TaskCompletionSource cancelled =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (token.Register(() => cancelled.TrySetResult()))
+        {
+            Task settled = await Task.WhenAny(cancelled.Task, Task.Delay(budget));
+            return ReferenceEquals(settled, cancelled.Task);
+        }
     }
 
     private static ServerProfileDto CreateServer(string rdpMode) =>

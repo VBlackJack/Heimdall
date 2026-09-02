@@ -37,6 +37,31 @@ internal sealed class RdpHandler : IProtocolHandler
     private readonly Func<string?, string?> _decryptPassword;
     private readonly RdpCredentialAutofillOperation _credentialAutofill;
     private readonly Action<string> _deleteRdpFile;
+    private readonly Func<TimeSpan, Task> _artifactCleanupDelay;
+    private readonly Action _sweepStaleRdpArtifacts;
+
+    /// <summary>Prefix of every temporary .rdp artifact this handler creates.</summary>
+    internal const string RdpArtifactFileNamePrefix = "heimdall_";
+
+    /// <summary>Extension of every temporary .rdp artifact this handler creates.</summary>
+    internal const string RdpArtifactFileExtension = ".rdp";
+
+    /// <summary>
+    /// Search pattern for the launch-time sweep. Derived from the same two constants the
+    /// artifact name is built from, so producer and janitor cannot drift apart.
+    /// </summary>
+    internal const string RdpArtifactSearchPattern =
+        RdpArtifactFileNamePrefix + "*" + RdpArtifactFileExtension;
+
+    /// <summary>Upper bound on the number of files one launch-time sweep may examine.</summary>
+    internal const int MaxSweptRdpArtifactsPerLaunch = 256;
+
+    /// <summary>
+    /// Age at which the launch-time sweep treats a temporary .rdp artifact as orphaned.
+    /// Well above the 60 s ceiling the settings schema allows for
+    /// RdpArtifactCleanupDelayMs, so a deferred cleanup still in flight is never raced.
+    /// </summary>
+    internal static readonly TimeSpan StaleRdpArtifactMaxAge = TimeSpan.FromHours(1);
 
     public RdpHandler(
         ITunnelService tunnelService,
@@ -47,7 +72,9 @@ internal sealed class RdpHandler : IProtocolHandler
         IRdpCredentialManager? credentialManager = null,
         Func<string?, string?>? decryptPassword = null,
         RdpCredentialAutofillOperation? credentialAutofill = null,
-        Action<string>? deleteRdpFile = null)
+        Action<string>? deleteRdpFile = null,
+        Func<TimeSpan, Task>? artifactCleanupDelay = null,
+        Action? sweepStaleRdpArtifacts = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -58,6 +85,8 @@ internal sealed class RdpHandler : IProtocolHandler
         _decryptPassword = decryptPassword ?? ConnectionHelpers.DecryptPassword;
         _credentialAutofill = credentialAutofill ?? Heimdall.Rdp.CredentialAutofill.WaitAndFillAsync;
         _deleteRdpFile = deleteRdpFile ?? File.Delete;
+        _artifactCleanupDelay = artifactCleanupDelay ?? (delay => Task.Delay(delay));
+        _sweepStaleRdpArtifacts = sweepStaleRdpArtifacts ?? SweepStaleRdpArtifactsInTempDirectory;
     }
 
     public string Protocol => "RDP";
@@ -185,7 +214,14 @@ internal sealed class RdpHandler : IProtocolHandler
                 }
             }
 
-            var rdpFile = Path.Combine(Path.GetTempPath(), $"heimdall_{server.Id}_{Guid.NewGuid():N}.rdp");
+            // The deferred cleanup below only runs while this process lives, so a crash or a
+            // shutdown inside the cleanup window strands the artifact. Reclaim what earlier
+            // runs left behind before adding one more file to %TEMP%.
+            _sweepStaleRdpArtifacts();
+
+            var rdpFile = Path.Combine(
+                Path.GetTempPath(),
+                $"{RdpArtifactFileNamePrefix}{server.Id}_{Guid.NewGuid():N}{RdpArtifactFileExtension}");
             // Take ownership of the artifact path as soon as it exists, so every early
             // return below deletes it synchronously before ConnectAsync hands back.
             rdpArtifactPath = rdpFile;
@@ -247,7 +283,7 @@ internal sealed class RdpHandler : IProtocolHandler
                     catch (Exception aclEx)
                     {
                         Core.Logging.FileLogger.Error(
-                            $"Failed to set ACL on .rdp file — file has inherited permissions: {aclEx.Message}");
+                            $"Failed to set ACL on .rdp file - file has inherited permissions: {aclEx.Message}");
                         warning ??= _localizer["WarnRdpFileAclFailed"];
                     }
                 }
@@ -303,6 +339,14 @@ internal sealed class RdpHandler : IProtocolHandler
             var displayNameForExitClosure = server.DisplayName;
             var stateMachineForExitClosure = _connectionSm;
 
+            // Owned by the autofill task below, which disposes it when the fill returns.
+            // Created before the Exited handler is registered so the handler can stop the
+            // watcher the moment the client is gone.
+            CancellationTokenSource? autofillCancellation =
+                !string.IsNullOrEmpty(rdpPassword) && mstscPid > 0
+                    ? new CancellationTokenSource()
+                    : null;
+
             mstscProcess.Exited += (_, _) =>
             {
                 var exitCode = -1;
@@ -317,6 +361,22 @@ internal sealed class RdpHandler : IProtocolHandler
 
                 Core.Logging.FileLogger.Info(
                     $"External mstsc.exe exited PID={mstscPid} ExitCode={exitCode} server={displayNameForExitClosure}");
+
+                try
+                {
+                    // Once the client is gone the watcher can only keep sweeping the desktop
+                    // with a live plaintext password, for a prompt that will never appear.
+                    autofillCancellation?.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // The autofill task already finished and disposed its own source.
+                }
+                catch (Exception ex)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"Autofill watcher cancellation on mstsc.exe exit failed: {ex.Message}");
+                }
 
                 try
                 {
@@ -353,14 +413,16 @@ internal sealed class RdpHandler : IProtocolHandler
             mstscProcess.EnableRaisingEvents = true;
             _connectionSm.TryTransition(server.Id, ConnectionState.LaunchedExternalClient);
 
-            if (!string.IsNullOrEmpty(rdpPassword) && mstscPid > 0)
+            if (autofillCancellation is not null)
             {
                 // CredentialAutofill zeroes its char[] buffer after use, but this
                 // closure string and its transient UI strings remain heap-resident
                 // until GC; that is inherent to .NET immutable strings.
-                string autofillPassword = rdpPassword;
+                string autofillPassword = rdpPassword!;
+                CancellationTokenSource autofillCancellationForTask = autofillCancellation;
                 // Autofill must outlive ConnectAsync: the connect-scoped token is cancelled
-                // when ConnectAsync returns. WaitAndFillAsync self-bounds via its timeout.
+                // when ConnectAsync returns. It is bounded instead by its own timeout and by
+                // this per-launch source, which the Exited handler above cancels.
                 _ = Task.Run(async () =>
                 {
                     try
@@ -371,7 +433,7 @@ internal sealed class RdpHandler : IProtocolHandler
                                 rdpHost,
                                 autofillPassword,
                                 autofillTimeout,
-                                CancellationToken.None)
+                                autofillCancellationForTask.Token)
                             .ConfigureAwait(false);
                         if (!filled)
                         {
@@ -379,9 +441,22 @@ internal sealed class RdpHandler : IProtocolHandler
                                 $"External RDP CredUI autofill timed out for {server.DisplayName}");
                         }
                     }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected: the external client exited before the prompt appeared, or
+                        // the fill already completed. Not logged - the Info/Debug regime bans
+                        // this vocabulary, and the client exit is already recorded above.
+                    }
                     catch (Exception ex)
                     {
                         Core.Logging.FileLogger.Warn($"External RDP CredUI autofill failed: {ex.Message}");
+                    }
+                    finally
+                    {
+                        // The fill has returned: nothing else may scan the desktop with
+                        // this password, and the source has no other owner.
+                        autofillCancellationForTask.Cancel();
+                        autofillCancellationForTask.Dispose();
                     }
                 }, CancellationToken.None);
             }
@@ -395,8 +470,7 @@ internal sealed class RdpHandler : IProtocolHandler
                             rdpFile,
                             credentialCleanupTarget,
                             credentialOwnershipMarker,
-                            cleanupDelay,
-                            ct)
+                            cleanupDelay)
                         .ConfigureAwait(false);
                 }
                 catch (Exception ex)
@@ -477,22 +551,18 @@ internal sealed class RdpHandler : IProtocolHandler
     }
 
     /// <summary>
-    /// Cleans up the temporary .rdp file and CredMan entry after a delay.
+    /// Cleans up the temporary .rdp file and CredMan entry after a delay. The delay is
+    /// deliberately not bound to the connect-scoped token: that token is cancelled when the
+    /// command is re-executed, and cancelling it used to bring the deletion forward instead
+    /// of holding it back, pulling the credential out from under a client still negotiating.
     /// </summary>
     private async Task CleanupRdpArtifactsAsync(
         string rdpFile,
         string? credentialCleanupTarget,
         string? credentialOwnershipMarker,
-        TimeSpan cleanupDelay,
-        CancellationToken ct)
+        TimeSpan cleanupDelay)
     {
-        try
-        {
-            await Task.Delay(cleanupDelay, ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        await _artifactCleanupDelay(cleanupDelay).ConfigureAwait(false);
 
         DeleteRdpArtifact(rdpFile);
 
@@ -502,9 +572,76 @@ internal sealed class RdpHandler : IProtocolHandler
         }
     }
 
+    private static void SweepStaleRdpArtifactsInTempDirectory()
+    {
+        SweepStaleRdpArtifacts(
+            Path.GetTempPath(),
+            StaleRdpArtifactMaxAge,
+            DateTime.UtcNow,
+            File.Delete);
+    }
+
     /// <summary>
-    /// Deletes the temporary .rdp artifact. Never throws: a failed deletion —
-    /// including <see cref="UnauthorizedAccessException"/> — must never prevent the
+    /// Removes temporary .rdp artifacts an earlier process left behind. The deferred
+    /// cleanup only runs while Heimdall lives, so a crash or a shutdown inside the cleanup
+    /// window strands the file; this bounded sweep is the janitor that reclaims it. Never
+    /// throws, and only touches files older than <paramref name="maxAge"/> so a cleanup
+    /// still in flight - in this process or another instance - is left alone.
+    /// </summary>
+    /// <returns>The number of artifacts deleted.</returns>
+    internal static int SweepStaleRdpArtifacts(
+        string directory,
+        TimeSpan maxAge,
+        DateTime utcNow,
+        Action<string> deleteFile)
+    {
+        ArgumentNullException.ThrowIfNull(deleteFile);
+
+        int deleted = 0;
+        int examined = 0;
+        try
+        {
+            foreach (string path in Directory.EnumerateFiles(directory, RdpArtifactSearchPattern))
+            {
+                if (examined >= MaxSweptRdpArtifactsPerLaunch)
+                {
+                    break;
+                }
+
+                examined++;
+                try
+                {
+                    if (utcNow - File.GetLastWriteTimeUtc(path) < maxAge)
+                    {
+                        continue;
+                    }
+
+                    deleteFile(path);
+                    deleted++;
+                }
+                catch (Exception ex)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"Stale RDP artifact sweep: failed to delete '{path}': {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Stale RDP artifact sweep failed: {ex.Message}");
+        }
+
+        if (deleted > 0)
+        {
+            Core.Logging.FileLogger.Info($"Stale RDP artifact sweep removed {deleted} orphaned file(s)");
+        }
+
+        return deleted;
+    }
+
+    /// <summary>
+    /// Deletes the temporary .rdp artifact. Never throws: a failed deletion -
+    /// including <see cref="UnauthorizedAccessException"/> - must never prevent the
     /// owned CredMan entry from being released. The .rdp file carries no secret,
     /// and the log line records only the path and the exception message.
     /// </summary>
@@ -524,7 +661,7 @@ internal sealed class RdpHandler : IProtocolHandler
     /// <summary>
     /// Releases the CredMan entry Heimdall owns. Never throws: an unexpected provider
     /// failure must neither mask the <see cref="ConnectionResult"/> nor prevent the
-    /// temporary .rdp artifact from being deleted. Only the exception type is logged —
+    /// temporary .rdp artifact from being deleted. Only the exception type is logged -
     /// never a username, domain, password, ownership marker or credential blob.
     /// </summary>
     private void ReleaseOwnedCredential(string credentialTarget, string ownershipMarker)
