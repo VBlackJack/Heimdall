@@ -82,6 +82,46 @@ public sealed class SshAgentRegistryTests
         Assert.Equal(targetBlob, key.PublicKeyBlob);
     }
 
+    /// <summary>
+    /// Authentication offers the keys of the first reachable agent that holds
+    /// any, and those alone - see <c>SshConnectionFactory.TryCreateAgentAuth</c>.
+    /// The refusal sentence quotes this number as keys that were offered to the
+    /// gateway, so summing every reachable agent would state a count that was
+    /// never presented to it.
+    /// </summary>
+    [Fact]
+    public void OfferableIdentityCount_CountsOnlyTheAgentWhoseKeysWouldBeOffered()
+    {
+        var registry = new SshAgentRegistry(
+            [
+                new FakeAgent(OpenSshPipeAgent.AgentName, available: true, [Key(), Key()]),
+                new FakeAgent(PageantAgent.AgentName, available: true, [Key()])
+            ],
+            () => SshAgentPreference.AutoOpenSshFirst);
+
+        Assert.Equal(2, registry.OfferableIdentityCount());
+    }
+
+    /// <summary>
+    /// A running but empty agent is not what would be offered either: the
+    /// selection skips it exactly as the authentication loop does.
+    /// </summary>
+    [Fact]
+    public void OfferableIdentityCount_SkipsAnAgentThatIsRunningButEmpty()
+    {
+        var registry = new SshAgentRegistry(
+            [
+                new FakeAgent(OpenSshPipeAgent.AgentName, available: true, []),
+                new FakeAgent(PageantAgent.AgentName, available: true, [Key(), Key(), Key()])
+            ],
+            () => SshAgentPreference.AutoOpenSshFirst);
+
+        Assert.Equal(3, registry.OfferableIdentityCount());
+    }
+
+    private static ISshAgentKey Key() =>
+        new FakeAgentKey(OpenSshAgentProtocolTests.BuildKeyBlob("ssh-ed25519"));
+
     private static SshAgentRegistry CreateRegistry(SshAgentPreference preference)
     {
         return new SshAgentRegistry(

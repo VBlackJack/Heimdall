@@ -79,6 +79,45 @@ public sealed class SshAgentRegistry
         return null;
     }
 
+    /// <summary>
+    /// How many identities Heimdall would actually offer a gateway.
+    /// <para>
+    /// Authentication takes the first reachable agent that holds any identity
+    /// and offers that agent's keys alone - see
+    /// <c>SshConnectionFactory.TryCreateAgentAuth</c> - so this is the count of
+    /// that one agent, not the sum over every agent running. Summing them would
+    /// state, as an observation, a number of keys that was never presented.
+    /// </para>
+    /// <para>
+    /// An agent that is running but empty is skipped, and so is one whose
+    /// identity request fails, exactly as the authentication loop skips them.
+    /// </para>
+    /// </summary>
+    public int OfferableIdentityCount()
+    {
+        foreach (var agent in GetAvailableAgents())
+        {
+            int count;
+            try
+            {
+                count = agent.GetIdentities().Count;
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"SSH agent {agent.Name}: identity enumeration failed: {ex.Message}");
+                continue;
+            }
+
+            if (count > 0)
+            {
+                return count;
+            }
+        }
+
+        return 0;
+    }
+
     public bool HasPlinkCompatibleAgent()
     {
         return GetAvailableAgents().Any(agent =>

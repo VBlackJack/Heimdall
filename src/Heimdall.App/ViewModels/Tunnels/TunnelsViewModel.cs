@@ -446,14 +446,17 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return new TunnelResult(false, null, message, SshFailureCode.PageantKeyUnavailable);
         }
 
-        var preflight = AuthPreflightChecker.Check(chain[0], isTunnelMode: true);
-        if (!preflight.Success)
+        // Every hop, not just the root: a later hop with no usable sign-in
+        // source fails the same way, and only after the chain has been dialled
+        // up to it.
+        var preflight = AuthPreflightChecker.CheckChain(chain, isTunnelMode: true, agentRegistry);
+        if (!preflight.Result.Success)
         {
             return new TunnelResult(
                 false,
                 null,
-                ResolvePreflightMessage(preflight.Message),
-                preflight.FailureCode);
+                ResolvePreflightMessage(preflight.Result.Message),
+                preflight.Result.FailureCode);
         }
 
         var remoteHost = vm.RemoteHost.Trim();

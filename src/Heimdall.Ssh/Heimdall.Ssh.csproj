@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Heimdall.Ssh.Tests" />
+    <InternalsVisibleTo Include="Heimdall.App.Tests" />
   </ItemGroup>
 
 </Project>

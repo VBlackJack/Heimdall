@@ -34,11 +34,49 @@ public sealed record PreflightResult(bool Success, SshFailureCode? FailureCode, 
 }
 
 /// <summary>
+/// Result of an authentication pre-flight check run over a whole gateway chain.
+/// </summary>
+/// <param name="Result">Outcome of the first hop that failed, or a passing result.</param>
+/// <param name="FailedHopIndex">Zero-based index of the failing hop, or -1 when all hops passed.</param>
+public sealed record ChainPreflightResult(PreflightResult Result, int FailedHopIndex)
+{
+    /// <summary>Create a passing chain result.</summary>
+    public static ChainPreflightResult Ok() => new(PreflightResult.Ok(), -1);
+}
+
+/// <summary>
 /// Validates SSH connection prerequisites before attempting a connection.
 /// Checks key file existence, SSH agent availability, and auth method availability.
 /// </summary>
 public static class AuthPreflightChecker
 {
+    /// <summary>
+    /// Runs <see cref="Check"/> against every hop of a gateway chain and returns
+    /// the first failure, so a doomed hop is reported at the door rather than
+    /// after the chain has been dialled up to it.
+    /// </summary>
+    /// <param name="gatewayChain">Ordered hops, root gateway first.</param>
+    /// <param name="isTunnelMode">Whether the connection is a background tunnel.</param>
+    /// <param name="agentRegistry">Agent registry to probe; the default registry when null.</param>
+    public static ChainPreflightResult CheckChain(
+        IReadOnlyList<SshConnectionParams> gatewayChain,
+        bool isTunnelMode = false,
+        SshAgentRegistry? agentRegistry = null)
+    {
+        ArgumentNullException.ThrowIfNull(gatewayChain);
+
+        for (int index = 0; index < gatewayChain.Count; index++)
+        {
+            PreflightResult result = Check(gatewayChain[index], isTunnelMode, agentRegistry);
+            if (!result.Success)
+            {
+                return new ChainPreflightResult(result, index);
+            }
+        }
+
+        return ChainPreflightResult.Ok();
+    }
+
     /// <summary>
     /// Run pre-flight checks against the given connection parameters.
     /// </summary>
