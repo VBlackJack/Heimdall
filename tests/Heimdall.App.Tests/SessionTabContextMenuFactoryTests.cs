@@ -20,6 +20,7 @@ using System.Threading;
 using System.Windows.Controls;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.App.Views.EmbeddedRdp;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 
@@ -444,6 +445,46 @@ public sealed partial class SessionCoordinatorPreMountTests
             Assert.Null(FindMenuItem(menu, harness.Main.Localize("SplitMergeWith")));
         });
     }
+
+    /// <summary>
+    /// The resolution menu header the context menu builds must read the same locale templates as
+    /// the toolbar header it mirrors. The templates are supplied here through a stub locale whose
+    /// separator differs from the ASCII fallback compiled into the formatter, so a call site that
+    /// drops them cannot produce this string.
+    /// </summary>
+    [Fact]
+    public void ResolutionActiveModeHeader_WithDimensions_UsesTheLocalizedSizeTemplate()
+    {
+        string header = SessionTabContextMenuFactory.BuildActiveModeHeaderText(
+            new RdpEffectiveResolutionState(RdpResolutionMode.Fixed, 1280, 720),
+            StubLocalize);
+
+        Assert.Equal("Mode actif : Fixe (1280x720)", header);
+    }
+
+    [Fact]
+    public void ResolutionActiveModeHeader_WithoutDimensions_UsesTheLocalizedModeOnlyTemplate()
+    {
+        string header = SessionTabContextMenuFactory.BuildActiveModeHeaderText(
+            new RdpEffectiveResolutionState(RdpResolutionMode.FitWindow, null, null),
+            StubLocalize);
+
+        Assert.Equal("Mode actif : Ajuster", header);
+    }
+
+    /// <summary>
+    /// Stands in for <c>MainViewModel.Localize</c>. Every value differs from the corresponding
+    /// English string, so a header assembled from anything other than these keys is visible.
+    /// </summary>
+    private static string StubLocalize(string key) => key switch
+    {
+        "RdpResolutionActiveModeLabel" => "Mode actif",
+        "ServerDialogResolutionModeFixed" => "Fixe",
+        "ServerDialogResolutionModeFitWindow" => "Ajuster",
+        "RdpResolutionHeaderFormat" => "{0} : {1}",
+        "RdpResolutionHeaderWithSizeFormat" => "{0} : {1} ({2}x{3})",
+        _ => key,
+    };
 
     private static void RunOnStaThread(Action action)
     {

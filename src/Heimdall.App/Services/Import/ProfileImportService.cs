@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -43,6 +44,18 @@ public sealed class ProfileImportService(
 
     internal static readonly IReadOnlySet<string> SupportedConnectionTypes =
         ConnectionTypeCatalog.CanonicalTypes;
+
+    /// <summary>Locale key holding the "{0} (Imported {1})" template shared with the .rdp import.</summary>
+    private const string RenameSuffixKey = "DialogImportRdpRenameSuffix";
+
+    /// <summary>
+    /// Word-free rename template used when the active locale carries no rename key, or a template
+    /// that drops the numeric placeholder. The search in <see cref="BuildAutoRename"/> can only
+    /// converge on a template that varies with the suffix.
+    /// </summary>
+    private const string NeutralRenameTemplate = "{0} ({1})";
+
+    private const int FirstAutoRenameSuffix = 2;
 
     private readonly IConfigManager _configManager = configManager;
     private readonly LocalizationManager _localizer = localizer;
@@ -501,14 +514,24 @@ public sealed class ProfileImportService(
         return Guid.NewGuid().ToString();
     }
 
-    private static string BuildAutoRename(string baseName, IReadOnlyList<ServerProfileDto> inventory)
+    private string BuildAutoRename(string baseName, IReadOnlyList<ServerProfileDto> inventory)
     {
-        var suffix = 2;
-        var candidate = $"{baseName} (Imported {suffix})";
+        // The suffix ends up in the persisted DisplayName the user reads, so it follows the active
+        // locale. Same key and same fallback rule as RdpImportService: the two import paths must
+        // not print two different suffixes for the same conflict.
+        var template = _localizer[RenameSuffixKey];
+        if (string.Equals(template, RenameSuffixKey, StringComparison.Ordinal)
+            || !template.Contains("{1}", StringComparison.Ordinal))
+        {
+            template = NeutralRenameTemplate;
+        }
+
+        var suffix = FirstAutoRenameSuffix;
+        var candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
         while (inventory.Any(server => string.Equals(server.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
         {
             suffix++;
-            candidate = $"{baseName} (Imported {suffix})";
+            candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
         }
 
         return candidate;

@@ -34,7 +34,7 @@ public static class MRemoteNgImporter
         ["VNC"] = "VNC",
         ["Telnet"] = "Telnet",
         ["Rlogin"] = "Telnet",
-        ["HTTP"] = "RDP",  // Fallback — no native HTTP in Heimdall
+        ["HTTP"] = "RDP",  // Fallback - no native HTTP in Heimdall
         ["HTTPS"] = "RDP",
         ["IntApp"] = "Local",
     };
@@ -170,7 +170,7 @@ public static class MRemoteNgImporter
             }
         }
 
-        // Description → Tags
+        // Description -> Tags
         var description = node.Attribute("Description")?.Value?.Trim();
         if (!string.IsNullOrWhiteSpace(description))
             dto.Tags = description;
@@ -179,6 +179,11 @@ public static class MRemoteNgImporter
         if (connectionType == "RDP")
         {
             dto.RdpMode = "Embedded";
+
+            // Every assignment below writes a per-profile RDP setting, which the connect-time
+            // resolver only reads once the profile stops following the application defaults.
+            // Same rule as the .rdp importer, so the two import paths cannot disagree.
+            var carriesPerProfileSettings = false;
 
             var colors = node.Attribute("Colors")?.Value;
             if (colors is not null)
@@ -192,21 +197,35 @@ public static class MRemoteNgImporter
                     "Colors32Bit" => 32,
                     _ => 32
                 };
+                carriesPerProfileSettings = true;
             }
 
             var resolution = node.Attribute("Resolution")?.Value;
             if (string.Equals(resolution, "SmartSize", StringComparison.OrdinalIgnoreCase))
+            {
                 dto.RdpDynamicResolution = true;
+                carriesPerProfileSettings = true;
+            }
 
-            ParseBool(node, "RedirectClipboard", v => dto.RdpRedirectClipboard = v);
-            ParseBool(node, "RedirectDiskDrives", v => dto.RdpRedirectDrives = v);
-            ParseBool(node, "RedirectPrinters", v => dto.RdpRedirectPrinters = v);
-            ParseBool(node, "RedirectSmartCards", v => dto.RdpRedirectSmartCards = v);
-            ParseBool(node, "RedirectAudioCapture", v => dto.RdpAudioCapture = v);
+            // Non-conditional or: every redirection still has to be mapped.
+            carriesPerProfileSettings |= ParseBool(node, "RedirectClipboard", v => dto.RdpRedirectClipboard = v);
+            carriesPerProfileSettings |= ParseBool(node, "RedirectDiskDrives", v => dto.RdpRedirectDrives = v);
+            carriesPerProfileSettings |= ParseBool(node, "RedirectPrinters", v => dto.RdpRedirectPrinters = v);
+            carriesPerProfileSettings |= ParseBool(node, "RedirectSmartCards", v => dto.RdpRedirectSmartCards = v);
+            carriesPerProfileSettings |= ParseBool(node, "RedirectAudioCapture", v => dto.RdpAudioCapture = v);
 
+            // The gateway is read by the resolver whichever branch it takes, so an entry that
+            // only names one is not carrying a per-profile setting.
             var rdpGw = node.Attribute("RDGatewayHostname")?.Value?.Trim();
             if (!string.IsNullOrWhiteSpace(rdpGw))
                 dto.RdpGateway = rdpGw;
+
+            if (carriesPerProfileSettings)
+            {
+                // Without this the resolver answers from the application defaults and every value
+                // mapped above is inert. A bare entry keeps following the defaults.
+                dto.RdpUseGlobalDefaults = false;
+            }
         }
 
         // SSH-specific settings
@@ -241,11 +260,18 @@ public static class MRemoteNgImporter
         }
     }
 
-    private static void ParseBool(XElement node, string attr, Action<bool> setter)
+    /// <summary>
+    /// Applies <paramref name="attr"/> when the node carries it, and reports whether it did, so the
+    /// caller can tell a mapped setting from an absent one.
+    /// </summary>
+    private static bool ParseBool(XElement node, string attr, Action<bool> setter)
     {
         var val = node.Attribute(attr)?.Value;
-        if (val is not null)
-            setter(string.Equals(val, "True", StringComparison.OrdinalIgnoreCase));
+        if (val is null)
+            return false;
+
+        setter(string.Equals(val, "True", StringComparison.OrdinalIgnoreCase));
+        return true;
     }
 
     public sealed class ImportResult
