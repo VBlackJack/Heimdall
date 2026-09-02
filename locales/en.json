@@ -2993,6 +2993,7 @@
   "RdpSendKeysCtrlAltDel": "Ctrl+Alt+Del",
   "RdpSendKeysCtrlEsc": "Ctrl+Esc (Start menu)",
   "RdpSendKeysEscape": "Escape",
+  "RdpSendKeysF11": "F11",
   "RdpSendKeysPrintScreen": "Print Screen",
   "RdpSendKeysSentFailedToast": "Could not send keys to the remote session.",
   "RdpSendKeysSentToast": "{0} sent to remote",

@@ -2990,6 +2990,7 @@
   "RdpSendKeysCtrlAltDel": "Ctrl+Alt+Suppr",
   "RdpSendKeysCtrlEsc": "Ctrl+\u00c9chap (menu D\u00e9marrer)",
   "RdpSendKeysEscape": "\u00c9chap",
+  "RdpSendKeysF11": "F11",
   "RdpSendKeysPrintScreen": "Impr. \u00e9cran",
   "RdpSendKeysSentFailedToast": "Impossible d'envoyer les touches \u00e0 la session distante.",
   "RdpSendKeysSentToast": "{0} envoy\u00e9 \u00e0 la session distante",

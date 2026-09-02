@@ -23,6 +23,63 @@ using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services.Import;
 
+/// <summary>
+/// The automatic-rename rule both import services apply to a display-name conflict.
+/// </summary>
+/// <remarks>
+/// The .rdp import and the profile import reach the same conflict from two entry points and have
+/// to resolve it to the same name, so the rule is held here once. Two verbatim copies of it used
+/// to sit in the two services, where either could be edited alone and the surfaces would disagree
+/// with nothing failing.
+/// </remarks>
+internal static class ImportAutoRename
+{
+    /// <summary>Locale key holding the "{0} (Imported {1})" rename template.</summary>
+    internal const string RenameSuffixKey = "DialogImportRdpRenameSuffix";
+
+    /// <summary>
+    /// Word-free rename template used when the active locale carries no rename key, or a template
+    /// that drops the numeric placeholder. The search in <see cref="Build"/> can only converge on
+    /// a template that varies with the suffix.
+    /// </summary>
+    internal const string NeutralRenameTemplate = "{0} ({1})";
+
+    /// <summary>The name already in the inventory is the implicit first, so the search starts here.</summary>
+    internal const int FirstAutoRenameSuffix = 2;
+
+    /// <summary>
+    /// Returns the first name derived from <paramref name="baseName"/> that no profile in
+    /// <paramref name="inventory"/> already carries.
+    /// </summary>
+    internal static string Build(
+        string baseName,
+        IReadOnlyList<ServerProfileDto> inventory,
+        LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        // The suffix ends up in the persisted DisplayName the user reads, so it follows the active
+        // locale like the generated fallback name does.
+        var template = localizer[RenameSuffixKey];
+        if (string.Equals(template, RenameSuffixKey, StringComparison.Ordinal)
+            || !template.Contains("{1}", StringComparison.Ordinal))
+        {
+            template = NeutralRenameTemplate;
+        }
+
+        var suffix = FirstAutoRenameSuffix;
+        var candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
+        while (inventory.Any(server => string.Equals(server.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            suffix++;
+            candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
+        }
+
+        return candidate;
+    }
+}
+
 public interface IRdpImportService
 {
     Task<RdpImportPreview> PreviewAsync(string[] filePaths, CancellationToken ct);
@@ -38,17 +95,6 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         "connection",
         "remote desktop connection"
     ], StringComparer.OrdinalIgnoreCase);
-
-    private const string RenameSuffixKey = "DialogImportRdpRenameSuffix";
-
-    /// <summary>
-    /// Word-free rename template used when the active locale carries no rename key, or a template
-    /// that drops the numeric placeholder. The search in <see cref="BuildAutoRename"/> can only
-    /// converge on a template that varies with the suffix.
-    /// </summary>
-    private const string NeutralRenameTemplate = "{0} ({1})";
-
-    private const int FirstAutoRenameSuffix = 2;
 
     /// <summary>Value of <c>drivestoredirect</c> that already means every local drive.</summary>
     private const string AllDrivesToken = "*";
@@ -240,7 +286,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                         case RdpConflictResolution.AutoRename:
                             {
                                 var renamed = CloneCandidate(previewEntry.Candidate);
-                                renamed.DisplayName = BuildAutoRename(renamed.DisplayName, inventory);
+                                renamed.DisplayName = ImportAutoRename.Build(renamed.DisplayName, inventory, _localizer);
                                 inventory.Add(renamed);
                                 importedCount++;
                                 renamedCount++;
@@ -567,28 +613,6 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             Environment = existing.Environment,
             MacAddress = existing.MacAddress
         };
-    }
-
-    private string BuildAutoRename(string baseName, IReadOnlyList<ServerProfileDto> inventory)
-    {
-        // The suffix ends up in the persisted DisplayName the user reads, so it follows the active
-        // locale like the generated fallback name does.
-        var template = _localizer[RenameSuffixKey];
-        if (string.Equals(template, RenameSuffixKey, StringComparison.Ordinal)
-            || !template.Contains("{1}", StringComparison.Ordinal))
-        {
-            template = NeutralRenameTemplate;
-        }
-
-        var suffix = FirstAutoRenameSuffix;
-        var candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
-        while (inventory.Any(server => string.Equals(server.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
-        {
-            suffix++;
-            candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
-        }
-
-        return candidate;
     }
 
     private static ServerProfileDto CloneCandidate(ServerProfileDto candidate)

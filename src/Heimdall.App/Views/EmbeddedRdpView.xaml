@@ -148,6 +148,9 @@
                             <MenuItem x:Name="SendKeysEscape"
                                       Header="{loc:Translate RdpSendKeysEscape}"
                                       Click="OnSendKeysEscapeClick"/>
+                            <MenuItem x:Name="SendKeysF11"
+                                      Header="{loc:Translate RdpSendKeysF11}"
+                                      Click="OnSendKeysF11Click"/>
                             <Separator/>
                             <MenuItem x:Name="SendKeysWinL"
                                       Header="{loc:Translate RdpSendKeysWinL}"

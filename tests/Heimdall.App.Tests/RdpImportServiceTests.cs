@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Import;
@@ -666,6 +667,94 @@ public sealed class RdpImportServiceTests
         Assert.Contains(servers, server => server.DisplayName == "Server (Importe 2)");
         Assert.DoesNotContain(servers, server => server.DisplayName.Contains("(Imported", StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// The .rdp import and the profile import reach the same display-name conflict from two
+    /// entry points and have to print the same suffix for it. Both used to carry a verbatim copy
+    /// of the rule - the locale key, the neutral fallback template, the missing-placeholder guard
+    /// and the first suffix - so either copy could be edited alone and the two surfaces would
+    /// disagree with nothing failing. The rule is one shared helper now; this fails if a caller
+    /// reintroduces its own.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(RdpImportService))]
+    [InlineData(typeof(ProfileImportService))]
+    public void ImportServices_DoNotCarryTheirOwnCopyOfTheAutoRenameRule(Type importService)
+    {
+        string[] ownedMembers = AutoRenameRuleMembers(importService);
+
+        Assert.True(
+            ownedMembers.Length == 0,
+                importService.Name + " declares its own copy of the auto-rename rule ("
+                + string.Join(", ", ownedMembers)
+                + "). Both import paths must resolve the same conflict to the same name, so the "
+                + "rule belongs to ImportAutoRename alone.");
+    }
+
+    // Positive control: the member names above are the ones the rule is actually made of, so an
+    // empty result on an import service is a measurement and not a mistyped lookup.
+    [Fact]
+    public void TheSharedHelperIsTheOneCarryingTheAutoRenameRule()
+    {
+        string[] sharedMembers = AutoRenameRuleMembers(typeof(ImportAutoRename));
+
+        Assert.Contains("NeutralRenameTemplate", sharedMembers);
+        Assert.Contains("FirstAutoRenameSuffix", sharedMembers);
+        Assert.Contains("RenameSuffixKey", sharedMembers);
+    }
+
+    [Fact]
+    public void AutoRename_WithoutTheLocaleKey_FallsBackToTheNeutralTemplate()
+    {
+        using var fixture = new RdpImportFixture(
+            localeOverrides: new Dictionary<string, string> { ["DialogImportRdpRenameSuffix"] = string.Empty });
+
+        Assert.Equal("Server (2)", ImportAutoRename.Build("Server", [], fixture.Localizer));
+    }
+
+    [Fact]
+    public void AutoRename_WithATemplateThatDropsTheNumber_FallsBackToTheNeutralTemplate()
+    {
+        using var fixture = new RdpImportFixture(
+            localeOverrides: new Dictionary<string, string> { ["DialogImportRdpRenameSuffix"] = "{0} (Imported)" });
+
+        // A template with no {1} never varies, so the collision walk below could not terminate.
+        Assert.Equal(
+            "Server (3)",
+            ImportAutoRename.Build(
+                "Server",
+                [new ServerProfileDto { Id = "a", DisplayName = "server (2)" }],
+                fixture.Localizer));
+    }
+
+    [Fact]
+    public void AutoRename_WalksPastNamesTheInventoryAlreadyCarries()
+    {
+        using var fixture = new RdpImportFixture(
+            localeOverrides: new Dictionary<string, string> { ["DialogImportRdpRenameSuffix"] = "{0} (Imported {1})" });
+
+        Assert.Equal(
+            "Server (Imported 4)",
+            ImportAutoRename.Build(
+                "Server",
+                [
+                    new ServerProfileDto { Id = "a", DisplayName = "Server (Imported 2)" },
+                    new ServerProfileDto { Id = "b", DisplayName = "SERVER (IMPORTED 3)" }
+                ],
+                fixture.Localizer));
+    }
+
+    private static string[] AutoRenameRuleMembers(Type type)
+        => type
+            .GetMembers(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Select(member => member.Name)
+            .Where(name => name is "BuildAutoRename"
+                or "NeutralRenameTemplate"
+                or "FirstAutoRenameSuffix"
+                or "RenameSuffixKey")
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
 
     private static RdpImportSelection SelectOne(string path, RdpConflictResolution resolution) =>
         new()

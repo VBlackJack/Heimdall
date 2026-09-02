@@ -938,45 +938,73 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         SendKeysMenu.IsOpen = true;
     }
 
+    /// <summary>
+    /// The virtual keys each Send Keys menu entry posts to the remote session, keyed by the
+    /// locale key that labels that entry in the menu.
+    /// </summary>
+    /// <remarks>
+    /// The click handlers read this table rather than each carrying its own key list, so the
+    /// entries the menu offers and the keys they deliver stay one decision instead of two. F11
+    /// is here because it is the only fullscreen chord with no modifier: the keyboard hook
+    /// consumes it while the remote surface holds the focus, so without this route the remote
+    /// session can never be sent an F11 at all.
+    /// </remarks>
+    [SupportedOSPlatform("windows")]
+    private static readonly IReadOnlyDictionary<string, byte[]> SendKeysSequences =
+        new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["RdpSendKeysCtrlAltDel"] =
+                [NativeMethods.VK_CONTROL, NativeMethods.VK_MENU, NativeMethods.VK_DELETE],
+            ["RdpSendKeysWindows"] = [NativeMethods.VK_LWIN],
+            ["RdpSendKeysAltTab"] = [NativeMethods.VK_MENU, NativeMethods.VK_TAB],
+            ["RdpSendKeysCtrlEsc"] = [NativeMethods.VK_CONTROL, NativeMethods.VK_ESCAPE],
+            ["RdpSendKeysPrintScreen"] = [NativeMethods.VK_SNAPSHOT],
+            ["RdpSendKeysEscape"] = [NativeMethods.VK_ESCAPE],
+            ["RdpSendKeysF11"] = [NativeMethods.VK_F11],
+            ["RdpSendKeysWinL"] = [NativeMethods.VK_LWIN, NativeMethods.VK_L],
+            ["RdpSendKeysWinD"] = [NativeMethods.VK_LWIN, NativeMethods.VK_D],
+            ["RdpSendKeysWinE"] = [NativeMethods.VK_LWIN, NativeMethods.VK_E]
+        };
+
     [SupportedOSPlatform("windows")]
     private void OnSendKeysCtrlAltDelClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote(
-            "RdpSendKeysCtrlAltDel",
-            NativeMethods.VK_CONTROL,
-            NativeMethods.VK_MENU,
-            NativeMethods.VK_DELETE);
+        => SendKeysToRemote("RdpSendKeysCtrlAltDel");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWindowsClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWindows", NativeMethods.VK_LWIN);
+        => SendKeysToRemote("RdpSendKeysWindows");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysAltTabClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysAltTab", NativeMethods.VK_MENU, NativeMethods.VK_TAB);
+        => SendKeysToRemote("RdpSendKeysAltTab");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysCtrlEscClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysCtrlEsc", NativeMethods.VK_CONTROL, NativeMethods.VK_ESCAPE);
+        => SendKeysToRemote("RdpSendKeysCtrlEsc");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysPrintScreenClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysPrintScreen", NativeMethods.VK_SNAPSHOT);
+        => SendKeysToRemote("RdpSendKeysPrintScreen");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysEscapeClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysEscape", NativeMethods.VK_ESCAPE);
+        => SendKeysToRemote("RdpSendKeysEscape");
+
+    [SupportedOSPlatform("windows")]
+    private void OnSendKeysF11Click(object sender, RoutedEventArgs e)
+        => SendKeysToRemote("RdpSendKeysF11");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWinLClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWinL", NativeMethods.VK_LWIN, NativeMethods.VK_L);
+        => SendKeysToRemote("RdpSendKeysWinL");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWinDClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWinD", NativeMethods.VK_LWIN, NativeMethods.VK_D);
+        => SendKeysToRemote("RdpSendKeysWinD");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWinEClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWinE", NativeMethods.VK_LWIN, NativeMethods.VK_E);
+        => SendKeysToRemote("RdpSendKeysWinE");
 
     private void OnSendKeysShortcutsHelpClick(object sender, RoutedEventArgs e)
     {
@@ -1023,6 +1051,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         AppendHelpLine(builder, localizer["RdpSendKeysCtrlEsc"]);
         AppendHelpLine(builder, localizer["RdpSendKeysPrintScreen"]);
         AppendHelpLine(builder, localizer["RdpSendKeysEscape"]);
+        AppendHelpLine(builder, localizer["RdpSendKeysF11"]);
 
         return builder.ToString().TrimEnd();
     }
@@ -1033,8 +1062,13 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     }
 
     [SupportedOSPlatform("windows")]
-    private void SendKeysToRemote(string? feedbackLabelKey, params byte[] virtualKeys)
+    private void SendKeysToRemote(string feedbackLabelKey)
     {
+        if (!SendKeysSequences.TryGetValue(feedbackLabelKey, out byte[]? virtualKeys))
+        {
+            return;
+        }
+
         if (_disposed || _rdpHost is null || !_rdpHost.IsConnected || virtualKeys.Length == 0)
         {
             return;
@@ -1068,7 +1102,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                     IntPtr.Zero);
             }
 
-            if (feedbackLabelKey is not null && _localizer is not null)
+            if (_localizer is not null)
             {
                 var label = _localizer[feedbackLabelKey];
                 ShowTransientToast(_localizer.Format("RdpSendKeysSentToast", label));
@@ -4598,6 +4632,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         internal const byte VK_DELETE = 0x2E;
         internal const byte VK_TAB = 0x09;
         internal const byte VK_SNAPSHOT = 0x2C;
+        internal const byte VK_F11 = 0x7A;
         internal const byte VK_LWIN = 0x5B;
         internal const byte VK_D = 0x44;
         internal const byte VK_E = 0x45;
