@@ -24,6 +24,14 @@ namespace Heimdall.App.Views.EmbeddedRdp;
 /// </summary>
 internal static class RdpHostDiagnosticFactory
 {
+    /// <summary>
+    /// Names the diagnostic Heimdall's own connect watchdog produces. It carries no disconnect
+    /// code, because the stack never reported one, so the key is the only thing that identifies
+    /// it to the overlay - which has to paint it the way it paints the stack's own
+    /// ConnectionTimeout, since both describe the same unreachable host.
+    /// </summary>
+    internal const string ConnectTimeoutMessageKey = "RdpDisconnectConnectTimeout";
+
     internal static SessionDiagnostic FromDisconnect(int reason)
         => FromDisconnect(reason, RdpActiveXHost.NoExtendedDisconnectReason);
 
@@ -57,7 +65,7 @@ internal static class RdpHostDiagnosticFactory
     {
         return new SessionDiagnostic(
             SessionFailureStage.RdpActiveXConnect,
-            "RdpDisconnectConnectTimeout",
+            ConnectTimeoutMessageKey,
             null,
             null);
     }

@@ -47,6 +47,16 @@ internal readonly record struct RdpRegionFrameLayout(
 
     public double HostHeight => IsLetterboxActive ? FrameHeight : double.NaN;
 
+    /// <summary>
+    /// Sizes the frame for a session rendered at a fixed resolution with scaling off.
+    /// </summary>
+    /// <remarks>
+    /// The aspect fit is only half the answer here. Letterboxing is used exactly when the session
+    /// is not scaled, so the remote image occupies its own pixel size and nothing more: a frame
+    /// larger than that is not the region rectangle it is pinned to be, and the leftover inside it
+    /// is Win32 background rather than the surface brush - the bleed the pinning exists to remove.
+    /// So the aspect-fit result is bounded by the content and re-centred.
+    /// </remarks>
     public static RdpRegionFrameLayout FromPaneAndContent(
         double paneWidth,
         double paneHeight,
@@ -59,11 +69,35 @@ internal readonly record struct RdpRegionFrameLayout(
             contentWidth,
             contentHeight);
 
+        rect = BoundToContent(rect, paneWidth, paneHeight, contentWidth, contentHeight);
+
         return new RdpRegionFrameLayout(
             new Thickness(rect.HostX, rect.HostY, 0, 0),
             rect.HostWidth,
             rect.HostHeight,
             HasLetterboxBands(rect, paneWidth, paneHeight));
+    }
+
+    private static (double HostX, double HostY, double HostWidth, double HostHeight) BoundToContent(
+        (double HostX, double HostY, double HostWidth, double HostHeight) rect,
+        double paneWidth,
+        double paneHeight,
+        double contentWidth,
+        double contentHeight)
+    {
+        if (rect.HostWidth <= 0 || rect.HostHeight <= 0 || contentWidth <= 0 || contentHeight <= 0)
+        {
+            return rect;
+        }
+
+        double width = Math.Min(rect.HostWidth, contentWidth);
+        double height = Math.Min(rect.HostHeight, contentHeight);
+
+        return (
+            Math.Max(0, (paneWidth - width) / 2.0),
+            Math.Max(0, (paneHeight - height) / 2.0),
+            width,
+            height);
     }
 
     public static bool HasLetterboxBands(

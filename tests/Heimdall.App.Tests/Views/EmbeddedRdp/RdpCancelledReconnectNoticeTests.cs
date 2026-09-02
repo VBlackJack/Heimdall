@@ -90,6 +90,38 @@ public sealed class RdpCancelledReconnectNoticeTests
                 + "surrounding code depends on.");
     }
 
+    /// <summary>
+    /// The notice must stay behind the condition that gives it its meaning.
+    /// </summary>
+    /// <remarks>
+    /// The order above holds just as well with the <c>if (cancelLostTheRace)</c> wrapper removed:
+    /// the three statements are still in sequence, the slice is still long, the locale key is still
+    /// there. What changes is that a server which drops the link and reconnects on its own - the
+    /// user never touched Cancel - now tells the user the reconnection they cancelled succeeded
+    /// anyway. That is the mutant this file could not see.
+    /// </remarks>
+    [Fact]
+    public void TheNoticeIsOnlyShownWhenTheCancelLostTheRace()
+    {
+        string handler = ReadAutoReconnectedHandler();
+
+        int guarded = handler.IndexOf(
+            "if (cancelLostTheRace)",
+            System.StringComparison.Ordinal);
+        int announced = handler.IndexOf(
+            "ShowTransientToast(",
+            System.StringComparison.Ordinal);
+
+        Assert.True(
+            guarded >= 0,
+            "The notice is no longer conditional. Every auto-reconnect now tells the user the "
+                + "reconnection they cancelled succeeded anyway, including the ones nobody "
+                + "cancelled.");
+        Assert.True(
+            guarded < announced,
+            "The announcement is outside the condition that gives it its meaning.");
+    }
+
     // Guarding the guard: a slice that failed to find the handler would be empty, and every
     // IndexOf above would return -1 and be reported as a missing statement rather than as a
     // broken slice.

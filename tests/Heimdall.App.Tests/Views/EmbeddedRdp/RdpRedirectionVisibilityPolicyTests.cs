@@ -43,11 +43,11 @@ public sealed class RdpRedirectionVisibilityPolicyTests
     }
 
     [Theory]
-    [InlineData(0, false, false, false)] // nothing disabled — no badge
-    [InlineData(3, false, false, true)]  // default mode + disabled count > 0 → badge
+    [InlineData(0, false, false, false)] // nothing disabled - no badge
+    [InlineData(3, false, false, true)]  // default mode + disabled count > 0 -> badge
     [InlineData(3, true, false, false)]  // alwaysExpanded suppresses badge
     [InlineData(3, false, true, false)]  // session override hides badge (already expanded)
-    [InlineData(8, false, false, true)]  // many disabled → badge
+    [InlineData(8, false, false, true)]  // many disabled -> badge
     public void ShouldShowExpandBadge_OnlyWhenAutoCollapseHidesSomething(
         int disabledCount,
         bool alwaysExpanded,

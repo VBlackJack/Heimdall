@@ -14,12 +14,53 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Views.EmbeddedRdp;
 using Heimdall.Rdp.ActiveX;
 
 namespace Heimdall.App.Tests.Views.EmbeddedRdp;
 
 public sealed class RdpDisconnectSeverityTests
 {
+    /// <summary>
+    /// Heimdall's own connect timeout is painted the way the stack's connect timeout is painted.
+    /// </summary>
+    /// <remarks>
+    /// One unreachable host, two ways of noticing it. If the control times out first, code 264
+    /// arrives, is classified Transient, and the overlay shows the notice strip. If Heimdall's
+    /// connect watchdog expires first - which for a black-holed port is the normal case - the
+    /// diagnostic it builds carries no code, so the severity resolver used to fall through to
+    /// TerminalError and the same condition was painted as a terminal failure. Which strip the
+    /// user saw depended only on which timer won.
+    /// </remarks>
+    [Fact]
+    public void ResolveOverlaySeverity_ForTheConnectWatchdogTimeout_MatchesTheStacksOwnTimeout()
+    {
+        RdpActiveXHost.RdpDisconnectSeverity watchdog = Heimdall.App.Views.EmbeddedRdpView.ResolveOverlaySeverity(
+            RdpHostDiagnosticFactory.FromConnectTimeout(),
+            RdpActiveXHost.NoExtendedDisconnectReason);
+
+        RdpActiveXHost.RdpDisconnectSeverity stack = Heimdall.App.Views.EmbeddedRdpView.ResolveOverlaySeverity(
+            RdpHostDiagnosticFactory.FromDisconnect(264),
+            RdpActiveXHost.NoExtendedDisconnectReason);
+
+        Assert.Equal(RdpActiveXHost.RdpDisconnectSeverity.Transient, stack);
+        Assert.Equal(stack, watchdog);
+    }
+
+    /// <summary>
+    /// Positive control: a code-less diagnostic that is not the connect timeout still resolves to
+    /// the terminal default, so the case above is a special case and not a blanket demotion.
+    /// </summary>
+    [Fact]
+    public void ResolveOverlaySeverity_ForAFatalError_StaysTerminal()
+    {
+        RdpActiveXHost.RdpDisconnectSeverity severity = Heimdall.App.Views.EmbeddedRdpView.ResolveOverlaySeverity(
+            RdpHostDiagnosticFactory.FromFatalError(-2147467259),
+            RdpActiveXHost.NoExtendedDisconnectReason);
+
+        Assert.Equal(RdpActiveXHost.RdpDisconnectSeverity.TerminalError, severity);
+    }
+
     [Theory]
     [InlineData(260)]
     [InlineData(264)]

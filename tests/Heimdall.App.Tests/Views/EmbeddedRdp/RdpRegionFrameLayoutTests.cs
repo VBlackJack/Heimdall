@@ -21,15 +21,27 @@ namespace Heimdall.App.Tests.Views.EmbeddedRdp;
 
 public sealed class RdpRegionFrameLayoutTests
 {
+    /// <summary>
+    /// The frame is the session rectangle, so it is never larger than the session.
+    /// </summary>
+    /// <remarks>
+    /// <para>This case used to assert 1200x900 for a 1024x768 session in a 1600x900 pane - the
+    /// aspect-fit answer, which is right when the image is scaled to the frame. Letterboxing is
+    /// used exactly when it is not: the mode is Fixed with scaling off, so the remote image
+    /// occupies 1024x768 and no more. The extra 176x132 inside the pinned host is Win32 background
+    /// rather than the surface brush, which is the bleed the pinning exists to remove.</para>
+    /// <para>Assertions the old expectation carried and this one keeps: the frame is top-left
+    /// aligned with a margin that centres it, and the host is pinned rather than stretched.</para>
+    /// </remarks>
     [Fact]
-    public void FromPaneAndContent_WhenPaneIsWiderThanContent_SizesFrameAndMarksLetterboxActive()
+    public void FromPaneAndContent_WhenPaneIsWiderThanContent_NeverAllocatesMoreThanTheSession()
     {
         var layout = RdpRegionFrameLayout.FromPaneAndContent(1600, 900, 1024, 768);
 
-        AssertClose(200, layout.FrameMargin.Left);
-        AssertClose(0, layout.FrameMargin.Top);
-        AssertClose(1200, layout.FrameWidth);
-        AssertClose(900, layout.FrameHeight);
+        AssertClose(1024, layout.FrameWidth);
+        AssertClose(768, layout.FrameHeight);
+        AssertClose(288, layout.FrameMargin.Left);
+        AssertClose(66, layout.FrameMargin.Top);
         Assert.True(layout.IsLetterboxActive);
         Assert.Equal(System.Windows.HorizontalAlignment.Left, layout.FrameHorizontalAlignment);
         Assert.Equal(System.Windows.VerticalAlignment.Top, layout.FrameVerticalAlignment);
@@ -38,8 +50,22 @@ public sealed class RdpRegionFrameLayoutTests
         Assert.Equal(System.Windows.HorizontalAlignment.Left, layout.HostHorizontalAlignment);
         Assert.Equal(System.Windows.VerticalAlignment.Top, layout.HostVerticalAlignment);
         Assert.Equal(new Thickness(0), layout.HostMargin);
-        AssertClose(1200, layout.HostWidth);
-        AssertClose(900, layout.HostHeight);
+        AssertClose(1024, layout.HostWidth);
+        AssertClose(768, layout.HostHeight);
+    }
+
+    /// <summary>
+    /// A pane smaller than the session still gets the aspect fit, because there is nothing else to
+    /// give it: the bound only ever removes upscale, never downscale.
+    /// </summary>
+    [Fact]
+    public void FromPaneAndContent_WhenPaneIsSmallerThanContent_StillFitsToThePane()
+    {
+        var layout = RdpRegionFrameLayout.FromPaneAndContent(800, 600, 1920, 1080);
+
+        AssertClose(800, layout.FrameWidth);
+        AssertClose(450, layout.FrameHeight);
+        Assert.True(layout.IsLetterboxActive);
     }
 
     [Fact]

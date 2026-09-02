@@ -77,6 +77,43 @@ public sealed class RdpCancelPhaseAgreementTests
         Assert.True(RdpConnectWatchdogPolicy.ShouldCancel(phase));
     }
 
+    /// <summary>
+    /// Both handlers must reach the phase transition, not merely contain one.
+    /// </summary>
+    /// <remarks>
+    /// <para>The extraction below finds the first textual occurrence, which is the same whether the
+    /// statement always runs or sits behind four calls that can throw. The two handlers already
+    /// differed that way: one sets the phase before its try block, the other set it inside, after
+    /// four calls, with the catch routing to the failure handler and the phase never cleared.</para>
+    /// <para>The consequences are the three this file already names: the connect-cancel button
+    /// stays on screen carrying the same _Cancel label, and the watchdog stays armed, so its expiry
+    /// raises a reconnect overlay on the session the user just abandoned.</para>
+    /// </remarks>
+    [Fact]
+    public void BothCancelHandlersSetThePhaseBeforeAnythingThatCanThrow()
+    {
+        AssertPhaseIsSetBeforeTheTryBlock(ReconnectCancelHandler);
+        AssertPhaseIsSetBeforeTheTryBlock(ConnectCancelHandler);
+    }
+
+    private static void AssertPhaseIsSetBeforeTheTryBlock(string handlerSignature)
+    {
+        string body = HandlerBody(handlerSignature);
+
+        Match phase = Regex.Match(body, @"TransitionPhase\(RdpConnectionPhase\.(\w+)\)");
+        Assert.True(phase.Success, $"{handlerSignature} no longer sets a connection phase.");
+
+        // The try block itself, not the word: prose above the statement mentions it.
+        Match tryBlock = Regex.Match(body, @"(?m)^\s*try\s*$");
+        Assert.True(tryBlock.Success, $"{handlerSignature} no longer has a try block to measure against.");
+
+        Assert.True(
+            phase.Index < tryBlock.Index,
+            $"{handlerSignature} sets the connection phase inside its try block, so a throw from "
+                + "any statement before it leaves the view describing a connection in progress that "
+                + "the user has just abandoned.");
+    }
+
     // The phase this all turns on is read out of the source, so the two tests above assert nothing
     // if that read stops working. This one fails loudly instead of letting them pass empty.
     [Fact]
@@ -92,7 +129,7 @@ public sealed class RdpCancelPhaseAgreementTests
         Assert.True(System.Enum.IsDefined(PhaseSetBy(ConnectCancelHandler)));
     }
 
-    private static RdpConnectionPhase PhaseSetBy(string handlerSignature)
+    private static string HandlerBody(string handlerSignature)
     {
         string source = ReadViewSource();
         int start = source.IndexOf(handlerSignature, System.StringComparison.Ordinal);
@@ -102,9 +139,14 @@ public sealed class RdpCancelPhaseAgreementTests
         Match next = Regex.Match(
             source[(start + handlerSignature.Length)..],
             @"(?m)^    (private|public|internal|protected)\s");
-        string body = next.Success
+        return next.Success
             ? source.Substring(start, handlerSignature.Length + next.Index)
             : source[start..];
+    }
+
+    private static RdpConnectionPhase PhaseSetBy(string handlerSignature)
+    {
+        string body = HandlerBody(handlerSignature);
 
         Match phase = Regex.Match(body, @"TransitionPhase\(RdpConnectionPhase\.(\w+)\)");
         Assert.True(

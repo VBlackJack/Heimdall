@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             xmlns:rdp="clr-namespace:Heimdall.App.Views.EmbeddedRdp"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
              mc:Ignorable="d"
@@ -78,7 +79,7 @@
                         </Style>
                     </Border.Style>
                 </Border>
-                <StackPanel x:Name="HealthDot"
+                <rdp:AutomationStackPanel x:Name="HealthDot"
                             DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             Margin="8,0,4,0"
@@ -100,7 +101,7 @@
                                Margin="2,0,0,0"
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource TextDisabledBrush}"/>
-                </StackPanel>
+                </rdp:AutomationStackPanel>
                 <Button x:Name="FullscreenButton"
                         DockPanel.Dock="Right"
                         TabIndex="1"
@@ -231,11 +232,15 @@
                                VerticalAlignment="Center"/>
                     <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
+                    <!-- No AutomationProperties.Name: a name wins over the element's own text,
+                         so a constant one announces "Connection status" in place of whichever of
+                         the thirty-odd status messages is showing. The role wording lives in
+                         HelpText, and the five sibling status lines below already do this. -->
                     <TextBlock x:Name="StatusTextBlock"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
-                               AutomationProperties.Name="{loc:Translate A11yConnectionStatus}"
+                               AutomationProperties.HelpText="{loc:Translate A11yConnectionStatus}"
                                AutomationProperties.LiveSetting="Polite"/>
                     <TextBlock x:Name="AutofillSeparator"
                                Text=" &#x2022; "
@@ -279,13 +284,15 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"
                                Visibility="Collapsed"/>
+                    <!-- No AutomationProperties.LiveSetting on the three timers below: they are rewritten
+                         once a second, and a polite live region firing every second is a flood
+                         rather than an announcement. The status line beside them carries the state. -->
                     <TextBlock x:Name="StabilizingStatusText"
                                FontSize="{StaticResource FontSizeCaption}"
                                FontStyle="Italic"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"
-                               Visibility="Collapsed"
-                               AutomationProperties.LiveSetting="Polite"/>
+                               Visibility="Collapsed"/>
                     <TextBlock x:Name="NextRetrySeparator"
                                Text=" &#x2022; "
                                Margin="6,0,0,0"
@@ -298,8 +305,7 @@
                                FontStyle="Italic"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"
-                               Visibility="Collapsed"
-                               AutomationProperties.LiveSetting="Polite"/>
+                               Visibility="Collapsed"/>
                     <TextBlock x:Name="ReconnectElapsedSeparator"
                                Text=" &#x2022; "
                                Margin="6,0,0,0"
@@ -312,9 +318,8 @@
                                FontStyle="Italic"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"
-                               Visibility="Collapsed"
-                               AutomationProperties.LiveSetting="Polite"/>
-                    <StackPanel x:Name="ConnectionPhaseStepper"
+                               Visibility="Collapsed"/>
+                    <rdp:AutomationStackPanel x:Name="ConnectionPhaseStepper"
                                 Orientation="Horizontal"
                                 Margin="12,0,0,0"
                                 VerticalAlignment="Center"
@@ -346,7 +351,7 @@
                                 Height="3"
                                 CornerRadius="1.5"
                                 Background="{DynamicResource TextDisabledBrush}"/>
-                    </StackPanel>
+                    </rdp:AutomationStackPanel>
                     <Button x:Name="AntiIdleBadge"
                             TabIndex="5"
                             Click="OnAntiIdleBadgeClick"
@@ -366,7 +371,7 @@
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Border x:Name="RedirectionIndicatorsPanel"
+                    <rdp:AutomationBorder x:Name="RedirectionIndicatorsPanel"
                             Margin="12,0,0,0"
                             Padding="6,1"
                             CornerRadius="4"
@@ -444,7 +449,7 @@
                                     ToolTip="{loc:Translate RdpRedirectionExpandBadgeTooltip}"
                                     AutomationProperties.Name="{loc:Translate RdpRedirectionExpandBadgeA11y}"/>
                         </StackPanel>
-                    </Border>
+                    </rdp:AutomationBorder>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -503,7 +508,7 @@
             </Border>
 
             <!-- Reconnect overlay (shown on unexpected disconnect) -->
-            <Border x:Name="ReconnectOverlay"
+            <rdp:AutomationBorder x:Name="ReconnectOverlay"
                     Style="{StaticResource FadeInPanelStyle}"
                     Visibility="Collapsed"
                     Focusable="True"
@@ -535,8 +540,7 @@
                                Foreground="{DynamicResource ErrorTextBrush}"
                                Focusable="False"
                                IsHitTestVisible="False"
-                               AutomationProperties.Name=""
-                               AutomationProperties.IsOffscreenBehavior="Onscreen"/>
+                               AutomationProperties.Name=" "/>
                     <TextBlock x:Name="ReconnectMessageText"
                                MaxWidth="400"
                                HorizontalAlignment="Center"
@@ -609,7 +613,7 @@
                                 Margin="8,0,0,0"/>
                     </WrapPanel>
                 </StackPanel>
-            </Border>
+            </rdp:AutomationBorder>
 
             <!-- Connection progress indicator -->
             <ProgressBar x:Name="RdpLoadingBar"
@@ -622,7 +626,7 @@
                          BorderThickness="0"
                          IsHitTestVisible="False"/>
 
-            <Border x:Name="TransientToast"
+            <rdp:AutomationBorder x:Name="TransientToast"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Top"
                     Margin="0,16,0,0"
@@ -641,7 +645,7 @@
                 <TextBlock x:Name="TransientToastText"
                            Foreground="{DynamicResource TextPrimaryBrush}"
                            FontSize="{StaticResource FontSizeBody}"/>
-            </Border>
+            </rdp:AutomationBorder>
         </Grid>
     </Grid>
 </UserControl>
