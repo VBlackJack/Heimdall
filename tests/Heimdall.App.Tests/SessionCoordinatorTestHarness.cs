@@ -28,6 +28,7 @@ using Heimdall.App.ViewModels.Settings;
 using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -329,11 +330,18 @@ public sealed partial class SessionCoordinatorPreMountTests
                 dialogService,
                 new FakeClipboardService(),
                 dispatcher);
+            TrustedRdpCertificatesSettingsViewModel trustedRdpCertificates = new(
+                new RdpCertificateTrustStore(),
+                () => Task.FromResult<IReadOnlyList<ServerProfileDto>>([]),
+                localizer,
+                dialogService,
+                dispatcher);
             SettingsViewModel settings = new SettingsViewModel(
                 configManager,
                 localizer,
                 dialogService,
                 trustedHostKeys,
+                trustedRdpCertificates,
                 new PinManager(),
                 new Heimdall.Core.Security.Vault.VaultLifecycleService(configManager),
                 null!,

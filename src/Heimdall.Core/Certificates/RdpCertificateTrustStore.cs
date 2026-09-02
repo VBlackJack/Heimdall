@@ -193,12 +193,15 @@ public sealed class RdpCertificateTrustStore
     /// <param name="thumbprint">The thumbprint to forget.</param>
     /// <returns><see langword="true"/> when something was removed.</returns>
     /// <remarks>
-    /// <b>No shipping surface calls this.</b> There is no settings screen for RDP
-    /// certificate trust, so today the only way a user can revoke a durable approval is to
-    /// hand-edit <c>trustedRdpCertificates</c> in settings.json - unlike SSH host keys,
-    /// which <c>TrustedHostKeysSettingsViewModel</c> can list and remove. The method is
-    /// kept and tested because that screen is what it is for; the comment says "no caller"
-    /// rather than "for the settings screen" so the gap stays visible.
+    /// <b>The caller is the settings screen this method was written for.</b>
+    /// <c>TrustedRdpCertificatesSettingsViewModel</c> lists every durable decision and
+    /// revokes one behind a confirmation; before it existed the only way back out of an
+    /// approval was to hand-edit <c>trustedRdpCertificates</c> in settings.json.
+    /// <para>
+    /// The removal is persisted by the <see cref="TrustChanged"/> subscriber, which writes
+    /// the set back exactly as a new approval does. Nothing here writes anything: a caller
+    /// that removes without that subscription in place forgets only until the next launch.
+    /// </para>
     /// </remarks>
     public bool Remove(string profileId, string thumbprint)
     {
@@ -237,8 +240,10 @@ public sealed class RdpCertificateTrustStore
 
     /// <summary>Every profile trusting at least one certificate.</summary>
     /// <remarks>
-    /// Shaped for a settings screen that does not ship yet, and with no caller until it
-    /// does. See <see cref="Remove"/> for what that absence costs a user.
+    /// Shaped for, and read by, <c>TrustedRdpCertificatesSettingsViewModel</c>: one row per
+    /// certificate, grouped under the profile that approved it. A profile holding an empty
+    /// set is omitted rather than returned empty, so the screen never draws a server with
+    /// nothing under it.
     /// </remarks>
     public IReadOnlyDictionary<string, IReadOnlyCollection<RdpCertificateEntry>> GetAllApproved()
     {

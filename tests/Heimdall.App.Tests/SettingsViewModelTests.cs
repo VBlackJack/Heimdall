@@ -26,6 +26,7 @@ using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -2626,11 +2627,18 @@ public sealed class SettingsViewModelTests
             dialog,
             new FakeClipboardService(),
             new FakeUiDispatcher());
+        TrustedRdpCertificatesSettingsViewModel trustedRdpCertificates = new(
+            new RdpCertificateTrustStore(),
+            () => Task.FromResult<IReadOnlyList<ServerProfileDto>>([]),
+            localizer,
+            dialog,
+            new FakeUiDispatcher());
         SettingsViewModel viewModel = new(
             new FakeConfigManager(),
             localizer,
             dialog,
             trustedHostKeys,
+            trustedRdpCertificates,
             new PinManager(),
             new VaultLifecycleService(new FakeConfigManager()),
             new FakeUpdateService(),
@@ -2777,12 +2785,19 @@ public sealed class SettingsViewModelTests
             dialog,
             new FakeClipboardService(),
             new FakeUiDispatcher());
+        var trustedRdpCertificates = new TrustedRdpCertificatesSettingsViewModel(
+            new RdpCertificateTrustStore(),
+            () => Task.FromResult<IReadOnlyList<ServerProfileDto>>([]),
+            localizer,
+            dialog,
+            new FakeUiDispatcher());
 
         return new SettingsViewModel(
             config,
             localizer,
             dialog,
             trustedHostKeys,
+            trustedRdpCertificates,
             new PinManager(),
             new VaultLifecycleService(config),
             updateService,

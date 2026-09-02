@@ -29,6 +29,7 @@ using Heimdall.App.ViewModels.Settings;
 using Heimdall.App.ViewModels.Shell;
 using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.App.Views;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -491,6 +492,12 @@ public sealed class MainViewModelSettingsNavigationTests
                 dialog,
                 new NullClipboardService(),
                 dispatcher);
+            TrustedRdpCertificatesSettingsViewModel trustedRdpCertificates = new(
+                new RdpCertificateTrustStore(),
+                () => Task.FromResult<IReadOnlyList<ServerProfileDto>>([]),
+                localizer,
+                dialog,
+                dispatcher);
             StubUpdateService updateService = new();
             StubAppVersionProvider appVersionProvider = new();
             StubUpdateInstallFlow updateInstallFlow = new();
@@ -501,6 +508,7 @@ public sealed class MainViewModelSettingsNavigationTests
                 localizer,
                 dialog,
                 trustedHostKeys,
+                trustedRdpCertificates,
                 new PinManager(),
                 vaultLifecycle,
                 updateService,

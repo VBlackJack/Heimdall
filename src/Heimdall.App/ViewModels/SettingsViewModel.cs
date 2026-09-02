@@ -990,6 +990,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         LocalizationManager localizer,
         IDialogService dialogService,
         TrustedHostKeysSettingsViewModel trustedHostKeys,
+        TrustedRdpCertificatesSettingsViewModel trustedRdpCertificates,
         PinManager pinManager,
         VaultLifecycleService vaultLifecycle,
         IUpdateService updateService,
@@ -1011,6 +1012,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _profileImportService = profileImportService;
         _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
         TrustedHostKeys = trustedHostKeys;
+        TrustedRdpCertificates = trustedRdpCertificates;
 
         // The banner and the tab badges are derived from the error set, so they have to follow it
         // rather than hold the shape it had when Save was last pressed.
@@ -1151,6 +1153,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     }
 
     public TrustedHostKeysSettingsViewModel TrustedHostKeys { get; }
+
+    /// <summary>The RDP certificate trust decisions this profile inventory carries.</summary>
+    public TrustedRdpCertificatesSettingsViewModel TrustedRdpCertificates { get; }
 
     internal Func<string?>? ImportFilePathProvider { get; set; }
 
@@ -1429,6 +1434,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SyncNumericTexts();
 
         TrustedHostKeys.Refresh();
+
+        // The RDP list reads the server inventory from disk, so its refresh is asynchronous
+        // while this reload is not. Started through its command rather than awaited: the
+        // command owns the failure, and the panel is not on screen when settings load.
+        TrustedRdpCertificates.RefreshCommand.Execute(null);
         IsDirty = false;
     }
 
@@ -3217,6 +3227,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         UnsubscribeExternalToolTracking();
         TrustedHostKeys.Dispose();
+        TrustedRdpCertificates.Dispose();
         GC.SuppressFinalize(this);
     }
 
