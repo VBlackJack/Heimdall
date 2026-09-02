@@ -40,6 +40,9 @@ public interface IDnsSecurityService
 /// </summary>
 public sealed class DnsSecurityService : IDnsSecurityService
 {
+    /// <summary>Executable that resolves DNS records locally.</summary>
+    internal const string NslookupExecutableName = "nslookup.exe";
+
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(8);
     private static readonly FrozenSet<string> AllowedRecordTypes =
         FrozenSet.ToFrozenSet(
@@ -276,12 +279,13 @@ public sealed class DnsSecurityService : IDnsSecurityService
 
         var psi = new ProcessStartInfo
         {
-            FileName = "nslookup",
+            FileName = SystemExecutablePath.InSystemDirectory(NslookupExecutableName),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
 
         psi.ArgumentList.Add($"-type={validatedRecordType}");

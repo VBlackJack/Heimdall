@@ -16,6 +16,7 @@
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using Heimdall.App.Services;
 using Heimdall.Core.SystemInfo;
@@ -98,7 +99,7 @@ public sealed class ServiceStatusServiceTests
         service.StartService("O'Brien");
 
         Assert.NotNull(captured);
-        Assert.Equal("powershell", captured!.FileName);
+        Assert.Equal("powershell.exe", Path.GetFileName(captured!.FileName), ignoreCase: true);
         Assert.True(captured.UseShellExecute);
         Assert.Equal("runas", captured.Verb);
         Assert.Contains("-EncodedCommand ", captured.Arguments, StringComparison.Ordinal);

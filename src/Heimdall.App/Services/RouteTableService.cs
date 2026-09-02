@@ -17,6 +17,7 @@
 using System.Diagnostics;
 using System.Text;
 using Heimdall.Core.Network;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
@@ -30,6 +31,12 @@ public interface IRouteTableService
 
 public sealed class RouteTableService : IRouteTableService
 {
+    /// <summary>Executable that prints the routing table.</summary>
+    internal const string RouteExecutableName = "route.exe";
+
+    /// <summary>Print the table; the parser reads the whole listing.</summary>
+    private const string RoutePrintArguments = "print";
+
     private readonly Func<string> _loadOutput;
 
     public RouteTableService()
@@ -56,19 +63,26 @@ public sealed class RouteTableService : IRouteTableService
         }
     }
 
-    private static string DefaultLoadOutput()
+    /// <summary>
+    /// Builds the start info for the routing-table dump.
+    /// </summary>
+    internal static ProcessStartInfo CreateRoutePrintStartInfo()
     {
-        var psi = new ProcessStartInfo
+        return new ProcessStartInfo
         {
-            FileName = "route",
-            Arguments = "print",
+            FileName = SystemExecutablePath.InSystemDirectory(RouteExecutableName),
+            Arguments = RoutePrintArguments,
             RedirectStandardOutput = true,
             UseShellExecute = false,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
+    }
 
-        using var proc = Process.Start(psi);
+    private static string DefaultLoadOutput()
+    {
+        using var proc = Process.Start(CreateRoutePrintStartInfo());
         if (proc is null)
         {
             throw new InvalidOperationException("Unable to start route.");

@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using Heimdall.Core.Network;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
@@ -33,6 +34,12 @@ public interface IWifiScanService
 public sealed class WifiScanService : IWifiScanService
 {
     public const int ProcessTimeoutMs = 10000;
+
+    /// <summary>Executable that reports the visible wireless networks.</summary>
+    internal const string NetshExecutableName = "netsh.exe";
+
+    /// <summary>List the networks with per-BSSID detail, which the parser expects.</summary>
+    private const string NetshWifiScanArguments = "wlan show networks mode=bssid";
 
     private readonly Func<Task<string>> _runNetshAsync;
 
@@ -55,20 +62,27 @@ public sealed class WifiScanService : IWifiScanService
             .ToList();
     }
 
+    /// <summary>
+    /// Builds the start info for the wireless-network scan.
+    /// </summary>
+    internal static ProcessStartInfo CreateNetshWifiScanStartInfo()
+    {
+        return new ProcessStartInfo
+        {
+            FileName = SystemExecutablePath.InSystemDirectory(NetshExecutableName),
+            Arguments = NetshWifiScanArguments,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
+        };
+    }
+
     private static Task<string> DefaultRunNetshAsync()
     {
         return Task.Run(async () =>
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "netsh",
-                Arguments = "wlan show networks mode=bssid",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            using var proc = Process.Start(psi)
+            using var proc = Process.Start(CreateNetshWifiScanStartInfo())
                 ?? throw new InvalidOperationException("Failed to start netsh process.");
 
             var outputTask = proc.StandardOutput.ReadToEndAsync();

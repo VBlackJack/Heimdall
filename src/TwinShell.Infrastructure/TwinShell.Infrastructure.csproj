@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="TwinShell.Infrastructure.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TwinShell.Core\TwinShell.Core.csproj" />
     <ProjectReference Include="..\TwinShell.Persistence\TwinShell.Persistence.csproj" />
   </ItemGroup>

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Network;
@@ -283,7 +284,7 @@ public sealed class DnsLookupServiceTests
 
         var service = BuildService(
             gateway: null,
-            hostEntryQuery: (_, _, _, _) => throw new Xunit.Sdk.XunitException("A/AAAA without custom server must use host-entry — use nslookup fixture for a different branch"),
+            hostEntryQuery: (_, _, _, _) => throw new Xunit.Sdk.XunitException("A/AAAA without custom server must use host-entry - use nslookup fixture for a different branch"),
             nslookupQuery: (_, type, _, _) =>
             {
                 capturedToken = type;
@@ -429,7 +430,7 @@ public sealed class DnsLookupServiceTests
     {
         var psi = DnsLookupService.CreateLocalNslookupStartInfo("example.com", "MX", "8.8.8.8");
 
-        Assert.Equal("nslookup", psi.FileName);
+        Assert.Equal("nslookup.exe", Path.GetFileName(psi.FileName), ignoreCase: true);
         Assert.Equal(3, psi.ArgumentList.Count);
         Assert.Equal("-type=MX", psi.ArgumentList[0]);
         Assert.Equal("example.com", psi.ArgumentList[1]);

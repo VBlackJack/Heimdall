@@ -65,6 +65,9 @@ public interface IDnsLookupService
 /// </summary>
 public sealed class DnsLookupService : IDnsLookupService
 {
+    /// <summary>Executable that resolves DNS records locally.</summary>
+    internal const string NslookupExecutableName = "nslookup.exe";
+
     /// <summary>
     /// Remote command timeout for the SSH gateway path (<c>dig</c>/<c>nslookup</c>/<c>host</c>).
     /// </summary>
@@ -265,12 +268,13 @@ public sealed class DnsLookupService : IDnsLookupService
 
         var psi = new ProcessStartInfo
         {
-            FileName = "nslookup",
+            FileName = SystemExecutablePath.InSystemDirectory(NslookupExecutableName),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
 
         psi.ArgumentList.Add($"-type={recordType}");

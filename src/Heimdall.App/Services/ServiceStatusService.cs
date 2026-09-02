@@ -17,6 +17,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using Heimdall.Core.Security;
 using Heimdall.Core.SystemInfo;
 
 namespace Heimdall.App.Services;
@@ -34,6 +35,13 @@ public interface IServiceStatusService
 
 public sealed class ServiceStatusService : IServiceStatusService
 {
+    /// <summary>Script that lists the services as CSV, which the parser expects.</summary>
+    private const string ServiceListScript =
+        "Get-Service | Select-Object Name,DisplayName,Status,StartType | ConvertTo-Csv -NoTypeInformation";
+
+    /// <summary>Elevation verb the service actions need.</summary>
+    private const string ElevationVerb = "runas";
+
     private readonly Func<CancellationToken, Task<string>> _loadCsvAsync;
     private readonly Func<ProcessStartInfo, Process?> _launchProcess;
 
@@ -75,13 +83,7 @@ public sealed class ServiceStatusService : IServiceStatusService
 
         try
         {
-            var process = _launchProcess(new ProcessStartInfo
-            {
-                FileName = "powershell",
-                Arguments = $"-NoProfile -EncodedCommand {encoded}",
-                Verb = "runas",
-                UseShellExecute = true,
-            });
+            var process = _launchProcess(CreateElevatedServiceActionStartInfo(encoded));
 
             process?.Dispose();
         }
@@ -91,20 +93,45 @@ public sealed class ServiceStatusService : IServiceStatusService
         }
     }
 
-    private static async Task<string> DefaultLoadCsvAsync(CancellationToken ct)
+    /// <summary>
+    /// Builds the start info for the elevated service action. The command itself is already
+    /// base64-encoded by the caller, so no quoting survives into the child.
+    /// </summary>
+    internal static ProcessStartInfo CreateElevatedServiceActionStartInfo(string encodedCommand)
     {
-        var psi = new ProcessStartInfo
+        ArgumentException.ThrowIfNullOrWhiteSpace(encodedCommand);
+
+        return new ProcessStartInfo
         {
-            FileName = "powershell",
-            Arguments = "-NoProfile -Command \"Get-Service | Select-Object Name,DisplayName,Status,StartType | ConvertTo-Csv -NoTypeInformation\"",
+            FileName = SystemExecutablePath.WindowsPowerShell,
+            Arguments = $"-NoProfile -EncodedCommand {encodedCommand}",
+            Verb = ElevationVerb,
+            UseShellExecute = true,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
+        };
+    }
+
+    /// <summary>
+    /// Builds the start info for the service listing.
+    /// </summary>
+    internal static ProcessStartInfo CreateServiceListStartInfo()
+    {
+        return new ProcessStartInfo
+        {
+            FileName = SystemExecutablePath.WindowsPowerShell,
+            Arguments = $"-NoProfile -Command \"{ServiceListScript}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
+    }
 
-        using var proc = Process.Start(psi)
+    private static async Task<string> DefaultLoadCsvAsync(CancellationToken ct)
+    {
+        using var proc = Process.Start(CreateServiceListStartInfo())
             ?? throw new InvalidOperationException("Failed to start PowerShell.");
 
         var output = await proc.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
