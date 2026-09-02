@@ -66,6 +66,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     private readonly HostKeyStore _hostKeyStore;
     private readonly IHostKeyVerifier _hostKeyVerifier;
     private readonly IConfigManager _configManager;
+    private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
     private readonly PropertyChangedEventHandler _connectionPropertyChangedHandler;
     private readonly NotifyCollectionChangedEventHandler _activeSessionsCollectionChangedHandler;
     private readonly PropertyChangedEventHandler _tabPropertyChangedHandler;
@@ -102,6 +103,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     {
     }
 
+    /// <param name="agentRegistryFactory">
+    /// Builds the SSH agent registry the manual-tunnel command observes. Left
+    /// null in production, where it resolves to the real Pageant and Windows
+    /// OpenSSH probes; a test supplies its own so the composed refusal does not
+    /// depend on what happens to be running on the machine.
+    /// </param>
     internal TunnelsViewModel(
         ITunnelsHost host,
         LocalizationManager localizer,
@@ -109,7 +116,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         ConnectionStateMachine connectionSm,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
-        IConfigManager configManager)
+        IConfigManager configManager,
+        Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null)
     {
         _host = host;
         _localizer = localizer;
@@ -118,6 +126,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         _hostKeyStore = hostKeyStore;
         _hostKeyVerifier = hostKeyVerifier;
         _configManager = configManager;
+        _agentRegistryFactory = agentRegistryFactory ?? SshAgentRegistry.CreateDefault;
         _settingsSnapshot = host.CurrentSettings;
         _connectionPropertyChangedHandler = OnConnectionPropertyChanged;
         _activeSessionsCollectionChangedHandler = OnActiveSessionsCollectionChanged;
@@ -418,7 +427,17 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task<TunnelResult> OpenManualTunnelAsync(
+    /// <summary>
+    /// Dials a manual local forward and composes what the user is shown when the
+    /// gateway refuses the sign-in.
+    /// </summary>
+    /// <remarks>
+    /// Internal rather than private so a test can drive the refusal path without
+    /// the modal dialog <see cref="NewTunnelAsync"/> opens around it. The message
+    /// this returns is the one the status bar shows, so it is the thing worth
+    /// pinning.
+    /// </remarks>
+    internal async Task<TunnelResult> OpenManualTunnelAsync(
         NewTunnelDialogViewModel vm,
         AppSettings settings,
         CancellationToken ct)
@@ -437,7 +456,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return new TunnelResult(false, null, ex.Message, SshFailureCode.Unknown);
         }
 
-        var agentRegistry = SshAgentRegistry.CreateDefault(settings.SshAgentPreference);
+        var agentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
         if (chain.Any(hop => hop.AgentForwarding)
             && !agentRegistry.HasPlinkCompatibleAgent()
             && agentRegistry.HasAnyNonPlinkAgent())
@@ -461,9 +480,16 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         var remoteHost = vm.RemoteHost.Trim();
         var label = string.IsNullOrWhiteSpace(vm.Label) ? null : vm.Label.Trim();
+
+        // Read before the dial, for the same reason the tunnel service reads it
+        // there: the sentence composed below states how many keys this dial
+        // offered, and the agents keep changing while a refusal is in flight.
+        var agentAtDial = agentRegistry.Observe();
+
+        TunnelResult result;
         if (chain.Count == 1)
         {
-            return await _tunnelManager.OpenTunnelAsync(
+            result = await _tunnelManager.OpenTunnelAsync(
                     chain[0],
                     remoteHost,
                     vm.RemotePort,
@@ -475,17 +501,38 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                     label: label)
                 .ConfigureAwait(false);
         }
+        else
+        {
+            result = await _tunnelManager.OpenChainedTunnelAsync(
+                    chain,
+                    remoteHost,
+                    vm.RemotePort,
+                    vm.LocalPort,
+                    hostKeyStore: _hostKeyStore,
+                    verifier: _hostKeyVerifier,
+                    cancellationToken: ct,
+                    label: label)
+                .ConfigureAwait(false);
+        }
 
-        return await _tunnelManager.OpenChainedTunnelAsync(
-                chain,
-                remoteHost,
-                vm.RemotePort,
-                vm.LocalPort,
-                hostKeyStore: _hostKeyStore,
-                verifier: _hostKeyVerifier,
-                cancellationToken: ct,
-                label: label)
-            .ConfigureAwait(false);
+        // A manual tunnel used to hand the gateway's bare sentence to the status
+        // bar and stop there, so the same refused sign-in told the owner less
+        // here than it did from a server profile. It is the same composition,
+        // through the same helper: the gateway's wording first, the agent
+        // observation after it.
+        if (!result.Success && SshAuthFailureDiagnoser.IsAuthRejection(result.FailureCode))
+        {
+            result = result with
+            {
+                ErrorMessage = SshAuthFailureMessageComposer.AppendAgentObservation(
+                    _localizer,
+                    result.ErrorMessage,
+                    chain,
+                    agentAtDial.OfferableIdentityCount)
+            };
+        }
+
+        return result;
     }
 
     private string ResolvePreflightMessage(string? message)

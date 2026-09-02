@@ -34,6 +34,19 @@ namespace Heimdall.App.Services.Handlers;
 /// </summary>
 internal sealed class SshHandler : IProtocolHandler, IDisposable
 {
+    /// <summary>
+    /// Opens the embedded shell session. Replaced in tests so the refusal
+    /// branches below can be reached without a live SSH server: everything the
+    /// handler does with the exception - classification, localization, the
+    /// agent decision and the composed message - stays production code.
+    /// </summary>
+    internal delegate Task ConnectShellSession(
+        SshShellSession session,
+        SshConnectionParams connectionParams,
+        HostKeyStore hostKeyStore,
+        IHostKeyVerifier hostKeyVerifier,
+        CancellationToken cancellationToken);
+
     private readonly ITunnelService _tunnelService;
     private readonly ConnectionStateMachine _connectionSm;
     private readonly LocalizationManager _localizer;
@@ -47,6 +60,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly SensitiveFileJanitorScheduler _plinkPasswordFileJanitorScheduler;
     private readonly Action<string?> _deletePlinkPasswordFile;
     private readonly Func<string?, PlinkAttestationLease> _plinkAttestation;
+    private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
+    private readonly ConnectShellSession _connectShellSession;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -62,7 +77,9 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
         Action<string?>? deletePlinkPasswordFile = null,
-        Func<string?, PlinkAttestationLease>? plinkAttestation = null)
+        Func<string?, PlinkAttestationLease>? plinkAttestation = null,
+        Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
+        ConnectShellSession? connectShellSession = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -76,6 +93,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _plinkPasswordFileJanitor = plinkPasswordFileJanitor ?? new PlinkPasswordFileJanitor();
         _deletePlinkPasswordFile = deletePlinkPasswordFile ?? DeletePlinkPasswordFile;
         _plinkAttestation = plinkAttestation ?? PlinkCompatibilityAttestation.Acquire;
+        _agentRegistryFactory = agentRegistryFactory ?? SshAgentRegistry.CreateDefault;
+        _connectShellSession = connectShellSession ?? ConnectShellSessionAsync;
         _plinkPasswordFileJanitorScheduler = new SensitiveFileJanitorScheduler(
             nameof(PlinkPasswordFileJanitor),
             _plinkPasswordFileJanitor.SweepStale);
@@ -152,7 +171,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             X11Forwarding = server.SshX11Forwarding
         };
 
-        var agentRegistry = SshAgentRegistry.CreateDefault(settings.SshAgentPreference);
+        var agentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
         if (sshParams.AgentForwarding
             && !agentRegistry.HasPlinkCompatibleAgent()
             && agentRegistry.HasAnyNonPlinkAgent())
@@ -223,11 +242,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         var session = new SshShellSession();
         try
         {
-            await session.ConnectAsync(
-                    sshParams,
-                    hostKeyStore: _hostKeyStore,
-                    hostKeyVerifier: _hostKeyVerifier,
-                    cancellationToken: ct)
+            await _connectShellSession(session, sshParams, _hostKeyStore, _hostKeyVerifier, ct)
                 .ConfigureAwait(false);
             if (session.Client is { } connectedClient)
             {
@@ -286,10 +301,21 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     or SshFailureCode.NoSupportedAuth
                     or SshFailureCode.KeyboardInteractiveNoPassword)
             {
-                var fallbackAgentRegistry = SshAgentRegistry.CreateDefault(settings.SshAgentPreference);
+                var fallbackAgentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
                 if (!fallbackAgentRegistry.HasPlinkCompatibleAgent() && fallbackAgentRegistry.HasAnyNonPlinkAgent())
                 {
-                    var message = _localizer[SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported];
+                    // Why no Plink retry was attempted. It is an observation
+                    // about Heimdall and it names no cause for the refusal, so
+                    // it goes after the server's own sentence and never over it.
+                    // This branch used to return the notice alone: with the
+                    // Windows OpenSSH Agent reachable and Pageant absent, a
+                    // wrong password produced a screen that said nothing about
+                    // the password.
+                    var message = SshAuthFailureMessageComposer.AppendSentence(
+                        localizedFailure.Message,
+                        _localizer[SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported],
+                        SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported)
+                        ?? localizedFailure.Message;
                     _connectionSm.SetError(server.Id, message);
                     ReleaseTunnelIfNeeded(usesTunnel, targetPort);
                     return new ConnectionResult(
@@ -342,6 +368,18 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     /// </remarks>
     private SshFailureInfo LocalizeFailure(SshFailureInfo failure, string targetHost) =>
         SshFailureLocalizer.Localize(failure, _localizer, targetHost);
+
+    private static Task ConnectShellSessionAsync(
+        SshShellSession session,
+        SshConnectionParams connectionParams,
+        HostKeyStore hostKeyStore,
+        IHostKeyVerifier hostKeyVerifier,
+        CancellationToken cancellationToken) =>
+        session.ConnectAsync(
+            connectionParams,
+            hostKeyStore: hostKeyStore,
+            hostKeyVerifier: hostKeyVerifier,
+            cancellationToken: cancellationToken);
 
     private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
     {

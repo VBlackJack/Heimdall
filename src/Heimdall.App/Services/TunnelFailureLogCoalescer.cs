@@ -26,8 +26,8 @@ namespace Heimdall.App.Services;
 /// </summary>
 /// <param name="ShouldReport">True for the first failure of its kind in the window.</param>
 /// <param name="SuppressedRepeats">
-/// On a full report, how many identical failures went unreported since the last
-/// one. On a suppressed failure, its rank among the repeats of the current window.
+/// On a full report, how many identical failures were demoted since the last
+/// one. On a demoted failure, its rank among the repeats of the current window.
 /// </param>
 internal readonly record struct TunnelFailureReportDecision(bool ShouldReport, int SuppressedRepeats);
 
@@ -40,28 +40,41 @@ internal readonly record struct TunnelFailureReportDecision(bool ShouldReport, i
 internal delegate void TunnelFailureLogWriter(bool fullReport, string message);
 
 /// <summary>
-/// Decides whether a tunnel failure adds anything to the log.
+/// Decides which tunnel failure is the one worth reading, and demotes its
+/// identical repeats.
 /// <para>
 /// Reconnecting a session set dials every profile that shares a gateway. When
 /// that gateway is unreachable or refuses authentication, each profile produces
-/// the same diagnosis, and the second through tenth copies bury the line that
-/// mattered. This class reports the first failure of a given
-/// (gateway chain, failure code, message) triple and holds back its identical
-/// repeats for a short window. A different gateway, a different failure code,
-/// or the same code carrying a different message is a different triple and is
-/// always reported - so "identical" is a comparison, not an assumption.
+/// the same diagnosis, and ten copies at the same severity bury the line that
+/// mattered. This class answers <c>ShouldReport</c> once for a given
+/// (gateway chain, failure code, message) triple and denies it to that triple's
+/// identical repeats for a short window. A different gateway, a different
+/// failure code, or the same code carrying a different message is a different
+/// triple and is always reported - so "identical" is a comparison, not an
+/// assumption.
 /// </para>
 /// <para>
-/// This changes what is written to the log, never whether a connection is
+/// What that buys is a severity, not a smaller file. The caller writes the
+/// reported failure at Error and each repeat at Debug (see
+/// <c>TunnelService.ReportTunnelFailure</c>), and <c>FileLogger</c> has one
+/// queue and one file for every level: ten identical failures still put ten
+/// lines in the log, one of them Error. Filtering on Error is what leaves one
+/// line; nothing here removes text from the file, and the repeats deliberately
+/// carry the full diagnosis so a reader holding only the log can still answer
+/// "why did attempt N fail".
+/// </para>
+/// <para>
+/// This changes how a tunnel failure is recorded, never whether a connection is
 /// attempted: it is not a retry policy and not a circuit breaker.
 /// </para>
 /// </summary>
 internal sealed class TunnelFailureLogCoalescer
 {
     /// <summary>
-    /// How long identical failures stay folded into the first report. A session
-    /// set reconnects within a few seconds of itself; this window covers that
-    /// burst without hiding a failure the user provoked again later by hand.
+    /// How long identical failures stay demoted behind the first report. A
+    /// session set reconnects within a few seconds of itself; this window covers
+    /// that burst without demoting a failure the user provoked again later by
+    /// hand.
     /// </summary>
     internal static readonly TimeSpan DefaultWindow = TimeSpan.FromSeconds(30);
 
@@ -99,11 +112,11 @@ internal sealed class TunnelFailureLogCoalescer
     /// <param name="message">
     /// The composed message this failure would report. It is part of the key, so
     /// the thing being deduplicated is the thing being compared: ten profiles
-    /// failing on one gateway still produce one line because their messages are
+    /// failing on one gateway produce one Error line because their messages are
     /// byte-identical, while the same gateway failing under the same code with a
     /// different message - a different target host, or a diagnosis that changed
     /// because the user loaded a key between attempts - reopens immediately
-    /// instead of being folded into a report that no longer describes it.
+    /// instead of being demoted behind a report that no longer describes it.
     /// </param>
     public TunnelFailureReportDecision Evaluate(
         string? gatewayChainKey,

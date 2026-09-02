@@ -276,6 +276,15 @@ public sealed class TunnelService : ITunnelService
             return new TunnelResult(false, null, message, SshFailureCode.PortInUse);
         }
 
+        // Read once, here, because this is the last statement before the chain is
+        // dialled. Every sentence composed after the refusal comes back is a claim
+        // about what was offered, and the agents keep changing while a refusal is
+        // in flight: a key loaded during a wrong-password timeout would otherwise
+        // be counted as a key this dial presented. For one hop this is the instant
+        // of that hop's dial. For a chain it is the instant of the FIRST hop's,
+        // which AppendAuthFailureContext states and bounds.
+        SshAgentObservation agentAtDial = agentRegistry.Observe();
+
         if (chain.Count == 1)
         {
             int keepAlive = _currentSettings?.SshKeepAliveIntervalSeconds ?? AppSettings.DefaultSshKeepAliveIntervalSeconds;
@@ -318,8 +327,9 @@ public sealed class TunnelService : ITunnelService
         // state where they fire - an SSH agent actually running - the gateway's
         // own sentence was replaced by a sentence about Heimdall's fallback.
         // The refusal is composed once, first, and every route below appends to
-        // it. The registry is the one observed before the dial and the one the
-        // diagnosis reads, so a single agent state decides the whole message.
+        // it. Every route also reads the same agent observation, taken before
+        // the dial, so one agent state decides the whole message - the count it
+        // quotes, and whether a Plink retry was attempted at all.
         if (!result.Success
             && chain.Count == 1
             && result.FailureCode is SshFailureCode.AuthRejected
@@ -327,11 +337,11 @@ public sealed class TunnelService : ITunnelService
                 or SshFailureCode.PassphraseRejected)
         {
             string? refusedByServer = result.ErrorMessage;
-            TunnelResult refusal = AppendAuthFailureContext(result, chain, agentRegistry);
+            TunnelResult refusal = AppendAuthFailureContext(result, chain, agentAtDial);
             string refusalMessage = refusal.ErrorMessage
                 ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
 
-            if (agentRegistry.HasPlinkCompatibleAgent())
+            if (agentAtDial.HasPlinkCompatibleAgent)
             {
                 Core.Logging.FileLogger.Info(
                     $"SSH.NET auth failed, falling back to Plink: {result.ErrorMessage}");
@@ -375,15 +385,16 @@ public sealed class TunnelService : ITunnelService
                 return fallback;
             }
 
-            if (agentRegistry.HasAnyNonPlinkAgent())
+            if (agentAtDial.HasAnyNonPlinkAgent)
             {
                 // Why no fallback was attempted. It is an observation about
                 // Heimdall, appended last, and it names no cause for the
                 // gateway's refusal.
-                string unusableAgentMessage = AppendSentence(
+                string unusableAgentMessage = SshAuthFailureMessageComposer.AppendSentence(
                     refusalMessage,
                     _localizer[SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported],
-                    SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported);
+                    SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported)
+                    ?? refusalMessage;
                 ReportTunnelFailure(
                     serverId,
                     gatewayId,
@@ -412,7 +423,7 @@ public sealed class TunnelService : ITunnelService
         else
         {
             string? relayedMessage = result.ErrorMessage;
-            result = AppendAuthFailureContext(result, chain, agentRegistry);
+            result = AppendAuthFailureContext(result, chain, agentAtDial);
             string message = result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
             ReportTunnelFailure(serverId, gatewayId, gatewayChainKey, result, message, relayedMessage);
             _connectionSm.SetError(serverId, message);
@@ -427,67 +438,46 @@ public sealed class TunnelService : ITunnelService
     /// true and which nothing here may drop: a wrong stored password and an
     /// unloaded agent key both come back as "Permission denied (password)", and
     /// only the server knows which it was. The appended sentence adds the one
-    /// fact the user cannot see - how many keys an agent had loaded - and
-    /// claims nothing about the cause.
+    /// fact the user cannot see - how many keys an agent had loaded when the
+    /// chain was dialled - and claims nothing about the cause.
+    /// <para>
+    /// The count comes from <paramref name="agentAtDial"/>, read before the
+    /// chain is dialled. Reading the agents here instead would quote the state
+    /// they are in after the refusal has travelled back, which is a different
+    /// instant and can be a different number.
+    /// </para>
+    /// <para>
+    /// <b>That instant is the refusing gateway's own dial for a single hop only.</b>
+    /// <c>TunnelManager</c> builds each hop's client as it reaches it, and
+    /// <c>SshConnectionFactory</c> takes the agent identities from the registry at
+    /// the moment each hop's connection is built, so a refusal from the third hop is
+    /// described with a reading taken before the first: a key loaded while the earlier
+    /// hops were negotiating WAS offered to the hop that refused, and is not counted
+    /// here. The sentence the user then reads is early by however long those hops
+    /// took, which is the honest residue of moving the reading before the dial rather
+    /// than after the refusal. Making it exact for chains means observing per hop,
+    /// which means threading the registry through <c>TunnelManager</c>. The gap is
+    /// named here rather than closed in prose.
+    /// </para>
     /// </summary>
     private TunnelResult AppendAuthFailureContext(
         TunnelResult result,
         IReadOnlyList<SshConnectionParams> chain,
-        SshAgentRegistry agentRegistry)
+        SshAgentObservation agentAtDial)
     {
         if (result.Success || !SshAuthFailureDiagnoser.IsAuthRejection(result.FailureCode))
         {
             return result;
         }
 
-        SshAuthFailureDiagnosis diagnosis = SshAuthFailureDiagnoser.Diagnose(chain, agentRegistry);
-        string context = _localizer.Format(diagnosis.ContextMessageKey, diagnosis.AgentIdentityCount);
-
-        // A key missing from the catalogue resolves to itself. Showing an
-        // identifier would be worse than showing nothing, and worse still than
-        // the server's own sentence, so the context is dropped rather than
-        // shipped raw. CSharpLocaleKeyCoverageTests is what makes that state
-        // visible before a release; this only bounds the damage if it ships.
-        if (string.Equals(context, diagnosis.ContextMessageKey, StringComparison.Ordinal))
-        {
-            return result;
-        }
-
         return result with
         {
-            ErrorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
-                ? context
-                : $"{result.ErrorMessage} {context}"
+            ErrorMessage = SshAuthFailureMessageComposer.AppendAgentObservation(
+                _localizer,
+                result.ErrorMessage,
+                chain,
+                agentAtDial.OfferableIdentityCount)
         };
-    }
-
-    /// <summary>
-    /// Joins one more sentence onto a message already composed. The head is
-    /// never rewritten: what the gateway said stays first, whatever Heimdall
-    /// has to add after it.
-    /// <para>
-    /// A sentence is dropped when it is empty, when it resolved to its own
-    /// locale key - showing an identifier would be worse than showing nothing -
-    /// or when the head already carries it.
-    /// </para>
-    /// </summary>
-    private static string AppendSentence(string head, string? sentence, string? sentenceKey = null)
-    {
-        if (string.IsNullOrWhiteSpace(sentence)
-            || (sentenceKey is not null
-                && string.Equals(sentence, sentenceKey, StringComparison.Ordinal)))
-        {
-            return head;
-        }
-
-        if (string.IsNullOrWhiteSpace(head))
-        {
-            return sentence;
-        }
-
-        return head.Contains(sentence, StringComparison.Ordinal)
-            ? head
-            : $"{head} {sentence}";
     }
 
     /// <summary>
@@ -597,7 +587,11 @@ public sealed class TunnelService : ITunnelService
     {
         TunnelResult Refuse(string message, SshFailureCode? code, string? messageKey = null)
         {
-            string composed = AppendSentence(precedingRefusal ?? string.Empty, message, messageKey);
+            string composed = SshAuthFailureMessageComposer.AppendSentence(
+                precedingRefusal ?? string.Empty,
+                message,
+                messageKey)
+                ?? string.Empty;
             _connectionSm.SetError(serverId, composed);
             return new TunnelResult(false, null, composed, code);
         }

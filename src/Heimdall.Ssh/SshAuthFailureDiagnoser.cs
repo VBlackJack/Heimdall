@@ -20,17 +20,17 @@ namespace Heimdall.Ssh;
 
 /// <summary>
 /// What Heimdall can prove about a refused SSH authentication, from the gateway
-/// chain it dialled and the local SSH agent state observed at failure time.
+/// chain it dialled and the local SSH agent state observed when it dialled.
 /// </summary>
 /// <param name="AgentIsSoleAuthSource">
 /// True when at least one hop of the chain carries neither a key file nor a
 /// stored password, so an SSH agent identity was that hop's only sign-in source.
 /// </param>
 /// <param name="AgentIdentityCount">
-/// How many identities were offered to the gateway when the dial failed. That
-/// is the identity count of the one agent whose keys authentication presents,
-/// not the sum over every agent running - see
-/// <see cref="SshAgentRegistry.OfferableIdentityCount"/>.
+/// How many identities were offered to the gateway. That is the identity count
+/// of the one agent whose keys authentication presents, not the sum over every
+/// agent running - see <see cref="SshAgentRegistry.OfferableIdentityCount"/> -
+/// and it is read before the dial, not after the refusal comes back.
 /// </param>
 /// <param name="ContextMessageKey">
 /// Localization key for the sentence appended after the server's own wording.
@@ -52,8 +52,8 @@ public sealed record SshAuthFailureDiagnosis(
 /// and it is never replaced here: a wrong stored password and an unloaded agent
 /// key produce the same refusal, and only the server knows which it was. What
 /// this class adds is the one thing Heimdall observed and the user cannot -
-/// how many keys an agent had loaded at that moment - as a sentence the caller
-/// appends after the server's.
+/// how many keys an agent had loaded when the dial was made - as a sentence the
+/// caller appends after the server's.
 /// </para>
 /// <para>
 /// It never says "your agent is missing" as a cause. With no agent key loaded
@@ -89,21 +89,18 @@ public static class SshAuthFailureDiagnoser
     }
 
     /// <summary>
-    /// Diagnoses a refused authentication against the live agent registry.
-    /// </summary>
-    public static SshAuthFailureDiagnosis Diagnose(
-        IReadOnlyList<SshConnectionParams> gatewayChain,
-        SshAgentRegistry agentRegistry)
-    {
-        ArgumentNullException.ThrowIfNull(agentRegistry);
-
-        return Diagnose(gatewayChain, agentRegistry.OfferableIdentityCount());
-    }
-
-    /// <summary>
-    /// Diagnoses a refused authentication from an already observed agent state.
+    /// Diagnoses a refused authentication from an agent state observed at the
+    /// dial.
     /// </summary>
     /// <remarks>
+    /// There is deliberately no overload taking an <see cref="SshAgentRegistry"/>.
+    /// A registry answers from the agents as they are when it is asked, and this
+    /// method is called after a refusal has come back, so such an overload would
+    /// quote a count read seconds after the dial it describes - the count of keys
+    /// loaded while the refusal was in flight, not the count offered. The caller
+    /// takes <see cref="SshAgentRegistry.Observe"/> before dialling and hands the
+    /// number down.
+    /// <para>
     /// The agent-is-sole-source observation selects no wording of its own. A hop
     /// with neither key file nor stored password and no agent identity to fall
     /// back on is refused by <see cref="AuthPreflightChecker.CheckChain"/>
@@ -111,6 +108,7 @@ public static class SshAuthFailureDiagnoser
     /// observes that pair from the tunnel path. The observation is still
     /// reported because it is proved, and because a caller that skips the chain
     /// pre-flight can act on it.
+    /// </para>
     /// </remarks>
     public static SshAuthFailureDiagnosis Diagnose(
         IReadOnlyList<SshConnectionParams> gatewayChain,

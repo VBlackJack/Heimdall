@@ -208,6 +208,81 @@ public sealed class TunnelServiceAuthDiagnosisTests : IDisposable
             outcome.ErrorMessage);
     }
 
+    // The sentence quotes a number of keys as keys this dial offered, so it has
+    // to be the number the dial had. Pageant is empty when the dial starts and
+    // three keys are loaded while the wrong-password refusal is in flight, which
+    // is a minute of a real working day: the owner reads the first line, loads
+    // his keys, and the refusal he provoked before that arrives afterwards.
+    //
+    // Reading the agents after the failure gives 3, and it also flips the branch
+    // taken - with an agent now reachable that the Plink retry cannot use, the
+    // message picks up a sentence about that retry as well. Both halves of the
+    // message are pinned here, because the claim being fixed is that ONE agent
+    // state decides the whole message, not just its number.
+    //
+    // Scope: the harness dials a single gateway, so "this dial" in the name is the
+    // refusing gateway's own. On a chain the reading is taken before the first hop
+    // and the sentence can be early by however long the earlier hops take, which
+    // TunnelService.AppendAuthFailureContext states and nothing here measures.
+    [Fact]
+    public async Task KeysLoadedWhileTheRefusalWasInFlight_AreNotCountedAsKeysThisDialOffered()
+    {
+        // A registry holds its agents, not their contents: an agent answers
+        // afresh every time it is probed, which is what makes a registry read
+        // after the failure a different reading. A frozen list of fakes would
+        // not model that, and a test built on one cannot fail.
+        LiveAgent pageant = new LiveAgent(PageantAgent.AgentName) { Available = false };
+        Harness harness = await HarnessRefusingAsync(
+            new SshAuthenticationException(RelayedServerRefusal),
+            agentsProvider: () => [pageant],
+            onDial: () =>
+            {
+                pageant.Available = true;
+                pageant.IdentityCount = 3;
+            });
+
+        TunnelSetupOutcome outcome = await harness.ConnectAsync(
+            GatewayForKeyFile(_keyFilePath),
+            "server-rdp-1");
+
+        Assert.Equal(1, harness.DialAttempts);
+        Assert.Equal(3, pageant.IdentityCount);
+        Assert.Equal($"{RelayedServerRefusal} {NoAgentKeySentence}", outcome.ErrorMessage);
+        Assert.Equal(
+            $"{RelayedServerRefusal} {NoAgentKeySentence}",
+            harness.ConnectionStates.GetStateData("server-rdp-1")?.ErrorMessage);
+    }
+
+    // Same instant, read the other way round: three keys are loaded when the
+    // dial is made and every one of them is removed before the refusal returns.
+    // A diagnosis that re-reads the agents would say no key was offered, which
+    // is the same defect with the sign flipped, so a fix that merely moved the
+    // read earlier for the empty case does not pass this one.
+    [Fact]
+    public async Task KeysUnloadedWhileTheRefusalWasInFlight_AreStillCountedAsKeysThisDialOffered()
+    {
+        LiveAgent pageant = new LiveAgent(PageantAgent.AgentName) { IdentityCount = 3 };
+        Harness harness = await HarnessRefusingAsync(
+            new SshAuthenticationException(RelayedServerRefusal),
+            agentsProvider: () => [pageant],
+            onDial: () =>
+            {
+                pageant.Available = false;
+                pageant.IdentityCount = 0;
+            },
+            plinkHostKeyProbe: new NoPresentationPlinkHostKeyProbe());
+
+        TunnelSetupOutcome outcome = await harness.ConnectAsync(
+            GatewayForKeyFile(_keyFilePath),
+            "server-rdp-1");
+
+        Assert.False(pageant.Available);
+        Assert.Equal(
+            $"{RelayedServerRefusal} FIXTURE 3 agent keys were offered and refused."
+            + $" {FallbackHostKeyUnavailableSentence}",
+            outcome.ErrorMessage);
+    }
+
     // Same surface, the other branch: what the pane reads must carry the
     // gateway's sentence there too.
     [Fact]
@@ -444,17 +519,25 @@ public sealed class TunnelServiceAuthDiagnosisTests : IDisposable
         IPlinkHostKeyProbe? plinkHostKeyProbe = null) =>
         HarnessRefusingAsync(failure, () => agents, localesPath, plinkHostKeyProbe);
 
+    /// <param name="onDial">
+    /// Runs inside the transport, after the client has been built and before the
+    /// refusal is raised. That is the only place a test can stand between the
+    /// dial and the failure, which is where the agent state has to change for
+    /// the drift to show.
+    /// </param>
     private async Task<Harness> HarnessRefusingAsync(
         Exception failure,
         Func<IReadOnlyList<ISshAgent>> agentsProvider,
         string? localesPath = "",
-        IPlinkHostKeyProbe? plinkHostKeyProbe = null)
+        IPlinkHostKeyProbe? plinkHostKeyProbe = null,
+        Action? onDial = null)
     {
         return new Harness(
             _ => failure,
             agentsProvider,
             await CreateLocalizerAsync(localesPath),
-            plinkHostKeyProbe ?? new NeverProbedPlinkHostKeyProbe());
+            plinkHostKeyProbe ?? new NeverProbedPlinkHostKeyProbe(),
+            onDial);
     }
 
     private async Task<Harness> HarnessSwitchingAsync(
@@ -509,15 +592,18 @@ public sealed class TunnelServiceAuthDiagnosisTests : IDisposable
     private sealed class Harness
     {
         private readonly Func<int, Exception> _failureForAttempt;
+        private readonly Action? _onDial;
         private int _dialAttempts;
 
         public Harness(
             Func<int, Exception> failureForAttempt,
             Func<IReadOnlyList<ISshAgent>> agentsProvider,
             LocalizationManager localizer,
-            IPlinkHostKeyProbe plinkHostKeyProbe)
+            IPlinkHostKeyProbe plinkHostKeyProbe,
+            Action? onDial = null)
         {
             _failureForAttempt = failureForAttempt;
+            _onDial = onDial;
             Clock = new FakeTimeProvider();
 
             TunnelManager = new TunnelManager(
@@ -618,6 +704,7 @@ public sealed class TunnelServiceAuthDiagnosisTests : IDisposable
             string cancelLogMessage)
         {
             int attempt = Interlocked.Increment(ref _dialAttempts);
+            _onDial?.Invoke();
             throw _failureForAttempt(attempt);
         }
     }
@@ -649,6 +736,26 @@ public sealed class TunnelServiceAuthDiagnosisTests : IDisposable
             int timeoutMs,
             CancellationToken ct) =>
             throw new InvalidOperationException("These tests never reach the Plink fallback.");
+    }
+
+    /// <summary>
+    /// An agent whose reachability and identity count are read at every probe,
+    /// the way a real Pageant or Windows OpenSSH Agent is. A fake that captures
+    /// its identities once cannot move between the dial and the refusal, and a
+    /// test built on one proves nothing about when the reading happened.
+    /// </summary>
+    private sealed class LiveAgent(string name) : ISshAgent
+    {
+        public string Name { get; } = name;
+
+        public bool Available { get; set; } = true;
+
+        public int IdentityCount { get; set; }
+
+        public bool IsAvailable() => Available;
+
+        public IReadOnlyList<ISshAgentKey> GetIdentities() =>
+            [.. Enumerable.Range(0, IdentityCount).Select(_ => new FakeAgentKey())];
     }
 
     private sealed class FakeAgent(
