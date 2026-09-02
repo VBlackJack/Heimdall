@@ -27,7 +27,11 @@ internal enum RdpNegotiationOutcome
     /// <summary>The server answered, but keeps standard RDP security - there is no certificate.</summary>
     TlsNotOffered,
 
-    /// <summary>The server explicitly refused the requested protocol.</summary>
+    /// <summary>
+    /// The server explicitly refused the requested protocol. It is not the same answer as
+    /// <see cref="TlsNotOffered"/>: a refusal can mean the server demands MORE than TLS,
+    /// so it says nothing about whether a certificate exists.
+    /// </summary>
     Refused,
 
     /// <summary>The answer was not a connection confirm this code can read.</summary>
@@ -67,6 +71,14 @@ internal static class RdpSecurityNegotiation
     private const byte TpduConnectionConfirm = 0xD0;
     private const byte TypeRdpNegRsp = 0x02;
     private const byte TypeRdpNegFailure = 0x03;
+
+    // RDP_NEG_FAILURE codes, MS-RDPBCGR 2.2.1.2.2.
+    private const uint SslRequiredByServer = 0x0000_0001;
+    private const uint SslNotAllowedByServer = 0x0000_0002;
+    private const uint SslCertNotOnServer = 0x0000_0003;
+    private const uint InconsistentFlags = 0x0000_0004;
+    private const uint HybridRequiredByServer = 0x0000_0005;
+    private const uint SslWithUserAuthRequiredByServer = 0x0000_0006;
 
     /// <summary>Length of a connection confirm carrying no negotiation response.</summary>
     private const int BareConfirmLength = 11;
@@ -116,7 +128,25 @@ internal static class RdpSecurityNegotiation
     /// verify".
     /// </remarks>
     internal static RdpNegotiationOutcome ParseConnectionConfirm(ReadOnlySpan<byte> frame)
+        => ParseConnectionConfirm(frame, out _);
+
+    /// <summary>Reads the server answer, keeping the reason when it refused.</summary>
+    /// <param name="frame">The whole TPKT frame, header included.</param>
+    /// <param name="failureCode">
+    /// The RDP_NEG_FAILURE code when the outcome is <see cref="RdpNegotiationOutcome.Refused"/>,
+    /// zero otherwise.
+    /// </param>
+    /// <remarks>
+    /// The code is the whole content of a refusal - SSL_NOT_ALLOWED_BY_SERVER and
+    /// HYBRID_REQUIRED_BY_SERVER are opposite facts about the server - so discarding it
+    /// leaves a log line that can only say that something was refused.
+    /// </remarks>
+    internal static RdpNegotiationOutcome ParseConnectionConfirm(
+        ReadOnlySpan<byte> frame,
+        out uint failureCode)
     {
+        failureCode = 0;
+
         if (frame.Length < BareConfirmLength
             || frame[0] != TpktVersion
             || BinaryPrimitives.ReadUInt16BigEndian(frame[2..4]) != frame.Length
@@ -130,14 +160,44 @@ internal static class RdpSecurityNegotiation
             return RdpNegotiationOutcome.TlsNotOffered;
         }
 
-        return frame[11] switch
+        switch (frame[11])
         {
-            TypeRdpNegFailure => RdpNegotiationOutcome.Refused,
-            TypeRdpNegRsp => SelectedProtocol(frame) == ProtocolRdp
-                ? RdpNegotiationOutcome.TlsNotOffered
-                : RdpNegotiationOutcome.TlsSelected,
-            _ => RdpNegotiationOutcome.Malformed,
+            case TypeRdpNegFailure:
+                // The failure code sits where a response would carry the selected protocol.
+                failureCode = SelectedProtocol(frame);
+                return RdpNegotiationOutcome.Refused;
+
+            case TypeRdpNegRsp:
+                return SelectedProtocol(frame) == ProtocolRdp
+                    ? RdpNegotiationOutcome.TlsNotOffered
+                    : RdpNegotiationOutcome.TlsSelected;
+
+            default:
+                return RdpNegotiationOutcome.Malformed;
+        }
+    }
+
+    /// <summary>Names an RDP_NEG_FAILURE code, for the log.</summary>
+    /// <param name="failureCode">The code the server answered with.</param>
+    /// <remarks>
+    /// Named rather than numbered because the names are what the fact is: a reader who has
+    /// to look up 0x00000005 to learn that the server DEMANDS CredSSP will read past it.
+    /// The number is kept beside the name for a code this list does not know.
+    /// </remarks>
+    internal static string DescribeFailure(uint failureCode)
+    {
+        string name = failureCode switch
+        {
+            SslRequiredByServer => "SSL_REQUIRED_BY_SERVER",
+            SslNotAllowedByServer => "SSL_NOT_ALLOWED_BY_SERVER",
+            SslCertNotOnServer => "SSL_CERT_NOT_ON_SERVER",
+            InconsistentFlags => "INCONSISTENT_FLAGS",
+            HybridRequiredByServer => "HYBRID_REQUIRED_BY_SERVER",
+            SslWithUserAuthRequiredByServer => "SSL_WITH_USER_AUTH_REQUIRED_BY_SERVER",
+            _ => "unknown failure code",
         };
+
+        return $"{name} (0x{failureCode:X8})";
     }
 
     /// <summary>Total frame length announced by a TPKT header.</summary>

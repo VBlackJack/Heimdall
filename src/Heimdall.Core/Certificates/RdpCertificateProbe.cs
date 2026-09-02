@@ -36,7 +36,11 @@ public enum RdpProbeOutcome
     /// <summary>The TLS handshake failed after the server had selected TLS.</summary>
     HandshakeFailed,
 
-    /// <summary>The server answered something this code cannot read.</summary>
+    /// <summary>
+    /// The server answered something this probe cannot obtain a certificate from - an
+    /// unreadable frame, or an explicit refusal of the TLS request. It is NOT
+    /// <see cref="TlsNotOffered"/>: nothing here says whether a certificate exists.
+    /// </summary>
     ProtocolUnexpected,
 }
 
@@ -52,6 +56,13 @@ public sealed record RdpProbeResult(
     string? Subject = null,
     string? Issuer = null,
     string? Detail = null);
+
+/// <summary>What the negotiation answered, and why when it refused.</summary>
+/// <param name="Outcome">How the exchange ended.</param>
+/// <param name="FailureCode">The RDP_NEG_FAILURE code, when the server refused.</param>
+internal readonly record struct RdpNegotiationResult(
+    RdpNegotiationOutcome Outcome,
+    uint FailureCode);
 
 /// <summary>Reads the certificate an RDP endpoint presents, before connecting to it.</summary>
 public interface IRdpCertificateProbe
@@ -110,19 +121,22 @@ public sealed class RdpCertificateProbe : IRdpCertificateProbe
             await tcp.ConnectAsync(host, port, bounded.Token);
             await using NetworkStream stream = tcp.GetStream();
 
-            RdpNegotiationOutcome negotiated =
-                await NegotiateAsync(stream, bounded.Token);
+            RdpNegotiationResult negotiated = await NegotiateAsync(stream, bounded.Token);
 
-            if (negotiated != RdpNegotiationOutcome.TlsSelected)
+            if (negotiated.Outcome != RdpNegotiationOutcome.TlsSelected)
             {
+                // A refusal is deliberately NOT TlsNotOffered. RDP_NEG_FAILURE can mean
+                // HYBRID_REQUIRED_BY_SERVER - a server that has a certificate and demands
+                // more than this probe asked for - so calling it "no certificate offered"
+                // would describe the most hardened endpoint on the network as the most
+                // permissive one. The honest answer is that nothing was verified.
                 return new RdpProbeResult(
-                    negotiated switch
+                    negotiated.Outcome switch
                     {
                         RdpNegotiationOutcome.TlsNotOffered => RdpProbeOutcome.TlsNotOffered,
-                        RdpNegotiationOutcome.Refused => RdpProbeOutcome.TlsNotOffered,
                         _ => RdpProbeOutcome.ProtocolUnexpected,
                     },
-                    Detail: negotiated.ToString());
+                    Detail: Describe(negotiated));
             }
 
             return await ReadCertificateAsync(stream, host, bounded.Token);
@@ -137,7 +151,14 @@ public sealed class RdpCertificateProbe : IRdpCertificateProbe
         }
     }
 
-    private static async Task<RdpNegotiationOutcome> NegotiateAsync(
+    /// <summary>Says what happened, naming the refusal reason when there is one.</summary>
+    /// <param name="negotiated">What the negotiation answered.</param>
+    private static string Describe(RdpNegotiationResult negotiated)
+        => negotiated.Outcome == RdpNegotiationOutcome.Refused
+            ? $"refused: {RdpSecurityNegotiation.DescribeFailure(negotiated.FailureCode)}"
+            : negotiated.Outcome.ToString();
+
+    private static async Task<RdpNegotiationResult> NegotiateAsync(
         NetworkStream stream,
         CancellationToken cancellationToken)
     {
@@ -150,14 +171,16 @@ public sealed class RdpCertificateProbe : IRdpCertificateProbe
         int total = RdpSecurityNegotiation.ReadTpktLength(header);
         if (total < 4 || total > 512)
         {
-            return RdpNegotiationOutcome.Malformed;
+            return new RdpNegotiationResult(RdpNegotiationOutcome.Malformed, 0);
         }
 
         byte[] frame = new byte[total];
         header.CopyTo(frame, 0);
         await stream.ReadExactlyAsync(frame.AsMemory(4, total - 4), cancellationToken);
 
-        return RdpSecurityNegotiation.ParseConnectionConfirm(frame);
+        RdpNegotiationOutcome outcome =
+            RdpSecurityNegotiation.ParseConnectionConfirm(frame, out uint failureCode);
+        return new RdpNegotiationResult(outcome, failureCode);
     }
 
     private static async Task<RdpProbeResult> ReadCertificateAsync(

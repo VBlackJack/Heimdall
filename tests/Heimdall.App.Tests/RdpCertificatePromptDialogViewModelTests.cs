@@ -180,6 +180,68 @@ public sealed class RdpCertificatePromptDialogViewModelTests
         Assert.Equal(string.Empty, key.Scope);
     }
 
+    [Fact]
+    public async Task AskAsync_TwoTabsOfOneProfileMeetingOneCertificate_AskOnce()
+    {
+        TaskCompletionSource<RdpTrustAnswer> answered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        int displayed = 0;
+        DialogRdpCertificateTrustPrompt prompt = new(
+            new LocalizationManager(),
+            new TrustPromptCoordinator(),
+            (_, _) =>
+            {
+                _ = Interlocked.Increment(ref displayed);
+                return answered.Task;
+            });
+
+        Task<RdpTrustAnswer> first = prompt.AskAsync(Context("profile-a"), CancellationToken.None);
+        Task<RdpTrustAnswer> second = prompt.AskAsync(Context("profile-a"), CancellationToken.None);
+        answered.SetResult(RdpTrustAnswer.TrustForSession);
+        RdpTrustAnswer[] answers = await Task.WhenAll(first, second);
+
+        // The defect this pins: bypassing the coordinator stacks one modal window per tab
+        // for a question that has one answer, and answering the first leaves the second
+        // still asking something already settled.
+        Assert.Equal(1, Volatile.Read(ref displayed));
+        Assert.All(answers, answer => Assert.Equal(RdpTrustAnswer.TrustForSession, answer));
+    }
+
+    [Fact]
+    public async Task AskAsync_TwoProfilesMeetingOneCertificate_AreAskedSeparately()
+    {
+        Dictionary<string, TaskCompletionSource<RdpTrustAnswer>> gates = new(StringComparer.Ordinal)
+        {
+            ["profile-a"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
+            ["profile-b"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
+        };
+
+        int displayed = 0;
+        DialogRdpCertificateTrustPrompt prompt = new(
+            new LocalizationManager(),
+            new TrustPromptCoordinator(),
+            (context, displayCt) =>
+            {
+                _ = displayCt;
+                _ = Interlocked.Increment(ref displayed);
+                return gates[context.ProfileId!].Task;
+            });
+
+        Task<RdpTrustAnswer> first = prompt.AskAsync(Context("profile-a"), CancellationToken.None);
+        Task<RdpTrustAnswer> second = prompt.AskAsync(Context("profile-b"), CancellationToken.None);
+
+        // The positive control for the count above, and the rule that must survive the
+        // coalescing: RDP trust is per profile, so one dialog naming profile A may never
+        // supply the answer for profile B. The second question waits its turn; it is not
+        // answered by the first.
+        gates["profile-a"].SetResult(RdpTrustAnswer.TrustPermanently);
+        Assert.Equal(RdpTrustAnswer.TrustPermanently, await first);
+
+        gates["profile-b"].SetResult(RdpTrustAnswer.Refuse);
+        Assert.Equal(RdpTrustAnswer.Refuse, await second);
+        Assert.Equal(2, Volatile.Read(ref displayed));
+    }
+
     private static RdpCertificatePromptContext Context(
         string profileId,
         string thumbprint = "SHA256:AA:BB:01")

@@ -119,14 +119,29 @@ public static class RdpCertificateTrust
         IReadOnlyCollection<string> thumbprints,
         string candidate)
     {
+        string normalizedCandidate = Normalize(candidate);
         bool found = false;
         foreach (string stored in thumbprints)
         {
-            found |= ConstantTimeEquals(stored, candidate);
+            found |= ConstantTimeEquals(Normalize(stored), normalizedCandidate);
         }
 
         return found;
     }
+
+    /// <summary>Puts a thumbprint in the one form every side of the store compares.</summary>
+    /// <param name="thumbprint">The thumbprint as it was given, from a file or a probe.</param>
+    /// <remarks>
+    /// <b>One rule about case, stated once.</b> The lookup below is a byte-exact fixed-time
+    /// comparison, so it is case-SENSITIVE; the store keys its sets by thumbprint. When
+    /// those two disagreed - the sets deduping case-insensitively while the lookup did not -
+    /// a thumbprint stored in the other case was invisible to <see cref="Decide"/> and at the
+    /// same time blocked the correctly-cased one from ever being added, so the question could
+    /// not be answered at all. Every value crossing this class is normalized here first, and
+    /// upper case is the form <see cref="CertificateFingerprint.ComputeSha256"/> emits.
+    /// </remarks>
+    public static string Normalize(string? thumbprint)
+        => thumbprint is null ? string.Empty : thumbprint.Trim().ToUpperInvariant();
 
     /// <summary>
     /// Fixed-time comparison of two equal-length ASCII thumbprints.
@@ -153,8 +168,8 @@ public static class RdpCertificateTrust
         IReadOnlyCollection<string> approved,
         IReadOnlyCollection<string> approvedForSession)
     {
-        HashSet<string> distinct = new(approved, StringComparer.OrdinalIgnoreCase);
-        distinct.UnionWith(approvedForSession);
+        HashSet<string> distinct = new(approved.Select(Normalize), StringComparer.Ordinal);
+        distinct.UnionWith(approvedForSession.Select(Normalize));
         return distinct.Count;
     }
 }

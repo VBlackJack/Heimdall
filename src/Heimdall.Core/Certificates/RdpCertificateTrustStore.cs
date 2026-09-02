@@ -35,6 +35,15 @@ namespace Heimdall.Core.Certificates;
 /// Durable trust carries an <see cref="RdpCertificateEntry"/>; session trust carries only a
 /// thumbprint, because nothing outlives the run to describe.
 /// </para>
+/// <para>
+/// <b>Every thumbprint entering this store passes through
+/// <see cref="RdpCertificateTrust.Normalize"/> first, and the sets are keyed
+/// <see cref="StringComparer.Ordinal"/> on the result.</b> The lookup is a byte-exact
+/// fixed-time comparison, so the sets may not dedupe by a looser rule than the one the
+/// lookup applies: when they did, an entry stored in another case was invisible to
+/// <see cref="Evaluate"/> and simultaneously made <see cref="Trust(string, string)"/> a
+/// no-op for the correctly-cased one, and the question could never be answered.
+/// </para>
 /// </remarks>
 public sealed class RdpCertificateTrustStore
 {
@@ -106,7 +115,11 @@ public sealed class RdpCertificateTrustStore
     public void Trust(string profileId, string thumbprint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(thumbprint);
-        Trust(profileId, new RdpCertificateEntry(thumbprint.Trim(), _timeProvider.GetUtcNow()));
+        Trust(
+            profileId,
+            new RdpCertificateEntry(
+                RdpCertificateTrust.Normalize(thumbprint),
+                _timeProvider.GetUtcNow()));
     }
 
     /// <summary>Remembers a certificate for this profile, across restarts.</summary>
@@ -134,11 +147,11 @@ public sealed class RdpCertificateTrustStore
         {
             if (!_approved.TryGetValue(profileId, out Dictionary<string, RdpCertificateEntry>? set))
             {
-                set = new Dictionary<string, RdpCertificateEntry>(StringComparer.OrdinalIgnoreCase);
+                set = new Dictionary<string, RdpCertificateEntry>(StringComparer.Ordinal);
                 _approved[profileId] = set;
             }
 
-            string thumbprint = entry.Thumbprint.Trim();
+            string thumbprint = RdpCertificateTrust.Normalize(entry.Thumbprint);
             if (set.ContainsKey(thumbprint))
             {
                 return;
@@ -167,18 +180,26 @@ public sealed class RdpCertificateTrustStore
         {
             if (!_session.TryGetValue(profileId, out HashSet<string>? set))
             {
-                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                set = new HashSet<string>(StringComparer.Ordinal);
                 _session[profileId] = set;
             }
 
-            set.Add(thumbprint.Trim());
+            set.Add(RdpCertificateTrust.Normalize(thumbprint));
         }
     }
 
-    /// <summary>Forgets one durable certificate, as the settings screen must be able to.</summary>
+    /// <summary>Forgets one durable certificate.</summary>
     /// <param name="profileId">The profile the certificate belongs to.</param>
     /// <param name="thumbprint">The thumbprint to forget.</param>
     /// <returns><see langword="true"/> when something was removed.</returns>
+    /// <remarks>
+    /// <b>No shipping surface calls this.</b> There is no settings screen for RDP
+    /// certificate trust, so today the only way a user can revoke a durable approval is to
+    /// hand-edit <c>trustedRdpCertificates</c> in settings.json - unlike SSH host keys,
+    /// which <c>TrustedHostKeysSettingsViewModel</c> can list and remove. The method is
+    /// kept and tested because that screen is what it is for; the comment says "no caller"
+    /// rather than "for the settings screen" so the gap stays visible.
+    /// </remarks>
     public bool Remove(string profileId, string thumbprint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
@@ -188,7 +209,7 @@ public sealed class RdpCertificateTrustStore
         lock (_gate)
         {
             if (!_approved.TryGetValue(profileId, out Dictionary<string, RdpCertificateEntry>? set)
-                || !set.Remove(thumbprint.Trim()))
+                || !set.Remove(RdpCertificateTrust.Normalize(thumbprint)))
             {
                 return false;
             }
@@ -214,7 +235,11 @@ public sealed class RdpCertificateTrustStore
         }
     }
 
-    /// <summary>Every profile trusting at least one certificate, for the settings screen.</summary>
+    /// <summary>Every profile trusting at least one certificate.</summary>
+    /// <remarks>
+    /// Shaped for a settings screen that does not ship yet, and with no caller until it
+    /// does. See <see cref="Remove"/> for what that absence costs a user.
+    /// </remarks>
     public IReadOnlyDictionary<string, IReadOnlyCollection<RdpCertificateEntry>> GetAllApproved()
     {
         lock (_gate)
@@ -246,7 +271,7 @@ public sealed class RdpCertificateTrustStore
         IEnumerable<RdpCertificateEntry> entries)
     {
         Dictionary<string, RdpCertificateEntry> set =
-            new(StringComparer.OrdinalIgnoreCase);
+            new(StringComparer.Ordinal);
 
         foreach (RdpCertificateEntry entry in entries ?? [])
         {
@@ -255,7 +280,7 @@ public sealed class RdpCertificateTrustStore
                 continue;
             }
 
-            string thumbprint = entry.Thumbprint.Trim();
+            string thumbprint = RdpCertificateTrust.Normalize(entry.Thumbprint);
             set.TryAdd(thumbprint, entry with { Thumbprint = thumbprint });
         }
 

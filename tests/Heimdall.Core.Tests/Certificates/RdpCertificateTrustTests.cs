@@ -34,6 +34,9 @@ public sealed class RdpCertificateTrustTests
     private const string SecondDc = "SHA256:AA:BB:02";
     private const string ThirdDc = "SHA256:AA:BB:03";
 
+    /// <summary>The first thumbprint as a hand-edited settings file may spell it.</summary>
+    private const string LowerCaseFirstDc = "sha256:aa:bb:01";
+
     [Fact]
     public void Trust_ASecondThumbprintForTheSameProfile_KeepsTheFirst()
     {
@@ -297,6 +300,66 @@ public sealed class RdpCertificateTrustTests
         // What the user reads is "you already trust N certificates for this name", so N
         // counts machines, not decisions - the same thumbprint approved twice is one.
         Assert.Equal(2, store.Evaluate(Profile, ThirdDc).AlreadyTrustedCount);
+    }
+
+    [Fact]
+    public void LoadFromConfig_ThumbprintWrittenInAnotherCase_IsRecognisedWhenThatMachineAnswers()
+    {
+        RdpCertificateTrustStore store = new();
+
+        // Hand-editing settings.json is currently the only way to manage these entries, so
+        // a lower-case thumbprint in the file is a reachable state. The probe always
+        // renders upper case, so both halves have to state ONE rule about case, or the
+        // profile is asked about a machine it already trusts on every single connect.
+        store.LoadFromConfig([(Profile, new[] { Entry(LowerCaseFirstDc) })]);
+
+        Assert.Equal(
+            RdpCertificateTrustVerdict.Trusted,
+            store.Evaluate(Profile, FirstDc).Verdict);
+    }
+
+    [Fact]
+    public void Trust_AnEquivalentThumbprintInAnotherCase_StillLandsInTheDurableSetOnce()
+    {
+        RdpCertificateTrustStore store = new();
+        List<IReadOnlyCollection<RdpCertificateEntry>> writes = [];
+        store.TrustChanged += (_, set) => writes.Add(set);
+
+        store.Trust(Profile, LowerCaseFirstDc);
+        store.Trust(Profile, FirstDc);
+
+        // Dedupe and lookup have to agree. When they do not, the second call is swallowed
+        // as a duplicate while the lookup keeps missing, and no answer the user gives can
+        // ever end the question.
+        RdpCertificateEntry stored = Assert.Single(store.GetApproved(Profile));
+        Assert.Equal(FirstDc, stored.Thumbprint);
+        Assert.Single(writes);
+    }
+
+    [Fact]
+    public void Evaluate_SessionThumbprintApprovedInAnotherCase_IsStillTrustedForTheRun()
+    {
+        RdpCertificateTrustStore store = new();
+
+        store.TrustForSession(Profile, LowerCaseFirstDc);
+
+        Assert.Equal(
+            RdpCertificateTrustVerdict.TrustedForSession,
+            store.Evaluate(Profile, FirstDc).Verdict);
+    }
+
+    [Fact]
+    public void Remove_ThumbprintGivenInAnotherCase_ForgetsTheStoredOne()
+    {
+        RdpCertificateTrustStore store = new();
+        store.Trust(Profile, FirstDc);
+
+        // The revocation half of the same rule: a caller that spells the thumbprint the
+        // other way must not be told there was nothing to forget.
+        Assert.True(store.Remove(Profile, LowerCaseFirstDc));
+        Assert.Equal(
+            RdpCertificateTrustVerdict.Unknown,
+            store.Evaluate(Profile, FirstDc).Verdict);
     }
 
     private static RdpCertificateEntry Entry(string thumbprint)
