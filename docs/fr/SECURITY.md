@@ -210,6 +210,16 @@ l'utilisateur apprend à valider sans lire vaut moins que pas d'invite du tout.
 Cela signifie aussi qu'aucune connexion déjà vérifiée ne gagne d'aller-retour
 réseau.
 
+**La vérification n'existe que sur le chemin embarqué.** `RdpCertificateGate`
+n'a de site d'appel que dans `src/Heimdall.App/Views/EmbeddedRdpView.xaml.cs`,
+nulle part ailleurs. Un lancement qui aboutit au client externe - un profil dont
+le mode RDP vaut `External`, ou un lancement forcé en externe - écrit
+l'identifiant `TERMSRV` et démarre `mstsc.exe` sans aucune vérification de
+certificat côté Heimdall, tandis que `RdpFileGenerator` inscrit dans le fichier
+`.rdp` généré le même `authentication level:i:0` que le chemin embarqué applique
+au contrôle. Sur ce chemin, la vérification de Windows est relâchée et rien ne
+la remplace.
+
 **Toute issue autre qu'un refus explicite laisse passer la connexion.**
 `RdpCertificateProbe` ouvre sa propre connexion TCP, effectue la négociation
 X.224 et lit le certificat présenté par la couche TLS. Si le point de
@@ -232,17 +242,22 @@ la machine plutôt qu'afficher quarante paires hexadécimales.
 
 **Limitation connue, et raison d'être de l'ensemble.** Rien ne garantit que le
 contrôle ActiveX se reconnecte à la machine que la sonde a inspectée - sur un
-pool multi-membres, c'est le cas normal et non un cas limite. Avec un ensemble,
-c'est inoffensif : chaque membre a été approuvé individuellement, donc quel que
-soit celui qui répond, son certificat a été vu et accepté. Un schéma qui
-approuverait un *pool* plutôt que des certificats individuels rendrait la même
-course nuisible, car la machine réellement jointe pourrait présenter un
-certificat jamais approuvé, seulement supposé appartenir. C'est pourquoi la
-confiance de pool a été rejetée : il n'existe aucun lien cryptographique entre
-deux certificats auto-signés de deux machines différentes, et cette
-fonctionnalité remplace une vérification de Microsoft qui laisse ensuite passer
-des identifiants CredSSP - elle ne peut donc pas être plus permissive que la
-vérification qu'elle désactive.
+pool multi-membres, c'est le cas normal et non un cas limite. L'ensemble ne
+comble pas cet écart : il fait converger la question, il n'authentifie pas la
+session. Heimdall ne compare que ce que sa propre sonde a lu, et le certificat
+que le contrôle ActiveX reçoit réellement n'est jamais comparé à quoi que ce
+soit ; au niveau `AuthenticationLevel` 0 - le seul niveau où cette vérification
+s'exécute - la session qui suit n'exige rien du serveur. Là où tous les membres
+du pool ont déjà été approuvés, celui qui répond présente un certificat que
+l'utilisateur a vu ; un membre ayant rejoint le pool après la dernière
+approbation est accepté sans invite et sans trace. Un schéma qui approuverait un
+*pool* plutôt que des certificats individuels serait pire encore, car la machine
+réellement jointe pourrait présenter un certificat jamais approuvé, seulement
+supposé appartenir. C'est pourquoi la confiance de pool a été rejetée : il
+n'existe aucun lien cryptographique entre deux certificats auto-signés de deux
+machines différentes, et cette fonctionnalité remplace une vérification de
+Microsoft qui laisse ensuite passer des identifiants CredSSP - elle ne peut donc
+pas être plus permissive que la vérification qu'elle désactive.
 
 ### Escalade sudo en SFTP et édition distante
 
@@ -716,7 +731,7 @@ remplacer la destination.
 - Tests de non-régression sur l'injection shell : couverture d'`InputValidator`
   dans `tests/Heimdall.Core.Tests`.
 - Assainissement de la génération de fichiers RDP :
-  `tests/Heimdall.Ssh.Tests/RdpFileGeneratorTests.cs`.
+  `tests/Heimdall.Rdp.Tests/RdpFileGeneratorTests.cs`.
 - La CI impose : une compilation sans aucun avertissement sous
   `TreatWarningsAsErrors`, `dotnet format --verify-no-changes`, la suite de
   tests complète, la parité des locales JSON (les jeux de clés EN et FR doivent

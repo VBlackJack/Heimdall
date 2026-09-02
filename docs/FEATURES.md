@@ -37,7 +37,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Credential autofill for CredUI dialogs (EnumThreadWindows + UI Automation), with Debug broker-window diagnostics limited to metadata such as title, handle, PID, and process name; credential fields are never logged (`1d7c78c`)
 - **Honest external-launch state**: when an external mstsc client is spawned, the session shows up in warning color with a dedicated *External client launched* status, signalling that Heimdall cannot directly observe the remote session beyond the launch itself
 - **Unified RDP import**: `.rdp` files dragged onto the main window or imported from `Settings → Import` go through the same preview/conflict resolution flow
-- **Performance**: COM pre-warm at startup, DNS pre-resolution on server selection, per-server experience flags (wallpaper/themes/animations), TCP-only mode for firewall-heavy environments
+- **Performance**: COM pre-warm at startup, DNS pre-resolution on server selection, per-server experience flags (wallpaper/themes/animations), UDP transport probe suppression for firewall-heavy environments (the Remote Desktop client exposes no way for an application to force TCP; what this removes is the probe that times out when UDP is dropped)
 
 ### SSH Terminal
 - Embedded terminal via WebView2 + xterm.js (full VT100/xterm rendering)

@@ -40,8 +40,10 @@ contrôle que celui de `mstsc.exe`.
 Direct3D et son contexte de décodage **pour chaque session ouverte**. C'est pour cette raison
 que la mémoire croît avec le nombre de sessions et non avec le trafic qui y circule.
 
-Il est **désactivé par défaut** depuis la v2026.082401. Il se trouve dans Paramètres, Bureau à
-distance, et par serveur dans l'onglet Bureau à distance de ce serveur.
+Il est **désactivé par défaut** depuis la v2026.082401. Dans Paramètres, il se trouve sur
+l'onglet **RDP**, sous-onglet **Performance**. Par serveur, il se trouve sur l'onglet **Options**
+de ce serveur, dans la carte **Options de session RDP**, sous le même sous-onglet
+**Performance**.
 
 | Trois sessions | Commit privé | Handles |
 |---|---:|---:|
@@ -60,8 +62,10 @@ qu'avant, réactivez le réglage pour ce serveur.
 **La résolution.** Passer de 1920x1080 à une session plus petite a économisé environ 86 Mo par
 session.
 
-Dans un profil de serveur, onglet RDP, mettez **Mode de résolution** sur `Fixed` et choisissez
-une taille inférieure à celle de votre écran, ou laissez-le sur `Auto` et réduisez la fenêtre
+Dans un profil de serveur, ouvrez l'onglet **Options** puis, dans la carte **Options de session
+RDP**, le sous-onglet **Affichage et audio**. Sous **Profil de résolution**, dépliez **Plus
+d'options d'affichage**, mettez **Mode de résolution** sur `Fixe` et choisissez une taille
+inférieure à celle de votre écran. Ou laissez le profil sur `Auto` et réduisez la fenêtre
 Heimdall. Les deux réduisent la géométrie négociée de la session.
 
 C'est un vrai compromis : une session plus petite, c'est un bureau distant plus petit pour
@@ -149,16 +153,23 @@ dans le même état.
 
 ## Le mesurer soi-même
 
-Deux harnais sont livrés dans le dépôt. `local/scripts/Measure-RdpMemory.ps1` échantillonne une
-famille de processus ; `local/scripts/Measure-RdpMemoryPair.ps1` en échantillonne deux sur le
-même tick, ce qui est la condition pour qu'une comparaison avec un autre client ait un sens. Les
-deux enregistrent le commit privé, le working set, les handles et les threads, comptent les
-connexions RDP établies pour que les paliers se segmentent d'eux-mêmes, et notent si la fenêtre
-était au premier plan pour que les échantillons rognés restent identifiables.
+Aucun harnais de mesure n'est livré avec le dépôt. Les chiffres ci-dessus proviennent de
+l'échantillonnage, à intervalle régulier, des compteurs que Windows expose déjà, et il n'en faut
+pas plus pour les reproduire.
+
+Échantillonnez la famille de processus entière en une passe - Heimdall lance des processus
+WebView2 pour le terminal et l'explorateur de fichiers - et, si vous comparez avec un autre
+client, lisez les deux familles sur le même tick. Enregistrez pour chaque échantillon : le
+**commit privé**, qui est le chiffre repris par tous les tableaux ci-dessus ; le working set,
+conservé seulement pour montrer quand Windows a rogné ; les compteurs de handles et de threads ;
+le nombre de connexions établies vers le port RDP, pour que les paliers se segmentent d'eux-mêmes ;
+et si la fenêtre était au premier plan, pour que les échantillons rognés restent identifiables.
 
 ```powershell
-pwsh -File local/scripts/Measure-RdpMemory.ps1 -ProcessName Heimdall -DurationMinutes 20
-pwsh -File local/scripts/Measure-RdpMemoryPair.ps1 -RdpPort 3389 -DurationMinutes 30
+$family = Get-Process -Name Heimdall, msedgewebview2 -ErrorAction SilentlyContinue
+[math]::Round(($family | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB, 1)
+($family | Measure-Object HandleCount -Sum).Sum
+(Get-NetTCPConnection -RemotePort 3389 -State Established).Count
 ```
 
 Ancrez les conclusions sur le **delta** entre paliers, jamais sur le socle absolu. Sur des
