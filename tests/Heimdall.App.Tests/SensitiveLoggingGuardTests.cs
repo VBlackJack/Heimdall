@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.RegularExpressions;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 
 namespace Heimdall.App.Tests;
 
@@ -31,6 +32,26 @@ public sealed class SensitiveLoggingGuardTests
     private const string EmbeddedRdpViewPath = @"src\Heimdall.App\Views\EmbeddedRdpView.xaml.cs";
     private const string RdpHandlerPath = @"src\Heimdall.App\Services\Handlers\RdpHandler.cs";
     private const string RdpPasswordResetPath = @"src\Heimdall.Rdp\ActiveX\RdpPasswordReset.cs";
+
+    private const string DisconnectedCallback = "private void OnRdpDisconnected(int reason)";
+    private const string FatalErrorCallback = "private void OnRdpFatalError(int errorCode)";
+
+    // The three steps whose order the disconnect callback owes, each carried whole. The reset is
+    // the one that clears the credential the control holds; a three-way ordering of IndexOf
+    // results is satisfied by the same reset folded behind a term that is false by construction,
+    // which leaves the text at the same offset, the ordering intact, and this guard reporting a
+    // secret cleared that is not.
+    private const string DisposedGuard = "if (_disposed)";
+    private const string NativePasswordReset =
+        "TryResetNativePassword(nameof(OnRdpDisconnected));";
+    private const string WatchdogGuard = "if (_connectAttempts.AbandonedByWatchdog)";
+
+    // The same statement on the fatal-error path, carried whole for the same reason. This is the
+    // twin of the reset above: it was left as a bare IndexOf ordering over raw source when its
+    // sibling twenty lines up was repaired, so the wipe on the fatal path could be folded behind a
+    // term that is false by construction and this file would still report the secret cleared.
+    private const string FatalNativePasswordReset =
+        "TryResetNativePassword(nameof(OnRdpFatalError));";
 
     // Regime B classification: CredentialAutofill.cs performs CredUI broker enumeration under the
     // second credential-logging clause in CLAUDE.md:361. It is excluded by regime, not allowlisted.
@@ -236,19 +257,25 @@ public sealed class SensitiveLoggingGuardTests
     [Fact]
     public void RdpDisconnectedCallback_ResetsPasswordBetweenDisposedAndWatchdogGuards()
     {
-        string body = ExtractMethodBody(
-            ReadSource(EmbeddedRdpViewPath),
-            "private void OnRdpDisconnected(int reason)");
+        string body = DisconnectedCallbackLogic(ReadSource(EmbeddedRdpViewPath));
 
-        int disposedGuardIndex = body.IndexOf("if (_disposed)", StringComparison.Ordinal);
-        int resetIndex = body.IndexOf(
-            "TryResetNativePassword(nameof(OnRdpDisconnected))",
-            StringComparison.Ordinal);
-        int watchdogGuardIndex = body.IndexOf(
-            "if (_connectAbandonedByWatchdog)",
-            StringComparison.Ordinal);
+        // Read as a step of the callback before anything is read as an offset in it: the
+        // ordering below holds just as well for a reset that is written and never runs.
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(body, NativePasswordReset),
+            "The native password reset is no longer a statement of OnRdpDisconnected: it is "
+                + "absent, or it now sits inside a condition, or an unconditional return stands "
+                + "above it. The credential the control holds is then not wiped when the session "
+                + "drops, and the ordering asserted here would not notice.");
+
+        int disposedGuardIndex = body.IndexOf(DisposedGuard, StringComparison.Ordinal);
+        int resetIndex = body.IndexOf(NativePasswordReset, StringComparison.Ordinal);
+        int watchdogGuardIndex = body.IndexOf(WatchdogGuard, StringComparison.Ordinal);
 
         Assert.True(disposedGuardIndex >= 0, "OnRdpDisconnected no longer guards on _disposed.");
+        Assert.True(
+            watchdogGuardIndex >= 0,
+            "OnRdpDisconnected no longer returns early on a watchdog abort.");
         Assert.True(
             resetIndex > disposedGuardIndex,
             "The native password reset must run after the _disposed guard.");
@@ -257,23 +284,112 @@ public sealed class SensitiveLoggingGuardTests
             "The native password reset must run before the watchdog early return.");
     }
 
+    /// <summary>
+    /// The control: the reading above rejects the reset kept exactly where it stands and folded
+    /// behind a term that is false on every disconnect that reaches it.
+    /// </summary>
+    /// <remarks>
+    /// Without it the assertion above is a presence with nothing proving that a reset which
+    /// never fires can be observed. The mutant is built from the view's real source and its
+    /// replacement count is asserted, so a mutant that failed to land cannot be read as a
+    /// rejection of unmutated code.
+    /// </remarks>
+    [Fact]
+    public void RdpDisconnectedPasswordReading_RejectsAResetFoldedBehindAnotherTerm()
+    {
+        string source = ReadSource(EmbeddedRdpViewPath);
+        int occurrences = Regex.Matches(source, Regex.Escape(NativePasswordReset)).Count;
+        Assert.True(
+            occurrences == 1,
+            $"Expected exactly one '{NativePasswordReset}' in the view, found {occurrences}. A "
+                + "mutant built from this would not measure what this test claims.");
+
+        string mutated = source.Replace(
+            NativePasswordReset,
+            "if (_disposed) " + NativePasswordReset,
+            StringComparison.Ordinal);
+        Assert.NotEqual(source, mutated);
+
+        Assert.False(
+            ViewSource.IsStatementOfTheMethodBody(
+                DisconnectedCallbackLogic(mutated), NativePasswordReset),
+            "A reset trailing a braceless condition satisfies this file's reading of the "
+                + "callback, so the guard cannot tell a credential that is wiped from one that "
+                + "is only written about.");
+    }
+
+    /// <summary>
+    /// The disconnect callback of any version of the view, blanked of comments and literals.
+    /// </summary>
+    /// <remarks>
+    /// Blanked first because a call left behind in a comment satisfies a substring search as
+    /// readily as one that runs, and this callback is the guard that says a credential is gone.
+    /// </remarks>
+    private static string DisconnectedCallbackLogic(string source) => ExtractMethodBody(
+        ViewSource.WithoutCommentsAndLiterals(source), DisconnectedCallback);
+
     [Fact]
     public void RdpFatalErrorCallback_ResetsPasswordAfterDisposedGuard()
     {
-        string body = ExtractMethodBody(
-            ReadSource(EmbeddedRdpViewPath),
-            "private void OnRdpFatalError(int errorCode)");
+        string body = FatalErrorCallbackLogic(ReadSource(EmbeddedRdpViewPath));
 
-        int disposedGuardIndex = body.IndexOf("if (_disposed)", StringComparison.Ordinal);
-        int resetIndex = body.IndexOf(
-            "TryResetNativePassword(nameof(OnRdpFatalError))",
-            StringComparison.Ordinal);
+        // Read as a step of the callback before anything is read as an offset in it, exactly as
+        // the disconnect twin above does: the ordering below holds just as well for a reset that
+        // is written and never runs.
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(body, FatalNativePasswordReset),
+            "The native password reset is no longer a statement of OnRdpFatalError: it is "
+                + "absent, or it now sits inside a condition, or an unconditional return stands "
+                + "above it. The credential the control holds is then not wiped when the session "
+                + "fails, and the ordering asserted here would not notice.");
+
+        int disposedGuardIndex = body.IndexOf(DisposedGuard, StringComparison.Ordinal);
+        int resetIndex = body.IndexOf(FatalNativePasswordReset, StringComparison.Ordinal);
 
         Assert.True(disposedGuardIndex >= 0, "OnRdpFatalError no longer guards on _disposed.");
         Assert.True(
             resetIndex > disposedGuardIndex,
             "The native password reset must run after the _disposed guard.");
     }
+
+    /// <summary>
+    /// The control for the fatal-error path: the reading above rejects the reset kept exactly
+    /// where it stands and folded behind a term that is false on every fatal error reaching it.
+    /// </summary>
+    /// <remarks>
+    /// The twin of <see cref="RdpDisconnectedPasswordReading_RejectsAResetFoldedBehindAnotherTerm"/>,
+    /// written at the same time as the reading it controls rather than a round later.
+    /// </remarks>
+    [Fact]
+    public void RdpFatalErrorPasswordReading_RejectsAResetFoldedBehindAnotherTerm()
+    {
+        string source = ReadSource(EmbeddedRdpViewPath);
+        int occurrences = Regex.Matches(source, Regex.Escape(FatalNativePasswordReset)).Count;
+        Assert.True(
+            occurrences == 1,
+            $"Expected exactly one '{FatalNativePasswordReset}' in the view, found "
+                + $"{occurrences}. A mutant built from this would not measure what this test "
+                + "claims.");
+
+        string mutated = source.Replace(
+            FatalNativePasswordReset,
+            "if (_disposed) " + FatalNativePasswordReset,
+            StringComparison.Ordinal);
+        Assert.NotEqual(source, mutated);
+
+        Assert.False(
+            ViewSource.IsStatementOfTheMethodBody(
+                FatalErrorCallbackLogic(mutated), FatalNativePasswordReset),
+            "A reset trailing a braceless condition satisfies this file's reading of the fatal "
+                + "error callback, so the guard cannot tell a credential that is wiped from one "
+                + "that is only written about.");
+    }
+
+    /// <summary>
+    /// The fatal-error callback of any version of the view, blanked of comments and literals.
+    /// </summary>
+    private static string FatalErrorCallbackLogic(string source) => ExtractMethodBody(
+        ViewSource.WithoutCommentsAndLiterals(source), FatalErrorCallback);
 
     private static string ExtractMethodBody(string source, string signature)
     {

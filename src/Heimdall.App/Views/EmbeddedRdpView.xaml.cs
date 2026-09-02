@@ -49,7 +49,11 @@ namespace Heimdall.App.Views;
 /// and delays dynamic resolution reconnects until the session is stable.
 /// </summary>
 public partial class EmbeddedRdpView
-    : UserControl, IDisposable, IRdpDisconnectTeardownTarget, IRdpConnectWatchdogTimer
+    : UserControl,
+        IDisposable,
+        IRdpDisconnectTeardownTarget,
+        IRdpConnectWatchdogTimer,
+        IRdpConnectAttemptRunner
 {
     private const int BeginConnectMaxAttempts = 10;
     private const int MaxReconnectAttemptTimestamps = 3;
@@ -103,6 +107,19 @@ public partial class EmbeddedRdpView
     private readonly LetterboxHintState _letterboxHintState = new();
     private readonly RdpConnectWatchdogArbiter _connectWatchdogArbiter;
 
+    /// <summary>
+    /// The connect attempt in flight: its abandonment state, and every decision that follows.
+    /// </summary>
+    /// <remarks>
+    /// The view held the abandonment as two plain fields and cleared them at the top of every
+    /// connect, retries included, so a Cancel pressed while a retry was pending was erased by that
+    /// retry. The state lives in one object now, only a connect the user asked for may clear it,
+    /// and the decisions it feeds - whether a retry may still connect, whether a connect that
+    /// arrives may be promoted - are taken in the arbiter rather than here, where a test can play
+    /// the whole sequence against them.
+    /// </remarks>
+    private readonly RdpConnectAttemptArbiter _connectAttempts;
+
     private bool _redirectionExpandedOverride;
 
     private CancellationTokenSource? _autofillCts;
@@ -116,8 +133,6 @@ public partial class EmbeddedRdpView
     private DispatcherTimer? _reconnectElapsedTimer;
     private DispatcherTimer? _connectWatchdogTimer;
     private bool _watchdogCredentialWaitActive;
-    private bool _connectAbandonedByWatchdog;
-    private bool _connectAbandonedByUser;
     private RdpActiveXHost? _rdpHost;
     private RdpRedirectionOptions? _pendingRedirections;
     private ServerProfileDto? _server;
@@ -232,6 +247,7 @@ public partial class EmbeddedRdpView
         InitializeComponent();
 
         _connectWatchdogArbiter = new RdpConnectWatchdogArbiter(this);
+        _connectAttempts = new RdpConnectAttemptArbiter(this);
 
         _resizeTimer = new DispatcherTimer(
             ResizeDebounceInterval,
@@ -904,9 +920,11 @@ public partial class EmbeddedRdpView
         // would stay armed to raise a reconnect overlay on the abandoned session.
         TransitionPhase(RdpConnectionPhase.None);
 
-        // The attempt already in flight can still complete: this latch is what stops a late
-        // OnConnected from promoting a session the user asked to stop.
-        _connectAbandonedByUser = true;
+        // The attempt already in flight can still complete: abandoning it here is what stops a
+        // late OnConnected from promoting a session the user asked to stop. It also stops a
+        // surface retry still pending against this attempt, which used to clear the latch and
+        // connect.
+        _connectAttempts.UserCancelled();
 
         // The certificate check runs before the connect does, so cancelling during it has to stop
         // the probe rather than wait out its timeout.
@@ -1557,7 +1575,46 @@ public partial class EmbeddedRdpView
         }
     }
 
+    /// <summary>Starts a fresh connect attempt, on behalf of the user.</summary>
+    /// <remarks>
+    /// Opening the attempt is what clears any prior abandonment, so this connect can promote
+    /// normally and is not refused by the late-connect guard. Nothing else may clear it: a retry
+    /// of an attempt the user cancelled in the meantime is not a new decision by the user, and
+    /// used to be treated as one.
+    /// </remarks>
     private void BeginConnect()
+    {
+        if (_disposed || _rdpHost is null || _server is null || _settings is null)
+        {
+            return;
+        }
+
+        _connectAttempts.UserRequestedConnect();
+    }
+
+    /// <summary>Hands a retry that has waited out a render pass back to the arbiter.</summary>
+    /// <param name="attempt">The attempt this retry was scheduled for.</param>
+    /// <remarks>
+    /// Whether the retry connects is the arbiter's decision, and running it is the arbiter's call
+    /// into <see cref="IRdpConnectAttemptRunner.RunAttempt"/>. What is left here is the refusal
+    /// log, which describes the decision and does not take it.
+    /// </remarks>
+    private void ContinueConnectAttempt(int attempt)
+    {
+        if (_connectAttempts.RetryArrived(attempt, _disposed) == RdpConnectRetryAdmission.Refuse)
+        {
+            Core.Logging.FileLogger.Info(
+                $"EmbeddedRDP surface retry for attempt {attempt} dropped: the attempt is "
+                + $"over (current={_connectAttempts.CurrentAttempt} "
+                + $"cancelled={_connectAttempts.AbandonedByUser} "
+                + $"watchdog={_connectAttempts.AbandonedByWatchdog} "
+                + $"disposed={_disposed})");
+        }
+    }
+
+    /// <summary>Configures the control and calls Connect, for an attempt already admitted.</summary>
+    /// <param name="attempt">The attempt being run, carried into any retry it schedules.</param>
+    private void RunConnectAttempt(int attempt)
     {
         var settings = _settings;
         if (_disposed || _rdpHost is null || _server is null || settings is null)
@@ -1567,10 +1624,6 @@ public partial class EmbeddedRdpView
 
         try
         {
-            // Fresh attempt: clear any prior watchdog abandonment so this connect
-            // can promote normally and is not refused by the late-connect guard.
-            _connectAbandonedByWatchdog = false;
-            _connectAbandonedByUser = false;
             _beginConnectAttempt++;
             Core.Logging.FileLogger.Info(
                 $"EmbeddedRDP BeginConnect attempt={_beginConnectAttempt} viewVisible={IsVisible} formsVisible={FormsHost.IsVisible} formsSize={FormsHost.ActualWidth:0.##}x{FormsHost.ActualHeight:0.##} surfaceSize={SurfaceContainer.ActualWidth:0.##}x{SurfaceContainer.ActualHeight:0.##}");
@@ -1580,7 +1633,7 @@ public partial class EmbeddedRdpView
                 if (_beginConnectAttempt <= BeginConnectMaxAttempts)
                 {
                     Core.Logging.FileLogger.Warn("EmbeddedRDP visual surface is not ready; retrying after render pass.");
-                    _ = RetryBeginConnectAsync();
+                    _ = RetryBeginConnectAsync(attempt);
                     return;
                 }
 
@@ -1665,7 +1718,14 @@ public partial class EmbeddedRdpView
         }
     }
 
-    private async Task RetryBeginConnectAsync()
+    /// <summary>Waits out a render pass, then resumes <paramref name="attempt"/>.</summary>
+    /// <remarks>
+    /// The token travels with the retry rather than being re-read on arrival: the whole point is
+    /// that the attempt may have ended while this was waiting, and a retry that asked "is anything
+    /// abandoned?" would have to be told about the cancel that has not been recorded yet. Carrying
+    /// the token makes the answer "which attempt are you a retry of", which cannot go stale.
+    /// </remarks>
+    private async Task RetryBeginConnectAsync(int attempt)
     {
         UpdateBeginConnectRetryStatus();
 
@@ -1684,7 +1744,9 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(BeginConnect));
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Render,
+            new Action(() => ContinueConnectAttempt(attempt)));
     }
 
     private void UpdateBeginConnectRetryStatus()
@@ -1842,26 +1904,17 @@ public partial class EmbeddedRdpView
 
         // A connect that completes after the attempt was abandoned must not be promoted to
         // Connected: after a watchdog abort that is a zombie session behind the error overlay,
-        // and after a user cancel it is a live session the user asked to stop. Hard-disconnect
-        // the COM and leave the existing state untouched. The disconnect that follows is also
+        // and after a user cancel it is a live session the user asked to stop. The arbiter
+        // hard-disconnects the COM; nothing here touches the existing state. That disconnect is
+        // also
         // what clears the user-disconnect flag, which is what stops the next genuine drop of this
         // session from being read as a user disconnect and dying in silence.
-        if (RdpLateConnectPolicy.Resolve(_connectAbandonedByWatchdog, _connectAbandonedByUser)
-            == RdpLateConnectDecision.Refuse)
+        if (_connectAttempts.ConnectArrived() == RdpLateConnectDecision.Refuse)
         {
             Core.Logging.FileLogger.Info(
                 "EmbeddedRDP OnConnected ignored: attempt abandoned "
-                + $"(watchdog={_connectAbandonedByWatchdog} user={_connectAbandonedByUser})");
-            try
-            {
-                _rdpHost?.Disconnect();
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn(
-                    $"EmbeddedRDP abandoned-connect disconnect failed: {ex.Message}");
-            }
-
+                + $"(watchdog={_connectAttempts.AbandonedByWatchdog} "
+                + $"user={_connectAttempts.AbandonedByUser})");
             return;
         }
 
@@ -1994,7 +2047,7 @@ public partial class EmbeddedRdpView
         // the normal overlay/status/diagnostic path does not overwrite it. The flag
         // stays set (reset only on a fresh BeginConnect) so a still-pending late
         // OnConnected remains refused.
-        if (_connectAbandonedByWatchdog)
+        if (_connectAttempts.AbandonedByWatchdog)
         {
             Core.Logging.FileLogger.Info(
                 $"EmbeddedRDP OnDisconnected from watchdog abort: reason={reason}; preserving connect-timeout error state");
@@ -3070,14 +3123,14 @@ public partial class EmbeddedRdpView
     }
 
     /// <summary>
-    /// Checks the server certificate, then starts the connection unless the user
-    /// refused it.
+    /// Checks the server certificate, then starts the connection unless the attempt was
+    /// abandoned while the check ran or the user refused the certificate.
     /// </summary>
     /// <remarks>
     /// The single place a certificate question can stop a session. It runs once per
-    /// view, not once per attempt: the retry path re-enters <c>BeginConnect</c>
-    /// directly, so a surface that is not ready yet does not re-probe the endpoint or
-    /// ask the user twice.
+    /// view, not once per attempt: the retry path re-enters the connect directly,
+    /// so a surface that is not ready yet does not re-probe the endpoint or ask the
+    /// user twice.
     /// </remarks>
     private async Task StartVerifiedConnectAsync()
     {
@@ -3104,22 +3157,25 @@ public partial class EmbeddedRdpView
             _connectWatchdogArbiter.CertificateCheckCompleted(_connectionPhase, _disposed);
         }
 
-        if (_disposed)
+        // Cancel during the check means cancel, not "start once the check finishes". The decision
+        // is the arbiter's, taken over the same latches as the retry and the late connect, and
+        // what is left here is the log that describes it. The teardown is one of its terms rather
+        // than a separate return above, so that no term of this condition is dead by construction
+        // at the site that reads it - a stopper that cannot fire is a stopper that is not there.
+        // It is asked before the refusal below because a user who cancelled is not a user who
+        // refused a certificate, and must not be shown that error instead of their own cancel.
+        if (_connectAttempts.CertificateCheckSettled(_disposed) == RdpVerifiedConnectAdmission.Refuse)
         {
+            Core.Logging.FileLogger.Info(
+                "EmbeddedRDP connect abandoned during certificate verification "
+                + $"(cancelled={_connectAttempts.AbandonedByUser} "
+                + $"watchdog={_connectAttempts.AbandonedByWatchdog} disposed={_disposed})");
             return;
         }
 
         if (decision == RdpConnectionDecision.Abandon)
         {
             HandleCertificateRefused();
-            return;
-        }
-
-        // Cancel during the check means cancel, not "start once the check finishes".
-        if (_connectAbandonedByUser)
-        {
-            Core.Logging.FileLogger.Info(
-                "EmbeddedRDP connect abandoned by the user during certificate verification");
             return;
         }
 
@@ -4411,6 +4467,21 @@ public partial class EmbeddedRdpView
 
     void IRdpConnectWatchdogTimer.Suspend() => SuspendConnectWatchdog();
 
+    void IRdpConnectAttemptRunner.RunAttempt(int attempt) => RunConnectAttempt(attempt);
+
+    void IRdpConnectAttemptRunner.DropAbandonedConnection()
+    {
+        try
+        {
+            _rdpHost?.Disconnect();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedRDP abandoned-connect disconnect failed: {ex.Message}");
+        }
+    }
+
     /// <summary>Stops the watchdog and forgets any credential-wait promotion.</summary>
     private void CancelConnectWatchdog()
     {
@@ -4501,9 +4572,10 @@ public partial class EmbeddedRdpView
         ShowReconnectOverlay();
 
         // Abandon the attempt and abort the underlying COM connect so a late
-        // OnConnected cannot resurrect this torn-down session. The error UI above
+        // OnConnected cannot resurrect this torn-down session, and so a surface retry still
+        // pending against it cannot restart a connection behind the error above. The error UI
         // is already in place; OnRdpDisconnected preserves it for the abort path.
-        _connectAbandonedByWatchdog = true;
+        _connectAttempts.WatchdogAborted();
         try
         {
             Core.Logging.FileLogger.Info("EmbeddedRDP watchdog aborting in-progress COM connect");
