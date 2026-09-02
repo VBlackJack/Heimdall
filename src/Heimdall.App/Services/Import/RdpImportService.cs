@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
@@ -21,6 +22,63 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services.Import;
+
+/// <summary>
+/// The automatic-rename rule both import services apply to a display-name conflict.
+/// </summary>
+/// <remarks>
+/// The .rdp import and the profile import reach the same conflict from two entry points and have
+/// to resolve it to the same name, so the rule is held here once. Two verbatim copies of it used
+/// to sit in the two services, where either could be edited alone and the surfaces would disagree
+/// with nothing failing.
+/// </remarks>
+internal static class ImportAutoRename
+{
+    /// <summary>Locale key holding the "{0} (Imported {1})" rename template.</summary>
+    internal const string RenameSuffixKey = "DialogImportRdpRenameSuffix";
+
+    /// <summary>
+    /// Word-free rename template used when the active locale carries no rename key, or a template
+    /// that drops the numeric placeholder. The search in <see cref="Build"/> can only converge on
+    /// a template that varies with the suffix.
+    /// </summary>
+    internal const string NeutralRenameTemplate = "{0} ({1})";
+
+    /// <summary>The name already in the inventory is the implicit first, so the search starts here.</summary>
+    internal const int FirstAutoRenameSuffix = 2;
+
+    /// <summary>
+    /// Returns the first name derived from <paramref name="baseName"/> that no profile in
+    /// <paramref name="inventory"/> already carries.
+    /// </summary>
+    internal static string Build(
+        string baseName,
+        IReadOnlyList<ServerProfileDto> inventory,
+        LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        // The suffix ends up in the persisted DisplayName the user reads, so it follows the active
+        // locale like the generated fallback name does.
+        var template = localizer[RenameSuffixKey];
+        if (string.Equals(template, RenameSuffixKey, StringComparison.Ordinal)
+            || !template.Contains("{1}", StringComparison.Ordinal))
+        {
+            template = NeutralRenameTemplate;
+        }
+
+        var suffix = FirstAutoRenameSuffix;
+        var candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
+        while (inventory.Any(server => string.Equals(server.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            suffix++;
+            candidate = string.Format(CultureInfo.CurrentCulture, template, baseName, suffix);
+        }
+
+        return candidate;
+    }
+}
 
 public interface IRdpImportService
 {
@@ -37,6 +95,13 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         "connection",
         "remote desktop connection"
     ], StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Value of <c>drivestoredirect</c> that already means every local drive.</summary>
+    private const string AllDrivesToken = "*";
+
+    private const int MinPortNumber = 1;
+
+    private const int MaxPortNumber = 65535;
 
     private readonly IConfigManager _configManager = configManager;
     private readonly LocalizationManager _localizer = localizer;
@@ -75,6 +140,19 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             string content;
             try
             {
+                // A .rdp file is untrusted text the user was invited to drag in. The JSON import
+                // path caps its input the same way; without the cap one oversized file aborts the
+                // whole batch instead of degrading like an unreadable one.
+                FileInfo fileInfo = new(path);
+                if (fileInfo.Length > AppConstants.MaxImportFileSizeBytes)
+                {
+                    filesUnreadable.Add(path);
+                    Core.Logging.FileLogger.Warn(
+                        $"[RdpImport] {Path.GetFileName(path)} rejected: {fileInfo.Length} bytes exceed the " +
+                        $"{AppConstants.MaxImportFileSizeBytes}-byte import limit.");
+                    continue;
+                }
+
                 content = await File.ReadAllTextAsync(path, ct);
             }
             catch (UnauthorizedAccessException)
@@ -186,7 +264,14 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
 
                 if (existingIndex >= 0)
                 {
-                    switch (selectionEntry.ConflictResolution)
+                    // Conflicts are computed once, before the batch runs. A row the preview showed
+                    // as conflict-free carries the Skip default that was never displayed for it, so
+                    // a name claimed by an earlier entry of the same batch must not drop the file.
+                    RdpConflictResolution resolution = previewEntry.HasNameConflict
+                        ? selectionEntry.ConflictResolution
+                        : RdpConflictResolution.AutoRename;
+
+                    switch (resolution)
                     {
                         case RdpConflictResolution.Skip:
                             skippedCount++;
@@ -201,7 +286,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                         case RdpConflictResolution.AutoRename:
                             {
                                 var renamed = CloneCandidate(previewEntry.Candidate);
-                                renamed.DisplayName = BuildAutoRename(renamed.DisplayName, inventory);
+                                renamed.DisplayName = ImportAutoRename.Build(renamed.DisplayName, inventory, _localizer);
                                 inventory.Add(renamed);
                                 importedCount++;
                                 renamedCount++;
@@ -248,7 +333,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             ? schema.FullAddress
             : schema.AlternateFullAddress;
 
-        if (!TrySplitHostAndPort(address, out var host, out var port))
+        if (!TrySplitHostAndPort(address, out var host, out var port, out var portOutOfRange))
         {
             return _localizer["WarningImportRdpInvalidAddress"];
         }
@@ -256,44 +341,73 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         candidate.RemoteServer = host;
         candidate.RemotePort = port;
 
+        if (portOutOfRange)
+        {
+            skippedMappings.Add("full address port");
+            Core.Logging.FileLogger.Info(
+                "[RdpImport] Port in 'full address' is outside 1-65535; the default RDP port is used.");
+        }
+
         if (!string.IsNullOrWhiteSpace(schema.Username))
         {
             candidate.RdpUsername = schema.Username;
         }
 
+        // Every assignment below writes a per-profile RDP setting, which the connect-time resolver
+        // only reads once the profile stops following the application defaults.
+        var carriesPerProfileSettings = false;
+
         if (schema.AudioMode.HasValue)
         {
             candidate.RdpAudioMode = MapAudioMode(schema.AudioMode.Value);
+            carriesPerProfileSettings = true;
         }
 
         if (schema.RedirectClipboard.HasValue)
         {
             candidate.RdpRedirectClipboard = schema.RedirectClipboard.Value;
+            carriesPerProfileSettings = true;
         }
 
         if (schema.RedirectPrinters.HasValue)
         {
             candidate.RdpRedirectPrinters = schema.RedirectPrinters.Value;
+            carriesPerProfileSettings = true;
         }
 
         if (schema.RedirectSmartCards.HasValue)
         {
             candidate.RdpRedirectSmartCards = schema.RedirectSmartCards.Value;
+            carriesPerProfileSettings = true;
         }
 
         if (schema.DrivesToRedirect is not null)
         {
             candidate.RdpRedirectDrives = !string.IsNullOrWhiteSpace(schema.DrivesToRedirect);
+            carriesPerProfileSettings = true;
+
+            // The profile carries a single all-drives flag, so a scoped list such as "C:;" is
+            // committed as "redirect every local drive". Disclose the widening instead of hiding it.
+            if (candidate.RdpRedirectDrives
+                && !string.Equals(schema.DrivesToRedirect.Trim(), AllDrivesToken, StringComparison.Ordinal))
+            {
+                skippedMappings.Add("drivestoredirect");
+                Core.Logging.FileLogger.Info(
+                    "[RdpImport] 'drivestoredirect' names specific drives; the profile can only store " +
+                    "an all-drives flag.");
+            }
         }
 
         if (schema.UseMultiMon.HasValue)
         {
             candidate.RdpMultiMonitor = schema.UseMultiMon.Value;
+            carriesPerProfileSettings = true;
         }
 
         if (schema.SessionBpp.HasValue)
         {
             candidate.RdpColorDepth = schema.SessionBpp.Value;
+            carriesPerProfileSettings = true;
         }
 
         // NLA state lives in enablecredsspsupport and nowhere else. authentication level describes
@@ -304,15 +418,21 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         if (schema.EnableCredSspSupport is int credSspSupport && credSspSupport is 0 or 1)
         {
             candidate.RdpNla = credSspSupport == 1;
+            carriesPerProfileSettings = true;
         }
 
         if (schema.AuthenticationLevel is int authenticationLevel && authenticationLevel is 0 or 1 or 2)
         {
             candidate.RdpStrictServerAuthentication = authenticationLevel == 1;
+            carriesPerProfileSettings = true;
         }
 
+        // An absent gatewayusagemethod is not a request to route the session: mstsc treats it as
+        // no gateway, and fabricating one here would let a crafted file put a third party in the
+        // path of the session and of its credential exchange.
         if (!string.IsNullOrWhiteSpace(schema.GatewayHostname)
-            && schema.GatewayUsageMethod.GetValueOrDefault(1) != 0)
+            && schema.GatewayUsageMethod is int gatewayUsageMethod
+            && gatewayUsageMethod != 0)
         {
             candidate.RdpGateway = schema.GatewayHostname;
         }
@@ -329,6 +449,13 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             Core.Logging.FileLogger.Info("[RdpImport] Skipped mapping for desktopwidth/desktopheight (no target fields).");
         }
 
+        if (carriesPerProfileSettings)
+        {
+            // Without this the resolver answers from the application defaults and every value
+            // mapped above is inert. A file carrying only an address keeps following the defaults.
+            candidate.RdpUseGlobalDefaults = false;
+        }
+
         return null;
     }
 
@@ -339,10 +466,15 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         _ => 0  // disabled
     };
 
-    private static bool TrySplitHostAndPort(string? fullAddress, out string host, out int port)
+    private static bool TrySplitHostAndPort(
+        string? fullAddress,
+        out string host,
+        out int port,
+        out bool portOutOfRange)
     {
         host = string.Empty;
         port = Heimdall.Core.Models.DefaultPorts.Rdp;
+        portOutOfRange = false;
 
         if (string.IsNullOrWhiteSpace(fullAddress))
         {
@@ -360,7 +492,16 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                     trimmed[closingBracket + 1] == ':' &&
                     int.TryParse(trimmed[(closingBracket + 2)..], out var parsedPort))
                 {
-                    port = parsedPort;
+                    // Same contract as the plain host:port branch below: a port outside the
+                    // protocol range is reported and the default is kept, never written through.
+                    if (IsValidPort(parsedPort))
+                    {
+                        port = parsedPort;
+                    }
+                    else
+                    {
+                        portOutOfRange = true;
+                    }
                 }
 
                 return true;
@@ -377,9 +518,16 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             if (!string.IsNullOrWhiteSpace(hostPart))
             {
                 host = hostPart;
-                if (int.TryParse(portPart, out var parsedPort) && parsedPort is > 0 and <= 65535)
+                if (int.TryParse(portPart, out var parsedPort))
                 {
-                    port = parsedPort;
+                    if (IsValidPort(parsedPort))
+                    {
+                        port = parsedPort;
+                    }
+                    else
+                    {
+                        portOutOfRange = true;
+                    }
                 }
 
                 return true;
@@ -389,6 +537,8 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         host = trimmed;
         return true;
     }
+
+    private static bool IsValidPort(int port) => port is >= MinPortNumber and <= MaxPortNumber;
 
     private string DeriveProposedName(string filePath, RdpFileSchema schema)
     {
@@ -422,10 +572,15 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             RemoteServer = candidate.RemoteServer,
             RemotePort = candidate.RemotePort,
             Group = existing.Group,
-            SshGatewayId = null,
+            // A .rdp file describes an RDP endpoint, not how Heimdall reaches it and not which
+            // vault entry holds its credential. Replace must leave those to the existing profile,
+            // or a bastion-tunnelled profile silently becomes a direct connection.
+            SshGatewayId = existing.SshGatewayId,
+            LocalPort = existing.LocalPort,
+            VaultEntryName = existing.VaultEntryName,
             RdpUsername = candidate.RdpUsername,
             RdpPasswordEncrypted = null,
-            UseDirectConnection = false,
+            UseDirectConnection = existing.UseDirectConnection,
             ProjectId = existing.ProjectId,
             ConnectionType = "RDP",
             IsFavorite = existing.IsFavorite,
@@ -458,19 +613,6 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             Environment = existing.Environment,
             MacAddress = existing.MacAddress
         };
-    }
-
-    private static string BuildAutoRename(string baseName, IReadOnlyList<ServerProfileDto> inventory)
-    {
-        var suffix = 2;
-        var candidate = $"{baseName} (Imported {suffix})";
-        while (inventory.Any(server => string.Equals(server.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
-        {
-            suffix++;
-            candidate = $"{baseName} (Imported {suffix})";
-        }
-
-        return candidate;
     }
 
     private static ServerProfileDto CloneCandidate(ServerProfileDto candidate)

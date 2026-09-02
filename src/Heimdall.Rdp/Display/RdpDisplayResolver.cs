@@ -23,8 +23,10 @@ namespace Heimdall.Rdp.Display;
 
 public static class RdpDisplayResolver
 {
-    private const int MinDesktopWidthPx = 640;
     private const int WidthSnapMultiplePx = 4;
+
+    /// <summary>Sentinel for a branch that applies no minimum width of its own.</summary>
+    private const int NoMinimumWidthPx = 0;
 
     private static readonly Size DefaultSize = new(1024, 768);
 
@@ -66,7 +68,7 @@ public static class RdpDisplayResolver
                 smartSizing: false,
                 multiMonitor: false,
                 reason: "explicit-fixed",
-                floorWidthToDesktopMinimum: true),
+                minimumWidthPx: RdpDisplayLimits.MinimumFixedDimension),
             RdpResolutionMode.SmartSizing => Create(
                 configuredMode,
                 RdpResolutionMode.SmartSizing,
@@ -76,7 +78,7 @@ public static class RdpDisplayResolver
                 smartSizing: true,
                 multiMonitor: false,
                 reason: "explicit-smart-sizing",
-                floorWidthToDesktopMinimum: false),
+                minimumWidthPx: NoMinimumWidthPx),
             RdpResolutionMode.Multimon => Create(
                 configuredMode,
                 RdpResolutionMode.Multimon,
@@ -86,7 +88,7 @@ public static class RdpDisplayResolver
                 smartSizing: false,
                 multiMonitor: true,
                 reason: "explicit-multimon",
-                floorWidthToDesktopMinimum: true),
+                minimumWidthPx: RdpDisplayLimits.MinimumSessionResolution),
             _ => Create(
                 configuredMode,
                 RdpResolutionMode.FitWindow,
@@ -96,7 +98,7 @@ public static class RdpDisplayResolver
                 smartSizing: true,
                 multiMonitor: false,
                 reason: "explicit-fit-window-scaled",
-                floorWidthToDesktopMinimum: false)
+                minimumWidthPx: NoMinimumWidthPx)
         };
     }
 
@@ -188,13 +190,13 @@ public static class RdpDisplayResolver
             return Create(
                 RdpResolutionMode.Auto,
                 RdpResolutionMode.Fixed,
-                SelectClosestPreset(monitorSize, presets),
+                SelectClosestFittingPreset(monitorSize, presets),
                 desktopScaleFactor,
                 deviceScaleFactor,
                 smartSizing: false,
                 multiMonitor: false,
                 reason: "auto-fullscreen-single-monitor",
-                floorWidthToDesktopMinimum: true);
+                minimumWidthPx: RdpDisplayLimits.MinimumSessionResolution);
         }
 
         return Create(
@@ -206,7 +208,7 @@ public static class RdpDisplayResolver
             smartSizing: true,
             multiMonitor: false,
             reason: usedFallback ? "auto-windowed-fallback" : "auto-windowed",
-            floorWidthToDesktopMinimum: false);
+            minimumWidthPx: NoMinimumWidthPx);
     }
 
     private static RdpMultimonValidation CreateMultimonFallback(
@@ -232,13 +234,13 @@ public static class RdpDisplayResolver
         bool smartSizing,
         bool multiMonitor,
         string reason,
-        bool floorWidthToDesktopMinimum)
+        int minimumWidthPx)
     {
         return new EffectiveDisplayContext
         {
             ConfiguredMode = configuredMode,
             EffectiveMode = effectiveMode,
-            Width = SnapWidth(size.Width, floorWidthToDesktopMinimum),
+            Width = SnapWidth(size.Width, minimumWidthPx),
             Height = size.Height > 0 ? size.Height : DefaultSize.Height,
             DesktopScaleFactor = desktopScaleFactor,
             DeviceScaleFactor = deviceScaleFactor,
@@ -260,7 +262,24 @@ public static class RdpDisplayResolver
         return CoalesceSize(hostContext.WorkingAreaPhysicalPx, hostContext.MonitorBoundsPhysicalPx, DefaultSize);
     }
 
-    private static Size SelectClosestPreset(Size target, IReadOnlyList<(int Width, int Height)> presets)
+    /// <summary>
+    /// Picks the preset closest to the monitor among those that fit inside it.
+    /// </summary>
+    /// <remarks>
+    /// <para>Fitting is a precondition, not a tie-breaker. The branch that calls this resolves with
+    /// smart sizing off, and the host strips the control's scrollbars, so any part of the desktop
+    /// beyond the monitor is unreachable for the life of the session - the remote taskbar and
+    /// anything docked bottom or right included. A desktop smaller than the monitor only
+    /// letterboxes.</para>
+    /// <para>Minimising distance alone does not imply fitting. On a 3440x1440 ultrawide,
+    /// 3840x2160 scores 678400 against 774400 for 2560x1440, so the oversized preset won and put
+    /// 400 columns and 720 rows off-screen.</para>
+    /// <para>When no preset fits, the monitor's own size is the answer: it is the one candidate
+    /// that fits by construction.</para>
+    /// </remarks>
+    private static Size SelectClosestFittingPreset(
+        Size target,
+        IReadOnlyList<(int Width, int Height)> presets)
     {
         var hasCandidate = false;
         var selected = target;
@@ -271,6 +290,11 @@ public static class RdpDisplayResolver
         foreach (var preset in presets)
         {
             if (preset.Width <= 0 || preset.Height <= 0)
+            {
+                continue;
+            }
+
+            if (preset.Width > target.Width || preset.Height > target.Height)
             {
                 continue;
             }
@@ -318,7 +342,19 @@ public static class RdpDisplayResolver
         return snapped > 0 ? snapped : WidthSnapMultiplePx;
     }
 
-    private static int SnapWidth(int width, bool floorToDesktopMinimum)
+    /// <summary>
+    /// Snaps a width down to the sizing granularity, then raises it to the caller's minimum.
+    /// </summary>
+    /// <remarks>
+    /// The minimum is the caller's because there are two of them and they are different decisions.
+    /// A fixed desktop is bounded by <see cref="RdpDisplayLimits.MinimumFixedDimension" />, the same
+    /// bound the server dialog, the schema validator and the external mstsc path enforce; a session
+    /// sized from the host's own screens is bounded by
+    /// <see cref="RdpDisplayLimits.MinimumSessionResolution" />. This method used to hold a private
+    /// copy of the second one and apply it to both, which is how a fixed 400x400 profile ran as
+    /// 640x400 embedded while every other path honoured the 400 the user had been promised.
+    /// </remarks>
+    private static int SnapWidth(int width, int minimumWidthPx)
     {
         var snapped = RdpDisplayHelper.SnapToMultipleOf(width, WidthSnapMultiplePx);
         if (snapped <= 0)
@@ -326,8 +362,6 @@ public static class RdpDisplayResolver
             snapped = WidthSnapMultiplePx;
         }
 
-        return floorToDesktopMinimum && snapped < MinDesktopWidthPx
-            ? MinDesktopWidthPx
-            : snapped;
+        return snapped < minimumWidthPx ? minimumWidthPx : snapped;
     }
 }

@@ -759,7 +759,7 @@ public class RdpFileGeneratorTests
         Assert.Contains("audiomode:i:2", content);
     }
 
-    // ── WriteToFileAsync — atomic ACL (TOCTOU regression) ─────────────
+    // ── WriteToFileAsync - atomic ACL (TOCTOU regression) ─────────────
 
     [Fact]
     public async Task WriteToFileAsync_WritesExpectedContent()
@@ -807,7 +807,7 @@ public class RdpFileGeneratorTests
         // Regression test for the TOCTOU window between file creation and ACL
         // application. Verify that the file is created with inheritance disabled
         // and only the current user / Administrators / SYSTEM are explicitly
-        // allowed — no inherited entries from %TEMP% leak through.
+        // allowed - no inherited entries from %TEMP% leak through.
         var path = Path.Combine(Path.GetTempPath(), $"heimdall-rdp-test-{Guid.NewGuid():N}.rdp");
         try
         {
@@ -818,14 +818,14 @@ public class RdpFileGeneratorTests
 
             Assert.True(
                 security.AreAccessRulesProtected,
-                "Inheritance should be disabled — TOCTOU regression");
+                "Inheritance should be disabled - TOCTOU regression");
 
             var rules = security
                 .GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier))
                 .Cast<FileSystemAccessRule>()
                 .ToList();
 
-            // No inherited rules — every rule must be explicit
+            // No inherited rules - every rule must be explicit
             Assert.All(rules, r => Assert.False(r.IsInherited));
 
             // Only known SIDs are allowed

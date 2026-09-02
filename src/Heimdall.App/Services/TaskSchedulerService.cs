@@ -128,7 +128,7 @@ public sealed class TaskSchedulerService : IDisposable
                     {
                         if (TaskDueCallback is not null)
                         {
-                            // Awaited fully — tick guard releases only after persistence completes.
+                            // Awaited fully - tick guard releases only after persistence completes.
                             await _uiDispatcher.InvokeAsync(async () =>
                             {
                                 try
@@ -152,7 +152,7 @@ public sealed class TaskSchedulerService : IDisposable
                     {
                         if (PersistCallback is not null)
                         {
-                            // Awaited fully — tick guard releases only after persistence completes.
+                            // Awaited fully - tick guard releases only after persistence completes.
                             await _uiDispatcher.InvokeAsync(async () =>
                             {
                                 await PersistCallback();

@@ -86,7 +86,7 @@ public partial class App : System.Windows.Application
 
         // Headless privilege launch mode: the app was re-launched elevated
         // via UAC to perform token-based process creation (SYSTEM / TrustedInstaller).
-        // Do the work and exit immediately — no UI, no DI, no splash.
+        // Do the work and exit immediately - no UI, no DI, no splash.
         var privExitCode = PrivilegeLauncher.HandlePrivilegeLaunchArgs(e.Args);
         if (privExitCode.HasValue)
         {
@@ -100,7 +100,7 @@ public partial class App : System.Windows.Application
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         var splash = CreateSplashWindow();
 
-        // Register global exception handlers BEFORE any awaits — async void
+        // Register global exception handlers BEFORE any awaits - async void
         // resumes on the dispatcher, so unhandled exceptions from awaited calls
         // must already be caught at this point.
         DispatcherUnhandledException += (_, args) =>
@@ -954,7 +954,7 @@ public partial class App : System.Windows.Application
             }
         }
 
-        // Standard host:port — split on the last colon only (handles bare IPv6 without brackets)
+        // Standard host:port - split on the last colon only (handles bare IPv6 without brackets)
         var lastColon = key.LastIndexOf(':');
         if (lastColon > 0 && int.TryParse(key[(lastColon + 1)..], out var parsedPort))
         {
@@ -979,7 +979,7 @@ public partial class App : System.Windows.Application
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                // Force COM activation of MsTscAx — loads mstscax.dll + all static dependencies.
+                // Force COM activation of MsTscAx - loads mstscax.dll + all static dependencies.
                 // Do NOT create WindowsFormsHost here: it is a WPF FrameworkElement and
                 // initializing the WPF-WinForms bridge on a background thread corrupts
                 // the interop layer for the real UI thread.
@@ -1028,7 +1028,7 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Heimdall.Core.Logging.FileLogger.Error(
-                "Failed to initialize HMAC key — credentials will use plain DPAPI", ex);
+                "Failed to initialize HMAC key - credentials will use plain DPAPI", ex);
             CredentialProtector.Initialize(null);
         }
     }
@@ -1231,7 +1231,7 @@ public partial class App : System.Windows.Application
         Core.Logging.FileLogger.Flush();
 
         // Hardcoded last-resort copy for the case where localization itself is broken.
-        // English-only by design — this path runs when DI / locale loading failed.
+        // English-only by design - this path runs when DI / locale loading failed.
         const string LastResortTitle = "Heimdall Error";
         const string LastResortBody = "An unexpected error occurred. A diagnostic log may be available in %LOCALAPPDATA%\\Heimdall\\logs.";
 
@@ -1254,7 +1254,7 @@ public partial class App : System.Windows.Application
 
         try
         {
-            // Themed dialog path. Never includes the stack trace — that goes to the log only.
+            // Themed dialog path. Never includes the stack trace - that goes to the log only.
             var dialogService = _serviceProvider?.GetService<IDialogService>();
             if (dialogService is not null)
             {
@@ -1269,7 +1269,7 @@ public partial class App : System.Windows.Application
 
         // Last-resort fallback: the themed path is unreachable (DI broken, dispatcher
         // shutting down, theme resources missing). This is the ONLY MessageBox.Show
-        // call allowed in the codebase — see audit-UX-A and codex/ux-a1-dialog-service.
+        // call allowed in the codebase - see audit-UX-A and codex/ux-a1-dialog-service.
         MessageBox.Show(
             errorBody,
             errorTitle,
@@ -1316,7 +1316,7 @@ public partial class App : System.Windows.Application
                 Core.Logging.FileLogger.Warn($"[App] session snapshot save failed: {ex.Message}");
             }
 
-            // Close all active sessions (SSH, SFTP, RDP, Local — disposes host controls + kills processes)
+            // Close all active sessions (SSH, SFTP, RDP, Local - disposes host controls + kills processes)
             try
             {
                 _mainViewModel?.Connection.CloseAllSessionsSilently();

@@ -89,7 +89,7 @@ internal static class TerminalAssetsLoader
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException(
-                $"Terminal asset '{relativePath}' not found at '{fullPath}' — installation corrupt",
+                $"Terminal asset '{relativePath}' not found at '{fullPath}' - installation corrupt",
                 fullPath);
         }
 

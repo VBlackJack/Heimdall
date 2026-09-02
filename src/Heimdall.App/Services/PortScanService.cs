@@ -167,7 +167,7 @@ public sealed class PortScanService : IPortScanService
         {
             stopwatch.Stop();
             var service = NetworkToolPresets.GetPortServiceLabel(port);
-            return new PortProbeResult(port, false, service, "—", null);
+            return new PortProbeResult(port, false, service, "-", null);
         }
     }
 
@@ -215,7 +215,7 @@ public sealed class PortScanService : IPortScanService
             stopwatch.Stop();
             var isOpen = string.Equals(result, "OPEN", StringComparison.OrdinalIgnoreCase);
             var service = NetworkToolPresets.GetPortServiceLabel(port);
-            return new PortProbeResult(port, isOpen, service, isOpen ? $"{stopwatch.ElapsedMilliseconds} ms" : "—", null);
+            return new PortProbeResult(port, isOpen, service, isOpen ? $"{stopwatch.ElapsedMilliseconds} ms" : "-", null);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -225,7 +225,7 @@ public sealed class PortScanService : IPortScanService
         {
             stopwatch.Stop();
             var service = NetworkToolPresets.GetPortServiceLabel(port);
-            return new PortProbeResult(port, false, service, "—", null);
+            return new PortProbeResult(port, false, service, "-", null);
         }
     }
 }

@@ -29,7 +29,7 @@ namespace Heimdall.App.Views.Tools;
 /// Embedded tool wrapping TwinShell's command library. Phase B of the
 /// <c>CommandLibraryView</c> refactor: the XAML binds directly to
 /// <see cref="CommandLibraryViewModel"/> state; this code-behind only keeps
-/// the view-only concerns that cannot be expressed as bindings — dialog
+/// the view-only concerns that cannot be expressed as bindings - dialog
 /// plumbing, clipboard I/O, link navigation, and the "copied" flash animation
 /// on the Copy/Send buttons.
 /// </summary>

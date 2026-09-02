@@ -27,6 +27,26 @@ namespace Heimdall.App.Services;
 /// </summary>
 internal sealed class RdpConnectivityTester
 {
+    private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolveAddresses;
+
+    public RdpConnectivityTester()
+        : this(static (host, cancellationToken) => Dns.GetHostAddressesAsync(host, cancellationToken))
+    {
+    }
+
+    /// <summary>
+    /// Test seam over name resolution.
+    /// </summary>
+    /// <remarks>
+    /// How the probe behaves on a name that resolves to several addresses is the whole point of
+    /// the loop below, and a loopback fixture resolves to exactly one - so without this seam the
+    /// multi-address path cannot be measured at all.
+    /// </remarks>
+    internal RdpConnectivityTester(Func<string, CancellationToken, Task<IPAddress[]>> resolveAddresses)
+    {
+        _resolveAddresses = resolveAddresses;
+    }
+
     public async Task<RdpConnectivityTestResult> TestAsync(
         string host,
         int port,
@@ -59,7 +79,7 @@ internal sealed class RdpConnectivityTester
                 cancellationToken,
                 timeoutCts.Token);
 
-            addresses = await Dns.GetHostAddressesAsync(trimmedHost, linkedCts.Token)
+            addresses = await _resolveAddresses(trimmedHost, linkedCts.Token)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -81,40 +101,70 @@ internal sealed class RdpConnectivityTester
             return RdpConnectivityTestResult.DnsNoResults();
         }
 
-        var resolvedAddress = addresses[0];
         var tcpStopwatch = Stopwatch.StartNew();
-        try
-        {
-            using var socket = new TcpClient(resolvedAddress.AddressFamily);
-            using var timeoutCts = new CancellationTokenSource(timeout);
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                timeoutCts.Token);
+        RdpConnectivityTestResult? lastFailure = null;
 
-            await socket.ConnectAsync(resolvedAddress, port, linkedCts.Token)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        // Every address the name resolved to, not just the first. A dual-stack host whose AAAA
+        // sorts ahead of its A under RFC 6724 answers on the second one at a site with no IPv6
+        // routing, and the RDP client - which connects by name - gets there. Reporting "the host
+        // may be off, unreachable" after dialling one of several addresses says more than was
+        // measured.
+        for (var index = 0; index < addresses.Length; index++)
         {
-            return RdpConnectivityTestResult.Cancelled();
-        }
-        catch (OperationCanceledException)
-        {
-            return RdpConnectivityTestResult.TcpTimeout(resolvedAddress.ToString(), timeout);
-        }
-        catch (SocketException ex)
-        {
-            return RdpConnectivityTestResult.TcpFailed(
+            var resolvedAddress = addresses[index];
+
+            // The caller's budget is shared out over the addresses left rather than granted to
+            // each in turn, so widening the probe cannot multiply the wait the user sits through.
+            var remaining = timeout - tcpStopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+
+            var attemptBudget = TimeSpan.FromTicks(remaining.Ticks / (addresses.Length - index));
+
+            try
+            {
+                using var socket = new TcpClient(resolvedAddress.AddressFamily);
+                using var timeoutCts = new CancellationTokenSource(attemptBudget);
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    timeoutCts.Token);
+
+                await socket.ConnectAsync(resolvedAddress, port, linkedCts.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return RdpConnectivityTestResult.Cancelled();
+            }
+            catch (OperationCanceledException)
+            {
+                lastFailure = RdpConnectivityTestResult.TcpTimeout(
+                    resolvedAddress.ToString(),
+                    attemptBudget);
+                continue;
+            }
+            catch (SocketException ex)
+            {
+                lastFailure = RdpConnectivityTestResult.TcpFailed(
+                    resolvedAddress.ToString(),
+                    ex.SocketErrorCode,
+                    ex.Message);
+                continue;
+            }
+
+            tcpStopwatch.Stop();
+            return RdpConnectivityTestResult.Success(
                 resolvedAddress.ToString(),
-                ex.SocketErrorCode,
-                ex.Message);
+                dnsStopwatch.Elapsed,
+                tcpStopwatch.Elapsed);
         }
 
-        tcpStopwatch.Stop();
-        return RdpConnectivityTestResult.Success(
-            resolvedAddress.ToString(),
-            dnsStopwatch.Elapsed,
-            tcpStopwatch.Elapsed);
+        // The loop only ends without a verdict when the budget ran out before an address could be
+        // tried, which is the same thing the first address timing out already reported.
+        return lastFailure
+            ?? RdpConnectivityTestResult.TcpTimeout(addresses[0].ToString(), timeout);
     }
 }
 

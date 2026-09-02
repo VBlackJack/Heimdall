@@ -84,7 +84,7 @@ public sealed class PageantClient : IPageantClient
     /// <param name="keyBlob">Public key blob identifying which key to use for signing.</param>
     /// <param name="data">Data to sign (typically the session hash + auth request).</param>
     /// <param name="flags">Agent signature flags (0 for default behavior).</param>
-    /// <returns>The full SSH signature blob from the agent (algorithm name + signature, each length-prefixed) — not raw signature bytes.</returns>
+    /// <returns>The full SSH signature blob from the agent (algorithm name + signature, each length-prefixed) - not raw signature bytes.</returns>
     /// <exception cref="InvalidOperationException">Pageant is not running or signing failed.</exception>
     /// <exception cref="TimeoutException">Pageant did not answer the bounded IPC request.</exception>
     public byte[] SignData(byte[] keyBlob, byte[] data, uint flags = 0)

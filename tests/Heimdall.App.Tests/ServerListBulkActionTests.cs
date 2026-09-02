@@ -1506,7 +1506,7 @@ public sealed class ServerListBulkActionTests
         Assert.Equal(0, configManager.SaveServersCallCount);
         AssertSelection(fixture.ViewModel, "alpha", "beta", "gamma");
         Assert.Equal("gamma", fixture.ViewModel.SelectedServer?.Id);
-        Assert.Equal("No changes applied — every selected server already uses this username.", fixture.LastStatusMessage);
+        Assert.Equal("No changes applied - every selected server already uses this username.", fixture.LastStatusMessage);
 
         var storedUsernames = (await fixture.ConfigManager.LoadServersAsync())
             .Where(server => server.Id is "alpha" or "beta" or "gamma")

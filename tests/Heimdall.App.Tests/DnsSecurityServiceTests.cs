@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
@@ -46,7 +47,7 @@ public sealed class DnsSecurityServiceTests
     {
         var psi = DnsSecurityService.CreateNslookupStartInfo("example.com", "TXT");
 
-        Assert.Equal("nslookup", psi.FileName);
+        Assert.Equal("nslookup.exe", Path.GetFileName(psi.FileName), ignoreCase: true);
         Assert.False(psi.UseShellExecute);
         Assert.Equal(2, psi.ArgumentList.Count);
         Assert.Equal("-type=TXT", psi.ArgumentList[0]);

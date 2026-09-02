@@ -17,6 +17,7 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
@@ -27,23 +28,35 @@ namespace Heimdall.App.Services;
 [SupportedOSPlatform("windows")]
 public sealed class WindowsTpmPresenceService : ITpmPresenceService
 {
+    /// <summary>Executable that reports the TPM device information.</summary>
+    internal const string TpmToolExecutableName = "tpmtool.exe";
+
+    /// <summary>The one verb the presence check needs.</summary>
+    private const string TpmToolDeviceInformationArguments = "getdeviceinformation";
+
+    /// <summary>
+    /// Builds the start info for the TPM presence probe.
+    /// </summary>
+    internal static ProcessStartInfo CreateTpmToolStartInfo()
+    {
+        return new ProcessStartInfo
+        {
+            FileName = SystemExecutablePath.InSystemDirectory(TpmToolExecutableName),
+            Arguments = TpmToolDeviceInformationArguments,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory
+        };
+    }
+
     /// <inheritdoc />
     public async Task<bool> IsTpm2PresentAsync(CancellationToken ct = default)
     {
         try
         {
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "tpmtool",
-                    Arguments = "getdeviceinformation",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
-            };
+            using var process = new Process { StartInfo = CreateTpmToolStartInfo() };
 
             process.Start();
             var outputTask = process.StandardOutput.ReadToEndAsync(ct);

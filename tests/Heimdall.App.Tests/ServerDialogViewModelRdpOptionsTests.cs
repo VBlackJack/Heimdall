@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Tests;
 
@@ -827,6 +829,107 @@ public sealed class ServerDialogViewModelRdpOptionsTests
         { true, SessionLoggingOverrideSelection.On },
         { false, SessionLoggingOverrideSelection.Off }
     };
+
+    // An RDP profile routes through its RD Gateway exactly as an SSH-family profile routes
+    // through a tunnel, and the reachability probe dials neither: it dials the target address
+    // from this machine. Off-site, that internal name does not resolve or its 3389 is filtered,
+    // so the chip used to state flatly that the host may be off or unreachable - about a host
+    // that then connected without trouble through the gateway. The verdict has to name the route
+    // it did not take, which is what the SSH half already does.
+    [Fact]
+    public async Task Rdp_failed_verdict_names_the_RD_Gateway_it_did_not_dial()
+    {
+        ServerDialogViewModel direct = await RdpProfileAsync();
+        ServerDialogViewModel throughGateway = await RdpProfileAsync(RdGatewayHost);
+
+        RdpConnectivityTestResult refused =
+            RdpConnectivityTestResult.TcpTimeout("10.0.0.5", TimeSpan.FromSeconds(5));
+
+        direct.ApplyReachabilityResult(refused);
+        throughGateway.ApplyReachabilityResult(refused);
+
+        Assert.Contains(RdGatewayHost, throughGateway.TestChipText, StringComparison.Ordinal);
+        Assert.StartsWith(direct.TestChipText, throughGateway.TestChipText, StringComparison.Ordinal);
+        Assert.NotEqual(direct.TestChipText, throughGateway.TestChipText);
+    }
+
+    // The positive control for the assertion above: a gatewayless RDP profile IS tested over the
+    // route it connects on, so appending the clause there would be the opposite lie. Without this
+    // case, "always append the clause" would pass.
+    [Fact]
+    public async Task Rdp_without_a_gateway_keeps_the_unqualified_verdict()
+    {
+        ServerDialogViewModel direct = await RdpProfileAsync();
+
+        direct.ApplyReachabilityResult(
+            RdpConnectivityTestResult.TcpTimeout("10.0.0.5", TimeSpan.FromSeconds(5)));
+
+        Assert.DoesNotContain(RdGatewayHost, direct.TestChipText, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ServerDialogReachabilityChipDirectScope",
+            direct.TestChipText,
+            StringComparison.Ordinal);
+    }
+
+    // A success is scoped for the same reason as a failure: what answered is the direct route,
+    // which is not the one this profile connects over.
+    [Fact]
+    public async Task Rdp_successful_verdict_also_names_the_RD_Gateway()
+    {
+        ServerDialogViewModel direct = await RdpProfileAsync();
+        ServerDialogViewModel throughGateway = await RdpProfileAsync(RdGatewayHost);
+
+        RdpConnectivityTestResult answered = RdpConnectivityTestResult.Success(
+            "10.0.0.5",
+            TimeSpan.FromMilliseconds(4),
+            TimeSpan.FromMilliseconds(11));
+
+        direct.ApplyReachabilityResult(answered);
+        throughGateway.ApplyReachabilityResult(answered);
+
+        Assert.Contains(RdGatewayHost, throughGateway.TestChipText, StringComparison.Ordinal);
+        Assert.StartsWith(direct.TestChipText, throughGateway.TestChipText, StringComparison.Ordinal);
+    }
+
+    private const string RdGatewayHost = "rdgw.example.com";
+
+    // The verdict is read from the shipped locale rather than from a stub: a bare
+    // LocalizationManager returns key names, under which a routing clause missing its
+    // placeholder would still look like a clause.
+    private static async Task<ServerDialogViewModel> RdpProfileAsync(string? rdpGateway = null)
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(RepoRoot(), "locales"), "en");
+
+        ServerDialogViewModel vm = new()
+        {
+            DisplayName = "RDP host",
+            RemoteServer = "fileserver.corp.local",
+            ConnectionType = "RDP",
+            RdpGateway = rdpGateway ?? ""
+        };
+
+        Assert.False(
+            vm.UsesGateway,
+            "The fixture must isolate the RD Gateway: an SSH gateway would scope the verdict on "
+            + "its own and the assertion would pass for the wrong reason.");
+
+        vm.Localizer = localizer;
+        return vm;
+    }
+
+    private static string RepoRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null
+            && !File.Exists(Path.Combine(directory.FullName, "Heimdall.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory!.FullName;
+    }
 
     private sealed class FakeMonitorEnumerator : IMonitorEnumerator
     {

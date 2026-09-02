@@ -39,7 +39,8 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
     private const string WritableProbePrefix = "Heimdall_writeprobe_";
     private const string WritableProbeExtension = ".tmp";
     /// <summary>
-    /// The host every supported Windows carries, chosen unconditionally.
+    /// The host every supported Windows carries, chosen unconditionally and named by its
+    /// absolute path under the system directory.
     /// </summary>
     /// <remarks>
     /// This used to prefer pwsh.exe when the PATH offered it and fall back here
@@ -47,8 +48,14 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
     /// cost that only showed up in support: whether an update behaved one way or the
     /// other depended on whether the user happened to have installed PowerShell 7.
     /// One host means one behaviour to reason about and one to test against.
+    /// <para>
+    /// The name used to be unqualified, which handed the choice back to the CreateProcess
+    /// search order: the application directory and the process's current directory are
+    /// searched before the system directory, and this is the launch that goes on to
+    /// replace the installed binaries.
+    /// </para>
     /// </remarks>
-    private const string WindowsPowerShell = "powershell.exe";
+    private static string WindowsPowerShell => SystemExecutablePath.WindowsPowerShell;
 
     private readonly string _dataRoot;
 
@@ -146,17 +153,27 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
     public bool VerifySha256(string path, string expectedSha256) =>
         Sha256Verifier.Verify(path, expectedSha256);
 
-    public bool StartDetached(string fileName, string arguments)
+    public bool StartDetached(string fileName, string arguments) =>
+        Process.Start(CreateDetachedStartInfo(fileName, arguments)) is not null;
+
+    /// <summary>
+    /// Builds the start info for the detached relauncher. The working directory is pinned to
+    /// the system directory rather than inherited: the inherited one is whatever folder the
+    /// user last browsed, and a child holding a handle on the install directory is also the
+    /// thing the relauncher is about to replace.
+    /// </summary>
+    internal static ProcessStartInfo CreateDetachedStartInfo(string fileName, string arguments)
     {
-        var startInfo = new ProcessStartInfo
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+
+        return new ProcessStartInfo
         {
             FileName = fileName,
             Arguments = arguments,
             UseShellExecute = false,
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
-
-        return Process.Start(startInfo) is not null;
     }
 }

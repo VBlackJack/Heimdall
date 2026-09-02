@@ -500,7 +500,7 @@ public partial class ServerDialog : Window
         DlgSrv_ProtoLocalName.Text = _localizer["ServerDialogProtocolLocalName"];
         DlgSrv_ProtoLocalDesc.Text = _localizer["ServerDialogProtocolLocalDesc"];
 
-        // Protocol badge (clickable chip — returns to protocol selector in add mode)
+        // Protocol badge (clickable chip - returns to protocol selector in add mode)
         DlgSrv_ProtocolBadgeLabel.Text = _localizer["ServerDialogProtocolBadge"];
 
         // Connection basics (essential section)

@@ -21,7 +21,7 @@ namespace Heimdall.Core.Discovery;
 
 /// <summary>
 /// Extracts hostname, domain, and OS build from Windows hosts via SMB2 NTLMSSP
-/// challenge exchange. No credentials are required — only the NTLM Type 1
+/// challenge exchange. No credentials are required - only the NTLM Type 1
 /// (Negotiate) is sent, and the Type 2 (Challenge) response is parsed for
 /// TargetInfo AV_PAIR structures.
 /// </summary>

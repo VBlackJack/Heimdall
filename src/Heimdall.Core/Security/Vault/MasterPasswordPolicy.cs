@@ -25,7 +25,7 @@ namespace Heimdall.Core.Security.Vault;
 /// Thresholds follow ANSSI/NIST guidance: a 12-character minimum with at least
 /// three of the four character classes, OR a 20-character minimum that exempts
 /// complexity (a long passphrase compensates for variety). All thresholds are
-/// named constants — no inline magic numbers.
+/// named constants - no inline magic numbers.
 /// </remarks>
 public static class MasterPasswordPolicy
 {

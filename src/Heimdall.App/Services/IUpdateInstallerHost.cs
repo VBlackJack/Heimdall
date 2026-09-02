@@ -37,7 +37,7 @@ internal interface IUpdateInstallerHost
     /// <summary>Where the relauncher records what went wrong, when something does.</summary>
     string CreateFailureRecordPath();
 
-    /// <summary>Resolves the PowerShell host: pwsh.exe when available, else powershell.exe.</summary>
+    /// <summary>Resolves the absolute path of the PowerShell host the relauncher runs under.</summary>
     string ResolvePowerShellExecutable();
 
     /// <summary>Probes whether the directory is writable (elevation probe).</summary>

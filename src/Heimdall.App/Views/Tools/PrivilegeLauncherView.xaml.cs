@@ -116,7 +116,7 @@ public partial class PrivilegeLauncherView : UserControl, IToolView
             new("Explorer", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe")),
         };
 
-        // pwsh.exe (PowerShell 7+) — search PATH and common install locations
+        // pwsh.exe (PowerShell 7+) - search PATH and common install locations
         var pwshPath = FindInPath("pwsh.exe")
             ?? FindInProgramFiles("PowerShell", "pwsh.exe");
         if (pwshPath is not null)

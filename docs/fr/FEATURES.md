@@ -37,7 +37,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Remplissage automatique des identifiants pour les boîtes CredUI (EnumThreadWindows + UI Automation), avec des diagnostics Debug de fenêtre broker limités aux métadonnées : titre, handle, PID et nom de processus ; les champs d'identifiants ne sont jamais journalisés (`1d7c78c`)
 - **État de lancement externe honnête** : lorsqu'un client mstsc externe est lancé, la session apparaît en couleur d'avertissement avec un état dédié *External client launched*, signalant que Heimdall ne peut pas observer directement la session distante au-delà du lancement lui-même
 - **Import RDP unifié** : les fichiers `.rdp` déposés sur la fenêtre principale ou importés depuis `Settings -> Import` empruntent le même flux d'aperçu et de résolution de conflits
-- **Performance** : préchauffage COM au démarrage, pré-résolution DNS à la sélection d'un serveur, indicateurs d'expérience par serveur (fond d'écran/thèmes/animations), mode TCP-only pour les environnements très filtrés
+- **Performance** : préchauffage COM au démarrage, pré-résolution DNS à la sélection d'un serveur, indicateurs d'expérience par serveur (fond d'écran/thèmes/animations), suppression de la sonde de transport UDP pour les environnements très filtrés (le client Bureau à distance n'expose aucun moyen, pour une application, de forcer TCP ; ce qui disparaît, c'est la sonde qui expire quand UDP est bloqué)
 
 ### Terminal SSH
 - Terminal embarqué via WebView2 + xterm.js (rendu VT100/xterm complet)

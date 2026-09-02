@@ -22,7 +22,7 @@ namespace Heimdall.Core.SessionHealth;
 /// </summary>
 public enum HealthStatus
 {
-    /// <summary>No verdict — server is behind a gateway, has no declared probe port, or has never been probed.</summary>
+    /// <summary>No verdict - server is behind a gateway, has no declared probe port, or has never been probed.</summary>
     Unknown,
     /// <summary>A probe is currently in flight for this server.</summary>
     Probing,

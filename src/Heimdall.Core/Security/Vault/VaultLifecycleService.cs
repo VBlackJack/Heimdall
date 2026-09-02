@@ -43,7 +43,7 @@ namespace Heimdall.Core.Security.Vault;
 /// </list>
 /// Rollback policy: enable never rolls back to disabled on failure. A failed or
 /// interrupted forward pass leaves Enabled=true + <c>InProgress</c> + the wrapped
-/// DEK, a consistent RESUMABLE state — re-unlock finishes it. A failed or
+/// DEK, a consistent RESUMABLE state - re-unlock finishes it. A failed or
 /// interrupted disable leaves the vault enabled with a mixed-but-readable set;
 /// re-disable finishes it. Neither path ever loses or silently downgrades data.
 /// </remarks>

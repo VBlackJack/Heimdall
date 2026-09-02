@@ -178,10 +178,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private IGatewayCreationService? _gatewayCreation;
     private List<ProjectDto> _pendingProjects = new();
 
-    // Projects removed before Save — servers are unassigned on flush
+    // Projects removed before Save - servers are unassigned on flush
     private readonly List<string> _deletedProjectIds = new();
 
-    // Gateways removed before Save — all reverse references are cleared on flush
+    // Gateways removed before Save - all reverse references are cleared on flush
     private readonly HashSet<string> _deletedGatewayIds = new(StringComparer.OrdinalIgnoreCase);
 
     // --- General ---
@@ -508,7 +508,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// Multi-line text representation of <see cref="RdpResolutionPresets"/>
     /// for the Settings UI: one preset per line, format <c>WIDTHxHEIGHT</c>.
     /// Setter parses, trims, validates and rebuilds the array. Invalid lines
-    /// are silently dropped — the user keeps editing what's left in the box.
+    /// are silently dropped - the user keeps editing what's left in the box.
     /// </summary>
     public string RdpResolutionPresetsText
     {
@@ -520,7 +520,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 .Select(line => line.Trim())
                 .Where(line =>
                 {
-                    var parts = line.Split(['x', 'X', '×'], 2);
+                    var parts = line.Split(['x', 'X', '\u00D7'], 2);
                     return parts.Length == 2
                         && int.TryParse(parts[0].Trim(), out var w) && w > 0
                         && int.TryParse(parts[1].Trim(), out var h) && h > 0;
@@ -3680,7 +3680,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         if (System.IO.File.Exists(exePath)) return true;
 
-        // Bare filename like "ping.exe" — search PATH
+        // Bare filename like "ping.exe" - search PATH
         if (!System.IO.Path.IsPathRooted(exePath))
         {
             var pathDirs = Environment.GetEnvironmentVariable("PATH")?.Split(';') ?? [];

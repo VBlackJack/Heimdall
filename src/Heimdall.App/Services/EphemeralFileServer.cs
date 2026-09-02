@@ -475,7 +475,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
                     }
                 }, token);
             }
-            // Ignore WRQ (opcode 2) and anything else for security — read-only server
+            // Ignore WRQ (opcode 2) and anything else for security - read-only server
         }
     }
 
@@ -565,7 +565,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
                         }
                         catch (OperationCanceledException) when (!token.IsCancellationRequested)
                         {
-                            // Timeout — retry
+                            // Timeout - retry
                         }
                     }
 

@@ -719,11 +719,17 @@ public partial class ServerDialogViewModel : ObservableValidator
     /// verdict rather than withdrawing the button, because whether the direct route is still
     /// dead is a question some users ask on purpose.
     ///
+    /// There are two such routes, not one. The SSH gateway was scoped from the start; an RDP
+    /// profile carrying an RD Gateway was not, so an off-site user testing an internal name was
+    /// told "the host may be off, unreachable" about an address that never had to answer
+    /// directly, and that the product then connected to without trouble.
+    ///
     /// A cancelled test is left alone: it reports no verdict, so it has no limit to name.
     /// </remarks>
     private string ScopeToDirectRoute(string verdict)
     {
-        if (!UsesGateway)
+        string? route = RoutedThrough;
+        if (route is null)
         {
             return verdict;
         }
@@ -733,7 +739,33 @@ public partial class ServerDialogViewModel : ObservableValidator
             + string.Format(
                 CultureInfo.CurrentCulture,
                 L("ServerDialogReachabilityChipDirectScope"),
-                SelectedGateway?.EffectiveName ?? L("ServerDialogTunnelSummaryFallbackGw"));
+                route);
+    }
+
+    /// <summary>
+    /// The intermediary this profile connects through, or <see langword="null"/> when the
+    /// session takes the same direct route the probe just dialled.
+    /// </summary>
+    /// <remarks>
+    /// The SSH gateway and the RD Gateway are alternatives, never both: a profile is either an
+    /// SSH-family one that can carry a tunnel or an RDP one that can carry an RD Gateway host.
+    /// </remarks>
+    private string? RoutedThrough
+    {
+        get
+        {
+            if (UsesGateway)
+            {
+                return SelectedGateway?.EffectiveName ?? L("ServerDialogTunnelSummaryFallbackGw");
+            }
+
+            if (IsRdpConnection && !string.IsNullOrWhiteSpace(RdpGateway))
+            {
+                return RdpGateway.Trim();
+            }
+
+            return null;
+        }
     }
 
     private string FormatRdpTestResult(RdpConnectivityTestResult result)
@@ -1798,9 +1830,10 @@ public partial class ServerDialogViewModel : ObservableValidator
     /// <summary>
     /// Pre-fills <see cref="RdpFixedWidth"/> and <see cref="RdpFixedHeight"/>
     /// from a "WIDTHxHEIGHT" preset string (e.g. "1920x1080"). Accepts the
-    /// regular ASCII <c>x</c> as well as the typographic multiplication sign
-    /// <c>×</c>. Invalid input is silently ignored — the user can still
-    /// type custom dimensions in the boxes.
+    /// regular ASCII <c>x</c> as well as the typographic multiplication sign,
+    /// written as the escape <c>\u00D7</c> so this file stays ASCII. Invalid
+    /// input is silently ignored - the user can still type custom dimensions
+    /// in the boxes.
     /// </summary>
     [RelayCommand]
     private void ApplyResolutionPreset(string? preset)
@@ -1810,7 +1843,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             return;
         }
 
-        string[] parts = preset.Split(['x', 'X', '×'], 2);
+        string[] parts = preset.Split(['x', 'X', '\u00D7'], 2);
         if (parts.Length != 2)
         {
             return;

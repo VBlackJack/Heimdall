@@ -40,7 +40,7 @@ namespace Heimdall.App.ViewModels.CommandPalette;
 /// <remarks>
 /// <para>
 /// Composition: instantiated inside <see cref="MainViewModel"/>'s
-/// constructor (<see cref="MainViewModel.CommandPalette"/>) — there is no
+/// constructor (<see cref="MainViewModel.CommandPalette"/>) - there is no
 /// DI registration. Matches the sidebar / tools-tab / onboarding sub-VM
 /// pattern established in earlier phases.
 /// </para>
@@ -277,7 +277,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     /// </summary>
     public void ExecuteSelection(ServerItemViewModel item)
     {
-        // Snippets open an in-palette detail view — keep the palette open.
+        // Snippets open an in-palette detail view - keep the palette open.
         if (item.Id.StartsWith("snippet-", StringComparison.Ordinal))
         {
             HandleSnippetSelection(item);
@@ -301,7 +301,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
                 return;
             }
 
-            // Built-in tool selected in split mode — dock tool in split pane
+            // Built-in tool selected in split mode - dock tool in split pane
             if (item.Id.StartsWith("tool-", StringComparison.Ordinal))
             {
                 SplitSessionWithTool(splitSession, item.Id["tool-".Length..], splitOrientation, splitPaneId);
@@ -330,7 +330,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     {
         if (server is null) return;
 
-        // Snippets open an in-palette detail view — keep the palette open.
+        // Snippets open an in-palette detail view - keep the palette open.
         if (server.Id.StartsWith("snippet-", StringComparison.Ordinal))
         {
             HandleSnippetSelection(server);
@@ -389,7 +389,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Normal (non-split) palette action — extracted so
+    /// Normal (non-split) palette action - extracted so
     /// <see cref="ExecuteSelection"/> can call it after the split check
     /// without duplicating the routing logic.
     /// </summary>
@@ -427,7 +427,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     {
         if (server is null) return;
 
-        // Snippets open an in-palette detail view — keep the palette open.
+        // Snippets open an in-palette detail view - keep the palette open.
         if (server.Id.StartsWith("snippet-", StringComparison.Ordinal))
         {
             HandleSnippetSelection(server);

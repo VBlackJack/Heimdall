@@ -241,7 +241,7 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="LblMin" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                <TextBlock x:Name="TxtMin" Text="—" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                <TextBlock x:Name="TxtMin" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource SuccessTextBrush}" FontWeight="SemiBold"/>
 
                 <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
@@ -249,7 +249,7 @@
 
                 <TextBlock x:Name="LblAvg" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                <TextBlock x:Name="TxtAvg" Text="—" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                <TextBlock x:Name="TxtAvg" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
 
                 <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
@@ -257,7 +257,7 @@
 
                 <TextBlock x:Name="LblMax" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                <TextBlock x:Name="TxtMax" Text="—" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                <TextBlock x:Name="TxtMax" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource WarningTextBrush}" FontWeight="SemiBold"/>
 
                 <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
@@ -265,7 +265,7 @@
 
                 <TextBlock x:Name="LblJitter" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                <TextBlock x:Name="TxtJitter" Text="—" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                <TextBlock x:Name="TxtJitter" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
 
                 <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
@@ -273,7 +273,7 @@
 
                 <TextBlock x:Name="LblLoss" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                <TextBlock x:Name="TxtLoss" Text="—" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                <TextBlock x:Name="TxtLoss" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                            Foreground="{DynamicResource ErrorTextBrush}" FontWeight="SemiBold"/>
             </StackPanel>
         </Border>

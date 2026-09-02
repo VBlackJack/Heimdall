@@ -39,11 +39,11 @@ internal readonly record struct RdpEffectiveResolutionState(
 internal static class RdpResolutionModeIndicator
 {
     // Segoe MDL2 Assets glyphs as raw Private Use Area codepoints.
-    private const string GlyphAuto = "";        // Settings — system decides
-    private const string GlyphFitWindow = "";   // FullScreen — follows the window
-    private const string GlyphSmartSizing = ""; // BackToWindow — smart shrink-fit
-    private const string GlyphFixed = "";       // TileSize — fixed rectangle
-    private const string GlyphMultimon = "";    // TVMonitor — multi-display
+    private const string GlyphAuto = "";        // Settings - system decides
+    private const string GlyphFitWindow = "";   // FullScreen - follows the window
+    private const string GlyphSmartSizing = ""; // BackToWindow - smart shrink-fit
+    private const string GlyphFixed = "";       // TileSize - fixed rectangle
+    private const string GlyphMultimon = "";    // TVMonitor - multi-display
 
     /// <summary>
     /// Resolves the live effective mode: a session-scoped manual override
@@ -100,21 +100,38 @@ internal static class RdpResolutionModeIndicator
     };
 
     /// <summary>
-    /// Builds the menu header string: <c>{activeModeLabel}: {modeLabel}</c>
-    /// or <c>{activeModeLabel}: {modeLabel} ({W}x{H})</c> when dimensions
-    /// are available.
+    /// The header layout used when the caller supplies no template. Separator and word order are
+    /// not adaptable through these, which is why a caller that can reach the locale files is
+    /// expected to pass its own; they exist so a caller that cannot still produces ASCII.
     /// </summary>
+    internal const string DefaultHeaderTemplate = "{0}: {1}";
+
+    /// <summary>The same, for the variant that carries the pixel dimensions.</summary>
+    internal const string DefaultHeaderWithSizeTemplate = "{0}: {1} ({2}x{3})";
+
+    /// <summary>
+    /// Builds the resolution menu header. Template arguments: <c>{0}</c> = active-mode label,
+    /// <c>{1}</c> = mode label, <c>{2}</c> = width, <c>{3}</c> = height.
+    /// </summary>
+    /// <remarks>
+    /// The templates are parameters for the same reason <see cref="FormatTooltip"/>'s are: the
+    /// string is user-facing, and a translator cannot reach a literal compiled into this method.
+    /// The literal this replaced also carried a multiplication sign, which the documentation on
+    /// this very method described as an ASCII <c>x</c>.
+    /// </remarks>
     public static string FormatHeader(
         string activeModeLabel,
         string modeLabel,
         int? width,
-        int? height)
+        int? height,
+        string? headerTemplate = null,
+        string? headerWithSizeTemplate = null)
     {
         if (width.HasValue && height.HasValue && width.Value > 0 && height.Value > 0)
         {
             return string.Format(
                 CultureInfo.CurrentCulture,
-                "{0}: {1} ({2}×{3})",
+                headerWithSizeTemplate ?? DefaultHeaderWithSizeTemplate,
                 activeModeLabel,
                 modeLabel,
                 width.Value,
@@ -123,7 +140,7 @@ internal static class RdpResolutionModeIndicator
 
         return string.Format(
             CultureInfo.CurrentCulture,
-            "{0}: {1}",
+            headerTemplate ?? DefaultHeaderTemplate,
             activeModeLabel,
             modeLabel);
     }

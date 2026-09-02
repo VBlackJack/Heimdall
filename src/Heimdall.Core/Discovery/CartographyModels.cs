@@ -144,7 +144,7 @@ public sealed record HostScanResult(
         Services.Count > 0
         || Hostname is not null
         || PrimaryRole is not null
-        || (Manufacturer is not null && Manufacturer != "—")
+        || (Manufacturer is not null && Manufacturer != "-")
         || NetBiosName is not null
         || SnmpInfo is not null
         || (MdnsServices is { Count: > 0 })

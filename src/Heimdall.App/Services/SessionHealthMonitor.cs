@@ -32,7 +32,7 @@ namespace Heimdall.App.Services;
 /// Gateway-fronted servers (<see cref="ServerProfileDto.SshGatewayId"/> set)
 /// and servers whose protocol exposes no probe port (Citrix, Local Shell) are
 /// recorded as <see cref="HealthStatus.Unknown"/> without consuming a probe
-/// slot — the MVP scope chose direct TCP only.
+/// slot - the MVP scope chose direct TCP only.
 /// </remarks>
 public sealed class SessionHealthMonitor : IDisposable
 {

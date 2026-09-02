@@ -747,7 +747,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             SudoMode = !SudoMode;
             UpdateStatus(SudoMode
-                ? (_localizer?["SftpSudoModeEnabled"] ?? "Sudo mode enabled — browsing as root")
+                ? (_localizer?["SftpSudoModeEnabled"] ?? "Sudo mode enabled - browsing as root")
                 : (_localizer?["SftpSudoModeDisabled"] ?? "Sudo mode disabled"));
         });
 
@@ -1757,7 +1757,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         string direction = progress.IsUpload ? "\u2191" : "\u2193";
-        TransferStatusText = $"{direction} {progress.FileName} — {transferred} / {total} ({percent:F0}%)";
+        TransferStatusText = $"{direction} {progress.FileName} - {transferred} / {total} ({percent:F0}%)";
     }
 
     /// <summary>
@@ -2842,7 +2842,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                       $"{L10n("SftpPropertiesPath")} {file.FullPath}";
 
         _dialogService.ShowInfo(
-            _localizer?.Format("SftpPropertiesTitle", file.Name) ?? $"Properties — {file.Name}",
+            _localizer?.Format("SftpPropertiesTitle", file.Name) ?? $"Properties - {file.Name}",
             body);
     }
 

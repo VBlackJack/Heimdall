@@ -64,7 +64,7 @@ public static class AuthPreflightChecker
                 $"Key file not found: {connectionParams.KeyPath}");
         }
 
-        // Tunnel mode: no key and no password — needs an agent as sole auth source.
+        // Tunnel mode: no key and no password - needs an agent as sole auth source.
         if (isTunnelMode
             && string.IsNullOrEmpty(connectionParams.KeyPath)
             && string.IsNullOrEmpty(connectionParams.Password))

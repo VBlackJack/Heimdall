@@ -508,4 +508,65 @@ public class MRemoteNgImporterTests
         var server = result.Servers.Single();
         Assert.Equal("RDP", server.ConnectionType);
     }
+
+    [Fact]
+    public void Parse_RdpConnectionCarryingSettings_StopsFollowingGlobalDefaults()
+    {
+        var result = MRemoteNgImporter.Parse(SampleXml);
+
+        var server = result.Servers.Single(s => s.DisplayName == "Web Server");
+
+        // The redirections below are only read by the connect-time resolver once the profile
+        // stops following the application defaults; while the flag stayed at its default every
+        // value this importer maps was thrown away.
+        Assert.False(server.RdpUseGlobalDefaults);
+        Assert.True(server.RdpRedirectPrinters);
+        Assert.False(server.RdpRedirectDrives);
+    }
+
+    [Theory]
+    // Attributes that write a per-profile RDP field: the profile must stop following the defaults.
+    [InlineData("RedirectClipboard=\"False\"", false)]
+    [InlineData("RedirectDiskDrives=\"True\"", false)]
+    [InlineData("RedirectPrinters=\"True\"", false)]
+    [InlineData("RedirectSmartCards=\"True\"", false)]
+    [InlineData("RedirectAudioCapture=\"True\"", false)]
+    [InlineData("Colors=\"Colors16Bit\"", false)]
+    [InlineData("Resolution=\"SmartSize\"", false)]
+    // Attributes that write nothing per-profile: the entry keeps following the defaults. The
+    // gateway is read by the resolver in both branches, so it is not a per-profile setting.
+    [InlineData("", true)]
+    [InlineData("Resolution=\"FullScreen\"", true)]
+    [InlineData("RDGatewayHostname=\"gw.example.com\"", true)]
+    public void Parse_RdpConnection_FollowsGlobalDefaultsOnlyWhenNoRdpSettingWasMapped(
+        string rdpAttributes,
+        bool expectedUseGlobalDefaults)
+    {
+        var xml = $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <Connections Name="Test" FullFileEncryption="false" ConfVersion="2.6">
+              <Node Name="Bare"
+                    Type="Connection"
+                    Hostname="bare.example.com"
+                    Protocol="RDP"
+                    Port="3389"
+                    {rdpAttributes} />
+            </Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        var server = result.Servers.Single();
+        Assert.Equal(expectedUseGlobalDefaults, server.RdpUseGlobalDefaults);
+    }
+
+    [Fact]
+    public void Parse_NonRdpConnection_KeepsFollowingGlobalDefaults()
+    {
+        var result = MRemoteNgImporter.Parse(SampleXml);
+
+        var server = result.Servers.Single(s => s.DisplayName == "App Server");
+
+        Assert.True(server.RdpUseGlobalDefaults);
+    }
 }

@@ -148,7 +148,7 @@ public static class NetworkScanner
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                // Per-port timeout — not a scan cancellation. Treat as closed port.
+                // Per-port timeout - not a scan cancellation. Treat as closed port.
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)

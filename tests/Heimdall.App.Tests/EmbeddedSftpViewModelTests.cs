@@ -1401,7 +1401,7 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.Equal(50, viewModel.TransferProgressValue);
         string transferred = EmbeddedSftpViewModel.FormatSize(512);
         string total = EmbeddedSftpViewModel.FormatSize(1024);
-        Assert.Equal($"\u2191 app.log \u2014 {transferred} / {total} (50%)", viewModel.TransferStatusText);
+        Assert.Equal($"\u2191 app.log - {transferred} / {total} (50%)", viewModel.TransferStatusText);
     }
 
     [Theory]

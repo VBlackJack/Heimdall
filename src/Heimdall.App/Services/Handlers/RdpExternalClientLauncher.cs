@@ -15,6 +15,7 @@
  */
 
 using System.Diagnostics;
+using System.IO;
 
 namespace Heimdall.App.Services.Handlers;
 
@@ -53,16 +54,37 @@ internal interface ILaunchedRdpClientProcess : IDisposable
 /// </summary>
 internal sealed class MstscRdpExternalClientLauncher : IRdpExternalClientLauncher
 {
+    internal const string MstscExecutableName = "mstsc.exe";
+
     public ILaunchedRdpClientProcess? Launch(string rdpFilePath)
     {
-        var process = Process.Start(new ProcessStartInfo
-        {
-            FileName = "mstsc.exe",
-            Arguments = $"\"{rdpFilePath}\"",
-            UseShellExecute = false
-        });
+        var process = Process.Start(CreateStartInfo(rdpFilePath));
 
         return process is null ? null : new ProcessRdpClientProcess(process);
+    }
+
+    /// <summary>
+    /// Builds the start info for mstsc.exe. The image is named by its absolute path under
+    /// the system directory, and the working directory is pinned there too: an unqualified
+    /// name would be resolved through the CreateProcess search order, which reaches the
+    /// process's current directory - a folder the user last browsed in a file dialog -
+    /// before System32, and the client is handed the generated .rdp file plus a Credential
+    /// Manager entry already primed with the profile password.
+    /// </summary>
+    internal static ProcessStartInfo CreateStartInfo(string rdpFilePath)
+    {
+        string systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        string executablePath = string.IsNullOrEmpty(systemDirectory)
+            ? MstscExecutableName
+            : Path.Combine(systemDirectory, MstscExecutableName);
+
+        return new ProcessStartInfo
+        {
+            FileName = executablePath,
+            Arguments = $"\"{rdpFilePath}\"",
+            UseShellExecute = false,
+            WorkingDirectory = systemDirectory
+        };
     }
 
     private sealed class ProcessRdpClientProcess(Process process) : ILaunchedRdpClientProcess

@@ -45,7 +45,7 @@ public enum VaultCipherId : byte
 /// <remarks>
 /// This format is distinct from the legacy <c>"|HMAC|"</c> DPAPI format handled
 /// by <c>HmacIntegrity</c>; the two never share parsing code. No field here is a
-/// plaintext secret — the salt and nonce are non-secret framing values and the
+/// plaintext secret - the salt and nonce are non-secret framing values and the
 /// ciphertext/tag are already encrypted, so the envelope bytes are not zeroed.
 /// </remarks>
 public sealed class VaultEnvelope

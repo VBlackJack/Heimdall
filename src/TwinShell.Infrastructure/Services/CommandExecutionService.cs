@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.Text;
+using Heimdall.Core.Security;
 using Microsoft.Extensions.Logging;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Interfaces;
@@ -28,6 +29,9 @@ namespace TwinShell.Infrastructure.Services;
 /// </summary>
 public sealed class CommandExecutionService : ICommandExecutionService
 {
+    /// <summary>Shell the Unix branch runs, resolved through the platform's own PATH.</summary>
+    private const string LinuxShellExecutableName = "bash";
+
     private readonly ILogger<CommandExecutionService>? _logger;
 
     public CommandExecutionService(ILogger<CommandExecutionService>? logger = null)
@@ -61,19 +65,7 @@ public sealed class CommandExecutionService : ICommandExecutionService
         try
         {
             // Determine executable and arguments based on platform
-            var (executable, arguments) = GetExecutableAndArguments(command, platform);
-
-            var processStartInfo = new ProcessStartInfo
-            {
-                FileName = executable,
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
+            var processStartInfo = CreateProcessStartInfo(command, platform);
 
             process = new Process { StartInfo = processStartInfo };
 
@@ -205,9 +197,35 @@ public sealed class CommandExecutionService : ICommandExecutionService
     }
 
     /// <summary>
-    /// Gets the executable and arguments based on platform
+    /// Builds the start info for a command, so a test can inspect the image the child runs.
     /// </summary>
-    private (string executable, string arguments) GetExecutableAndArguments(string command, Platform platform)
+    internal ProcessStartInfo CreateProcessStartInfo(string command, Platform platform)
+    {
+        var (executable, arguments, workingDirectory) = GetExecutableAndArguments(command, platform);
+
+        return new ProcessStartInfo
+        {
+            FileName = executable,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
+            WorkingDirectory = workingDirectory
+        };
+    }
+
+    /// <summary>
+    /// Gets the executable, arguments and working directory based on platform. The Windows
+    /// host is named by absolute path and the child's working directory is pinned to the
+    /// system directory: an unqualified name would be resolved by CreateProcess through the
+    /// application directory and this process's current directory before the system one.
+    /// </summary>
+    private (string executable, string arguments, string workingDirectory) GetExecutableAndArguments(
+        string command,
+        Platform platform)
     {
         // Detect current OS if platform is "Both"
         var actualPlatform = platform;
@@ -218,8 +236,11 @@ public sealed class CommandExecutionService : ICommandExecutionService
 
         return actualPlatform switch
         {
-            Platform.Windows => ("powershell.exe", BuildPowerShellCommand(command)),
-            Platform.Linux => ("bash", BuildBashCommand(command)),
+            Platform.Windows => (
+                SystemExecutablePath.WindowsPowerShell,
+                BuildPowerShellCommand(command),
+                SystemExecutablePath.SystemDirectory),
+            Platform.Linux => (LinuxShellExecutableName, BuildBashCommand(command), string.Empty),
             _ => throw new NotSupportedException($"Platform {platform} is not supported for command execution")
         };
     }

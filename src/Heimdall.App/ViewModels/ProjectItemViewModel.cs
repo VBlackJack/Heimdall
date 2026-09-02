@@ -30,5 +30,5 @@ public partial class ProjectItemViewModel : ObservableObject
 
     public string DisplayText => string.IsNullOrWhiteSpace(Description)
         ? Name
-        : $"{Name} — {Description}";
+        : $"{Name} - {Description}";
 }

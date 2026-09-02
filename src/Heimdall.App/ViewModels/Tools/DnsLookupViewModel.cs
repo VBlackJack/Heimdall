@@ -249,7 +249,7 @@ public sealed partial class DnsLookupViewModel : ObservableObject, IDisposable
         }
         catch (System.Runtime.InteropServices.ExternalException)
         {
-            // Clipboard locked by another process — swallow and let the UI stay responsive.
+            // Clipboard locked by another process - swallow and let the UI stay responsive.
         }
     }
 

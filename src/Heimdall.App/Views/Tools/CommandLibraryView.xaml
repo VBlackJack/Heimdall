@@ -19,7 +19,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- ═══════════ ROW 0 — HEADER ═══════════ -->
+        <!-- ═══════════ ROW 0 - HEADER ═══════════ -->
         <Border Grid.Row="0"
                 Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
@@ -113,7 +113,7 @@
             </DockPanel>
         </Border>
 
-        <!-- ═══════════ ROW 1 — HELP PANEL ═══════════ -->
+        <!-- ═══════════ ROW 1 - HELP PANEL ═══════════ -->
         <Border Grid.Row="1"
                 Style="{StaticResource ToolHelpPanelStyle}"
                 Visibility="{Binding IsHelpVisible, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -135,7 +135,7 @@
             </DockPanel>
         </Border>
 
-        <!-- ═══════════ ROW 2 — FILTERS ═══════════ -->
+        <!-- ═══════════ ROW 2 - FILTERS ═══════════ -->
         <Border Grid.Row="2"
                 Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
@@ -147,7 +147,7 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Search bar — always full width -->
+                <!-- Search bar - always full width -->
                 <Grid Grid.Row="0">
                     <TextBox x:Name="SearchBox"
                              Style="{StaticResource WatermarkTextBoxStyle}"
@@ -170,7 +170,7 @@
                             Visibility="{Binding HasSearchText, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 </Grid>
 
-                <!-- Filter controls — wrappable -->
+                <!-- Filter controls - wrappable -->
                 <WrapPanel Grid.Row="1" Margin="0,6,0,0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding ResultCountText}"
                                FontSize="{StaticResource FontSizeCaption}"
@@ -215,7 +215,7 @@
                      Style="{StaticResource ToolLoadingBarStyle}"
                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-        <!-- ═══════════ ROW 4 — ACTION LIST ═══════════ -->
+        <!-- ═══════════ ROW 4 - ACTION LIST ═══════════ -->
         <ListView Grid.Row="4"
                   Background="Transparent" BorderThickness="0"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -346,7 +346,7 @@
             </StackPanel>
         </Border>
 
-        <!-- ═══════════ ROW 5 — GENERATOR PANEL ═══════════ -->
+        <!-- ═══════════ ROW 5 - GENERATOR PANEL ═══════════ -->
         <Border Grid.Row="5"
                 Visibility="{Binding IsGeneratorVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{DynamicResource SurfaceBrush}"
@@ -517,7 +517,7 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- Action buttons — always visible below scroll area -->
+                <!-- Action buttons - always visible below scroll area -->
                 <DockPanel Grid.Row="1" Margin="12,0,12,12">
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
                         <Button Command="{Binding EditSelectedCommand}"
@@ -579,7 +579,7 @@
             </Grid>
         </Border>
 
-        <!-- ═══════════ ROW 6 — HISTORY PANEL ═══════════ -->
+        <!-- ═══════════ ROW 6 - HISTORY PANEL ═══════════ -->
         <Border Grid.Row="6"
                 Visibility="{Binding IsHistoryVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{DynamicResource SurfaceBrush}"

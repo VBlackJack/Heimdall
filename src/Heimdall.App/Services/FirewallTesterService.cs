@@ -34,7 +34,7 @@ public sealed class FwProbeProgress
 public interface IFirewallTesterService
 {
     /// <summary>
-    /// Probes every host × port combination, returning connectivity status
+    /// Probes every host x port combination, returning connectivity status
     /// for each cell of the matrix.
     /// </summary>
     Task<IReadOnlyList<FwProbeResult>> TestMatrixAsync(

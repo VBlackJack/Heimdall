@@ -135,7 +135,7 @@ public static class CredentialProtector
         }
 
         // Write-downgrade resistance: if a vault IS configured but no usable DEK
-        // is set (locked), refuse to write — NEVER fall back to the weaker legacy
+        // is set (locked), refuse to write - NEVER fall back to the weaker legacy
         // format while the vault is enabled.
         if (_vaultEnabled)
         {
@@ -205,7 +205,7 @@ public static class CredentialProtector
             }
         }
 
-        // Legacy path (HMAC or plain DPAPI) — unchanged, preserves migration reads.
+        // Legacy path (HMAC or plain DPAPI) - unchanged, preserves migration reads.
         try
         {
             if (HmacIntegrity.IsHmacProtected(protectedValue) && _hmacKeyRaw is not null)
@@ -213,7 +213,7 @@ public static class CredentialProtector
                 return HmacIntegrity.UnprotectWithHmac(protectedValue, _hmacKeyRaw);
             }
 
-            // Legacy DPAPI-only blob — decrypt without HMAC verification
+            // Legacy DPAPI-only blob - decrypt without HMAC verification
             return DpapiProvider.Unprotect(protectedValue);
         }
         catch

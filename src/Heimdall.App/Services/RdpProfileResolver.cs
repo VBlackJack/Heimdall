@@ -39,6 +39,11 @@ public sealed record RdpResolvedResolution(
 /// <summary>
 /// Resolves connect-time RDP options from a server profile and the global settings.
 /// </summary>
+/// <summary>
+/// The host and port a certificate probe should dial for a profile.
+/// </summary>
+public readonly record struct RdpCertificateProbeTarget(string Host, int Port);
+
 internal static class RdpProfileResolver
 {
     private const int FallbackWidth = 1920;
@@ -83,6 +88,37 @@ internal static class RdpProfileResolver
         }
 
         return (rdpUsername, null);
+    }
+
+    /// <summary>
+    /// The endpoint the certificate probe should dial for a profile, or <c>null</c> when the
+    /// endpoint the session will actually use cannot be reached by a direct TCP connection from
+    /// this machine.
+    /// </summary>
+    /// <remarks>
+    /// A profile routed through an RD Gateway is the case that matters: the session reaches the
+    /// target through the gateway, while a probe dialling the bare target name resolves nothing or
+    /// is filtered. That failure is indistinguishable from "the check ran and found no problem",
+    /// so the caller must be able to tell the two apart rather than reading a silent Proceed.
+    /// </remarks>
+    /// <param name="server">The profile about to be connected.</param>
+    /// <param name="tunnelPort">The dynamically allocated SSH tunnel port, when one is open.</param>
+    public static RdpCertificateProbeTarget? BuildCertificateVerificationTarget(
+        ServerProfileDto server,
+        int? tunnelPort)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+
+        if (!string.IsNullOrWhiteSpace(server.RdpGateway))
+        {
+            return null;
+        }
+
+        bool direct = server.UseDirectConnection || string.IsNullOrWhiteSpace(server.SshGatewayId);
+
+        return direct
+            ? new RdpCertificateProbeTarget(server.RemoteServer, server.RemotePort)
+            : new RdpCertificateProbeTarget("127.0.0.1", tunnelPort ?? server.LocalPort);
     }
 
     /// <summary>

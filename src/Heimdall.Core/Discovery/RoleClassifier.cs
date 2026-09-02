@@ -51,7 +51,7 @@ public static class RoleClassifier
         new("Windows RDP", [DefaultPorts.Rdp], [445, 135, 139, 5985], 70),
         new("VNC Server", [DefaultPorts.Vnc], [DefaultPorts.VncAlt, 5902], 65),
         new("Proxy/Load Balancer", [8080], [8443, 3128, 80, 443], 55),
-        // Syslog (514/udp) and DHCP (67-68/udp) are UDP-only — detected via
+        // Syslog (514/udp) and DHCP (67-68/udp) are UDP-only - detected via
         // banner fingerprints or SNMP, not TCP port scan.
         new("FTP Server", [21], [990], 60),
         new("Redis", [6379], [], 75),
@@ -88,7 +88,7 @@ public static class RoleClassifier
         new("MQTT Broker", [1883], [8883, 9001], 75),
         new("Apple Device", [62078], [5353, 3689], 70),
         new("Chromecast/Smart TV", [8008], [8443, 9000], 70),
-        // UPnP/SSDP (1900/udp) is UDP multicast — detected via SSDP probe, not TCP port scan.
+        // UPnP/SSDP (1900/udp) is UDP multicast - detected via SSDP probe, not TCP port scan.
 
         // ── Telephony / VoIP ───────────────────────────────────────────
         new("VoIP/SIP Server", [5060], [5061, 80, 443], 75),

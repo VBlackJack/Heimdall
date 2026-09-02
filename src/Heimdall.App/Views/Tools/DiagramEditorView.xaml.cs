@@ -30,7 +30,7 @@ namespace Heimdall.App.Views.Tools;
 /// Embedded draw.io diagram editor hosted via WebView2 in embed mode.
 /// Uses an iframe wrapper (heimdall-host.html) because draw.io's embed
 /// protocol requires (window.opener || window.parent) != window.
-/// draw.io's own top toolbar is disabled in the iframe host — Heimdall provides
+/// draw.io's own top toolbar is disabled in the iframe host - Heimdall provides
 /// the command surface for reliable actions such as undo/redo and zoom.
 /// </summary>
 public partial class DiagramEditorView : UserControl, IToolView
@@ -77,7 +77,7 @@ public partial class DiagramEditorView : UserControl, IToolView
             {
                 Core.Logging.FileLogger.Warn(
                     "[DiagramEditor] Draw.io assets not found at " + assetsPath +
-                    " — expected in Release builds only.");
+                    " - expected in Release builds only.");
                 ShowFallback(L("DiagramEditorDebugOnly"));
                 return;
             }

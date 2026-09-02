@@ -80,7 +80,7 @@ public sealed class ExternalToolSettingsService
 
             var descLabel = new TextBlock
             {
-                Text = $" — {_localizer[descKey]}",
+                Text = $" - {_localizer[descKey]}",
                 FontSize = captionFontSize,
                 Opacity = 0.8,
                 VerticalAlignment = VerticalAlignment.Center

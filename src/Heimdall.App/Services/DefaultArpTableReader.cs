@@ -18,6 +18,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Heimdall.Core.Network;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
@@ -28,13 +29,22 @@ public sealed class DefaultArpTableReader : IArpTableReader
 {
     private const int ProcessTimeoutMs = 5000;
 
+    /// <summary>Windows image name of the ARP tool, which lives in the system directory.</summary>
+    internal const string WindowsArpExecutableName = "arp.exe";
+
+    /// <summary>Unix image name of the same tool, resolved through the platform's own PATH.</summary>
+    private const string UnixArpExecutableName = "arp";
+
+    /// <summary>Dump the whole table, which is what the parsers expect.</summary>
+    private const string ArpArguments = "-a";
+
     public async Task<IReadOnlyDictionary<string, string>> ReadAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            var output = await ReadCommandOutputAsync("arp", "-a", cancellationToken);
+            var output = await ReadCommandOutputAsync(CreateWindowsArpStartInfo(), cancellationToken);
             return ArpTableParser.ParseWindows(output);
         }
 
@@ -50,29 +60,40 @@ public sealed class DefaultArpTableReader : IArpTableReader
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            var output = await ReadCommandOutputAsync("arp", "-a", cancellationToken);
+            var output = await ReadCommandOutputAsync(
+                CreateStartInfo(UnixArpExecutableName, string.Empty),
+                cancellationToken);
             return ArpTableParser.ParseMacOs(output);
         }
 
         throw new PlatformNotSupportedException("ARP monitor is not supported on this operating system.");
     }
 
-    private static async Task<string> ReadCommandOutputAsync(
-        string fileName,
-        string arguments,
-        CancellationToken cancellationToken)
-    {
-        var psi = new ProcessStartInfo
+    /// <summary>
+    /// Builds the start info for the Windows ARP tool.
+    /// </summary>
+    internal static ProcessStartInfo CreateWindowsArpStartInfo() =>
+        CreateStartInfo(
+            SystemExecutablePath.InSystemDirectory(WindowsArpExecutableName),
+            SystemExecutablePath.SystemDirectory);
+
+    private static ProcessStartInfo CreateStartInfo(string fileName, string workingDirectory) =>
+        new()
         {
             FileName = fileName,
-            Arguments = arguments,
+            Arguments = ArpArguments,
             RedirectStandardOutput = true,
             UseShellExecute = false,
-            CreateNoWindow = true
+            CreateNoWindow = true,
+            WorkingDirectory = workingDirectory
         };
 
+    private static async Task<string> ReadCommandOutputAsync(
+        ProcessStartInfo psi,
+        CancellationToken cancellationToken)
+    {
         using var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException($"Failed to start {fileName} process.");
+            ?? throw new InvalidOperationException($"Failed to start {psi.FileName} process.");
 
         var outputTask = proc.StandardOutput.ReadToEndAsync(cancellationToken);
         if (!proc.WaitForExit(ProcessTimeoutMs))

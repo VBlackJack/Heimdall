@@ -350,7 +350,7 @@ public sealed class ConPtySession : ITerminalSession
             _bootstrapBuffer = null;
         }
 
-        // Close pseudo console first — this signals the child process to exit
+        // Close pseudo console first - this signals the child process to exit
         // and unblocks any pending read on the output pipe.
         _pseudoConsole?.Dispose();
         _pseudoConsole = null;

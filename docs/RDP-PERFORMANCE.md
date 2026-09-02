@@ -39,8 +39,9 @@ control, which Heimdall hosts in its own process. The same control is what `msts
 decoding context **for every session you open**. That is why memory grows with the number of
 sessions rather than with the traffic in them.
 
-It is **off by default** from v2026.082401. You will find it under Settings, Remote Desktop,
-and per server on that server's Remote Desktop tab.
+It is **off by default** from v2026.082401. In Settings it sits on the **RDP** tab, under the
+**Performance** sub-tab. Per server it sits on that server's **Options** tab, in the
+**RDP session options** card, under the same **Performance** sub-tab.
 
 | Three sessions | Private commit | Handles |
 |---|---:|---:|
@@ -57,9 +58,10 @@ smooth than it used to, switch the setting back on for that server.
 
 **Resolution.** Going from 1920x1080 to a smaller session saved about 86 MB per session.
 
-In a server profile, under the RDP tab, set **Resolution mode** to `Fixed` and choose a size
-smaller than your monitor, or leave it on `Auto` and make the Heimdall window smaller. Both
-reduce the negotiated session geometry.
+In a server profile, open the **Options** tab and, in the **RDP session options** card, the
+**Display & Audio** sub-tab. Under **Resolution profile**, expand **More display options**, set
+**Resolution mode** to `Fixed` and choose a size smaller than your monitor. Or leave the profile
+on `Auto` and make the Heimdall window smaller. Both reduce the negotiated session geometry.
 
 This is a real trade: a smaller session is a smaller remote desktop to work in.
 
@@ -139,15 +141,21 @@ state.
 
 ## Measuring it yourself
 
-Two harnesses ship in the repository. `local/scripts/Measure-RdpMemory.ps1` samples one process
-family; `local/scripts/Measure-RdpMemoryPair.ps1` samples two on the same tick, which is what
-makes a comparison against another client meaningful. Both record private commit, working set,
-handles and threads, count established RDP connections so plateaus segment themselves, and note
-whether the window was in the foreground so trimmed samples stay identifiable.
+No measurement harness is shipped with the repository. The numbers above came from sampling the
+counters Windows already exposes, on a timer, and that is all it takes to reproduce them.
+
+Sample the whole process family in one pass - Heimdall spawns WebView2 children for the terminal
+and file browser panes - and, if you are comparing against another client, read both families on
+the same tick. Record for every sample: **private commit**, which is the figure every table above
+uses; working set, kept only to show when Windows has trimmed it; handle and thread counts; the
+number of established connections to the RDP port, so plateaus segment themselves; and whether
+the window was in the foreground, so trimmed samples stay identifiable.
 
 ```powershell
-pwsh -File local/scripts/Measure-RdpMemory.ps1 -ProcessName Heimdall -DurationMinutes 20
-pwsh -File local/scripts/Measure-RdpMemoryPair.ps1 -RdpPort 3389 -DurationMinutes 30
+$family = Get-Process -Name Heimdall, msedgewebview2 -ErrorAction SilentlyContinue
+[math]::Round(($family | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB, 1)
+($family | Measure-Object HandleCount -Sum).Sum
+(Get-NetTCPConnection -RemotePort 3389 -State Established).Count
 ```
 
 Anchor conclusions on the **delta** between plateaus, never on the absolute baseline. Across

@@ -35,6 +35,15 @@ namespace Heimdall.Core.Discovery;
 /// </summary>
 public sealed class CartographyEngine
 {
+    /// <summary>Windows image name of the ARP tool, which lives in the system directory.</summary>
+    internal const string WindowsArpExecutableName = "arp.exe";
+
+    /// <summary>Unix image name of the same tool, resolved through the platform's own PATH.</summary>
+    private const string UnixArpExecutableName = "arp";
+
+    /// <summary>Dump the whole table, which is what the parsers expect.</summary>
+    private const string ArpArguments = "-a";
+
     // Cached compiled regexes for banner parsing
     private static readonly Regex ServerHeaderRegex = new(
         @"Server:\s*(.+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -422,7 +431,7 @@ public sealed class CartographyEngine
                 }
             }
             catch (OperationCanceledException) { throw; }
-            catch { /* probe failed for this IP — skip */ }
+            catch { /* probe failed for this IP - skip */ }
             finally { semaphore.Release(); }
         });
 
@@ -460,7 +469,7 @@ public sealed class CartographyEngine
     private static async Task<bool> TcpDiscoveryProbeAsync(
         string ip, int timeoutMs, CancellationToken ct)
     {
-        // Quick TCP connect on a few key ports — any open port proves the host exists
+        // Quick TCP connect on a few key ports - any open port proves the host exists
         using var cts = new CancellationTokenSource(Math.Min(timeoutMs, 1500));
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, cts.Token);
 
@@ -731,7 +740,7 @@ public sealed class CartographyEngine
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                // Per-port timeout expired during banner grab — port is still open
+                // Per-port timeout expired during banner grab - port is still open
             }
             catch (OperationCanceledException) { throw; }
             catch { /* banner grab failed, port is still open */ }
@@ -754,7 +763,7 @@ public sealed class CartographyEngine
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // Per-port timeout — not a scan cancellation. Treat as closed port.
+            // Per-port timeout - not a scan cancellation. Treat as closed port.
             return new ServiceResult(port, false, null, null, null, sw.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) { throw; }
@@ -1163,6 +1172,31 @@ public sealed class CartographyEngine
     }
 
     /// <summary>
+    /// Builds the start info for the Windows ARP tool.
+    /// </summary>
+    internal static ProcessStartInfo CreateWindowsArpStartInfo() =>
+        CreateArpStartInfo(
+            SystemExecutablePath.InSystemDirectory(WindowsArpExecutableName),
+            SystemExecutablePath.SystemDirectory);
+
+    /// <summary>
+    /// Builds the start info for the Unix ARP tool, resolved through the platform's own PATH.
+    /// </summary>
+    private static ProcessStartInfo CreateUnixArpStartInfo() =>
+        CreateArpStartInfo(UnixArpExecutableName, string.Empty);
+
+    private static ProcessStartInfo CreateArpStartInfo(string fileName, string workingDirectory) =>
+        new()
+        {
+            FileName = fileName,
+            Arguments = ArpArguments,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = workingDirectory
+        };
+
+    /// <summary>
     /// Retrieves the local ARP table by running "arp -a" (Windows/macOS) or reading /proc/net/arp (Linux).
     /// Returns a dictionary mapping IP addresses to MAC addresses.
     /// </summary>
@@ -1173,15 +1207,7 @@ public sealed class CartographyEngine
         {
             if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "arp",
-                    Arguments = "-a",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var proc = Process.Start(psi);
+                using var proc = Process.Start(CreateWindowsArpStartInfo());
                 if (proc is null) return result;
 
                 var output = proc.StandardOutput.ReadToEnd();
@@ -1227,15 +1253,7 @@ public sealed class CartographyEngine
             }
             else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "arp",
-                    Arguments = "-a",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var proc = Process.Start(psi);
+                using var proc = Process.Start(CreateUnixArpStartInfo());
                 if (proc is null) return result;
                 var output = proc.StandardOutput.ReadToEnd();
                 if (!proc.WaitForExit(5000)) { try { proc.Kill(); } catch { /* already exited */ } }

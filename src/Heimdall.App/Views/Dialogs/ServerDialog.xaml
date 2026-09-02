@@ -1489,11 +1489,11 @@
                                                                                   Style="{StaticResource DialogFormComboBoxStyle}"
                                                                                   Margin="0,0,0,12">
                                                                             <ComboBoxItem Content="{loc:Translate ServerDialogRdpResolutionPresetCustom}" Tag=""/>
-                                                                            <ComboBoxItem Content="1280×720" Tag="1280x720"/>
-                                                                            <ComboBoxItem Content="1366×768" Tag="1366x768"/>
-                                                                            <ComboBoxItem Content="1920×1080" Tag="1920x1080"/>
-                                                                            <ComboBoxItem Content="2560×1440" Tag="2560x1440"/>
-                                                                            <ComboBoxItem Content="3840×2160" Tag="3840x2160"/>
+                                                                            <ComboBoxItem Content="1280x720" Tag="1280x720"/>
+                                                                            <ComboBoxItem Content="1366x768" Tag="1366x768"/>
+                                                                            <ComboBoxItem Content="1920x1080" Tag="1920x1080"/>
+                                                                            <ComboBoxItem Content="2560x1440" Tag="2560x1440"/>
+                                                                            <ComboBoxItem Content="3840x2160" Tag="3840x2160"/>
                                                                         </ComboBox>
                                                                     </StackPanel>
                                                                     <Grid Margin="0,0,0,0"

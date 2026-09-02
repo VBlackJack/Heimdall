@@ -574,7 +574,7 @@ public partial class PasswordAuditView : UserControl, IToolView
         };
         StrengthBar.Background = barBrush;
 
-        StrengthScoreLabel.Text = $"{score}/100 — {L(analysis.ScoreLabelKey)}";
+        StrengthScoreLabel.Text = $"{score}/100 - {L(analysis.ScoreLabelKey)}";
         StrengthScoreLabel.Foreground = barBrush;
     }
 

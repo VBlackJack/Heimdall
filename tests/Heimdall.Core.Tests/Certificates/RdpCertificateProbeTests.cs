@@ -38,6 +38,22 @@ public sealed class RdpCertificateProbeTests
 {
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(20);
 
+    /// <summary>HYBRID_REQUIRED_BY_SERVER, the refusal a CredSSP-only server answers with.</summary>
+    private const uint HybridRequiredByServer = 0x0000_0005;
+
+    /// <summary>What the fake server answers the negotiation request with.</summary>
+    private enum FakeServerAnswer
+    {
+        /// <summary>Selects TLS, then completes the handshake.</summary>
+        SelectsTls,
+
+        /// <summary>Keeps standard RDP security, so there is no certificate at all.</summary>
+        KeepsStandardSecurity,
+
+        /// <summary>Answers RDP_NEG_FAILURE: it has a certificate and refuses to show it.</summary>
+        RefusesTls,
+    }
+
     [Fact]
     public void BuildConnectionRequest_IsTheNineteenBytesAnRdpServerExpects()
     {
@@ -90,6 +106,38 @@ public sealed class RdpCertificateProbeTests
             RdpNegotiationOutcome.Refused,
             RdpSecurityNegotiation.ParseConnectionConfirm(Confirm(negType: 0x03, selected: 0)));
 
+    [Fact]
+    public void ParseConnectionConfirm_ServerRefused_KeepsTheReasonItGave()
+    {
+        RdpNegotiationOutcome outcome = RdpSecurityNegotiation.ParseConnectionConfirm(
+            Confirm(negType: 0x03, selected: HybridRequiredByServer),
+            out uint failureCode);
+
+        // SSL_NOT_ALLOWED_BY_SERVER and HYBRID_REQUIRED_BY_SERVER are opposite facts about
+        // the same server, so a refusal that arrives without its code has lost everything
+        // it carried.
+        Assert.Equal(RdpNegotiationOutcome.Refused, outcome);
+        Assert.Equal(HybridRequiredByServer, failureCode);
+        Assert.Contains(
+            "HYBRID_REQUIRED_BY_SERVER",
+            RdpSecurityNegotiation.DescribeFailure(failureCode),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParseConnectionConfirm_ServerSelectedTls_ReportsNoFailureCode()
+    {
+        // The counterpart of the test above: the selected protocol sits at the same offset
+        // as a failure code, so reading one as the other would report a refusal reason for
+        // a negotiation that succeeded.
+        RdpNegotiationOutcome outcome = RdpSecurityNegotiation.ParseConnectionConfirm(
+            Confirm(negType: 0x02, selected: 1),
+            out uint failureCode);
+
+        Assert.Equal(RdpNegotiationOutcome.TlsSelected, outcome);
+        Assert.Equal(0u, failureCode);
+    }
+
     [Theory]
     [InlineData(0, 0x04)]  // not a TPKT frame
     [InlineData(5, 0xE0)]  // a connection REQUEST answering a request
@@ -121,7 +169,7 @@ public sealed class RdpCertificateProbeTests
     {
         using X509Certificate2 certificate = CreateServerCertificate();
         using CancellationTokenSource cts = new(Bound);
-        int port = StartFakeRdpServer(certificate, offerTls: true, cts.Token);
+        int port = StartFakeRdpServer(certificate, FakeServerAnswer.SelectsTls, cts.Token);
 
         RdpProbeResult result = await new RdpCertificateProbe(Bound)
             .ProbeAsync("127.0.0.1", port, cts.Token);
@@ -139,7 +187,10 @@ public sealed class RdpCertificateProbeTests
     {
         using X509Certificate2 certificate = CreateServerCertificate();
         using CancellationTokenSource cts = new(Bound);
-        int port = StartFakeRdpServer(certificate, offerTls: false, cts.Token);
+        int port = StartFakeRdpServer(
+            certificate,
+            FakeServerAnswer.KeepsStandardSecurity,
+            cts.Token);
 
         RdpProbeResult result = await new RdpCertificateProbe(Bound)
             .ProbeAsync("127.0.0.1", port, cts.Token);
@@ -148,6 +199,31 @@ public sealed class RdpCertificateProbeTests
         // certificate that does not exist.
         Assert.Equal(RdpProbeOutcome.TlsNotOffered, result.Outcome);
         Assert.Null(result.Thumbprint);
+    }
+
+    [Fact]
+    public async Task ProbeAsync_ServerRefusedTheNegotiation_IsNotReportedAsHavingNoCertificate()
+    {
+        using X509Certificate2 certificate = CreateServerCertificate();
+        using CancellationTokenSource cts = new(Bound);
+        int port = StartFakeRdpServer(certificate, FakeServerAnswer.RefusesTls, cts.Token);
+
+        RdpProbeResult result = await new RdpCertificateProbe(Bound)
+            .ProbeAsync("127.0.0.1", port, cts.Token);
+
+        // A refusal is the OPPOSITE of "no certificate": HYBRID_REQUIRED_BY_SERVER means the
+        // server has one and demands more than the probe asked for. Reporting it as
+        // TlsNotOffered makes the log read "keeps standard RDP security, nothing to verify"
+        // about the most hardened server on the network.
+        Assert.Equal(RdpProbeOutcome.ProtocolUnexpected, result.Outcome);
+        Assert.Null(result.Thumbprint);
+
+        // And the reason has to survive. The bare outcome name says that a refusal happened
+        // without saying which one, and this log line is the only trace the feature leaves.
+        Assert.Contains(
+            "HYBRID_REQUIRED_BY_SERVER",
+            result.Detail ?? string.Empty,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -220,7 +296,7 @@ public sealed class RdpCertificateProbeTests
 
     private static int StartFakeRdpServer(
         X509Certificate2 certificate,
-        bool offerTls,
+        FakeServerAnswer answer,
         CancellationToken cancellationToken)
     {
         TcpListener listener = new(IPAddress.Loopback, 0);
@@ -261,13 +337,18 @@ public sealed class RdpCertificateProbeTests
                         return;
                     }
 
-                    byte[] confirm = offerTls
-                        ? Confirm(negType: 0x02, selected: 1)
-                        : Confirm(negType: 0x02, selected: 0);
+                    byte[] confirm = answer switch
+                    {
+                        FakeServerAnswer.SelectsTls => Confirm(negType: 0x02, selected: 1),
+                        FakeServerAnswer.RefusesTls =>
+                            Confirm(negType: 0x03, selected: HybridRequiredByServer),
+                        _ => Confirm(negType: 0x02, selected: 0),
+                    };
+
                     await stream.WriteAsync(confirm, cancellationToken);
                     await stream.FlushAsync(cancellationToken);
 
-                    if (!offerTls)
+                    if (answer != FakeServerAnswer.SelectsTls)
                     {
                         return;
                     }

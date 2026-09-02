@@ -24,7 +24,7 @@ namespace Heimdall.App.Services;
 /// Supports three resolution strategies in priority order:
 /// 1. Bundled Fixed Version Runtime in <c>runtimes/webview2/</c> (fully portable)
 /// 2. System-wide Evergreen Runtime (Microsoft Edge or standalone installer)
-/// 3. Unavailable — caller should show fallback UI
+/// 3. Unavailable - caller should show fallback UI
 /// </summary>
 public static class WebView2Helper
 {

@@ -133,7 +133,7 @@ public sealed class TcpPingViewModelTests
         vm.StartCommand.Execute(null);
         await WaitUntilAsync(() => !vm.IsBusy && vm.HasResults);
 
-        Assert.Equal("[1/1] example.com:443 — 12.5 ms" + Environment.NewLine, vm.Results);
+        Assert.Equal("[1/1] example.com:443 - 12.5 ms" + Environment.NewLine, vm.Results);
         Assert.Contains("Lost: 0/1", vm.SummaryText, StringComparison.Ordinal);
         Assert.Contains("1 ping", vm.StatusText, StringComparison.Ordinal);
         Assert.False(vm.ShowError);
@@ -166,7 +166,7 @@ public sealed class TcpPingViewModelTests
     }
 
     [Fact]
-    public async Task StartCommand_AllLost_UsesEmDashSummaryPlaceholders()
+    public async Task StartCommand_AllLost_UsesHyphenSummaryPlaceholders()
     {
         var localizer = await CreateLocalizerAsync("en");
         var service = new FakeTcpPingService
@@ -181,7 +181,7 @@ public sealed class TcpPingViewModelTests
         vm.StartCommand.Execute(null);
         await WaitUntilAsync(() => !vm.IsBusy && vm.HasResults);
 
-        Assert.Contains("Min: —", vm.SummaryText, StringComparison.Ordinal);
+        Assert.Contains("Min: -", vm.SummaryText, StringComparison.Ordinal);
         Assert.Contains("Lost: 2/2", vm.SummaryText, StringComparison.Ordinal);
     }
 

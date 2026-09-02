@@ -52,6 +52,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 {
     private const int BeginConnectMaxAttempts = 10;
     private const int MaxReconnectAttemptTimestamps = 3;
+
     private TimeSpan _initialResizeEnableDelay = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan BeginConnectRetryDelay = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan ResizeDebounceInterval = TimeSpan.FromMilliseconds(1000);
@@ -114,6 +115,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private DispatcherTimer? _connectWatchdogTimer;
     private bool _watchdogCredentialWaitActive;
     private bool _connectAbandonedByWatchdog;
+    private bool _connectAbandonedByUser;
     private RdpActiveXHost? _rdpHost;
     private RdpRedirectionOptions? _pendingRedirections;
     private ServerProfileDto? _server;
@@ -313,6 +315,15 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     internal static class LocaleKeys
     {
         internal const string ReconnectSucceededAfterCancel = "RdpReconnectSucceededAfterCancelToast";
+        internal const string CopyErrorToast = "RdpCopyErrorToast";
+        internal const string CopyErrorFailedToast = "RdpCopyErrorFailedToast";
+        internal const string ErrorDisconnectFailed = "RdpErrorDisconnectFailed";
+        internal const string ErrorCancelReconnectFailed = "RdpErrorCancelReconnectFailed";
+        internal const string ErrorCancelConnectFailed = "RdpErrorCancelConnectFailed";
+        internal const string ErrorStartEmbeddedSessionFailed = "RdpErrorStartEmbeddedSessionFailed";
+        internal const string CertificateNotVerifiableToast = "RdpCertificateNotVerifiableToast";
+        internal const string ResolutionHeaderFormat = "RdpResolutionHeaderFormat";
+        internal const string ResolutionHeaderWithSizeFormat = "RdpResolutionHeaderWithSizeFormat";
     }
 
     private void ShowTransientToast(string message)
@@ -339,6 +350,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         TransientToastText.Text = message;
         TransientToast.Visibility = System.Windows.Visibility.Visible;
+        _ = RdpLiveRegion.Announce(TransientToast);
         _transientToastTimer = new DispatcherTimer(
             TransientToastDuration,
             DispatcherPriority.Background,
@@ -784,33 +796,32 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             var dialogService = (Application.Current as App)?.Services?.GetService<IDialogService>();
             if (dialogService is not null)
             {
+                bool confirmed;
                 try
                 {
                     _disconnectConfirmInFlight = true;
-                    var confirmed = await dialogService.ShowConfirmAsync(
-                        _localizer?["RdpConfirmDisconnectTitle"] ?? "RdpConfirmDisconnectTitle",
-                        _localizer?.Format(
-                            "RdpConfirmDisconnectMessage",
-                            _server?.DisplayName ?? string.Empty)
-                        ?? "RdpConfirmDisconnectMessage",
-                        "warning");
 
-                    if (!confirmed)
-                    {
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Core.Logging.FileLogger.Warn(
-                        $"[EmbeddedRdpView] Disconnect confirmation failed: {ex.Message}");
+                    // A confirmation that could not be asked is not a Yes. The sibling
+                    // confirmation for a resolution-driven reconnect already fails closed on the
+                    // same exception; this one used to fall through to the teardown, so the
+                    // session died with no prompt ever having been shown.
+                    confirmed = await RdpDisconnectConfirmationPolicy.ConfirmAsync(
+                        () => dialogService.ShowConfirmAsync(
+                            _localizer?["RdpConfirmDisconnectTitle"] ?? "RdpConfirmDisconnectTitle",
+                            _localizer?.Format(
+                                "RdpConfirmDisconnectMessage",
+                                _server?.DisplayName ?? string.Empty)
+                            ?? "RdpConfirmDisconnectMessage",
+                            "warning"),
+                        ex => Core.Logging.FileLogger.Warn(
+                            $"[EmbeddedRdpView] Disconnect confirmation failed: {ex.Message}"));
                 }
                 finally
                 {
                     _disconnectConfirmInFlight = false;
                 }
 
-                if (_disposed || _rdpHost is null)
+                if (!confirmed || _disposed || _rdpHost is null)
                 {
                     return;
                 }
@@ -840,7 +851,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
         catch (Exception ex)
         {
-            HandleFailure("Disconnect failed.", ex);
+            HandleFailure(L(LocaleKeys.ErrorDisconnectFailed), ex);
         }
     }
 
@@ -872,7 +883,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
         catch (Exception ex)
         {
-            HandleFailure("Cancel reconnect failed.", ex);
+            HandleFailure(L(LocaleKeys.ErrorCancelReconnectFailed), ex);
         }
     }
 
@@ -883,6 +894,20 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
+        // Outside the try, like the sibling handler: a throw from any statement below must not
+        // leave the view describing a connection in progress the user has just abandoned - the
+        // connect-cancel button would stay on screen carrying the same label, and the watchdog
+        // would stay armed to raise a reconnect overlay on the abandoned session.
+        TransitionPhase(RdpConnectionPhase.None);
+
+        // The attempt already in flight can still complete: this latch is what stops a late
+        // OnConnected from promoting a session the user asked to stop.
+        _connectAbandonedByUser = true;
+
+        // The certificate check runs before the connect does, so cancelling during it has to stop
+        // the probe rather than wait out its timeout.
+        _certificateVerificationCts?.Cancel();
+
         try
         {
             Core.Logging.FileLogger.Info("EmbeddedRDP user cancelled in-progress connection");
@@ -891,7 +916,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             _allowResolutionUpdates = false;
             StopStabilizationCountdown();
             StopReconnectElapsedTracking();
-            TransitionPhase(RdpConnectionPhase.None);
             _rdpHost.CancelAutoReconnect = true;
             TryTransitionConnectionState(ConnectionState.Disconnecting);
             UpdateSessionStatus(RdpSessionStatus.Disconnecting);
@@ -899,7 +923,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
         catch (Exception ex)
         {
-            HandleFailure("Cancel connection failed.", ex);
+            HandleFailure(L(LocaleKeys.ErrorCancelConnectFailed), ex);
         }
     }
 
@@ -914,45 +938,73 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         SendKeysMenu.IsOpen = true;
     }
 
+    /// <summary>
+    /// The virtual keys each Send Keys menu entry posts to the remote session, keyed by the
+    /// locale key that labels that entry in the menu.
+    /// </summary>
+    /// <remarks>
+    /// The click handlers read this table rather than each carrying its own key list, so the
+    /// entries the menu offers and the keys they deliver stay one decision instead of two. F11
+    /// is here because it is the only fullscreen chord with no modifier: the keyboard hook
+    /// consumes it while the remote surface holds the focus, so without this route the remote
+    /// session can never be sent an F11 at all.
+    /// </remarks>
+    [SupportedOSPlatform("windows")]
+    private static readonly IReadOnlyDictionary<string, byte[]> SendKeysSequences =
+        new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["RdpSendKeysCtrlAltDel"] =
+                [NativeMethods.VK_CONTROL, NativeMethods.VK_MENU, NativeMethods.VK_DELETE],
+            ["RdpSendKeysWindows"] = [NativeMethods.VK_LWIN],
+            ["RdpSendKeysAltTab"] = [NativeMethods.VK_MENU, NativeMethods.VK_TAB],
+            ["RdpSendKeysCtrlEsc"] = [NativeMethods.VK_CONTROL, NativeMethods.VK_ESCAPE],
+            ["RdpSendKeysPrintScreen"] = [NativeMethods.VK_SNAPSHOT],
+            ["RdpSendKeysEscape"] = [NativeMethods.VK_ESCAPE],
+            ["RdpSendKeysF11"] = [NativeMethods.VK_F11],
+            ["RdpSendKeysWinL"] = [NativeMethods.VK_LWIN, NativeMethods.VK_L],
+            ["RdpSendKeysWinD"] = [NativeMethods.VK_LWIN, NativeMethods.VK_D],
+            ["RdpSendKeysWinE"] = [NativeMethods.VK_LWIN, NativeMethods.VK_E]
+        };
+
     [SupportedOSPlatform("windows")]
     private void OnSendKeysCtrlAltDelClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote(
-            "RdpSendKeysCtrlAltDel",
-            NativeMethods.VK_CONTROL,
-            NativeMethods.VK_MENU,
-            NativeMethods.VK_DELETE);
+        => SendKeysToRemote("RdpSendKeysCtrlAltDel");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWindowsClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWindows", NativeMethods.VK_LWIN);
+        => SendKeysToRemote("RdpSendKeysWindows");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysAltTabClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysAltTab", NativeMethods.VK_MENU, NativeMethods.VK_TAB);
+        => SendKeysToRemote("RdpSendKeysAltTab");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysCtrlEscClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysCtrlEsc", NativeMethods.VK_CONTROL, NativeMethods.VK_ESCAPE);
+        => SendKeysToRemote("RdpSendKeysCtrlEsc");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysPrintScreenClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysPrintScreen", NativeMethods.VK_SNAPSHOT);
+        => SendKeysToRemote("RdpSendKeysPrintScreen");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysEscapeClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysEscape", NativeMethods.VK_ESCAPE);
+        => SendKeysToRemote("RdpSendKeysEscape");
+
+    [SupportedOSPlatform("windows")]
+    private void OnSendKeysF11Click(object sender, RoutedEventArgs e)
+        => SendKeysToRemote("RdpSendKeysF11");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWinLClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWinL", NativeMethods.VK_LWIN, NativeMethods.VK_L);
+        => SendKeysToRemote("RdpSendKeysWinL");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWinDClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWinD", NativeMethods.VK_LWIN, NativeMethods.VK_D);
+        => SendKeysToRemote("RdpSendKeysWinD");
 
     [SupportedOSPlatform("windows")]
     private void OnSendKeysWinEClick(object sender, RoutedEventArgs e)
-        => SendKeysToRemote("RdpSendKeysWinE", NativeMethods.VK_LWIN, NativeMethods.VK_E);
+        => SendKeysToRemote("RdpSendKeysWinE");
 
     private void OnSendKeysShortcutsHelpClick(object sender, RoutedEventArgs e)
     {
@@ -999,6 +1051,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         AppendHelpLine(builder, localizer["RdpSendKeysCtrlEsc"]);
         AppendHelpLine(builder, localizer["RdpSendKeysPrintScreen"]);
         AppendHelpLine(builder, localizer["RdpSendKeysEscape"]);
+        AppendHelpLine(builder, localizer["RdpSendKeysF11"]);
 
         return builder.ToString().TrimEnd();
     }
@@ -1009,8 +1062,13 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     }
 
     [SupportedOSPlatform("windows")]
-    private void SendKeysToRemote(string? feedbackLabelKey, params byte[] virtualKeys)
+    private void SendKeysToRemote(string feedbackLabelKey)
     {
+        if (!SendKeysSequences.TryGetValue(feedbackLabelKey, out byte[]? virtualKeys))
+        {
+            return;
+        }
+
         if (_disposed || _rdpHost is null || !_rdpHost.IsConnected || virtualKeys.Length == 0)
         {
             return;
@@ -1044,7 +1102,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                     IntPtr.Zero);
             }
 
-            if (feedbackLabelKey is not null && _localizer is not null)
+            if (_localizer is not null)
             {
                 var label = _localizer[feedbackLabelKey];
                 ShowTransientToast(_localizer.Format("RdpSendKeysSentToast", label));
@@ -1508,6 +1566,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             // Fresh attempt: clear any prior watchdog abandonment so this connect
             // can promote normally and is not refused by the late-connect guard.
             _connectAbandonedByWatchdog = false;
+            _connectAbandonedByUser = false;
             _beginConnectAttempt++;
             Core.Logging.FileLogger.Info(
                 $"EmbeddedRDP BeginConnect attempt={_beginConnectAttempt} viewVisible={IsVisible} formsVisible={FormsHost.IsVisible} formsSize={FormsHost.ActualWidth:0.##}x{FormsHost.ActualHeight:0.##} surfaceSize={SurfaceContainer.ActualWidth:0.##}x{SurfaceContainer.ActualHeight:0.##}");
@@ -1598,7 +1657,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
         catch (Exception ex)
         {
-            HandleFailure("Unable to start the embedded Remote Desktop session.", ex);
+            HandleFailure(L(LocaleKeys.ErrorStartEmbeddedSessionFailed), ex);
         }
     }
 
@@ -1639,10 +1698,10 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                 return;
             }
 
-            StatusTextBlock.Text = localizer.Format(
+            SetStatusText(localizer.Format(
                 "RdpStatusInitializingSurface",
                 _beginConnectAttempt,
-                BeginConnectMaxAttempts);
+                BeginConnectMaxAttempts));
         }
 
         if (Dispatcher.CheckAccess())
@@ -1777,13 +1836,18 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        // A connect that completes after the watchdog already abandoned the attempt
-        // must not be promoted to Connected (zombie session behind the error overlay).
-        // Hard-disconnect the COM and leave the timeout error state untouched.
-        if (_connectAbandonedByWatchdog)
+        // A connect that completes after the attempt was abandoned must not be promoted to
+        // Connected: after a watchdog abort that is a zombie session behind the error overlay,
+        // and after a user cancel it is a live session the user asked to stop. Hard-disconnect
+        // the COM and leave the existing state untouched. The disconnect that follows is also
+        // what clears the user-disconnect flag, which is what stops the next genuine drop of this
+        // session from being read as a user disconnect and dying in silence.
+        if (RdpLateConnectPolicy.Resolve(_connectAbandonedByWatchdog, _connectAbandonedByUser)
+            == RdpLateConnectDecision.Refuse)
         {
             Core.Logging.FileLogger.Info(
-                "EmbeddedRDP OnConnected ignored: attempt abandoned by connect watchdog");
+                "EmbeddedRDP OnConnected ignored: attempt abandoned "
+                + $"(watchdog={_connectAbandonedByWatchdog} user={_connectAbandonedByUser})");
             try
             {
                 _rdpHost?.Disconnect();
@@ -2254,17 +2318,24 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _autofillCts = new CancellationTokenSource();
         var token = _autofillCts.Token;
 
-        _ = TryAutofillCredentialsAsync(password, hostHint, token);
-    }
-
-    private async Task TryAutofillCredentialsAsync(string password, string hostHint, CancellationToken cancellationToken)
-    {
+        // The view-side state belongs to the caller's thread, which is the UI thread at both call
+        // sites. The watcher does not: its first scan enumerates every visible top-level window,
+        // resolves a process name for each one and walks this process's threads, with nothing
+        // awaited before it, so a bare call runs that inline - right after Connect(), inside a
+        // render-priority operation, with the control's own callbacks queued behind it.
         Dispatcher.Invoke(() =>
         {
             UpdateAutofillState(RdpAutofillState.Searching);
             ArmStageTwoConnectWatchdog();
         });
 
+        _ = RdpAutofillLauncher.StartAsync(
+            watcherToken => TryAutofillCredentialsAsync(password, hostHint, watcherToken),
+            token);
+    }
+
+    private async Task TryAutofillCredentialsAsync(string password, string hostHint, CancellationToken cancellationToken)
+    {
         try
         {
             var timeoutMs = _settings?.RdpCredentialAutofillTimeoutMs ?? 90000;
@@ -2386,6 +2457,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
 
         AutofillStatusText.Text = L(key);
+        _ = RdpLiveRegion.Announce(AutofillStatusText);
         AutofillStatusText.Visibility = Visibility.Visible;
         AutofillSeparator.Visibility = Visibility.Visible;
         UpdateAutofillActionButtonsVisibility(state);
@@ -2506,7 +2578,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         var statusKey = RdpConnectionPhasePolicy.GetStatusKey(newPhase);
         if (statusKey is not null)
         {
-            StatusTextBlock.Text = L(statusKey);
+            SetStatusText(L(statusKey));
         }
 
         UpdateHealthDot();
@@ -2555,6 +2627,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                 phaseLabel,
                 litSegments,
                 totalSegments));
+        _ = RdpLiveRegion.Announce(ConnectionPhaseStepper);
     }
 
     private void UpdateVisibilityForPhase()
@@ -2591,6 +2664,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
         var label = L(ResolveHealthDotLabelKey(state));
         AutomationProperties.SetName(HealthDot, label);
+        _ = RdpLiveRegion.Announce(HealthDot);
         var endpoint = _server is null ? string.Empty : BuildEndpointText(_server);
         HealthDot.ToolTip = string.IsNullOrWhiteSpace(endpoint)
             ? label
@@ -2685,6 +2759,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         UpdateRedirectionExpandBadge(alwaysExpanded);
 
         RedirectionIndicatorsPanel.Visibility = Visibility.Visible;
+        _ = RdpLiveRegion.Announce(RedirectionIndicatorsPanel);
     }
 
     private void HideRedirectionIndicators()
@@ -2848,7 +2923,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        StatusTextBlock.Text = FormatConnectionStateStatus(metadata.DisplayKey);
+        SetStatusText(FormatConnectionStateStatus(metadata.DisplayKey));
         RdpLoadingBar.Visibility = metadata.IsProgress ? Visibility.Visible : Visibility.Collapsed;
         StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush", Brushes.White);
     }
@@ -2861,7 +2936,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        StatusTextBlock.Text = L(_connectStatusOverrideKey);
+        SetStatusText(L(_connectStatusOverrideKey));
         StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush", Brushes.White);
     }
     private string FormatConnectionStateStatus(string statusKey)
@@ -2933,7 +3008,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             _sessionTab.Status = invariantCode;
         }
 
-        StatusTextBlock.Text = localizedLabel;
+        SetStatusText(localizedLabel);
 
         var isProgress = status is RdpSessionStatus.Connecting
             or RdpSessionStatus.Preparing
@@ -3006,6 +3081,12 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     /// </remarks>
     private async Task StartVerifiedConnectAsync()
     {
+        // The certificate probe and any trust question happen here, before Connect(). This is the
+        // Preparing phase: it lights the stepper's first segment, offers the Cancel button and
+        // arms the connect watchdog, none of which used to happen because the phase had no
+        // producer and the view sat in None while the status line already said Connecting.
+        TransitionPhase(RdpConnectionPhase.Preparing);
+
         RdpConnectionDecision decision = await VerifyServerCertificateAsync();
 
         if (_disposed)
@@ -3016,6 +3097,14 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         if (decision == RdpConnectionDecision.Abandon)
         {
             HandleCertificateRefused();
+            return;
+        }
+
+        // Cancel during the check means cancel, not "start once the check finishes".
+        if (_connectAbandonedByUser)
+        {
+            Core.Logging.FileLogger.Info(
+                "EmbeddedRDP connect abandoned by the user during certificate verification");
             return;
         }
 
@@ -3053,18 +3142,35 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return RdpConnectionDecision.Proceed;
         }
 
+        // The address actually dialled, which for a tunneled session is the local end of the
+        // tunnel - the certificate that answers there is the one that matters. A gateway-routed
+        // profile has no such address: the session reaches the target through the RD Gateway, so
+        // a probe dialling the bare target name resolves nothing or is filtered. That failure
+        // used to be reported as CouldNotVerify and mapped to Proceed, which is indistinguishable
+        // from a check that ran and found nothing wrong - and it cost the probe's full timeout in
+        // front of every such connect.
+        RdpCertificateProbeTarget? target =
+            RdpProfileResolver.BuildCertificateVerificationTarget(server, _tunnelPort);
+        if (target is null)
+        {
+            Core.Logging.FileLogger.Warn(
+                "EmbeddedRDP certificate verification is not possible on this profile: the "
+                + $"session is routed through RD Gateway '{server.RdpGateway}', which the probe "
+                + "cannot reach. Connecting without a verified certificate.");
+            ShowTransientToast(L(LocaleKeys.CertificateNotVerifiableToast));
+            return RdpConnectionDecision.Proceed;
+        }
+
         _certificateVerificationCts?.Dispose();
         _certificateVerificationCts = new CancellationTokenSource();
 
-        // The address actually dialled, which for a tunneled session is the local end
-        // of the tunnel - the certificate that answers there is the one that matters.
         RdpCertificateVerificationRequest request = new(
             server.Id,
             string.IsNullOrWhiteSpace(server.DisplayName)
                 ? server.RemoteServer
                 : server.DisplayName,
-            ResolveConnectHost(server),
-            ResolveConnectPort(server));
+            target.Value.Host,
+            target.Value.Port);
 
         return await RdpCertificateGate.DecideConnectionAsync(
             auth.AuthenticationLevel,
@@ -3093,7 +3199,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _allowResolutionUpdates = false;
         TransitionPhase(RdpConnectionPhase.None);
         UpdateSessionStatus(RdpSessionStatus.Error);
-        StatusTextBlock.Text = L("RdpCertificateRefusedStatus");
+        SetStatusText(L("RdpCertificateRefusedStatus"));
     }
 
     private void HandleFailure(string message, Exception ex)
@@ -3104,8 +3210,8 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         TransitionPhase(RdpConnectionPhase.None);
         HideRedirectionIndicators();
         UpdateSessionStatus(RdpSessionStatus.Error);
-        StatusTextBlock.Text = _localizer?.Format("RdpStatusErrorDetail", message, ex.Message)
-            ?? $"{message} {ex.Message}";
+        SetStatusText(_localizer?.Format("RdpStatusErrorDetail", message, ex.Message)
+            ?? $"{message} {ex.Message}");
     }
 
     private void HandleGatewayAttestationFailure(RdpGatewayAttestationException ex)
@@ -3178,7 +3284,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
 
         // Trigger a resolution recalculation via the resize timer
-        // (don't call OnSurfaceContainerSizeChanged directly — it needs a real SizeChangedEventArgs)
+        // (don't call OnSurfaceContainerSizeChanged directly - it needs a real SizeChangedEventArgs)
         _resizeTimer.Stop();
         _resizeTimer.Start();
     }
@@ -3243,7 +3349,9 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             activeModeLabel,
             modeLabel,
             state.Width,
-            state.Height);
+            state.Height,
+            L(LocaleKeys.ResolutionHeaderFormat),
+            L(LocaleKeys.ResolutionHeaderWithSizeFormat));
     }
 
     private void OnSkipStabilizationClick(object sender, RoutedEventArgs e)
@@ -3411,6 +3519,20 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
 
     /// <summary>Resolves a locale key, falling back to the key name if no localizer is set.</summary>
     private string L(string key) => _localizer?[key] ?? key;
+
+    /// <summary>
+    /// Writes the session status line and tells UI Automation the live region changed.
+    /// </summary>
+    /// <remarks>
+    /// The LiveSetting on the element is only a property; without the event no screen reader ever
+    /// learns that the text moved. Routing every write through here is what keeps that true of new
+    /// write sites too.
+    /// </remarks>
+    private void SetStatusText(string text)
+    {
+        StatusTextBlock.Text = text;
+        _ = RdpLiveRegion.Announce(StatusTextBlock);
+    }
 
     private void RequestSkipStabilization()
     {
@@ -3644,6 +3766,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
 
         ReconnectMessageText.Text = primary;
+        _ = RdpLiveRegion.Announce(ReconnectMessageText);
 
         var hasSpecificPrimary = hasDiagnosticMessage
             && !string.Equals(diagnostic!.MessageKey, "RdpDisconnectedMessage", StringComparison.Ordinal);
@@ -3814,13 +3937,22 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         return string.Equals(diagnostic.MessageKey, "RdpStatusFatalErrorDetail", StringComparison.Ordinal);
     }
 
-    private static RdpActiveXHost.RdpDisconnectSeverity ResolveOverlaySeverity(
+    internal static RdpActiveXHost.RdpDisconnectSeverity ResolveOverlaySeverity(
         Core.SessionDiagnostics.SessionDiagnostic? diagnostic,
         int extendedReason)
     {
         if (diagnostic?.MessageKey == "RdpStatusFatalErrorDetail")
         {
             return RdpActiveXHost.RdpDisconnectSeverity.TerminalError;
+        }
+
+        // Heimdall's own connect watchdog and the stack's ConnectionTimeout (264) describe the
+        // same user-visible event, so they must be painted the same way. This diagnostic carries
+        // no code on purpose - 264 was never reported by the stack here - so the message key is
+        // what identifies it, next to the fatal-error case above.
+        if (diagnostic?.MessageKey == RdpHostDiagnosticFactory.ConnectTimeoutMessageKey)
+        {
+            return RdpActiveXHost.RdpDisconnectSeverity.Transient;
         }
 
         return diagnostic?.Code is int code
@@ -3877,15 +4009,15 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        try
-        {
-            Clipboard.SetText(BuildReconnectErrorReport(messageLines));
-            ShowTransientToast(_localizer?["RdpCopyErrorToast"] ?? string.Empty);
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Warn($"[EmbeddedRdpView] Copy reconnect overlay error failed: {ex.Message}");
-        }
+        bool copied = RdpClipboardCopy.TryCopy(
+            report => Clipboard.SetDataObject(report, copy: true),
+            BuildReconnectErrorReport(messageLines),
+            ex => Core.Logging.FileLogger.Warn(
+                $"[EmbeddedRdpView] Copy reconnect overlay error failed: {ex.Message}"));
+
+        ShowTransientToast(L(copied
+            ? LocaleKeys.CopyErrorToast
+            : LocaleKeys.CopyErrorFailedToast));
     }
 
     private static void AddClipboardLine(ICollection<string> lines, TextBlock textBlock)
@@ -4014,7 +4146,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return;
         }
 
-        ReconnectOverlay.Visibility = System.Windows.Visibility.Collapsed;
+        // The editor is a modal dialog over this same tab, so the overlay behind it costs
+        // nothing and is still there when the dialog closes. Collapsing it left the pane empty
+        // for good: the native host was already collapsed, the only writer that shows the overlay
+        // again is a fresh callback on a session that is already dead, and this is the
+        // pre-focused default for six disconnect codes.
         EditServerRequested?.Invoke(_server.Id);
     }
 
@@ -4032,7 +4168,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
             return (1024, 768);
         }
 
-        // Manual resolution override — use exact dimensions if set
+        // Manual resolution override - use exact dimensions if set
         if (_manualResolutionWidth > 0 && _manualResolutionHeight > 0)
         {
             return (SnapRdpWidth(_manualResolutionWidth), _manualResolutionHeight);
@@ -4197,9 +4333,18 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         string stage;
         if (_watchdogCredentialWaitActive)
         {
-            // Stage 2: the credential-autofill watcher is searching, so the RDP stack
-            // is reachable and we are blocked on the remote NLA prompt. Extend the
-            // budget past the autofill timeout so its graceful retry runs first.
+            // Stage 2: the credential-autofill watcher is searching for the remote NLA prompt, so
+            // the budget is extended past the autofill timeout and its graceful retry runs before
+            // a hard watchdog teardown does.
+            //
+            // What this does NOT establish is that the RDP stack is reachable, which is what this
+            // comment used to claim. The watcher starts on the statement after Connect(), before
+            // a single byte has been exchanged, so for a black-holed port the promotion happens
+            // anyway and the user's configured connect timeout is outlived. Promoting on evidence
+            // instead - the watcher having actually seen a credential window - needs an
+            // observation callback on CredentialAutofill.WaitAndFillAsync, which lives in
+            // Heimdall.Rdp; until that exists the trigger stays where it is rather than being
+            // moved to a signal that arrives after the credential wait is already over.
             int autofillTimeoutMs = _settings?.RdpCredentialAutofillTimeoutMs ?? 90000;
             timeoutMs = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(configuredTimeoutMs, autofillTimeoutMs);
             stage = "two";
@@ -4246,6 +4391,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     /// longer credential-wait budget only when one is currently armed and the phase
     /// is still arming; otherwise it just records the credential-wait state.
     /// </summary>
+    /// <remarks>
+    /// The trigger is the watcher starting, not the watcher finding anything, so this fires for
+    /// every profile that carries a saved password - including one whose target is unreachable.
+    /// See the note in <see cref="StartConnectWatchdog"/>.
+    /// </remarks>
     private void ArmStageTwoConnectWatchdog()
     {
         _watchdogCredentialWaitActive = true;
@@ -4355,10 +4505,12 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                     IntPtr.Zero);
             }
 
-            // Also keep the local display alive
-            NativeMethods.SetThreadExecutionState(
-                NativeMethods.ES_CONTINUOUS |
-                NativeMethods.ES_DISPLAY_REQUIRED);
+            // Keeping the local machine awake is SleepPrevention's decision, not this timer's: it
+            // is bound to the user's "prevent sleep during session" setting, and it holds the
+            // display request already whenever that setting allows it. Writing the execution
+            // state from here ran whether or not the user had allowed it, and - because
+            // SetThreadExecutionState replaces the continuous flag set rather than merging into
+            // it - withdrew the system-required request the service had put on this same thread.
         }
         catch (Exception ex)
         {
@@ -4471,9 +4623,6 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     [SupportedOSPlatform("windows")]
     private static class NativeMethods
     {
-        internal const uint ES_CONTINUOUS = 0x80000000;
-        internal const uint ES_DISPLAY_REQUIRED = 0x00000002;
-
         internal const uint WM_KEYDOWN = 0x0100;
         internal const uint WM_KEYUP = 0x0101;
         internal const byte VK_SHIFT = 0x10;
@@ -4483,13 +4632,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         internal const byte VK_DELETE = 0x2E;
         internal const byte VK_TAB = 0x09;
         internal const byte VK_SNAPSHOT = 0x2C;
+        internal const byte VK_F11 = 0x7A;
         internal const byte VK_LWIN = 0x5B;
         internal const byte VK_D = 0x44;
         internal const byte VK_E = 0x45;
         internal const byte VK_L = 0x4C;
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        internal static extern uint SetThreadExecutionState(uint esFlags);
 
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

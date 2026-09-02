@@ -45,6 +45,9 @@ namespace Heimdall.App.Services;
 /// </remarks>
 public sealed class SessionTabContextMenuFactory
 {
+    /// <summary>Locale key of the "Active mode" caption that opens the resolution header.</summary>
+    private const string ActiveModeLabelKey = "RdpResolutionActiveModeLabel";
+
     /// <summary>
     /// Initialises a new <see cref="SessionTabContextMenuFactory"/>.
     /// </summary>
@@ -310,7 +313,7 @@ public sealed class SessionTabContextMenuFactory
     /// <summary>
     /// Builds the RDP Resolution sub-menu. "Match Window" is a nested
     /// sub-menu where the user picks how the dynamic surface should be
-    /// shaped (Stretch / 16:9 / 4:3 / 21:9) — these aspect ratio choices
+    /// shaped (Stretch / 16:9 / 4:3 / 21:9) - these aspect ratio choices
     /// only have a visible effect in the dynamic Match Window mode, so they
     /// no longer live in their own top-level menu. Fixed presets, Custom and
     /// Save-as-default keep their original semantics. Checkmarks reflect the
@@ -416,14 +419,7 @@ public sealed class SessionTabContextMenuFactory
         EmbeddedRdpView rdpView,
         MainViewModel vm)
     {
-        var state = rdpView.GetEffectiveResolutionState();
-        var modeLabel = vm.Localize(RdpResolutionModeIndicator.GetModeLocalizationKey(state.Mode));
-        var activeModeLabel = vm.Localize("RdpResolutionActiveModeLabel");
-        var headerText = RdpResolutionModeIndicator.FormatHeader(
-            activeModeLabel,
-            modeLabel,
-            state.Width,
-            state.Height);
+        var headerText = BuildActiveModeHeaderText(rdpView.GetEffectiveResolutionState(), vm.Localize);
 
         var headerTextBlock = new TextBlock
         {
@@ -444,6 +440,31 @@ public sealed class SessionTabContextMenuFactory
 
         resolutionMenu.Items.Add(headerItem);
         resolutionMenu.Items.Add(new Separator());
+    }
+
+    /// <summary>
+    /// Builds the text of the resolution menu's active-mode header.
+    /// </summary>
+    /// <remarks>
+    /// Free of WPF types so the localization contract is testable without a dispatcher. The header
+    /// mirrors the toolbar one in <c>EmbeddedRdpView</c>, so both read the same locale keys through
+    /// <see cref="EmbeddedRdpView.LocaleKeys"/> rather than each holding its own copy of the text.
+    /// </remarks>
+    internal static string BuildActiveModeHeaderText(
+        RdpEffectiveResolutionState state,
+        Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+
+        var modeLabel = localize(RdpResolutionModeIndicator.GetModeLocalizationKey(state.Mode));
+        var activeModeLabel = localize(ActiveModeLabelKey);
+        return RdpResolutionModeIndicator.FormatHeader(
+            activeModeLabel,
+            modeLabel,
+            state.Width,
+            state.Height,
+            localize(EmbeddedRdpView.LocaleKeys.ResolutionHeaderFormat),
+            localize(EmbeddedRdpView.LocaleKeys.ResolutionHeaderWithSizeFormat));
     }
 
     // ── Detach (branches on split state) ─────────────────────────────
@@ -700,7 +721,7 @@ public sealed class SessionTabContextMenuFactory
 
             menu.Items.Add(splitMenu);
 
-            // "Merge with..." submenu — nested per session with orientation sub-items
+            // "Merge with..." submenu - nested per session with orientation sub-items
             var otherSessions = vm.Connection.ActiveSessions
                 .Where(s => s != session
                     && s.HostControl is not null

@@ -317,7 +317,7 @@ public partial class FirewallTesterView : UserControl, IToolView
 
                 var tooltipText = result?.Status switch
                 {
-                    ProbeStatus.Open => $"{L("ToolFwStatusOpen")} — {result.ResponseTimeMs} ms",
+                    ProbeStatus.Open => $"{L("ToolFwStatusOpen")} - {result.ResponseTimeMs} ms",
                     ProbeStatus.Closed => L("ToolFwStatusClosed"),
                     ProbeStatus.Timeout => L("ToolFwStatusTimeout"),
                     _ => L("ToolFwStatusTimeout"),

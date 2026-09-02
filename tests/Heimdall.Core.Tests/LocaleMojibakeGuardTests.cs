@@ -39,27 +39,27 @@ public sealed class LocaleMojibakeGuardTests
     /// </summary>
     private static readonly IReadOnlyList<string> MojibakeMarkers = new[]
     {
-        "Ã‰",  // Ã‰  – mojibake for É
-        "Ã©",  // Ã©  – mojibake for é
-        "Ã¨",  // Ã¨  – mojibake for è
-        "Ãª",  // Ãª  – mojibake for ê
-        "Ã ",  // Ã   – mojibake for à
-        "Ã´",  // Ã´  – mojibake for ô
-        "Ã®",  // Ã®  – mojibake for î
-        "Ã¢",  // Ã¢  – mojibake for â
-        "Ã»",  // Ã»  – mojibake for û
-        "Ã§",  // Ã§  – mojibake for ç
-        "Â«",  // Â«  – mojibake for «
-        "Â»",  // Â»  – mojibake for »
-        "Â ",  // Â<NBSP> – mojibake for NBSP
-        "â€”", // â€"  – mojibake for —
-        "â€“", // â€"  – mojibake for –
-        "â€¦", // â€¦  – mojibake for …
-        "â€™", // â€™  – mojibake for '
-        "â€˜", // â€˜  – mojibake for '
-        "â€œ", // â€œ  – mojibake for "
-        "â†’", // â†'  – mojibake for →
-        "â†‘", // â†'  – mojibake for ↑
+        "Ã‰",  // mojibake for É
+        "Ã©",  // mojibake for é
+        "Ã¨",  // mojibake for è
+        "Ãª",  // mojibake for ê
+        "Ã ",  // mojibake for à
+        "Ã´",  // mojibake for ô
+        "Ã®",  // mojibake for î
+        "Ã¢",  // mojibake for â
+        "Ã»",  // mojibake for û
+        "Ã§",  // mojibake for ç
+        "Â«",  // mojibake for U+00AB guillemet
+        "Â»",  // mojibake for U+00BB guillemet
+        "Â ",  // mojibake for NBSP
+        "â€”", // mojibake for U+2014 em dash
+        "â€“", // mojibake for U+2013 en dash
+        "â€¦", // mojibake for U+2026 ellipsis
+        "â€™", // mojibake for '
+        "â€˜", // mojibake for '
+        "â€œ", // mojibake for "
+        "â†’", // mojibake for →
+        "â†‘", // mojibake for ↑
         "�",        // U+FFFD replacement character (lost-encoding marker)
     };
 
@@ -68,6 +68,16 @@ public sealed class LocaleMojibakeGuardTests
     /// corpus. The blacklist above remains necessary for corrupt sequences made
     /// entirely from scalars in this set.
     /// </summary>
+    /// <remarks>
+    /// This is an allow-list, consumed below as <c>!AllowedScalars.Contains(...)</c>. Every
+    /// entry it holds is a character no gate can ever fail on, so the typographic substitutes
+    /// the project rule bans are deliberately absent: em dash, en dash, curly apostrophe,
+    /// curly quote, both guillemets, the oe ligature, the single-character ellipsis, the
+    /// no-break space and the multiplication sign. Accents, the bullet, the euro sign, arrows,
+    /// stars, check marks and emoji stay: they carry something no pair of ASCII characters
+    /// carries as clearly. <see cref="SourceTypographyGuardTests"/> refuses the banned set by
+    /// name and reports the ASCII form to write instead.
+    /// </remarks>
     private static readonly HashSet<int> AllowedScalars = CreateAllowedScalars();
 
     [Theory]
@@ -137,10 +147,10 @@ public sealed class LocaleMojibakeGuardTests
         HashSet<int> allowed = new()
         {
             0x0009, 0x000A,
-            0x00A0, 0x00AB, 0x00B7, 0x00BB, 0x00C0, 0x00C9, 0x00CA, 0x00D7,
+            0x00B7, 0x00C0, 0x00C9, 0x00CA,
             0x00E0, 0x00E2, 0x00E7, 0x00E8, 0x00E9, 0x00EA, 0x00EB, 0x00EE,
-            0x00F4, 0x00F9, 0x00FB, 0x0153, 0x2013, 0x2014, 0x2019, 0x201D,
-            0x2022, 0x2026, 0x20AC, 0x2190, 0x2191, 0x2192, 0x2193, 0x2605,
+            0x00F4, 0x00F9, 0x00FB,
+            0x2022, 0x20AC, 0x2190, 0x2191, 0x2192, 0x2193, 0x2605,
             0x2606, 0x2713, 0x2717, 0x1F512, 0x1F680,
         };
 

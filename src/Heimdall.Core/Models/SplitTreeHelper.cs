@@ -113,7 +113,7 @@ public static class SplitTreeHelper
     /// Removes a leaf pane from the tree and promotes its sibling.
     /// Returns the new root (which may be a single <see cref="SessionPaneModel"/>
     /// if only one pane remains). Returns null if the pane is the only node.
-    /// Does NOT dispose the pane's HostControl — caller must do that first.
+    /// Does NOT dispose the pane's HostControl - caller must do that first.
     /// </summary>
     public static ISplitContent? RemovePane(ISplitContent? root, string paneId)
     {
@@ -141,13 +141,13 @@ public static class SplitTreeHelper
             return container.First;
         }
 
-        // Recurse deeper — rebuild the tree with the modified subtree
+        // Recurse deeper - rebuild the tree with the modified subtree
         var modifiedFirst = RemovePane(container.First, paneId);
         if (!ReferenceEquals(modifiedFirst, container.First))
         {
             if (modifiedFirst is null)
             {
-                // Entire First subtree consumed — promote Second
+                // Entire First subtree consumed - promote Second
                 return container.Second;
             }
 
@@ -160,7 +160,7 @@ public static class SplitTreeHelper
         {
             if (modifiedSecond is null)
             {
-                // Entire Second subtree consumed — promote First
+                // Entire Second subtree consumed - promote First
                 return container.First;
             }
 

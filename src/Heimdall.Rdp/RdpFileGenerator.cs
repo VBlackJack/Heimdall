@@ -165,7 +165,7 @@ public static class RdpFileGenerator
             sb.AppendLine("connection type:i:7");
         }
 
-        // RD Gateway — validate hostname before writing to .rdp file
+        // RD Gateway - validate hostname before writing to .rdp file
         if (!string.IsNullOrWhiteSpace(options.GatewayHostname))
         {
             if (!Core.Security.InputValidator.Validate(options.GatewayHostname, "Address"))

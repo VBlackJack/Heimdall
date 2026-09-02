@@ -192,6 +192,15 @@ many, and a prompt users learn to click through is worse than no prompt. This
 also means no connection that has verification today gains a network round
 trip.
 
+**The check is embedded-only.** `RdpCertificateGate` has call sites in
+`src/Heimdall.App/Views/EmbeddedRdpView.xaml.cs` and nowhere else. A launch that
+resolves to the external client - a profile whose RDP mode is `External`, or a
+Force-External launch - writes the `TERMSRV` credential and starts `mstsc.exe`
+with no Heimdall-side certificate check at all, while `RdpFileGenerator` puts
+the same `authentication level:i:0` into the generated `.rdp` file that the
+embedded path applies to the control. On that path the Windows check is relaxed
+and nothing replaces it.
+
 **Every outcome other than an explicit refusal proceeds.** `RdpCertificateProbe`
 opens its own TCP connection, performs the X.224 negotiation, and reads the
 certificate offered by the TLS layer. If the endpoint is unreachable, keeps
@@ -212,16 +221,21 @@ machine rather than show forty hexadecimal pairs.
 
 **Known limitation, and the reason the set matters.** Nothing guarantees that
 the ActiveX control reconnects to the same machine the probe inspected - on a
-multi-member pool that is the normal case, not an edge case. With a set this is
-harmless: every member has been approved individually, so whichever one answers,
-its certificate has been seen and accepted. A scheme that approved a *pool*
-rather than individual certificates would make the same race harmful, because
-the machine actually joined could present a certificate that was never approved,
-only assumed to belong. That is why pool-shaped trust was rejected: there is no
-cryptographic link between two self-signed certificates from two different
-machines, and this feature replaces a Microsoft check that then lets CredSSP
-credentials through, so it cannot be more permissive than the check it
-disables.
+multi-member pool that is the normal case, not an edge case. The set does not
+close that gap: it makes the question converge, it does not authenticate the
+session. Heimdall compares only what its own probe read, and the certificate the
+ActiveX control actually receives is never compared to anything; at
+`AuthenticationLevel` 0 - the only level on which this check runs - the session
+that follows requires nothing of the server. Where every member of the pool has
+already been approved, whichever one answers presents a certificate the user has
+seen; a member that joined after the last approval is accepted with no prompt
+and no record. A scheme that approved a *pool* rather than individual
+certificates would be worse still, because the machine actually joined could
+present a certificate that was never approved, only assumed to belong. That is
+why pool-shaped trust was rejected: there is no cryptographic link between two
+self-signed certificates from two different machines, and this feature replaces
+a Microsoft check that then lets CredSSP credentials through, so it cannot be
+more permissive than the check it disables.
 
 ### SFTP sudo escalation and remote editing
 
@@ -648,7 +662,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
 - Shell-injection regression tests: `InputValidator` coverage in
   `tests/Heimdall.Core.Tests`.
 - RDP file generation sanitization:
-  `tests/Heimdall.Ssh.Tests/RdpFileGeneratorTests.cs`.
+  `tests/Heimdall.Rdp.Tests/RdpFileGeneratorTests.cs`.
 - CI enforces: build with zero warnings under `TreatWarningsAsErrors`,
   `dotnet format --verify-no-changes`, full test suite, JSON locale parity
   (EN and FR key sets must be identical, currently 5,489 keys each), and an

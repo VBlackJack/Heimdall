@@ -44,7 +44,7 @@ public sealed partial class CommandLibraryParameterEntry : ObservableObject
     /// <summary>Optional human-readable description shown as a tooltip.</summary>
     public string? Description { get; init; }
 
-    /// <summary>Parameter type hint (string, int, hostname, ipaddress, …).</summary>
+    /// <summary>Parameter type hint (string, int, hostname, ipaddress, ...).</summary>
     public string Type { get; init; } = "string";
 
     /// <summary>

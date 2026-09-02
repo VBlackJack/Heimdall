@@ -22,7 +22,7 @@ namespace Heimdall.App.Services;
 /// <summary>
 /// Translates the short machine-friendly reason tags emitted by
 /// <see cref="SessionHealthMonitor"/> into the user-facing tooltip shown on
-/// each sidebar dot. Pure static surface — testable without a live WPF
+/// each sidebar dot. Pure static surface - testable without a live WPF
 /// dispatcher and shared by every view that needs to render a
 /// <see cref="HealthState"/>.
 /// </summary>
@@ -30,7 +30,7 @@ public static class HealthReasonLocalizer
 {
     /// <summary>
     /// Returns the i18n key for a status enum value. Used to render the
-    /// leading label segment of a tooltip ("Reachable", "Unreachable", …).
+    /// leading label segment of a tooltip ("Reachable", "Unreachable", ...).
     /// </summary>
     public static string StatusKey(HealthStatus status) => status switch
     {
@@ -42,7 +42,7 @@ public static class HealthReasonLocalizer
 
     /// <summary>
     /// Returns the i18n key for a known reason tag, or <c>null</c> when the
-    /// tag is unknown — caller then renders the raw tag in parentheses so the
+    /// tag is unknown - caller then renders the raw tag in parentheses so the
     /// information is not lost during development of new reason codes.
     /// </summary>
     public static string? ReasonKey(string? reason)

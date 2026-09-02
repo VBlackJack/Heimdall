@@ -162,7 +162,59 @@ public sealed class RdpResolutionModeIndicatorTests
             1920,
             1080);
 
-        Assert.Equal("Active mode: Fixed (1920×1080)", result);
+        Assert.Equal("Active mode: Fixed (1920x1080)", result);
+    }
+
+    /// <summary>
+    /// The header layout comes from the caller, so a translator can reach it.
+    /// </summary>
+    /// <remarks>
+    /// It used to be a literal compiled into the method, carrying a multiplication sign that the
+    /// method's own documentation described as an ASCII x. Neither the separator, the word order
+    /// nor the character was adaptable, on a string shown in the resolution menu.
+    /// </remarks>
+    [Fact]
+    public void FormatHeader_UsesTheSuppliedTemplate()
+    {
+        var result = RdpResolutionModeIndicator.FormatHeader(
+            "Mode actif",
+            "Fixe",
+            1920,
+            1080,
+            "{0} : {1}",
+            "{0} : {1} [{2} sur {3}]");
+
+        Assert.Equal("Mode actif : Fixe [1920 sur 1080]", result);
+    }
+
+    [Fact]
+    public void FormatHeader_WithoutDimensions_UsesTheSuppliedModeOnlyTemplate()
+    {
+        var result = RdpResolutionModeIndicator.FormatHeader(
+            "Mode actif",
+            "Ajuster",
+            null,
+            null,
+            "{0} : {1}",
+            "{0} : {1} [{2} sur {3}]");
+
+        Assert.Equal("Mode actif : Ajuster", result);
+    }
+
+    /// <summary>
+    /// And the fallback a caller with no locale access gets is ASCII, which the previous literal
+    /// was not.
+    /// </summary>
+    [Fact]
+    public void FormatHeader_WithNoTemplate_ProducesOnlyAsciiPunctuation()
+    {
+        var result = RdpResolutionModeIndicator.FormatHeader(
+            "Active mode",
+            "Fixed",
+            1920,
+            1080);
+
+        Assert.All(result, c => Assert.True(c <= '\u007e', $"non-ASCII character U+{(int)c:X4}"));
     }
 
     [Fact]
@@ -181,25 +233,25 @@ public sealed class RdpResolutionModeIndicatorTests
     public void FormatTooltip_WithoutDims_UsesModeOnlyTemplate()
     {
         var result = RdpResolutionModeIndicator.FormatTooltip(
-            "Change resolution — {0}",
-            "Change resolution — {0} ({1}×{2})",
+            "Change resolution - {0}",
+            "Change resolution - {0} ({1}x{2})",
             "Multi-monitor",
             null,
             null);
 
-        Assert.Equal("Change resolution — Multi-monitor", result);
+        Assert.Equal("Change resolution - Multi-monitor", result);
     }
 
     [Fact]
     public void FormatTooltip_WithDims_UsesModeAndSizeTemplate()
     {
         var result = RdpResolutionModeIndicator.FormatTooltip(
-            "Change resolution — {0}",
-            "Change resolution — {0} ({1}×{2})",
+            "Change resolution - {0}",
+            "Change resolution - {0} ({1}x{2})",
             "Fixed",
             2560,
             1440);
 
-        Assert.Equal("Change resolution — Fixed (2560×1440)", result);
+        Assert.Equal("Change resolution - Fixed (2560x1440)", result);
     }
 }

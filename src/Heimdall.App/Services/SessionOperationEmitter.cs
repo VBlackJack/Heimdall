@@ -20,7 +20,7 @@ namespace Heimdall.App.Services;
 
 /// <summary>
 /// Gated emitter for file-transfer operation records produced OUTSIDE the
-/// <see cref="LoggingRemoteBrowser"/> decorator — specifically the SFTP sudo fallbacks, which bypass
+/// <see cref="LoggingRemoteBrowser"/> decorator - specifically the SFTP sudo fallbacks, which bypass
 /// <see cref="IRemoteBrowser"/> by running privileged commands over a raw SSH exec channel. Each
 /// <c>RunXxxAsync</c> helper times the privileged body, awaits it, and emits exactly one
 /// <see cref="SessionOperationRecord"/> (success / error / cancelled) when the live gate permits,

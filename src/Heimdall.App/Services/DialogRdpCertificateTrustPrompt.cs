@@ -30,15 +30,56 @@ namespace Heimdall.App.Services;
 /// <b>Every path that is not an answer returns <see cref="RdpTrustAnswer.Refuse"/>.</b>
 /// No application, a cancelled token, a window closed by its title-bar cross: none of
 /// those is approval, and the alternative is opening a session nobody approved. The
-/// modelling here follows <see cref="DialogHostKeyVerifier"/>, including the deadlock
-/// avoidance when the caller is already on the UI thread.
+/// modelling here follows <see cref="DialogHostKeyVerifier"/>.
+/// <para>
+/// <b>Unlike that one, there is no bypass of the coordinator for a caller already on the
+/// UI thread.</b> The bypass exists there for a caller that BLOCKS on the answer, which
+/// would deadlock against a queue that needs the dispatcher. The only caller here awaits -
+/// <c>EmbeddedRdpView</c> starts the verification from <c>OnLoaded</c> and awaits it all
+/// the way down - so the bypass never protected anything and only removed the coalescing:
+/// it made every request take the uncoalesced path, which is the whole path, and two tabs
+/// of one profile meeting one certificate stacked two modal windows asking one question.
+/// The display below re-checks the dispatcher, so the coordinator may call it from
+/// anywhere.
+/// </para>
 /// </remarks>
-internal sealed class DialogRdpCertificateTrustPrompt(
-    LocalizationManager localizer,
-    TrustPromptCoordinator coordinator) : IRdpCertificateTrustPrompt
+internal sealed class DialogRdpCertificateTrustPrompt : IRdpCertificateTrustPrompt
 {
-    private readonly LocalizationManager _localizer = localizer;
-    private readonly TrustPromptCoordinator _coordinator = coordinator;
+    private readonly LocalizationManager _localizer;
+    private readonly TrustPromptCoordinator _coordinator;
+    private readonly Func<RdpCertificatePromptContext, CancellationToken, Task<RdpTrustAnswer>>
+        _display;
+
+    /// <summary>Initializes a new instance of the <see cref="DialogRdpCertificateTrustPrompt"/> class.</summary>
+    /// <param name="localizer">Supplies the wording of the question.</param>
+    /// <param name="coordinator">Serializes and coalesces trust questions.</param>
+    public DialogRdpCertificateTrustPrompt(
+        LocalizationManager localizer,
+        TrustPromptCoordinator coordinator)
+    {
+        _localizer = localizer;
+        _coordinator = coordinator;
+        _display = ShowDialogOnDispatcherAsync;
+    }
+
+    /// <summary>Initializes a new instance with the display replaced.</summary>
+    /// <param name="localizer">Supplies the wording of the question.</param>
+    /// <param name="coordinator">Serializes and coalesces trust questions.</param>
+    /// <param name="display">Puts one question to the user and returns the answer.</param>
+    /// <remarks>
+    /// The seam exists so the coalescing can be asserted without a window: building a WPF
+    /// <c>Window</c> in a test seals application-level styles onto the shared dispatcher and
+    /// takes unrelated tests down with it.
+    /// </remarks>
+    internal DialogRdpCertificateTrustPrompt(
+        LocalizationManager localizer,
+        TrustPromptCoordinator coordinator,
+        Func<RdpCertificatePromptContext, CancellationToken, Task<RdpTrustAnswer>> display)
+    {
+        _localizer = localizer;
+        _coordinator = coordinator;
+        _display = display;
+    }
 
     /// <inheritdoc />
     public async Task<RdpTrustAnswer> AskAsync(
@@ -47,33 +88,16 @@ internal sealed class DialogRdpCertificateTrustPrompt(
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Application? app = Application.Current;
-        if (app is null)
-        {
-            FileLogger.Warn(
-                $"DialogRdpCertificateTrustPrompt invoked without Application.Current for "
-                + $"{context.Host}; refusing the certificate.");
-            return RdpTrustAnswer.Refuse;
-        }
-
         if (cancellationToken.IsCancellationRequested)
         {
             return RdpTrustAnswer.Refuse;
-        }
-
-        if (app.Dispatcher.CheckAccess())
-        {
-            // The queue needs the dispatcher to display prompts. Bypass it on the UI
-            // thread so a caller that waits synchronously cannot deadlock. This request
-            // is not coalesced, but the UI thread serializes its own dialogs.
-            return ShowDialog(app, context, cancellationToken);
         }
 
         try
         {
             return await _coordinator.RequestAsync(
                 BuildKey(context),
-                displayCt => ShowDialogOnDispatcherAsync(app, context, displayCt),
+                displayCt => _display(context, displayCt),
                 RdpTrustAnswer.Refuse,
                 cancellationToken);
         }
@@ -108,10 +132,18 @@ internal sealed class DialogRdpCertificateTrustPrompt(
     }
 
     private Task<RdpTrustAnswer> ShowDialogOnDispatcherAsync(
-        Application app,
         RdpCertificatePromptContext context,
         CancellationToken ct)
     {
+        Application? app = Application.Current;
+        if (app is null)
+        {
+            FileLogger.Warn(
+                $"DialogRdpCertificateTrustPrompt invoked without Application.Current for "
+                + $"{context.Host}; refusing the certificate.");
+            return Task.FromResult(RdpTrustAnswer.Refuse);
+        }
+
         if (app.Dispatcher.CheckAccess())
         {
             return Task.FromResult(ShowDialog(app, context, ct));

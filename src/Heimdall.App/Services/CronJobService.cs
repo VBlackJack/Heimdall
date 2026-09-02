@@ -17,6 +17,7 @@
 using System.Diagnostics;
 using System.Text;
 using Heimdall.Core.CronJob;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
@@ -30,6 +31,12 @@ public interface ICronJobService
 
 public sealed class CronJobService : ICronJobService
 {
+    /// <summary>Executable that reports the Windows scheduled tasks.</summary>
+    internal const string SchtasksExecutableName = "schtasks.exe";
+
+    /// <summary>The whole task list as verbose CSV, which the parser expects.</summary>
+    private const string SchtasksQueryArguments = "/query /fo CSV /v";
+
     private readonly Func<CancellationToken, Task<string>> _runSchtasks;
 
     public CronJobService()
@@ -49,20 +56,27 @@ public sealed class CronJobService : ICronJobService
         return SchtasksCsvParser.Parse(csv);
     }
 
-    private static async Task<string> DefaultRunSchtasksAsync(CancellationToken ct)
+    /// <summary>
+    /// Builds the start info for the scheduled-task query.
+    /// </summary>
+    internal static ProcessStartInfo CreateSchtasksStartInfo()
     {
-        var psi = new ProcessStartInfo
+        return new ProcessStartInfo
         {
-            FileName = "schtasks",
-            Arguments = "/query /fo CSV /v",
+            FileName = SystemExecutablePath.InSystemDirectory(SchtasksExecutableName),
+            Arguments = SchtasksQueryArguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
+    }
 
-        using var proc = Process.Start(psi);
+    private static async Task<string> DefaultRunSchtasksAsync(CancellationToken ct)
+    {
+        using var proc = Process.Start(CreateSchtasksStartInfo());
         if (proc is null)
         {
             return string.Empty;

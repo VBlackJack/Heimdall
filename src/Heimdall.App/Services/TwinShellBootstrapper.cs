@@ -136,7 +136,7 @@ internal static class TwinShellBootstrapper
         if (!Directory.Exists(seedDir))
         {
             Heimdall.Core.Logging.FileLogger.Warn(
-                "[TwinShell] No seed directory found — command library will be empty");
+                "[TwinShell] No seed directory found - command library will be empty");
             return;
         }
 

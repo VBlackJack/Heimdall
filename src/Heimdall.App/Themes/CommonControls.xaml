@@ -196,7 +196,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Empty State — centered container for "no content" placeholders -->
+    <!-- Empty State - centered container for "no content" placeholders -->
     <Style x:Key="EmptyStateStyle" TargetType="{x:Type Border}">
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment" Value="Center"/>

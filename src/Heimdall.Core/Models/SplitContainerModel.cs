@@ -40,7 +40,7 @@ public partial class SplitContainerModel : ObservableObject, ISplitContent
     private SplitOrientation _orientation;
 
     /// <summary>
-    /// Splitter position ratio (0.0–1.0) between the first and second child.
+    /// Splitter position ratio (0.0-1.0) between the first and second child.
     /// Automatically clamped to [<see cref="MinRatio"/>, <see cref="MaxRatio"/>].
     /// Preserved when switching tabs and persisted via split layout memory.
     /// Manual property (not [ObservableProperty]) to clamp BEFORE PropertyChanged fires.

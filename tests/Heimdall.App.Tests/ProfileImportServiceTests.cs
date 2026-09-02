@@ -550,6 +550,50 @@ public sealed class ProfileImportServiceTests
         }
     }
 
+
+    [Fact]
+    public async Task ImportFromPathAsync_Json_AutoRename_UsesTheLocalizedSuffix()
+    {
+        using ProfileImportFixture fixture = new(locale: "fr");
+        await fixture.ConfigManager.SaveServersAsync(
+        [
+            new ServerProfileDto
+            {
+                Id = "existing-profile",
+                DisplayName = "Conflict",
+                ConnectionType = "SSH",
+                RemoteServer = "ssh.example.com",
+                SshPort = 22
+            }
+        ]);
+
+        string path = await fixture.WriteJsonAsync("servers.json",
+        [
+            new ServerProfileDto
+            {
+                Id = "incoming-profile",
+                DisplayName = "Conflict",
+                ConnectionType = "SSH",
+                RemoteServer = "other.example.com",
+                SshPort = 22
+            }
+        ]);
+
+        ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.Equal(1, result.RenamedCount);
+        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        ServerProfileDto renamed = Assert.Single(
+            servers,
+            (ServerProfileDto server) => !string.Equals(server.Id, "existing-profile", StringComparison.Ordinal));
+
+        // fr.json holds "{0} (Import\u00e9 {1})"; escaped here so this file stays ASCII exactly the
+        // way the locale file writes it. The suffix is persisted in the DisplayName the user reads,
+        // so an English literal compiled into the service printed "Conflict (Imported 2)" whatever
+        // the active locale was.
+        Assert.Equal("Conflict (Import\u00e9 2)", renamed.DisplayName);
+    }
+
     private sealed class ProfileImportFixture : IDisposable
     {
         public string RootPath { get; } = Path.Combine(Path.GetTempPath(), "heimdall-profile-import-tests", Guid.NewGuid().ToString("N"));
@@ -566,11 +610,13 @@ public sealed class ProfileImportServiceTests
         /// </summary>
         public Action? AfterSettingsLoaded { get; set; }
 
-        public ProfileImportFixture(long maxImportFileSizeBytes = AppConstants.MaxImportFileSizeBytes)
+        public ProfileImportFixture(
+            long maxImportFileSizeBytes = AppConstants.MaxImportFileSizeBytes,
+            string locale = "en")
         {
             Directory.CreateDirectory(RootPath);
             ConfigManager = new ConfigManager(RootPath);
-            LocalizationManager localizer = CreateLocalizerAsync().GetAwaiter().GetResult();
+            LocalizationManager localizer = CreateLocalizerAsync(locale).GetAwaiter().GetResult();
             RdpImportService rdpImport = new(ConfigManager, localizer);
             InterceptingConfigManager intercepted = new(ConfigManager)
             {
@@ -619,10 +665,10 @@ public sealed class ProfileImportServiceTests
             }
         }
 
-        private static async Task<LocalizationManager> CreateLocalizerAsync()
+        private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
         {
             var manager = new LocalizationManager();
-            await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+            await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
             return manager;
         }
     }

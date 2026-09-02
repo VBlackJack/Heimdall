@@ -142,7 +142,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     [ObservableProperty]
     private bool _isReady;
 
-    /// <summary>Current search term (raw TextBox text — debouncing is internal).</summary>
+    /// <summary>Current search term (raw TextBox text - debouncing is internal).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSearchText))]
     private string _searchText = string.Empty;
@@ -235,7 +235,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private string _helpContentText = string.Empty;
 
     /// <summary>
-    /// True when a <see cref="SendCommandHandler"/> is wired up — controls
+    /// True when a <see cref="SendCommandHandler"/> is wired up - controls
     /// the visibility of the Send button in the generator panel.
     /// </summary>
     [ObservableProperty]
@@ -311,7 +311,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>
     /// Tooltip for the Send button. When the button is enabled it returns the
-    /// normal "Send to terminal" hint; when disabled it explains why — either
+    /// normal "Send to terminal" hint; when disabled it explains why - either
     /// the command is not ready, or there is no injectable terminal in this tab.
     /// </summary>
     public string SendTooltip
@@ -396,7 +396,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     public bool HasActiveSearch => _searchMatchIds is not null;
 
     /// <summary>
-    /// The handler invoked when the user clicks "Send" — populated by the
+    /// The handler invoked when the user clicks "Send" - populated by the
     /// view from <see cref="Heimdall.Core.Models.ToolContext.SendCommandAction"/>.
     /// When null, the Send button is hidden.
     /// </summary>
@@ -632,7 +632,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// <summary>
     /// Populates the platform/risk filter combo items from current locale
     /// strings and optionally auto-selects a platform based on the originating
-    /// connection type. Called on first init — combos are not rebuilt on
+    /// connection type. Called on first init - combos are not rebuilt on
     /// subsequent reloads because the preserved index avoids a re-select
     /// flicker.
     /// </summary>

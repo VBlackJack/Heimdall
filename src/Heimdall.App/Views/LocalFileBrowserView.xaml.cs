@@ -38,6 +38,15 @@ public partial class LocalFileBrowserView : UserControl
     private const double MinimumNameColumnWidth = 200;
     private const string DefaultEditorPath = @"%windir%\system32\notepad.exe";
 
+    /// <summary>Host of the shell "Open with" dialog.</summary>
+    internal const string RunDllExecutableName = "rundll32.exe";
+
+    /// <summary>Entry point of the shell "Open with" dialog inside rundll32.</summary>
+    private const string OpenAsRunDllEntryPoint = "shell32.dll,OpenAs_RunDLL";
+
+    /// <summary>File-manager image; it sits in the Windows directory, not in System32.</summary>
+    internal const string ExplorerExecutableName = "explorer.exe";
+
     private readonly LocalizationManager? _localizer;
     private readonly LocalFileBrowserViewModel _viewModel;
 
@@ -272,13 +281,7 @@ public partial class LocalFileBrowserView : UserControl
 
         try
         {
-            // Windows paths cannot contain double quotes, CR, or LF, so literal quoting is safe here.
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "rundll32.exe",
-                Arguments = $"shell32.dll,OpenAs_RunDLL \"{entry.FullPath}\"",
-                UseShellExecute = false
-            })?.Dispose();
+            Process.Start(CreateOpenWithStartInfo(entry.FullPath))?.Dispose();
         }
         catch (Exception ex)
         {
@@ -295,19 +298,11 @@ public partial class LocalFileBrowserView : UserControl
                 // Windows paths cannot contain double quotes, CR, or LF, so literal quoting is safe here.
                 if (!entry.IsDirectory)
                 {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "explorer.exe",
-                        Arguments = $"/select,\"{entry.FullPath}\""
-                    })?.Dispose();
+                    Process.Start(CreateExplorerRevealStartInfo(entry.FullPath))?.Dispose();
                 }
                 else
                 {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "explorer.exe",
-                        Arguments = $"\"{entry.FullPath}\""
-                    })?.Dispose();
+                    Process.Start(CreateExplorerBrowseStartInfo(entry.FullPath))?.Dispose();
                 }
             }
             catch (Exception ex)
@@ -319,12 +314,7 @@ public partial class LocalFileBrowserView : UserControl
         {
             try
             {
-                // Windows paths cannot contain double quotes, CR, or LF, so literal quoting is safe here.
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    Arguments = $"\"{_viewModel.CurrentPath}\""
-                })?.Dispose();
+                Process.Start(CreateExplorerBrowseStartInfo(_viewModel.CurrentPath))?.Dispose();
             }
             catch (Exception ex)
             {
@@ -413,6 +403,55 @@ public partial class LocalFileBrowserView : UserControl
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[LocalFileBrowser] paste handler failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Builds the start info for the shell "Open with" dialog.
+    /// Windows paths cannot contain double quotes, CR, or LF, so literal quoting is safe here.
+    /// </summary>
+    internal static ProcessStartInfo CreateOpenWithStartInfo(string fullPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
+
+        return new ProcessStartInfo
+        {
+            FileName = SystemExecutablePath.InSystemDirectory(RunDllExecutableName),
+            Arguments = $"{OpenAsRunDllEntryPoint} \"{fullPath}\"",
+            UseShellExecute = false,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory
+        };
+    }
+
+    /// <summary>
+    /// Builds the start info that opens the file manager with the entry selected.
+    /// Windows paths cannot contain double quotes, CR, or LF, so literal quoting is safe here.
+    /// </summary>
+    internal static ProcessStartInfo CreateExplorerRevealStartInfo(string fullPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
+
+        return new ProcessStartInfo
+        {
+            FileName = SystemExecutablePath.InWindowsDirectory(ExplorerExecutableName),
+            Arguments = $"/select,\"{fullPath}\"",
+            WorkingDirectory = SystemExecutablePath.WindowsDirectory
+        };
+    }
+
+    /// <summary>
+    /// Builds the start info that opens the file manager on a directory.
+    /// Windows paths cannot contain double quotes, CR, or LF, so literal quoting is safe here.
+    /// </summary>
+    internal static ProcessStartInfo CreateExplorerBrowseStartInfo(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        return new ProcessStartInfo
+        {
+            FileName = SystemExecutablePath.InWindowsDirectory(ExplorerExecutableName),
+            Arguments = $"\"{path}\"",
+            WorkingDirectory = SystemExecutablePath.WindowsDirectory
+        };
     }
 
     internal static bool TryCreateEditorStartInfo(

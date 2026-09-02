@@ -183,7 +183,7 @@ public sealed class FileShareService : IAsyncDisposable, INotifyPropertyChanged
 
     /// <summary>
     /// Tears the running server down, releasing ports and clearing all state.
-    /// Idempotent — calling it while already stopped is a no-op (no event is raised).
+    /// Idempotent - calling it while already stopped is a no-op (no event is raised).
     /// </summary>
     public async Task StopAsync()
     {

@@ -22,7 +22,7 @@ namespace Heimdall.App.Localization;
 /// <summary>
 /// Singleton bridge between <see cref="LocalizationManager"/> and WPF bindings.
 /// Exposes an indexer that resolves i18n keys, and raises <see cref="PropertyChanged"/>
-/// for <c>Item[]</c> when the locale changes — causing all <c>{loc:Translate}</c>
+/// for <c>Item[]</c> when the locale changes - causing all <c>{loc:Translate}</c>
 /// bindings to re-evaluate automatically.
 /// </summary>
 public sealed class LocalizationSource : INotifyPropertyChanged

@@ -97,7 +97,7 @@ public sealed class SessionLogService : ISessionLogService
 
                 // Replace any pre-existing writer for this key (restart semantics, e.g. reconnect).
                 // Close the previous segment with a proper footer so its transcript is not left
-                // header-only — keeping the audit trail symmetric across reconnected sessions.
+                // header-only - keeping the audit trail symmetric across reconnected sessions.
                 if (_writers.TryRemove(context.SessionKey, out SessionLogWriter? existing))
                 {
                     existing.Close(BuildFooter(existing.StartedUtc));

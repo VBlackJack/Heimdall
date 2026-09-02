@@ -35,6 +35,9 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class SecNumCloudAuditEngine
 {
+    /// <summary>Executable that resolves DNS records locally.</summary>
+    internal const string NslookupExecutableName = "nslookup.exe";
+
     // ── Events ───────────────────────────────────────────────────────
 
     /// <summary>Fires per-host within each audit phase (phaseName, completed, total).</summary>
@@ -100,7 +103,7 @@ public sealed class SecNumCloudAuditEngine
 
     // ── TLS protocol definitions (requires obsolete enum values) ─────
 
-#pragma warning disable CA5397, CS0618, SYSLIB0039 // Obsolete TLS/SSL versions — needed to detect insecure configs
+#pragma warning disable CA5397, CS0618, SYSLIB0039 // Obsolete TLS/SSL versions - needed to detect insecure configs
     private static readonly (string Name, SslProtocols Protocol, bool IsWeak)[] TlsProtocols =
     [
         ("SSL 3.0",  SslProtocols.Ssl3,  true),
@@ -204,7 +207,7 @@ public sealed class SecNumCloudAuditEngine
 
     /// <summary>
     /// Runs the full SecNumCloud audit and returns the completed report.
-    /// Each chapter and check is independent — a single failure never aborts
+    /// Each chapter and check is independent - a single failure never aborts
     /// the entire audit.
     /// </summary>
     public async Task<AuditReport> RunAuditAsync(
@@ -389,7 +392,7 @@ public sealed class SecNumCloudAuditEngine
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested)
                 {
-                    // Per-port timeout — not a scan cancellation. Skip this port.
+                    // Per-port timeout - not a scan cancellation. Skip this port.
                 }
                 catch (OperationCanceledException) { throw; }
                 catch { /* port closed or unreachable */ }
@@ -424,7 +427,7 @@ public sealed class SecNumCloudAuditEngine
     };
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Phase 2: Network Security (Chapter NET — 4 checks)
+    //  Phase 2: Network Security (Chapter NET - 4 checks)
     // ═══════════════════════════════════════════════════════════════════
 
     private AuditChapter BuildNetworkChapter() => new()
@@ -648,7 +651,7 @@ public sealed class SecNumCloudAuditEngine
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Phase 3: Cryptography (Chapter CRY — 4 checks)
+    //  Phase 3: Cryptography (Chapter CRY - 4 checks)
     // ═══════════════════════════════════════════════════════════════════
 
     private AuditChapter BuildCryptoChapter() => new()
@@ -1006,7 +1009,7 @@ public sealed class SecNumCloudAuditEngine
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Phase 4: Access Control (Chapter ACC — 3 checks)
+    //  Phase 4: Access Control (Chapter ACC - 3 checks)
     // ═══════════════════════════════════════════════════════════════════
 
     private AuditChapter BuildAccessChapter() => new()
@@ -1295,7 +1298,7 @@ public sealed class SecNumCloudAuditEngine
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Phase 5: Operations Security (Chapter OPS — 4 checks)
+    //  Phase 5: Operations Security (Chapter OPS - 4 checks)
     // ═══════════════════════════════════════════════════════════════════
 
     private AuditChapter BuildOperationsChapter() => new()
@@ -1835,6 +1838,23 @@ public sealed class SecNumCloudAuditEngine
     }
 
     /// <summary>
+    /// Builds the start info for the DNS record query.
+    /// </summary>
+    internal static ProcessStartInfo CreateNslookupStartInfo(string recordType, string domain)
+    {
+        return new ProcessStartInfo
+        {
+            FileName = SystemExecutablePath.InSystemDirectory(NslookupExecutableName),
+            Arguments = $"-type={recordType} {domain}",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = SystemExecutablePath.SystemDirectory,
+        };
+    }
+
+    /// <summary>
     /// Executes nslookup with the specified record type and returns the raw output.
     /// </summary>
     private static async Task<string> RunDnsQueryAsync(
@@ -1845,17 +1865,7 @@ public sealed class SecNumCloudAuditEngine
 
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "nslookup",
-                Arguments = $"-type={recordType} {domain}",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            using var process = new Process { StartInfo = psi };
+            using var process = new Process { StartInfo = CreateNslookupStartInfo(recordType, domain) };
             process.Start();
 
             using var cts = new CancellationTokenSource(DnsTimeoutMs);

@@ -359,7 +359,7 @@ public sealed class ProfileImportService(
 
                         case RdpConflictResolution.AutoRename:
                             candidate.Id = BuildUniqueId(candidate.Id, inventory);
-                            candidate.DisplayName = BuildAutoRename(candidate.DisplayName, inventory);
+                            candidate.DisplayName = ImportAutoRename.Build(candidate.DisplayName, inventory, _localizer);
                             inventory.Add(candidate);
                             appliedServers.Add(candidate);
                             importedCount++;
@@ -499,19 +499,6 @@ public sealed class ProfileImportService(
         }
 
         return Guid.NewGuid().ToString();
-    }
-
-    private static string BuildAutoRename(string baseName, IReadOnlyList<ServerProfileDto> inventory)
-    {
-        var suffix = 2;
-        var candidate = $"{baseName} (Imported {suffix})";
-        while (inventory.Any(server => string.Equals(server.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
-        {
-            suffix++;
-            candidate = $"{baseName} (Imported {suffix})";
-        }
-
-        return candidate;
     }
 
     internal static ProfileConfigDocument ReadJsonConfigDocument(string json)

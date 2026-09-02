@@ -36,12 +36,19 @@ namespace Heimdall.App.Tests.Services;
 /// </remarks>
 public sealed class SystemUpdateInstallerHostPowerShellTests
 {
+    /// <summary>Where Windows PowerShell sits, relative to the system directory.</summary>
+    private static string WindowsPowerShellPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.System),
+        "WindowsPowerShell",
+        "v1.0",
+        "powershell.exe");
+
     [Fact]
     public void ResolvePowerShellExecutable_NamesTheHostEveryWindowsCarries()
     {
         var host = new SystemUpdateInstallerHost();
 
-        Assert.Equal("powershell.exe", host.ResolvePowerShellExecutable());
+        Assert.Equal(WindowsPowerShellPath, host.ResolvePowerShellExecutable(), ignoreCase: true);
     }
 
     [Fact]
@@ -66,7 +73,7 @@ public sealed class SystemUpdateInstallerHostPowerShellTests
             {
                 Environment.SetEnvironmentVariable("PATH", probeDirectory);
 
-                Assert.Equal("powershell.exe", host.ResolvePowerShellExecutable());
+                Assert.Equal(WindowsPowerShellPath, host.ResolvePowerShellExecutable(), ignoreCase: true);
             }
             finally
             {

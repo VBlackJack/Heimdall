@@ -156,5 +156,5 @@ public sealed partial class ImportKnownHostsConflictRowViewModel : ObservableObj
     partial void OnReplaceWithImportedChanged(bool value) => OnPropertyChanged(nameof(KeepExisting));
 
     private static string TruncateFingerprint(string fingerprint)
-        => fingerprint.Length <= 16 ? fingerprint : fingerprint[..16] + "…";
+        => fingerprint.Length <= 16 ? fingerprint : fingerprint[..16] + "...";
 }

@@ -29,7 +29,7 @@ namespace Heimdall.App.Converters;
 /// Implements both <see cref="IValueConverter"/> (for legacy single-value bindings)
 /// and <see cref="IMultiValueConverter"/> so XAML can pass a <c>ThemeRevision</c>
 /// trigger as a second value. The trigger forces WPF to re-run the converter on
-/// runtime theme swap — the value itself is ignored.
+/// runtime theme swap - the value itself is ignored.
 /// </remarks>
 public sealed class ResourceKeyToBrushConverter : IValueConverter, IMultiValueConverter
 {

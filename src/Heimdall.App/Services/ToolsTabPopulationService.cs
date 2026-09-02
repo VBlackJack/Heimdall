@@ -600,7 +600,7 @@ public sealed class ToolsTabPopulationService
         }
         content.Children.Add(textStack);
 
-        // Use a bare template so the button has no hover chrome —
+        // Use a bare template so the button has no hover chrome -
         // all visual feedback comes from the outer cardBorder.
         var btnTemplate = new ControlTemplate(typeof(Button));
         var btnPresenter = new FrameworkElementFactory(typeof(ContentPresenter));

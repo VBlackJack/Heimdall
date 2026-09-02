@@ -105,8 +105,8 @@ public static class VaultKeyManager
     /// <param name="storedWrappedDek">The DPAPI-wrapped envelope string from storage.</param>
     /// <returns>The recovered DEK in a pinned holder; the caller owns and disposes it.</returns>
     /// <exception cref="VaultUnlockException">
-    /// Thrown on ANY failure — DPAPI failure, envelope decode failure, or AEAD
-    /// tag mismatch — with a single generic message, so a wrong password and a
+    /// Thrown on ANY failure - DPAPI failure, envelope decode failure, or AEAD
+    /// tag mismatch - with a single generic message, so a wrong password and a
     /// corrupted vault are indistinguishable.
     /// </exception>
     public static VaultDekHolder UnwrapDek(ReadOnlySpan<byte> masterPassword, string storedWrappedDek)

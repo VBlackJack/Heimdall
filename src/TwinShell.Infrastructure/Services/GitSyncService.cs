@@ -88,8 +88,8 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
     /// <summary>
     /// Imports the YAML tree into the database through a fresh DI scope.
     /// <see cref="ISyncService"/> is scoped (it depends on the per-request
-    /// <c>DbContext</c> and repositories); resolving it here — rather than
-    /// holding it in a field on this singleton — avoids a captive dependency
+    /// <c>DbContext</c> and repositories); resolving it here - rather than
+    /// holding it in a field on this singleton - avoids a captive dependency
     /// that would pin one <c>DbContext</c> for the whole application lifetime.
     /// </summary>
     private async Task<SyncImportResult> ImportFromYamlAsync(string localPath, CancellationToken cancellationToken)

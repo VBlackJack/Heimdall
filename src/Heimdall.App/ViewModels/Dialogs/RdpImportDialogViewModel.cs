@@ -309,6 +309,7 @@ public partial class RdpImportRowViewModel : ObservableObject
         ParseErrorMessage = previewEntry.ParseErrorMessage;
         HasNameConflict = previewEntry.HasNameConflict;
         ConflictingExistingName = previewEntry.ConflictingExistingName;
+        Gateway = previewEntry.Candidate.RdpGateway;
         UnknownKeyCount = previewEntry.UnknownKeyCount;
         HasSkippedMappings = previewEntry.SkippedMappings.Count > 0;
         IsSelected = !previewEntry.HasParseError;
@@ -337,6 +338,14 @@ public partial class RdpImportRowViewModel : ObservableObject
 
     public string? ConflictingExistingName { get; }
 
+    /// <summary>
+    /// Gateway the import would commit. It routes the session and its credential exchange, so the
+    /// row states it instead of letting it reach the profile unseen.
+    /// </summary>
+    public string? Gateway { get; }
+
+    public bool HasGateway => !string.IsNullOrWhiteSpace(Gateway);
+
     public int UnknownKeyCount { get; }
 
     public bool HasUnknownKeys => UnknownKeyCount > 0;
@@ -352,6 +361,8 @@ public partial class RdpImportRowViewModel : ObservableObject
     public string UnknownKeysText => _localizer.Format("DialogImportRdpStatusUnknownKeys", UnknownKeyCount);
 
     public string SkippedMappingsText => _localizer["DialogImportRdpStatusPartialMapping"];
+
+    public string GatewayText => _localizer.Format("DialogImportRdpStatusGateway", Gateway ?? string.Empty);
 
     public string ConflictAccessibleName => _localizer.Format("A11yRdpImportConflictForName", ProposedName);
 
@@ -374,6 +385,11 @@ public partial class RdpImportRowViewModel : ObservableObject
             if (HasNameConflict)
             {
                 segments.Add(ConflictText);
+            }
+
+            if (HasGateway)
+            {
+                segments.Add(GatewayText);
             }
 
             if (HasUnknownKeys)

@@ -46,7 +46,7 @@ public interface IConfigManager
     /// <summary>
     /// Performs first-run initialization: creates directories,
     /// copies default files if runtime files are missing, and sets file/directory ACLs.
-    /// ACL enforcement is fail-closed during initialization — if ACLs cannot be
+    /// ACL enforcement is fail-closed during initialization - if ACLs cannot be
     /// applied to sensitive directories, the error is logged but initialization
     /// proceeds (config may be on a non-NTFS filesystem).
     /// </summary>

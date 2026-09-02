@@ -210,7 +210,7 @@ public static class KnowledgeBaseManager
         {
             // Check if the host was scanned recently (use LastSeen as proxy for
             // "UDP probes were attempted but returned null"). If the host was seen
-            // within the UDP TTL window, the null result is still valid — the host
+            // within the UDP TTL window, the null result is still valid - the host
             // simply doesn't respond to UDP probes and re-probing won't help.
             return IsFresh(host.LastSeen, ttl.UdpProbeHours);
         }

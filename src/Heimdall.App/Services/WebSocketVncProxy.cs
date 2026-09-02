@@ -102,7 +102,7 @@ public sealed class WebSocketVncProxy : IDisposable
                 }
 
                 // Validate Origin to prevent Cross-Site WebSocket Hijacking (CSWSH).
-                // Parse the URI and compare scheme + host exactly — StartsWith would allow
+                // Parse the URI and compare scheme + host exactly - StartsWith would allow
                 // subdomain bypasses such as "https://heimdall-vnc.local.attacker.tld".
                 var origin = context.Request.Headers["Origin"];
                 if (!IsAllowedOrigin(origin))

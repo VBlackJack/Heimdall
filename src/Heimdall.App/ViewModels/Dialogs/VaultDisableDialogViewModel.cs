@@ -85,7 +85,7 @@ public partial class VaultDisableDialogViewModel : ObservableObject
             }
             catch (VaultUnlockException)
             {
-                // Wrong password (or corruption) — single generic message.
+                // Wrong password (or corruption) - single generic message.
                 ErrorMessage = _localizer.GetString("VaultUnlockError");
             }
             catch (Exception ex)

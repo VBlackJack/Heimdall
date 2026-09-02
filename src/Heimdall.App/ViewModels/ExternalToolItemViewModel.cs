@@ -41,5 +41,5 @@ public partial class ExternalToolItemViewModel : ObservableValidator
 
     public bool IsValid => !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(ExecutablePath);
 
-    public string DisplayText => $"{Name} — {ExecutablePath}";
+    public string DisplayText => $"{Name} - {ExecutablePath}";
 }

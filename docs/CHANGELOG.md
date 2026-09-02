@@ -12,6 +12,65 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-09-02: the RDP audit
+
+Sixty-one findings on the Remote Desktop surface, each read a second time by an adversarial
+pass whose job was to refute it before a line was written. Eight did not survive that reading.
+Fifty-seven are fixed here, along with fourteen more the fix pass turned up on contact; four
+stay open because each needs a decision rather than a fix.
+
+### Two defects, one shape
+
+The control pool reuses one MsTscAx instance between sessions. Every Apply*Settings method
+wrote conditionally - only when the incoming profile named a value - and ResetForReuse cleared
+Heimdall's own session model but never the control's properties. So whatever a profile left
+blank was inherited from the session before it. A profile with no RD Gateway was tunnelled
+through the previous profile's and presented its credentials to it. A profile with no username
+connected as the previous user, which submits one account's password against another. USB
+redirection was only ever written true. An empty monitor selection wrote nothing at all.
+
+The second is the mirror image in the import path. ServerProfileDto.RdpUseGlobalDefaults
+defaults to true and neither the .rdp importer nor the mRemoteNG importer ever cleared it, so
+every per-profile setting they mapped was read, shown in the preview, and then discarded at
+connect time. The flag is now cleared when, and only when, the source carried at least one
+per-profile setting: a bare file that names an address still follows the global defaults.
+
+### A guard that could not fail
+
+The locale guard's allow-list explicitly permitted the em dash, the guillemets, the curly
+apostrophe, the one-character ellipsis, the non-breaking space and the oe ligature - the exact
+characters the project rule bans. The documentation guard reads only Markdown. Nothing read the
+C# and XAML sources at all.
+
+Counted once, by decoding what a reader sees rather than scanning raw bytes, there were 1139
+occurrences. Four earlier counts in this campaign gave 8, 13, 20 and 22: none of them read
+XAML, none read the libraries, and a raw byte scan of en.json sees 11 of its 121 em dashes
+because the other 110 are \u escapes. The new guard carries a refusal table with an ASCII
+remedy per character, sweeps the locale values and every source and XAML file recursively, and
+asserts separately that the sweep reaches a subdirectory.
+
+### One fix that was nineteen
+
+mstsc.exe was started by bare filename with UseShellExecute false and no working directory.
+CreateProcess resolves an unqualified name by searching the application directory and the
+current directory before the system directory. Widening the sweep found eighteen more, three of
+them outside the original census: the update relauncher, which goes on to replace the installed
+binaries and had explicitly documented that it no longer depended on PATH; the TwinShell command
+host; and a service action launched elevated. Shell execution skips the PATH search but still
+resolves an unqualified name against the current directory, which is exactly where an elevated
+launch matters.
+
+### What is still open
+
+The certificate gate exists only on the embedded path, so a Force-External launch stages a
+credential and starts mstsc.exe with no check - closing that means a new refusal contract.
+A certificate trust decision persists across restarts and cannot be viewed or revoked from the
+application. The long connect budget protects the autofill retry at the cost of failing fast,
+which is a choice between two things a user wants. And the configurable-shortcut path in the
+keyboard hook is wired to nothing, so deleting it or connecting it is a product call rather
+than a fix - it has no user-visible effect today, which is why it was not guessed at.
+The documentation no longer claims otherwise on any of them.
+
 ## 2026-09-01 (second release of the day): the rest of the UX audit, and nineteen decisions
 
 The previous entry covered the two defects that destroyed work. This one covers everything else

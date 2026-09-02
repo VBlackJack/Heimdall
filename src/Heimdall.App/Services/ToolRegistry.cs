@@ -134,7 +134,7 @@ public sealed class ToolRegistry
     /// <summary>
     /// Registers external tools detected by <see cref="ExternalToolProviderService"/>.
     /// Merges them into the <see cref="All"/> list under the External category.
-    /// Thread-safe — can be called from a background scan thread.
+    /// Thread-safe - can be called from a background scan thread.
     /// </summary>
     public void RegisterExternalTools(
         IReadOnlyList<Core.Configuration.ExternalToolInfo> tools)
@@ -151,7 +151,7 @@ public sealed class ToolRegistry
                     Id: id,
                     Category: ToolCategory.External,
                     CategoryLabelKey: "ToolCategoryExternal",
-                    LabelKey: tool.Name, // Direct name (not i18n key) — external tools have static names
+                    LabelKey: tool.Name, // Direct name (not i18n key) - external tools have static names
                     LabelWithArgKey: null,
                     CommandPrefixes: [tool.Id.ToLowerInvariant(), tool.Name.ToLowerInvariant().Replace(" ", "")],
                     IsNetworkTool: false,
@@ -181,7 +181,7 @@ public sealed class ToolRegistry
 
     /// <summary>
     /// Looks up a tool by its short ID (e.g. "PING") or external ID (e.g. "EXT:SYSINTERNALS:PSEXEC").
-    /// Also accepts the prefixed form "TOOL:PING" — the prefix is stripped automatically.
+    /// Also accepts the prefixed form "TOOL:PING" - the prefix is stripped automatically.
     /// </summary>
     public ToolDescriptor? GetById(string toolId)
     {

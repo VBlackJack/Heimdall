@@ -181,7 +181,7 @@ public static class HmacIntegrity
                     "HMAC verification failed: data integrity compromised.");
             }
 
-            // HMAC verified — decrypt with DPAPI
+            // HMAC verified - decrypt with DPAPI
             decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(decrypted);
         }
