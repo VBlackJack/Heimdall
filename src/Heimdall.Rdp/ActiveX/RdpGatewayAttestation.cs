@@ -70,12 +70,28 @@ internal static class RdpGatewayAttestation
     private const int GatewayProfileUsageMethod = 1;
     private const int GatewayCredsSource = 0;
 
+    /// <summary>TSC_PROXY_MODE_NONE_DIRECT: connect to the server without a gateway.</summary>
+    private const int DirectUsageMethod = 0;
+
+    /// <summary>The gateway profile the control uses when no gateway is configured.</summary>
+    private const int DirectProfileUsageMethod = 0;
+
+    /// <summary>
+    /// Writes the route the profile asked for onto the control, and proves the control took it.
+    /// </summary>
+    /// <remarks>
+    /// A profile that names no gateway is asking for a direct connection, which is an instruction
+    /// and not an absence of one. The control is pooled, so a gateway written by one session
+    /// stays on it until another session overwrites it: leaving the properties alone hands the
+    /// next profile the previous profile's route, and its credentials with it.
+    /// </remarks>
     internal static void Apply(
         string? gatewayHost,
         IRdpGatewayTransportSettings? settings)
     {
         if (string.IsNullOrWhiteSpace(gatewayHost))
         {
+            ApplyDirect(settings);
             return;
         }
 
@@ -89,11 +105,48 @@ internal static class RdpGatewayAttestation
             throw CreateFailure(gatewayHost, RdpGatewayAttestationStep.SettingsAvailability);
         }
 
+        WriteAndAttest(
+            settings,
+            gatewayHost,
+            expectedHostname: gatewayHost,
+            expectedUsageMethod: GatewayUsageMethod,
+            expectedProfileUsageMethod: GatewayProfileUsageMethod);
+    }
+
+    /// <summary>
+    /// Writes "no gateway" as positively as a gateway is written, and fails when one survives it.
+    /// </summary>
+    /// <param name="settings">
+    /// The control's transport settings, or null when the control exposes none - in which case
+    /// there is nowhere a gateway could have been written either, and nothing to undo.
+    /// </param>
+    private static void ApplyDirect(IRdpGatewayTransportSettings? settings)
+    {
+        if (settings is null)
+        {
+            return;
+        }
+
+        WriteAndAttest(
+            settings,
+            gatewayHost: string.Empty,
+            expectedHostname: string.Empty,
+            expectedUsageMethod: DirectUsageMethod,
+            expectedProfileUsageMethod: DirectProfileUsageMethod);
+    }
+
+    private static void WriteAndAttest(
+        IRdpGatewayTransportSettings settings,
+        string gatewayHost,
+        string expectedHostname,
+        int expectedUsageMethod,
+        int expectedProfileUsageMethod)
+    {
         try
         {
-            settings.GatewayHostname = gatewayHost;
-            settings.GatewayUsageMethod = GatewayUsageMethod;
-            settings.GatewayProfileUsageMethod = GatewayProfileUsageMethod;
+            settings.GatewayHostname = expectedHostname;
+            settings.GatewayUsageMethod = expectedUsageMethod;
+            settings.GatewayProfileUsageMethod = expectedProfileUsageMethod;
             settings.GatewayCredsSource = GatewayCredsSource;
         }
         catch (Exception ex)
@@ -107,7 +160,7 @@ internal static class RdpGatewayAttestation
         int readCredsSource;
         try
         {
-            readGatewayHost = settings.GatewayHostname;
+            readGatewayHost = settings.GatewayHostname ?? string.Empty;
             readUsageMethod = Convert.ToInt32(settings.GatewayUsageMethod, CultureInfo.InvariantCulture);
             readProfileUsageMethod = Convert.ToInt32(
                 settings.GatewayProfileUsageMethod,
@@ -120,17 +173,17 @@ internal static class RdpGatewayAttestation
         }
 
         List<RdpGatewayAttestationProperty> divergentProperties = [];
-        if (!string.Equals(readGatewayHost, gatewayHost, StringComparison.Ordinal))
+        if (!string.Equals(readGatewayHost, expectedHostname, StringComparison.Ordinal))
         {
             divergentProperties.Add(RdpGatewayAttestationProperty.GatewayHostname);
         }
 
-        if (readUsageMethod != GatewayUsageMethod)
+        if (readUsageMethod != expectedUsageMethod)
         {
             divergentProperties.Add(RdpGatewayAttestationProperty.GatewayUsageMethod);
         }
 
-        if (readProfileUsageMethod != GatewayProfileUsageMethod)
+        if (readProfileUsageMethod != expectedProfileUsageMethod)
         {
             divergentProperties.Add(RdpGatewayAttestationProperty.GatewayProfileUsageMethod);
         }
@@ -142,7 +195,10 @@ internal static class RdpGatewayAttestation
 
         if (divergentProperties.Count > 0)
         {
-            throw RdpGatewayAttestationException.ForComparison(gatewayHost, divergentProperties);
+            // On a failed clear the requested host is empty, so the message names the gateway
+            // that survived instead: that is the one a reader needs.
+            string reportedHost = gatewayHost.Length == 0 ? readGatewayHost : gatewayHost;
+            throw RdpGatewayAttestationException.ForComparison(reportedHost, divergentProperties);
         }
     }
 

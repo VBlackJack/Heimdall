@@ -20,17 +20,51 @@ namespace Heimdall.Rdp.Tests;
 
 public sealed class RdpGatewayAttestationTests
 {
+    /// <summary>
+    /// A blank gateway is an instruction to connect directly, so it is written and attested like
+    /// any other route.
+    /// </summary>
+    /// <remarks>
+    /// This test used to assert the opposite - that a blank gateway touched nothing - which is
+    /// exactly the defect: the control is pooled, so the settings a blank gateway left alone were
+    /// the previous session's gateway, and the next profile was routed through it.
+    /// </remarks>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Apply_BlankGateway_DoesNotTouchSettings(string? gatewayHost)
+    public void Apply_BlankGateway_WritesTheDirectRoute(string? gatewayHost)
     {
-        var settings = new FakeSettings { ThrowOnAccess = true };
+        var settings = new FakeSettings();
+        RdpGatewayAttestation.Apply("gateway.example.com", settings);
 
         RdpGatewayAttestation.Apply(gatewayHost, settings);
 
-        Assert.Equal(0, settings.AccessCount);
+        Assert.Equal(string.Empty, settings.WrittenGatewayHostname);
+        Assert.Equal(0, Convert.ToInt32(settings.WrittenGatewayUsageMethod));
+        Assert.Equal(0, Convert.ToInt32(settings.WrittenGatewayProfileUsageMethod));
+        Assert.Equal(0, Convert.ToInt32(settings.WrittenGatewayCredsSource));
+    }
+
+    /// <summary>
+    /// A control that exposes no transport settings has nowhere a gateway could have been
+    /// written, so the direct case stays silent instead of failing every direct connection.
+    /// </summary>
+    [Fact]
+    public void Apply_BlankGatewayWithNullSettings_DoesNothing()
+    {
+        RdpGatewayAttestation.Apply(gatewayHost: null, settings: null);
+    }
+
+    [Fact]
+    public void Apply_BlankGateway_WriteThrows_ThrowsWriteFailure()
+    {
+        var settings = new FakeSettings { ThrowOnWrite = true };
+
+        RdpGatewayAttestationException exception = Assert.Throws<RdpGatewayAttestationException>(
+            () => RdpGatewayAttestation.Apply(string.Empty, settings));
+
+        Assert.Equal(RdpGatewayAttestationStep.SettingsWrite, exception.Step);
     }
 
     [Fact]

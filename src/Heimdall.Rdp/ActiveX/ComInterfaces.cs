@@ -80,6 +80,96 @@ internal interface IMsRdpClientNonScriptable5
 {
 }
 
+// The seams below stand between the host and the late-bound parts of the control that a pooled
+// instance carries from one session to the next. They exist so the rule those writes obey can be
+// asserted without a COM apartment: every profile-driven setting is written on every connect,
+// including when the profile asks for the default, because a value that is only ever written when
+// it is set is a value the next session inherits without ever asking for it.
+
+/// <summary>
+/// The logon identity the control presents to the server.
+/// </summary>
+internal interface IRdpIdentitySettings
+{
+    string UserName { get; set; }
+
+    string Domain { get; set; }
+}
+
+/// <summary>
+/// Late-bound <c>UserName</c> and <c>Domain</c> on the MsTscAx control itself.
+/// </summary>
+internal sealed class DynamicRdpIdentitySettings : IRdpIdentitySettings
+{
+    private readonly dynamic _ocx;
+
+    internal DynamicRdpIdentitySettings(object ocx)
+    {
+        _ocx = ocx;
+    }
+
+    public string UserName
+    {
+        get => _ocx.UserName;
+        set => _ocx.UserName = value;
+    }
+
+    public string Domain
+    {
+        get => _ocx.Domain;
+        set => _ocx.Domain = value;
+    }
+}
+
+/// <summary>
+/// PnP and USB device redirection, carried by the advanced settings of the control.
+/// </summary>
+internal interface IRdpDeviceRedirectionSettings
+{
+    bool RedirectDevices { get; set; }
+}
+
+/// <summary>
+/// Late-bound <c>RedirectDevices</c> on <c>IMsRdpClientAdvancedSettings</c>.
+/// </summary>
+internal sealed class DynamicRdpDeviceRedirectionSettings : IRdpDeviceRedirectionSettings
+{
+    private readonly dynamic _advancedSettings;
+
+    internal DynamicRdpDeviceRedirectionSettings(object advancedSettings)
+    {
+        _advancedSettings = advancedSettings;
+    }
+
+    public bool RedirectDevices
+    {
+        get => _advancedSettings.RedirectDevices;
+        set => _advancedSettings.RedirectDevices = value;
+    }
+}
+
+/// <summary>
+/// The <c>MsRdpClientShell</c> property bag, which carries the .rdp-file settings that have no
+/// COM property of their own.
+/// </summary>
+internal interface IRdpClientShellWriter
+{
+    /// <summary>Writes one .rdp property; returns false when the control refused it.</summary>
+    bool TrySetRdpProperty(string propertyName, object value);
+}
+
+/// <summary>
+/// The half of the control a resolved display context has to be pushed onto.
+/// </summary>
+/// <remarks>
+/// Smart sizing is live-mutable and the display resolver flips it on a fullscreen toggle, so
+/// remembering the resolved value is not the same as applying it.
+/// </remarks>
+internal interface IRdpDisplayContextSink
+{
+    void SetSmartSizing(bool enabled);
+}
+
 /// <summary>
 /// COM event source interface for MsTscAx ActiveX control.
 /// </summary>

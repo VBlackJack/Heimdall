@@ -35,10 +35,10 @@ namespace Heimdall.Rdp.ActiveX;
 /// <see cref="IRdpSession"/> for a clean abstraction layer.
 ///
 /// IMPORTANT: Do NOT call <see cref="AttachEventSink"/> from the
-/// <see cref="AxHost.CreateSink"/> override — this causes hangs in non-STA
+/// <see cref="AxHost.CreateSink"/> override - this causes hangs in non-STA
 /// contexts (e.g., unit tests). Call it explicitly after the handle is created.
 /// </summary>
-public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
+public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDisplayContextSink
 {
     // MsTscAx ActiveX control CLSID. The registry names this coclass
     // "Microsoft RDP Client Control - version 2" (ProgID MsTscAx.MsTscAx.2); newer
@@ -52,6 +52,17 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
     /// decodes and presents through the graphics adapter.
     /// </summary>
     private const string HardwareModeProperty = "EnableHardwareMode";
+
+    /// <summary>
+    /// Name of the <c>MsRdpClientShell</c> .rdp property carrying the monitor selection.
+    /// </summary>
+    private const string SelectedMonitorsProperty = "selectedmonitors";
+
+    /// <summary>
+    /// Name of the advanced setting carrying PnP and USB device redirection, used for logging
+    /// when the control refuses it.
+    /// </summary>
+    private const string RedirectDevicesProperty = "RedirectDevices";
 
     private static readonly Guid IidMsRdpExtendedSettings = new("302D8188-0052-4807-806A-362B628F9AC5");
     private static readonly Guid IidMsRdpClientNonScriptable5 = new("4F6996D5-D7B1-412C-B0FF-063718566907");
@@ -601,7 +612,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
             var ocx = GetOcx();
             if (ocx is null)
             {
-                LastError = "GetOcx() returned null — connection point not available for event sink";
+                LastError = "GetOcx() returned null - connection point not available for event sink";
                 Core.Logging.FileLogger.Warn("RdpActiveXHost.AttachEventSink failed: GetOcx returned null");
                 return false;
             }
@@ -651,7 +662,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
     {
         try
         {
-            var ocx = GetOcx();
+            // The cached instance, not GetOcx(): teardown destroys the handle before the control
+            // is released for reuse, and the password still has to be reachable after that.
+            var ocx = GetActiveXInstance();
             if (ocx is null)
             {
                 LastError = "GetOcx() returned null";
@@ -1350,6 +1363,23 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         }
     }
 
+    /// <summary>
+    /// Writes PnP and USB device redirection onto the control.
+    /// </summary>
+    /// <remarks>
+    /// Written on every connect, including when the profile asks for no redirection: the header
+    /// strip states the profile's own answer, so a control that silently kept the previous
+    /// session's answer makes the indicator lie about what the session is exposing.
+    /// </remarks>
+    internal static void ApplyDeviceRedirection(
+        IRdpDeviceRedirectionSettings settings,
+        bool usbRedirectionEnabled)
+    {
+        TrySetDynamic(
+            RedirectDevicesProperty,
+            () => settings.RedirectDevices = usbRedirectionEnabled);
+    }
+
     private int ReadExtendedDisconnectReason()
     {
         object? ocx = GetActiveXInstance();
@@ -1418,15 +1448,37 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         }
     }
 
-    private static bool TrySetSelectedMonitors(object ocx, IReadOnlyList<int> selectedMonitorIndices)
+    /// <summary>
+    /// Writes the monitor selection through the client shell property bag.
+    /// </summary>
+    /// <remarks>
+    /// An empty selection is an instruction - "every monitor" - and not an absence of one. A
+    /// pooled control keeps the list the previous session wrote, so the empty case has to be
+    /// stated rather than skipped, or the next profile spans whichever monitors the last one
+    /// picked while the desktop is sized for all of them.
+    /// </remarks>
+    internal static bool ApplySelectedMonitors(
+        IRdpClientShellWriter shell,
+        IReadOnlyList<int> selectedMonitorIndices)
     {
-        if (selectedMonitorIndices.Count == 0)
+        string selectedMonitors = string.Join(',', selectedMonitorIndices);
+        return shell.TrySetRdpProperty(SelectedMonitorsProperty, selectedMonitors);
+    }
+
+    /// <summary>
+    /// Writes one <c>MsRdpClientShell</c> .rdp property on the live control.
+    /// </summary>
+    private sealed class DynamicRdpClientShellWriter : IRdpClientShellWriter
+    {
+        private readonly object _ocx;
+
+        internal DynamicRdpClientShellWriter(object ocx)
         {
-            return false;
+            _ocx = ocx;
         }
 
-        string selectedMonitors = string.Join(',', selectedMonitorIndices);
-        return TrySetClientShellRdpProperty(ocx, "selectedmonitors", selectedMonitors);
+        public bool TrySetRdpProperty(string propertyName, object value)
+            => TrySetClientShellRdpProperty(_ocx, propertyName, value);
     }
 
     private static bool TrySetClientShellRdpProperty(object ocx, string propertyName, object value)
@@ -1714,14 +1766,11 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
                 };
             }
 
-            _session.Width = effectiveContext.Width;
-            _session.Height = effectiveContext.Height;
-            _session.DesktopScaleFactor = effectiveContext.DesktopScaleFactor;
-            _session.DeviceScaleFactor = effectiveContext.DeviceScaleFactor;
-            _session.DpiScaleX = hostContext.DesktopDpiScale;
-            _session.DpiScaleY = hostContext.DesktopDpiScale;
-            InitialSmartSizing = effectiveContext.SmartSizingEnabled;
-            _session.Redirections.MultiMonitor = effectiveContext.MultiMonitorEnabled;
+            AdoptResolvedDisplayContext(
+                _session,
+                effectiveContext,
+                hostContext.DesktopDpiScale,
+                this);
 
             Core.Logging.FileLogger.Info(
                 $"RDP display mode: configured={effectiveContext.ConfiguredMode} effective={effectiveContext.EffectiveMode} {effectiveContext.Width}x{effectiveContext.Height} dpi={effectiveContext.DesktopScaleFactor}/{effectiveContext.DeviceScaleFactor} smartSizing={effectiveContext.SmartSizingEnabled} multimon={effectiveContext.MultiMonitorEnabled} reason={effectiveContext.Reason}");
@@ -1735,6 +1784,31 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
                 ex);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Copies a resolved display context onto the session and pushes onto the control the part of
+    /// it the control has to be told about.
+    /// </summary>
+    /// <remarks>
+    /// Smart sizing is the one resolved value that is live-mutable, and the resolver flips it on a
+    /// fullscreen toggle. Remembering it is not applying it: a control that is never told keeps
+    /// scaling the desktop while the log line below says it does not.
+    /// </remarks>
+    internal static void AdoptResolvedDisplayContext(
+        RdpSessionState session,
+        EffectiveDisplayContext effectiveContext,
+        double hostDpiScale,
+        IRdpDisplayContextSink sink)
+    {
+        session.Width = effectiveContext.Width;
+        session.Height = effectiveContext.Height;
+        session.DesktopScaleFactor = effectiveContext.DesktopScaleFactor;
+        session.DeviceScaleFactor = effectiveContext.DeviceScaleFactor;
+        session.DpiScaleX = hostDpiScale;
+        session.DpiScaleY = hostDpiScale;
+        session.Redirections.MultiMonitor = effectiveContext.MultiMonitorEnabled;
+        sink.SetSmartSizing(effectiveContext.SmartSizingEnabled);
     }
 
     private HostDisplayContext BuildHostDisplayContext()
@@ -1897,23 +1971,30 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
 
     private void ApplyCredentialSettings(object ocx)
     {
-        dynamic ax = ocx;
-
-        if (!string.IsNullOrWhiteSpace(_session.Username))
-        {
-            ax.UserName = _session.Username;
-        }
-
-        if (!string.IsNullOrWhiteSpace(_session.Domain))
-        {
-            ax.Domain = _session.Domain;
-        }
+        ApplyIdentitySettings(new DynamicRdpIdentitySettings(ocx), _session.Username, _session.Domain);
 
         // Password must be set via IMsTscNonScriptable, not via IDispatch
         if (_session.Password is not null)
         {
             SetClearTextPassword(_session.Password);
         }
+    }
+
+    /// <summary>
+    /// Writes the logon identity onto the control, including when the profile names none.
+    /// </summary>
+    /// <remarks>
+    /// The same rule as PerformanceFlags: an identity that is only written when the profile
+    /// carries one is an identity a pooled control inherits from the session before it, and the
+    /// next profile then authenticates as somebody it never named.
+    /// </remarks>
+    internal static void ApplyIdentitySettings(
+        IRdpIdentitySettings settings,
+        string? username,
+        string? domain)
+    {
+        settings.UserName = username ?? string.Empty;
+        settings.Domain = domain ?? string.Empty;
     }
 
     private void ApplyDisplaySettings(object ocx)
@@ -1936,9 +2017,15 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
     /// pool cannot inherit the choice made by the session before it.
     /// </remarks>
     private void ApplyPresenterSettings(object extendedSettings)
-    {
-        bool hardwareAcceleration = _session.Redirections.HardwareAcceleration;
+        => ApplyPresenterSettings(extendedSettings, _session.Redirections.HardwareAcceleration);
 
+    /// <summary>
+    /// Writes the presenter switch that decides whether the control decodes through the graphics
+    /// adapter, and reports whether the control accepted it.
+    /// </summary>
+    /// <returns>True when the control took the value.</returns>
+    internal static bool ApplyPresenterSettings(object extendedSettings, bool hardwareAcceleration)
+    {
         // The property is VT_BOOL; a numeric variant is answered with E_FAIL.
         bool applied = TrySetExtendedSettingBoolean(
             extendedSettings, HardwareModeProperty, hardwareAcceleration);
@@ -1952,6 +2039,8 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
                 $"RdpActiveXHost presenter fallback: {HardwareModeProperty} could not be written; " +
                 "the MsTscAx default remains in effect for this session.");
         }
+
+        return applied;
     }
 
     private void ApplyDisplayScaleSettings(object ocx)
@@ -2048,10 +2137,10 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         }
 
         // USB / PnP device redirection
-        if (_session.Redirections.Usb)
-        {
-            TrySetDynamic("RedirectDevices", () => adv.RedirectDevices = true);
-        }
+        object advancedSettings = adv;
+        ApplyDeviceRedirection(
+            new DynamicRdpDeviceRedirectionSettings(advancedSettings),
+            _session.Redirections.Usb);
 
         // NOTE: Webcam (camerastoredirect) requires IMsRdpClientNonScriptable7
         // CameraRedirConfigCollection which is not available via simple IDispatch.
@@ -2060,7 +2149,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         // NOTE: DynamicResolution is handled at the view layer via UpdateResolution()
         // after connect, not via a COM property on the ActiveX control.
 
-        // Allow background input — CRITICAL for anti-idle on background tabs.
+        // Allow background input - CRITICAL for anti-idle on background tabs.
         // Without this, the RDP ActiveX control discards PostMessage input
         // when it does not have focus, silently breaking anti-idle.
         TrySetDynamic("allowBackgroundInput", () => adv.allowBackgroundInput = 1);
@@ -2084,11 +2173,11 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
 
         // Multi-monitor is a pre-Connect nonscriptable setting. Runtime changes require reconnect.
         TrySetUseMultimon(ocx, _session.Redirections.MultiMonitor);
-        if (_session.Redirections.MultiMonitor && _session.ResolutionMode == RdpResolutionMode.Multimon)
-        {
-            var selectedMonitorIndices = ResolvePendingSelectedMonitorIndices();
-            TrySetSelectedMonitors(ocx, selectedMonitorIndices);
-        }
+        IReadOnlyList<int> selectedMonitorIndices =
+            _session.Redirections.MultiMonitor && _session.ResolutionMode == RdpResolutionMode.Multimon
+                ? ResolvePendingSelectedMonitorIndices()
+                : [];
+        ApplySelectedMonitors(new DynamicRdpClientShellWriter(ocx), selectedMonitorIndices);
 
         // Suppress the UDP probe: disable bandwidth auto-detection (which uses UDP probes)
         // and set an explicit network type so the client does not attempt UDP transport.
@@ -2098,20 +2187,25 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         if (_session.Redirections.DisableUdp)
         {
             TrySetDynamic("DisableUdp BandwidthDetection", () => adv.BandwidthDetection = false);
-            TrySetDynamic("DisableUdp NetworkConnectionType", () => adv.NetworkConnectionType = 6); // LAN — no probing needed
+            TrySetDynamic("DisableUdp NetworkConnectionType", () => adv.NetworkConnectionType = 6); // LAN - no probing needed
         }
 
         ApplyGatewaySettings(ocx);
     }
 
+    /// <summary>
+    /// Puts the profile's route onto the control: its RD Gateway, or the direct route when it
+    /// names none.
+    /// </summary>
+    /// <remarks>
+    /// The direct case is a write and not a skip. A pooled control keeps the gateway of the
+    /// session before it, so a profile that never named one would otherwise be tunnelled through
+    /// it, and its credentials presented to it.
+    /// </remarks>
     private void ApplyGatewaySettings(object ocx)
     {
         string? gateway = _session.Redirections.GatewayHostname;
-        if (string.IsNullOrWhiteSpace(gateway))
-        {
-            // No gateway configured — leave MsTscAx at its default (direct).
-            return;
-        }
+        bool hasGateway = !string.IsNullOrWhiteSpace(gateway);
 
         object? transport;
         try
@@ -2121,8 +2215,17 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
         }
         catch (Exception ex)
         {
+            if (!hasGateway)
+            {
+                // Nothing asked for a gateway and the property one would have been written
+                // through is out of reach, so there is nothing on the control to undo.
+                Core.Logging.FileLogger.Info(
+                    $"RdpActiveXHost.ApplyGatewaySettings: TransportSettings unavailable on a direct profile: {ex.Message}");
+                return;
+            }
+
             throw new RdpGatewayAttestationException(
-                gateway,
+                gateway!,
                 RdpGatewayAttestationStep.SettingsAvailability,
                 ex);
         }
@@ -2132,7 +2235,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
             : new DynamicRdpGatewayTransportSettings(transport);
         RdpGatewayAttestation.Apply(gateway, settings);
         Core.Logging.FileLogger.Info(
-            $"RdpActiveXHost.ApplyGatewaySettings: RD Gateway attested host={gateway}");
+            hasGateway
+                ? $"RdpActiveXHost.ApplyGatewaySettings: RD Gateway attested host={gateway}"
+                : "RdpActiveXHost.ApplyGatewaySettings: direct route attested, the profile names no RD Gateway");
     }
 
     #endregion
@@ -2166,14 +2271,14 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
             StopPostConnectStripTimerOnUiThread("ResetForReuse");
             DetachEventSink();
             ClearEventSubscribers();
-            ClearRemoteCredential();
 
-            _session.Reset();
-            InitialSmartSizing = DefaultInitialSmartSizing;
-            CancelAutoReconnect = false;
-            IsConnected = false;
-            LastError = null;
-            LastExtendedDisconnectReason = NoExtendedDisconnectReason;
+            if (!TryCompleteResetForReuse(ClearRemoteCredential, ResetSessionForReuse))
+            {
+                IsReusable = false;
+                Core.Logging.FileLogger.Warn(
+                    "RdpActiveXHost.ResetForReuse: the control's password could not be overwritten, it will not be reused");
+                return false;
+            }
 
             Core.Logging.FileLogger.Info("RdpActiveXHost.ResetForReuse: control returned to a reusable state");
             return true;
@@ -2185,6 +2290,41 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
                 $"RdpActiveXHost.ResetForReuse failed, control will not be reused: {ex.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// The reuse decision, held apart from the control so it can be asserted: a control whose
+    /// password could not be overwritten is not handed to another session.
+    /// </summary>
+    /// <param name="clearRemoteCredential">
+    /// Overwrites the password held by the control; false when that could not be established.
+    /// </param>
+    /// <param name="resetSessionState">Restores everything else a new session starts from.</param>
+    /// <returns>True when the control may be reused.</returns>
+    internal static bool TryCompleteResetForReuse(
+        Func<bool> clearRemoteCredential,
+        Action resetSessionState)
+    {
+        if (!clearRemoteCredential())
+        {
+            return false;
+        }
+
+        resetSessionState();
+        return true;
+    }
+
+    /// <summary>
+    /// Restores everything a new session starts from, apart from the credential.
+    /// </summary>
+    private void ResetSessionForReuse()
+    {
+        _session.Reset();
+        InitialSmartSizing = DefaultInitialSmartSizing;
+        CancelAutoReconnect = false;
+        IsConnected = false;
+        LastError = null;
+        LastExtendedDisconnectReason = NoExtendedDisconnectReason;
     }
 
     /// <summary>
@@ -2205,16 +2345,25 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
     /// Overwrites the password held by the control itself. Resetting the pending state is
     /// not enough: the secret was pushed across to the OCX and stays there until replaced.
     /// </summary>
-    private void ClearRemoteCredential()
+    /// <returns>True when the control is known to hold no password any more.</returns>
+    private bool ClearRemoteCredential()
     {
         try
         {
-            _ = SetClearTextPassword(string.Empty);
+            if (GetActiveXInstance() is null)
+            {
+                // No COM instance was ever created on this control, so there is no secret on the
+                // other side of it to overwrite.
+                return true;
+            }
+
+            return SetClearTextPassword(string.Empty);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn(
                 $"RdpActiveXHost.ClearRemoteCredential failed: {ex.Message}");
+            return false;
         }
     }
 
@@ -2235,7 +2384,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost
             }
 
             // Clear our cached reference; let AxHost.Dispose handle COM cleanup.
-            // Do NOT call Marshal.ReleaseComObject here — AxHost holds its own
+            // Do NOT call Marshal.ReleaseComObject here - AxHost holds its own
             // internal reference to the same RCW, and releasing it first causes
             // "COM object separated from its underlying RCW" in base.Dispose().
             _activeX = null;
