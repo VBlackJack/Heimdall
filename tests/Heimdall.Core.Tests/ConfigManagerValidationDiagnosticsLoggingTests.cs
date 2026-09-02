@@ -119,13 +119,25 @@ public sealed class ConfigManagerValidationDiagnosticsLoggingTests
     }
 
     /// <summary>
-    /// The quoted slice is the most severe few, not the first few. Calling them
-    /// "first" tells the reader that the Error the line quotes was the first
-    /// diagnostic in the document and that the ones omitted came after it -
-    /// both of which the severity sort makes untrue.
+    /// What the warning line calls its slice, and nothing about what the slice
+    /// contains.
     /// </summary>
+    /// <remarks>
+    /// <para>Both assertions read the wording of the line: it must say "most
+    /// severe" and must never say "first". Calling them "first" would tell the
+    /// reader that the Error the line quotes was the first diagnostic in the
+    /// document and that the ones omitted came after it, which the severity
+    /// sort makes untrue.</para>
+    /// <para>Which diagnostics actually survive the trim is measured by
+    /// <see cref="AnErrorBehindFiveWarnings_IsStillQuotedInTheWarningLine"/>,
+    /// and that is the test that fails when the severity sort is dropped. This
+    /// one does not move: remove the sort and the line still describes itself
+    /// as the most severe few while quoting by position. Read as a pair - one
+    /// pins the label, the other pins the slice - or the label is taken for the
+    /// measurement.</para>
+    /// </remarks>
     [Fact]
-    public void TheWarningLine_NamesTheQuotedSliceBySeverityNotByPosition()
+    public void TheWarningLine_CallsItsSliceTheMostSevereAndNeverTheFirst()
     {
         List<ValidationDiagnostic> diagnostics =
         [

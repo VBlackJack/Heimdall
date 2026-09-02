@@ -37,10 +37,22 @@ namespace Heimdall.App.Tests;
 /// References are read from the call shapes the source actually uses, not from a
 /// shape invented here: the localizer indexer, a localizer-named delegate or
 /// helper invoked with a literal, <c>GetString</c> / <c>Format</c> on a
-/// localizer, and constants that hold a key. Keys assembled at runtime are the
-/// known false positive, and the literal prefixes they are assembled from are
-/// learned from the source the way <see cref="DeadLocaleKeyGuardTests"/> learns
-/// them.
+/// localizer, the short key-translating helper each view declares for itself,
+/// and constants that hold a key. Keys assembled at runtime are the known false
+/// positive, and the literal prefixes they are assembled from are learned from
+/// the source the way <see cref="DeadLocaleKeyGuardTests"/> learns them.
+/// </para>
+///
+/// <para>
+/// Four of the five original shapes required the identifier at the call site to
+/// contain <c>ocaliz</c>. The single largest family in this repository does not:
+/// 107 files declare a short private helper - <c>L</c>, <c>T</c>, <c>Lk</c>,
+/// <c>L10n</c>, <c>LF</c>, <c>Translate</c>, <c>GetString</c> - and call it with
+/// the key, 42 times in EmbeddedSshView.xaml.cs alone. 1310 keys were reachable
+/// only that way and were invisible to this guard, which could therefore pass
+/// vacuously over the exact idiom it exists to protect: rename such a key in
+/// both catalogues and the panel renders the identifier, because a missing key
+/// falls back to itself.
 /// </para>
 ///
 /// <para>
@@ -60,7 +72,7 @@ public sealed class CSharpLocaleKeyCoverageTests
     // breaks returns far less than its floor rather than passing on an empty
     // set.
     private const int MinExpectedSourceFiles = 1000;
-    private const int MinExpectedKeyReferences = 900;
+    private const int MinExpectedKeyReferences = 2000;
 
     /// <summary>
     /// How each reference was discovered. The rule is carried on the reference
@@ -73,6 +85,7 @@ public sealed class CSharpLocaleKeyCoverageTests
         Indexer,
         LocalizerCall,
         LocalizerMethod,
+        LocalizerHelper,
         KeyHolderClass,
         KeyNamedConstant
     }
@@ -92,6 +105,39 @@ public sealed class CSharpLocaleKeyCoverageTests
     private static readonly Regex s_localizerMethodRegex = new(
         @"[A-Za-z_][A-Za-z0-9_]*ocaliz[A-Za-z0-9_]*\s*\??\.\s*(?:GetString|Format)\s*\(\s*""([A-Za-z0-9_]+)""\s*[,)]",
         RegexOptions.Compiled);
+
+    // The declaration of a key-translating helper, which is how the shortest and
+    // commonest call shape in this repository is found: nothing in "L(...)" says
+    // localization, so the callers cannot be recognised on their own. Matched
+    // here is a method returning string whose FIRST parameter is a string and
+    // whose body hands that same parameter to a localizer - as an indexer
+    // argument or as the first argument of a localizer method. Group 1 is the
+    // helper name, group 2 the parameter, groups 3 and 4 the expression-bodied
+    // and block-bodied forms.
+    private static readonly Regex s_keyHelperDeclarationRegex = new(
+        @"\bstring\??\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*string\??\s+([A-Za-z_][A-Za-z0-9_]*)\s*"
+        + @"(?:\)|,[^()]*\))\s*(?:=>\s*([^;]*);|\{([^{}]*)\})",
+        RegexOptions.Compiled);
+
+    // The narrowing that keeps this rule from swallowing every one-argument
+    // method that happens to mention a localizer. TrustedRdpCertificatesSettings-
+    // ViewModel.Describe(string? value) is the live counter-example: it takes a
+    // string, indexes the localizer, and returns its argument untouched, so its
+    // callers pass values and not keys. Requiring the localizer expression itself
+    // to consume the parameter rejects it, and rejected it when this was measured.
+    private static bool TranslatesItsParameter(string body, string parameterName) =>
+        Regex.IsMatch(
+            body,
+            @"ocaliz[A-Za-z0-9_]*[^;{}]{0,32}?[\[(]\s*" + Regex.Escape(parameterName)
+            + @"\s*[\],)]");
+
+    // A call to a helper discovered above, in the file that declares it. Helpers
+    // are private, so the declaration and its callers are read per document; a
+    // caller in another part of a partial class is missed, which under-counts
+    // rather than inventing a key. The lookbehind keeps SomeType.L("x") out.
+    private static Regex KeyHelperCallRegex(string helperName) =>
+        new(@"(?<![A-Za-z0-9_.])" + Regex.Escape(helperName)
+            + @"\s*\(\s*""([A-Za-z0-9_]+)""\s*[,)]");
 
     // A class that holds locale keys, by the naming this repository actually
     // uses: SshLocalizationKeys, CloseGuardLocaleKeys, SshAuthFailureLocaleKeys,
@@ -262,6 +308,31 @@ public sealed class CSharpLocaleKeyCoverageTests
             public const string MessageKeyAlpha = "FixtureKeyAlpha";
         }
         """)]
+    [InlineData("short key helper", """
+        private string L(string key) => _localizer?[key] ?? key;
+
+        private void Render() => Show(L("FixtureKeyAlpha"));
+        """)]
+    [InlineData("short key helper with a block body", """
+        private string L(string key)
+        {
+            return FindMainViewModel()?.GetLocalizer()[key] ?? key;
+        }
+
+        private void Render() => Show(L("FixtureKeyAlpha"));
+        """)]
+    [InlineData("key helper taking format arguments", """
+        private string LF(string key, params object[] args)
+            => _localization.GetFormattedString(key, args);
+
+        private void Render() => Show(LF("FixtureKeyAlpha", count));
+        """)]
+    [InlineData("key helper named for translation rather than localization", """
+        private string Translate(string key)
+            => _localizer?.HasKey(key) == true ? _localizer[key] : Fallback(key);
+
+        private void Render() => Show(Translate("FixtureKeyAlpha"));
+        """)]
     public void EachDiscoveryShape_FindsTheKeyItIsMeantToFind(string shape, string source)
     {
         List<KeyReference> references = Analyse([new SourceDocument("Fixture.cs", source)], []);
@@ -285,6 +356,60 @@ public sealed class CSharpLocaleKeyCoverageTests
             internal static class ThemeBrushes
             {
                 public const string Accent = "AccentBrush";
+            }
+            """);
+
+        Assert.Empty(Analyse([document], []));
+    }
+
+    /// <summary>
+    /// A one-argument method that merely mentions a localizer is not a key
+    /// helper. Taking it for one turns every literal its callers pass into a
+    /// demand for a translation, and a guard that reports invented keys is a
+    /// guard somebody switches off.
+    /// </summary>
+    /// <remarks>
+    /// The fixture is <c>TrustedRdpCertificatesSettingsViewModel.Describe</c>
+    /// reduced to its shape: string in, localizer indexed, argument returned
+    /// untouched.
+    /// </remarks>
+    [Fact]
+    public void AMethodThatMentionsALocalizerWithoutTranslatingItsArgument_IsNotAKeyHelper()
+    {
+        SourceDocument document = new SourceDocument(
+            "Fixture.cs",
+            """
+            private string Describe(string? value)
+                => string.IsNullOrWhiteSpace(value)
+                    ? _localizer["FixtureFieldUnknown"]
+                    : value;
+
+            private void Render() => Show(Describe("SomeServerName"));
+            """);
+
+        List<string> keys = Analyse([document], []).Select(reference => reference.Key).ToList();
+
+        // Positive control: the localizer call in the same fixture is still found, so the
+        // absence below is a rejection of Describe and not an analysis that returned nothing.
+        Assert.Contains("FixtureFieldUnknown", keys);
+        Assert.DoesNotContain("SomeServerName", keys);
+    }
+
+    /// <summary>
+    /// The helper is read from its declaration, not from its name, so a file
+    /// that calls a one-letter method it does not declare as a helper yields
+    /// nothing.
+    /// </summary>
+    [Fact]
+    public void AOneLetterCallWithNoHelperDeclaration_YieldsNoKey()
+    {
+        SourceDocument document = new SourceDocument(
+            "Fixture.cs",
+            """
+            private void Render()
+            {
+                E("SomeEventName");
+                Builder.L("SomeLayerName");
             }
             """);
 
@@ -349,6 +474,17 @@ public sealed class CSharpLocaleKeyCoverageTests
                 }
             }
 
+            foreach (string helper in KeyHelpersDeclaredIn(document.Text))
+            {
+                foreach (Match match in KeyHelperCallRegex(helper).Matches(document.Text))
+                {
+                    references.Add(new KeyReference(
+                        match.Groups[1].Value,
+                        document.RelativePath,
+                        DiscoveryRule.LocalizerHelper));
+                }
+            }
+
             foreach (Match match in s_keyNamedConstantRegex.Matches(document.Text))
             {
                 references.Add(new KeyReference(
@@ -379,19 +515,50 @@ public sealed class CSharpLocaleKeyCoverageTests
             .ToList();
     }
 
+    /// <summary>
+    /// The key-translating helpers a single file declares for its own use.
+    /// </summary>
+    /// <remarks>
+    /// A helper whose own name contains <c>ocaliz</c> is left out: its calls are
+    /// already found by <see cref="DiscoveryRule.LocalizerCall"/>, and counting
+    /// them twice would let this rule's floor be satisfied by sites that rule
+    /// covers, which is the way a floor stops measuring its own rule.
+    /// </remarks>
+    private static IEnumerable<string> KeyHelpersDeclaredIn(string text)
+    {
+        HashSet<string> helpers = new(StringComparer.Ordinal);
+        foreach (Match match in s_keyHelperDeclarationRegex.Matches(text))
+        {
+            string name = match.Groups[1].Value;
+            if (name.Contains("ocaliz", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string body = match.Groups[3].Value + match.Groups[4].Value;
+            if (TranslatesItsParameter(body, match.Groups[2].Value))
+            {
+                helpers.Add(name);
+            }
+        }
+
+        return helpers;
+    }
+
     internal sealed record SourceDocument(string RelativePath, string Text);
 
     internal sealed record KeyReference(string Key, string RelativePath, DiscoveryRule Rule);
 
     // Measured on this tree: Indexer 658, LocalizerCall 271, LocalizerMethod
-    // 242, KeyHolderClass 68, KeyNamedConstant 7 distinct keys. The floors sit
-    // under those with room for ordinary churn; a rule that stops matching
-    // returns zero and lands far below its own.
+    // 242, LocalizerHelper 1360, KeyHolderClass 68, KeyNamedConstant 7 distinct
+    // keys. The floors sit under those with room for ordinary churn; a rule that
+    // stops matching returns zero and lands far below its own.
     private static readonly (DiscoveryRule Rule, int Floor)[] RuleFloors =
     [
         (DiscoveryRule.Indexer, 600),
         (DiscoveryRule.LocalizerCall, 250),
         (DiscoveryRule.LocalizerMethod, 220),
+        (DiscoveryRule.LocalizerHelper, 1200),
         (DiscoveryRule.KeyHolderClass, 60),
         (DiscoveryRule.KeyNamedConstant, 5)
     ];
