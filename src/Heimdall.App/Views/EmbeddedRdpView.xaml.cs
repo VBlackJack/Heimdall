@@ -48,7 +48,8 @@ namespace Heimdall.App.Views;
 /// Applies the proven WPF/WinForms layout flush pattern before Connect()
 /// and delays dynamic resolution reconnects until the session is stable.
 /// </summary>
-public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectTeardownTarget
+public partial class EmbeddedRdpView
+    : UserControl, IDisposable, IRdpDisconnectTeardownTarget, IRdpConnectWatchdogTimer
 {
     private const int BeginConnectMaxAttempts = 10;
     private const int MaxReconnectAttemptTimestamps = 3;
@@ -100,6 +101,7 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private readonly DispatcherTimer _resizeTimer;
     private readonly List<DateTime> _reconnectAttemptTimestampsUtc = new(MaxReconnectAttemptTimestamps);
     private readonly LetterboxHintState _letterboxHintState = new();
+    private readonly RdpConnectWatchdogArbiter _connectWatchdogArbiter;
 
     private bool _redirectionExpandedOverride;
 
@@ -228,6 +230,8 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     public EmbeddedRdpView()
     {
         InitializeComponent();
+
+        _connectWatchdogArbiter = new RdpConnectWatchdogArbiter(this);
 
         _resizeTimer = new DispatcherTimer(
             ResizeDebounceInterval,
@@ -2562,15 +2566,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         }
 
         _connectionPhase = newPhase;
-        if (RdpConnectWatchdogPolicy.ShouldCancel(newPhase))
-        {
-            _watchdogCredentialWaitActive = false;
-            StopConnectWatchdog();
-        }
-        else if (RdpConnectWatchdogPolicy.ShouldArm(newPhase))
-        {
-            StartConnectWatchdog();
-        }
+
+        // The arbiter, not this method, decides whether the watchdog runs: a certificate
+        // question outstanding on this view suspends it, and no phase may arm a connect
+        // budget over a wait for a human answer.
+        _connectWatchdogArbiter.PhaseChanged(newPhase);
 
         UpdatePhaseStepper();
         UpdateVisibilityForPhase();
@@ -3082,12 +3082,27 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
     private async Task StartVerifiedConnectAsync()
     {
         // The certificate probe and any trust question happen here, before Connect(). This is the
-        // Preparing phase: it lights the stepper's first segment, offers the Cancel button and
+        // Preparing phase: it lights the stepper's first segment, shows the Cancel button and
         // arms the connect watchdog, none of which used to happen because the phase had no
         // producer and the view sat in None while the status line already said Connecting.
+        // The watchdog is suspended for the check itself (see RdpConnectWatchdogArbiter). Note
+        // that a displayed trust dialog is application-modal, so the Cancel button shown here
+        // cannot be clicked while any question is on screen, in this tab or another.
         TransitionPhase(RdpConnectionPhase.Preparing);
 
-        RdpConnectionDecision decision = await VerifyServerCertificateAsync();
+        RdpConnectionDecision decision;
+        try
+        {
+            decision = await VerifyServerCertificateAsync();
+        }
+        finally
+        {
+            // Resumed here rather than at each exit below, so a refusal, a cancellation and a
+            // teardown all leave the watchdog in a state the arbiter chose. The call is a no-op
+            // when no check was owed, which is what keeps a profile without one on exactly the
+            // budget it had before.
+            _connectWatchdogArbiter.CertificateCheckCompleted(_connectionPhase, _disposed);
+        }
 
         if (_disposed)
         {
@@ -3171,6 +3186,11 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
                 : server.DisplayName,
             target.Value.Host,
             target.Value.Port);
+
+        // Past this point a probe runs and a trust question may be asked. The question is
+        // serialized across every session, so the answer can arrive minutes later; the connect
+        // watchdog stops here and is resumed by the caller once the check has returned.
+        _connectWatchdogArbiter.CertificateCheckStarted();
 
         return await RdpCertificateGate.DecideConnectionAsync(
             auth.AuthenticationLevel,
@@ -4383,6 +4403,36 @@ public partial class EmbeddedRdpView : UserControl, IDisposable, IRdpDisconnectT
         _connectWatchdogTimer.Tick -= OnConnectWatchdogTick;
         _connectWatchdogTimer = null;
         Core.Logging.FileLogger.Info("RDP connect watchdog stopped");
+    }
+
+    void IRdpConnectWatchdogTimer.Arm() => StartConnectWatchdog();
+
+    void IRdpConnectWatchdogTimer.Cancel() => CancelConnectWatchdog();
+
+    void IRdpConnectWatchdogTimer.Suspend() => SuspendConnectWatchdog();
+
+    /// <summary>Stops the watchdog and forgets any credential-wait promotion.</summary>
+    private void CancelConnectWatchdog()
+    {
+        _watchdogCredentialWaitActive = false;
+        StopConnectWatchdog();
+    }
+
+    /// <summary>Stops the watchdog while the view waits on a human answer.</summary>
+    /// <remarks>
+    /// The credential-wait promotion is deliberately kept, unlike in
+    /// <see cref="CancelConnectWatchdog"/>: a suspension is a pause on the same attempt, not
+    /// its end.
+    /// </remarks>
+    private void SuspendConnectWatchdog()
+    {
+        if (_connectWatchdogTimer is not null)
+        {
+            Core.Logging.FileLogger.Info(
+                "RDP connect watchdog suspended for the server certificate check");
+        }
+
+        StopConnectWatchdog();
     }
 
     /// <summary>
