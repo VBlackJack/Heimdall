@@ -15,6 +15,9 @@
  */
 
 using System.IO;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Xml.Linq;
 using Heimdall.App.Services.Import;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
@@ -120,6 +123,97 @@ public sealed class RdpImportDialogViewModelTests
         Assert.Contains(row.ConflictText, row.RowAccessibleSummary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void ApplyToAllButtons_KeepTheirOwnAutomationName()
+    {
+        // AutomationProperties.LabeledBy is consulted before a ButtonBase falls back to its Content,
+        // so pointing three buttons at one shared label makes all three announce the same name.
+        var document = XDocument.Load(RdpImportDialogPath());
+
+        var offenders = document
+            .Descendants()
+            .Where(element => element.Name.LocalName == "Button")
+            .Where(element =>
+                !string.IsNullOrWhiteSpace(element.Attribute("Content")?.Value)
+                && element.Attributes().Any(attribute =>
+                    // The attached property is one XML name, dot included, so an equality test on
+                    // "LabeledBy" alone never matches and would pass on the defect.
+                    attribute.Name.LocalName.EndsWith("LabeledBy", StringComparison.Ordinal)))
+            .Select(element => element.Attribute("Content")!.Value)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public async Task RowAccessibleSummary_NamesTheGatewayTheImportWouldCommit()
+    {
+        var localizer = await CreateLocalizerAsync(GatewayLocaleOverride);
+        var row = new RdpImportRowViewModel(
+            new RdpImportPreviewEntry
+            {
+                SourceFilePath = "C:\\finance-vpn.rdp",
+                ProposedName = "finance-vpn",
+                Candidate = new ServerProfileDto
+                {
+                    DisplayName = "finance-vpn",
+                    RemoteServer = "fileserver.corp.local",
+                    RemotePort = 3389,
+                    ConnectionType = "RDP",
+                    RdpGateway = "gw.attacker.example"
+                }
+            },
+            localizer);
+
+        Assert.Contains("gw.attacker.example", row.RowAccessibleSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RowAccessibleSummary_OmitsTheGateway_WhenTheFileCarriesNone()
+    {
+        var localizer = await CreateLocalizerAsync(GatewayLocaleOverride);
+        var row = new RdpImportRowViewModel(
+            new RdpImportPreviewEntry
+            {
+                SourceFilePath = "C:\\plain.rdp",
+                ProposedName = "plain",
+                Candidate = new ServerProfileDto
+                {
+                    DisplayName = "plain",
+                    RemoteServer = "plain.example.com",
+                    RemotePort = 3389,
+                    ConnectionType = "RDP"
+                }
+            },
+            localizer);
+
+        // Positive control: the row above proves the summary can carry a gateway.
+        Assert.Equal("plain.rdp", row.RowAccessibleSummary);
+    }
+
+    /// <summary>
+    /// Resolves the dialog markup from the compiled-in source path, so the lookup survives a build
+    /// whose output directory lives outside the repository.
+    /// </summary>
+    private static string RdpImportDialogPath([CallerFilePath] string testFilePath = "")
+    {
+        var dir = Path.GetDirectoryName(testFilePath);
+        while (dir is not null)
+        {
+            if (File.Exists(Path.Combine(dir, "Heimdall.slnx")))
+            {
+                var path = Path.Combine(dir, "src", "Heimdall.App", "Views", "Dialogs", "RdpImportDialog.xaml");
+                Assert.True(File.Exists(path), $"Dialog XAML not found: {path}");
+                return path;
+            }
+
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        throw new DirectoryNotFoundException(
+            $"Cannot find repository root containing Heimdall.slnx from: {testFilePath}");
+    }
+
     private static async Task<RdpImportDialogViewModel> CreateViewModelAsync()
     {
         var localizer = await CreateLocalizerAsync();
@@ -157,10 +251,51 @@ public sealed class RdpImportDialogViewModelTests
         });
     }
 
-    private static async Task<LocalizationManager> CreateLocalizerAsync()
+    /// <summary>
+    /// Keys a fix introduces reach locales/*.json through the release pipeline. Supplying them from
+    /// a private copy keeps the assertion on the view-model instead of on the merge state of the
+    /// shared locale files.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> GatewayLocaleOverride { get; } =
+        new Dictionary<string, string> { ["DialogImportRdpStatusGateway"] = "Gateway {0}" };
+
+    private static async Task<LocalizationManager> CreateLocalizerAsync(
+        IReadOnlyDictionary<string, string>? localeOverrides = null)
     {
         var manager = new LocalizationManager();
-        await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
-        return manager;
+        var shippedLocalesPath = Path.Combine(AppContext.BaseDirectory, "locales");
+
+        if (localeOverrides is null || localeOverrides.Count == 0)
+        {
+            await manager.LoadAsync(shippedLocalesPath, "en");
+            return manager;
+        }
+
+        var localesPath = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-b56-locales",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(localesPath);
+        try
+        {
+            var shipped = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                await File.ReadAllTextAsync(Path.Combine(shippedLocalesPath, "en.json")))
+                ?? [];
+
+            foreach (var pair in localeOverrides)
+            {
+                shipped[pair.Key] = pair.Value;
+            }
+
+            await File.WriteAllTextAsync(
+                Path.Combine(localesPath, "en.json"),
+                JsonSerializer.Serialize(shipped));
+            await manager.LoadAsync(localesPath, "en");
+            return manager;
+        }
+        finally
+        {
+            Directory.Delete(localesPath, recursive: true);
+        }
     }
 }
