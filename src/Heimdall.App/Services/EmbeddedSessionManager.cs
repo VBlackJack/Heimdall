@@ -147,6 +147,29 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         _configManager = configManager;
     }
 
+    /// <summary>
+    /// Builds the RDP session view and hands it the shared host pool.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="CreateHostControl"/>, and internal, so the provider a session
+    /// ends up holding can be observed without acquiring an ActiveX control. The view's own
+    /// default provider is the transient one, which builds and destroys a control per session at
+    /// a measured 66 kernel handles each; losing the assignment below would revert pooling with
+    /// nothing to notice it.
+    /// </remarks>
+    internal EmbeddedRdpView CreateRdpView()
+    {
+        return new EmbeddedRdpView
+        {
+            HostProvider = _rdpHostProvider,
+            SessionEventLog = _sessionEventLog,
+            // Read the LIVE global toggle at the seam (ConfigManager.CurrentSettings is replaced
+            // on Save/Merge/Load), so enabling session logging takes effect without a restart.
+            SessionLoggingEnabledProvider = () =>
+                _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
+        };
+    }
+
     public object CreateHostControl(
         SessionTabViewModel sessionTab,
         string displayName,
@@ -164,15 +187,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         if (string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase) &&
             session is RdpSessionResult rdp)
         {
-            var view = new EmbeddedRdpView
-            {
-                HostProvider = _rdpHostProvider,
-                SessionEventLog = _sessionEventLog,
-                // Read the LIVE global toggle at the seam (ConfigManager.CurrentSettings is replaced
-                // on Save/Merge/Load), so enabling session logging takes effect without a restart.
-                SessionLoggingEnabledProvider = () =>
-                    _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
-            };
+            var view = CreateRdpView();
             var rdpSettings = settings ?? new AppSettings();
             var (runtimeServer, multimonFallbackStatusKey) = ResolveEmbeddedRdpRuntimeServer(rdp.Server);
             view.SessionLoggingOverride = runtimeServer.SessionLoggingOverride;
