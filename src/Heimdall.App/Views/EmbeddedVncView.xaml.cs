@@ -164,7 +164,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
             // Map local Assets folder to a virtual HTTPS host so noVNC runs
             // under a proper origin instead of file:// (Microsoft recommended pattern
-            // for local content in WebView2 — avoids CORS issues and provides a stable
+            // for local content in WebView2 - avoids CORS issues and provides a stable
             // origin for WebMessage source validation).
             var assetsPath = Path.Combine(AppContext.BaseDirectory, "Assets");
             core.SetVirtualHostNameToFolderMapping(

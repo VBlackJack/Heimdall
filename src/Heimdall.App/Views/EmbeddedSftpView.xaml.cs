@@ -46,7 +46,7 @@ namespace Heimdall.App.Views;
 /// <c>GridView</c> column sizing and sort-header management; the embedded-editor
 /// hand-off (<c>EditFileAsync</c> creates an <c>EmbeddedEditorView</c> and overlays
 /// it without transferring pane ownership); the bookmarks overflow <c>ContextMenu</c> built in
-/// code; and session lifecycle — browser/editor creation, reconnect requests,
+/// code; and session lifecycle - browser/editor creation, reconnect requests,
 /// the health-check timer, and the browser/editor event relays into the ViewModel.
 /// <para>
 /// It is also the pane's <see cref="ICloseGuard"/>. The interface is implemented here rather than
@@ -63,7 +63,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     private const double FileListWidthPadding = 10;
     private const double MinimumNameColumnWidth = 200;
     // Toolbar width (px) below which the labelled actions collapse into the
-    // overflow menu. First estimate — tune against split-pane screenshots.
+    // overflow menu. First estimate - tune against split-pane screenshots.
     private const double ToolbarCompactThresholdPx = 780;
 
     // Severity hint for the close confirmation: losing an in-flight transfer or unsaved edits is a

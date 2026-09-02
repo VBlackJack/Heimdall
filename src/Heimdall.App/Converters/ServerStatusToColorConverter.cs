@@ -34,7 +34,7 @@ namespace Heimdall.App.Converters;
 /// <see cref="SessionHealthMonitor"/>, and optionally <c>[3]</c> a <c>ThemeRevision</c>
 /// trigger that forces WPF to re-run the converter after a runtime theme swap
 /// (the trigger value itself is ignored). The HealthState slot is back-compatible
-/// — when absent or null, the disconnected branch falls back to the legacy
+/// - when absent or null, the disconnected branch falls back to the legacy
 /// connection-type palette so any existing site that still passes only 2/3
 /// values keeps rendering correctly.
 /// </remarks>
@@ -64,7 +64,7 @@ public sealed class ServerStatusToColorConverter : IMultiValueConverter
         string connectionType = values[0]?.ToString()?.ToUpperInvariant() ?? string.Empty;
         string connectionState = values[1]?.ToString()?.ToLowerInvariant() ?? string.Empty;
         var healthState = values.Length >= 3 && values[2] is HealthState hs ? hs : null;
-        // The optional ThemeRevision trigger (values[3]) is ignored — it only exists
+        // The optional ThemeRevision trigger (values[3]) is ignored - it only exists
         // to force WPF to re-evaluate the binding after a theme swap.
 
         // State-based colors take priority over type-based colors

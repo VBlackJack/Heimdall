@@ -311,7 +311,7 @@ public sealed partial class KnownHostItemViewModel : ObservableObject, IAccessib
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
 
         return fingerprint.Length > 25
-            ? $"{fingerprint[..17]}…{fingerprint[^10..]}"
+            ? $"{fingerprint[..17]}...{fingerprint[^10..]}"
             : fingerprint;
     }
 

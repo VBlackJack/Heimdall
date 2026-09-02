@@ -210,7 +210,7 @@ public sealed class SplitService : ISplitService
             session.RootContent = SplitTreeHelper.ReplacePane(
                 session.RootContent, targetPane.PaneId, container);
 
-            // Async connection — can be cancelled or session can be closed while waiting
+            // Async connection - can be cancelled or session can be closed while waiting
             ConnectionResult result = await ConnectByProtocolAsync(
                 paneScopedServerDto,
                 settings,
@@ -241,7 +241,7 @@ public sealed class SplitService : ISplitService
                 SafeDisposeSessionResult(result.Session);
                 CleanupOrphanedPane(paneSessionId);
                 Core.Logging.FileLogger.Info(
-                    $"Split cancelled for '{serverDto.DisplayName}' — session or pane removed during connection.");
+                    $"Split cancelled for '{serverDto.DisplayName}' - session or pane removed during connection.");
                 return;
             }
 
@@ -258,7 +258,7 @@ public sealed class SplitService : ISplitService
                 CleanupOrphanedPane(paneSessionId);
                 session.RootContent = SplitTreeHelper.RemovePane(
                     session.RootContent, newPane.PaneId) ?? session.PrimaryPane;
-                SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
+                SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
                 Core.Logging.FileLogger.Error(
                     $"Split host creation failed for '{serverDto.DisplayName}': {ex.Message}", ex);
                 return;
@@ -294,7 +294,7 @@ public sealed class SplitService : ISplitService
             }
 
             Core.Logging.FileLogger.Info(
-                $"Split cancelled for session '{session.Title}' — tab closed during connection.");
+                $"Split cancelled for session '{session.Title}' - tab closed during connection.");
         }
         catch (Exception ex)
         {
@@ -304,7 +304,7 @@ public sealed class SplitService : ISplitService
             }
 
             Core.Logging.FileLogger.Error($"Split session error: {ex.Message}", ex);
-            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
+            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
         }
     }
 
@@ -496,7 +496,7 @@ public sealed class SplitService : ISplitService
             else
             {
                 Core.Logging.FileLogger.Warn(
-                    $"Merge: orphaned host control for pane '{id}' — pane not found after reparent.");
+                    $"Merge: orphaned host control for pane '{id}' - pane not found after reparent.");
                 SafeDispose(control as IDisposable);
             }
         }
@@ -528,7 +528,7 @@ public sealed class SplitService : ISplitService
         if (pane is null)
         {
             Core.Logging.FileLogger.Info(
-                $"ClosePane: pane '{paneId}' not found — already removed or double-close.");
+                $"ClosePane: pane '{paneId}' not found - already removed or double-close.");
             return PaneCloseResult.Closed;
         }
 
@@ -690,7 +690,7 @@ public sealed class SplitService : ISplitService
                 SafeDisposeSessionResult(result.Session);
                 CleanupOrphanedPane(paneScopedServerDto.Id);
                 Core.Logging.FileLogger.Info(
-                    $"ReconnectPane cancelled for '{paneScopedServerDto.DisplayName}' — session or pane removed.");
+                    $"ReconnectPane cancelled for '{paneScopedServerDto.DisplayName}' - session or pane removed.");
                 return;
             }
 
@@ -713,7 +713,7 @@ public sealed class SplitService : ISplitService
                 SafeDisposeSessionResult(result.Session);
                 CleanupOrphanedPane(paneScopedServerDto.Id);
                 pane.Status = SessionStatusTokens.Error;
-                SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
+                SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
                 Core.Logging.FileLogger.Error(
                     $"ReconnectPane host creation failed for '{paneScopedServerDto.DisplayName}': {ex.Message}", ex);
                 return;
@@ -736,21 +736,21 @@ public sealed class SplitService : ISplitService
             pane.ConnectionType = effectiveConnectionType;
             pane.Status = SessionStatusTokens.Connected;
 
-            // No LayoutMemory.Record here — reconnect targets the same server,
+            // No LayoutMemory.Record here - reconnect targets the same server,
             // and the pair was already recorded when the split was first created.
         }
         catch (OperationCanceledException)
         {
             ReleaseOldConnectionStateOnce("ReconnectPane cancellation");
             Core.Logging.FileLogger.Info(
-                $"ReconnectPane cancelled for session '{session.Title}' — tab closed during reconnection.");
+                $"ReconnectPane cancelled for session '{session.Title}' - tab closed during reconnection.");
         }
         catch (Exception ex)
         {
             pane.Status = SessionStatusTokens.Error;
             ReleaseOldConnectionStateOnce("ReconnectPane exception");
             Core.Logging.FileLogger.Error($"ReconnectPane error: {ex.Message}", ex);
-            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
+            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
         }
     }
 
@@ -818,7 +818,7 @@ public sealed class SplitService : ISplitService
                 DisconnectDetachedHosts(session, detachedHostControls);
                 detachedHostControls = null;
                 Core.Logging.FileLogger.Info(
-                    $"Swap split panes aborted for '{session.Title}' — tab closed during the swap.");
+                    $"Swap split panes aborted for '{session.Title}' - tab closed during the swap.");
                 return;
             }
 
@@ -843,7 +843,7 @@ public sealed class SplitService : ISplitService
         {
             TryRestoreDetachedHostControls(session, detachedHostControls);
             Core.Logging.FileLogger.Error($"Swap split panes error: {ex.Message}", ex);
-            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" — {ex.Message}");
+            SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
         }
     }
 

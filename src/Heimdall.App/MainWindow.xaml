@@ -625,7 +625,7 @@
                                 </ItemsPanelTemplate>
                             </TreeView.ItemsPanel>
                             <TreeView.Resources>
-                                <!-- Folder node template (recursive — unlimited nesting) -->
+                                <!-- Folder node template (recursive - unlimited nesting) -->
                                 <HierarchicalDataTemplate DataType="{x:Type vm:FolderViewModel}"
                                                           ItemsSource="{Binding Children}">
                                     <Border Margin="0,3,4,1"
@@ -3902,7 +3902,7 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Sessions overlay removed — now inside Servers Grid Column 2 -->
+            <!-- Sessions overlay removed - now inside Servers Grid Column 2 -->
         </Grid>
         </Grid>
 
@@ -4005,7 +4005,7 @@
                            AutomationProperties.Name="{Binding StatusText}"
                            AutomationProperties.LiveSetting="Polite"
                            behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
-                <!-- Subtle F1 shortcut hint — visible when status shows default ready text -->
+                <!-- Subtle F1 shortcut hint - visible when status shows default ready text -->
                 <TextBlock x:Name="Mw_StatusBarShortcutHint" Text="{loc:Translate StatusBarShortcutHint}"
                            FontSize="{StaticResource FontSizeSmallCaption}"
                            Foreground="{DynamicResource TextDisabledBrush}"
@@ -4140,7 +4140,7 @@
                 </StackPanel>
             </DockPanel>
         </Border>
-        <!-- Quick Connect Command Palette (Ctrl+K) — uses a Popup so it gets its own
+        <!-- Quick Connect Command Palette (Ctrl+K) - uses a Popup so it gets its own
              HWND and renders above WindowsFormsHost / ActiveX surfaces (airspace fix). -->
         <Popup x:Name="CommandPalettePopup"
                IsOpen="{Binding CommandPalette.IsOpen}"
@@ -4158,7 +4158,7 @@
                     MouseDown="OnPaletteBorderClick">
                 <Border.Resources>
                     <!-- Groups palette results by their Group property so each
-                         category (Servers, Tools, Snippets, Quick Connect, …)
+                         category (Servers, Tools, Snippets, Quick Connect, ...)
                          renders under its own header. The converter normalises
                          empty groups to a localized fallback. -->
                     <CollectionViewSource x:Key="PaletteResultsView"

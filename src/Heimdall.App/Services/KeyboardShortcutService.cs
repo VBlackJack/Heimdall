@@ -39,7 +39,7 @@ namespace Heimdall.App.Services;
 ///   </item>
 ///   <item>
 ///     Bindings registered with <see cref="ModifierKeys.None"/> match on
-///     <see cref="Key"/> alone, regardless of which modifiers are held —
+///     <see cref="Key"/> alone, regardless of which modifiers are held -
 ///     this preserves the legacy laxist behavior of single-key shortcuts
 ///     such as F1/F11/Delete/Apps/Escape.
 ///   </item>
@@ -56,14 +56,14 @@ public sealed class KeyboardShortcutService
 
     /// <summary>
     /// Registers a keyboard shortcut. Multiple shortcuts may share the same
-    /// (<paramref name="key"/>, <paramref name="modifiers"/>) tuple — on a
+    /// (<paramref name="key"/>, <paramref name="modifiers"/>) tuple - on a
     /// match, the first one whose <paramref name="canExecute"/> returns
     /// <c>true</c> (or has no predicate) is invoked.
     /// </summary>
     /// <param name="key">The WPF key (e.g. <see cref="Key.N"/>, <see cref="Key.F11"/>).</param>
     /// <param name="modifiers">
     /// Required modifier mask. Use <see cref="ModifierKeys.None"/> for keys
-    /// whose legacy behavior fires regardless of modifier state — the matcher
+    /// whose legacy behavior fires regardless of modifier state - the matcher
     /// treats <see cref="ModifierKeys.None"/> as "any modifiers accepted".
     /// </param>
     /// <param name="action">Callback invoked on match.</param>

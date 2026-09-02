@@ -58,7 +58,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private static extern IntPtr SetFocus(IntPtr hWnd);
 
     /// <summary>
-    /// Centralized tool registry — injected from the ViewModel. Replaces the former
+    /// Centralized tool registry - injected from the ViewModel. Replaces the former
     /// static <c>ToolTypeDefinitions</c> and <c>NetworkTools</c> arrays.
     /// </summary>
     private ToolRegistry ToolRegistry => ((MainViewModel)DataContext).ToolRegistry;
@@ -1504,7 +1504,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private void RegisterKeyboardShortcuts()
     {
         // ── Server list ──────────────────────────────────────────────
-        // Ctrl+N: add server (always — never gated by terminal focus, matches legacy)
+        // Ctrl+N: add server (always - never gated by terminal focus, matches legacy)
         _keyboardShortcutService.Register(Key.N, ModifierKeys.Control, () =>
         {
             if (GetMainVm() is { } vm)
@@ -1921,7 +1921,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         TabTools.IsChecked = true;
     }
 
-    // ── Sidebar Tools tab — view-layer glue (state lives in SidebarViewModel) ──
+    // ── Sidebar Tools tab - view-layer glue (state lives in SidebarViewModel) ──
 
     private void OnSidebarTabToolsChecked(object sender, RoutedEventArgs e)
     {
@@ -3155,7 +3155,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// <summary>
     /// Dismiss the command palette when the user clicks anywhere in the main window
     /// (outside the Popup). The Popup is a separate HWND, so clicks on the main
-    /// window surface never reach it — we intercept them here instead.
+    /// window surface never reach it - we intercept them here instead.
     /// </summary>
     private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {

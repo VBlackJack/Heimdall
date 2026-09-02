@@ -33,9 +33,9 @@ namespace Heimdall.App.Services;
 /// The service is deliberately window-agnostic: public methods take the
 /// <see cref="MainViewModel"/> as an explicit parameter (mirroring
 /// <see cref="ContextMenuFactory"/> / <see cref="SessionTabContextMenuFactory"/>),
-/// and the one piece of view-layer interop that could not be inlined —
+/// and the one piece of view-layer interop that could not be inlined -
 /// focusing the Command Palette input after
-/// <see cref="RequestSplitSession"/> — is surfaced via the
+/// <see cref="RequestSplitSession"/> - is surfaced via the
 /// <see cref="SplitPaletteRequested"/> event. The host window subscribes
 /// and calls its own <c>BeginFocusCommandPalette</c> helper.
 /// </remarks>

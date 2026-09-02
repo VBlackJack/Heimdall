@@ -25,11 +25,11 @@ namespace Heimdall.Core.Security;
 /// <remarks>
 /// The command template supports the following placeholders:
 /// <list type="bullet">
-///   <item><c>{Host}</c> — Target server hostname or IP</item>
-///   <item><c>{Port}</c> — Target port number</item>
-///   <item><c>{User}</c> — Username hint</item>
-///   <item><c>{Title}</c> — Server display name / entry title</item>
-///   <item><c>{Database}</c> — Configured database path</item>
+///   <item><c>{Host}</c> - Target server hostname or IP</item>
+///   <item><c>{Port}</c> - Target port number</item>
+///   <item><c>{User}</c> - Username hint</item>
+///   <item><c>{Title}</c> - Server display name / entry title</item>
+///   <item><c>{Database}</c> - Configured database path</item>
 ///   <item><c>{KeyFile}</c> - Path to the key file (replaces <c>{KeyFile}</c>)</item>
 /// </list>
 /// The command's stdout is captured and trimmed as the password.
@@ -271,7 +271,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
 
             if (process.ExitCode != 0)
             {
-                // Log only exit code — stderr may contain credential fragments from
+                // Log only exit code - stderr may contain credential fragments from
                 // the external tool and must not be persisted to log files.
                 Logging.FileLogger.Warn(
                     $"CommandCredentialProvider: command exited with code {process.ExitCode}");
@@ -333,7 +333,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     }
 
     /// <summary>
-    /// Strips all shell metacharacters — used when the template targets a shell
+    /// Strips all shell metacharacters - used when the template targets a shell
     /// interpreter (cmd.exe, .bat, .cmd, PowerShell) or when unknown.
     /// </summary>
     private static string SanitizeStrict(string? value)

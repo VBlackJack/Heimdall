@@ -407,7 +407,7 @@ public sealed partial class CommandPaletteViewModel
     private const string MergeArrowPrefix = "↔ ";
 
     /// <summary>Ellipsis glyph appended to truncated previews.</summary>
-    private const string EllipsisGlyph = "…";
+    private const string EllipsisGlyph = "...";
 
     /// <summary>
     /// Returns true when the input looks like a bare IP address or hostname
@@ -461,7 +461,7 @@ public sealed partial class CommandPaletteViewModel
 
     /// <summary>
     /// Scores a TwinShell action against a free-text query. The Title carries
-    /// the strongest weight, then each Tag (full weight — sysops queries like
+    /// the strongest weight, then each Tag (full weight - sysops queries like
     /// "disk" or "df" usually match a tag), with Description and Category at
     /// halved weight.
     /// </summary>

@@ -186,7 +186,7 @@ public partial class MainWindow
         }
         else if (targetTab is null && _tabState.DragItem is not null)
         {
-            // Dragging over the content area — show split drop zone
+            // Dragging over the content area - show split drop zone
             // Allow merging into already-split sessions (N-pane support)
             if (DataContext is MainViewModel vm
                 && vm.DragDisplaySession is not null

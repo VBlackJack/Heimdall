@@ -290,7 +290,7 @@ public sealed partial class CronJobViewModel : ObservableObject, IDisposable
             var fields = parsed.ScheduleFields();
             var description = CronDescriber.Describe(fields, L);
             var nextRuns = CronScheduleCalculator.CalculateNextRuns(fields, 1, _lastParseNow);
-            var nextRun = nextRuns.Count > 0 ? nextRuns[0] : "—";
+            var nextRun = nextRuns.Count > 0 ? nextRuns[0] : "-";
             var schedule = $"{parsed.Minute} {parsed.Hour} {parsed.DayOfMonth} {parsed.Month} {parsed.DayOfWeek}";
             CronEntries.Add(new CrontabDisplayEntry(schedule, parsed.Command, nextRun, description, parsed));
         }
@@ -318,7 +318,7 @@ public sealed partial class CronJobViewModel : ObservableObject, IDisposable
         var source = SelectedCronEntry.Source;
         var fields = source.ScheduleFields();
         var nextRuns = CronScheduleCalculator.CalculateNextRuns(fields, NextRunsCount, _lastParseNow);
-        var nextRunsText = nextRuns.Count > 0 ? string.Join("\n", nextRuns) : "—";
+        var nextRunsText = nextRuns.Count > 0 ? string.Join("\n", nextRuns) : "-";
         var schedule = $"{source.Minute} {source.Hour} {source.DayOfMonth} {source.Month} {source.DayOfWeek}";
 
         DetailScheduleText = string.Format(

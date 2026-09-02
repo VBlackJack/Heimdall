@@ -89,7 +89,7 @@ public partial class NotesToolView : UserControl, IToolView
             Editor.SyntaxHighlighting = MarkdownHighlighting.Create();
             Editor.TextArea.TextView.LineTransformers.Add(new MarkdownLivePreviewTransformer());
         }
-        catch { /* Highlighting is cosmetic — do not block initialization */ }
+        catch { /* Highlighting is cosmetic - do not block initialization */ }
     }
 
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
@@ -536,7 +536,7 @@ public partial class NotesToolView : UserControl, IToolView
         }
         catch
         {
-            // Non-critical UI preference — swallow errors
+            // Non-critical UI preference - swallow errors
         }
     }
 

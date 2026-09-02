@@ -69,7 +69,7 @@ public sealed class TreeInteractionState
     private ServerItemViewModel? _dragSourceServer;
     private ServerItemViewModel? _deferredSingleSelection;
 
-    /// <summary>Mouse position captured on left button down — start of a potential drag.</summary>
+    /// <summary>Mouse position captured on left button down - start of a potential drag.</summary>
     public System.Windows.Point DragStartPoint { get; set; }
 
     /// <summary>True while a drag-drop operation is currently in flight.</summary>
@@ -195,7 +195,7 @@ public sealed class TreeInteractionState
     /// <summary>
     /// True when the upcoming <see cref="ContextMenu"/> opening was triggered
     /// by a right-click (preview mouse down captured a target). False when the
-    /// menu is opening for some other reason — e.g. a keyboard shortcut.
+    /// menu is opening for some other reason - e.g. a keyboard shortcut.
     /// </summary>
     public bool ContextTargetFromPointer { get; set; }
 

@@ -33,7 +33,7 @@ namespace Heimdall.App.ViewModels.Scheduled;
 /// </summary>
 /// <remarks>
 /// Composition: instantiated inside <see cref="MainViewModel"/>'s
-/// constructor (<see cref="MainViewModel.Scheduled"/>) — no DI
+/// constructor (<see cref="MainViewModel.Scheduled"/>) - no DI
 /// registration. Creates its own
 /// <see cref="TaskSchedulerService"/> instance in the constructor
 /// (configured with <c>TasksProvider</c>, <c>TaskDueCallback</c> and
@@ -80,7 +80,7 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
 
     // ── Observable state ─────────────────────────────────────────────
 
-    /// <summary>Persisted scheduled-task entries — bound by the Scheduled tab DataGrid.</summary>
+    /// <summary>Persisted scheduled-task entries - bound by the Scheduled tab DataGrid.</summary>
     [ObservableProperty]
     private ObservableCollection<ScheduledTaskDto> _tasks = new();
 

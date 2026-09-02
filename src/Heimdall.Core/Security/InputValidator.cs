@@ -265,7 +265,7 @@ public static class InputValidator
 
     /// <summary>
     /// Escapes a value for safe interpolation inside a double-quoted shell string.
-    /// Unlike <see cref="EscapeShellArg"/>, this does NOT wrap in single quotes —
+    /// Unlike <see cref="EscapeShellArg"/>, this does NOT wrap in single quotes -
     /// it only neutralizes characters that have special meaning inside
     /// <c>"..."</c>: backslash, double-quote, dollar, and backtick.
     /// Use this for values embedded in <c>echo -e "..."</c> payloads sent over nc.

@@ -169,8 +169,8 @@ public sealed class PipeModeSession : ITerminalSession
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = null,  // Binary mode — no internal StreamReader
-            StandardErrorEncoding = null,  // Binary mode — allows direct BaseStream read
+            StandardOutputEncoding = null,  // Binary mode - no internal StreamReader
+            StandardErrorEncoding = null,  // Binary mode - allows direct BaseStream read
             WorkingDirectory = workingDirectory ?? string.Empty
         };
 
@@ -237,7 +237,7 @@ public sealed class PipeModeSession : ITerminalSession
 
     public void Resize(int columns, int rows)
     {
-        // Pipe mode cannot resize — the remote PTY size is fixed at connection time.
+        // Pipe mode cannot resize - the remote PTY size is fixed at connection time.
         // This is a known limitation vs ConPTY.
     }
 

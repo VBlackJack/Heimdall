@@ -40,7 +40,7 @@ public interface IContextMenuCallbacks
     void LaunchExternalTool(ServerItemViewModel server, ExternalToolDefinition tool);
 
     /// <summary>
-    /// Launches an auto-detected third-party tool (Sysinternals, NirSoft, …)
+    /// Launches an auto-detected third-party tool (Sysinternals, NirSoft, ...)
     /// against the supplied server, handling UAC elevation when required.
     /// </summary>
     void LaunchDetectedTool(ServerItemViewModel server, ExternalToolInfo tool);

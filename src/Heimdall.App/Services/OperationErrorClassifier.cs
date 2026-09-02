@@ -32,16 +32,16 @@ namespace Heimdall.App.Services;
 /// </remarks>
 public static class OperationErrorClassifier
 {
-    /// <summary>"permission" — a permission-denied failure (remote SFTP or local filesystem).</summary>
+    /// <summary>"permission" - a permission-denied failure (remote SFTP or local filesystem).</summary>
     public const string Permission = "permission";
 
-    /// <summary>"security" — a host-key rejection / MITM signal.</summary>
+    /// <summary>"security" - a host-key rejection / MITM signal.</summary>
     public const string Security = "security";
 
-    /// <summary>"io" — a general input/output failure.</summary>
+    /// <summary>"io" - a general input/output failure.</summary>
     public const string Io = "io";
 
-    /// <summary>"other" — any failure not matched by a more specific category.</summary>
+    /// <summary>"other" - any failure not matched by a more specific category.</summary>
     public const string Other = "other";
 
     /// <summary>

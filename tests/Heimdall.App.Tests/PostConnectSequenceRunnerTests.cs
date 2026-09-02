@@ -196,7 +196,7 @@ public sealed class PostConnectSequenceRunnerTests
         var pending = Assert.Single(recorder.Items, progress => progress.Status == PostConnectStepStatus.Pending);
         Assert.NotNull(pending);
         Assert.Equal(80, pending.CurrentStepDisplayText.Length);
-        Assert.EndsWith("…", pending.CurrentStepDisplayText);
+        Assert.EndsWith("...", pending.CurrentStepDisplayText);
     }
 
     [Fact]

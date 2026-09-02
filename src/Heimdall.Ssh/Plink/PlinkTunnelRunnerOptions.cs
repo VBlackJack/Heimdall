@@ -18,7 +18,7 @@ namespace Heimdall.Ssh.Plink;
 
 /// <summary>
 /// Tunable parameters for <see cref="PlinkTunnelRunner"/>. Surface kept narrow
-/// — only the values that legitimately differ between environments (slow VPN,
+/// - only the values that legitimately differ between environments (slow VPN,
 /// CI, debugging) are exposed. Defaults match the historical hard-coded
 /// values and are wire-compatible with existing call sites.
 /// </summary>

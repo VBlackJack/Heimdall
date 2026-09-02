@@ -202,7 +202,7 @@ public partial class EmbeddedEditorView : UserControl
         Editor.TextArea.TextView.CurrentLineBorder = new System.Windows.Media.Pen(
             new SolidColorBrush(border), 1);
 
-        // Syntax tokens use the fixed Dracula palette — it reads well against every
+        // Syntax tokens use the fixed Dracula palette - it reads well against every
         // Dracula variant and avoids per-theme highlight-definition plumbing.
         DraculaSyntaxPalette.Apply(Editor.SyntaxHighlighting);
     }

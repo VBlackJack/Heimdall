@@ -427,7 +427,7 @@ public sealed class PlinkTunnelRunner : IDisposable
         catch (ObjectDisposedException)
         {
             // The CTS may have been disposed by an earlier Stop() / Dispose();
-            // safe to ignore — the drain task is already gone.
+            // safe to ignore - the drain task is already gone.
         }
 
         if (_drainTask is not null)

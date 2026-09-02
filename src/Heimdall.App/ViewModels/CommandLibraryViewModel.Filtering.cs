@@ -76,7 +76,7 @@ public sealed partial class CommandLibraryViewModel
 
         if (trimmed == _lastSearchTerm)
         {
-            // Same query — no work needed, but ensure the view still reflects
+            // Same query - no work needed, but ensure the view still reflects
             // ordering (e.g., after a selection toggled it off and on).
             ApplyGroupingForSearch(isSearching: true);
             RefreshActionsView();

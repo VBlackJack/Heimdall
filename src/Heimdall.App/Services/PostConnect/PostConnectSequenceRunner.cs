@@ -188,6 +188,6 @@ public sealed class PostConnectSequenceRunner : IPostConnectSequenceRunner
             return trimmed;
         }
 
-        return trimmed[..79] + "…";
+        return trimmed[..77] + "...";
     }
 }

@@ -29,12 +29,12 @@ namespace Heimdall.App.Services;
 /// operation is still forwarded and no record is emitted at all. The gate silences the journal, never
 /// the transfer. A copy emits a single Copy record because it is a
 /// single high-level operation: for SFTP there is no download-and-upload roundtrip to fall back to any
-/// more. That says nothing about whether the server was reached — a transport that refuses fail-closed
+/// more. That says nothing about whether the server was reached - a transport that refuses fail-closed
 /// records its Copy without any server-side operation having taken place.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This seam only sees operations that flow through <see cref="IRemoteBrowser"/> — the NON-sudo path.
+/// This seam only sees operations that flow through <see cref="IRemoteBrowser"/> - the NON-sudo path.
 /// The sudo fallbacks (view-model sudo mkdir/mv/rm/chmod, sudo base64 download, sudo upload to a temp
 /// path, and the sudo editor save) bypass this interface entirely and are logged separately in Lot 3
 /// Prompt 3; their absence here is by design, not a coverage gap.

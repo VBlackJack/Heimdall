@@ -43,7 +43,7 @@ public sealed class ExternalToolProviderService
 
     /// <summary>
     /// Scans all registered providers for available tools.
-    /// Call from a background thread — performs disk I/O.
+    /// Call from a background thread - performs disk I/O.
     /// </summary>
     /// <param name="settings">Current app settings for user-configured search paths.</param>
     public void ScanAll(AppSettings? settings)

@@ -22,7 +22,7 @@ namespace Heimdall.App.Services;
 /// given host (RDP-DISC-04) and to surface a "Recents" suggestion list when
 /// the palette query is empty (RDP-DISC-05).
 ///
-/// Process-scoped only — no persistence in this iteration. Adding disk
+/// Process-scoped only - no persistence in this iteration. Adding disk
 /// persistence later means adding load/save around <see cref="_entries"/>
 /// without changing the public API.
 /// </summary>
@@ -81,7 +81,7 @@ public sealed class RecentConnectionTracker : IRecentConnectionTracker
 
         lock (_lock)
         {
-            // Drop any existing entry for the same (host, protocol) — keeps the list deduped.
+            // Drop any existing entry for the same (host, protocol) - keeps the list deduped.
             var node = _entries.First;
             while (node is not null)
             {

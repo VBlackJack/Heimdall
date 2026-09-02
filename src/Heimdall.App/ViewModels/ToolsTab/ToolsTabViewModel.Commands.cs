@@ -35,7 +35,7 @@ public sealed partial class ToolsTabViewModel
     /// <see cref="MainViewModel.OpenToolTabAsync"/> and tracks it as
     /// recently used. Tab-strip navigation
     /// (<c>TabSessions.IsChecked = true</c>) is the host window's
-    /// responsibility — this command focuses on the tool-launch logic only.
+    /// responsibility - this command focuses on the tool-launch logic only.
     /// </summary>
     [RelayCommand]
     private async Task LaunchToolAsync(ToolDescriptor? descriptor)

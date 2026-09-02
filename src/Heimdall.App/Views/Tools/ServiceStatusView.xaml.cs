@@ -91,7 +91,7 @@ public partial class ServiceStatusView : UserControl, IToolView
     {
         if (!_vm.HasRefreshSnapshot)
         {
-            TxtTotal.Text = TxtRunning.Text = TxtStopped.Text = "—";
+            TxtTotal.Text = TxtRunning.Text = TxtStopped.Text = "-";
             return;
         }
         TxtTotal.Text = _vm.TotalCount.ToString();

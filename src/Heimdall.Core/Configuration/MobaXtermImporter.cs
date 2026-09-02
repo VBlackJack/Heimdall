@@ -54,7 +54,7 @@ public static partial class MobaXtermImporter
         [98] = "Telnet",
     };
 
-    // Default ports per protocol — delegates to shared constants.
+    // Default ports per protocol - delegates to shared constants.
     private static int GetDefaultPort(string protocol) => protocol switch
     {
         "SSH" => Models.DefaultPorts.Ssh,

@@ -301,7 +301,7 @@ public sealed class TextDiffViewModelTests
         await localizer.SwitchLocaleAsync("fr");
 
         Assert.Equal(1, service.DiffCallCount);
-        Assert.Equal("Diff terminé : 2 lignes", vm.StatusText);
+        Assert.Equal("Diff terminé : 2 lignes", vm.StatusText);
     }
 
     [Fact]

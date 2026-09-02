@@ -492,7 +492,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
     /// <summary>
     /// Whether the embedded session host is visible. Hidden while locked so its
-    /// Win32 (RDP ActiveX) and WebView2 (terminal/VNC) child HWNDs are masked — a
+    /// Win32 (RDP ActiveX) and WebView2 (terminal/VNC) child HWNDs are masked - a
     /// WPF overlay alone cannot cover those, so the host must be collapsed.
     /// </summary>
     public bool IsSessionHostVisible => !IsWorkspaceLocked;

@@ -171,7 +171,7 @@ public sealed class BannerGrabService : IBannerGrabService
         {
             stopwatch.Stop();
             var service = BannerGrabEngine.IdentifyService(port, null, NetworkToolPresets.GetPortServiceLabel);
-            return new BannerProbeResult(port, service, "—", null);
+            return new BannerProbeResult(port, service, "-", null);
         }
     }
 
@@ -229,7 +229,7 @@ public sealed class BannerGrabService : IBannerGrabService
                 {
                     stopwatch.Stop();
                     var closedService = BannerGrabEngine.IdentifyService(port, null, NetworkToolPresets.GetPortServiceLabel);
-                    return new BannerProbeResult(port, closedService, "—", null);
+                    return new BannerProbeResult(port, closedService, "-", null);
                 }
 
                 var bannerRaw = await Task.Run(() =>
@@ -259,7 +259,7 @@ public sealed class BannerGrabService : IBannerGrabService
         {
             stopwatch.Stop();
             var service = BannerGrabEngine.IdentifyService(port, null, NetworkToolPresets.GetPortServiceLabel);
-            return new BannerProbeResult(port, service, "—", null);
+            return new BannerProbeResult(port, service, "-", null);
         }
     }
 }

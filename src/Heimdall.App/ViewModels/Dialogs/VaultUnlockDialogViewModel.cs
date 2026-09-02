@@ -176,7 +176,7 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
             }
             catch (VaultUnlockException)
             {
-                // Wrong password OR corrupted vault — indistinguishable by contract.
+                // Wrong password OR corrupted vault - indistinguishable by contract.
                 _lockout.RegisterFailure();
                 if (_lockout.IsLockedOut)
                 {

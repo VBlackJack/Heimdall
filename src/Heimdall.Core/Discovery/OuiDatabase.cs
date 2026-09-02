@@ -41,7 +41,7 @@ public static class OuiDatabase
             return manufacturer;
 
         // Detect locally administered MAC (bit 1 of first byte set)
-        // — indicates randomized MAC from smartphones, tablets, or modern OS privacy features
+        // - indicates randomized MAC from smartphones, tablets, or modern OS privacy features
         var firstByte = Convert.ToByte(oui[..2], 16);
         if ((firstByte & 0x02) != 0)
             return "Private (Randomized MAC)";

@@ -86,7 +86,7 @@ public sealed class ExternalToolDefinition
     }
 
     /// <summary>
-    /// Strips all shell metacharacters — used when the target is a shell interpreter
+    /// Strips all shell metacharacters - used when the target is a shell interpreter
     /// (cmd.exe, .bat, .cmd, PowerShell) or when the target is unknown.
     /// </summary>
     private static string SanitizeStrict(string value)

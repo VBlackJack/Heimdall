@@ -145,7 +145,7 @@ public partial class HostsFileEditorView : UserControl, IToolView
                     }
                     else
                     {
-                        // Regular comment — keep as preamble if still at top
+                        // Regular comment - keep as preamble if still at top
                         if (inPreamble)
                         {
                             _preambleLines.Add(rawLine);

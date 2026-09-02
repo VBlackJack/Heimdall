@@ -33,9 +33,9 @@ public sealed class ServiceStatusSmokeTests : UiTestBase<ServiceStatusView>
         using var session = OpenTool();
 
         WaitForRefreshSnapshot(session);
-        Assert.NotEqual("—", ReadText(session.FindByAutomationId("ServiceStatus.TotalCount")));
-        Assert.NotEqual("—", ReadText(session.FindByAutomationId("ServiceStatus.RunningCount")));
-        Assert.NotEqual("—", ReadText(session.FindByAutomationId("ServiceStatus.StoppedCount")));
+        Assert.NotEqual("-", ReadText(session.FindByAutomationId("ServiceStatus.TotalCount")));
+        Assert.NotEqual("-", ReadText(session.FindByAutomationId("ServiceStatus.RunningCount")));
+        Assert.NotEqual("-", ReadText(session.FindByAutomationId("ServiceStatus.StoppedCount")));
     }
 
     [StaFact]

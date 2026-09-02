@@ -41,7 +41,7 @@ public sealed class ContextMenuFactory
     /// </summary>
     /// <param name="externalToolProvider">
     /// Service that exposes the list of auto-detected third-party tools
-    /// (Sysinternals, NirSoft, …) used to build the "Detected Tools" submenu.
+    /// (Sysinternals, NirSoft, ...) used to build the "Detected Tools" submenu.
     /// </param>
     public ContextMenuFactory(ExternalToolProviderService externalToolProvider)
     {
@@ -376,7 +376,7 @@ public sealed class ContextMenuFactory
     {
         var menu = CreateContextMenu();
 
-        // "Open in Tab" — the primary action for tools
+        // "Open in Tab" - the primary action for tools
         var openItem = new MenuItem { Header = vm.Localize("TreeCtxOpenToolInTab") };
         openItem.Click += (_, _) =>
         {

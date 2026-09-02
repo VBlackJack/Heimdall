@@ -22,7 +22,7 @@ namespace Heimdall.App.Services;
 /// <summary>
 /// Prevents Windows from entering sleep/standby while embedded sessions are active.
 /// Uses <c>SetThreadExecutionState</c> with a reference-counted session model and
-/// a 60-second heartbeat to reset the OS idle timer — required for VMs and RDP hosts
+/// a 60-second heartbeat to reset the OS idle timer - required for VMs and RDP hosts
 /// where a single <c>ES_CONTINUOUS</c> flag is insufficient.
 /// </summary>
 [SupportedOSPlatform("windows")]
@@ -59,7 +59,7 @@ public static class SleepPrevention
             _enabled = value;
             if (!value && _activeSessionCount > 0)
             {
-                // Setting turned off while sessions are active — release immediately
+                // Setting turned off while sessions are active - release immediately
                 Interlocked.Exchange(ref _activeSessionCount, 0);
                 _keepAliveTimer?.Dispose();
                 _keepAliveTimer = null;

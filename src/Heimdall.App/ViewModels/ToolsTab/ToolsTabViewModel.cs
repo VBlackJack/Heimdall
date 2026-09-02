@@ -28,7 +28,7 @@ namespace Heimdall.App.ViewModels.ToolsTab;
 /// <remarks>
 /// <para>
 /// Composition: instantiated inside <see cref="MainViewModel"/>'s constructor
-/// (<see cref="MainViewModel.ToolsTab"/>) — there is no DI registration. This
+/// (<see cref="MainViewModel.ToolsTab"/>) - there is no DI registration. This
 /// matches the sidebar/onboarding sub-VM pattern.
 /// </para>
 /// <para>
@@ -37,7 +37,7 @@ namespace Heimdall.App.ViewModels.ToolsTab;
 /// <see cref="System.Windows.Controls.Panel"/> by
 /// <see cref="ToolsTabPopulationService.RefreshToolsTabSections"/>. The view
 /// listens to <see cref="SectionsInvalidated"/> and re-runs that rendering.
-/// This intentionally leaves the service untouched — refactoring the
+/// This intentionally leaves the service untouched - refactoring the
 /// imperative card rendering into a templated <c>ItemsControl</c> is tracked
 /// as separate post-refactor tech debt.
 /// </para>

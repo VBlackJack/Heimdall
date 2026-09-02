@@ -19,7 +19,7 @@ namespace Heimdall.Core.Configuration;
 /// <summary>
 /// Detects NirSoft CLI tools on the local machine.
 /// Scans common install directories, NirLauncher locations, and user-configured folders.
-/// NirSoft tools cannot be redistributed — users must download them from nirsoft.net.
+/// NirSoft tools cannot be redistributed - users must download them from nirsoft.net.
 /// </summary>
 public sealed class NirSoftToolProvider : IExternalToolProvider
 {

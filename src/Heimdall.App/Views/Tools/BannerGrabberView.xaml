@@ -171,7 +171,7 @@
                 <TextBlock x:Name="TxtProgressPercent" Text="0%"
                            FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
-                <TextBlock Text="  —  " FontSize="{StaticResource FontSizeCaption}"
+                <TextBlock Text="  -  " FontSize="{StaticResource FontSizeCaption}"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                 <TextBlock x:Name="TxtProgressCount" Text="0 / 0"
                            FontSize="{StaticResource FontSizeCaption}"

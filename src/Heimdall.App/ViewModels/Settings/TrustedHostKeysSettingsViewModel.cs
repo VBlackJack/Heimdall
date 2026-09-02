@@ -475,5 +475,5 @@ public sealed partial class TrustedHostKeyRowViewModel : ObservableObject
     public string PublicKeyDisplay { get; }
 
     private static string TruncateFingerprint(string fingerprint)
-        => fingerprint.Length <= 16 ? fingerprint : fingerprint[..16] + "…";
+        => fingerprint.Length <= 16 ? fingerprint : fingerprint[..16] + "...";
 }

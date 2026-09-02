@@ -355,7 +355,7 @@ public static class PrivilegeLauncher
             return 1;
         }
 
-        // We are now elevated — do the actual token work
+        // We are now elevated - do the actual token work
         PrivilegeLaunchResult result;
         try
         {
@@ -467,14 +467,14 @@ public static class PrivilegeLauncher
     {
         string? processPath = Environment.ProcessPath;
 
-        // Direct exe launch (Release, Run.bat, etc.) — ProcessPath IS the app exe
+        // Direct exe launch (Release, Run.bat, etc.) - ProcessPath IS the app exe
         if (processPath is not null
             && !processPath.EndsWith("dotnet.exe", StringComparison.OrdinalIgnoreCase))
         {
             return (processPath, string.Empty);
         }
 
-        // Running via "dotnet run" or "dotnet exec" — derive the .exe from the loaded DLL
+        // Running via "dotnet run" or "dotnet exec" - derive the .exe from the loaded DLL
         string? dllPath = Assembly.GetEntryAssembly()?.Location;
         if (!string.IsNullOrEmpty(dllPath))
         {
@@ -482,7 +482,7 @@ public static class PrivilegeLauncher
             if (System.IO.File.Exists(exePath))
                 return (exePath, string.Empty);
 
-            // No .exe found (single-file or framework-dependent without host) — use dotnet exec
+            // No .exe found (single-file or framework-dependent without host) - use dotnet exec
             if (processPath is not null)
                 return (processPath, $"exec \"{dllPath}\" ");
         }

@@ -51,7 +51,7 @@ internal interface ITunnelsHost
 /// </summary>
 /// <remarks>
 /// Composition: instantiated inside <see cref="MainViewModel"/>'s
-/// constructor (<see cref="MainViewModel.Tunnels"/>) — no DI registration.
+/// constructor (<see cref="MainViewModel.Tunnels"/>) - no DI registration.
 /// Subscribes to <see cref="TunnelManager.TunnelOpened"/> /
 /// <see cref="TunnelManager.TunnelClosed"/> in its constructor and
 /// unsubscribes in <see cref="Dispose"/> (which <see cref="MainViewModel.Dispose"/>
@@ -137,7 +137,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isPanelOpen;
 
-    /// <summary>Live snapshot of active tunnels — bound by the DataGrid.</summary>
+    /// <summary>Live snapshot of active tunnels - bound by the DataGrid.</summary>
     [ObservableProperty]
     private ObservableCollection<TunnelInfo> _list = new();
 
@@ -146,7 +146,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     private TunnelInfo? _selectedItem;
 
     /// <summary>
-    /// Number of active tunnels — bound by the status-bar badge and the
+    /// Number of active tunnels - bound by the status-bar badge and the
     /// tunnels tab count indicator. Maintained alongside
     /// <see cref="List"/> on every refresh.
     /// </summary>

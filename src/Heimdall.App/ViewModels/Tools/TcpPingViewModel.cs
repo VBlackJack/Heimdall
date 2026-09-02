@@ -303,9 +303,9 @@ public sealed partial class TcpPingViewModel : ObservableObject, IDisposable
             return string.Format(
                 CultureInfo.InvariantCulture,
                 L("ToolTcpPingSummary"),
-                "—",
-                "—",
-                "—",
+                "-",
+                "-",
+                "-",
                 summary.Lost,
                 summary.Total);
         }
@@ -340,7 +340,7 @@ public sealed partial class TcpPingViewModel : ObservableObject, IDisposable
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "[{0}/{1}] {2}:{3} — {4:F1} ms",
+                "[{0}/{1}] {2}:{3} - {4:F1} ms",
                 probe.Seq,
                 totalCount,
                 probe.Host,
@@ -350,7 +350,7 @@ public sealed partial class TcpPingViewModel : ObservableObject, IDisposable
 
         return string.Format(
             CultureInfo.InvariantCulture,
-            "[{0}/{1}] {2}:{3} — FAILED: {4}",
+            "[{0}/{1}] {2}:{3} - FAILED: {4}",
             probe.Seq,
             totalCount,
             probe.Host,

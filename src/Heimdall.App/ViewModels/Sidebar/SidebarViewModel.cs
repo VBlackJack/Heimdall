@@ -34,7 +34,7 @@ namespace Heimdall.App.ViewModels.Sidebar;
 /// <remarks>
 /// <para>
 /// Composition: instantiated inside <see cref="MainViewModel"/>'s constructor
-/// (<see cref="MainViewModel.Sidebar"/>) — there is no DI registration. This
+/// (<see cref="MainViewModel.Sidebar"/>) - there is no DI registration. This
 /// avoids a cyclic dependency between the sub-VM and its host.
 /// </para>
 /// <para>
@@ -103,7 +103,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
     /// </summary>
     public string ContextTooltip => _toolContext.ContextTooltip;
 
-    /// <summary>True when the active filter hides every tool — drives the "no results" hint.</summary>
+    /// <summary>True when the active filter hides every tool - drives the "no results" hint.</summary>
     [ObservableProperty]
     private bool _hasNoResults;
 

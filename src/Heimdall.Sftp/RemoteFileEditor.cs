@@ -321,7 +321,7 @@ public sealed class RemoteFileEditor : IDisposable
 
         Directory.CreateDirectory(tempDir);
 
-        // Restrict temp directory ACL — edited files may contain sensitive
+        // Restrict temp directory ACL - edited files may contain sensitive
         // server configs (root-owned files downloaded via sudo)
         if (OperatingSystem.IsWindows())
         {
@@ -329,7 +329,7 @@ public sealed class RemoteFileEditor : IDisposable
             catch (Exception ex)
             {
                 Heimdall.Core.Logging.FileLogger.Error(
-                    $"Failed to restrict temp directory ACL for SFTP editor — edited files may be readable by other users: {ex.Message}");
+                    $"Failed to restrict temp directory ACL for SFTP editor - edited files may be readable by other users: {ex.Message}");
             }
         }
 
@@ -437,7 +437,7 @@ public sealed class RemoteFileEditor : IDisposable
         bool success;
         try
         {
-            // Serialize uploads per file — prevents concurrent saves from overlapping
+            // Serialize uploads per file - prevents concurrent saves from overlapping
             if (!await session.UploadSemaphore.WaitAsync(0, ct).ConfigureAwait(false))
             {
                 ArmDebounceTimer(session);

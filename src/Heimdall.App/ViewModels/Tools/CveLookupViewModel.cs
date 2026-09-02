@@ -64,7 +64,7 @@ public sealed partial class CveLookupViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _dbInfoText = string.Empty;
     [ObservableProperty] private string _helpText = string.Empty;
 
-    // No service layer: the engine is pure, sync, offline — direct static call
+    // No service layer: the engine is pure, sync, offline - direct static call
     // into CveLookupEngine is the simplest honest answer for this tool.
     public CveLookupViewModel()
     {

@@ -167,7 +167,7 @@ internal static class VaultMigrationEngine
         if (plaintext is null)
         {
             // Undecryptable legacy blob (e.g. DPAPI from another user). Preserve
-            // the original bytes — never lose data or write null. No value logged.
+            // the original bytes - never lose data or write null. No value logged.
             FileLogger.Warn("Vault migration: skipped an undecryptable legacy secret field.");
             return current;
         }

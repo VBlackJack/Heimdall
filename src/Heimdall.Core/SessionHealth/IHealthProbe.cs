@@ -27,7 +27,7 @@ public interface IHealthProbe
     /// <summary>
     /// Attempts a single probe against <paramref name="host"/>:<paramref name="port"/>
     /// with a hard deadline of <paramref name="timeoutMs"/>. Implementations must
-    /// never throw — failures are encoded in the returned <see cref="HealthState"/>.
+    /// never throw - failures are encoded in the returned <see cref="HealthState"/>.
     /// </summary>
     Task<HealthState> ProbeAsync(string host, int port, int timeoutMs, CancellationToken ct);
 }

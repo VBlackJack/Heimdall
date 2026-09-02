@@ -1830,9 +1830,10 @@ public partial class ServerDialogViewModel : ObservableValidator
     /// <summary>
     /// Pre-fills <see cref="RdpFixedWidth"/> and <see cref="RdpFixedHeight"/>
     /// from a "WIDTHxHEIGHT" preset string (e.g. "1920x1080"). Accepts the
-    /// regular ASCII <c>x</c> as well as the typographic multiplication sign
-    /// <c>×</c>. Invalid input is silently ignored - the user can still
-    /// type custom dimensions in the boxes.
+    /// regular ASCII <c>x</c> as well as the typographic multiplication sign,
+    /// written as the escape <c>\u00D7</c> so this file stays ASCII. Invalid
+    /// input is silently ignored - the user can still type custom dimensions
+    /// in the boxes.
     /// </summary>
     [RelayCommand]
     private void ApplyResolutionPreset(string? preset)
@@ -1842,7 +1843,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             return;
         }
 
-        string[] parts = preset.Split(['x', 'X', '×'], 2);
+        string[] parts = preset.Split(['x', 'X', '\u00D7'], 2);
         if (parts.Length != 2)
         {
             return;

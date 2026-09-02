@@ -46,7 +46,7 @@ namespace Heimdall.App.ViewModels.Session;
 /// <remarks>
 /// <para>
 /// Composition: instantiated inside <see cref="MainViewModel"/>'s
-/// constructor (<see cref="MainViewModel.Session"/>) — no DI registration.
+/// constructor (<see cref="MainViewModel.Session"/>) - no DI registration.
 /// Follows the same pattern as <c>TunnelsViewModel</c> and
 /// <c>ScheduledTasksViewModel</c>: takes <see cref="MainViewModel"/> as
 /// first ctor parameter and reaches other sub-VMs
@@ -1215,7 +1215,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 $"activeTabs={_main.Connection.ActiveSessions.Count}");
 
             // Defensive guard: if the standard close path did not remove the
-            // tab (unexpected — see logs for the original failure), force the
+            // tab (unexpected - see logs for the original failure), force the
             // removal so the user never sees a stale tab next to the new
             // connection. Production bug observed 2026-05-16: in some real
             // sessions the tab persisted after a clean CloseSessionAsync call
@@ -1927,7 +1927,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         // The 8 provider/callback wire-ups on Split + EmbeddedSessionManager
         // + ConnectionService are owned by external services and are left
-        // in place on shutdown — clearing them could break other teardown
+        // in place on shutdown - clearing them could break other teardown
         // paths that still reference them. No harm in leaving the delegate
         // references since the owning services are themselves disposed.
     }

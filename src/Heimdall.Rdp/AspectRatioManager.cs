@@ -55,7 +55,7 @@ public static class AspectRatioManager
         switch (ratio)
         {
             case AspectRatio.Stretch:
-                // Use full container — no letterboxing
+                // Use full container - no letterboxing
                 return (containerWidth, containerHeight);
 
             case AspectRatio.Auto:
@@ -89,13 +89,13 @@ public static class AspectRatioManager
 
         if (containerRatio > targetRatio)
         {
-            // Container is wider than target — pillarbox (constrain by height)
+            // Container is wider than target - pillarbox (constrain by height)
             height = containerHeight;
             width = (int)Math.Round(containerHeight * targetRatio);
         }
         else
         {
-            // Container is taller than target — letterbox (constrain by width)
+            // Container is taller than target - letterbox (constrain by width)
             width = containerWidth;
             height = (int)Math.Round(containerWidth / targetRatio);
         }

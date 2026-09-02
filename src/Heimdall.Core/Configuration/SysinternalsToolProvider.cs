@@ -19,7 +19,7 @@ namespace Heimdall.Core.Configuration;
 /// <summary>
 /// Detects Microsoft Sysinternals CLI tools on the local machine.
 /// Scans PATH, common install directories, winget paths, and user-configured folders.
-/// Redistribution is prohibited — tools must be installed by the user.
+/// Redistribution is prohibited - tools must be installed by the user.
 /// </summary>
 public sealed class SysinternalsToolProvider : IExternalToolProvider
 {
@@ -121,7 +121,7 @@ public sealed class SysinternalsToolProvider : IExternalToolProvider
             var candidate64 = Path.Combine(dir, name64);
             if (Environment.Is64BitOperatingSystem && File.Exists(candidate64)) return candidate64;
 
-            // WinGet nested package directories — search one level deep
+            // WinGet nested package directories - search one level deep
             if (dir.Contains("WinGet", StringComparison.OrdinalIgnoreCase))
             {
                 try

@@ -209,7 +209,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
         }
         catch (OperationCanceledException)
         {
-            // Timeout or manual cancel — kill the process tree so it does not
+            // Timeout or manual cancel - kill the process tree so it does not
             // continue running in the background after the tab shows a timeout.
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { /* process may have already exited */ }
             throw;
@@ -223,7 +223,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
     /// <summary>
     /// Runs an elevated tool directly via UseShellExecute + Verb=runas.
     /// Cannot capture stdout (Windows limitation), so the tool opens in its own window.
-    /// No shell interpolation — arguments are passed directly to the process, not via cmd.exe.
+    /// No shell interpolation - arguments are passed directly to the process, not via cmd.exe.
     /// </summary>
     private async Task<(int ExitCode, string Stdout, string Stderr)> RunElevatedToolAsync(
         string exePath, string arguments, CancellationToken ct)
@@ -248,14 +248,14 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
         }
         catch (OperationCanceledException)
         {
-            // Timeout or manual cancel — kill the elevated process tree so it does not
+            // Timeout or manual cancel - kill the elevated process tree so it does not
             // continue running in the background after the tab shows a timeout.
             try { if (_runningProcess is { HasExited: false } p) p.Kill(entireProcessTree: true); } catch { /* process may have already exited */ }
             throw;
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            // ERROR_CANCELLED — user declined UAC
+            // ERROR_CANCELLED - user declined UAC
             return (-1, "", L("ExtToolElevationCancelled"));
         }
         finally
@@ -343,7 +343,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
                 var row = table.NewRow();
                 foreach (var prop in element.EnumerateObject())
                 {
-                    // Match by property name, not position — handles missing/reordered fields
+                    // Match by property name, not position - handles missing/reordered fields
                     if (table.Columns.Contains(prop.Name))
                         row[prop.Name] = prop.Value.ToString();
                     else if (!firstRow)

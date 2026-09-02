@@ -92,7 +92,7 @@ public sealed class PinManager
 
                 if (DateTime.UtcNow >= _lockoutUntilUtc.Value)
                 {
-                    // Lockout expired — auto-reset
+                    // Lockout expired - auto-reset
                     // Intentionally no StateChanged here; persisted expiry is reconciled during restore.
                     _failureCount = 0;
                     _lockoutUntilUtc = null;
@@ -313,7 +313,7 @@ public sealed class PinManager
             }
             else
             {
-                // Expired lockout — reset
+                // Expired lockout - reset
                 _lockoutUntilUtc = null;
                 if (lockoutUntilUtc.HasValue)
                 {

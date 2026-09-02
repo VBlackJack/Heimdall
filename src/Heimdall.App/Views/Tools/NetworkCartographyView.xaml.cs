@@ -650,7 +650,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         {
             CmbHistory.Items.Add(new ComboBoxItem
             {
-                Content = $"{timestamp:yyyy-MM-dd HH:mm} — {subnet}"
+                Content = $"{timestamp:yyyy-MM-dd HH:mm} - {subnet}"
             });
         }
 

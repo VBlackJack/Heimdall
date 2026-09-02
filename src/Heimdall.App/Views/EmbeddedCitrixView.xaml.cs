@@ -339,7 +339,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             }
         }
 
-        // Timeout — no seamless session window appeared. This commonly means Citrix
+        // Timeout - no seamless session window appeared. This commonly means Citrix
         // Workspace needs the user to (re)authenticate before the app can launch.
         // Try to embed Workspace's own sign-in window inline (Option 2b spike) so the
         // user authenticates without leaving Heimdall; Citrix keeps ownership of the
@@ -347,7 +347,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         _captureInProgress = false;
 
         // Only treat this as a sign-in situation when Workspace's own window is actually
-        // in the foreground — Citrix surfaces its login front-and-centre. A bare timeout
+        // in the foreground - Citrix surfaces its login front-and-centre. A bare timeout
         // otherwise just means the app opened into a shared session or as an unseen
         // seamless window, so fall through to external mode instead of grabbing the shell.
         IntPtr authHwnd = TryFindCitrixAuthWindow();
@@ -357,7 +357,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
                 $"Citrix: Workspace sign-in window is foreground; embedding it inline hwnd=0x{authHwnd.ToInt64():X}");
             await Dispatcher.InvokeAsync(() =>
             {
-                CaptureLoadingText.Text = _localizer?["CitrixAuthSignInHint"] ?? "Sign in to Citrix…";
+                CaptureLoadingText.Text = _localizer?["CitrixAuthSignInHint"] ?? "Sign in to Citrix...";
 
                 // Recorded before embedding: the sign-in shell is the ONE window embedded without
                 // a session handle, and naming it here is what keeps the existence-only liveness
@@ -521,7 +521,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         {
             if (!IsWindowVisible(hwnd)) return true;
 
-            // Only windows that appeared after our launch — covers both a fresh ICA
+            // Only windows that appeared after our launch - covers both a fresh ICA
             // process and a new window opened inside an already-running (shared) session.
             if (preLaunchWindows.Contains(hwnd)) return true;
 
@@ -938,12 +938,12 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
 
         if (_captureInProgress)
         {
-            // Still searching for a window to capture — don't declare dead.
+            // Still searching for a window to capture - don't declare dead.
             // SelfService.exe exits immediately; that's expected.
             return;
         }
 
-        // External mode — the session handle is the only source of liveness. The launcher is not
+        // External mode - the session handle is the only source of liveness. The launcher is not
         // consulted: it exits as soon as Workspace takes the request, so reading it reported a
         // dead session for a running one, and a live one for a launcher that merely lingered.
         bool alive = _sessionHandle?.IsAlive == true;

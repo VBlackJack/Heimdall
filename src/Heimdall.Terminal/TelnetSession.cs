@@ -82,7 +82,7 @@ public sealed class TelnetSession : ITerminalSession
     /// <summary>
     /// Opens a TCP connection to the remote Telnet host and starts the read loop.
     /// The <paramref name="executable"/> and <paramref name="arguments"/> parameters
-    /// are ignored — host and port are provided via the constructor.
+    /// are ignored - host and port are provided via the constructor.
     /// </summary>
     public async Task StartAsync(
         string executable, string arguments,
@@ -147,7 +147,7 @@ public sealed class TelnetSession : ITerminalSession
 
     /// <summary>
     /// Sends a Telnet NAWS subnegotiation if the remote side accepted NAWS.
-    /// Otherwise this is a no-op — raw TCP has no resize signaling.
+    /// Otherwise this is a no-op - raw TCP has no resize signaling.
     /// </summary>
     public void Resize(int columns, int rows)
     {
@@ -408,7 +408,7 @@ public sealed class TelnetSession : ITerminalSession
     {
         if (option == NAWS)
         {
-            // Accept NAWS — we can report window size
+            // Accept NAWS - we can report window size
             SendCommand(WILL, NAWS);
             _nawsNegotiated = true;
             SendNawsSubnegotiation(_columns, _rows);
