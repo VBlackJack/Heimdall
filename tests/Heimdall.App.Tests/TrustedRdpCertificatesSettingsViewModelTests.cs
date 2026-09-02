@@ -43,6 +43,16 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     private static readonly DateTimeOffset Stamp =
         new(2026, 8, 23, 10, 0, 0, TimeSpan.Zero);
 
+    /// <summary>Words with which this screen would promise a question it cannot deliver.</summary>
+    private static readonly string[] FutureQuestionPhrases =
+    [
+        "next time",
+        "ask you again",
+        "prochaine fois",
+        "reposera",
+        "demandera",
+    ];
+
     /// <summary>
     /// The empty state, asserted with the control that makes it mean something.
     /// </summary>
@@ -205,16 +215,24 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     }
 
     /// <summary>
-    /// The removal must reach settings.json, through the very handler the application wires.
+    /// The removal must reach settings.json through <c>App.PersistTrustedRdpCertificatesAsync</c>,
+    /// the production method the application's startup handler calls.
     /// </summary>
     /// <remarks>
-    /// A screen that forgets only until the next restart is the same defect wearing a different
-    /// hat, and no double can catch it: the assertion is a reload from disk after the real
-    /// <c>App.PersistTrustedRdpCertificatesAsync</c> ran off the store's own
-    /// <c>TrustChanged</c> event, which is the wiring in <c>App.OnStartup</c>.
+    /// <para>A screen that forgets only until the next restart is the same defect wearing a
+    /// different hat, and no double can catch it: the assertion is a reload from disk after the
+    /// real <c>App.PersistTrustedRdpCertificatesAsync</c> ran on the entries the store published,
+    /// with a real <c>ConfigManager</c> over a real directory.</para>
+    /// <para><b>What this does NOT prove.</b> The subscription itself. The production one is
+    /// created inside <c>App.OnStartup</c>, which needs an <c>Application</c> instance and a built
+    /// service provider, so no unit test reaches it; the lambda below is this test's own, and
+    /// deleting the real subscription in App.xaml.cs leaves this green. It measures the handler's
+    /// body and the store's event, not the line that joins them. Say so rather than let the name
+    /// promise it: an earlier version of this comment claimed "the very handler the application
+    /// wires", which is a label overstating a feature, in a test.</para>
     /// </remarks>
     [Fact]
-    public async Task Forget_Confirmed_PersistsThroughTheApplicationsOwnTrustChangedHandler()
+    public async Task Forget_Confirmed_PersistsThroughTheApplicationsPersistenceMethod()
     {
         string rootPath = Path.Combine(
             Path.GetTempPath(),
@@ -234,6 +252,14 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
                 ]);
 
             AppSettings settings = await configManager.LoadSettingsAsync();
+
+            // Positive control: the seed really reached the file. Without it, a persistence
+            // method that writes nothing at all leaves the final assertion reading an absence
+            // it would report as a successful revocation.
+            Assert.Equal(
+                ["SHA256:AA:BB:01", "SHA256:AA:BB:02"],
+                settings.TrustedRdpCertificates["srv-1"].Select(e => e.Thumbprint));
+
             var fixture = await VmFixture.CreateAsync();
             fixture.Store.LoadFromConfig(settings.TrustedRdpCertificates.Select(
                 pair => (pair.Key, (IEnumerable<RdpCertificateEntry>)pair.Value)));
@@ -325,6 +351,47 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     }
 
     /// <summary>
+    /// An inventory that cannot be read is reported as unreadable, not as a wave of deletions.
+    /// </summary>
+    /// <remarks>
+    /// <para>The failure path replaced the whole name map with an empty one, so every identifier
+    /// stopped resolving and every row was drawn under the red "profile deleted" badge - while
+    /// the status line under the same grid said the names could not be read. The screen observed
+    /// "the inventory is unavailable" and reported "these profiles were deleted", and a user acts
+    /// differently on each: the first is a file to repair, the second is a list of stale trust to
+    /// clean out.</para>
+    /// <para>The third refresh is the control. Without it, never badging anything would satisfy
+    /// the assertion above forever: a readable inventory that no longer lists the profile is
+    /// still a deletion and still says so.</para>
+    /// </remarks>
+    [Fact]
+    public async Task Refresh_WhenTheInventoryCannotBeRead_DoesNotReportTheProfileAsDeleted()
+    {
+        var fixture = await VmFixture.CreateAsync();
+        fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
+        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        await fixture.ViewModel.RefreshAsync();
+        Assert.False(fixture.ViewModel.Rows[0].IsProfileMissing);
+
+        fixture.ProfilesThrow = true;
+        await fixture.ViewModel.RefreshAsync();
+
+        var row = Assert.Single(fixture.ViewModel.Rows);
+        Assert.Contains("srv-1", row.ProfileDisplay, StringComparison.Ordinal);
+        Assert.False(row.IsProfileMissing);
+
+        // The row says nothing about deletion because the status line is what carries the fact
+        // that was actually observed.
+        Assert.True(fixture.ViewModel.HasStatusMessage);
+
+        fixture.ProfilesThrow = false;
+        fixture.Profiles.Clear();
+        await fixture.ViewModel.RefreshAsync();
+
+        Assert.True(Assert.Single(fixture.ViewModel.Rows).IsProfileMissing);
+    }
+
+    /// <summary>
     /// A profile created since the last refresh is named, not accused of having been deleted.
     /// </summary>
     /// <remarks>
@@ -401,6 +468,56 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     }
 
     /// <summary>
+    /// A reload that cannot read the inventory badges nothing, on the path no refresh walks.
+    /// </summary>
+    /// <remarks>
+    /// <para>The fix has two sites. <c>RefreshAsync</c> is one and is measured by
+    /// <see cref="Refresh_WhenTheInventoryCannotBeRead_DoesNotReportTheProfileAsDeleted"/>; the
+    /// store-event reload is the other, and it was reachable by nothing. The state that separates
+    /// them is a map that is empty AND not a reading: a refresh that failed leaves exactly that,
+    /// and the reload that follows it must not promote the leftover into evidence. The test above
+    /// this one cannot see the difference, because there the names survive and the row resolves
+    /// either way.</para>
+    /// <para>Revoking a certificate from another tab is what raises the event, so the sequence is
+    /// a working day: servers.json is locked, the user refreshes and is told so, then acts on a
+    /// certificate. Every row would be badged "profile deleted" over an inventory nothing read.
+    /// The third step is the control - a reload that DOES read the inventory and no longer finds
+    /// the profile still badges it - without which never badging anything would pass for
+    /// ever.</para>
+    /// </remarks>
+    [Fact]
+    public async Task StoreChange_AfterARefreshThatCouldNotReadTheInventory_BadgesNothing()
+    {
+        var fixture = await VmFixture.CreateAsync();
+        fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
+        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        await fixture.ViewModel.RefreshAsync();
+        Assert.False(fixture.ViewModel.Rows[0].IsProfileMissing);
+
+        // The refresh that drops the names and says so. What it leaves behind is an empty map
+        // that was never a reading of anything.
+        fixture.ProfilesThrow = true;
+        await fixture.ViewModel.RefreshAsync();
+        Assert.Equal("srv-1", fixture.ViewModel.Rows[0].ProfileDisplay);
+        Assert.False(fixture.ViewModel.Rows[0].IsProfileMissing);
+
+        // A trust decision taken elsewhere, with the inventory still unreadable.
+        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
+
+        Assert.Equal(2, fixture.ViewModel.Rows.Count);
+        Assert.All(fixture.ViewModel.Rows, row => Assert.False(row.IsProfileMissing));
+
+        // The control: the inventory comes back readable and really has lost the profile, so the
+        // badge is owed and appears - off the same reload path, without a refresh.
+        fixture.ProfilesThrow = false;
+        fixture.Profiles.Clear();
+        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:03", Stamp));
+
+        Assert.Equal(3, fixture.ViewModel.Rows.Count);
+        Assert.All(fixture.ViewModel.Rows, row => Assert.True(row.IsProfileMissing));
+    }
+
+    /// <summary>
     /// The re-read runs behind the user's confirmation and must not wipe it off the screen.
     /// </summary>
     /// <remarks>
@@ -462,6 +579,96 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
 
         Assert.Single(fixture.ViewModel.Rows);
     }
+
+    /// <summary>
+    /// The confirmation describes what revoking does, and promises nothing beyond it.
+    /// </summary>
+    /// <remarks>
+    /// <para>It used to say the machine would be asked about again the next time it presented the
+    /// certificate. Nothing here can keep that promise. A profile whose name answers on more than
+    /// one machine - a pool, a cluster address - can have a certificate trusted for each; the
+    /// pre-flight evaluates the one certificate it actually probed, so with the sibling still
+    /// trusted it proceeds silently, and the connection that follows is a separate exchange which
+    /// can land on the machine whose certificate was just revoked. At authentication level 0
+    /// Windows imposes no check of its own either. The revoked machine is then presented with no
+    /// question asked.</para>
+    /// <para>Rewording is the whole fix: revoking really does forget this certificate for this
+    /// profile, and saying that is both true and enough to act on. The phrase detector is proven
+    /// able to fire, on the exact wording that shipped, in the test below - an assertion that
+    /// something is absent is worth nothing until something makes it present.</para>
+    /// </remarks>
+    [Fact]
+    public async Task Forget_TheConfirmationSaysWhatRevokingDoes_AndPromisesNoFutureQuestion()
+    {
+        var fixture = await VmFixture.CreateAsync();
+        fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
+        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        await fixture.ViewModel.RefreshAsync();
+        fixture.Dialog.ConfirmResult = false;
+
+        await fixture.ViewModel.ForgetCommand.ExecuteAsync(fixture.ViewModel.Rows[0]);
+
+        string message = fixture.Dialog.LastConfirmMessage;
+
+        // What is forgotten: this certificate, on this profile. Both have to be in the sentence
+        // for the user to know which of several rows they are about to act on.
+        Assert.Contains("Domain controller A", message, StringComparison.Ordinal);
+        Assert.Contains("SHA256:AA:BB:01", message, StringComparison.Ordinal);
+
+        Assert.False(
+            PromisesAFutureQuestion(message),
+            "The revocation confirmation promises a question that the connection pre-flight "
+                + "cannot guarantee: " + message);
+    }
+
+    /// <summary>
+    /// The same promise is gone from both catalogues, and from the panel's own hint.
+    /// </summary>
+    /// <remarks>
+    /// The section hint over the grid carried the identical claim in the identical words. Fixing
+    /// the dialog alone would leave the screen contradicting itself, and the French catalogue is
+    /// where the claim would have survived unnoticed.
+    /// </remarks>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    public async Task TheRevocationCopyPromisesNoFutureQuestionInEitherLanguage(string locale)
+    {
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+
+        string message = localizer.Format(
+            "DialogTrustedRdpCertificateForgetMessage",
+            "Domain controller A",
+            "SHA256:AA:BB:01");
+        string hint = localizer["SettingsRdpTrustedCertificatesSectionHint"];
+
+        Assert.False(PromisesAFutureQuestion(message), locale + ": " + message);
+        Assert.False(PromisesAFutureQuestion(hint), locale + ": " + hint);
+    }
+
+    /// <summary>
+    /// The control for the two tests above: the detector fires on the wording that shipped.
+    /// </summary>
+    /// <remarks>
+    /// Without this, a detector that recognised nothing would report both catalogues clean for
+    /// ever, including the sentence this was written to remove.
+    /// </remarks>
+    [Fact]
+    public void TheFutureQuestionDetectorFiresOnTheWordingThatShipped()
+    {
+        Assert.True(PromisesAFutureQuestion(
+            "Heimdall will stop trusting SHA256:AA:BB:01 for Domain controller A, and will ask "
+                + "you again the next time that machine presents it."));
+
+        Assert.True(PromisesAFutureQuestion(
+            "Heimdall cessera d'approuver SHA256:AA:BB:01 pour Domain controller A, et vous "
+                + "reposera la question la prochaine fois que cette machine le presentera."));
+    }
+
+    private static bool PromisesAFutureQuestion(string text)
+        => FutureQuestionPhrases.Any(
+            phrase => text.Contains(phrase, StringComparison.OrdinalIgnoreCase));
 
     private static ServerProfileDto Profile(string id, string displayName)
         => new() { Id = id, DisplayName = displayName, RemoteServer = id + ".example" };

@@ -68,6 +68,17 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
     private readonly IUiDispatcher _dispatcher;
     private readonly List<TrustedRdpCertificateRowViewModel> _allRows = [];
     private Dictionary<string, string> _profileNames = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether the name map came from an inventory that could actually be read, and is therefore
+    /// evidence about which profiles still exist.
+    /// </summary>
+    /// <remarks>
+    /// An identifier the map does not name means "this profile was deleted" only when the map is
+    /// a reading of the inventory. When the inventory could not be read the map says nothing
+    /// about anything, and the row must not turn that silence into a deletion.
+    /// </remarks>
+    private bool _profileNamesAreEvidence;
     private bool _disposed;
 
     [ObservableProperty]
@@ -165,6 +176,11 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
         // says so. The names are what the user asked to have re-read; keeping the old ones and
         // staying quiet would answer a question nobody asked.
         _profileNames = names ?? new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // Dropping the names is not the same as learning that every profile is gone. The empty
+        // map below is what the failure left behind, not a reading of the inventory, so the rows
+        // it builds must say only what the status line says: the names could not be read.
+        _profileNamesAreEvidence = names is not null;
         RebuildRows();
         StatusMessage = failure;
     }
@@ -209,9 +225,17 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
     /// <summary>Revokes one certificate, once the user has confirmed it.</summary>
     /// <param name="row">The row to forget; ignored when null.</param>
     /// <remarks>
-    /// The confirmation is not a formality. Forgetting is destructive and silent - nothing
-    /// visible happens until the next connection to that machine asks the question again - so
-    /// a mis-click here costs the user an interruption they cannot connect to a cause.
+    /// <para>The confirmation is not a formality. Forgetting is destructive and it is silent: the
+    /// row leaves the grid and nothing else on the screen changes, so a mis-click here costs the
+    /// user a trust decision they will not see undone.</para>
+    /// <para><b>What it does not promise is the next question</b>, and the confirmation copy must
+    /// not promise it either. Revoking removes this certificate from this profile's trust set,
+    /// full stop. Whether the next connection asks again depends on which certificate the endpoint
+    /// presents - <see cref="Heimdall.Core.Certificates.RdpCertificateVerifier"/> evaluates the
+    /// store for the thumbprint it actually probed, so a sibling certificate still trusted for the
+    /// same profile makes the pre-flight silent - and on the pre-flight reaching the endpoint at
+    /// all, which a gateway-routed profile does not. Anyone reworking this wording, or documenting
+    /// this panel, starts from that sentence and not from an older one.</para>
     /// </remarks>
     [RelayCommand]
     private async Task ForgetAsync(TrustedRdpCertificateRowViewModel? row)
@@ -314,6 +338,13 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
         bool known = _profileNames.TryGetValue(profileId, out string? name)
             && !string.IsNullOrWhiteSpace(name);
 
+        // "Not in the inventory" and "the inventory could not be read" both leave the row under
+        // its raw identifier, and they are different facts: the first says the profile was
+        // deleted and this trust decision outlived it, the second says nothing about the profile
+        // at all. Only the first earns the deletion badge, so a user who corrupts or locks
+        // servers.json is not told that every server they own has been deleted.
+        bool missing = !known && _profileNamesAreEvidence;
+
         // The raw identifier is the whole fallback, with no localized parenthetical folded into
         // it: the grid puts a separate "profile deleted" badge beside it. Folding the two would
         // make the cell unsortable against the named rows, unsearchable by the identifier the
@@ -321,7 +352,7 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
         return new TrustedRdpCertificateRowViewModel(
             profileId,
             known ? name! : profileId,
-            !known,
+            missing,
             entry,
             Describe(entry.Subject),
             Describe(entry.Issuer),
@@ -363,6 +394,9 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
             _profileNames = names;
         }
 
+        // Kept names are still shown, but a map that could not be refreshed has stopped being a
+        // reading of the inventory: it can no longer be cited as proof that a profile is gone.
+        _profileNamesAreEvidence = names is not null;
         RebuildRows();
     }
 
