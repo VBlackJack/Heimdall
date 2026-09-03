@@ -679,7 +679,8 @@ public class TunnelManagerTests : IDisposable
             remotePort: 3389,
             socksProxyPort: 0,
             remoteBindPort,
-            remoteLocalPort);
+            remoteLocalPort,
+            gatewayRoute: null);
 
         Assert.Equal(expectedEffectiveRemoteLocalPort, info.EffectiveRemoteLocalPort);
     }

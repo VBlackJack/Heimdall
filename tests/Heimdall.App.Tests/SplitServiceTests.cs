@@ -153,6 +153,167 @@ public sealed class SplitServiceTests : IDisposable
         Assert.False(token1.IsCancellationRequested);
     }
 
+    // ── Category B1: a closing pane survives a state observer that throws ────
+
+    // The shipped defect this pins, which the logs show happening on every exit that had sessions
+    // open. ConnectionStateMachine.Teardown publishes the state change and deliberately rethrows
+    // an observer's exception. ServerListViewModel is such an observer, and its handler's first
+    // act is to reach the UI dispatcher through Application.Current.Dispatcher - null once WPF has
+    // begun shutting down, and it throws synchronously rather than returning a faulted task.
+    //
+    // The teardown call sat bare while the disconnect below it was wrapped, so the throw skipped
+    // the disconnect and every pane behind it. No host was closed, no view was disposed, and
+    // anything a view settles on its way out - a certificate question a connection is still
+    // waiting on, among others - stayed unsettled. The caller's single catch logged one line and
+    // moved on to the next cleanup step, which reads exactly like success.
+    /// <summary>What the UI dispatcher does once <c>Application.Current</c> has gone.</summary>
+    private static void ThrowLikeADeadDispatcher(ConnectionStateChange change)
+        => throw new InvalidOperationException("UI dispatcher is not available.");
+
+    /// <summary>
+    /// A pane whose server the state machine is actually tracking, so a teardown of it reaches
+    /// the publish that rethrows.
+    /// </summary>
+    /// <remarks>
+    /// Without the transition, <c>Teardown</c> returns at its first line - the server is not in
+    /// the dictionary - and no observer is ever called. A test that skipped this looked like it
+    /// was measuring the guard and was measuring nothing: the bare teardown it was written
+    /// against survives it.
+    /// </remarks>
+    private SessionPaneModel TrackedPane(string serverId)
+    {
+        var pane = MakePane(serverId: serverId, connectionType: "SSH");
+        pane.HostControl = new StubCloseGuard { IsBusy = false, Verdict = CloseVerdict.Allow };
+        _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.Initializing);
+        return pane;
+    }
+
+    [Fact]
+    public void CloseAllPanes_StateObserverThrows_StillClosesTheHost()
+    {
+        var session = new SessionTabViewModel();
+        var pane = TrackedPane("srv-close-all");
+        session.RootContent = pane;
+
+        // Subscribed after the transition above, which publishes as well.
+        _connectionSm.StateChanged += ThrowLikeADeadDispatcher;
+        try
+        {
+            var result = _sut.CloseAllPanes(session, CloseRequest.Silent(DisconnectReason.UserAction));
+
+            Assert.True(result.IsClosed);
+
+            // The host is what proves the disconnect ran. Under the defect this stayed set,
+            // because the throw left the method before DisconnectPaneHost.
+            Assert.Null(pane.HostControl);
+        }
+        finally
+        {
+            _connectionSm.StateChanged -= ThrowLikeADeadDispatcher;
+        }
+    }
+
+    // The same sibling, one primitive over. ClosePane carried its own bare teardown, so a single
+    // pane closed by hand at exit hit exactly the same wall - and left the pane in the tree.
+    [Fact]
+    public void ClosePane_StateObserverThrows_StillClosesTheHostAndRemovesThePane()
+    {
+        var session = new SessionTabViewModel();
+        var first = TrackedPane("srv-close-one-a");
+        var second = TrackedPane("srv-close-one-b");
+        session.RootContent = new SplitContainerModel
+        {
+            Orientation = SplitOrientation.Vertical,
+            First = first,
+            Second = second,
+        };
+
+        _connectionSm.StateChanged += ThrowLikeADeadDispatcher;
+        try
+        {
+            var result = _sut.ClosePane(
+                session,
+                second.PaneId,
+                CloseRequest.Silent(DisconnectReason.UserAction));
+
+            Assert.True(result.IsClosed);
+            Assert.Null(second.HostControl);
+
+            // And the tree really lost it, which the throw used to prevent.
+            Assert.DoesNotContain(
+                SplitTreeHelper.EnumerateLeaves(session.RootContent),
+                leaf => string.Equals(leaf.PaneId, second.PaneId, StringComparison.Ordinal));
+        }
+        finally
+        {
+            _connectionSm.StateChanged -= ThrowLikeADeadDispatcher;
+        }
+    }
+
+    // The other way the close could die before touching a single pane: CancelSession runs above
+    // the loop, and Cancel() executes the token's registered callbacks inline, wrapping whatever
+    // they throw. Only ObjectDisposedException was caught.
+    [Fact]
+    public void CloseAllPanes_ACancellationCallbackThrows_StillClosesTheHost()
+    {
+        var session = new SessionTabViewModel();
+        var pane = TrackedPane("srv-cancel-callback");
+        session.RootContent = pane;
+
+        _sut.RegisterSession(session);
+        CancellationToken token = _sut.GetSessionToken(session);
+        using CancellationTokenRegistration registration =
+            token.Register(() => throw new InvalidOperationException("cancellation callback"));
+
+        var result = _sut.CloseAllPanes(session, CloseRequest.Silent(DisconnectReason.UserAction));
+
+        Assert.True(result.IsClosed);
+        Assert.Null(pane.HostControl);
+    }
+
+    // The negative control the assertions above need: with no throwing observer the same close
+    // clears the host too, so they measure survival of the fault rather than a host that was
+    // going to be cleared regardless of what happened above it.
+    [Fact]
+    public void CloseAllPanes_NoObserverThrows_ClosesTheHostTheSameWay()
+    {
+        var session = new SessionTabViewModel();
+        var pane = TrackedPane("srv-control");
+        session.RootContent = pane;
+
+        var result = _sut.CloseAllPanes(session, CloseRequest.Silent(DisconnectReason.UserAction));
+
+        Assert.True(result.IsClosed);
+        Assert.Null(pane.HostControl);
+    }
+
+    // And that the fault really does escape Teardown, so the test above is not measuring a state
+    // machine that quietly swallows it. Without this, wrapping the call in SplitService would look
+    // load-bearing even if nothing could ever throw there.
+    [Fact]
+    public void ConnectionStateMachine_Teardown_RethrowsWhatAnObserverThrew()
+    {
+        void Thrower(ConnectionStateChange change)
+            => throw new InvalidOperationException("UI dispatcher is not available.");
+
+        // Subscribed AFTER the transition on purpose: TryTransition publishes as well, so an
+        // observer attached before it throws there instead, and the assertion below would pass
+        // while measuring the wrong call. Getting that wrong is what this control is for.
+        _connectionSm.TryTransition("srv-observed", Core.Models.ConnectionState.Initializing);
+        _connectionSm.StateChanged += Thrower;
+        try
+        {
+            InvalidOperationException thrown =
+                Assert.Throws<InvalidOperationException>(() => _connectionSm.Teardown("srv-observed"));
+
+            Assert.Equal("UI dispatcher is not available.", thrown.Message);
+        }
+        finally
+        {
+            _connectionSm.StateChanged -= Thrower;
+        }
+    }
+
     // ── Category B0: close guards, whatever the pane hosts ──────────────
     // The guard is consulted for every pane, tool or not, and nothing is torn down while a close
     // is withheld. These are behavioural rather than source-level on purpose: a bypass in one
@@ -661,10 +822,10 @@ public sealed class SplitServiceTests : IDisposable
     {
         // The seam between the two halves of one rule. SplitService gives each pane its own state
         // key by writing it over the profile copy's Id, and the certificate question is filed
-        // against whatever Id the pane runs on. Those two decisions only agree because the key is
-        // minted by SessionIdCodec, which is the only thing that inverts it: mint it any other
-        // way and every split-pane approval is stored under an identifier that dies with the
-        // pane, and the two panes stop sharing a coalescing scope.
+        // against the profile that copy belongs to. Those two decisions only agree because the
+        // key goes on through AdoptSessionIdentity, which records the profile being left behind:
+        // assign the Id directly instead and every split-pane approval is stored under an
+        // identifier that dies with the pane, and the two panes stop sharing a coalescing scope.
         const string inventoryServerId = "rdp-inventory-1";
         AllProfilesRecordingConnectionService connectionService = new AllProfilesRecordingConnectionService();
         SplitService sut = CreateSplitService(connectionService);

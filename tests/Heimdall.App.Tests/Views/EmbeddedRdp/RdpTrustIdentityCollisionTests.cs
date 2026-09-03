@@ -108,11 +108,15 @@ public sealed class RdpTrustIdentityCollisionTests
 
         ServerProfileDto pane = new()
         {
-            Id = SessionIdCodec.Create(ProductionId),
+            Id = ProductionId,
             DisplayName = "Production",
             RemoteServer = "srv01",
             RemotePort = 3389,
         };
+
+        // Through the supported route, which is what records that this copy is a pane OF
+        // Production rather than a profile in its own right.
+        pane.AdoptSessionIdentity(SessionIdCodec.Create(ProductionId));
 
         RdpCertificateVerificationRequest paneRequest =
             RdpCertificateVerificationRequestBuilder.Build(
@@ -144,8 +148,10 @@ public sealed class RdpTrustIdentityCollisionTests
     // never asked.
     //
     // No refinement of that lookup helps: a minted identifier and a deleted profile's identifier
-    // are both absent from the inventory, and absence is all the inventory can report. This is
-    // why the mint records what it minted instead.
+    // are both absent from the inventory, and absence is all the inventory can report. Nor could
+    // the mint keep a record of its own, because an import can arrive carrying a string an
+    // earlier session was minted. This is why the profile copy records what it is a copy OF, at
+    // the instant its identifier is replaced.
     [Fact]
     public async Task AProfileAbsentFromTheInventoryStillKeepsItsApprovalToItself()
     {

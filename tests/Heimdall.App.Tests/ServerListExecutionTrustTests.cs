@@ -80,10 +80,12 @@ public sealed class ServerListExecutionTrustTests
         ServerProfileDto storedProfile = CreateLocalShellProfile("local-1");
         await fixture.ConfigManager.SaveServersAsync(new List<ServerProfileDto> { storedProfile });
 
-        // Minted, not written out. The two are indistinguishable as text, and only the mint says
-        // this session belongs to "local-1" - which is the whole reason an identifier of this
-        // shape is no longer decoded on sight.
-        ServerProfileDto promptProfile = CreateLocalShellProfile(SessionIdCodec.Create("local-1"));
+        // Adopted, not written out. The resulting identifier is indistinguishable as text from
+        // one an import could carry, and only the act of adopting it says this copy belongs to
+        // "local-1" - which is the whole reason an identifier of this shape is no longer decoded
+        // on sight.
+        ServerProfileDto promptProfile = CreateLocalShellProfile("local-1");
+        promptProfile.AdoptSessionIdentity(SessionIdCodec.Create("local-1"));
 
         bool result = await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
         List<ServerProfileDto> storedProfiles = await fixture.ConfigManager.LoadServersAsync();

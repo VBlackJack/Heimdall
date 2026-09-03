@@ -113,16 +113,18 @@ public sealed class TunnelReuseIdentityTests
             Host = "gateway.example.test",
             User = "ssh-user"
         };
+        // Carrying the route it was built with, back when the gateway still read this way.
+        // Written in the initialiser because the property is init-only: a route assigned after
+        // the record exists reaches whichever copy is in hand, and this record is copied twice
+        // more before any caller sees it.
         TunnelInfo existing = MakeTunnel(
             TunnelService.BuildGatewayChainKey([gateway]),
             remoteHost,
             remotePort) with
         {
-            LocalPort = 50124
+            LocalPort = 50124,
+            GatewayRoute = "Paris datacentre"
         };
-
-        // Stamped by whoever opened it, back when the gateway still read this way.
-        existing.GatewayRoute = "Paris datacentre";
 
         Assert.True(tunnelManager.TryRegisterExternalTunnel(existing, new TestDisposable(), () => true));
         var service = new TunnelService(

@@ -1477,7 +1477,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private static ServerProfileDto CloneAdHocProfileForConnection(ServerProfileDto snapshot)
     {
         ServerProfileDto runtimeProfile = snapshot.CloneFaithfully();
-        runtimeProfile.Id = SessionIdCodec.Create(snapshot.Id);
+        runtimeProfile.AdoptSessionIdentity(SessionIdCodec.Create(snapshot.Id));
         return runtimeProfile;
     }
 

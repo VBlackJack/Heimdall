@@ -56,7 +56,7 @@ internal static class RdpCertificateVerificationRequestBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(promptScopeId);
 
         return new RdpCertificateVerificationRequest(
-            ResolveTrustProfileId(server.Id),
+            ResolveTrustProfileId(server),
             string.IsNullOrWhiteSpace(server.DisplayName)
                 ? server.RemoteServer
                 : server.DisplayName,
@@ -70,11 +70,9 @@ internal static class RdpCertificateVerificationRequestBuilder
     /// <summary>
     /// The profile an approval belongs to, given the identifier a pane runs under.
     /// </summary>
-    /// <param name="runtimeProfileId">
-    /// The <c>Id</c> the profile copy this pane runs on carries.
-    /// </param>
-    /// <returns>The profile that identifier was minted for, or it unchanged when it is a
-    /// profile's own.</returns>
+    /// <param name="server">The profile copy this pane runs on.</param>
+    /// <returns>The inventory profile the pane belongs to, or its own identifier when it is one.
+    /// </returns>
     /// <remarks>
     /// <para><b>Trust is a property of the profile, not of the pane.</b> A session-scoped key is
     /// minted per pane so tunnel lifetime and error recovery stay independent, and it is written
@@ -82,20 +80,26 @@ internal static class RdpCertificateVerificationRequestBuilder
     /// Nothing about that is wrong; what was wrong was letting it reach the trust store, which
     /// stores one set of approved thumbprints per profile and is read again on the next
     /// connection, long after every key minted for this one has gone.</para>
-    /// <para><b>Read back from the mint, which is where the answer actually is.</b> The pane copy
-    /// is made in more than one place - a split, an ad-hoc reconnect, a multi-monitor coercion -
-    /// but all of them get their identifier from <see cref="SessionIdCodec.Create"/>, so
-    /// recording the profile there covers every one of them and no call site can forget to.</para>
-    /// <para><b>Two weaker answers were shipped before it, and both misfiled an approval.</b>
-    /// Inverting the identifier's shape unconditionally read the imported profile
-    /// <c>prod_deadbeef</c> as a mint for <c>prod</c> and wrote its approval into that unrelated
-    /// profile's trust set. Asking the inventory first - exact identifier, invert only when it
-    /// names nothing - fixed that case and not the one where <c>prod_deadbeef</c> is deleted
-    /// while its own connection is still being established: deleting a profile does not end the
-    /// connection it started, so the question still carries the deleted profile's name while the
-    /// approval lands under <c>prod</c> again. Absence from the inventory is not evidence of a
-    /// mint, and no lookup can make it so.</para>
+    /// <para><b>Asked of the profile, which is the only thing that knows.</b>
+    /// <see cref="ServerProfileDto.AdoptSessionIdentity"/> records the profile being left behind
+    /// at the instant the key replaces it, and <see cref="ServerProfileDto.InventoryProfileId"/> reads
+    /// that back. Nothing here inspects the identifier's text.</para>
+    /// <para><b>Three weaker answers were shipped before it, and each misfiled an approval.</b>
+    /// Inverting the identifier's SHAPE read the imported profile <c>prod_deadbeef</c> as a mint
+    /// for <c>prod</c>. Asking the INVENTORY fixed that and not the profile deleted while its own
+    /// connection was still being established - deleting a profile does not end the connection it
+    /// started, and a deleted profile is absent for the same reason a minted key is. Keeping a
+    /// process-wide LEDGER of every mint fixed that and not an import arriving under a string an
+    /// earlier session was minted: the session identifier is written to the log, and an import
+    /// preserves the identifier its file carried, so the ledger recognised it as its own past
+    /// mint. Each answer asked what a string WAS; none could, because the same string can be both
+    /// a mint and a profile's name. What distinguishes them is the object's role, and only the
+    /// code that assigned the identifier ever holds it.</para>
     /// </remarks>
-    internal static string ResolveTrustProfileId(string runtimeProfileId)
-        => SessionIdCodec.ResolveInventoryId(runtimeProfileId);
+    internal static string ResolveTrustProfileId(ServerProfileDto server)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+
+        return server.InventoryProfileId;
+    }
 }

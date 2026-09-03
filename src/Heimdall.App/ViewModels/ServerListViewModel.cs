@@ -369,16 +369,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             await _configManager.MutateServersAsync(servers =>
             {
-                // The profile this session was minted for, from the codec's record of the mint.
-                // Written as the shared decision rather than as a second copy of it: the
-                // certificate question applies the same rule from a different layer, and the two
-                // agreeing by resemblance is how one of them shipped inverting unconditionally.
+                // The profile this session belongs to, as the profile itself records it. Read
+                // from the shared property rather than re-derived here: the certificate question
+                // applies the same rule from a different layer, and the two agreeing by
+                // resemblance is how one of them shipped inverting the mint unconditionally.
                 //
-                // Deliberately not narrowed by `servers` here. Reading the inventory looks like
-                // the more careful answer and is the weaker one: a profile deleted while this
-                // connection was still running is absent from `servers`, and treating absence as
+                // Deliberately not narrowed by `servers`. Reading the inventory looks like the
+                // more careful answer and is the weaker one: a profile deleted while this
+                // connection was still running is absent from it, and treating absence as
                 // evidence of a mint is exactly what filed one profile's approval under another.
-                string inventoryId = SessionIdCodec.ResolveInventoryId(profile.Id);
+                string inventoryId = profile.InventoryProfileId;
 
                 ServerProfileDto? stored = servers.FirstOrDefault(
                     server => string.Equals(server.Id, inventoryId, StringComparison.Ordinal));
@@ -996,7 +996,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     : null);
         }
 
-        serverDto.Id = sessionId;
+        // Through AdoptSessionIdentity: the profile this connection belongs to is recorded here,
+        // where it is still known, instead of being read back out of the key's text later.
+        serverDto.AdoptSessionIdentity(sessionId);
         var sessionStartFired = false;
         CancellationTokenSource? sessionStartCts = null;
         var lifecycleHandedOff = false;

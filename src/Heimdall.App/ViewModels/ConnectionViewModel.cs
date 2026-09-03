@@ -557,12 +557,28 @@ public partial class ConnectionViewModel : ObservableObject
     /// Reserved for application exit. The Close All command is a user gesture and drives the
     /// interactive path instead - a guard exists precisely to be consulted there.
     /// </para>
+    /// <para><b>Per session, because one session's failure is not the others'.</b> This ran as a
+    /// bare loop, so the first session that threw ended the cleanup for every session behind it -
+    /// and one reliably did, at exit, on the very path this exists to serve. The caller's single
+    /// catch logged the message and moved on to the next cleanup step, which reads exactly like
+    /// success. What is lost is not tidiness: a session that is never closed is a host never
+    /// disposed and a view never torn down, so anything a view settles on its way out stays
+    /// unsettled and any connection waiting on it waits forever.</para>
     /// </remarks>
     public void CloseAllSessionsSilently()
     {
         foreach (var session in ActiveSessions.ToList())
         {
-            CloseSessionInternal(session, CloseRequest.Silent(DisconnectReason.UserAction));
+            try
+            {
+                CloseSessionInternal(session, CloseRequest.Silent(DisconnectReason.UserAction));
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"Silent close failed for session '{session.Title}': {ex.Message}. "
+                    + "Continuing with the remaining sessions.");
+            }
         }
     }
 

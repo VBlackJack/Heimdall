@@ -113,8 +113,18 @@ public sealed class SplitService : ISplitService
     {
         if (_sessionCts.TryRemove(session, out var cts))
         {
+            // Every exception, not only ObjectDisposedException. Cancel() runs the token's
+            // registered callbacks inline and wraps whatever they throw in an
+            // AggregateException, and this call sits ABOVE the loop that closes each pane - so a
+            // faulting callback would take the whole close down before a single host was
+            // disconnected, which is the same shape as the teardown defect below it.
             try { cts.Cancel(); }
             catch (ObjectDisposedException) { /* Already disposed */ }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"Cancelling the session token threw: {ex.Message}. Closing its panes anyway.");
+            }
 
             // Deferred dispose: in-flight operations still hold token references
             // that must remain valid long enough for guard checks to observe cancellation.
@@ -566,7 +576,10 @@ public sealed class SplitService : ISplitService
             var stateData = _connectionSm.GetStateData(pane.ServerId);
             if (stateData?.TunnelLocalPort is int localPort)
                 _tunnelManager.ReleaseReference(localPort);
-            _connectionSm.Teardown(pane.ServerId);
+
+            // Guarded for the reason TearDownPaneState gives: a state observer that throws must
+            // not skip the disconnect below, nor leave the pane in the tree.
+            TearDownPaneState(pane);
         }
 
         DisconnectPaneHost(pane, request.Reason);
@@ -884,7 +897,19 @@ public sealed class SplitService : ISplitService
         var stateData = _connectionSm.GetStateData(serverId);
         if (stateData?.TunnelLocalPort is int port)
             _tunnelManager.ReleaseReference(port);
-        _connectionSm.Teardown(serverId);
+
+        // Same guard, same reason. This one runs while tidying up after a pane that is already
+        // gone, so a throw here would abandon the tidy-up and log nothing about why.
+        try
+        {
+            _connectionSm.Teardown(serverId);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"Connection state teardown failed for orphaned server '{serverId}': "
+                + $"{ex.Message}. Continuing the cleanup.");
+        }
 
         Core.Logging.FileLogger.Info(
             $"Cleaned up orphaned pane resources for server '{serverId}'.");
@@ -953,7 +978,7 @@ public sealed class SplitService : ISplitService
                 if (stateData?.TunnelLocalPort is int localPort)
                     _tunnelManager.ReleaseReference(localPort);
 
-                _connectionSm.Teardown(pane.ServerId);
+                TearDownPaneState(pane);
             }
 
             DisconnectPaneHost(pane, request.Reason);
@@ -961,6 +986,36 @@ public sealed class SplitService : ISplitService
         }
 
         return PaneCloseResult.Closed;
+    }
+
+    /// <summary>Drops the connection state a closing pane owns.</summary>
+    /// <remarks>
+    /// <para><b>Guarded, for the same reason <see cref="DisconnectPaneHost"/> is, and it was the
+    /// asymmetry between the two that mattered.</b> The cheap call was protected and the throwing
+    /// one was not, so a fault here skipped the disconnect below it and every pane after it.</para>
+    /// <para><b>It throws in the one situation where this loop matters most: application
+    /// exit.</b> <c>Teardown</c> publishes the state change and deliberately rethrows an
+    /// observer's exception. <c>ServerListViewModel</c> is such an observer, and its handler's
+    /// first act is to reach the UI dispatcher through <c>Application.Current.Dispatcher</c> -
+    /// which is null once WPF has begun shutting down, and throws synchronously rather than
+    /// returning a faulted task. The shipped logs show it: every exit that saved a session
+    /// snapshot is followed by "session cleanup: UI dispatcher is not available." and by no
+    /// disconnect at all, so no host was closed and no view was disposed. Anything a view settles
+    /// on its way out - a certificate question a connection is still waiting on, among others -
+    /// was simply never settled.</para>
+    /// </remarks>
+    private void TearDownPaneState(SessionPaneModel pane)
+    {
+        try
+        {
+            _connectionSm.Teardown(pane.ServerId);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"Connection state teardown failed for pane '{pane.PaneId}': {ex.Message}. "
+                + "Closing the pane's host anyway, so the session is not left open.");
+        }
     }
 
     // ── Private helpers ──────────────────────────────────────────────
@@ -1037,7 +1092,11 @@ public sealed class SplitService : ISplitService
         }
 
         var clone = CloneServerProfile(serverDto);
-        clone.Id = stateKey;
+
+        // Through AdoptSessionIdentity, so the pane records which inventory profile it is a pane
+        // OF. A bare assignment leaves that recoverable only from the key's text, and the key's
+        // text cannot be told apart from an imported profile's own identifier.
+        clone.AdoptSessionIdentity(stateKey);
         clone.ConnectionType = connectionType;
         return clone;
     }

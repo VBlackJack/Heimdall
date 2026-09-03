@@ -165,7 +165,21 @@ public sealed partial class TunnelManager
         }
     }
 
-    internal static TunnelInfo BuildTunnelInfo(
+    /// <summary>
+    /// Builds the record for one tunnel, including the gateway route it was dialled through.
+    /// </summary>
+    /// <remarks>
+    /// <para>Public because it is the ONLY place a tunnel record is built. It was internal while
+    /// a second, hand-written construction existed for the Plink fallback in the application
+    /// layer, and that duplicate was outside every test covering this one - so a route added here
+    /// was simply absent there, and the absence was invisible.</para>
+    /// <para><b><paramref name="gatewayRoute"/> is required, and sits before the optional tail so
+    /// that it can be.</b> It arrived as an optional trailing argument, and an optional argument
+    /// that is forgotten is a tunnel with no route and no diagnostic - the exact shape that
+    /// shipped. Passing null is still allowed and still means "no chain to name"; what is no
+    /// longer allowed is not saying.</para>
+    /// </remarks>
+    public static TunnelInfo BuildTunnelInfo(
         string gatewayHost,
         int localPort,
         string remoteHost,
@@ -173,6 +187,7 @@ public sealed partial class TunnelManager
         int socksProxyPort,
         int remoteBindPort,
         int remoteLocalPort,
+        string? gatewayRoute,
         string? label = null,
         string? gatewayChainKey = null,
         string localBindHost = LoopbackBinding.DefaultHost)
@@ -192,7 +207,13 @@ public sealed partial class TunnelManager
                 remoteLocalPort),
             LocalBindHost = LoopbackBinding.NormalizeHost(localBindHost),
             Label = string.IsNullOrWhiteSpace(label) ? null : label.Trim(),
-            GatewayChainKey = gatewayChainKey ?? string.Empty
+            GatewayChainKey = gatewayChainKey ?? string.Empty,
+
+            // Set here rather than assigned once the tunnel is up, because there is no single
+            // "once it is up": the establishment delay runs after registration, and the Plink
+            // fallback returns from a branch of its own. Both left a registered, reusable tunnel
+            // carrying no route.
+            GatewayRoute = string.IsNullOrWhiteSpace(gatewayRoute) ? null : gatewayRoute
         };
     }
 

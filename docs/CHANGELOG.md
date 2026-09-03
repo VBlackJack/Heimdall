@@ -12,6 +12,89 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: three answers to a question a string cannot hold
+
+A third review round. Both remaining blockers were places where a fix had closed the case it was
+shown and left a sibling open.
+
+### Which profile owns a certificate approval
+
+Three schemes tried to recover, from a session identifier's TEXT, which profile it belonged to.
+Reading its shape handed an imported profile's approval to the profile its prefix named. Asking
+the inventory fixed that and not a profile deleted while its own connection was still being
+established. Keeping a process-wide record of every mint fixed that and not an import arriving
+under a string an earlier session had been minted - session identifiers are written to the log,
+and an import preserves whatever identifier its file carried.
+
+None of them could work, and the reason is worth stating plainly: the same string can be both a
+mint and a profile's own name, so no examination of it can separate the two. What separates them
+is the role the object holds it in, and only the code that assigned the identifier ever knows
+that.
+
+A profile copy now records the profile it is a copy of, at the instant its identifier is replaced.
+Forgetting to record it files the approval under a key that dies with the pane, so the certificate
+is asked about again - and no arrangement of the field sends an approval to a profile that did not
+earn it. The field is never serialized, so a crafted import cannot supply one.
+
+### The route on the certificate question, on every way a tunnel can open
+
+Recording the route once the tunnel was up covered neither of the two paths that matter most. The
+recording ran after the configured establishment delay while the tunnel had been registered and
+reusable before it, so a connection reusing it inside that window - thirty seconds, on a profile
+configured for one - got nothing. And the successful Plink fallback returns from a branch of its
+own, above the recording entirely, so every tunnel opened that way and every reuse of one carried
+no route at all.
+
+The route is now set when the tunnel record is built, which is the one instant every opening path
+passes through, and it is an init-only property so the copies taken on the way to a caller carry
+it. Nothing is stamped afterwards, and the result of an attempt no longer carries a second copy of
+it: one field, on the tunnel, read once.
+
+### Every session stayed open at exit, on every exit that had one
+
+Closing a pane tore down its connection state before disconnecting its host, and only the
+disconnect was guarded. The teardown publishes a state change and deliberately rethrows whatever
+an observer throws - and at exit one reliably does, because the observer's first act is to reach
+the UI dispatcher through an `Application.Current` that WPF has already cleared. So the first pane
+threw, the disconnect below it never ran, and neither did anything for any pane behind it. The
+caller logged one line and moved on to the next cleanup step, which reads exactly like success.
+
+The shipped logs say it happened every time: each exit that saved a session snapshot is followed
+by "session cleanup: UI dispatcher is not available." and by no disconnect at all. No host was
+closed and no view was disposed, so anything a view settles on its way out - a certificate
+question a connection is still waiting on, among others - was never settled.
+
+The teardown is now guarded like the disconnect beside it, and the silent close is per session, so
+one session's failure is no longer every session's.
+
+### The same defect, three doors further along
+
+An adversarial sweep and a fourth review round found the siblings each of the fixes above had left
+open, which is the shape this whole campaign keeps taking.
+
+The gateway route reached the tunnel record on the paths that were looked at and not on the rest:
+a chained open with a single gateway delegates to the simple open and dropped the route on the
+way, and both manual tunnel openings never carried one at all - so a hand-opened tunnel, once
+reused by a profile, produced a question with no route. The parameter is now required and sits
+before the optional tail on every one of those calls, so forgetting it does not compile.
+
+The unguarded teardown had two more of itself, in the single-pane close and in the orphan cleanup,
+and the session's cancellation ran above all of them catching only `ObjectDisposedException` while
+`Cancel()` wraps whatever a registered callback throws. All four are guarded now.
+
+### Also
+
+- A split pane's "Edit profile" button asked the editor for the pane's own runtime key, which no
+  inventory row carries, so it answered "server not found" - on the button that is the pre-focused
+  default for six disconnect codes. It now asks for the profile the pane is a copy of. The guard
+  over it asserted only that the event was raised, never with what.
+- The withdrawal posted at application shutdown subscribed to the dispatcher operation's abort,
+  which is not enough on its own: the abort can happen between the post and the subscription, and
+  WPF does not replay it. The status is now re-read after subscribing, behind a latch.
+- The test that covered the route recording supplied an already-recorded tunnel, so it measured
+  the hand-back rather than the recording. It is replaced by tests over the record's construction
+  and over each copy taken between there and the caller.
+
 ## Unreleased: two answers that were safe and still wrong
 
 An external review blocked the certificate-question work twice more. Both blockers came from the
