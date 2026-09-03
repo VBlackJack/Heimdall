@@ -71,20 +71,27 @@ internal static class RdpConnectWatchdogPolicy
     /// </param>
     /// <remarks>
     /// <b>The connect watchdog exists to catch a connection that hangs, not a human who has
-    /// not answered yet.</b> Certificate questions are serialized across the whole
-    /// application - one dialog is shown at a time - so with ten sessions reconnecting at
-    /// once the tenth question is asked minutes after its view entered
-    /// <see cref="RdpConnectionPhase.Preparing"/>. Arming a connect budget over that wait
-    /// tears down a session whose only fault is being at the back of the queue, and the
-    /// symptom is exactly the one serializing the prompts was meant to cure.
+    /// not answered yet.</b> The wait inside a certificate check is a human reading a
+    /// fingerprint, and there is no budget at which that becomes a fault: a session torn down
+    /// because its owner was still reading is a session destroyed by its own safety check.
     /// <para>
-    /// The phase itself is unaffected and still lights the stepper's first segment. Do NOT
-    /// read that as the Cancel button being usable meanwhile: the trust dialog is shown with
-    /// <c>Window.ShowDialog</c>, which is application-modal, so every other window is disabled
-    /// at the Win32 level for as long as any question is on screen - continuously, from the
-    /// first of a queue to the last. The button reports itself enabled and is not clickable.
-    /// While the queue drains, the escape hatch is each dialog's own refusal, which abandons
-    /// that session; Cancel becomes reachable again once no question is displayed.
+    /// <b>The wait can now be indefinite, and that is deliberate.</b> The question used to be
+    /// an application-modal window, which forced an answer by making the rest of the
+    /// application unusable until one arrived. It is now displayed inside the session pane
+    /// that asked it, so it blocks that one connection and nothing else: a user can leave it
+    /// unanswered for as long as they like while they work in every other tab and window. What
+    /// that costs is one pane sitting in <see cref="RdpConnectionPhase.Preparing"/>, showing an
+    /// explicit question, with two ways out on screen. What it buys is that no session is torn
+    /// down for a delay that belongs to the person, not to the network. The pane is not silent
+    /// meanwhile: its status line says it is waiting on the answer.
+    /// </para>
+    /// <para>
+    /// The phase itself is unaffected and still lights the stepper's first segment, and the
+    /// Cancel button it shows is genuinely usable now - in this pane and in every other one.
+    /// That was NOT true while the question was a <c>Window.ShowDialog</c>: application modality
+    /// disabled every other window at the Win32 level for as long as any question was on
+    /// screen, so the button reported itself enabled and could not be clicked. So there are
+    /// three ways out of the wait rather than one: answer, refuse, or cancel the connection.
     /// </para>
     /// <para>
     /// A phase that ends the attempt still wins over a suspension, so cancelling or tearing

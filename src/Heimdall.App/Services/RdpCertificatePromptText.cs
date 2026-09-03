@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Certificates;
+
 namespace Heimdall.App.Services;
 
 /// <summary>Locale keys for the RDP certificate question.</summary>
@@ -42,6 +44,49 @@ public static class RdpCertificatePromptLocaleKeys
 
     /// <summary>Label above the thumbprint.</summary>
     public const string ThumbprintLabel = "RdpCertPromptThumbprintLabel";
+
+    /// <summary>Label above the machine the question is about.</summary>
+    public const string RemoteEndpointLabel = "RdpCertPromptRemoteEndpointLabel";
+
+    /// <summary>Label above the gateways the session reaches that machine through.</summary>
+    public const string RouteLabel = "RdpCertPromptRouteLabel";
+
+    /// <summary>Automation name of the question, which declares itself a dialog.</summary>
+    public const string AutomationName = "A11yRdpCertificatePrompt";
+
+    /// <summary>Status line shown by the pane while it waits for the answer.</summary>
+    public const string PendingStatus = "RdpCertPromptPendingStatus";
+
+    /// <summary>Status line for a connection stopped by an answer the user gave.</summary>
+    public const string RefusedStatus = "RdpCertificateRefusedStatus";
+
+    /// <summary>Status line for a connection stopped by a question that reached nobody.</summary>
+    public const string NotAskedStatus = "RdpCertPromptNotAskedStatus";
+}
+
+/// <summary>Which sentence a stopped connection shows, given why it stopped.</summary>
+/// <remarks>
+/// <para><b>Two ways not to connect, and only one of them is something the user did.</b>
+/// <c>RdpCertificateRefusedStatus</c> reads "you did not approve the certificate this server
+/// presented". Before the question moved into the pane that sentence could not be false: a prompt
+/// always had a window to appear on, so a refusal only ever came from a person. Moving it into a
+/// pane created ways for the question to reach nobody - a pane torn down between the probe and
+/// the question, a surface already unregistered - and every one of them reported the same
+/// outcome, putting that sentence in front of a user who was asked nothing.</para>
+/// <para>Pure and keyed on the outcome, so the mapping is a decision with a test rather than a
+/// branch inside a view nothing can construct.</para>
+/// </remarks>
+public static class RdpCertificateStoppedStatus
+{
+    /// <summary>The locale key for the status line, given what the verifier concluded.</summary>
+    /// <param name="outcome">
+    /// What the check returned, or null when the caller never got one - which is itself a
+    /// question that reached nobody.
+    /// </param>
+    public static string StatusKey(RdpVerificationOutcome? outcome)
+        => outcome == RdpVerificationOutcome.RefusedByUser
+            ? RdpCertificatePromptLocaleKeys.RefusedStatus
+            : RdpCertificatePromptLocaleKeys.NotAskedStatus;
 }
 
 /// <summary>

@@ -49,6 +49,7 @@ public sealed class RdpViewAutomationSurfaceTests
         "ConnectionPhaseStepper",
         "RedirectionIndicatorsPanel",
         "ReconnectOverlay",
+        "CertificatePromptOverlay",
         "TransientToast",
     ];
 

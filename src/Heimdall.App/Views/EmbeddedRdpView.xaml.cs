@@ -28,6 +28,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views.EmbeddedRdp;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
@@ -53,7 +54,8 @@ public partial class EmbeddedRdpView
         IDisposable,
         IRdpDisconnectTeardownTarget,
         IRdpConnectWatchdogTimer,
-        IRdpConnectAttemptRunner
+        IRdpConnectAttemptRunner,
+        IRdpTrustPromptSurface
 {
     private const int BeginConnectMaxAttempts = 10;
     private const int MaxReconnectAttemptTimestamps = 3;
@@ -121,6 +123,27 @@ public partial class EmbeddedRdpView
     private readonly RdpConnectAttemptArbiter _connectAttempts;
 
     private bool _redirectionExpandedOverride;
+
+    /// <summary>
+    /// The token this view's certificate questions are routed by.
+    /// </summary>
+    /// <remarks>
+    /// Minted per view, carried through <c>Heimdall.Core</c> untouched, and resolved back to
+    /// this instance by <see cref="RdpTrustPromptSurfaceRegistry"/>. It is what makes the
+    /// question arrive in the pane that asked it rather than at the main window.
+    /// </remarks>
+    private readonly string _trustPromptScopeId = Guid.NewGuid().ToString("N");
+
+    /// <summary>The certificate question this pane is waiting on, if any.</summary>
+    /// <remarks>
+    /// Built in the constructor rather than here because it is handed this pane's dispatcher:
+    /// a withdrawal is applied where the question is drawn, so it cannot settle in the hop
+    /// between a person pressing an answer and the overlay coming down.
+    /// </remarks>
+    private readonly RdpTrustPromptSession _trustPrompt;
+
+    private IDisposable? _trustPromptRegistration;
+    private string? _statusTextBeforeTrustPrompt;
 
     private CancellationTokenSource? _autofillCts;
     private CancellationTokenSource? _stabilizationCts;
@@ -257,6 +280,9 @@ public partial class EmbeddedRdpView
         {
             IsEnabled = false
         };
+
+        _trustPrompt = new RdpTrustPromptSession(PostTrustPromptWithdrawal);
+        _trustPrompt.QuestionChanged += OnTrustPromptQuestionChanged;
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -499,6 +525,24 @@ public partial class EmbeddedRdpView
         PopulateResolutionMenu();
         CreateHostControl();
         UpdateConnectingStatusFromStateMachineOrDefault();
+
+        RegisterTrustPromptSurface();
+    }
+
+    /// <summary>Publishes this pane as the surface its certificate questions are put to.</summary>
+    /// <remarks>
+    /// Called from <see cref="InitializeSession"/> rather than the constructor because a
+    /// surface that cannot say which machine it is connecting is worse than no surface at all:
+    /// the profile is what supplies the logical host, and until it is set this view would
+    /// answer the question with the address that was dialled - 127.0.0.1 for every tunnelled
+    /// profile, which is the identification failure the whole change exists to remove.
+    /// </remarks>
+    private void RegisterTrustPromptSurface()
+    {
+        RdpTrustPromptSurfaceRegistry? registry = (Application.Current as App)
+            ?.Services?.GetService<RdpTrustPromptSurfaceRegistry>();
+
+        _trustPromptRegistration = registry?.Register(_trustPromptScopeId, this);
     }
 
     public void SetOwningPane(SessionPaneModel pane)
@@ -567,6 +611,17 @@ public partial class EmbeddedRdpView
         _certificateVerificationCts?.Cancel();
         _certificateVerificationCts?.Dispose();
         _certificateVerificationCts = null;
+
+        // Unregistered first so no new question can be routed here, then closed so the one
+        // already on screen stops waiting. Closing the pane is not an answer - it is something
+        // the user did to the pane, not something they said about the certificate - so the
+        // session settles it as NotAsked, which still stops the connection. Reporting it as a
+        // refusal is what told a user they had declined a certificate they were never shown.
+        _trustPromptRegistration?.Dispose();
+        _trustPromptRegistration = null;
+        _trustPrompt.Close();
+        _trustPrompt.QuestionChanged -= OnTrustPromptQuestionChanged;
+
         StopReconnectElapsedTracking();
         StopAntiIdleTimer();
         StopConnectWatchdog();
@@ -3138,15 +3193,16 @@ public partial class EmbeddedRdpView
         // Preparing phase: it lights the stepper's first segment, shows the Cancel button and
         // arms the connect watchdog, none of which used to happen because the phase had no
         // producer and the view sat in None while the status line already said Connecting.
-        // The watchdog is suspended for the check itself (see RdpConnectWatchdogArbiter). Note
-        // that a displayed trust dialog is application-modal, so the Cancel button shown here
-        // cannot be clicked while any question is on screen, in this tab or another.
+        // The watchdog is suspended for the check itself (see RdpConnectWatchdogArbiter). The
+        // Cancel button shown here is clickable throughout, including while this pane or any
+        // other is holding a certificate question: the question is displayed inside the pane
+        // that asked it and is not modal to the application.
         TransitionPhase(RdpConnectionPhase.Preparing);
 
-        RdpConnectionDecision decision;
+        RdpCertificateCheckResult check;
         try
         {
-            decision = await VerifyServerCertificateAsync();
+            check = await VerifyServerCertificateAsync();
         }
         finally
         {
@@ -3173,9 +3229,9 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        if (decision == RdpConnectionDecision.Abandon)
+        if (check.Decision == RdpConnectionDecision.Abandon)
         {
-            HandleCertificateRefused();
+            HandleCertificateStopped(check.Outcome);
             return;
         }
 
@@ -3183,13 +3239,19 @@ public partial class EmbeddedRdpView
     }
 
     /// <summary>Runs the certificate check for this profile, when one is owed.</summary>
-    private async Task<RdpConnectionDecision> VerifyServerCertificateAsync()
+    /// <remarks>
+    /// Returns the gate's own <c>RdpCertificateCheckResult</c>: the decision AND what was
+    /// concluded. Two outcomes stop the connection - an answer a person gave, and a question
+    /// that reached nobody - and the pane has a different sentence for each, so the one-bit
+    /// decision on its own would leave the caller guessing which of them happened.
+    /// </remarks>
+    private async Task<RdpCertificateCheckResult> VerifyServerCertificateAsync()
     {
         AppSettings? settings = _settings;
         ServerProfileDto? server = _server;
         if (_disposed || server is null || settings is null)
         {
-            return RdpConnectionDecision.Proceed;
+            return new RdpCertificateCheckResult(RdpConnectionDecision.Proceed, null);
         }
 
         RdpRedirectionOptions redirections =
@@ -3200,7 +3262,7 @@ public partial class EmbeddedRdpView
 
         if (!RdpCertificateGate.VerificationRequired(auth.AuthenticationLevel))
         {
-            return RdpConnectionDecision.Proceed;
+            return new RdpCertificateCheckResult(RdpConnectionDecision.Proceed, null);
         }
 
         RdpCertificateVerifier? verifier = (Application.Current as App)
@@ -3210,7 +3272,7 @@ public partial class EmbeddedRdpView
             // Nothing was verified, so nothing may change.
             Core.Logging.FileLogger.Warn(
                 "EmbeddedRDP certificate verifier is unavailable; connecting unverified.");
-            return RdpConnectionDecision.Proceed;
+            return new RdpCertificateCheckResult(RdpConnectionDecision.Proceed, null);
         }
 
         // The address actually dialled, which for a tunneled session is the local end of the
@@ -3229,26 +3291,25 @@ public partial class EmbeddedRdpView
                 + $"session is routed through RD Gateway '{server.RdpGateway}', which the probe "
                 + "cannot reach. Connecting without a verified certificate.");
             ShowTransientToast(L(LocaleKeys.CertificateNotVerifiableToast));
-            return RdpConnectionDecision.Proceed;
+            return new RdpCertificateCheckResult(RdpConnectionDecision.Proceed, null);
         }
 
         _certificateVerificationCts?.Dispose();
         _certificateVerificationCts = new CancellationTokenSource();
 
-        RdpCertificateVerificationRequest request = new(
-            server.Id,
-            string.IsNullOrWhiteSpace(server.DisplayName)
-                ? server.RemoteServer
-                : server.DisplayName,
-            target.Value.Host,
-            target.Value.Port);
+        // Built rather than written inline because of the scope token: it is what routes the
+        // question back into this pane instead of onto the application's main window, and a
+        // request that loses it is refused rather than asked somewhere else.
+        RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(server, target.Value, _trustPromptScopeId);
 
-        // Past this point a probe runs and a trust question may be asked. The question is
-        // serialized across every session, so the answer can arrive minutes later; the connect
-        // watchdog stops here and is resumed by the caller once the check has returned.
+        // Past this point a probe runs and a trust question may be asked. The question is put to
+        // a person inside this pane and may go unanswered indefinitely, so the connect watchdog
+        // stops here and is resumed by the caller once the check has returned. Two questions
+        // about the same certificate and the same profile are still coalesced into one, so a
+        // second pane can be waiting on an answer given in the first.
         _connectWatchdogArbiter.CertificateCheckStarted();
 
-        return await RdpCertificateGate.DecideConnectionAsync(
+        return await RdpCertificateGate.CheckConnectionAsync(
             auth.AuthenticationLevel,
             async ct =>
             {
@@ -3263,19 +3324,317 @@ public partial class EmbeddedRdpView
             _certificateVerificationCts.Token);
     }
 
-    /// <summary>Ends the attempt the user declined, and says why.</summary>
+    /// <summary>Ends an attempt no approval cleared, and says which of the two it was.</summary>
+    /// <param name="outcome">What the verifier concluded, or null when no outcome came back.</param>
     /// <remarks>
-    /// Reported through the error surface because the tab is finished either way, but
-    /// with its own wording: this is not a fault, it is the answer the user gave.
+    /// <para>Reported through the error surface because the tab is finished either way, but with
+    /// its own wording: this is not a fault.</para>
+    /// <para><b>The wording is chosen from the outcome, not assumed.</b> This method used to say
+    /// "you did not approve the certificate this server presented" whatever had happened, which
+    /// was safe while a question always had a window to appear on. Once the question lives in a
+    /// pane it can reach nobody - a pane torn down between the probe and the question, a surface
+    /// already unregistered - and that sentence then attributes to the user a decision they were
+    /// never offered.</para>
     /// </remarks>
-    private void HandleCertificateRefused()
+    private void HandleCertificateStopped(RdpVerificationOutcome? outcome)
     {
         Core.Logging.FileLogger.Warn(
-            "EmbeddedRDP connection abandoned: the server certificate was refused.");
+            "EmbeddedRDP connection abandoned without an approved certificate "
+            + $"(outcome={outcome?.ToString() ?? "none"}).");
         _allowResolutionUpdates = false;
         TransitionPhase(RdpConnectionPhase.None);
         UpdateSessionStatus(RdpSessionStatus.Error);
-        SetStatusText(L("RdpCertificateRefusedStatus"));
+        SetStatusText(L(RdpCertificateStoppedStatus.StatusKey(outcome)));
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The pane is the surface, so the marshalling happens here rather than in the presenter:
+    /// the question is a WPF element of this view and everything it shows is read off this
+    /// view's own state.
+    /// </remarks>
+    Task<RdpTrustAnswer> IRdpTrustPromptSurface.AskAsync(
+        RdpCertificatePromptContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (!Dispatcher.CheckAccess())
+        {
+            return Dispatcher
+                .InvokeAsync(
+                    () => AskInPaneAsync(context, cancellationToken),
+                    DispatcherPriority.Normal)
+                .Task
+                .Unwrap();
+        }
+
+        return AskInPaneAsync(context, cancellationToken);
+    }
+
+    private Task<RdpTrustAnswer> AskInPaneAsync(
+        RdpCertificatePromptContext context,
+        CancellationToken cancellationToken)
+    {
+        if (_disposed || _localizer is null)
+        {
+            // Nothing can be shown, so nothing was asked and nothing was approved. A pane torn
+            // down between the probe and the question is the ordinary case here. It stops the
+            // connection, and it is reported as a question nobody received rather than as an
+            // answer nobody gave.
+            Core.Logging.FileLogger.Warn(
+                "EmbeddedRDP cannot show the certificate question: the pane is gone "
+                + $"(disposed={_disposed}). The question was not asked.");
+            return Task.FromResult(RdpTrustAnswer.NotAsked);
+        }
+
+        RdpCertificatePromptDialogViewModel question =
+            new(_localizer, context, BuildTrustPromptOrigin(context));
+
+        return _trustPrompt.AskAsync(question, cancellationToken);
+    }
+
+    /// <summary>Says which machine this pane is reaching, through what, and where the pane is.</summary>
+    /// <remarks>
+    /// <para><b>The endpoint here is the profile's, not the probe's.</b> The probe dials the
+    /// local end of the SSH tunnel when there is one, so its address is 127.0.0.1 for every
+    /// tunnelled profile in the application; the same text the header bar shows is what
+    /// identifies the machine, and it names the tunnel endpoint after it rather than instead of
+    /// it.</para>
+    /// <para><b>And the endpoint alone is still not an identity.</b> Two profiles reaching one
+    /// short name through two different gateways are two machines whose endpoint text differs
+    /// only by an ephemeral local port. The gateway chain is resolved here, from the profile
+    /// rather than from the live tunnel, because this question is asked during Preparing - before
+    /// the tab's own route string has been filled in.</para>
+    /// <para><b>The tab is named as it is announced, not as it is displayed.</b>
+    /// <c>DisplayTitle</c> is identical by construction for two sessions of one profile, so it
+    /// added nothing precisely where two same-named sessions were the problem;
+    /// <c>AccessibleName</c> is the same string with the ordinal this application already
+    /// computes for colliding titles.</para>
+    /// </remarks>
+    private RdpTrustPromptOrigin BuildTrustPromptOrigin(RdpCertificatePromptContext context)
+    {
+        ServerProfileDto? server = _server;
+        string endpoint = server is null ? string.Empty : BuildEndpointText(server);
+        string? route = server is null
+            ? null
+            : RdpTrustPromptRoute.Describe(
+                server.UseDirectConnection,
+                server.SshGatewayId,
+                _settings?.SshGateways);
+
+        return new RdpTrustPromptOrigin(
+            string.IsNullOrWhiteSpace(endpoint) ? context.Host : endpoint,
+            route,
+            AnnouncedTabTitle(),
+            Window.GetWindow(this)?.Title);
+    }
+
+    /// <summary>How this pane's tab is announced, falling back to what it displays.</summary>
+    /// <remarks>
+    /// The choice itself lives in <see cref="RdpTrustPromptOwner.AnnouncedName"/>, with the
+    /// reasoning: the displayed title is identical by construction for two sessions of one
+    /// profile, so it identified nothing in exactly the case this line exists for.
+    /// </remarks>
+    private string? AnnouncedTabTitle()
+    {
+        SessionTabViewModel? tab = _sessionTab;
+        if (tab is null)
+        {
+            return null;
+        }
+
+        return RdpTrustPromptOwner.AnnouncedName(tab.AccessibleName, tab.DisplayTitle);
+    }
+
+    /// <summary>Applies a withdrawal of the certificate question where the question is drawn.</summary>
+    /// <remarks>
+    /// <para>A withdrawal arrives on whichever thread cancelled - a pool thread running another
+    /// pane's answer - while the three buttons that answer this pane's copy are hit-tested here.
+    /// Posting it makes the settlement and the hiding one work item on this thread, so the
+    /// question stops being answerable at the moment it stops being visible instead of a
+    /// dispatcher hop earlier. In that hop a person pressed Do-not-connect on a live-looking
+    /// question, had it discarded, and watched the pane adopt the other pane's approval and
+    /// connect.</para>
+    /// <para><b>Background, not Normal.</b> Background sits below Input, so a click already
+    /// queued is dispatched before the withdrawal and counts as the answer to a question its
+    /// user could still see. At Normal the withdrawal would overtake that click and lose it,
+    /// which is the same defect in a shorter window.</para>
+    /// </remarks>
+    private void PostTrustPromptWithdrawal(Action withdrawal)
+    {
+        try
+        {
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, withdrawal);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The dispatcher has finished shutting down, so nothing will ever draw or click this
+            // question again and there is no press left to race. Applying it here is then as
+            // safe as applying it there, and the alternative is a connection left waiting for an
+            // answer that can no longer arrive.
+            Core.Logging.FileLogger.Warn(
+                "EmbeddedRDP could not post the certificate question's withdrawal to the UI "
+                + $"thread ({ex.Message}); applying it here instead.");
+            withdrawal();
+        }
+    }
+
+    /// <summary>Shows or hides the question the session is waiting on.</summary>
+    /// <remarks>
+    /// The session raises this on whichever thread settled the question - the UI thread for an
+    /// answer, the cancelling thread for a withdrawal - so it is marshalled here before any
+    /// element is touched.
+    /// </remarks>
+    private void OnTrustPromptQuestionChanged()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.Normal,
+                new Action(OnTrustPromptQuestionChanged));
+            return;
+        }
+
+        RdpCertificatePromptDialogViewModel? question = _trustPrompt.Question;
+        if (question is null)
+        {
+            HideCertificatePrompt();
+            return;
+        }
+
+        ShowCertificatePrompt(question);
+    }
+
+    private void ShowCertificatePrompt(RdpCertificatePromptDialogViewModel question)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        CertificatePromptOverlay.DataContext = question;
+
+        // WindowsFormsHost is backed by a child HWND and paints over WPF whatever the z-order,
+        // so the question would sit invisible behind the RDP surface. The reconnect overlay
+        // obeys the same airspace rule; this one restores the host when the question is
+        // answered, because unlike a disconnect there is a session still to come.
+        FormsHost.Visibility = System.Windows.Visibility.Collapsed;
+        CertificatePromptOverlay.Visibility = System.Windows.Visibility.Visible;
+
+        // A pane the user is not looking at can be holding a question, and the question no
+        // longer comes to them: the header line has to say why this session has stopped. The
+        // previous line is kept so the pane does not come back from an answer with a status
+        // that belongs to the question.
+        _statusTextBeforeTrustPrompt = StatusTextBlock.Text;
+        SetStatusText(L(RdpCertificatePromptLocaleKeys.PendingStatus));
+
+        // LiveSetting alone publishes a property nothing reads. The event is what a screen
+        // reader is told by, and it is raised on the message rather than on the container,
+        // whose name is a constant.
+        _ = RdpLiveRegion.Announce(CertificatePromptMessageText);
+
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            if (_disposed
+                || CertificatePromptOverlay.Visibility != System.Windows.Visibility.Visible)
+            {
+                return;
+            }
+
+            // Refusal keeps the focus, which is what makes it the default action now that no
+            // window carries IsDefault: the answer a stray Enter gives creates no durable trust.
+            _ = CertificatePromptRefuseButton.Focus();
+            _ = Keyboard.Focus(CertificatePromptRefuseButton);
+        }));
+    }
+
+    private void HideCertificatePrompt()
+    {
+        CertificatePromptOverlay.Visibility = System.Windows.Visibility.Collapsed;
+        CertificatePromptOverlay.DataContext = null;
+
+        // Restored only when the line is still the one this question put there. A tunnel or a
+        // state-machine update during the wait owns the status now, and writing the older text
+        // back over it would report a stage the session has already left.
+        if (_statusTextBeforeTrustPrompt is not null
+            && string.Equals(
+                StatusTextBlock.Text,
+                L(RdpCertificatePromptLocaleKeys.PendingStatus),
+                StringComparison.Ordinal))
+        {
+            SetStatusText(_statusTextBeforeTrustPrompt);
+        }
+
+        _statusTextBeforeTrustPrompt = null;
+
+        RestoreRdpSurfaceAfterTrustPrompt();
+    }
+
+    /// <summary>Gives the native RDP surface back once no question stands in front of it.</summary>
+    /// <remarks>
+    /// The other half of an airspace pairing: <see cref="ShowCertificatePrompt"/> collapses the
+    /// <c>WindowsFormsHost</c> because its child HWND paints over WPF whatever the z-order, and
+    /// a collapse without this restore leaves every approved session showing a blank pane,
+    /// which looks exactly like a failed connection. A torn-down pane keeps it collapsed: its
+    /// own teardown collapses it anyway, and there is no session left to show.
+    /// </remarks>
+    private void RestoreRdpSurfaceAfterTrustPrompt()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        FormsHost.Visibility = System.Windows.Visibility.Visible;
+    }
+
+    private void OnCertificatePromptPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_disposed || e is null)
+        {
+            return;
+        }
+
+        RdpCertificatePromptDialogViewModel? question = _trustPrompt.Question;
+        if (question is null)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            // Escape is a refusal, exactly as the title-bar cross of the window it replaces was.
+            question.RefuseFromDismissal();
+            e.Handled = true;
+            return;
+        }
+
+        // A focused Button answers Space on its own but not Enter, which only ever went to a
+        // window's IsDefault button. There is no window here, so Enter is delivered by hand to
+        // whichever answer holds the focus.
+        if (e.Key == Key.Enter
+            && Keyboard.FocusedElement is Button focused
+            && IsWithinCertificatePrompt(focused))
+        {
+            focused.RaiseEvent(new RoutedEventArgs(
+                System.Windows.Controls.Primitives.ButtonBase.ClickEvent,
+                focused));
+            e.Handled = true;
+        }
+    }
+
+    private bool IsWithinCertificatePrompt(DependencyObject element)
+    {
+        for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, CertificatePromptOverlay))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void HandleFailure(string message, Exception ex)

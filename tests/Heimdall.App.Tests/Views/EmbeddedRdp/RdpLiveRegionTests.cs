@@ -77,13 +77,17 @@ public sealed class RdpLiveRegionTests
     }
 
     // Guarding the guard: the elements named above really do declare the live setting, so the
-    // theory is measuring the view's own declarations rather than a list that drifted.
+    // theory is measuring the view's own declarations rather than a list that drifted. The
+    // expected value is per element rather than a constant, because the two settings are not
+    // interchangeable: Polite waits for a gap in whatever the reader is saying, which is right
+    // for a status line, and Assertive interrupts, which is right for a question that has
+    // stopped the session and is waiting on an answer.
     [Theory]
     [MemberData(nameof(AnnouncingRegions))]
-    public void EachNamedRegionStillDeclaresALiveSetting(string elementName)
+    public void EachNamedRegionStillDeclaresItsOwnLiveSetting(string elementName)
     {
         Assert.Equal(
-            "Polite",
+            AnnouncingRegionSettings[elementName],
             ViewSource.AutomationAttribute(ViewSource.NamedElement(elementName), "LiveSetting"));
     }
 
@@ -115,17 +119,29 @@ public sealed class RdpLiveRegionTests
         Assert.Equal(expected, declared);
     }
 
-    /// <summary>Every element in the RDP view that is declared as a live region.</summary>
+    /// <summary>
+    /// Every element in the RDP view that is declared as a live region, and how it announces.
+    /// </summary>
+    /// <remarks>
+    /// <c>CertificatePromptMessageText</c> is the one Assertive region: it carries a question
+    /// that has blocked its session and that nothing else on screen restates. Everything else
+    /// here reports state the user can come back to.
+    /// </remarks>
+    private static readonly Dictionary<string, string> AnnouncingRegionSettings =
+        new(StringComparer.Ordinal)
+        {
+            ["AutofillStatusText"] = "Polite",
+            ["CertificatePromptMessageText"] = "Assertive",
+            ["ConnectionPhaseStepper"] = "Polite",
+            ["HealthDot"] = "Polite",
+            ["ReconnectMessageText"] = "Polite",
+            ["RedirectionIndicatorsPanel"] = "Polite",
+            ["StatusTextBlock"] = "Polite",
+            ["TransientToast"] = "Polite",
+        };
+
     private static readonly string[] AnnouncingRegionNames =
-    [
-        "AutofillStatusText",
-        "ConnectionPhaseStepper",
-        "HealthDot",
-        "ReconnectMessageText",
-        "RedirectionIndicatorsPanel",
-        "StatusTextBlock",
-        "TransientToast",
-    ];
+        [.. AnnouncingRegionSettings.Keys];
 
     public static TheoryData<string> AnnouncingRegions()
     {

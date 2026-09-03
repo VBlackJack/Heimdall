@@ -46,10 +46,23 @@ internal static class ViewSource
 
     internal static XDocument Markup() => XDocument.Load(MarkupPath());
 
+    /// <summary>The markup as text, for a guard that wants to measure a mutated copy.</summary>
+    internal static string MarkupText() => File.ReadAllText(MarkupPath());
+
     /// <summary>Finds the markup element carrying <paramref name="name"/> as its x:Name.</summary>
-    internal static XElement NamedElement(string name)
+    internal static XElement NamedElement(string name) => NamedElement(Markup(), name);
+
+    /// <summary>The same, over any version of the markup.</summary>
+    /// <remarks>
+    /// A markup guard has the same vacuity problem as a source guard: an assertion over the
+    /// real file passes and says nothing about whether it would fail on the shape it forbids.
+    /// Parsing a mutated copy is how such a guard gets its control.
+    /// </remarks>
+    internal static XElement NamedElement(XDocument markup, string name)
     {
-        XElement? element = Markup()
+        ArgumentNullException.ThrowIfNull(markup);
+
+        XElement? element = markup
             .Descendants()
             .FirstOrDefault(e => (string?)e.Attribute(s_xaml + "Name") == name);
 

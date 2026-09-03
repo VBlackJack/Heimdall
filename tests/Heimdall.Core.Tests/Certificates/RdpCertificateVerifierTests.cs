@@ -175,6 +175,32 @@ public sealed class RdpCertificateVerifierTests
     }
 
     [Fact]
+    public async Task Verify_QuestionReachedNobody_IsNotReportedAsARefusal()
+    {
+        // The defect this separates out. Every way of failing to ask - a pane torn down between
+        // the probe and the question, a surface already unregistered - used to come back as
+        // RefusedByUser, and the pane then told its user "you did not approve the certificate
+        // this server presented" about a question that was never put to them.
+        RdpCertificateTrustStore store = new();
+
+        RdpVerificationOutcome outcome = await Build(
+                Obtained(Thumb),
+                store,
+                new FakePrompt(RdpTrustAnswer.NotAsked))
+            .VerifyAsync(Request(), default);
+
+        Assert.Equal(RdpVerificationOutcome.QuestionNotAsked, outcome);
+        Assert.NotEqual(RdpVerificationOutcome.RefusedByUser, outcome);
+
+        // Nothing was approved, so nothing is written - the same as a refusal, and the reason
+        // the distinction is safe to make at all.
+        Assert.Empty(store.GetApproved(ProfileId));
+        Assert.Equal(
+            RdpCertificateTrustVerdict.Unknown,
+            store.Evaluate(ProfileId, Thumb).Verdict);
+    }
+
+    [Fact]
     public async Task Verify_TrustIsPerProfile_SoAnotherProfileIsStillAsked()
     {
         RdpCertificateTrustStore store = new();

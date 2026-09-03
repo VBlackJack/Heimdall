@@ -39,6 +39,25 @@ public enum RdpVerificationOutcome
     /// verified nothing and must not act as though it had.
     /// </summary>
     CouldNotVerify,
+
+    /// <summary>
+    /// An unknown certificate was found and the question about it never reached a person.
+    /// The connection must not be opened, and the user must not be told they refused it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not <see cref="RefusedByUser"/>, and the difference is a sentence the user reads.</b>
+    /// The pane that could not ask - torn down between the probe and the question, holding no
+    /// surface to draw on - used to report the same outcome as a person pressing "Do not
+    /// connect", so the status line said "you did not approve the certificate" about a question
+    /// that was never put to anyone.
+    /// <para>
+    /// <b>Not <see cref="CouldNotVerify"/> either.</b> That one means the probe found nothing to
+    /// judge, and the connection proceeds exactly as it would have without this feature. Here
+    /// the probe found a certificate this profile has never trusted, so proceeding would open a
+    /// session on an approval nobody gave.
+    /// </para>
+    /// </remarks>
+    QuestionNotAsked,
 }
 
 /// <summary>What the user is shown when an unknown certificate turns up.</summary>
@@ -72,6 +91,21 @@ public sealed record RdpCertificatePromptContext(
     /// user was never shown.
     /// </remarks>
     public string? ProfileId { get; init; }
+
+    /// <summary>
+    /// Identifies the surface that must display this question, so it is put where the user is
+    /// looking rather than at whichever window the application calls its main one.
+    /// </summary>
+    /// <remarks>
+    /// An opaque token minted by the presentation layer and carried through untouched: this
+    /// assembly neither reads it nor knows what it addresses. It exists because a question has
+    /// to name a machine, and <see cref="Host"/> cannot always do that - a session tunnelled
+    /// over SSH verifies the local end of the tunnel, so its address is 127.0.0.1 for every
+    /// such profile. Two tunnelled profiles both named "Production" therefore produced two
+    /// identical questions, both owned by the main window, and either answer could be given
+    /// to the wrong machine.
+    /// </remarks>
+    public string? PromptScopeId { get; init; }
 }
 
 /// <summary>What the user answered.</summary>
@@ -85,6 +119,19 @@ public enum RdpTrustAnswer
 
     /// <summary>Do not connect.</summary>
     Refuse,
+
+    /// <summary>
+    /// Nobody was asked, so nobody answered.
+    /// </summary>
+    /// <remarks>
+    /// <b>Every way of not answering resolves here, and every one of them still stops the
+    /// connection.</b> The surface torn down, the pane closed, the question withdrawn because
+    /// another pane answered it first: none is approval, and the safety rule is unchanged.
+    /// What changes is that the caller can now tell those apart from
+    /// <see cref="Refuse"/> - an answer a person gave - and so can say which of the two
+    /// happened instead of attributing to the user a decision they never made.
+    /// </remarks>
+    NotAsked,
 }
 
 /// <summary>Asks the user about a certificate their profile has never seen.</summary>
@@ -107,7 +154,16 @@ public sealed record RdpCertificateVerificationRequest(
     string ProfileId,
     string ProfileName,
     string Host,
-    int Port);
+    int Port)
+{
+    /// <summary>Identifies the surface that must display any question this check raises.</summary>
+    /// <remarks>
+    /// Opaque here; <see cref="RdpCertificatePromptContext.PromptScopeId"/> says what it buys.
+    /// A request carrying none asks nobody: the presenter has no surface to put the question
+    /// on, and a question that cannot be asked is refused rather than assumed.
+    /// </remarks>
+    public string? PromptScopeId { get; init; }
+}
 
 /// <summary>
 /// Runs the certificate check that must happen before an RDP session is opened.
@@ -177,6 +233,7 @@ public sealed class RdpCertificateVerifier(
                 decision.AlreadyTrustedCount)
             {
                 ProfileId = request.ProfileId,
+                PromptScopeId = request.PromptScopeId,
             },
             cancellationToken);
 
@@ -203,6 +260,11 @@ public sealed class RdpCertificateVerifier(
             case RdpTrustAnswer.TrustForSession:
                 _store.TrustForSession(profileId, probed.Thumbprint!);
                 return RdpVerificationOutcome.TrustedByUser;
+
+            case RdpTrustAnswer.NotAsked:
+                // Nothing is written and nothing is opened, but the caller is told which of the
+                // two "do not connect" outcomes this was, because it has a sentence to choose.
+                return RdpVerificationOutcome.QuestionNotAsked;
 
             default:
                 return RdpVerificationOutcome.RefusedByUser;
