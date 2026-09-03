@@ -41,10 +41,12 @@ internal interface IRdpConnectWatchdogTimer
 /// <remarks>
 /// <para>The reason this is a type and not two statements in the view: with about ten RDP
 /// sessions reconnecting at once, every view enters <see cref="RdpConnectionPhase.Preparing"/>
-/// immediately and arms its own connect budget, while the trust prompts are serialized and
-/// shown one at a time. The sessions at the back of the queue exceeded the budget before
-/// their question was ever displayed. Serializing the prompts had turned "a dialog hides
-/// behind another window" into "the back of the queue times out".</para>
+/// immediately and arms its own connect budget, while the answer is a human reading a
+/// fingerprint. The sessions whose question was answered last exceeded the budget without
+/// anything having gone wrong on the network. That was at its worst while the questions were
+/// serialized application-wide - the back of the queue timed out before its question had even
+/// been displayed - and it does not disappear now that each pane shows its own question, since
+/// a person still answers ten of them one after another.</para>
 /// <para>The whole certificate check is suspended, not just the question. The probe bounds
 /// itself - five seconds by default - so the watchdog is not what protects it, and the only
 /// unbounded wait inside the check is the human answer, which is precisely the wait that must

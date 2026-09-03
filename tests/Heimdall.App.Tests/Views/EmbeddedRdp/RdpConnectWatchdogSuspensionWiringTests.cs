@@ -54,7 +54,7 @@ public sealed class RdpConnectWatchdogSuspensionWiringTests
     private const string TransitionPhase = "private void TransitionPhase(RdpConnectionPhase newPhase)";
     private const string StartVerifiedConnect = "private async Task StartVerifiedConnectAsync()";
     private const string VerifyCertificate =
-        "private async Task<RdpConnectionDecision> VerifyServerCertificateAsync()";
+        "private async Task<RdpCertificateCheckResult> VerifyServerCertificateAsync()";
     private const string SuspendMember = "private void SuspendConnectWatchdog()";
     private const string CancelMember = "private void CancelConnectWatchdog()";
 
@@ -83,11 +83,16 @@ public sealed class RdpConnectWatchdogSuspensionWiringTests
         "_ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(BeginConnect));";
 
     // The question itself, carried whole. The ordering below used to end on the bare name
-    // "RdpCertificateGate.DecideConnectionAsync", and a bare name is text at an offset: fold the
+    // "RdpCertificateGate.CheckConnectionAsync", and a bare name is text at an offset: fold the
     // question behind a term that is false by construction and the name stays exactly where it
     // was, the ordering still holds, and this file stays green while no question is ever asked.
+    //
+    // CheckConnectionAsync rather than DecideConnectionAsync: the check now hands back what it
+    // concluded as well as whether to connect, because two outcomes stop the connection - an
+    // answer a person gave, and a question that reached nobody - and the pane has a different
+    // sentence for each.
     private const string CertificateQuestion =
-        "return await RdpCertificateGate.DecideConnectionAsync(";
+        "return await RdpCertificateGate.CheckConnectionAsync(";
 
     // The credential-wait reset of the cancel path, carried whole for the same reason. A bare
     // Assert.Contains on the assignment sees it wherever it stands, so a reset folded behind a

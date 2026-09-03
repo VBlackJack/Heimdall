@@ -224,6 +224,14 @@ public sealed class TrustPromptCoordinatorTests
         Assert.Equal(1, displayCount);
     }
 
+    // The RDP certificate question no longer arrives here. It shares an answer without sharing
+    // a display, which this type cannot express: it runs the FIRST caller's display and hands
+    // that one return value to everyone who joined, so a teardown in the displaying pane became
+    // the other pane's answer. See RdpTrustQuestionCoalescer, and the tests that pin it in
+    // PaneRdpCertificateTrustPromptTests. What remains here is the two callers this shape is
+    // right for: SSH host keys and FTPS certificates, whose questions are top-level modal
+    // windows owned by the application rather than by any one caller.
+
     private static TrustPromptKey CreateKey(
         TrustPromptKind kind,
         string host,

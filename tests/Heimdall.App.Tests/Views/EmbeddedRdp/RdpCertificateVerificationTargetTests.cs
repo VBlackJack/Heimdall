@@ -108,7 +108,7 @@ public sealed class RdpCertificateVerificationTargetTests
     [Fact]
     public void TheViewBuildsItsProbeTargetThroughTheResolver()
     {
-        string body = ViewSource.HandlerBody("private async Task<RdpConnectionDecision> VerifyServerCertificateAsync()");
+        string body = ViewSource.HandlerBody("private async Task<RdpCertificateCheckResult> VerifyServerCertificateAsync()");
 
         Assert.Contains(
             "RdpProfileResolver.BuildCertificateVerificationTarget(",

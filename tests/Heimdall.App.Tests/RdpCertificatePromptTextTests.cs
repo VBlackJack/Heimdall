@@ -90,7 +90,9 @@ public sealed class RdpCertificatePromptTextTests
         LocalizationManager french = await CreateLocalizerAsync("fr");
 
         // Reflected rather than listed, so a key added later without a translation is a
-        // red test rather than silent drift.
+        // red test rather than silent drift. The count below is the vacuity guard on the
+        // reflection, and it tracks the constants: a key added to the holder without being
+        // counted here would leave this loop measuring a set nobody chose.
         string[] keys =
         [
             .. typeof(RdpCertificatePromptLocaleKeys)
@@ -99,7 +101,7 @@ public sealed class RdpCertificatePromptTextTests
                 .Select(field => (string)field.GetRawConstantValue()!)
         ];
 
-        Assert.Equal(8, keys.Length);
+        Assert.Equal(14, keys.Length);
         foreach (string key in keys)
         {
             Assert.NotEqual(key, english[key]);

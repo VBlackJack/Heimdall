@@ -618,6 +618,203 @@
                 </StackPanel>
             </rdp:AutomationBorder>
 
+            <!--
+                Certificate question. Application-NONMODAL and session-blocking: it stops this
+                connection and nothing else, which is why it lives here rather than in a
+                top-level Window. AutomationBorder rather than Border because a plain Border has
+                no automation peer, so IsDialog and Name on one are read by nothing.
+            -->
+            <rdp:AutomationBorder x:Name="CertificatePromptOverlay"
+                    Visibility="Collapsed"
+                    Focusable="True"
+                    Panel.ZIndex="60"
+                    KeyboardNavigation.IsTabStop="False"
+                    KeyboardNavigation.TabNavigation="Cycle"
+                    KeyboardNavigation.ControlTabNavigation="Cycle"
+                    Background="{DynamicResource OverlayBackground}"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    AutomationProperties.IsDialog="True"
+                    AutomationProperties.Name="{loc:Translate A11yRdpCertificatePrompt}"
+                    PreviewKeyDown="OnCertificatePromptPreviewKeyDown">
+                <Border MaxWidth="640"
+                        Margin="24"
+                        Padding="20"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource CornerRadiusXl}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <TextBlock Margin="0,0,10,0"
+                                       VerticalAlignment="Top"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="24"
+                                       Text="&#xE783;"
+                                       Foreground="{DynamicResource WarningBrush}"
+                                       Focusable="False"
+                                       IsHitTestVisible="False"
+                                       AutomationProperties.Name=" "/>
+                            <TextBlock x:Name="CertificatePromptTitleText"
+                                       MaxWidth="540"
+                                       FontSize="{StaticResource FontSizeSubtitle}"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Text="{Binding Title}"/>
+                        </StackPanel>
+
+                        <!--
+                            No AutomationProperties.Name here, on this or on any other text
+                            below: a static name masks a TextBlock's live text, so a screen
+                            reader would announce the label instead of the question.
+                        -->
+                        <TextBlock x:Name="CertificatePromptMessageText"
+                                   MaxWidth="580"
+                                   Margin="0,0,0,12"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   AutomationProperties.LiveSetting="Assertive"
+                                   Text="{Binding Message}"/>
+
+                        <TextBlock x:Name="CertificatePromptHostLabel"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding RemoteEndpointLabel}"/>
+                        <TextBlock x:Name="CertificatePromptHostText"
+                                   Margin="0,2,0,10"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Text="{Binding RemoteEndpoint}"/>
+
+                        <!--
+                            The gateway chain, which is the half of the machine's identity the
+                            endpoint above cannot carry. Two profiles reaching one short name
+                            through two different gateways are two machines, and their endpoint
+                            text differs only by an ephemeral local tunnel port. No static
+                            AutomationProperties.Name on either block: one would mask the live
+                            text a screen reader has to hear.
+                        -->
+                        <TextBlock x:Name="CertificatePromptRouteLabel"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding RouteLabel}"
+                                   Visibility="{Binding HasRoute, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        <TextBlock x:Name="CertificatePromptRouteText"
+                                   Margin="0,2,0,10"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Text="{Binding Route}"
+                                   Visibility="{Binding HasRoute, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <TextBlock x:Name="CertificatePromptThumbprintLabel"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding ThumbprintLabel}"/>
+                        <TextBox x:Name="CertificatePromptThumbprintBox"
+                                 Margin="0,2,0,10"
+                                 IsReadOnly="True"
+                                 TextWrapping="Wrap"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
+                                 FontSize="{StaticResource FontSizeBody}"
+                                 Background="{DynamicResource BackgroundBrush}"
+                                 BorderBrush="{DynamicResource BorderBrush}"
+                                 BorderThickness="1"
+                                 Padding="8"
+                                 Text="{Binding Thumbprint, Mode=OneWay}"/>
+
+                        <TextBlock x:Name="CertificatePromptSubjectText"
+                                   Margin="0,0,0,10"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding Subject}"
+                                   Visibility="{Binding HasSubject, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <TextBlock x:Name="CertificatePromptAlreadyTrustedText"
+                                   Margin="0,0,0,10"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Text="{Binding AlreadyTrustedText}"
+                                   Visibility="{Binding HasAlreadyTrustedText, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <TextBlock x:Name="CertificatePromptOwnerText"
+                                   Margin="0,0,0,4"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding OwnerText}"
+                                   Visibility="{Binding HasOwnerText, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <!--
+                            Refusal first and focused: the answer an accidental keystroke gives
+                            is the one that creates no durable trust.
+
+                            NO KeyboardNavigation.TabNavigation HERE, deliberately, and unlike
+                            the reconnect overlay above. A nested Cycle scope with focus placed
+                            inside it is a trap within a trap: Tab returns to the first button
+                            instead of leaving, so the three answers are all a keyboard user can
+                            ever reach. The fingerprint they are being asked to compare sits in a
+                            read-only TextBox that is a tab stop and was unreachable - never
+                            focusable, never selectable, never copyable, and never read out by a
+                            screen reader walking the question with Tab. The overlay's own Cycle
+                            scope is the single trap, so Tab now reaches that box before coming
+                            back round to the buttons.
+
+                            The box is the whole gain, and the only one. Every other line of the
+                            question - the endpoint, the route, the owner line - is a TextBlock,
+                            which WPF gives Focusable=False, so none of them was ever a tab stop
+                            and none of them becomes one here. A screen reader reads them from
+                            the dialog's content; making them focusable to satisfy a sentence
+                            would lengthen the tab cycle of a security question for nothing.
+                        -->
+                        <WrapPanel x:Name="CertificatePromptAnswers"
+                                   Orientation="Horizontal"
+                                   HorizontalAlignment="Right"
+                                   Margin="0,12,0,0">
+                            <Button x:Name="CertificatePromptRefuseButton"
+                                    TabIndex="0"
+                                    MinWidth="140"
+                                    Margin="0,0,8,0"
+                                    Padding="14,6"
+                                    Content="{Binding RefuseButtonText}"
+                                    Command="{Binding RefuseCommand}"/>
+                            <Button x:Name="CertificatePromptTrustOnceButton"
+                                    TabIndex="1"
+                                    MinWidth="150"
+                                    MaxWidth="240"
+                                    Margin="0,0,8,0"
+                                    Padding="14,6"
+                                    Command="{Binding TrustOnceCommand}"
+                                    Style="{DynamicResource SecondaryButtonStyle}">
+                                <TextBlock Text="{Binding TrustOnceButtonText}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"/>
+                            </Button>
+                            <Button x:Name="CertificatePromptTrustButton"
+                                    TabIndex="2"
+                                    MinWidth="200"
+                                    MaxWidth="300"
+                                    Padding="14,6"
+                                    Command="{Binding TrustCommand}"
+                                    Style="{DynamicResource PrimaryButtonStyle}">
+                                <TextBlock Text="{Binding TrustButtonText}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"/>
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </rdp:AutomationBorder>
+
             <!-- Connection progress indicator -->
             <ProgressBar x:Name="RdpLoadingBar"
                          VerticalAlignment="Top"

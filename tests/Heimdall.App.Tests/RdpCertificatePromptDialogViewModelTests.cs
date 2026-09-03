@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Certificates;
@@ -28,10 +29,12 @@ namespace Heimdall.App.Tests;
 /// <remarks>
 /// No window is constructed anywhere here. Building a WPF <c>Window</c> in a test seals
 /// application-level styles onto the shared dispatcher and took 23 unrelated tests down
-/// during BL-0089, which is why the dialog holds no decisions to test.
+/// during BL-0089, which is why the question holds no decisions of its own to test.
 /// </remarks>
 public sealed class RdpCertificatePromptDialogViewModelTests
 {
+    private const string TunnelledOrigin = "dc-pool.example.com:3389 via localhost:53211";
+
     [Fact]
     public async Task Message_NamesTheProfileAndTheAddressThatAnswered()
     {
@@ -42,6 +45,143 @@ public sealed class RdpCertificatePromptDialogViewModelTests
         Assert.Contains("dc-pool.example.com", vm.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("{0}", vm.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("{1}", vm.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Message_TunnelledProfile_NamesTheMachine_NotTheLocalEndOfTheTunnel()
+    {
+        // The security defect this pins, and it was live on master. The verification target of
+        // an SSH-tunnelled profile is 127.0.0.1, and the question used to show exactly that.
+        // Two tunnelled profiles both named "Production", both connecting, produced two
+        // questions reading "Production" ... 127.0.0.1, and a certificate could be approved
+        // for the wrong machine.
+        RdpCertificatePromptDialogViewModel vm = await CreateAsync(
+            alreadyTrusted: 0,
+            host: "127.0.0.1",
+            origin: new RdpTrustPromptOrigin(TunnelledOrigin, null, "Production", "Heimdall"));
+
+        Assert.Contains("dc-pool.example.com", vm.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("127.0.0.1", vm.Message, StringComparison.Ordinal);
+        Assert.Equal(TunnelledOrigin, vm.RemoteEndpoint);
+    }
+
+    [Fact]
+    public async Task Route_TwoProfilesBehindDifferentGateways_ReadDifferently()
+    {
+        // The case the whole lot exists for, and the one the endpoint alone could not carry.
+        // Two saved profiles, both named "Production", both reaching "srv01:3389", one through
+        // Paris and one through Berlin: two physically different machines behind one short
+        // name. Their endpoint text differs only by an ephemeral local tunnel port the user has
+        // never seen and cannot map to a gateway, so approving the Paris fingerprint wrote
+        // durable trust into the Berlin profile.
+        RdpCertificatePromptDialogViewModel paris = await CreateAsync(
+            alreadyTrusted: 0,
+            host: "127.0.0.1",
+            origin: new RdpTrustPromptOrigin(
+                "srv01:3389 via localhost:53211", "gw-paris", "Production", "Heimdall"));
+        RdpCertificatePromptDialogViewModel berlin = await CreateAsync(
+            alreadyTrusted: 0,
+            host: "127.0.0.1",
+            origin: new RdpTrustPromptOrigin(
+                "srv01:3389 via localhost:53212", "gw-berlin", "Production", "Heimdall"));
+
+        Assert.True(paris.HasRoute);
+        Assert.True(berlin.HasRoute);
+        Assert.Equal("gw-paris", paris.Route);
+        Assert.Equal("gw-berlin", berlin.Route);
+        Assert.NotEqual(paris.Route, berlin.Route);
+    }
+
+    [Fact]
+    public async Task Route_DirectProfile_ShowsNoRouteLineAtAll()
+    {
+        // A direct connection reaches the machine itself. An empty "Reached through" caption
+        // would be a question whose own text looks broken.
+        RdpCertificatePromptDialogViewModel vm = await CreateAsync(
+            alreadyTrusted: 0,
+            origin: new RdpTrustPromptOrigin(
+                "srv01:3389", null, "Production", "Heimdall"));
+
+        Assert.Null(vm.Route);
+        Assert.False(vm.HasRoute);
+    }
+
+    [Fact]
+    public async Task RemoteEndpoint_WithNoOrigin_FallsBackToTheAddressThatWasDialled()
+    {
+        // The fallback is the behaviour that shipped before any of this, not an improvement:
+        // a caller that cannot say which machine it reached says which address it dialled.
+        RdpCertificatePromptDialogViewModel vm = await CreateAsync(
+            alreadyTrusted: 0,
+            host: "127.0.0.1",
+            origin: null);
+
+        Assert.Equal("127.0.0.1", vm.RemoteEndpoint);
+    }
+
+    [Fact]
+    public async Task OwnerText_NamesTheTabAndTheWindowHoldingTheQuestion()
+    {
+        RdpCertificatePromptDialogViewModel vm = await CreateAsync(
+            alreadyTrusted: 0,
+            origin: new RdpTrustPromptOrigin(
+                TunnelledOrigin, null, "Production", "Paris datacentre"));
+
+        Assert.True(vm.HasOwnerText);
+        Assert.Contains("Production", vm.OwnerText!, StringComparison.Ordinal);
+        Assert.Contains("Paris datacentre", vm.OwnerText!, StringComparison.Ordinal);
+        Assert.DoesNotContain("{0}", vm.OwnerText!, StringComparison.Ordinal);
+        Assert.DoesNotContain("{1}", vm.OwnerText!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OwnerText_WithNothingToName_IsNotShownAtAll()
+    {
+        RdpCertificatePromptDialogViewModel vm = await CreateAsync(
+            alreadyTrusted: 0,
+            origin: new RdpTrustPromptOrigin(TunnelledOrigin, null, null, "   "));
+
+        Assert.Null(vm.OwnerText);
+        Assert.False(vm.HasOwnerText);
+    }
+
+    [Fact]
+    public async Task OwnerText_TwoSessionsOfOneName_AreNamedApartByTheAnnouncedOrdinal()
+    {
+        // What the owner line was expected to do and did not. It was fed DisplayTitle, which
+        // this repository documents as identical by construction for two sessions of one
+        // profile - so it read the same twice in exactly the case two same-named sessions were
+        // the problem. It is fed the announced name now, which carries the ordinal
+        // ConnectionViewModel already assigns to colliding titles.
+        RdpCertificatePromptDialogViewModel first = await CreateAsync(
+            alreadyTrusted: 0,
+            origin: new RdpTrustPromptOrigin(
+                TunnelledOrigin, null, "Production (1)", "Production - Detached"));
+        RdpCertificatePromptDialogViewModel second = await CreateAsync(
+            alreadyTrusted: 0,
+            origin: new RdpTrustPromptOrigin(
+                TunnelledOrigin, null, "Production (2)", "Production - Detached"));
+
+        Assert.NotEqual(first.OwnerText, second.OwnerText);
+        Assert.Contains("Production (1)", first.OwnerText!, StringComparison.Ordinal);
+        Assert.Contains("Production (2)", second.OwnerText!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OwnerText_ADetachedWindowThatOnlyDecoratesTheTabName_AddsNoClause()
+    {
+        // The rule the type documented and did not implement. A detached window titles itself
+        // with the SessionDetachTitle format - "Production" becomes "Production - Detached" -
+        // so the two strings never matched, the window clause always stood, and two same-named
+        // detached sessions read character for character alike at twice the length.
+        RdpCertificatePromptDialogViewModel vm = await CreateAsync(
+            alreadyTrusted: 0,
+            origin: new RdpTrustPromptOrigin(
+                TunnelledOrigin, null, "Production", "Production - Detached"));
+
+        Assert.True(vm.HasOwnerText);
+        Assert.Contains("Production", vm.OwnerText!, StringComparison.Ordinal);
+        Assert.DoesNotContain("Detached", vm.OwnerText!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -78,8 +218,10 @@ public sealed class RdpCertificatePromptDialogViewModelTests
     {
         RdpCertificatePromptDialogViewModel vm = await CreateAsync(alreadyTrusted: 0);
 
-        // The contract the presenter depends on: null is not an answer, and a window
-        // closed by its title-bar cross has to be read as a refusal.
+        // The contract the session depends on: null is not an answer, and it is not a refusal
+        // either. A question the pane took off the screen without one was answered by nobody,
+        // which the session settles as RdpTrustAnswer.NotAsked - the connection stops without
+        // telling anyone they declined something they were never shown.
         Assert.Null(vm.Answer);
     }
 
@@ -106,28 +248,53 @@ public sealed class RdpCertificatePromptDialogViewModelTests
             new[] { trust.Answer, once.Answer, refuse.Answer });
     }
 
-    [Fact]
-    public async Task Trusting_ClosesTheWindowAsConfirmed()
+    [Theory]
+    [InlineData(RdpTrustAnswer.TrustPermanently)]
+    [InlineData(RdpTrustAnswer.TrustForSession)]
+    [InlineData(RdpTrustAnswer.Refuse)]
+    public async Task Answering_RaisesTheAnswerItself_NotADialogResult(RdpTrustAnswer expected)
     {
         RdpCertificatePromptDialogViewModel vm = await CreateAsync(alreadyTrusted: 0);
-        bool? closedWith = null;
-        vm.CloseRequested += result => closedWith = result;
+        List<RdpTrustAnswer> raised = [];
+        vm.Answered += raised.Add;
 
-        vm.TrustCommand.Execute(null);
+        CommandFor(vm, expected).Execute(null);
 
-        Assert.True(closedWith);
+        // A boolean dialog result could never have carried three answers; the window it came
+        // from mapped two of them onto true and lost the difference at the boundary.
+        Assert.Equal([expected], raised);
     }
 
     [Fact]
-    public async Task Refusing_ClosesTheWindowAsCancelled()
+    public async Task Dismissing_IsARefusal()
     {
+        // Escape, and the pane being closed. Neither is approval, and the alternative is
+        // opening a session nobody approved.
         RdpCertificatePromptDialogViewModel vm = await CreateAsync(alreadyTrusted: 0);
-        bool? closedWith = null;
-        vm.CloseRequested += result => closedWith = result;
+        List<RdpTrustAnswer> raised = [];
+        vm.Answered += raised.Add;
 
-        vm.RefuseCommand.Execute(null);
+        vm.RefuseFromDismissal();
 
-        Assert.False(closedWith);
+        Assert.Equal(RdpTrustAnswer.Refuse, vm.Answer);
+        Assert.Equal([RdpTrustAnswer.Refuse], raised);
+    }
+
+    [Fact]
+    public async Task ASecondAnswerIsIgnored_SoTrustCannotArriveAfterARefusal()
+    {
+        // Escape landing on top of a click, or a second press. Without the latch the second
+        // answer is raised too, and the session would settle on whichever arrived last - which
+        // can be the approval the user had already declined by pressing Escape.
+        RdpCertificatePromptDialogViewModel vm = await CreateAsync(alreadyTrusted: 0);
+        List<RdpTrustAnswer> raised = [];
+        vm.Answered += raised.Add;
+
+        vm.RefuseFromDismissal();
+        vm.TrustCommand.Execute(null);
+
+        Assert.Equal(RdpTrustAnswer.Refuse, vm.Answer);
+        Assert.Equal([RdpTrustAnswer.Refuse], raised);
     }
 
     [Fact]
@@ -142,128 +309,72 @@ public sealed class RdpCertificatePromptDialogViewModelTests
         Assert.False(blank.HasSubject);
     }
 
-    [Fact]
-    public void PromptKey_DiffersByProfile_SoTwoProfilesAreAskedSeparately()
-    {
-        // The defect this pins: RDP trust is per profile, so coalescing two profiles'
-        // questions into one dialog would name profile A and write the answer into both
-        // trust sets - durable trust granted from a question the user never saw.
-        Assert.NotEqual(
-            DialogRdpCertificateTrustPrompt.BuildKey(Context("profile-a")),
-            DialogRdpCertificateTrustPrompt.BuildKey(Context("profile-b")));
-    }
-
-    [Fact]
-    public void PromptKey_SameProfileAndCertificate_IsTheSameQuestion()
-    {
-        // The other half: two tabs of one profile meeting the same certificate must
-        // still be asked once, which is what the coordinator is for.
-        Assert.Equal(
-            DialogRdpCertificateTrustPrompt.BuildKey(Context("profile-a")),
-            DialogRdpCertificateTrustPrompt.BuildKey(Context("profile-a")));
-    }
-
-    [Fact]
-    public void PromptKey_DifferentCertificate_IsADifferentQuestion()
-        => Assert.NotEqual(
-            DialogRdpCertificateTrustPrompt.BuildKey(Context("profile-a", "SHA256:AA:BB:01")),
-            DialogRdpCertificateTrustPrompt.BuildKey(Context("profile-a", "SHA256:CC:DD:02")));
-
-    [Fact]
-    public void PromptKey_NoProfile_IsStillBuildable()
-    {
-        // A context without a profile must not throw its way out of the prompt: the
-        // fallback loses the separation, it does not lose the question.
-        TrustPromptKey key = DialogRdpCertificateTrustPrompt.BuildKey(
-            new RdpCertificatePromptContext("DC pool", "dc-pool.example.com", "SHA256:AA", null, 0));
-
-        Assert.Equal(string.Empty, key.Scope);
-    }
-
-    [Fact]
-    public async Task AskAsync_TwoTabsOfOneProfileMeetingOneCertificate_AskOnce()
-    {
-        TaskCompletionSource<RdpTrustAnswer> answered = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        int displayed = 0;
-        DialogRdpCertificateTrustPrompt prompt = new(
-            new LocalizationManager(),
-            new TrustPromptCoordinator(),
-            (_, _) =>
-            {
-                _ = Interlocked.Increment(ref displayed);
-                return answered.Task;
-            });
-
-        Task<RdpTrustAnswer> first = prompt.AskAsync(Context("profile-a"), CancellationToken.None);
-        Task<RdpTrustAnswer> second = prompt.AskAsync(Context("profile-a"), CancellationToken.None);
-        answered.SetResult(RdpTrustAnswer.TrustForSession);
-        RdpTrustAnswer[] answers = await Task.WhenAll(first, second);
-
-        // The defect this pins: bypassing the coordinator stacks one modal window per tab
-        // for a question that has one answer, and answering the first leaves the second
-        // still asking something already settled.
-        Assert.Equal(1, Volatile.Read(ref displayed));
-        Assert.All(answers, answer => Assert.Equal(RdpTrustAnswer.TrustForSession, answer));
-    }
-
-    [Fact]
-    public async Task AskAsync_TwoProfilesMeetingOneCertificate_AreAskedSeparately()
-    {
-        Dictionary<string, TaskCompletionSource<RdpTrustAnswer>> gates = new(StringComparer.Ordinal)
+    private static System.Windows.Input.ICommand CommandFor(
+        RdpCertificatePromptDialogViewModel vm,
+        RdpTrustAnswer answer) => answer switch
         {
-            ["profile-a"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
-            ["profile-b"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
-        };
-
-        int displayed = 0;
-        DialogRdpCertificateTrustPrompt prompt = new(
-            new LocalizationManager(),
-            new TrustPromptCoordinator(),
-            (context, displayCt) =>
-            {
-                _ = displayCt;
-                _ = Interlocked.Increment(ref displayed);
-                return gates[context.ProfileId!].Task;
-            });
-
-        Task<RdpTrustAnswer> first = prompt.AskAsync(Context("profile-a"), CancellationToken.None);
-        Task<RdpTrustAnswer> second = prompt.AskAsync(Context("profile-b"), CancellationToken.None);
-
-        // The positive control for the count above, and the rule that must survive the
-        // coalescing: RDP trust is per profile, so one dialog naming profile A may never
-        // supply the answer for profile B. The second question waits its turn; it is not
-        // answered by the first.
-        gates["profile-a"].SetResult(RdpTrustAnswer.TrustPermanently);
-        Assert.Equal(RdpTrustAnswer.TrustPermanently, await first);
-
-        gates["profile-b"].SetResult(RdpTrustAnswer.Refuse);
-        Assert.Equal(RdpTrustAnswer.Refuse, await second);
-        Assert.Equal(2, Volatile.Read(ref displayed));
-    }
-
-    private static RdpCertificatePromptContext Context(
-        string profileId,
-        string thumbprint = "SHA256:AA:BB:01")
-        => new("DC pool", "dc-pool.example.com", thumbprint, "CN=dc04", 0)
-        {
-            ProfileId = profileId,
+            RdpTrustAnswer.TrustPermanently => vm.TrustCommand,
+            RdpTrustAnswer.TrustForSession => vm.TrustOnceCommand,
+            _ => vm.RefuseCommand,
         };
 
     private static async Task<RdpCertificatePromptDialogViewModel> CreateAsync(
         int alreadyTrusted,
-        string? subject = "CN=dc04")
+        string? subject = "CN=dc04",
+        string host = "dc-pool.example.com",
+        RdpTrustPromptOrigin? origin = null)
     {
-        LocalizationManager localizer = new();
-        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
-
         return new RdpCertificatePromptDialogViewModel(
-            localizer,
+            await LocalizerAsync(),
             new RdpCertificatePromptContext(
                 "DC pool",
-                "dc-pool.example.com",
+                host,
                 "SHA256:AA:BB:01",
                 subject,
-                alreadyTrusted));
+                alreadyTrusted),
+            origin);
+    }
+
+    /// <summary>The shipped catalogue, plus the sentences this change adds to it.</summary>
+    /// <remarks>
+    /// <para><b>The owner sentences are not in <c>locales/en.json</c> yet.</b> New user-facing
+    /// strings are handed to the integrator, who merges them into both catalogues; until that
+    /// lands, <see cref="LocalizationManager.Format"/> returns the key rather than a sentence,
+    /// and an assertion on the rendered text would be measuring the merge rather than the
+    /// ViewModel. Templates are supplied here so these tests keep measuring what they are for:
+    /// that the tab and the window reach the format at all. Whether the keys have landed is
+    /// owned by the locale coverage guard, which is the right place for it.</para>
+    /// <para>The catalogue is copied rather than edited: <c>locales/en.json</c> mixes literal
+    /// UTF-8 with escapes and is not safe to re-serialize.</para>
+    /// </remarks>
+    private static async Task<LocalizationManager> LocalizerAsync()
+    {
+        string shipped = Path.Combine(AppContext.BaseDirectory, "locales", "en.json");
+        Dictionary<string, string> strings =
+            JsonSerializer.Deserialize<Dictionary<string, string>>(
+                await File.ReadAllTextAsync(shipped))
+            ?? [];
+
+        // Only added where the catalogue has not caught up, so a merged key is exercised as
+        // merged and this scaffolding disappears on its own.
+        _ = strings.TryAdd(
+            RdpTrustPromptOwnerLocaleKeys.Tab,
+            "This question belongs to the tab \"{0}\".");
+        _ = strings.TryAdd(
+            RdpTrustPromptOwnerLocaleKeys.TabInWindow,
+            "This question belongs to the tab \"{0}\", in the window \"{1}\".");
+        _ = strings.TryAdd(
+            RdpTrustPromptOwnerLocaleKeys.Window,
+            "This question belongs to the window \"{0}\".");
+
+        string directory = Path.Combine(
+            AppContext.BaseDirectory, "locale-prompt-tests", Guid.NewGuid().ToString("N"));
+        _ = Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "en.json"), JsonSerializer.Serialize(strings));
+
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(directory, "en");
+        return localizer;
     }
 }

@@ -49,6 +49,18 @@ public sealed class RdpCertificateGateTests
             RdpCertificateGate.Decide(RdpVerificationOutcome.RefusedByUser));
 
     [Fact]
+    public void Decide_QuestionReachedNobody_StopsTheConnectionToo()
+    {
+        // An unknown certificate whose question was never put to anyone. Nobody approved it, so
+        // it may not open a session - the same decision a refusal produces, from a different
+        // event. The two stay distinct all the way to the pane because the sentence the user
+        // reads is not the same, but neither of them connects.
+        Assert.Equal(
+            RdpConnectionDecision.Abandon,
+            RdpCertificateGate.Decide(RdpVerificationOutcome.QuestionNotAsked));
+    }
+
+    [Fact]
     public void Decide_UserTrusted_LetsItThrough()
         => Assert.Equal(
             RdpConnectionDecision.Proceed,
@@ -160,14 +172,74 @@ public sealed class RdpCertificateGateTests
     }
 
     [Fact]
+    public async Task CheckConnection_HandsBackWhatWasConcluded_NotOnlyWhetherToConnect()
+    {
+        // The reason this overload exists. Two outcomes stop the connection and produce the
+        // same one bit, so a caller holding only the bit has to guess which happened - and the
+        // guess made was "the user refused", which put "you did not approve the certificate
+        // this server presented" in front of a user who was never asked.
+        RdpCertificateCheckResult refused = await RdpCertificateGate.CheckConnectionAsync(
+            RdpCertificateGate.NoServerAuthenticationRequired,
+            _ => Task.FromResult(RdpVerificationOutcome.RefusedByUser),
+            onVerificationFailed: null,
+            CancellationToken.None);
+
+        RdpCertificateCheckResult unasked = await RdpCertificateGate.CheckConnectionAsync(
+            RdpCertificateGate.NoServerAuthenticationRequired,
+            _ => Task.FromResult(RdpVerificationOutcome.QuestionNotAsked),
+            onVerificationFailed: null,
+            CancellationToken.None);
+
+        Assert.Equal(RdpConnectionDecision.Abandon, refused.Decision);
+        Assert.Equal(RdpConnectionDecision.Abandon, unasked.Decision);
+        Assert.Equal(refused.Decision, unasked.Decision);
+        Assert.NotEqual(refused.Outcome, unasked.Outcome);
+        Assert.Equal(RdpVerificationOutcome.RefusedByUser, refused.Outcome);
+        Assert.Equal(RdpVerificationOutcome.QuestionNotAsked, unasked.Outcome);
+    }
+
+    [Fact]
+    public async Task CheckConnection_NoCheckWasOwed_ConcludesNothing()
+    {
+        RdpCertificateCheckResult result = await RdpCertificateGate.CheckConnectionAsync(
+            authenticationLevel: 1,
+            _ => Task.FromResult(RdpVerificationOutcome.RefusedByUser),
+            onVerificationFailed: null,
+            CancellationToken.None);
+
+        Assert.Equal(RdpConnectionDecision.Proceed, result.Decision);
+        Assert.Null(result.Outcome);
+    }
+
+    [Fact]
+    public async Task CheckConnection_CheckThrew_ConcludesNothingAndStillConnects()
+    {
+        // A check that threw verified nothing, so it may neither relax nor tighten the
+        // connection - and it concluded nothing worth naming, so the caller must not be handed
+        // an outcome to build a sentence out of.
+        RdpCertificateCheckResult result = await RdpCertificateGate.CheckConnectionAsync(
+            RdpCertificateGate.NoServerAuthenticationRequired,
+            _ => throw new InvalidOperationException("probe exploded"),
+            onVerificationFailed: null,
+            CancellationToken.None);
+
+        Assert.Equal(RdpConnectionDecision.Proceed, result.Decision);
+        Assert.Null(result.Outcome);
+    }
+
+    [Fact]
     public void Decide_EveryOutcome_IsAccountedFor()
     {
         // Reflected over the enum so an outcome added later cannot silently fall into the
         // proceed branch by default. Exactly one of them stops the connection.
         RdpVerificationOutcome[] all = Enum.GetValues<RdpVerificationOutcome>();
 
-        Assert.Equal(4, all.Length);
-        Assert.Single(all, outcome =>
-            RdpCertificateGate.Decide(outcome) == RdpConnectionDecision.Abandon);
+        Assert.Equal(5, all.Length);
+        Assert.Equal(
+            [RdpVerificationOutcome.RefusedByUser, RdpVerificationOutcome.QuestionNotAsked],
+            all.Where(outcome =>
+                RdpCertificateGate.Decide(outcome) == RdpConnectionDecision.Abandon)
+                .OrderBy(outcome => outcome)
+                .ToArray());
     }
 }
