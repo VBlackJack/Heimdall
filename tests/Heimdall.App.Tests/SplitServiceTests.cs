@@ -20,6 +20,9 @@ using System.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
+using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Core.Certificates;
+using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -651,6 +654,71 @@ public sealed class SplitServiceTests : IDisposable
         Assert.All(connectionService.ServerIds, serverId =>
             Assert.Null(_connectionSm.GetStateData(serverId)));
         Assert.False(_tunnelManager.HasTunnel(localPort));
+    }
+
+    [Fact]
+    public async Task SplitSessionWithServerAsync_Rdp_PaneProfilesStillResolveToTheInventoryProfileForTrust()
+    {
+        // The seam between the two halves of one rule. SplitService gives each pane its own state
+        // key by writing it over the profile copy's Id, and the certificate question is filed
+        // against whatever Id the pane runs on. Those two decisions only agree because the key is
+        // minted by SessionIdCodec, which is the only thing that inverts it: mint it any other
+        // way and every split-pane approval is stored under an identifier that dies with the
+        // pane, and the two panes stop sharing a coalescing scope.
+        const string inventoryServerId = "rdp-inventory-1";
+        AllProfilesRecordingConnectionService connectionService = new AllProfilesRecordingConnectionService();
+        SplitService sut = CreateSplitService(connectionService);
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new ServerProfileDto
+            {
+                Id = inventoryServerId,
+                DisplayName = "Production",
+                ConnectionType = "RDP",
+                RemoteServer = "srv01",
+                RemotePort = 3389
+            }
+        });
+
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-runtime",
+            connectionType: "RDP");
+        primaryPane.OriginalServerId = "primary-inventory";
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = primaryPane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new ObservableCollection<SessionTabViewModel>
+        {
+            session
+        };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        await sut.SplitSessionWithServerAsync(
+            session,
+            inventoryServerId,
+            SplitOrientation.Vertical,
+            primaryPane.PaneId);
+        await sut.SplitSessionWithServerAsync(
+            session,
+            inventoryServerId,
+            SplitOrientation.Horizontal,
+            primaryPane.PaneId);
+
+        Assert.Equal(2, connectionService.Profiles.Count);
+        Assert.Equal(
+            2,
+            connectionService.Profiles.Select(profile => profile.Id).Distinct(StringComparer.Ordinal).Count());
+        Assert.All(
+            connectionService.Profiles,
+            profile => Assert.NotEqual(inventoryServerId, profile.Id));
+
+        List<RdpCertificateVerificationRequest> requests = connectionService.Profiles
+            .Select(profile => RdpCertificateVerificationRequestBuilder.Build(
+                profile,
+                new RdpCertificateProbeTarget("127.0.0.1", 53211),
+                "pane-" + profile.Id))
+            .ToList();
+
+        Assert.All(requests, request => Assert.Equal(inventoryServerId, request.ProfileId));
     }
 
     [Theory]
@@ -1656,6 +1724,89 @@ public sealed class SplitServiceTests : IDisposable
     {
         public bool Disposed { get; private set; }
         public void Dispose() => Disposed = true;
+    }
+
+    /// <summary>
+    /// Records every profile copy dispatched to a connect, so a test can read the identifier each
+    /// pane actually ran under rather than the one it expected to be given.
+    /// </summary>
+    private sealed class AllProfilesRecordingConnectionService : IConnectionService
+    {
+        public List<ServerProfileDto> Profiles { get; } = [];
+
+        public AppSettings? CurrentSettings => null;
+
+        public PreflightResult RunPreflight(ServerProfileDto server, AppSettings settings)
+            => PreflightResult.Ok();
+
+        public Task<ConnectionResult> ConnectSshAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectRdpAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default,
+            RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectSftpAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectVncAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectTelnetAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectFtpAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectCitrixAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectLocalShellAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public Task<ConnectionResult> ConnectWinRmAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct = default)
+            => Record(server, ct);
+
+        public void Dispose()
+        {
+        }
+
+        private Task<ConnectionResult> Record(ServerProfileDto server, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            Profiles.Add(server);
+
+            // Failing the dispatch keeps the test clear of host-control materialization, which
+            // needs a dispatcher. The profile has already been recorded by then.
+            return Task.FromResult(new ConnectionResult(false, "recorded", null));
+        }
     }
 
     private sealed class RecordingConnectionService : IConnectionService

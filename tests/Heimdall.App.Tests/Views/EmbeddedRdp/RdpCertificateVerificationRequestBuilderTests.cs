@@ -17,6 +17,7 @@
 using Heimdall.App.Services;
 using Heimdall.App.Views.EmbeddedRdp;
 using Heimdall.Core.Certificates;
+using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests.Views.EmbeddedRdp;
@@ -95,6 +96,70 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
                 Profile("Production"),
                 new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
                 scopeId!));
+    }
+
+    [Fact]
+    public void ASplitPanesApprovalIsFiledUnderTheProfile_NotUnderThePane()
+    {
+        // The pane runs on a copy of the profile whose Id has been replaced by a session-scoped
+        // state key. Filing the approval under that key stores it where nothing will ever look
+        // again: the key dies with the pane, and the next connection asks about the same
+        // certificate as if it had never been approved.
+        ServerProfileDto paneScoped = Profile("Production");
+        paneScoped.Id = SessionIdCodec.Create("profile-1");
+
+        RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
+            paneScoped,
+            new RdpCertificateProbeTarget("127.0.0.1", 53211),
+            "pane-7");
+
+        Assert.NotEqual("profile-1", paneScoped.Id);
+        Assert.Equal("profile-1", request.ProfileId);
+    }
+
+    [Fact]
+    public void TwoPanesOfOneProfileAskAboutOneCertificateUnderOneIdentity()
+    {
+        // The coalescing scope is this identity - PaneRdpCertificateTrustPrompt.BuildKey passes
+        // the profile as the scope - so two panes carrying two pane-scoped keys were two
+        // questions about one certificate on one profile, and the user answered twice.
+        ServerProfileDto firstPane = Profile("Production");
+        firstPane.Id = SessionIdCodec.Create("profile-1");
+        ServerProfileDto secondPane = Profile("Production");
+        secondPane.Id = SessionIdCodec.Create("profile-1");
+
+        RdpCertificateVerificationRequest first = RdpCertificateVerificationRequestBuilder.Build(
+            firstPane,
+            new RdpCertificateProbeTarget("127.0.0.1", 53211),
+            "pane-7");
+        RdpCertificateVerificationRequest second = RdpCertificateVerificationRequestBuilder.Build(
+            secondPane,
+            new RdpCertificateProbeTarget("127.0.0.1", 53212),
+            "pane-8");
+
+        Assert.NotEqual(firstPane.Id, secondPane.Id);
+        Assert.Equal("profile-1", first.ProfileId);
+        Assert.Equal(first.ProfileId, second.ProfileId);
+    }
+
+    [Theory]
+    [InlineData("profile-1")]
+    [InlineData("7c9f0f2e-9a1c-4f1e-9b39-0c1d2e3f4a5b")]
+    [InlineData("profile_1")]
+    [InlineData("profile_zzzzzzzz")]
+    public void AnInventoryProfileIsFiledUnderItself(string inventoryProfileId)
+    {
+        // Nothing is stripped from an identifier that was never minted for a session, including
+        // one whose underscore is part of the name the user chose.
+        ServerProfileDto server = Profile("Production");
+        server.Id = inventoryProfileId;
+
+        RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
+            server,
+            new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
+            "pane-7");
+
+        Assert.Equal(inventoryProfileId, request.ProfileId);
     }
 
     private static ServerProfileDto Profile(string? displayName) => new()

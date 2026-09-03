@@ -235,6 +235,25 @@ public partial class EmbeddedRdpView
     public bool? SessionLoggingOverride { get; set; }
 
     /// <summary>
+    /// The settings instance this pane's connection resolved its gateway chain from, supplied by
+    /// <c>EmbeddedSessionManager</c> from <c>RdpSessionResult</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Deliberately not the same thing as <c>_settings</c>, and never merged into
+    /// it.</b> <c>_settings</c> is the snapshot the pane was materialised with, and every
+    /// resolution, redirection and timeout the pane reads from it is a question about how to
+    /// present a session that is already opening. The certificate question asks something else -
+    /// which machine the certificate arrived from - and only the connect-time instance can answer
+    /// it. Materialisation happens after the connect, and settings are handed out as a fresh deep
+    /// clone, so the two genuinely differ once a gateway is edited during a slow establishment.
+    /// </para>
+    /// <para>Null when nothing recorded it. The route line then says nothing rather than
+    /// something it cannot stand behind: see
+    /// <see cref="Services.RdpTrustPromptRoute.DescribeConnection"/>.</para>
+    /// </remarks>
+    internal AppSettings? ConnectionSettings { get; set; }
+
+    /// <summary>
     /// Raised when the user clicks the Split button in the header strip.
     /// The subscriber (EmbeddedSessionManager) shows the split picker context menu.
     /// </summary>
@@ -615,8 +634,15 @@ public partial class EmbeddedRdpView
         // Unregistered first so no new question can be routed here, then closed so the one
         // already on screen stops waiting. Closing the pane is not an answer - it is something
         // the user did to the pane, not something they said about the certificate - so the
-        // session settles it as NotAsked, which still stops the connection. Reporting it as a
-        // refusal is what told a user they had declined a certificate they were never shown.
+        // session settles it as NotAsked. Reporting it as a refusal is what told a user they had
+        // declined a certificate they were never shown.
+        //
+        // NotAsked does not stop a connection on its own; a pane sharing its question is handed
+        // the answer given elsewhere. This path stops for a reason of its own, and it is the
+        // ordering a few lines above: the verification token is cancelled BEFORE the question is
+        // closed, and the coalescer takes no shared answer for a pane whose own connection was
+        // given up. Moving that cancellation below this block would put a session behind a pane
+        // that no longer exists.
         _trustPromptRegistration?.Dispose();
         _trustPromptRegistration = null;
         _trustPrompt.Close();
@@ -3379,9 +3405,13 @@ public partial class EmbeddedRdpView
         if (_disposed || _localizer is null)
         {
             // Nothing can be shown, so nothing was asked and nothing was approved. A pane torn
-            // down between the probe and the question is the ordinary case here. It stops the
-            // connection, and it is reported as a question nobody received rather than as an
-            // answer nobody gave.
+            // down between the probe and the question is the ordinary case here, and it is
+            // reported as a question nobody received rather than as an answer nobody gave.
+            //
+            // Not "and the connection stops": NotAsked leaves that to the coalescer, which hands
+            // a pane sharing its question the answer given elsewhere. Nothing opens here for a
+            // reason of its own - Dispose cancels the verification token before it closes the
+            // question, and a pane whose own connection was given up adopts nothing.
             Core.Logging.FileLogger.Warn(
                 "EmbeddedRDP cannot show the certificate question: the pane is gone "
                 + $"(disposed={_disposed}). The question was not asked.");
@@ -3406,6 +3436,12 @@ public partial class EmbeddedRdpView
     /// only by an ephemeral local port. The gateway chain is resolved here, from the profile
     /// rather than from the live tunnel, because this question is asked during Preparing - before
     /// the tab's own route string has been filled in.</para>
+    /// <para><b>From the connection's own settings, never the application's current ones.</b>
+    /// <see cref="ConnectionSettings"/> is the instance the chain was resolved from at connect
+    /// time; <c>_settings</c> is a later clone taken when the pane was materialised. Reading the
+    /// second is how a gateway edited during a slow tunnel establishment came to be named under
+    /// "Reached through" for a certificate that had arrived through the first. With no carrier
+    /// the line says nothing at all, which is the one honest answer available then.</para>
     /// <para><b>The tab is named as it is announced, not as it is displayed.</b>
     /// <c>DisplayTitle</c> is identical by construction for two sessions of one profile, so it
     /// added nothing precisely where two same-named sessions were the problem;
@@ -3416,12 +3452,7 @@ public partial class EmbeddedRdpView
     {
         ServerProfileDto? server = _server;
         string endpoint = server is null ? string.Empty : BuildEndpointText(server);
-        string? route = server is null
-            ? null
-            : RdpTrustPromptRoute.Describe(
-                server.UseDirectConnection,
-                server.SshGatewayId,
-                _settings?.SshGateways);
+        string? route = RdpTrustPromptRoute.DescribeConnection(server, ConnectionSettings);
 
         return new RdpTrustPromptOrigin(
             string.IsNullOrWhiteSpace(endpoint) ? context.Host : endpoint,
@@ -3610,31 +3641,20 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        // A focused Button answers Space on its own but not Enter, which only ever went to a
-        // window's IsDefault button. There is no window here, so Enter is delivered by hand to
-        // whichever answer holds the focus.
-        if (e.Key == Key.Enter
-            && Keyboard.FocusedElement is Button focused
-            && IsWithinCertificatePrompt(focused))
-        {
-            focused.RaiseEvent(new RoutedEventArgs(
-                System.Windows.Controls.Primitives.ButtonBase.ClickEvent,
-                focused));
-            e.Handled = true;
-        }
-    }
-
-    private bool IsWithinCertificatePrompt(DependencyObject element)
-    {
-        for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current))
-        {
-            if (ReferenceEquals(current, CertificatePromptOverlay))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        // Enter is deliberately left alone, and that is the fix rather than an omission. Each
+        // answer declares KeyboardNavigation.AcceptsReturn, which is the hook ButtonBase.OnKeyDown
+        // reads to click the focused button on Enter - a real OnClick, so the bound command runs.
+        // Handling Enter here would take the keystroke off the button before it ever saw it.
+        //
+        // What stood here raised ButtonBase.ClickEvent on the focused button by hand. OnClick
+        // raises that event AND THEN executes the command source, and these three answers are
+        // driven by bound commands, so the raise announced a click and answered nothing: a person
+        // pressed "Do not connect", no refusal was recorded, and the pane went on to adopt the
+        // approval given in another pane and open the session.
+        //
+        // The reconnect overlay above still delivers Enter by hand and is right to - its buttons
+        // carry Click handlers, for which the raised event IS the whole click. Both halves are
+        // measured on a real Button in RdpCertificatePromptSurfaceTests.
     }
 
     private void HandleFailure(string message, Exception ex)

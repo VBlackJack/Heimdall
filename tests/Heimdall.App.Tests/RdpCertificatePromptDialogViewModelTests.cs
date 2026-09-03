@@ -220,8 +220,15 @@ public sealed class RdpCertificatePromptDialogViewModelTests
 
         // The contract the session depends on: null is not an answer, and it is not a refusal
         // either. A question the pane took off the screen without one was answered by nobody,
-        // which the session settles as RdpTrustAnswer.NotAsked - the connection stops without
-        // telling anyone they declined something they were never shown.
+        // which the session settles as RdpTrustAnswer.NotAsked - reported without telling anyone
+        // they declined something they were never shown.
+        //
+        // Deliberately says nothing about the connection. NotAsked does not stop it on its own:
+        // a pane sharing its question with another pane is handed the answer given there,
+        // approval included, and only a pane asking alone or one whose own connection was given
+        // up stops on it. That is RdpTrustQuestionCoalescer's decision, it is stated on the
+        // property this test measures, and a comment here that promised a stop would contradict
+        // the very XML doc it sits under.
         Assert.Null(vm.Answer);
     }
 

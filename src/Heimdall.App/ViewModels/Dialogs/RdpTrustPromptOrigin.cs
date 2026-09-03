@@ -22,7 +22,10 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// endpoint appended when there is one.
 /// </param>
 /// <param name="RouteLabel">
-/// The SSH gateways the session reaches that machine through, or null for a direct connection.
+/// The SSH gateways the profile is configured to reach that machine through, or null for a
+/// direct connection. Configuration rather than measurement, and labelled as such on screen:
+/// nothing records the chain a live tunnel actually resolved, so a gateway edited during a slow
+/// establishment can make this disagree with the wire.
 /// </param>
 /// <param name="TabTitle">
 /// How the tab holding the session is announced, when it has a name. The announced name rather
@@ -40,7 +43,9 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// two profiles reaching one short name through two different gateways are two machines, and
 /// their endpoint text differs only by an ephemeral local port. The gateway was read to pick the
 /// endpoint's format string and then thrown away; carrying it as its own field is what makes the
-/// two questions readably different.</para>
+/// two questions readably different. It is the configured chain, and the question says so rather
+/// than claiming the certificate arrived that way - see <see cref="Services.RdpTrustPromptRoute"/>
+/// for what would have to be recorded before it could claim more.</para>
 /// <para><b>What the owner fields are, and what they are not.</b> They say where on screen the
 /// question is. They are not the thing that tells two machines apart - the profile name, the
 /// endpoint and the route are - because two sessions of one profile are the same machine and one

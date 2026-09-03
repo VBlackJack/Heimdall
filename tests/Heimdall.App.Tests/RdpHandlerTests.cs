@@ -128,6 +128,48 @@ public sealed class RdpHandlerTests
         Assert.Equal(0, launcher.LaunchCalls);
     }
 
+    // The certificate question's "Reached through" line names a gateway, and it may only name the
+    // gateway THIS connection resolved. The pane is materialised later and re-reads the
+    // application's settings, which are handed out as a fresh deep clone each time, so a gateway
+    // edited during a slow tunnel establishment reached the question while the certificate had
+    // come through the old host. The result is what carries the connect-time instance across that
+    // gap; without it the pane has nothing to distinguish the two instants by.
+    [Fact]
+    public async Task ConnectAsync_Embedded_CarriesTheSettingsTheGatewayChainWasResolvedFrom()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = 51001
+        };
+        RdpHandler handler = CreateHandler(tunnelService, new TrackingRdpExternalClientLauncher());
+        ServerProfileDto server = CreateServer("Embedded");
+        server.UseDirectConnection = false;
+        server.SshGatewayId = "gw-paris";
+        AppSettings settings = new AppSettings
+        {
+            SshGateways =
+            [
+                new SshGatewayDto { Id = "gw-paris", Name = "Paris datacentre", Host = "paris" }
+            ]
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceEmbedded);
+
+        Assert.True(result.Success);
+        RdpSessionResult session = Assert.IsType<RdpSessionResult>(result.Session);
+
+        // By reference, not by value: a clone carrying the same gateway names would be exactly
+        // the later re-read this exists to stop, and would compare equal on every field.
+        Assert.Same(settings, session.ConnectionSettings);
+        Assert.Same(tunnelService.LastSettings, session.ConnectionSettings);
+    }
+
     [Fact]
     public async Task ConnectAsync_ForceExternalLaunchExceptionReturnsLocalizedMstscError()
     {
@@ -1100,6 +1142,17 @@ public sealed class RdpHandlerTests
         public int ReleasedLocalPort { get; private set; }
         public bool? LastPreferDistinctLoopback { get; private set; }
 
+        /// <summary>
+        /// The settings instance the tunnel was asked to resolve its gateway chain from.
+        /// </summary>
+        /// <remarks>
+        /// Recorded so a test can compare it by reference with what the result carries.
+        /// <c>TunnelService.EstablishTunnelAsync</c> reads <c>SshGateways</c> off this very
+        /// argument, so an instance that is the same object as this one is the instance the
+        /// chain was resolved from - which is the whole claim the carrier makes.
+        /// </remarks>
+        public AppSettings? LastSettings { get; private set; }
+
         public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
             int remotePort,
@@ -1108,6 +1161,7 @@ public sealed class RdpHandlerTests
             bool preferDistinctLoopback = false)
         {
             LastPreferDistinctLoopback = preferDistinctLoopback;
+            LastSettings = settings;
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
             return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
