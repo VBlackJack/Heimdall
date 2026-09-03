@@ -43,6 +43,10 @@ public sealed class TunnelService : ITunnelService
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
     private readonly TimeProvider _timeProvider;
 
+    private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
+    private readonly TunnelFailureLogCoalescer _failureLogCoalescer;
+    private readonly TunnelFailureLogWriter _failureLogWriter;
+
     private AppSettings? _currentSettings;
     private readonly RecentForwardedPortFailureTracker _forwardedPortFailures = new();
 
@@ -73,7 +77,10 @@ public sealed class TunnelService : ITunnelService
         LocalizationManager localizer,
         IHostKeyVerifier hostKeyVerifier,
         IPlinkHostKeyProbe plinkHostKeyProbe,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
+        TunnelFailureLogCoalescer? failureLogCoalescer = null,
+        TunnelFailureLogWriter? failureLogWriter = null)
     {
         _tunnelManager = tunnelManager;
         _hostKeyStore = hostKeyStore;
@@ -83,6 +90,9 @@ public sealed class TunnelService : ITunnelService
         _hostKeyVerifier = hostKeyVerifier;
         _plinkHostKeyProbe = plinkHostKeyProbe;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _agentRegistryFactory = agentRegistryFactory ?? SshAgentRegistry.CreateDefault;
+        _failureLogCoalescer = failureLogCoalescer ?? new TunnelFailureLogCoalescer();
+        _failureLogWriter = failureLogWriter ?? WriteTunnelFailureToFileLog;
 
         // TunnelService and TunnelManager are both DI singletons living for the
         // application lifetime, so this subscription needs no explicit teardown.
@@ -224,7 +234,7 @@ public sealed class TunnelService : ITunnelService
                 ? "Using OS-assigned tunnel port."
                 : $"Allocated tunnel port: {localPort}");
 
-        SshAgentRegistry agentRegistry = SshAgentRegistry.CreateDefault(settings.SshAgentPreference);
+        SshAgentRegistry agentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
         if (chain.Any(hop => hop.AgentForwarding)
             && !agentRegistry.HasPlinkCompatibleAgent()
             && agentRegistry.HasAnyNonPlinkAgent())
@@ -234,12 +244,20 @@ public sealed class TunnelService : ITunnelService
             return new TunnelResult(false, null, message, SshFailureCode.PageantKeyUnavailable);
         }
 
-        PreflightResult preflight = AuthPreflightChecker.Check(chain[0], isTunnelMode: true);
-        if (!preflight.Success)
+        // Every hop is checked, not just the root: a hop whose only sign-in
+        // source is an agent that offers nothing is doomed before the chain is
+        // dialled up to it, and saying so here costs no round trip.
+        ChainPreflightResult preflight = AuthPreflightChecker.CheckChain(
+            chain,
+            isTunnelMode: true,
+            agentRegistry);
+        if (!preflight.Result.Success)
         {
-            string msg = ResolvePreflightMessage(preflight.Message);
+            string msg = FormatChainPreflightMessage(preflight, chainDtos);
+            Core.Logging.FileLogger.Warn(
+                $"Tunnel preflight refused {serverId} at gateway hop {preflight.FailedHopIndex + 1}/{chain.Count}: {msg}");
             _connectionSm.SetError(serverId, msg);
-            return new TunnelResult(false, null, msg, preflight.FailureCode);
+            return new TunnelResult(false, null, msg, preflight.Result.FailureCode);
         }
 
         TunnelResult result;
@@ -257,6 +275,15 @@ public sealed class TunnelService : ITunnelService
             _connectionSm.SetError(serverId, message);
             return new TunnelResult(false, null, message, SshFailureCode.PortInUse);
         }
+
+        // Read once, here, because this is the last statement before the chain is
+        // dialled. Every sentence composed after the refusal comes back is a claim
+        // about what was offered, and the agents keep changing while a refusal is
+        // in flight: a key loaded during a wrong-password timeout would otherwise
+        // be counted as a key this dial presented. For one hop this is the instant
+        // of that hop's dial. For a chain it is the instant of the FIRST hop's,
+        // which AppendAuthFailureContext states and bounds.
+        SshAgentObservation agentAtDial = agentRegistry.Observe();
 
         if (chain.Count == 1)
         {
@@ -295,46 +322,88 @@ public sealed class TunnelService : ITunnelService
                 .ConfigureAwait(false);
         }
 
-        if (!result.Success
-            && chain.Count == 1
-            && result.FailureCode is SshFailureCode.AuthRejected
-                or SshFailureCode.KeyRejected
-                or SshFailureCode.PassphraseRejected
-            && SshAgentRegistry.CreateDefault(settings.SshAgentPreference).HasPlinkCompatibleAgent())
-        {
-            Core.Logging.FileLogger.Info(
-                $"SSH.NET auth failed, falling back to Plink: {result.ErrorMessage}");
-
-            int plinkLocalPort = useOsAssignedLocalPort
-                ? _tunnelManager.AllocatePort(0)
-                : localPort;
-            Core.Logging.FileLogger.Info($"Allocated Plink fallback tunnel port: {plinkLocalPort}");
-
-            return await EstablishPlinkTunnelAsync(
-                    serverId,
-                    chain[0],
-                    remoteHost,
-                    remotePort,
-                    plinkLocalPort,
-                    settings,
-                    gatewayChainKey,
-                    ct,
-                    preferDistinctLoopback)
-                .ConfigureAwait(false);
-        }
-
+        // A refused sign-in on a single gateway. Both routes out of here used
+        // to compose a message of their own and return, so on the one machine
+        // state where they fire - an SSH agent actually running - the gateway's
+        // own sentence was replaced by a sentence about Heimdall's fallback.
+        // The refusal is composed once, first, and every route below appends to
+        // it. Every route also reads the same agent observation, taken before
+        // the dial, so one agent state decides the whole message - the count it
+        // quotes, and whether a Plink retry was attempted at all.
         if (!result.Success
             && chain.Count == 1
             && result.FailureCode is SshFailureCode.AuthRejected
                 or SshFailureCode.KeyRejected
                 or SshFailureCode.PassphraseRejected)
         {
-            SshAgentRegistry registry = SshAgentRegistry.CreateDefault(settings.SshAgentPreference);
-            if (!registry.HasPlinkCompatibleAgent() && registry.HasAnyNonPlinkAgent())
+            string? refusedByServer = result.ErrorMessage;
+            TunnelResult refusal = AppendAuthFailureContext(result, chain, agentAtDial);
+            string refusalMessage = refusal.ErrorMessage
+                ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
+
+            if (agentAtDial.HasPlinkCompatibleAgent)
             {
-                string message = _localizer[SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported];
-                _connectionSm.SetError(serverId, message);
-                return new TunnelResult(false, null, message, result.FailureCode);
+                Core.Logging.FileLogger.Info(
+                    $"SSH.NET auth failed, falling back to Plink: {result.ErrorMessage}");
+
+                int plinkLocalPort = useOsAssignedLocalPort
+                    ? _tunnelManager.AllocatePort(0)
+                    : localPort;
+                Core.Logging.FileLogger.Info($"Allocated Plink fallback tunnel port: {plinkLocalPort}");
+
+                // The refusal is handed down rather than composed onto the
+                // result here. What the pane shows is the message the state
+                // machine holds, and Error -> Error is not a valid transition
+                // there: a second SetError after the fallback has set its own
+                // is dropped without a word, leaving the pane the fallback's
+                // wording and the caller the belief that it composed over it.
+                TunnelResult fallback = await EstablishPlinkTunnelAsync(
+                        serverId,
+                        chain[0],
+                        remoteHost,
+                        remotePort,
+                        plinkLocalPort,
+                        settings,
+                        gatewayChainKey,
+                        ct,
+                        preferDistinctLoopback,
+                        refusalMessage)
+                    .ConfigureAwait(false);
+
+                if (fallback.Success)
+                {
+                    return fallback;
+                }
+
+                ReportTunnelFailure(
+                    serverId,
+                    gatewayId,
+                    gatewayChainKey,
+                    fallback,
+                    fallback.ErrorMessage ?? refusalMessage,
+                    refusedByServer);
+                return fallback;
+            }
+
+            if (agentAtDial.HasAnyNonPlinkAgent)
+            {
+                // Why no fallback was attempted. It is an observation about
+                // Heimdall, appended last, and it names no cause for the
+                // gateway's refusal.
+                string unusableAgentMessage = SshAuthFailureMessageComposer.AppendSentence(
+                    refusalMessage,
+                    _localizer[SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported],
+                    SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported)
+                    ?? refusalMessage;
+                ReportTunnelFailure(
+                    serverId,
+                    gatewayId,
+                    gatewayChainKey,
+                    refusal,
+                    unusableAgentMessage,
+                    refusedByServer);
+                _connectionSm.SetError(serverId, unusableAgentMessage);
+                return refusal with { ErrorMessage = unusableAgentMessage };
             }
         }
 
@@ -353,13 +422,157 @@ public sealed class TunnelService : ITunnelService
         }
         else
         {
-            Core.Logging.FileLogger.Error($"Tunnel failed for {serverId}: {result.ErrorMessage}");
-            _connectionSm.SetError(serverId, result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed]);
+            string? relayedMessage = result.ErrorMessage;
+            result = AppendAuthFailureContext(result, chain, agentAtDial);
+            string message = result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
+            ReportTunnelFailure(serverId, gatewayId, gatewayChainKey, result, message, relayedMessage);
+            _connectionSm.SetError(serverId, message);
         }
 
         return result;
     }
 
+    /// <summary>
+    /// Appends what Heimdall observed locally to the server's own refusal
+    /// wording. The transport relays the sentence the gateway sent, which is
+    /// true and which nothing here may drop: a wrong stored password and an
+    /// unloaded agent key both come back as "Permission denied (password)", and
+    /// only the server knows which it was. The appended sentence adds the one
+    /// fact the user cannot see - how many keys an agent had loaded when the
+    /// chain was dialled - and claims nothing about the cause.
+    /// <para>
+    /// The count comes from <paramref name="agentAtDial"/>, read before the
+    /// chain is dialled. Reading the agents here instead would quote the state
+    /// they are in after the refusal has travelled back, which is a different
+    /// instant and can be a different number.
+    /// </para>
+    /// <para>
+    /// <b>That instant is the refusing gateway's own dial for a single hop only.</b>
+    /// <c>TunnelManager</c> builds each hop's client as it reaches it, and
+    /// <c>SshConnectionFactory</c> takes the agent identities from the registry at
+    /// the moment each hop's connection is built, so a refusal from the third hop is
+    /// described with a reading taken before the first: a key loaded while the earlier
+    /// hops were negotiating WAS offered to the hop that refused, and is not counted
+    /// here. The sentence the user then reads is early by however long those hops
+    /// took, which is the honest residue of moving the reading before the dial rather
+    /// than after the refusal. Making it exact for chains means observing per hop,
+    /// which means threading the registry through <c>TunnelManager</c>. The gap is
+    /// named here rather than closed in prose.
+    /// </para>
+    /// </summary>
+    private TunnelResult AppendAuthFailureContext(
+        TunnelResult result,
+        IReadOnlyList<SshConnectionParams> chain,
+        SshAgentObservation agentAtDial)
+    {
+        if (result.Success || !SshAuthFailureDiagnoser.IsAuthRejection(result.FailureCode))
+        {
+            return result;
+        }
+
+        return result with
+        {
+            ErrorMessage = SshAuthFailureMessageComposer.AppendAgentObservation(
+                _localizer,
+                result.ErrorMessage,
+                chain,
+                agentAtDial.OfferableIdentityCount)
+        };
+    }
+
+    /// <summary>
+    /// Writes one full diagnosis per (gateway chain, failure kind, message) per
+    /// window. Reconnecting a session set produces the same failure once per
+    /// profile; the repeats carry no new information and are recorded at Debug,
+    /// in full, so the line that mattered stays visible without any text being
+    /// lost.
+    /// </summary>
+    private void ReportTunnelFailure(
+        string serverId,
+        string gatewayId,
+        string gatewayChainKey,
+        TunnelResult result,
+        string message,
+        string? relayedMessage)
+    {
+        TunnelFailureReportDecision decision =
+            _failureLogCoalescer.Evaluate(gatewayChainKey, result.FailureCode, message);
+
+        // The relayed wording is repeated only when the composed message does
+        // not already carry it, which it does whenever a context sentence was
+        // appended to it.
+        string relaySuffix = relayedMessage is not null
+            && !message.Contains(relayedMessage, StringComparison.Ordinal)
+            ? $" [server reported: {relayedMessage}]"
+            : string.Empty;
+
+        if (!decision.ShouldReport)
+        {
+            // The message is part of the coalescer key, so "identical" is true
+            // by construction here. It is written out anyway: a Debug log that
+            // asserts sameness without showing the text cannot answer "why did
+            // attempt N fail" when the reader only has the file.
+            _failureLogWriter(
+                false,
+                $"Tunnel failed for {serverId} via gateway {gatewayId}, identical to the failure already "
+                + $"reported ({result.FailureCode}); repeat {decision.SuppressedRepeats}: {message}{relaySuffix}");
+            return;
+        }
+
+        string repeatSuffix = decision.SuppressedRepeats > 0
+            ? $" [{decision.SuppressedRepeats} identical failure(s) since the previous report were logged at Debug]"
+            : string.Empty;
+
+        _failureLogWriter(
+            true,
+            $"Tunnel failed for {serverId} via gateway {gatewayId}: {message}{relaySuffix}{repeatSuffix}");
+    }
+
+    private static void WriteTunnelFailureToFileLog(bool fullReport, string message)
+    {
+        if (fullReport)
+        {
+            Core.Logging.FileLogger.Error(message);
+        }
+        else
+        {
+            Core.Logging.FileLogger.Debug(message);
+        }
+    }
+
+    /// <summary>
+    /// Localizes a chain pre-flight failure, naming the gateway that failed when
+    /// the chain has more than one hop.
+    /// </summary>
+    private string FormatChainPreflightMessage(
+        ChainPreflightResult preflight,
+        IReadOnlyList<SshGatewayDto> chainDtos)
+    {
+        string message = ResolvePreflightMessage(preflight.Result.Message);
+        if (chainDtos.Count <= 1
+            || preflight.FailedHopIndex < 0
+            || preflight.FailedHopIndex >= chainDtos.Count)
+        {
+            return message;
+        }
+
+        SshGatewayDto failedGateway = chainDtos[preflight.FailedHopIndex];
+        string gatewayLabel = string.IsNullOrWhiteSpace(failedGateway.Name)
+            ? failedGateway.Host
+            : failedGateway.Name;
+
+        // Same gateway-scoping convention as FailureClassifier.FormatMessage:
+        // the label is data, the separator is punctuation, and neither needs a
+        // catalogue entry of its own.
+        return $"{gatewayLabel}: {message}";
+    }
+
+    /// <param name="precedingRefusal">
+    /// What the gateway already said, when this fallback follows a refused
+    /// SSH.NET sign-in. Every failure below is appended to it and the composed
+    /// text is what reaches the connection state, so the sentence the server
+    /// sent stays at the head of the message whatever the fallback runs into.
+    /// </param>
     internal async Task<TunnelResult> EstablishPlinkTunnelAsync(
         string serverId,
         SshConnectionParams gatewayParams,
@@ -369,14 +582,27 @@ public sealed class TunnelService : ITunnelService
         AppSettings settings,
         string gatewayChainKey,
         CancellationToken ct,
-        bool preferDistinctLoopback = false)
+        bool preferDistinctLoopback = false,
+        string? precedingRefusal = null)
     {
+        TunnelResult Refuse(string message, SshFailureCode? code, string? messageKey = null)
+        {
+            string composed = SshAuthFailureMessageComposer.AppendSentence(
+                precedingRefusal ?? string.Empty,
+                message,
+                messageKey)
+                ?? string.Empty;
+            _connectionSm.SetError(serverId, composed);
+            return new TunnelResult(false, null, composed, code);
+        }
+
         string? plinkPath = ConnectionHelpers.ResolvePlinkPath(settings.PlinkPath);
         if (string.IsNullOrWhiteSpace(plinkPath) || !File.Exists(plinkPath))
         {
-            string message = _localizer[SshLocalizationKeys.ErrorPlinkNotConfigured];
-            _connectionSm.SetError(serverId, message);
-            return new TunnelResult(false, null, message, SshFailureCode.Unknown);
+            return Refuse(
+                _localizer[SshLocalizationKeys.ErrorPlinkNotConfigured],
+                SshFailureCode.Unknown,
+                SshLocalizationKeys.ErrorPlinkNotConfigured);
         }
 
         string? storedFingerprint = _hostKeyTrustService.GetEffectiveEntry(gatewayParams.Host, gatewayParams.Port)?.Fingerprint;
@@ -395,12 +621,8 @@ public sealed class TunnelService : ITunnelService
 
         if (!hostKeyDecision.ShouldProceed)
         {
-            string message = BuildPlinkHostKeyFailureMessage(hostKeyDecision);
-            _connectionSm.SetError(serverId, message);
-            return new TunnelResult(
-                false,
-                null,
-                message,
+            return Refuse(
+                BuildPlinkHostKeyFailureMessage(hostKeyDecision),
                 hostKeyDecision.FailureCode ?? SshFailureCode.Unknown);
         }
 
@@ -414,10 +636,11 @@ public sealed class TunnelService : ITunnelService
         }
         catch (InvalidOperationException ex)
         {
-            string message = _localizer[SshLocalizationKeys.ErrorTunnelNoLoopbackAlias];
             Core.Logging.FileLogger.Warn($"Loopback alias allocation failed for Plink tunnel {serverId}: {ex.Message}");
-            _connectionSm.SetError(serverId, message);
-            return new TunnelResult(false, null, message, SshFailureCode.PortInUse);
+            return Refuse(
+                _localizer[SshLocalizationKeys.ErrorTunnelNoLoopbackAlias],
+                SshFailureCode.PortInUse,
+                SshLocalizationKeys.ErrorTunnelNoLoopbackAlias);
         }
 
         PlinkTunnelRunner runner = new PlinkTunnelRunner(
@@ -451,9 +674,8 @@ public sealed class TunnelService : ITunnelService
                 : result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
             Core.Logging.FileLogger.Error(
                 $"Plink tunnel failed for {serverId} via {gatewayParams.Host}:{gatewayParams.Port}: {errorMsg}");
-            _connectionSm.SetError(serverId, errorMsg);
             runner.Dispose();
-            return new TunnelResult(false, null, errorMsg, result.FailureCode);
+            return Refuse(errorMsg, result.FailureCode);
         }
 
         TunnelInfo tunnelInfo = new TunnelInfo(
@@ -471,9 +693,10 @@ public sealed class TunnelService : ITunnelService
         if (!_tunnelManager.TryRegisterExternalTunnel(tunnelInfo, runner, () => runner.IsRunning))
         {
             runner.Dispose();
-            string duplicateMessage = _localizer[SshLocalizationKeys.ErrorTunnelPortConcurrent];
-            _connectionSm.SetError(serverId, duplicateMessage);
-            return new TunnelResult(false, null, duplicateMessage, SshFailureCode.PortInUse);
+            return Refuse(
+                _localizer[SshLocalizationKeys.ErrorTunnelPortConcurrent],
+                SshFailureCode.PortInUse,
+                SshLocalizationKeys.ErrorTunnelPortConcurrent);
         }
 
         await WaitForTunnelEstablishmentAsync(

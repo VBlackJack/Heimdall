@@ -763,6 +763,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<ConnectionViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<TrustedHostKeysSettingsViewModel>();
+        services.AddTransient<TrustedRdpCertificatesSettingsViewModel>();
         services.AddTransient<CommandLibraryViewModel>();
         services.AddTransient<ImportOpenSshConfigDialogViewModel>();
         services.AddTransient<ImportPuttySessionsDialogViewModel>();

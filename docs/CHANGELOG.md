@@ -12,6 +12,69 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-09-02 (second release of the day): what the guards were not measuring
+
+The morning's release closed an RDP audit. This one closes what that release shipped by mistake,
+and it is mostly a story about tests that were green and measured nothing.
+
+### A cancelled session stayed cancelled only on three doors out of four
+
+v2026.090201 added a latch so a late OnConnected could not promote a session the user had
+stopped. It worked. It did not survive the surface retry, which presented itself as a new
+user-authorized attempt and cleared the latch on its way past - so a Cancel pressed in the 120 ms
+window before the surface is laid out was undone and the session connected anyway.
+
+The attempt sequence is a decision now rather than a field: an arbiter owns which attempt a retry
+belongs to, whether it may proceed, whether an arriving connect may be promoted, and the hard
+disconnect of a refused arrival, which nothing had ever measured. Three of the four doors already
+had guards, each removed and watched fail. The fourth was found only because a mutation census
+asked the behavioural question - can a cancelled session still connect - instead of reading the
+tests: the certificate check was guarded by a bare condition that a text-ordering assertion could
+see but not run.
+
+### Green, and measuring nothing
+
+That fourth door is the whole lesson. Fold the guarded condition behind a term that is false by
+construction and 5880 tests stayed green while the shipped defect came back to life. Deleting the
+statement was caught; neutralising it was not, because an IndexOf sees text and not a condition.
+
+Asking that question systematically found eight more of the same shape on the branch, in the same
+files as the ones just repaired, twice in the very test a previous round had rewritten. Among them:
+the guard asserting a credential is wiped when a session drops, and the guard on the single
+junction the cancel fix hangs on.
+
+Four rounds closed these one at a time and each round missed a twin, so the last round guarded the
+shape instead of the instance. A scan blanks comments and literals from all 828 test sources,
+finds every test holding production source - directly, through a helper, or through a local - and
+fails when one anchors a presence assertion on a fragment it never carried through the statement
+predicate. It found 211 sites in 48 files: three were this work's and are fixed, 208 predate it
+and are frozen in a shrink-only baseline. Thirteen evasions were tried against the scan and five
+caught; the eight that get through need deliberate circumvention and are named in its own remarks.
+
+The limit is written down rather than implied: a whole-statement match settles that a statement is
+WRITTEN as a step of a body, never that it RUNS, because the predicate walks past every conditional
+early return above it. Anything needing "it runs" belongs in an extracted decision with a
+behavioural test, which is what the four doors now are.
+
+### The count that was read after the fact
+
+An independent review found the observation appended to a refused SSH gateway - how many agent
+keys were offered - was read from a different registry than the one that dialled, after the failure
+came back. A user who loaded three keys while the refusal was in flight was told three keys were
+offered by a client built with no agent method at all. The state is observed once now, immediately
+before the dial. Threading a single registry through would not have fixed it: every member of a
+registry re-probes the live agents when called, so instance identity was never the variable.
+
+The same review found the rule that the server's own sentence comes first held inside one method
+and nowhere else. A census of the seven callers that surface an authentication failure found two
+more that broke it.
+
+### Also
+
+A revocation confirmation promised a question it could not deliver on a pool whose sibling
+certificate is still trusted. An unreadable server inventory was reported as deleted profiles. The
+C#-to-catalogue locale guard missed the short-helper idiom used at forty-two call sites in one view.
+
 ## 2026-09-02: the RDP audit
 
 Sixty-one findings on the Remote Desktop surface, each read a second time by an adversarial

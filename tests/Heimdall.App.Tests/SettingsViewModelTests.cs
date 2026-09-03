@@ -26,6 +26,7 @@ using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.App.Views.EmbeddedRdp;
+using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -2626,11 +2627,18 @@ public sealed class SettingsViewModelTests
             dialog,
             new FakeClipboardService(),
             new FakeUiDispatcher());
+        TrustedRdpCertificatesSettingsViewModel trustedRdpCertificates = new(
+            new RdpCertificateTrustStore(),
+            () => Task.FromResult<IReadOnlyList<ServerProfileDto>>([]),
+            localizer,
+            dialog,
+            new FakeUiDispatcher());
         SettingsViewModel viewModel = new(
             new FakeConfigManager(),
             localizer,
             dialog,
             trustedHostKeys,
+            trustedRdpCertificates,
             new PinManager(),
             new VaultLifecycleService(new FakeConfigManager()),
             new FakeUpdateService(),
@@ -2649,6 +2657,122 @@ public sealed class SettingsViewModelTests
 
         Assert.Empty(trustedHostKeys.Rows);
     }
+
+    /// <summary>
+    /// Opening the settings screen fills the trusted RDP certificate panel.
+    /// </summary>
+    /// <remarks>
+    /// <para>The panel builds no rows of its own: its constructor subscribes to the store and to
+    /// the localizer, and nothing else. Until something asks it to refresh, it reports the empty
+    /// state - "nothing is trusted" - over a store holding every approval the user has ever given.
+    /// The one statement in <c>LoadFromSettings</c> that asks is what makes the revocation screen
+    /// this branch shipped visible at all, and both it and the panel were delivered with green
+    /// suites either side of the junction, which is the shape this repository has already been
+    /// bitten by.</para>
+    /// <para>The first two assertions are the control. Without them a panel that filled itself in
+    /// its constructor, or one already holding rows from an earlier test, would satisfy the
+    /// assertions after the load without the reload having done anything.</para>
+    /// </remarks>
+    [Fact]
+    public async Task LoadFromSettings_FillsTheTrustedRdpCertificatePanelFromTheStore()
+    {
+        var store = new RdpCertificateTrustStore();
+        store.Trust(
+            "srv-1",
+            new RdpCertificateEntry("SHA256:AA:BB:01", new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero)));
+
+        FakeConfigManager config = new();
+        LocalizationManager localizer = new();
+        FakeDialogService dialog = new();
+        TrustedRdpCertificatesSettingsViewModel panel = CreateTrustedRdpCertificatesPanel(
+            store, localizer, dialog);
+        SettingsViewModel viewModel = CreateViewModelOver(config, panel, localizer, dialog);
+
+        Assert.Empty(panel.Rows);
+        Assert.True(panel.IsEmptyStateVisible);
+
+        viewModel.LoadFromSettings(config.Settings);
+        await (panel.RefreshCommand.ExecutionTask ?? Task.CompletedTask);
+
+        Assert.Equal(["SHA256:AA:BB:01"], panel.Rows.Select(row => row.Thumbprint));
+        Assert.False(panel.IsEmptyStateVisible);
+    }
+
+    /// <summary>
+    /// Closing the settings screen lets the trusted RDP certificate panel go.
+    /// </summary>
+    /// <remarks>
+    /// <para>The settings view model is registered transient, so a new one is built every time the
+    /// screen is opened, and the panel's own <c>Dispose</c> is the only place its store and
+    /// localizer subscriptions are detached. Without the one statement that calls it, every
+    /// settings window opened leaves a live subscriber behind, rebuilding rows on every later
+    /// trust decision and locale change for the life of the process.</para>
+    /// <para>The first half is the control: without it a panel that never subscribed at all would
+    /// satisfy the second half, and this would describe a stub rather than measure a detach.</para>
+    /// </remarks>
+    [Fact]
+    public void Dispose_DetachesTheTrustedRdpCertificatePanelFromTheStore()
+    {
+        var store = new RdpCertificateTrustStore();
+        var stamp = new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero);
+
+        FakeConfigManager config = new();
+        LocalizationManager localizer = new();
+        FakeDialogService dialog = new();
+        TrustedRdpCertificatesSettingsViewModel panel = CreateTrustedRdpCertificatesPanel(
+            store, localizer, dialog);
+        SettingsViewModel viewModel = CreateViewModelOver(config, panel, localizer, dialog);
+
+        store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", stamp));
+        Assert.Equal(["SHA256:AA:BB:01"], panel.Rows.Select(row => row.Thumbprint));
+
+        viewModel.Dispose();
+        store.Trust("srv-2", new RdpCertificateEntry("SHA256:AA:BB:02", stamp));
+
+        Assert.Equal(["SHA256:AA:BB:01"], panel.Rows.Select(row => row.Thumbprint));
+    }
+
+    /// <summary>The trust panel over a caller-owned store, with an empty inventory.</summary>
+    private static TrustedRdpCertificatesSettingsViewModel CreateTrustedRdpCertificatesPanel(
+        RdpCertificateTrustStore store,
+        LocalizationManager localizer,
+        FakeDialogService dialog)
+        => new(
+            store,
+            () => Task.FromResult<IReadOnlyList<ServerProfileDto>>([]),
+            localizer,
+            dialog,
+            new FakeUiDispatcher());
+
+    /// <summary>A settings view model over a caller-owned trust panel.</summary>
+    /// <remarks>
+    /// <see cref="CreateViewModel"/> builds its own panel over its own store, which no test can
+    /// seed or watch. The two above need both, so they pass one in.
+    /// </remarks>
+    private static SettingsViewModel CreateViewModelOver(
+        FakeConfigManager config,
+        TrustedRdpCertificatesSettingsViewModel trustedRdpCertificates,
+        LocalizationManager localizer,
+        FakeDialogService dialog)
+        => new(
+            config,
+            localizer,
+            dialog,
+            new TrustedHostKeysSettingsViewModel(
+                new HostKeyTrustService(new HostKeyStore()),
+                () => new KnownHostsImportReport(0, 0, []),
+                () => new KnownHostsExportReport(0, 0, 0),
+                localizer,
+                dialog,
+                new FakeClipboardService(),
+                new FakeUiDispatcher()),
+            trustedRdpCertificates,
+            new PinManager(),
+            new VaultLifecycleService(config),
+            new FakeUpdateService(),
+            new AppVersionProvider("2026.061501"),
+            new FakeUpdateInstallFlow(),
+            new StubBrowserLauncher());
 
     /// <summary>
     /// The settings screen and the settings schema must admit exactly the same watchdog timeouts.
@@ -2777,12 +2901,19 @@ public sealed class SettingsViewModelTests
             dialog,
             new FakeClipboardService(),
             new FakeUiDispatcher());
+        var trustedRdpCertificates = new TrustedRdpCertificatesSettingsViewModel(
+            new RdpCertificateTrustStore(),
+            () => Task.FromResult<IReadOnlyList<ServerProfileDto>>([]),
+            localizer,
+            dialog,
+            new FakeUiDispatcher());
 
         return new SettingsViewModel(
             config,
             localizer,
             dialog,
             trustedHostKeys,
+            trustedRdpCertificates,
             new PinManager(),
             new VaultLifecycleService(config),
             updateService,

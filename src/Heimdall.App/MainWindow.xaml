@@ -3147,6 +3147,171 @@
                                         </StackPanel>
                                     </ScrollViewer>
                                 </TabItem>
+                                <TabItem x:Name="Mw_SettingsRdpSubTabCertificates"
+                                         Header="{loc:Translate SettingsRdpSubTabCertificates}"
+                                         Style="{StaticResource SegmentedTabItemStyle}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,12">
+                                            <StackPanel>
+                                                <TextBlock x:Name="Mw_SettingsTrustedRdpCertificatesTitle"
+                                                           Text="{loc:Translate SettingsRdpTrustedCertificatesSectionTitle}"
+                                                           FontSize="{StaticResource FontSizeSubtitle}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="{loc:Translate SettingsRdpTrustedCertificatesSectionHint}"
+                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           Margin="0,4,0,0"
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button Command="{Binding Settings.TrustedRdpCertificates.RefreshCommand}"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        Padding="8,3"
+                                                        FontSize="{StaticResource FontSizeCaption}"
+                                                        AutomationProperties.Name="{loc:Translate BtnRefreshTrustedRdpCertificates}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72C;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:Translate BtnRefreshTrustedRdpCertificates}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </DockPanel>
+
+                                        <TextBox Text="{Binding Settings.TrustedRdpCertificates.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="{loc:Translate HintTrustedRdpCertificatesSearch}"
+                                                 AutomationProperties.Name="{loc:Translate HintTrustedRdpCertificatesSearch}"
+                                                 Margin="0,0,0,8"/>
+
+                                        <Grid>
+                                            <DataGrid ItemsSource="{Binding Settings.TrustedRdpCertificates.Rows}"
+                                                      SelectedItem="{Binding Settings.TrustedRdpCertificates.SelectedRow, Mode=TwoWay}"
+                                                      AutoGenerateColumns="False"
+                                                      CanUserAddRows="False"
+                                                      CanUserDeleteRows="False"
+                                                      CanUserReorderColumns="False"
+                                                      CanUserResizeRows="False"
+                                                      HeadersVisibility="Column"
+                                                      IsReadOnly="True"
+                                                      SelectionMode="Single"
+                                                      SelectionUnit="FullRow"
+                                                      RowHeaderWidth="0"
+                                                      MaxHeight="260"
+                                                      Visibility="{Binding Settings.TrustedRdpCertificates.HasRows, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                      AutomationProperties.Name="{loc:Translate A11yTrustedRdpCertificatesGrid}">
+                                                <DataGrid.RowStyle>
+                                                    <!-- The accessible name goes on the container. Set inside a cell template it
+                                                         would land on an element with no automation peer, and every row would fall
+                                                         back to the type name of the item in front of a screen reader. -->
+                                                    <Style TargetType="{x:Type DataGridRow}"
+                                                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                                                        <Setter Property="AutomationProperties.Name">
+                                                            <Setter.Value>
+                                                                <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yTrustedRdpCertificateRow]"/>
+                                                                    <Binding Path="ProfileDisplay"/>
+                                                                    <!-- The elided form, not Thumbprint: a full thumbprint is 102
+                                                                         characters of colon-separated hex, and a screen reader would
+                                                                         read all of them out before reaching the date the user needs
+                                                                         to pick a row. The full value stays in the cell tooltip and
+                                                                         in the confirmation. -->
+                                                                    <Binding Path="ThumbprintDisplay"/>
+                                                                    <Binding Path="FirstTrustedDisplay"/>
+                                                                </MultiBinding>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </DataGrid.RowStyle>
+                                                <DataGrid.InputBindings>
+                                                    <KeyBinding Key="Delete" Command="{Binding Settings.TrustedRdpCertificates.ForgetSelectedCommand}"/>
+                                                </DataGrid.InputBindings>
+                                                <DataGrid.Columns>
+                                                    <DataGridTemplateColumn Header="{loc:Translate ColTrustedRdpCertificateProfile}" SortMemberPath="ProfileDisplay" Width="190">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding ProfileDisplay}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                    <Border Background="{DynamicResource ErrorBrush}"
+                                                                            CornerRadius="{StaticResource CornerRadiusSm}"
+                                                                            Padding="5,0"
+                                                                            Margin="6,0,0,0"
+                                                                            VerticalAlignment="Center"
+                                                                            Visibility="{Binding IsProfileMissing, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                                        <TextBlock Text="{loc:Translate LblTrustedRdpCertificateProfileMissing}"
+                                                                                   Foreground="{DynamicResource BadgeTextBrush}"
+                                                                                   FontSize="10"
+                                                                                   VerticalAlignment="Center"/>
+                                                                    </Border>
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTextColumn Header="{loc:Translate ColTrustedRdpCertificateThumbprint}" Binding="{Binding ThumbprintDisplay}" SortMemberPath="Thumbprint" Width="190">
+                                                        <DataGridTextColumn.ElementStyle>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="ToolTip" Value="{Binding Thumbprint}"/>
+                                                            </Style>
+                                                        </DataGridTextColumn.ElementStyle>
+                                                    </DataGridTextColumn>
+                                                    <DataGridTextColumn Header="{loc:Translate ColTrustedRdpCertificateSubject}" Binding="{Binding SubjectDisplay}" SortMemberPath="SubjectDisplay" Width="*"/>
+                                                    <DataGridTextColumn Header="{loc:Translate ColTrustedRdpCertificateIssuer}" Binding="{Binding IssuerDisplay}" SortMemberPath="IssuerDisplay" Width="*"/>
+                                                    <DataGridTextColumn Header="{loc:Translate ColTrustedRdpCertificateFirstTrusted}" Binding="{Binding FirstTrustedDisplay}" SortMemberPath="FirstTrusted" Width="130"/>
+                                                    <DataGridTemplateColumn Header="{loc:Translate ColTrustedRdpCertificateActions}" Width="70">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <!-- A flat Button, never an InputBinding: a Command bound on an
+                                                                     InputBinding inside a DataTemplate only ever sees the DataContext
+                                                                     of the first row. -->
+                                                                <Button Command="{Binding DataContext.Settings.TrustedRdpCertificates.ForgetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                                        Padding="5,2"
+                                                                        HorizontalAlignment="Right"
+                                                                        ToolTip="{loc:Translate BtnTrustedRdpCertificateForget}"
+                                                                        AutomationProperties.Name="{loc:Translate BtnTrustedRdpCertificateForget}">
+                                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12"/>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+
+                                            <Border Padding="{StaticResource SpacingLg}"
+                                                    Background="{DynamicResource BackgroundBrush}"
+                                                    BorderBrush="{DynamicResource BorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="{StaticResource CornerRadiusMd}"
+                                                    Visibility="{Binding Settings.TrustedRdpCertificates.IsEmptyStateVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <TextBlock Text="{loc:Translate EmptyStateNoTrustedRdpCertificates}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               FontWeight="SemiBold"
+                                                               HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{loc:Translate EmptyStateNoTrustedRdpCertificatesHint}"
+                                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               TextWrapping="Wrap"
+                                                               TextAlignment="Center"
+                                                               Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding Settings.TrustedRdpCertificates.StatusMessage}"
+                                                   Foreground="{DynamicResource TextTertiaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   Margin="0,8,0,0"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="{Binding Settings.TrustedRdpCertificates.HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    </StackPanel>
+                                </Border>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </TabItem>
                             </TabControl>
 
                                 <Button x:Name="Mw_SettingsResetRdpDefaults"

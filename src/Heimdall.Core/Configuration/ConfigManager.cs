@@ -1062,6 +1062,14 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
         }
     }
 
+    /// <summary>
+    /// How many individual diagnostics a warning line carries before the rest
+    /// are counted instead of quoted. A settings refresh over a large inventory
+    /// can produce hundreds of identically shaped diagnostics, and one line
+    /// holding all of them buries whatever else was logged in the same refresh.
+    /// </summary>
+    internal const int MaxQuotedValidationDiagnostics = 5;
+
     private static void LogValidationDiagnostics(
         string documentName,
         IReadOnlyCollection<ValidationDiagnostic> diagnostics)
@@ -1071,13 +1079,64 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             return;
         }
 
-        string detail = string.Join(
-            "; ",
-            diagnostics.Select(diagnostic =>
-                $"[{diagnostic.Severity}] {diagnostic.Message}"));
-        Logging.FileLogger.Warn(
-            $"Configuration diagnostics for {documentName}: {detail}");
+        Logging.FileLogger.Warn(BuildValidationDiagnosticsSummary(documentName, diagnostics));
+
+        if (diagnostics.Count > MaxQuotedValidationDiagnostics)
+        {
+            Logging.FileLogger.Debug(BuildValidationDiagnosticsDetail(documentName, diagnostics));
+        }
     }
+
+    /// <summary>
+    /// Builds the warning line: the total, then the most severe few diagnostics.
+    /// <para>
+    /// Severity decides which ones survive the trim, not collection order. The
+    /// diagnostics arrive in document order - settings-level first, then one
+    /// gateway at a time - so quoting by position lets five harmless hostname
+    /// warnings push out the single Error that will block the next write, which
+    /// is the burial this line was shortened to prevent. Ordering is stable
+    /// within a severity, so the quoted ones stay in document order.
+    /// </para>
+    /// </summary>
+    internal static string BuildValidationDiagnosticsSummary(
+        string documentName,
+        IReadOnlyCollection<ValidationDiagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        string quoted = string.Join(
+            "; ",
+            diagnostics
+                .OrderByDescending(diagnostic => diagnostic.Severity)
+                .Take(MaxQuotedValidationDiagnostics)
+                .Select(FormatValidationDiagnostic));
+
+        if (diagnostics.Count <= MaxQuotedValidationDiagnostics)
+        {
+            return $"Configuration diagnostics for {documentName}: {diagnostics.Count} total: {quoted}";
+        }
+
+        int remaining = diagnostics.Count - MaxQuotedValidationDiagnostics;
+        return $"Configuration diagnostics for {documentName}: {diagnostics.Count} total, "
+            + $"{MaxQuotedValidationDiagnostics} most severe: {quoted}; {remaining} more at Debug.";
+    }
+
+    /// <summary>
+    /// Builds the Debug line holding every diagnostic, so nothing summarized out
+    /// of the warning line is lost.
+    /// </summary>
+    internal static string BuildValidationDiagnosticsDetail(
+        string documentName,
+        IReadOnlyCollection<ValidationDiagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        string detail = string.Join("; ", diagnostics.Select(FormatValidationDiagnostic));
+        return $"Configuration diagnostics for {documentName} (all {diagnostics.Count}): {detail}";
+    }
+
+    private static string FormatValidationDiagnostic(ValidationDiagnostic diagnostic) =>
+        $"[{diagnostic.Severity}] {diagnostic.Message}";
 
     /// <summary>
     /// Serializes and saves the server inventory to servers.json (UTF-8 without BOM).

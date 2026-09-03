@@ -82,6 +82,115 @@ public sealed class SshAgentRegistryTests
         Assert.Equal(targetBlob, key.PublicKeyBlob);
     }
 
+    /// <summary>
+    /// Authentication offers the keys of the first reachable agent that holds
+    /// any, and those alone - see <c>SshConnectionFactory.TryCreateAgentAuth</c>.
+    /// The refusal sentence quotes this number as keys that were offered to the
+    /// gateway, so summing every reachable agent would state a count that was
+    /// never presented to it.
+    /// </summary>
+    [Fact]
+    public void OfferableIdentityCount_CountsOnlyTheAgentWhoseKeysWouldBeOffered()
+    {
+        var registry = new SshAgentRegistry(
+            [
+                new FakeAgent(OpenSshPipeAgent.AgentName, available: true, [Key(), Key()]),
+                new FakeAgent(PageantAgent.AgentName, available: true, [Key()])
+            ],
+            () => SshAgentPreference.AutoOpenSshFirst);
+
+        Assert.Equal(2, registry.OfferableIdentityCount());
+    }
+
+    /// <summary>
+    /// A running but empty agent is not what would be offered either: the
+    /// selection skips it exactly as the authentication loop does.
+    /// </summary>
+    [Fact]
+    public void OfferableIdentityCount_SkipsAnAgentThatIsRunningButEmpty()
+    {
+        var registry = new SshAgentRegistry(
+            [
+                new FakeAgent(OpenSshPipeAgent.AgentName, available: true, []),
+                new FakeAgent(PageantAgent.AgentName, available: true, [Key(), Key(), Key()])
+            ],
+            () => SshAgentPreference.AutoOpenSshFirst);
+
+        Assert.Equal(3, registry.OfferableIdentityCount());
+    }
+
+    /// <summary>
+    /// One pass, and the same three answers the individual members give. They
+    /// are what a refusal message quotes about a single dial, so they have to
+    /// come from one reading: asked separately they can disagree with each
+    /// other, because each one probes the agents afresh.
+    /// </summary>
+    [Fact]
+    public void Observe_AnswersExactlyWhatTheIndividualMembersWouldAtThatMoment()
+    {
+        var registry = new SshAgentRegistry(
+            [
+                new FakeAgent(OpenSshPipeAgent.AgentName, available: true, [Key(), Key()]),
+                new FakeAgent(PageantAgent.AgentName, available: true, [Key()])
+            ],
+            () => SshAgentPreference.AutoOpenSshFirst);
+
+        SshAgentObservation observation = registry.Observe();
+
+        Assert.Equal(registry.OfferableIdentityCount(), observation.OfferableIdentityCount);
+        Assert.Equal(registry.HasPlinkCompatibleAgent(), observation.HasPlinkCompatibleAgent);
+        Assert.Equal(registry.HasAnyNonPlinkAgent(), observation.HasAnyNonPlinkAgent);
+        Assert.Equal(2, observation.OfferableIdentityCount);
+        Assert.True(observation.HasPlinkCompatibleAgent);
+        Assert.True(observation.HasAnyNonPlinkAgent);
+    }
+
+    /// <summary>
+    /// An agent that is reachable but empty must not decide the count. It is the
+    /// mistake a single pass invites - stop at the first agent - and it would
+    /// tell the user no key was offered while one was.
+    /// </summary>
+    [Fact]
+    public void Observe_SkipsAnAgentThatIsReachableButEmpty()
+    {
+        var registry = new SshAgentRegistry(
+            [
+                new FakeAgent(OpenSshPipeAgent.AgentName, available: true, []),
+                new FakeAgent(PageantAgent.AgentName, available: true, [Key(), Key(), Key()])
+            ],
+            () => SshAgentPreference.AutoOpenSshFirst);
+
+        SshAgentObservation observation = registry.Observe();
+
+        Assert.Equal(3, observation.OfferableIdentityCount);
+        Assert.True(observation.HasPlinkCompatibleAgent);
+        Assert.True(observation.HasAnyNonPlinkAgent);
+    }
+
+    /// <summary>
+    /// An agent that is not reachable counts for neither flag, so the message
+    /// cannot explain away a refusal with an agent that was not there.
+    /// </summary>
+    [Fact]
+    public void Observe_IgnoresAnAgentThatIsNotReachable()
+    {
+        var registry = new SshAgentRegistry(
+            [
+                new FakeAgent(OpenSshPipeAgent.AgentName, available: true, [Key()]),
+                new FakeAgent(PageantAgent.AgentName, available: false, [Key(), Key()])
+            ],
+            () => SshAgentPreference.AutoOpenSshFirst);
+
+        SshAgentObservation observation = registry.Observe();
+
+        Assert.Equal(1, observation.OfferableIdentityCount);
+        Assert.False(observation.HasPlinkCompatibleAgent);
+        Assert.True(observation.HasAnyNonPlinkAgent);
+    }
+
+    private static ISshAgentKey Key() =>
+        new FakeAgentKey(OpenSshAgentProtocolTests.BuildKeyBlob("ssh-ed25519"));
+
     private static SshAgentRegistry CreateRegistry(SshAgentPreference preference)
     {
         return new SshAgentRegistry(
