@@ -83,7 +83,19 @@ public sealed class RdpTrustPromptWiringTests
     // the withdrawal silently never happens. The connection is then left waiting on a completion
     // nobody will settle, through an exit whose later cleanup runs only if its handler reaches
     // the end.
-    private const string AbortedStatement = "operation.Aborted += (_, _) =>";
+    //
+    // The status statement below carries its effect on the same line deliberately: with a braced
+    // body, "the branch is present and empty" satisfies any reading of the condition alone.
+    private const string AbortedStatement = "operation.Aborted += (_, _) => ApplyWithdrawalOnce();";
+
+    // And the status re-read, which subscribing alone does not give. Between the post and the
+    // subscription this thread can be descheduled long enough for the dispatcher to finish
+    // shutting down and abort the operation; WPF does not replay the event for a handler attached
+    // afterwards, and a dispatcher already down can hand back an operation aborted from the start
+    // without throwing. Carried whole because the comparison is the whole line: reading Completed
+    // instead, or reading it before subscribing, leaves the same gap with the same tokens.
+    private const string AbortedStatusStatement =
+        "if (operation.Status == DispatcherOperationStatus.Aborted) ApplyWithdrawalOnce();";
 
     private const string PostWithdrawalMember =
         "private void PostTrustPromptWithdrawal(Action withdrawal)";
@@ -99,7 +111,7 @@ public sealed class RdpTrustPromptWiringTests
     // another pane's scope and the question is asked at a machine the user is not connecting.
     //
     // Which profile the approval belongs to is no longer an argument here at all: it is settled
-    // inside the builder from the codec's record of the mint, and measured behaviourally in
+    // inside the builder by asking the profile itself, and measured behaviourally in
     // RdpTrustIdentityCollisionTests. A predicate used to be passed in from an inventory read,
     // and the inventory turned out to be unable to answer the question - a profile deleted while
     // its own connection was still being established is missing from it exactly as a minted
@@ -295,6 +307,14 @@ public sealed class RdpTrustPromptWiringTests
                 AbortedStatement),
             "The hand-over no longer watches the operation it posted, so a withdrawal the "
                 + "dispatcher drops during shutdown is never applied and never reported.");
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                TryBlock(ViewSource.HandlerLogic(PostWithdrawalMember)),
+                AbortedStatusStatement),
+            "The hand-over subscribes but never re-reads the operation's status, so an abort "
+                + "that happened between the post and the subscription is missed: WPF does not "
+                + "replay it, and the connection waits for an answer that can no longer arrive.");
     }
 
     // Positive control 8. The wiring commented out, which is the mutant a wiring test is owed:
@@ -347,6 +367,41 @@ public sealed class RdpTrustPromptWiringTests
             "A hand-over that drops the operation on the floor satisfies this file's reading, "
                 + "so the reading cannot tell a withdrawal that always happens from one the "
                 + "dispatcher may discard.");
+
+    // Positive control 9c. The status read for the WRONG state - Completed rather than Aborted -
+    // which leaves the member name, the operation, the comparison and the branch all standing
+    // exactly where a reading anchored on "operation.Status" would have been satisfied, while an
+    // abort that beat the subscription goes unnoticed exactly as before.
+    [Fact]
+    public void TheAbortWatchIsNotFoundWhenTheStatusReadNamesTheWrongState()
+        => Assert.False(
+            ViewSource.IsStatementOfTheMethodBody(
+                LogicOf(
+                    Mutate(
+                        AbortedStatusStatement,
+                        "if (operation.Status == DispatcherOperationStatus.Completed) "
+                        + "ApplyWithdrawalOnce();"),
+                    PostWithdrawalMember,
+                    TryBlock),
+                AbortedStatusStatement),
+            "A hand-over that checks for the wrong terminal state satisfies this file's reading, "
+                + "so the reading cannot tell a closed race from an open one.");
+
+    // Positive control 9d. The branch kept and its effect dropped, which is the mutant a reading
+    // anchored on the condition alone cannot see: the status IS re-read, and nothing happens.
+    [Fact]
+    public void TheAbortWatchIsNotFoundWhenTheStatusReadDoesNothing()
+        => Assert.False(
+            ViewSource.IsStatementOfTheMethodBody(
+                LogicOf(
+                    Mutate(
+                        AbortedStatusStatement,
+                        "if (operation.Status == DispatcherOperationStatus.Aborted) { }"),
+                    PostWithdrawalMember,
+                    TryBlock),
+                AbortedStatusStatement),
+            "A status re-read with no effect satisfies this file's reading, so the reading "
+                + "cannot tell a withdrawal that is applied from one that is merely noticed.");
 
     [Fact]
     public void TearingThePaneDownUnregistersItAndSettlesWhateverItWasAsking()

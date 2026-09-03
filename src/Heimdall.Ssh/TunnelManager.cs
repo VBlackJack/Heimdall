@@ -177,7 +177,8 @@ public sealed partial class TunnelManager : IDisposable
         int remoteLocalPort = 0,
         string? label = null,
         string? gatewayChainKey = null,
-        string localBindHost = LoopbackBinding.DefaultHost)
+        string localBindHost = LoopbackBinding.DefaultHost,
+        string? gatewayRoute = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(gatewayParams);
@@ -246,6 +247,7 @@ public sealed partial class TunnelManager : IDisposable
                 socksProxyPort,
                 remoteBindPort,
                 remoteLocalPort,
+                gatewayRoute,
                 label,
                 gatewayChainKey,
                 localBindHost);
@@ -287,7 +289,8 @@ public sealed partial class TunnelManager : IDisposable
         int remoteLocalPort = 0,
         string? label = null,
         string? gatewayChainKey = null,
-        string localBindHost = LoopbackBinding.DefaultHost)
+        string localBindHost = LoopbackBinding.DefaultHost,
+        string? gatewayRoute = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(gatewayChain);
@@ -308,7 +311,8 @@ public sealed partial class TunnelManager : IDisposable
                     socksProxyPort: socksProxyPort, remoteBindPort: remoteBindPort, remoteLocalPort: remoteLocalPort,
                     label: label,
                     gatewayChainKey: gatewayChainKey,
-                    localBindHost: localBindHost)
+                    localBindHost: localBindHost,
+                    gatewayRoute: gatewayRoute)
                 .ConfigureAwait(false);
         }
 
@@ -435,6 +439,7 @@ public sealed partial class TunnelManager : IDisposable
                 socksProxyPort,
                 remoteBindPort,
                 remoteLocalPort,
+                gatewayRoute,
                 label,
                 gatewayChainKey,
                 localBindHost);

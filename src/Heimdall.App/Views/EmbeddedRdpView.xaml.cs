@@ -3326,10 +3326,10 @@ public partial class EmbeddedRdpView
         // question back into this pane instead of onto the application's main window, and a
         // request that loses it is refused rather than asked somewhere else.
         //
-        // Which profile the approval belongs to is settled inside the builder, from the codec's
-        // record of the mint. The inventory used to be read here and passed in; it cannot answer
-        // the question, because a profile deleted while this very connection is being established
-        // is missing from it for the same reason a minted identifier is.
+        // Which profile the approval belongs to is settled inside the builder, by asking the
+        // profile itself. The inventory used to be read here and passed in; it cannot answer the
+        // question, because a profile deleted while this very connection is being established is
+        // missing from it for the same reason a session key is.
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(server, target.Value, _trustPromptScopeId);
 
         // Past this point a probe runs and a trust question may be asked. The question is put to
@@ -3505,21 +3505,39 @@ public partial class EmbeddedRdpView
     /// moment of posting - does not cover it. An aborted withdrawal would leave the connection
     /// waiting on a completion nobody will ever settle, through an application exit whose later
     /// cleanup is itself reached only if the exit handler runs to its end.</para>
+    /// <para><b>Subscribing is not enough on its own, and the status is read after it.</b>
+    /// Between the post and the subscription this thread can be descheduled long enough for the
+    /// dispatcher to finish shutting down and abort the operation; a handler attached after the
+    /// event has been raised is never called, because WPF does not replay it. A dispatcher that
+    /// is already down can also hand back an operation that is aborted from the start, without
+    /// throwing. Reading <c>Status</c> once, after subscribing, closes both - and the two paths
+    /// share a latch, since a subscription that fires while the status is being read would
+    /// otherwise apply the withdrawal twice.</para>
     /// </remarks>
     private void PostTrustPromptWithdrawal(Action withdrawal)
     {
         try
         {
-            DispatcherOperation operation = Dispatcher.BeginInvoke(DispatcherPriority.Background, withdrawal);
+            int applied = 0;
 
-            operation.Aborted += (_, _) =>
+            void ApplyWithdrawalOnce()
             {
+                if (Interlocked.Exchange(ref applied, 1) != 0)
+                {
+                    return;
+                }
+
                 Core.Logging.FileLogger.Warn(
-                    "EmbeddedRDP's certificate question withdrawal was aborted by dispatcher "
+                    "EmbeddedRDP's certificate question withdrawal was dropped by dispatcher "
                     + "shutdown before it ran; applying it directly so the connection is not "
                     + "left waiting for an answer that can no longer arrive.");
                 withdrawal();
-            };
+            }
+
+            DispatcherOperation operation = Dispatcher.BeginInvoke(DispatcherPriority.Background, withdrawal);
+            operation.Aborted += (_, _) => ApplyWithdrawalOnce();
+
+            if (operation.Status == DispatcherOperationStatus.Aborted) ApplyWithdrawalOnce();
         }
         catch (InvalidOperationException ex)
         {
@@ -4629,7 +4647,11 @@ public partial class EmbeddedRdpView
         // for good: the native host was already collapsed, the only writer that shows the overlay
         // again is a fresh callback on a session that is already dead, and this is the
         // pre-focused default for six disconnect codes.
-        EditServerRequested?.Invoke(_server.Id);
+        // The inventory profile, not the key this pane runs under. A split pane runs on a copy
+        // whose Id has been replaced by a session key that no inventory row carries, so this used
+        // to hand the editor an identifier it could not match and the pane reported "server not
+        // found" - on the button that is the pre-focused default for six disconnect codes.
+        EditServerRequested?.Invoke(_server.InventoryProfileId);
     }
 
     private void OnOverlayCloseClick(object sender, RoutedEventArgs e)

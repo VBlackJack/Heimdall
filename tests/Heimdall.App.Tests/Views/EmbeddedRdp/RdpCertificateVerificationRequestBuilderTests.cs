@@ -106,7 +106,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         // again: the key dies with the pane, and the next connection asks about the same
         // certificate as if it had never been approved.
         ServerProfileDto paneScoped = Profile("Production");
-        paneScoped.Id = SessionIdCodec.Create("profile-1");
+        paneScoped.AdoptSessionIdentity(SessionIdCodec.Create("profile-1"));
 
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             paneScoped,
@@ -124,9 +124,9 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         // the profile as the scope - so two panes carrying two pane-scoped keys were two
         // questions about one certificate on one profile, and the user answered twice.
         ServerProfileDto firstPane = Profile("Production");
-        firstPane.Id = SessionIdCodec.Create("profile-1");
+        firstPane.AdoptSessionIdentity(SessionIdCodec.Create("profile-1"));
         ServerProfileDto secondPane = Profile("Production");
-        secondPane.Id = SessionIdCodec.Create("profile-1");
+        secondPane.AdoptSessionIdentity(SessionIdCodec.Create("profile-1"));
 
         RdpCertificateVerificationRequest first = RdpCertificateVerificationRequestBuilder.Build(
             firstPane,
@@ -192,11 +192,13 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         // pane's approval is filed under an identifier that dies with the pane, so the
         // certificate is asked about again every time the split is recreated.
         //
-        // Minted here rather than written out, which is the whole distinction: the string below
-        // is indistinguishable from the imported identifiers above, and only the mint says which
-        // profile it belongs to.
+        // Adopted rather than assigned, which is the whole distinction: the resulting string is
+        // indistinguishable from the imported identifiers above, and only the act of adopting it
+        // says which profile this copy belongs to. A bare assignment leaves the pane owning its
+        // own key - the safe direction, and the reason this must be spelled deliberately.
         ServerProfileDto paneScoped = Profile("Production");
-        paneScoped.Id = SessionIdCodec.Create("prod");
+        paneScoped.Id = "prod";
+        paneScoped.AdoptSessionIdentity(SessionIdCodec.Create("prod"));
 
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             paneScoped,

@@ -41,7 +41,19 @@ public sealed class RdpOverlayWayForwardTests
         string handler = ViewSource.HandlerBody("private void OnOverlayEditProfileClick");
 
         Assert.DoesNotContain(CollapseOverlay, handler, StringComparison.Ordinal);
-        Assert.Contains("EditServerRequested?.Invoke(", handler, StringComparison.Ordinal);
+
+        // WHICH identifier, carried whole through the statement predicate. Asserting the bare
+        // call left this green while the handler passed the pane's own key: a split pane runs on
+        // a copy whose Id is a minted session key that no inventory row carries, so the editor
+        // matched nothing and the pane answered "server not found" - on the button that is the
+        // pre-focused default for six disconnect codes.
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                ViewSource.HandlerLogic("private void OnOverlayEditProfileClick"),
+                "EditServerRequested?.Invoke(_server.InventoryProfileId);"),
+            "The overlay's edit button no longer asks for the inventory profile as a step of its "
+                + "own body. Handing it the pane's runtime key sends the editor an identifier no "
+                + "inventory row carries, and the pane answers \"server not found\".");
     }
 
     // Positive control: the two handlers that genuinely finish with the overlay still collapse it,

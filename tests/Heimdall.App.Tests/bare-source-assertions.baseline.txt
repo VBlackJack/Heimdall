@@ -153,7 +153,6 @@ tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpDisconnectOverlayPolicyTests.cs|Th
 tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpFailureMessageLocalizationTests.cs|NoFailureMessageIsAStringLiteral|regex|@"HandleFailure\(\s*"""
 tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpFailureMessageLocalizationTests.cs|TheFailureSitesAreStillThere|regex|@"HandleFailure\("
 tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpLiveRegionTests.cs|EachAnnouncingRegionIsRaisedSomewhereInTheView|regex|@"RdpLiveRegion\.Announce\(" + Regex.Escape(elementName) + @"\)"
-tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpOverlayWayForwardTests.cs|EditProfileDoesNotTakeTheOverlayAwayWithIt|assert-presence|"EditServerRequested?.Invoke("
 tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpOverlayWayForwardTests.cs|TheHandlersThatDoFinishWithTheOverlayStillCollapseIt|assert-presence|CollapseOverlay
 tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpPhaseReachabilityTests.cs|EveryDeclaredPhaseIsEnteredSomewhere|regex|@"TransitionPhase\(RdpConnectionPhase\." + phase + @"\)"
 tests/Heimdall.App.Tests/Views/EmbeddedRdp/RdpPhaseReachabilityTests.cs|TheCertificateCheckRunsInThePreparingPhase|assert-presence|"TransitionPhase(RdpConnectionPhase.Preparing)"

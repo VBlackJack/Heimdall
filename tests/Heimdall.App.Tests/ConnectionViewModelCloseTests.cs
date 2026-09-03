@@ -694,6 +694,40 @@ public sealed class ConnectionViewModelCloseTests
         Assert.Equal(CloseIntent.Silent, Assert.Single(splitService.Requests).Intent);
     }
 
+    // The half of the exit path a single-session test cannot reach. This ran as a bare loop, so
+    // the first session that threw ended the cleanup for every session behind it - and one
+    // reliably does at exit, where the caller's single catch logs the message and moves on to the
+    // next cleanup step, which reads exactly like success. A session never closed is a host never
+    // disposed and a view never torn down, so whatever a view settles on its way out - a
+    // certificate question a connection is still waiting on, among others - stays unsettled.
+    [Fact]
+    public void CloseAllSessionsSilently_OneSessionThrows_StillClosesTheRest()
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new()
+        {
+            CloseAllPanesResult = true,
+            ThrowForSessionTitled = "Faulty",
+        };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+
+        SessionTabViewModel faulty = CreateSplitSession("Connected", "Disconnected");
+        faulty.Title = "Faulty";
+        SessionTabViewModel healthy = CreateSplitSession("Connected", "Disconnected");
+        healthy.Title = "Healthy";
+
+        AddActiveSession(sut, faulty);
+        AddActiveSession(sut, healthy);
+
+        sut.CloseAllSessionsSilently();
+
+        // Both were attempted. Under the bare loop the second call never happened at all.
+        Assert.Equal(2, splitService.CloseAllPanesCallCount);
+        Assert.Contains(
+            splitService.Requests,
+            request => request.Intent == CloseIntent.Silent);
+    }
+
     [Fact]
     public void CloseAllSessionsSilently_IsSilent()
     {
@@ -759,6 +793,9 @@ public sealed class ConnectionViewModelCloseTests
         public SplitLayoutMemory LayoutMemory { get; } = new(Path.GetTempPath());
 
         public bool CloseAllPanesResult { get; init; }
+
+        /// <summary>A session whose close throws, standing in for whatever faults at exit.</summary>
+        public string? ThrowForSessionTitled { get; init; }
 
         public int CloseAllPanesCallCount { get; private set; }
 
@@ -849,6 +886,11 @@ public sealed class ConnectionViewModelCloseTests
             LastClosedSession = session;
             LastRequest = request;
             Requests.Add(request);
+
+            if (string.Equals(session.Title, ThrowForSessionTitled, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("close failed for this session");
+            }
 
             if (string.Equals(session.Title, BlockSessionTitled, StringComparison.Ordinal))
             {

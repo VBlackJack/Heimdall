@@ -162,7 +162,13 @@ public sealed class TunnelService : ITunnelService
         return new TunnelSetupOutcome(true, true, localBindHost, localPort, null, null)
         {
             ReusedExistingTunnel = tunnelResult.ReusedExistingTunnel,
-            GatewayRoute = tunnelResult.GatewayRoute,
+
+            // Read off the tunnel, not off the attempt. Every opening path builds its tunnel
+            // record with the route already on it, and a reuse hands back a copy of that record,
+            // so this one read covers a fresh SSH.NET tunnel, a Plink fallback and a reuse of
+            // either. An attempt-level field would need writing on each of those paths, and the
+            // two that were missed were missed exactly that way.
+            GatewayRoute = tunnelResult.Tunnel?.GatewayRoute,
         };
     }
 
@@ -243,7 +249,6 @@ public sealed class TunnelService : ITunnelService
             return new TunnelResult(true, existing, null, null)
             {
                 ReusedExistingTunnel = true,
-                GatewayRoute = existing.GatewayRoute,
             };
         }
 
@@ -324,7 +329,8 @@ public sealed class TunnelService : ITunnelService
                     remoteBindPort: remoteBindPort,
                     remoteLocalPort: remoteLocalPort,
                     gatewayChainKey: gatewayChainKey,
-                    localBindHost: localBindHost)
+                    localBindHost: localBindHost,
+                    gatewayRoute: resolvedRoute)
                 .ConfigureAwait(false);
         }
         else
@@ -341,7 +347,8 @@ public sealed class TunnelService : ITunnelService
                     remoteBindPort: remoteBindPort,
                     remoteLocalPort: remoteLocalPort,
                     gatewayChainKey: gatewayChainKey,
-                    localBindHost: localBindHost)
+                    localBindHost: localBindHost,
+                    gatewayRoute: resolvedRoute)
                 .ConfigureAwait(false);
         }
 
@@ -389,6 +396,7 @@ public sealed class TunnelService : ITunnelService
                         settings,
                         gatewayChainKey,
                         ct,
+                        resolvedRoute,
                         preferDistinctLoopback,
                         refusalMessage)
                     .ConfigureAwait(false);
@@ -443,16 +451,11 @@ public sealed class TunnelService : ITunnelService
             _connectionSm.SetTunnelInfo(serverId, establishedLocalPort, 0);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
 
-            // Stamped on the instance the manager registered, so every later connection that
-            // reuses this tunnel reads back the chain it was actually dialled through instead of
-            // resolving one from settings that have moved on since. Assigned rather than copied
-            // with `with`, which would leave the registry holding the unstamped original.
-            if (result.Tunnel is not null)
-            {
-                result.Tunnel.GatewayRoute = resolvedRoute;
-            }
-
-            result = result with { GatewayRoute = resolvedRoute };
+            // Nothing is stamped here. The route was set when the tunnel record was built, which
+            // is the only instant every opening path passes through: this block runs AFTER the
+            // establishment delay, and the tunnel is registered and reusable before it, so a
+            // connection reusing it during that window read a route this line had not written
+            // yet. The successful Plink fallback never reaches this block at all.
         }
         else
         {
@@ -616,6 +619,7 @@ public sealed class TunnelService : ITunnelService
         AppSettings settings,
         string gatewayChainKey,
         CancellationToken ct,
+        string? gatewayRoute,
         bool preferDistinctLoopback = false,
         string? precedingRefusal = null)
     {
@@ -712,17 +716,21 @@ public sealed class TunnelService : ITunnelService
             return Refuse(errorMsg, result.FailureCode);
         }
 
-        TunnelInfo tunnelInfo = new TunnelInfo(
+        // Through the same builder the SSH.NET paths use. This record used to be written out by
+        // hand here, which is how it came to be the one opening path with no route on it: a field
+        // added to the builder simply did not exist in this copy, and no test that covered the
+        // builder could see the difference.
+        TunnelInfo tunnelInfo = TunnelManager.BuildTunnelInfo(
             gatewayParams.Host,
             localPort,
             remoteHost,
             remotePort,
-            DateTime.UtcNow,
-            IsAlive: true)
-        {
-            LocalBindHost = localBindHost,
-            GatewayChainKey = gatewayChainKey
-        };
+            socksProxyPort: 0,
+            remoteBindPort: 0,
+            remoteLocalPort: 0,
+            gatewayChainKey: gatewayChainKey,
+            localBindHost: localBindHost,
+            gatewayRoute: gatewayRoute);
 
         if (!_tunnelManager.TryRegisterExternalTunnel(tunnelInfo, runner, () => runner.IsRunning))
         {

@@ -39,6 +39,78 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
         new(StringComparer.Ordinal);
 
     public string Id { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The inventory profile this copy belongs to, once <see cref="Id"/> has been replaced by a
+    /// key minted for one session; null until that happens.
+    /// <para>Not "null whenever the identifier is the profile's own": the ordinary connect path
+    /// puts the key on for the length of the connect and then restores the original
+    /// <see cref="Id"/> without clearing this, so a profile can carry an origin equal to its own
+    /// identifier. <see cref="InventoryProfileId"/> answers the same either way, which is why
+    /// the restore leaves it alone.</para>
+    /// </summary>
+    /// <remarks>
+    /// <para>Transient, never serialized, and null by default - like
+    /// <see cref="AllowCredentialPrompt"/> below, it carries a decision rather than a derived
+    /// value, which is why it says so here.</para>
+    /// <para><b>Carried, because it cannot be recovered.</b> A pane-scoped copy is minted a key
+    /// of the form <c>&lt;profileId&gt;_&lt;8 hex&gt;</c> so tunnel lifetime and error recovery
+    /// stay independent. Two earlier attempts tried to invert that afterwards and both handed one
+    /// profile's certificate approval to another. Reading the shape decoded the imported profile
+    /// <c>prod_deadbeef</c> to <c>prod</c>. Asking the inventory fixed that and not the profile
+    /// deleted while its own connection was still being established, which is absent for the same
+    /// reason a minted key is. Keeping a process-wide record of every mint fixed that in turn and
+    /// not an import that arrives carrying a string some earlier session was minted - the session
+    /// identifier is written to the log, and an import preserves whatever identifier its file
+    /// held. Each of those asked what a STRING was; the question is what this OBJECT is, and only
+    /// the code that replaced the identifier knows.</para>
+    /// <para><b>Forgetting to set it is the safe direction.</b> A mint that leaves this null files
+    /// an approval under a key that dies with the pane, so the certificate is asked about again
+    /// next time. There is no arrangement of this field that sends an approval to a profile that
+    /// did not earn it without a call site explicitly naming that profile.</para>
+    /// </remarks>
+    [JsonIgnore]
+    public string? SessionOriginProfileId { get; private set; }
+
+    /// <summary>
+    /// The inventory profile this copy stands for: <see cref="SessionOriginProfileId"/> when a
+    /// session key has replaced <see cref="Id"/>, and <see cref="Id"/> otherwise.
+    /// </summary>
+    /// <remarks>
+    /// <para>The single spelling of the rule. Three surfaces ask it - the RDP certificate
+    /// question, the execution-trust prompt, and the disconnect overlay's "Edit profile" - and
+    /// surfaces agreeing by resemblance is how one of them once shipped inverting the mint
+    /// unconditionally while another silently answered "server not found".</para>
+    /// <para>Named for what it answers rather than for who asks. It was briefly
+    /// <c>TrustProfileId</c>, which read as though trust were its meaning; trust is one reader of
+    /// it, and the reader that had been getting a pane key and finding no profile at all was the
+    /// edit button.</para>
+    /// </remarks>
+    [JsonIgnore]
+    public string InventoryProfileId =>
+        string.IsNullOrWhiteSpace(SessionOriginProfileId) ? Id : SessionOriginProfileId;
+
+    /// <summary>
+    /// Replaces <see cref="Id"/> with a key minted for one session, recording the profile being
+    /// left behind.
+    /// </summary>
+    /// <remarks>
+    /// The only supported way to put a minted key on a profile, so the origin is recorded at the
+    /// one instant it is known rather than reconstructed later from the key's text. A copy that
+    /// already carries an origin keeps it: minting again over a pane-scoped profile - a split of
+    /// a split - must still name the inventory profile at the bottom, not the pane above it.
+    /// </remarks>
+    public void AdoptSessionIdentity(string sessionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+
+        if (string.IsNullOrWhiteSpace(SessionOriginProfileId) && !string.IsNullOrWhiteSpace(Id))
+        {
+            SessionOriginProfileId = Id;
+        }
+
+        Id = sessionId;
+    }
     public string DisplayName { get; set; } = string.Empty;
     /// <summary>
     /// Provenance tag. Profiles serialized before b63 omit this field and therefore

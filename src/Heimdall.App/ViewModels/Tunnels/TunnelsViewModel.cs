@@ -481,6 +481,16 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         var remoteHost = vm.RemoteHost.Trim();
         var label = string.IsNullOrWhiteSpace(vm.Label) ? null : vm.Label.Trim();
 
+        // The chain this dial is about to make, named as the certificate question names it.
+        // Recorded even though nothing here displays it: a tunnel opened by hand is reusable, and
+        // the connection that reuses it reads its route off the record rather than resolving one
+        // of its own. A manual tunnel that carried none was a session whose question showed no
+        // route at all, for no reason the user could see.
+        var gatewayRoute = Heimdall.App.Services.RdpTrustPromptRoute.Describe(
+            useDirectConnection: false,
+            vm.SelectedGateway!.Id,
+            settings.SshGateways);
+
         // Read before the dial, for the same reason the tunnel service reads it
         // there: the sentence composed below states how many keys this dial
         // offered, and the agents keep changing while a refusal is in flight.
@@ -498,7 +508,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                     verifier: _hostKeyVerifier,
                     cancellationToken: ct,
                     keepAliveIntervalSeconds: settings.SshKeepAliveIntervalSeconds,
-                    label: label)
+                    label: label,
+                    gatewayRoute: gatewayRoute)
                 .ConfigureAwait(false);
         }
         else
@@ -511,7 +522,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                     hostKeyStore: _hostKeyStore,
                     verifier: _hostKeyVerifier,
                     cancellationToken: ct,
-                    label: label)
+                    label: label,
+                    gatewayRoute: gatewayRoute)
                 .ConfigureAwait(false);
         }
 

@@ -84,41 +84,4 @@ public sealed class SessionIdCodecTests
     {
         Assert.ThrowsAny<ArgumentException>(() => SessionIdCodec.Create(inventoryId!));
     }
-
-    // The two identifiers this whole mechanism exists to keep apart. They have the same shape -
-    // a name, an underscore, eight hexadecimal characters - and nothing in the string says which
-    // is which. One was minted for a session of "prod"; the other is an ordinary profile that an
-    // import brought in under a name of that shape.
-    //
-    // Deciding by shape sent both to "prod", which handed an imported profile's certificate
-    // approval to an unrelated one. Deciding by looking them up in the inventory sent the second
-    // to "prod" as well, as soon as that profile was deleted - which can happen while its own
-    // connection is still being established, since deleting a profile does not end it.
-    [Fact]
-    public void OnlyAnIdentifierThisProcessMintedIsResolvedToAnotherProfile()
-    {
-        string minted = SessionIdCodec.Create("prod");
-        const string imported = "prod_deadbeef";
-
-        Assert.Equal("prod", SessionIdCodec.ResolveInventoryId(minted));
-        Assert.Equal(imported, SessionIdCodec.ResolveInventoryId(imported));
-
-        // The control that keeps the pair meaningful: both really do read as a mint by shape, so
-        // the difference above is the record and not the text.
-        Assert.True(SessionIdCodec.TryGetInventoryId(minted, out string mintedPrefix));
-        Assert.True(SessionIdCodec.TryGetInventoryId(imported, out string importedPrefix));
-        Assert.Equal("prod", mintedPrefix);
-        Assert.Equal("prod", importedPrefix);
-    }
-
-    [Fact]
-    public void AnIdentifierWithNoMintedShapeAtAllIsItsOwn()
-        => Assert.Equal("plain-profile", SessionIdCodec.ResolveInventoryId("plain-profile"));
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void AnEmptyRuntimeIdentifierIsEchoed(string runtimeId)
-        => Assert.Equal(runtimeId, SessionIdCodec.ResolveInventoryId(runtimeId));
-
 }

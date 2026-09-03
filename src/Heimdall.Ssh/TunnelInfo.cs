@@ -82,12 +82,20 @@ public sealed record TunnelInfo(
     /// a later connection reusing this tunnel can resolve a chain naming an entirely different
     /// machine, and it may belong to a different profile altogether. The route that is true is
     /// the one recorded here by whoever opened it.</para>
-    /// <para><b>Settable, unlike its siblings, and written once.</b> The chain is resolved a
-    /// layer above this assembly, so the value is stamped onto the instance the manager
-    /// registered rather than passed through the open call - which would put a presentation
-    /// string into the tunnel-opening signature. A <c>with</c> expression cannot serve here: it
-    /// would produce a copy while the registry, and therefore every future reuse, kept the
-    /// original.</para>
+    /// <para><b>Set at construction, which stamping it afterwards could not achieve.</b> The
+    /// first attempt assigned it to the returned instance once the tunnel was up. That left two
+    /// holes and both were reachable. The assignment happened after the configured establishment
+    /// delay while the tunnel had been registered before it, so a connection reusing it during
+    /// that window - thirty seconds, on a profile configured for one - copied a route that was
+    /// still null. And the successful Plink fallback returns from its own branch, above the
+    /// assignment, so every tunnel opened that way and every reuse of one kept no route at all.
+    /// </para>
+    /// <para><b>An <c>init</c> property is what makes the copies safe.</b> This record is copied
+    /// with <c>with</c> in at least two places on the way to a caller - the reuse hand-back sets
+    /// <c>IsAlive</c>, external registration normalises <c>LocalBindHost</c> - and a <c>with</c>
+    /// carries every property it does not name. A settable property assigned after those copies
+    /// were taken updates whichever instance happens to be in hand, which is not necessarily the
+    /// one the registry holds.</para>
     /// </remarks>
-    public string? GatewayRoute { get; set; }
+    public string? GatewayRoute { get; init; }
 }

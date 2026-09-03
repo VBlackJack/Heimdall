@@ -39,29 +39,10 @@ public sealed record TunnelResult(
     /// tunnel opened through Paris is therefore still reused by a later connection whose settings
     /// now say Berlin, on the same local port, to the same target.</para>
     /// <para>Reported because a caller may then not claim that what it resolved describes the
-    /// wire. What the wire actually is arrives separately, in
-    /// <see cref="GatewayRoute"/>.</para>
+    /// wire. What the wire actually is lives on <see cref="TunnelInfo.GatewayRoute"/>, set when
+    /// that tunnel's record was built and carried by every copy of it - deliberately NOT
+    /// duplicated onto this result, because a field here would have to be written on each of the
+    /// three opening paths and the two that were missed were missed exactly that way.</para>
     /// </remarks>
     public bool ReusedExistingTunnel { get; init; }
-
-    /// <summary>
-    /// The gateway chain this tunnel was opened through, as it read when it was dialled; null
-    /// for a direct connection and for a tunnel whose opening was not recorded.
-    /// </summary>
-    /// <remarks>
-    /// <para><b>Recorded at the dial and handed back on reuse, rather than resolved again by
-    /// whoever asks.</b> Two facts make a re-resolution wrong. The gateway list is re-read as a
-    /// fresh clone each time it is asked for, so an edit made during a slow establishment lands
-    /// between the dial and the question. And <see cref="ReusedExistingTunnel"/> above says a
-    /// tunnel handed back here may have been dialled by an entirely different connection, from
-    /// settings this process no longer holds.</para>
-    /// <para><b>Withholding it instead was tried, and it reinstated the confusion it was meant to
-    /// prevent.</b> A route that cannot be proven used to be reported as no route at all, which
-    /// is honest and useless: the field exists so that two identically named profiles reaching
-    /// two different sites can be told apart, and the reused tunnel - the very case where two
-    /// such profiles are most likely to be open at once - was exactly the case that showed
-    /// nothing. Saying nothing is safe against naming the wrong machine and not against being
-    /// asked about two machines that look the same.</para>
-    /// </remarks>
-    public string? GatewayRoute { get; init; }
 }

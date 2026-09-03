@@ -308,6 +308,8 @@ public sealed class PlinkFailClosedTests
 
         try
         {
+            // gatewayRoute is required: an optional trailing argument was how the Plink path
+            // came to open tunnels with no route at all.
             var result = await service.EstablishPlinkTunnelAsync(
                 "server-1",
                 new SshConnectionParams
@@ -325,7 +327,8 @@ public sealed class PlinkFailClosedTests
                     HostKeyProbeTimeoutMs = 1000
                 },
                 "gw-key",
-                CancellationToken.None);
+                CancellationToken.None,
+                gatewayRoute: "Paris datacentre");
 
             Assert.False(result.Success);
             Assert.Equal(SshFailureCode.HostKeyUnavailable, result.FailureCode);
