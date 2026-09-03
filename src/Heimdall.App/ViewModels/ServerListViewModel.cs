@@ -369,15 +369,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             await _configManager.MutateServersAsync(servers =>
             {
-                // Exact first, the mint inverted only when the exact identifier names no
-                // profile. Written as the shared decision rather than as a second copy of it:
-                // the certificate question applies the same rule from a different layer, and
-                // the two agreeing by resemblance is how one of them shipped inverting
-                // unconditionally.
-                string inventoryId = SessionIdCodec.ResolveInventoryId(
-                    profile.Id,
-                    candidate => servers.Exists(
-                        server => string.Equals(server.Id, candidate, StringComparison.Ordinal)));
+                // The profile this session was minted for, from the codec's record of the mint.
+                // Written as the shared decision rather than as a second copy of it: the
+                // certificate question applies the same rule from a different layer, and the two
+                // agreeing by resemblance is how one of them shipped inverting unconditionally.
+                //
+                // Deliberately not narrowed by `servers` here. Reading the inventory looks like
+                // the more careful answer and is the weaker one: a profile deleted while this
+                // connection was still running is absent from `servers`, and treating absence as
+                // evidence of a mint is exactly what filed one profile's approval under another.
+                string inventoryId = SessionIdCodec.ResolveInventoryId(profile.Id);
 
                 ServerProfileDto? stored = servers.FirstOrDefault(
                     server => string.Equals(server.Id, inventoryId, StringComparison.Ordinal));

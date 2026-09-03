@@ -20,8 +20,8 @@ using System.Text.RegularExpressions;
 namespace Heimdall.App.Tests.Views.EmbeddedRdp;
 
 /// <summary>
-/// Reads the two hops that carry a connection's own settings to the certificate question, so the
-/// gateway it names is the one that connection went through.
+/// Reads the two hops that carry a connection's route to the certificate question, so the gateway
+/// it names is the one that connection actually went through.
 /// </summary>
 /// <remarks>
 /// <para><b>The defect these two hops close.</b> The pane is built from the profile the connection
@@ -32,13 +32,20 @@ namespace Heimdall.App.Tests.Views.EmbeddedRdp;
 /// establishment named the new host under "Reached through" for a certificate that had arrived
 /// through the old one. That line exists to tell two same-named machines apart, so one that can
 /// name the wrong one is worse than no line.</para>
+/// <para><b>And the second defect, which withholding the route did not close.</b> A tunnel that
+/// is already open is reused on a hash over gateway IDENTIFIERS, which an edit leaves alone, so
+/// the connection reusing it cannot resolve its route at all - and answering that with no line
+/// left two identically named profiles reaching two different sites indistinguishable, which is
+/// the confusion the line exists to end. The route is therefore composed once at the dial and
+/// travels as text; these are the two hops it travels along.</para>
 /// <para><b>Why this is read rather than run.</b> Both hops end in a WPF code-behind whose
 /// certificate path needs a live <c>Application</c> and an ActiveX host before it reaches any of
 /// this. What each hop DECIDES is measured behaviourally elsewhere and against no WPF at all:
-/// <c>RdpHandlerTests</c> pins that the result carries the very instance the tunnel resolved its
-/// chain from, and <c>RdpTrustPromptRouteTests</c> pins what the route says with that instance,
-/// with a later one, and with none. Nothing in either fails if the carrier stops being passed
-/// from one hop to the next, which is the junction this file reads.</para>
+/// <c>TunnelReuseIdentityTests</c> pins that a reused tunnel reports the route it was opened
+/// through rather than the one the reusing connection resolves, and <c>RdpHandlerTests</c> pins
+/// that the session result carries what the tunnel layer settled rather than the settings the
+/// pane would re-read. Nothing in either fails if the route stops being passed from one hop to
+/// the next, which is the junction this file reads.</para>
 /// <para><b>What it cannot see.</b> That any of it RUNS. The predicate reads a statement at its
 /// body's own brace depth and walks straight past every conditional early return above it.</para>
 /// </remarks>
@@ -48,15 +55,15 @@ public sealed class RdpTrustRouteCarrierWiringTests
     private const string OriginMember =
         "private RdpTrustPromptOrigin BuildTrustPromptOrigin(RdpCertificatePromptContext context)";
 
-    // The hand-over, carried whole. Assigning the materialisation snapshot instead leaves the
-    // property name exactly where a bare Contains would have anchored, while the question goes
-    // back to naming whichever gateway the settings happen to hold when the pane is built.
-    private const string CarrierStatement = "view.ConnectionSettings = rdp.ConnectionSettings;";
+    // The hand-over, carried whole. Resolving a route from the materialisation snapshot instead
+    // leaves the property name exactly where a bare Contains would have anchored, while the
+    // question goes back to naming whichever gateway the settings happen to hold when the pane
+    // is built.
+    private const string CarrierStatement = "view.GatewayRoute = rdp.GatewayRoute;";
 
-    // And what the question then does with it, carried whole for the same reason: swap the
-    // argument for _settings and the call, the type and the method name all stay put.
-    private const string RouteStatement =
-        "string? route = RdpTrustPromptRoute.DescribeConnection(server, ConnectionSettings);";
+    // And what the question then does with it, carried whole for the same reason: resolve it
+    // here from the pane's own snapshot and the local, its type and its name all stay put.
+    private const string RouteStatement = "string? route = GatewayRoute;";
 
     /// <summary>
     /// Both members still exist, so nothing below can pass by reading an empty body.
@@ -73,8 +80,8 @@ public sealed class RdpTrustRouteCarrierWiringTests
         => Assert.True(
             ViewSource.IsStatementOfTheMethodBody(
                 RdpBranch(ManagerLogic(ManagerSource())), CarrierStatement),
-            "The RDP branch no longer hands the pane the settings the connection was made with, "
-                + "as a step of its own block. The certificate question then has no carrier and "
+            "The RDP branch no longer hands the pane the route the tunnel carrying it was "
+                + "dialled through, as a step of its own block. The certificate question then "
                 + "says nothing under \"Reached through\" - or, if the assignment was changed "
                 + "rather than dropped, it names whatever gateway the settings held when the "
                 + "pane was materialised, which is a later instant than the connect.");
@@ -100,19 +107,23 @@ public sealed class RdpTrustRouteCarrierWiringTests
             ViewSource.IsStatementOfTheMethodBody(
                 RdpBranch(
                     ManagerLogic(
-                        MutateManager(CarrierStatement, "view.ConnectionSettings = settings;"))),
+                        MutateManager(
+                            CarrierStatement,
+                            "view.GatewayRoute = RdpTrustPromptRoute.Describe("
+                            + "runtimeServer.UseDirectConnection, runtimeServer.SshGatewayId, "
+                            + "rdpSettings.SshGateways);"))),
                 CarrierStatement),
-            "Handing the pane the settings it is being materialised with satisfies this file's "
-                + "reading, so the reading cannot tell the connection's own gateway list from "
-                + "one re-read after it.");
+            "A route resolved from the settings the pane is being materialised with satisfies "
+                + "this file's reading, so the reading cannot tell the route the tunnel was "
+                + "dialled through from one composed after the fact.");
 
     [Fact]
     public void TheQuestionReadsItsRouteFromThatCarrierAndNotFromThePanesOwnSnapshot()
         => Assert.True(
             ViewSource.IsStatementOfTheMethodBody(
                 ViewSource.HandlerLogic(OriginMember), RouteStatement),
-            "The certificate question no longer resolves its route from the connection's own "
-                + "settings as a step of its own body, so \"Reached through\" can name a gateway "
+            "The certificate question no longer takes its route from what the tunnel layer "
+                + "settled, as a step of its own body, so \"Reached through\" can name a gateway "
                 + "the certificate did not arrive through.");
 
     // Positive control 3. The pane's own snapshot passed instead - one identifier changed, the
@@ -124,7 +135,9 @@ public sealed class RdpTrustRouteCarrierWiringTests
                 LogicOf(
                     MutateView(
                         RouteStatement,
-                        "string? route = RdpTrustPromptRoute.DescribeConnection(server, _settings);"),
+                        "string? route = RdpTrustPromptRoute.Describe("
+                        + "server?.UseDirectConnection ?? false, server?.SshGatewayId, "
+                        + "_settings?.SshGateways);"),
                     OriginMember),
                 RouteStatement),
             "A route resolved from the pane's materialisation snapshot satisfies this file's "

@@ -112,23 +112,12 @@ public sealed class EmbeddedRdpCertificatePromptTests
             WpfTestHost.ResetLocale();
             EmbeddedRdpView view = CreateTunnelledPane();
 
-            // The connection's own settings, not the pane's materialisation snapshot. The route
-            // is resolved from the instance the tunnel resolved its chain from, carried in on
-            // RdpSessionResult and assigned by EmbeddedSessionManager; feeding _settings here
-            // fed the pane the very field the route was moved OFF, so this read an empty line
-            // and reported a defect that was in the fixture.
-            view.ConnectionSettings = new AppSettings
-            {
-                SshGateways =
-                [
-                    new SshGatewayDto
-                    {
-                        Id = "gateway-1",
-                        Name = "Paris datacentre",
-                        Host = "gw1.example.com",
-                    },
-                ],
-            };
+            // The route the tunnel carrying this connection was dialled through, composed by the
+            // tunnel layer at the dial, carried in on RdpSessionResult and assigned by
+            // EmbeddedSessionManager. Not the pane's materialisation snapshot: feeding _settings
+            // here fed the pane the very field the route was moved OFF, so this read an empty
+            // line and reported a defect that was in the fixture.
+            view.GatewayRoute = "Paris datacentre";
 
             Task<RdpTrustAnswer> pending = Ask(view);
 

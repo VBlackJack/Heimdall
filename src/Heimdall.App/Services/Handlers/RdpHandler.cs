@@ -160,28 +160,21 @@ internal sealed class RdpHandler : IProtocolHandler
         {
             int? effectiveTunnelPort = usesTunnel ? targetPort : null;
 
-            // The settings argument travels with the result because it is the instance the
-            // gateway chain above was resolved from. The pane otherwise reads the gateway list
-            // at materialisation time, which is a later instant and a different clone: a gateway
-            // edited during the establishment delay then names one machine in the certificate
-            // question while the certificate arrived from another.
+            // The route travels as text the tunnel layer composed when the tunnel was dialled,
+            // not as a settings instance to be read later. The pane otherwise reads the gateway
+            // list at materialisation time, which is a later instant and a different clone: a
+            // gateway edited during the establishment delay then names one machine in the
+            // certificate question while the certificate arrived from another.
             //
-            // And it travels ONLY when this connection actually opened the tunnel. A reused
-            // tunnel was opened by an earlier connection, possibly from an older settings
-            // instance: the reuse key hashes gateway identifiers, which an edit leaves alone, so
-            // a tunnel dialled through Paris is still reused by a profile whose settings now say
-            // Berlin. Withholding the carrier is what stops the question claiming Berlin for a
-            // certificate that answered at the end of the Paris tunnel;
-            // RdpTrustPromptRoute.DescribeConnection says nothing without one, which is the only
-            // honest answer available here, and a line naming the wrong machine is worse than no
-            // line because the user acts on it.
-            AppSettings? routeEvidence =
-                tunnelOutcome.ReusedExistingTunnel ? null : settings;
-
+            // It is equally the answer for a REUSED tunnel, which an earlier connection opened
+            // and this one only borrows. Carrying the settings this connection read would name
+            // its own chain for a wire it did not dial; carrying nothing - which is what shipped
+            // - left two identically named profiles reaching two different sites with no line at
+            // all to tell them apart, which is the confusion the line exists to end.
             return new ConnectionResult(
                 true,
                 null,
-                new RdpSessionResult(server, effectiveTunnelPort, routeEvidence));
+                new RdpSessionResult(server, effectiveTunnelPort, tunnelOutcome.GatewayRoute));
         }
 
         string? rdpPassword = null;

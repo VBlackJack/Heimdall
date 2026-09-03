@@ -68,4 +68,26 @@ public sealed record TunnelInfo(
     /// tunnels opened without an associated gateway chain.
     /// </summary>
     public string GatewayChainKey { get; init; } = string.Empty;
+
+    /// <summary>
+    /// How the gateway chain that opened this tunnel read at the moment it was dialled, for
+    /// showing a person which machine they are being asked about. Null for a tunnel opened
+    /// without a chain, and for one whose opener recorded nothing.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why it lives on the tunnel and not on the connection that asks.</b>
+    /// <see cref="GatewayChainKey"/> above is a hash over the chain's gateway IDENTIFIERS, and
+    /// editing a gateway leaves its identifier alone - which is deliberate, since a tunnel
+    /// already dialled to a host is still a working tunnel to that host. The consequence is that
+    /// a later connection reusing this tunnel can resolve a chain naming an entirely different
+    /// machine, and it may belong to a different profile altogether. The route that is true is
+    /// the one recorded here by whoever opened it.</para>
+    /// <para><b>Settable, unlike its siblings, and written once.</b> The chain is resolved a
+    /// layer above this assembly, so the value is stamped onto the instance the manager
+    /// registered rather than passed through the open call - which would put a presentation
+    /// string into the tunnel-opening signature. A <c>with</c> expression cannot serve here: it
+    /// would produce a copy while the registry, and therefore every future reuse, kept the
+    /// original.</para>
+    /// </remarks>
+    public string? GatewayRoute { get; set; }
 }

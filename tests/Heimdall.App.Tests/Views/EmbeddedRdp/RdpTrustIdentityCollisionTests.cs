@@ -118,8 +118,7 @@ public sealed class RdpTrustIdentityCollisionTests
             RdpCertificateVerificationRequestBuilder.Build(
                 pane,
                 new RdpCertificateProbeTarget("127.0.0.1", 53211),
-                "pane-7",
-                Inventory);
+                "pane-7");
 
         _ = await verifier.VerifyAsync(paneRequest, CancellationToken.None);
         RdpVerificationOutcome again = await verifier.VerifyAsync(
@@ -133,10 +132,41 @@ public sealed class RdpTrustIdentityCollisionTests
             store.Evaluate(LabId, Thumbprint).Verdict);
     }
 
-    /// <summary>The two profiles the import produced, and nothing else.</summary>
-    private static bool Inventory(string profileId) =>
-        string.Equals(profileId, ProductionId, StringComparison.Ordinal)
-        || string.Equals(profileId, LabId, StringComparison.Ordinal);
+    // The case the inventory lookup could not reach, and the reason nothing reads an inventory
+    // here any more.
+    //
+    // Deleting a profile does not end the connection it started. So: import "Lab" as
+    // prod_deadbeef, start it behind a slow tunnel, and delete it while the tunnel is still being
+    // established. The certificate question arrives afterwards, still naming Lab. An
+    // implementation that decided by looking Lab up - exact identifier first, invert the mint
+    // only when it names no profile - now finds nothing, decodes prod_deadbeef to prod, and files
+    // Lab's approval in Production's trust set. Production then meets that certificate and is
+    // never asked.
+    //
+    // No refinement of that lookup helps: a minted identifier and a deleted profile's identifier
+    // are both absent from the inventory, and absence is all the inventory can report. This is
+    // why the mint records what it minted instead.
+    [Fact]
+    public async Task AProfileAbsentFromTheInventoryStillKeepsItsApprovalToItself()
+    {
+        RdpCertificateTrustStore store = new();
+        RecordingPrompt prompt = new(RdpTrustAnswer.TrustPermanently);
+        RdpCertificateVerifier verifier = new(new StubProbe(Thumbprint), store, prompt);
+
+        // Nothing minted this identifier - it came in on an imported file - and no inventory
+        // holds it, because the profile was deleted a moment ago.
+        _ = await verifier.VerifyAsync(RequestFor(LabId, "Lab"), CancellationToken.None);
+
+        Assert.Equal(
+            RdpCertificateTrustVerdict.Trusted,
+            store.Evaluate(LabId, Thumbprint).Verdict);
+
+        // The whole point: Production, which is still very much in the inventory, learned
+        // nothing.
+        Assert.Equal(
+            RdpCertificateTrustVerdict.Unknown,
+            store.Evaluate(ProductionId, Thumbprint).Verdict);
+    }
 
     private static RdpCertificateVerificationRequest RequestFor(
         string profileId,
@@ -153,8 +183,7 @@ public sealed class RdpTrustIdentityCollisionTests
         return RdpCertificateVerificationRequestBuilder.Build(
             profile,
             new RdpCertificateProbeTarget("srv01", 3389),
-            "pane-" + profileId,
-            Inventory);
+            "pane-" + profileId);
     }
 
     private sealed class StubProbe(string thumbprint) : IRdpCertificateProbe

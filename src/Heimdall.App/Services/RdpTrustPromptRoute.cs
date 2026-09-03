@@ -30,32 +30,26 @@ namespace Heimdall.App.Services;
 /// questions read identically apart from an ephemeral local port the user has never seen. The
 /// gateway is what tells them apart, and it is the one part of the route the endpoint text
 /// looked at - to choose its format string - and then discarded.</para>
-/// <para><b>What makes this the route the connection took.</b> The question is asked during
-/// Preparing, before the session is ready and before the tab's own route string is filled in, so
-/// the live session cannot be read for it. What is read instead is the gateway chain as
-/// configured in the settings instance THIS connection resolved its chain from - the same object
-/// <c>TunnelService.EstablishTunnelAsync</c> walked to build the hops it dialled, carried to the
-/// pane on <c>RdpSessionResult</c> and reached through <see cref="DescribeConnection"/>. For a
-/// tunnel this connection opened, that instance IS the evidence: the chain was resolved from it
-/// and immediately dialled, with no re-read in between. It is not evidence for a tunnel that was
-/// already open, which is why the carrier is withheld in that case and no line is shown.</para>
-/// <para><b>Reading the application's current settings instead was a defect, not a
-/// shortcut.</b> Those are re-read when the pane is materialised, which is later than the
-/// connect, and each read is a fresh deep clone: a gateway edited during a slow tunnel
-/// establishment named the new host here for a certificate that arrived from the old one. Two
-/// machines told apart by a line that could name either of them is worse than no line, because
-/// the user acts on it.</para>
-/// <para><b>The route the connection took is not recorded anywhere, so a reused tunnel gets no
-/// line at all.</b> The resolved chain is a local of <c>TunnelService.EstablishTunnelAsync</c>
-/// and does not survive establishment; what survives on <c>TunnelInfo</c> is the last hop's host
-/// and a SHA-256 over the chain's gateway identifiers. That hash is invariant under editing a
-/// gateway, because an edit leaves its identifier alone, so an already-open tunnel is still
-/// reused for a chain whose hosts have since changed - and the connect-time settings of the
-/// connection REUSING it are not the ones the tunnel was opened from. <c>RdpHandler</c>
-/// therefore withholds the carrier when <c>TunnelSetupOutcome.ReusedExistingTunnel</c> is set,
-/// and <see cref="DescribeConnection"/> answers null without one. The line is shown when it can
-/// be proven and omitted when it cannot, which is what the wording above it needs in order not
-/// to overclaim.</para>
+/// <para><b>Where the route the question shows actually comes from.</b> Not from here at
+/// question time. The question is asked during Preparing, before the session is ready and before
+/// the tab's own route string is filled in, so the live session cannot be read for it - and the
+/// settings can no longer be read for it either, because they are handed out as a fresh deep
+/// clone and carry every edit made since the connect. <c>TunnelService</c> therefore calls
+/// <see cref="Describe"/> once, at the dial, from the settings instance it resolved the hops
+/// from, and records the answer against the tunnel's local port. The pane is handed that text on
+/// <c>RdpSessionResult</c> and shows it unchanged.</para>
+/// <para><b>Which is what makes a reused tunnel answerable at all.</b> Reuse is decided on a
+/// SHA-256 over the chain's gateway identifiers, and an edit leaves an identifier alone, so an
+/// already-open tunnel is still handed to a connection whose chain now names different hosts -
+/// and it may have been dialled by a different profile entirely. The recorded route belongs to
+/// the tunnel rather than to whoever is using it, so reuse reads back what was actually
+/// dialled.</para>
+/// <para><b>Withholding the line when it could not be proven was the previous answer, and it was
+/// not good enough.</b> It is true that a line naming the wrong machine is worse than no line,
+/// because the user acts on it. But no line is not neutral either: this field exists so that two
+/// identically named profiles reaching two different sites can be told apart, and both of them
+/// reusing a tunnel - the likeliest way for both to be open at once - was exactly the case that
+/// showed nothing. Recording the route at the dial removes the choice between the two.</para>
 /// <para>Pure and free of WPF, so two routes can be compared in a test without a window.</para>
 /// </remarks>
 public static class RdpTrustPromptRoute
@@ -66,42 +60,6 @@ public static class RdpTrustPromptRoute
     /// recognises the other. Written as an escape so the source file stays ASCII.
     /// </remarks>
     public const string ChainSeparator = " \u2192 ";
-
-    /// <summary>
-    /// The same, for one connection, read from the settings that connection was made with.
-    /// </summary>
-    /// <param name="profile">The profile the pane is running, or null before it has one.</param>
-    /// <param name="connectionSettings">
-    /// The settings instance the connection resolved its gateway chain from, carried on
-    /// <c>RdpSessionResult</c>. Null when nothing recorded it.
-    /// </param>
-    /// <returns>The route, or null when this cannot be said about THIS connection.</returns>
-    /// <remarks>
-    /// <para><b>No carrier means no line, and that is the whole point of the overload.</b> The
-    /// obvious spelling - passing <c>connectionSettings?.SshGateways</c> straight to
-    /// <see cref="Describe"/> - is not equivalent: with no gateway list to walk, that returns the
-    /// raw gateway identifier, so an absent carrier would still put a line under "Reached
-    /// through". A line naming the wrong machine is worse than no line, because the user acts on
-    /// it, and so is a line whose provenance nobody can establish. Saying nothing is the only
-    /// answer this can give without a carrier.</para>
-    /// <para>Reaching for the application's current settings instead is exactly the defect this
-    /// exists to close: those are re-read at pane materialisation, after the connection resolved
-    /// its chain, and they carry every edit made in between.</para>
-    /// </remarks>
-    public static string? DescribeConnection(
-        ServerProfileDto? profile,
-        AppSettings? connectionSettings)
-    {
-        if (profile is null || connectionSettings is null)
-        {
-            return null;
-        }
-
-        return Describe(
-            profile.UseDirectConnection,
-            profile.SshGatewayId,
-            connectionSettings.SshGateways);
-    }
 
     /// <summary>
     /// The gateways this profile is configured to reach its target through, or null when it is

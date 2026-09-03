@@ -162,6 +162,7 @@ public sealed class TunnelService : ITunnelService
         return new TunnelSetupOutcome(true, true, localBindHost, localPort, null, null)
         {
             ReusedExistingTunnel = tunnelResult.ReusedExistingTunnel,
+            GatewayRoute = tunnelResult.GatewayRoute,
         };
     }
 
@@ -209,6 +210,12 @@ public sealed class TunnelService : ITunnelService
             return new TunnelResult(false, null, ex.Message, SshFailureCode.Unknown);
         }
 
+        // Composed here, from the settings instance the chain above was resolved from, because
+        // this is the instant the route is true at. Asking again later reads a fresh clone of the
+        // gateway list and so answers with every edit made since - which named the wrong city in
+        // a certificate question during a slow establishment.
+        string? resolvedRoute = RdpTrustPromptRoute.Describe(false, gatewayId, settings.SshGateways);
+
         TunnelInfo? existing = _tunnelManager.AcquireReusableTunnel(
             gatewayChainKey,
             remoteHost,
@@ -225,13 +232,18 @@ public sealed class TunnelService : ITunnelService
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.EstablishingTunnel);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
 
-            // Reported, because the chain resolved above is NOT what this tunnel was opened
-            // through. The reuse key hashes gateway identifiers and an edit leaves those alone,
-            // so the tunnel handed back here can have been opened from an older settings
-            // instance - through a gateway host that has since been changed.
+            // The route this tunnel was OPENED through, not the one just resolved. The reuse key
+            // hashes gateway identifiers and an edit leaves those alone, so the tunnel handed
+            // back here can have been dialled from an older settings instance, through a gateway
+            // host that has since been changed - or by another profile entirely.
+            //
+            // Null when nothing recorded that opening, which is a tunnel this process did not
+            // open. The question then shows no route line, as it did for every reuse before the
+            // opening was recorded at all.
             return new TunnelResult(true, existing, null, null)
             {
                 ReusedExistingTunnel = true,
+                GatewayRoute = existing.GatewayRoute,
             };
         }
 
@@ -430,6 +442,17 @@ public sealed class TunnelService : ITunnelService
             Core.Logging.FileLogger.Info($"Tunnel established for {serverId} on port {establishedLocalPort}");
             _connectionSm.SetTunnelInfo(serverId, establishedLocalPort, 0);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
+
+            // Stamped on the instance the manager registered, so every later connection that
+            // reuses this tunnel reads back the chain it was actually dialled through instead of
+            // resolving one from settings that have moved on since. Assigned rather than copied
+            // with `with`, which would leave the registry holding the unstamped original.
+            if (result.Tunnel is not null)
+            {
+                result.Tunnel.GatewayRoute = resolvedRoute;
+            }
+
+            result = result with { GatewayRoute = resolvedRoute };
         }
         else
         {

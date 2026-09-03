@@ -12,6 +12,57 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: two answers that were safe and still wrong
+
+An external review blocked the certificate-question work twice more. Both blockers came from the
+same habit: answering a question with the safest thing available, rather than with the fact.
+
+### An approval could be filed under another profile without any collision
+
+Deleting a profile does not end the connection it started. So a profile imported as
+`prod_deadbeef`, started behind a slow tunnel and deleted during the establishment delay, was
+absent from the inventory by the time its certificate question arrived - and the code decided
+which profile an approval belonged to by asking the inventory. Absent, it decoded the identifier
+to `prod` and wrote the approval into that unrelated profile's trust set, which then opened
+sessions on that certificate without asking anybody.
+
+The previous fix, which looked the exact identifier up first, could not have covered this and
+neither could any refinement of it: a minted identifier and a deleted profile's identifier are
+both absent from the inventory, and absence is the only thing an inventory can report. The
+distinction exists at the mint and nowhere else.
+
+The session-identifier codec now records what it mints, and reads that record back. It consults
+no inventory at all. The ledger is bounded, and forgetting a mint costs a re-asked certificate,
+never a misfiled one.
+
+### Two sites, two identical questions, and a route line that had been withdrawn
+
+The route line under "Reached through" exists so that two profiles with the same name reaching two
+different sites can be told apart. When a tunnel is reused, the connection reusing it cannot
+resolve the route it is actually on - reuse is decided on a hash of gateway identifiers, which an
+edit leaves alone - so the line was withheld rather than risk naming the wrong machine.
+
+That was safe and it was the wrong answer. Two profiles both named `Production`, one reaching
+Paris and one reaching Berlin, both reusing a tunnel, produced two questions with nothing
+whatsoever to tell them apart. The case where the line was withheld is the case it exists for.
+
+A tunnel now records the gateway chain it was dialled through, at the moment it is dialled, and
+hands that back to every connection that reuses it. The route travels as text rather than as a
+settings instance to be read later, so the RDP session result no longer carries application
+settings at all. A tunnel this process did not open still records nothing and still shows no line,
+which is the one remaining silence and an honest one.
+
+### Also
+
+- A withdrawal posted to a dispatcher that is shutting down can be aborted without throwing, so
+  the surrounding catch never ran and the connection was left waiting on a completion nobody
+  would settle. The operation is now watched.
+- Two comments that outran their code: one claiming every queued click counts as an answer, which
+  holds for a refusal and not for an approval arriving after another pane has published one; and
+  one describing the Enter negative control's causality backwards for the third time. Marking the
+  keystroke handled broke Enter on its own - the by-hand click only made the handler look like it
+  was answering.
+
 ## 2026-09-02 (second release of the day): what the guards were not measuring
 
 The morning's release closed an RDP audit. This one closes what that release shipped by mistake,

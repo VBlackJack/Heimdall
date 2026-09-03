@@ -88,6 +88,155 @@ public sealed class TunnelReuseIdentityTests
         Assert.True(result.ReusedExistingTunnel);
     }
 
+    // What the reuse flag above is FOR, measured on the value the question actually shows.
+    //
+    // Reuse is decided on a hash over the chain's gateway identifiers, and editing a gateway
+    // leaves its identifier alone - so the tunnel handed back here was dialled through a chain
+    // this connection cannot reconstruct, and may have been dialled by another profile entirely.
+    // Resolving the route from the settings in hand would name Berlin for a certificate that
+    // answered at the end of the Paris tunnel.
+    //
+    // Withholding it instead - which is what shipped - is honest and not sufficient: the line
+    // exists so that two identically named profiles reaching two different sites can be told
+    // apart, and both of them reusing a tunnel is precisely when both lines vanished. So the
+    // opener records the route on the tunnel, and reuse reads it back.
+    [Fact]
+    public async Task SetupTunnelIfNeededAsync_ReusedTunnel_ReportsTheRouteThatTunnelWasOpenedThrough()
+    {
+        using var tunnelManager = new TunnelManager();
+        const string gatewayId = "gw-A";
+        const string remoteHost = "10.0.0.5";
+        const int remotePort = 3389;
+        var gateway = new SshGatewayDto
+        {
+            Id = gatewayId,
+            Host = "gateway.example.test",
+            User = "ssh-user"
+        };
+        TunnelInfo existing = MakeTunnel(
+            TunnelService.BuildGatewayChainKey([gateway]),
+            remoteHost,
+            remotePort) with
+        {
+            LocalPort = 50124
+        };
+
+        // Stamped by whoever opened it, back when the gateway still read this way.
+        existing.GatewayRoute = "Paris datacentre";
+
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(existing, new TestDisposable(), () => true));
+        var service = new TunnelService(
+            tunnelManager,
+            new HostKeyStore(),
+            new HostKeyTrustService(new HostKeyStore()),
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            RejectingHostKeyVerifier.Instance);
+        var server = new ServerProfileDto
+        {
+            Id = "server-1",
+            RemoteServer = remoteHost,
+            RemotePort = remotePort,
+            SshGatewayId = gatewayId,
+            UseDirectConnection = false
+        };
+
+        // The same identifier, renamed since - which is exactly what reuse cannot see.
+        var settings = new AppSettings
+        {
+            SshGateways =
+            [
+                new SshGatewayDto
+                {
+                    Id = gatewayId,
+                    Name = "Berlin datacentre",
+                    Host = "berlin.example.test",
+                    User = "ssh-user"
+                }
+            ]
+        };
+
+        var result = await service.SetupTunnelIfNeededAsync(
+            server,
+            remotePort,
+            settings,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(result.ReusedExistingTunnel);
+
+        // Paris, which this tunnel was dialled through. Not Berlin, which the chain resolved for
+        // this attempt would say, and not null, which is what shipped.
+        Assert.Equal("Paris datacentre", result.GatewayRoute);
+    }
+
+    // The other half, and the reason the route is allowed to be absent at all: a tunnel this
+    // process did not open records nothing, so there is nothing truthful to show. The question
+    // then draws no route line, which is what every reuse did before the opening was recorded.
+    // Without this control the assertion above would also pass on an implementation that echoed
+    // any non-empty string it could find.
+    [Fact]
+    public async Task SetupTunnelIfNeededAsync_ReusedTunnelNobodyRecorded_ReportsNoRoute()
+    {
+        using var tunnelManager = new TunnelManager();
+        const string gatewayId = "gw-A";
+        const string remoteHost = "10.0.0.5";
+        const int remotePort = 3389;
+        var gateway = new SshGatewayDto
+        {
+            Id = gatewayId,
+            Host = "gateway.example.test",
+            User = "ssh-user"
+        };
+        TunnelInfo existing = MakeTunnel(
+            TunnelService.BuildGatewayChainKey([gateway]),
+            remoteHost,
+            remotePort) with
+        {
+            LocalPort = 50125
+        };
+
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(existing, new TestDisposable(), () => true));
+        var service = new TunnelService(
+            tunnelManager,
+            new HostKeyStore(),
+            new HostKeyTrustService(new HostKeyStore()),
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            RejectingHostKeyVerifier.Instance);
+        var server = new ServerProfileDto
+        {
+            Id = "server-1",
+            RemoteServer = remoteHost,
+            RemotePort = remotePort,
+            SshGatewayId = gatewayId,
+            UseDirectConnection = false
+        };
+        var settings = new AppSettings
+        {
+            SshGateways =
+            [
+                new SshGatewayDto
+                {
+                    Id = gatewayId,
+                    Name = "Berlin datacentre",
+                    Host = "berlin.example.test",
+                    User = "ssh-user"
+                }
+            ]
+        };
+
+        var result = await service.SetupTunnelIfNeededAsync(
+            server,
+            remotePort,
+            settings,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(result.ReusedExistingTunnel);
+        Assert.Null(result.GatewayRoute);
+    }
+
     [Fact]
     public async Task SetupTunnelIfNeededAsync_NoReusableTunnel_DoesNotReportReuse()
     {

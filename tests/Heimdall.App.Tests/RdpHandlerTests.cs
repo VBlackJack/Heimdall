@@ -128,30 +128,35 @@ public sealed class RdpHandlerTests
         Assert.Equal(0, launcher.LaunchCalls);
     }
 
-    // The certificate question's "Reached through" line names a gateway, and it may only name the
-    // gateway THIS connection resolved. The pane is materialised later and re-reads the
-    // application's settings, which are handed out as a fresh deep clone each time, so a gateway
-    // edited during a slow tunnel establishment reached the question while the certificate had
-    // come through the old host. The result is what carries the connect-time instance across that
-    // gap; without it the pane has nothing to distinguish the two instants by.
+    // The certificate question's "Reached through" line names a gateway, and it may only name
+    // the gateway the tunnel carrying THIS connection was dialled through. The pane is
+    // materialised later and re-reads the application's settings, which are handed out as a
+    // fresh deep clone each time, so a gateway edited during a slow tunnel establishment reached
+    // the question while the certificate had come through the old host. The tunnel layer settles
+    // the route at the dial; the result is what carries that text across the gap.
     [Fact]
-    public async Task ConnectAsync_Embedded_CarriesTheSettingsTheGatewayChainWasResolvedFrom()
+    public async Task ConnectAsync_Embedded_CarriesTheRouteTheTunnelLayerSettled()
     {
         FakeTunnelService tunnelService = new FakeTunnelService
         {
             UsesTunnel = true,
             TargetHost = "127.0.0.1",
-            TargetPort = 51001
+            TargetPort = 51001,
+            GatewayRoute = "Paris datacentre"
         };
         RdpHandler handler = CreateHandler(tunnelService, new TrackingRdpExternalClientLauncher());
         ServerProfileDto server = CreateServer("Embedded");
         server.UseDirectConnection = false;
         server.SshGatewayId = "gw-paris";
+
+        // Deliberately naming a DIFFERENT city than the tunnel reported. These are the settings
+        // the pane would re-read; a handler that resolved the route from them instead of taking
+        // what the tunnel settled would answer "Berlin datacentre" here.
         AppSettings settings = new AppSettings
         {
             SshGateways =
             [
-                new SshGatewayDto { Id = "gw-paris", Name = "Paris datacentre", Host = "paris" }
+                new SshGatewayDto { Id = "gw-paris", Name = "Berlin datacentre", Host = "berlin" }
             ]
         };
 
@@ -163,30 +168,29 @@ public sealed class RdpHandlerTests
 
         Assert.True(result.Success);
         RdpSessionResult session = Assert.IsType<RdpSessionResult>(result.Session);
-
-        // By reference, not by value: a clone carrying the same gateway names would be exactly
-        // the later re-read this exists to stop, and would compare equal on every field.
-        Assert.Same(settings, session.ConnectionSettings);
-        Assert.Same(tunnelService.LastSettings, session.ConnectionSettings);
+        Assert.Equal("Paris datacentre", session.GatewayRoute);
     }
 
-    // And the other half of the same rule. A tunnel that was already open is reused on a hash
-    // over the chain's gateway IDENTIFIERS, which editing a gateway's host leaves alone: the
-    // tunnel dialled through Paris is handed to a later profile whose settings now say Berlin,
-    // on the same local port, to the same target. Carrying those settings would put "Berlin"
-    // under "Reached through" for a certificate that answered at the end of the Paris tunnel -
-    // and that line exists to tell two same-named machines apart, so naming the wrong one is
-    // worse than naming none. Nothing records the chain a live tunnel was opened from, so
-    // withholding the carrier is the honest answer, and the question then shows no route line.
+    // And the case that made withholding the route untenable. A tunnel that was already open is
+    // reused on a hash over the chain's gateway IDENTIFIERS, which editing a gateway's host
+    // leaves alone, and which two different profiles reaching one target through one chain share.
+    // What shipped answered that case with no route line at all - honest, and useless in exactly
+    // the situation the line exists for: two profiles named "Production", one reaching Paris and
+    // one reaching Berlin, both reusing a tunnel, both asking about a certificate for "srv01"
+    // with nothing on either question to tell the two sites apart.
+    //
+    // The tunnel layer now reports what the reused tunnel was OPENED through, so the route is
+    // carried for a reused tunnel exactly as for a fresh one.
     [Fact]
-    public async Task ConnectAsync_Embedded_ReusedTunnel_CarriesNoSettingsToDescribeItsRouteFrom()
+    public async Task ConnectAsync_Embedded_ReusedTunnel_CarriesTheRouteThatTunnelWasOpenedThrough()
     {
         FakeTunnelService tunnelService = new FakeTunnelService
         {
             UsesTunnel = true,
             TargetHost = "127.0.0.1",
             TargetPort = 51001,
-            ReusesExistingTunnel = true
+            ReusesExistingTunnel = true,
+            GatewayRoute = "Paris datacentre"
         };
         RdpHandler handler = CreateHandler(tunnelService, new TrackingRdpExternalClientLauncher());
         ServerProfileDto server = CreateServer("Embedded");
@@ -208,16 +212,11 @@ public sealed class RdpHandlerTests
 
         Assert.True(result.Success);
         RdpSessionResult session = Assert.IsType<RdpSessionResult>(result.Session);
-        Assert.Null(session.ConnectionSettings);
 
-        // Measured through the route itself, not only through the carrier: the carrier is a
-        // means, and what must not happen is a route line naming Berlin.
-        Assert.Null(RdpTrustPromptRoute.DescribeConnection(
-            session.Server,
-            session.ConnectionSettings));
-        Assert.Equal(
-            "Berlin datacentre",
-            RdpTrustPromptRoute.DescribeConnection(session.Server, settings));
+        // Paris, which is what the tunnel was dialled through. Not Berlin, which is what these
+        // settings say now, and not null, which is what shipped.
+        Assert.Equal("Paris datacentre", session.GatewayRoute);
+        Assert.NotNull(session.GatewayRoute);
     }
 
     [Fact]
@@ -1198,13 +1197,13 @@ public sealed class RdpHandlerTests
         /// <summary>
         /// The settings instance the tunnel was asked to resolve its gateway chain from.
         /// </summary>
-        /// <remarks>
-        /// Recorded so a test can compare it by reference with what the result carries.
-        /// <c>TunnelService.EstablishTunnelAsync</c> reads <c>SshGateways</c> off this very
-        /// argument, so an instance that is the same object as this one is the instance the
-        /// chain was resolved from - which is the whole claim the carrier makes.
-        /// </remarks>
         public AppSettings? LastSettings { get; private set; }
+
+        /// <summary>
+        /// The route the tunnel layer reports this connection was carried over, standing in for
+        /// what <c>TunnelService</c> composes at the dial and reads back off a reused tunnel.
+        /// </summary>
+        public string? GatewayRoute { get; init; }
 
         public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
@@ -1221,6 +1220,7 @@ public sealed class RdpHandlerTests
                 new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null)
                 {
                     ReusedExistingTunnel = ReusesExistingTunnel,
+                    GatewayRoute = GatewayRoute,
                 });
         }
 
