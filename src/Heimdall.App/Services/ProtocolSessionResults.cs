@@ -57,12 +57,16 @@ public sealed record ConnectionResult(
 /// handed, which is the one <c>TunnelService.EstablishTunnelAsync</c> resolved the gateway chain
 /// from. Not a copy of it and not a re-read: the same object, so what is read back here is what
 /// the chain was resolved from.</para>
-/// <para><b>What it is still not.</b> A record of the route the connection travelled. A tunnel
-/// that was already open is reused when its chain hashes the same, and that hash is over gateway
-/// identifiers, which an edit leaves alone - so a reused tunnel can have been opened from an
-/// older settings instance than this one. Recording the resolved chain on the tunnel is what
-/// would settle that; this carrier narrows the disagreement to a reused tunnel rather than
-/// removing it, and nothing written from it may claim to describe the wire.</para>
+/// <para><b>And null exactly when it would not describe the wire.</b> A tunnel that was already
+/// open is reused when its chain hashes the same, and that hash is over gateway identifiers,
+/// which an edit leaves alone - so a reused tunnel can have been opened from an older settings
+/// instance than this one, through a gateway host that has since changed. Nothing records the
+/// chain a live tunnel was opened from, so on reuse <c>RdpHandler</c> passes null here rather
+/// than an instance whose gateway list describes a route this connection did not take.
+/// <c>RdpTrustPromptRoute.DescribeConnection</c> answers null without a carrier, so the
+/// question shows no route line at all in that case - which is what makes the line's own
+/// wording true wherever it appears, instead of true only for a tunnel this connection
+/// opened.</para>
 /// </remarks>
 public sealed record RdpSessionResult(
     ServerProfileDto Server,

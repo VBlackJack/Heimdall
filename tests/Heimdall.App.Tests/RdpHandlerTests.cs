@@ -170,6 +170,56 @@ public sealed class RdpHandlerTests
         Assert.Same(tunnelService.LastSettings, session.ConnectionSettings);
     }
 
+    // And the other half of the same rule. A tunnel that was already open is reused on a hash
+    // over the chain's gateway IDENTIFIERS, which editing a gateway's host leaves alone: the
+    // tunnel dialled through Paris is handed to a later profile whose settings now say Berlin,
+    // on the same local port, to the same target. Carrying those settings would put "Berlin"
+    // under "Reached through" for a certificate that answered at the end of the Paris tunnel -
+    // and that line exists to tell two same-named machines apart, so naming the wrong one is
+    // worse than naming none. Nothing records the chain a live tunnel was opened from, so
+    // withholding the carrier is the honest answer, and the question then shows no route line.
+    [Fact]
+    public async Task ConnectAsync_Embedded_ReusedTunnel_CarriesNoSettingsToDescribeItsRouteFrom()
+    {
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = 51001,
+            ReusesExistingTunnel = true
+        };
+        RdpHandler handler = CreateHandler(tunnelService, new TrackingRdpExternalClientLauncher());
+        ServerProfileDto server = CreateServer("Embedded");
+        server.UseDirectConnection = false;
+        server.SshGatewayId = "gw-paris";
+        AppSettings settings = new AppSettings
+        {
+            SshGateways =
+            [
+                new SshGatewayDto { Id = "gw-paris", Name = "Berlin datacentre", Host = "berlin" }
+            ]
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceEmbedded);
+
+        Assert.True(result.Success);
+        RdpSessionResult session = Assert.IsType<RdpSessionResult>(result.Session);
+        Assert.Null(session.ConnectionSettings);
+
+        // Measured through the route itself, not only through the carrier: the carrier is a
+        // means, and what must not happen is a route line naming Berlin.
+        Assert.Null(RdpTrustPromptRoute.DescribeConnection(
+            session.Server,
+            session.ConnectionSettings));
+        Assert.Equal(
+            "Berlin datacentre",
+            RdpTrustPromptRoute.DescribeConnection(session.Server, settings));
+    }
+
     [Fact]
     public async Task ConnectAsync_ForceExternalLaunchExceptionReturnsLocalizedMstscError()
     {
@@ -1136,6 +1186,9 @@ public sealed class RdpHandlerTests
     private sealed class FakeTunnelService : ITunnelService
     {
         public bool UsesTunnel { get; init; }
+
+        /// <summary>Whether setup hands back a tunnel that was already open.</summary>
+        public bool ReusesExistingTunnel { get; init; }
         public string TargetHost { get; init; } = "";
         public int TargetPort { get; init; }
         public int ReleaseCount { get; private set; }
@@ -1164,7 +1217,11 @@ public sealed class RdpHandlerTests
             LastSettings = settings;
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
-            return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
+            return Task.FromResult(
+                new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null)
+                {
+                    ReusedExistingTunnel = ReusesExistingTunnel,
+                });
         }
 
         public void UpdateSettings(AppSettings settings)

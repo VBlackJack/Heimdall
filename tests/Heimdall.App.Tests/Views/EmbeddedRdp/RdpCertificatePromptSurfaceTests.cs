@@ -272,9 +272,15 @@ public sealed class RdpCertificatePromptSurfaceTests
         // event really is the whole click.
         //
         // What answers Enter now is the framework's own hook: ButtonBase.OnKeyDown clicks the
-        // focused button when KeyboardNavigation.AcceptsReturn is set on it, and that click is a
-        // real OnClick - the event and the command source both. The value is taken from the
-        // shipped markup rather than assumed, so dropping the attribute fails here.
+        // focused button when KeyboardNavigation.AcceptsReturn holds on it, and that click is a
+        // real OnClick - the event and the command source both.
+        //
+        // The markup value is read rather than assumed, and what that buys is narrower than it
+        // looks: ButtonBase OVERRIDES the property's default to true, measured in
+        // AnAnswerAcceptsReturnWithNoAttributeAtAll below. So the attribute in the markup is a
+        // declaration of intent that changes nothing, and its ABSENCE would leave Enter working
+        // in the product. What is caught here is an answer opted OUT in markup
+        // (AcceptsReturn="False"), which really would stop Enter.
         XElement answer = ViewSource.NamedElement(answerName);
 
         Assert.False(
@@ -292,17 +298,87 @@ public sealed class RdpCertificatePromptSurfaceTests
     }
 
     [Fact]
-    public void EnterRunsNothingOnAnAnswerThatDoesNotAcceptReturn()
+    public void AnAnswerAcceptsReturnWithNoAttributeAtAll()
     {
-        // The control for the theory above, which would otherwise pass on any markup at all -
-        // including markup that answers nothing. This is the framework fact the fix rests on,
-        // measured rather than quoted: without the attribute WPF's ButtonBase ignores Enter
-        // entirely, so the theory above is red the moment an answer loses it.
+        // The framework fact this file used to get backwards, measured rather than quoted.
+        // ButtonBase overrides KeyboardNavigation.AcceptsReturn to true, so a fresh Button
+        // already accepts Enter and the markup attribute on the three answers grants nothing.
+        //
+        // It matters because the control that stood here asserted the opposite causality: it
+        // claimed that removing the attribute stops Enter working, and it built its fixture by
+        // turning an ABSENT attribute into false and then setting that value explicitly.
+        // Removing the attribute from the markup would have left Enter working in the product
+        // while this file went red - an alarm about a defect that is not there, in a file whose
+        // whole subject is a person pressing an answer and nothing happening.
+        Assert.True(StaRunner.Run(() => KeyboardNavigation.GetAcceptsReturn(new Button())));
+    }
+
+    [Fact]
+    public void EnterRunsNothingOnAnAnswerOptedOutOfReturnInMarkup()
+    {
+        // What the theory above is actually a control for: an answer that opts OUT
+        // (AcceptsReturn="False" in markup) is ignored by ButtonBase.OnKeyDown. Setting the
+        // value explicitly is the fixture's claim here, and it is the same thing the markup
+        // would be saying - unlike the absent-attribute case, which says nothing at all.
         Press press = StaRunner.Run(() => PressEnter(acceptsReturn: false));
 
         Assert.Equal(0, press.Executed);
         Assert.Equal(0, press.Clicked);
         Assert.False(press.Handled);
+    }
+
+    [Fact]
+    public void EnterAnswersNothingWhenAHandlerDeliversTheClickByHand()
+    {
+        // THE causality the fix rests on, and the one the old negative control got wrong. What
+        // broke Enter was not a missing attribute: it was the pane's PreviewKeyDown handler
+        // delivering the click itself - raising ButtonBase.ClickEvent on the focused answer and
+        // marking the keystroke handled. OnClick raises that event AND THEN executes the command
+        // source, so raising it by hand announced a click and ran nothing, and marking the key
+        // handled took it off the button before ButtonBase.OnKeyDown could do the real click.
+        //
+        // Deleting that half of the handler is the fix. This plays the deleted code back onto a
+        // real Button carrying a bound command: put it back in the view and Enter answers
+        // nothing again, with every answer still declaring AcceptsReturn exactly as it does now.
+        //
+        // The keystroke is delivered in both of the stages the input manager uses, because the
+        // second half of that causality is unmeasurable without them. ButtonBase.OnKeyDown is a
+        // class handler on KeyDownEvent alone, so a fixture that raises the preview and stops
+        // never reaches it whatever the handler does, and its Executed of zero would then be an
+        // artifact of the delivery rather than a fact about the handler.
+        // TheByHandClickAnswersNothingOnlyBecauseTheKeystrokeIsMarkedHandled below is the other
+        // half: the same handler that does not mark the keystroke leaves Enter answering.
+        Press press = StaRunner.Run(
+            () => PressEnterThroughAByHandClickHandler(marksTheKeystrokeHandled: true));
+
+        Assert.True(
+            press.Handled,
+            "The replayed handler no longer takes the keystroke, so it is not the shape that "
+                + "shipped and the causality below is not the one being measured.");
+        Assert.Equal(1, press.Clicked);
+        Assert.Equal(0, press.Executed);
+    }
+
+    [Fact]
+    public void TheByHandClickAnswersNothingOnlyBecauseTheKeystrokeIsMarkedHandled()
+    {
+        // The half the sentence above names and the assertions above cannot reach on their own:
+        // that it is the marking, not the by-hand click, which stops the answer. The same
+        // handler is replayed with that one line dropped, and Enter answers - the by-hand click
+        // is still announced and still runs nothing, the keystroke goes on to the button, and
+        // ButtonBase.OnKeyDown does the real click that executes the command.
+        //
+        // So the shipped handler needed both halves to break Enter, and a fix that had only
+        // stopped it raising the click event would have left the question answerable.
+        Press press = StaRunner.Run(
+            () => PressEnterThroughAByHandClickHandler(marksTheKeystrokeHandled: false));
+
+        Assert.Equal(1, press.Executed);
+        Assert.Equal(2, press.Clicked);
+        Assert.True(
+            press.Handled,
+            "ButtonBase.OnKeyDown no longer takes the keystroke it acted on, so the delivery "
+                + "here did not reach it and what this measures is not the real click.");
     }
 
     [Fact]
@@ -351,6 +427,78 @@ public sealed class RdpCertificatePromptSurfaceTests
         button.RaiseEvent(key);
 
         return new Press(clicked, command.Executed, key.Handled);
+    }
+
+    /// <summary>
+    /// Presses Enter on an answer whose ancestor handler delivers the click by hand, which is
+    /// the code that shipped and whose deletion is the fix.
+    /// </summary>
+    /// <param name="marksTheKeystrokeHandled">
+    /// Whether the replayed handler also takes the keystroke, which is the half of the shipped
+    /// shape that decides whether the button ever gets to do the real click.
+    /// </param>
+    /// <remarks>
+    /// The handler is attached to the button's own PreviewKeyDown rather than to a parent, so no
+    /// visual tree is needed: what is being reproduced is a handler that runs before
+    /// <c>ButtonBase.OnKeyDown</c> and marks the keystroke handled, and preview handlers on the
+    /// element itself run before its own class handler exactly as an ancestor's would.
+    /// </remarks>
+    private static Press PressEnterThroughAByHandClickHandler(bool marksTheKeystrokeHandled)
+    {
+        CountingCommand command = new();
+        Button button = new() { Command = command };
+        int clicked = 0;
+        button.Click += (_, _) => clicked++;
+        KeyboardNavigation.SetAcceptsReturn(button, true);
+
+        button.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != Key.Enter)
+            {
+                return;
+            }
+
+            button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, button));
+            args.Handled = marksTheKeystrokeHandled;
+        };
+
+        bool handled = DeliverEnter(button);
+
+        return new Press(clicked, command.Executed, handled);
+    }
+
+    /// <summary>
+    /// Delivers one Enter keystroke to <paramref name="target"/> in the two stages the input
+    /// manager uses: the tunnelling preview, and the bubbling key down only when the preview
+    /// left the keystroke unhandled.
+    /// </summary>
+    /// <remarks>
+    /// <para>The promotion rule is the subject, not scaffolding around it. Marking a preview
+    /// handled is how a handler takes a keystroke off the element behind it, and the only way
+    /// that shows up is in whether the second stage happens at all.</para>
+    /// <para>Two argument objects, because that is what the input manager makes: whichever
+    /// stage took the keystroke is the one carrying Handled at the end.</para>
+    /// </remarks>
+    private static bool DeliverEnter(UIElement target)
+    {
+        KeyEventArgs preview = new(Keyboard.PrimaryDevice, new DetachedSource(), 0, Key.Enter)
+        {
+            RoutedEvent = Keyboard.PreviewKeyDownEvent,
+        };
+        target.RaiseEvent(preview);
+
+        if (preview.Handled)
+        {
+            return true;
+        }
+
+        KeyEventArgs down = new(Keyboard.PrimaryDevice, new DetachedSource(), 0, Key.Enter)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent,
+        };
+        target.RaiseEvent(down);
+
+        return down.Handled;
     }
 
     /// <summary>Raises the click event on an answer button, and nothing else.</summary>

@@ -3326,7 +3326,14 @@ public partial class EmbeddedRdpView
         // Built rather than written inline because of the scope token: it is what routes the
         // question back into this pane instead of onto the application's main window, and a
         // request that loses it is refused rather than asked somewhere else.
-        RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(server, target.Value, _trustPromptScopeId);
+        //
+        // The inventory is read here because the builder cannot reach it and must not invert the
+        // session-identifier mint on an identifier a profile really has: an import keeps whatever
+        // identifier its file carried, so "prod_deadbeef" is an ordinary profile, and decoding it
+        // filed its approval in the trust set of the unrelated profile "prod".
+        Func<string, bool> isInventoryProfileId = await InventoryProfileIds.LoadPredicateAsync((Application.Current as App)?.Services?.GetService<IConfigManager>());
+
+        RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(server, target.Value, _trustPromptScopeId, isInventoryProfileId);
 
         // Past this point a probe runs and a trust question may be asked. The question is put to
         // a person inside this pane and may go unanswered indefinitely, so the connect watchdog

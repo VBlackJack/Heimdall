@@ -79,6 +79,67 @@ public sealed class TunnelReuseIdentityTests
         Assert.True(result.UsesTunnel);
         Assert.Equal(localBindHost, result.Host);
         Assert.Equal(localPort, result.Port);
+
+        // The chain resolved just above is not what this tunnel was opened through, and the
+        // caller has to be told so. The reuse key hashes gateway identifiers, which an edit
+        // leaves alone, so the certificate question would otherwise name the gateway host as it
+        // reads TODAY for a certificate that answered at the end of a tunnel opened through the
+        // host it had BEFORE.
+        Assert.True(result.ReusedExistingTunnel);
+    }
+
+    [Fact]
+    public async Task SetupTunnelIfNeededAsync_NoReusableTunnel_DoesNotReportReuse()
+    {
+        // The negative control the flag needs: an open tunnel whose chain key does not match is
+        // not reusable, so this attempt goes on to dial and fails against a verifier that
+        // refuses every host key. Failure or not, nothing was reused, and a flag that answered
+        // true here would withhold the route line from every connection instead of from the
+        // reusing ones.
+        using var tunnelManager = new TunnelManager();
+        const string gatewayId = "gw-A";
+        const string remoteHost = "10.0.0.5";
+        const int remotePort = 3389;
+        var gateway = new SshGatewayDto
+        {
+            Id = gatewayId,
+            Host = "gateway.example.test",
+            User = "ssh-user"
+        };
+        TunnelInfo unrelated = MakeTunnel(
+            TunnelService.BuildGatewayChainKey(
+                [new SshGatewayDto { Id = "gw-OTHER", Host = "other.example.test" }]),
+            remoteHost,
+            remotePort) with
+        {
+            LocalPort = 50321
+        };
+
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(unrelated, new TestDisposable(), () => true));
+        var service = new TunnelService(
+            tunnelManager,
+            new HostKeyStore(),
+            new HostKeyTrustService(new HostKeyStore()),
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            RejectingHostKeyVerifier.Instance);
+        var server = new ServerProfileDto
+        {
+            Id = "server-2",
+            RemoteServer = remoteHost,
+            RemotePort = remotePort,
+            SshGatewayId = gatewayId,
+            UseDirectConnection = false
+        };
+        var settings = new AppSettings { SshGateways = [gateway] };
+
+        var result = await service.SetupTunnelIfNeededAsync(
+            server,
+            remotePort,
+            settings,
+            CancellationToken.None);
+
+        Assert.False(result.ReusedExistingTunnel);
     }
 
     [Fact]

@@ -369,15 +369,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             await _configManager.MutateServersAsync(servers =>
             {
-                ServerProfileDto? stored = servers.FirstOrDefault(
-                    server => string.Equals(server.Id, profile.Id, StringComparison.Ordinal));
+                // Exact first, the mint inverted only when the exact identifier names no
+                // profile. Written as the shared decision rather than as a second copy of it:
+                // the certificate question applies the same rule from a different layer, and
+                // the two agreeing by resemblance is how one of them shipped inverting
+                // unconditionally.
+                string inventoryId = SessionIdCodec.ResolveInventoryId(
+                    profile.Id,
+                    candidate => servers.Exists(
+                        server => string.Equals(server.Id, candidate, StringComparison.Ordinal)));
 
-                if (stored is null
-                    && SessionIdCodec.TryGetInventoryId(profile.Id, out string inventoryId))
-                {
-                    stored = servers.FirstOrDefault(
-                        server => string.Equals(server.Id, inventoryId, StringComparison.Ordinal));
-                }
+                ServerProfileDto? stored = servers.FirstOrDefault(
+                    server => string.Equals(server.Id, inventoryId, StringComparison.Ordinal));
 
                 if (stored is not null)
                 {

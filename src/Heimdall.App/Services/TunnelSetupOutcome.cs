@@ -29,6 +29,16 @@ public sealed record TunnelSetupOutcome(
     SshFailureCode? FailureCode)
 {
     /// <summary>
+    /// Whether an already-open tunnel was handed back rather than a new one opened.
+    /// </summary>
+    /// <remarks>
+    /// Carried out of the tunnel layer so a caller can decline to describe this connection's
+    /// route. <see cref="TunnelResult.ReusedExistingTunnel"/> says why the two can disagree: the
+    /// reuse key hashes gateway identifiers, which an edit leaves alone.
+    /// </remarks>
+    public bool ReusedExistingTunnel { get; init; }
+
+    /// <summary>
     /// Five-value deconstruction kept for source compatibility with the previous tuple
     /// contract, so existing consumers continue to compile unchanged.
     /// </summary>
