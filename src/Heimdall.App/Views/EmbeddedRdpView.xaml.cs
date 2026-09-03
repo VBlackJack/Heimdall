@@ -235,23 +235,22 @@ public partial class EmbeddedRdpView
     public bool? SessionLoggingOverride { get; set; }
 
     /// <summary>
-    /// The settings instance this pane's connection resolved its gateway chain from, supplied by
-    /// <c>EmbeddedSessionManager</c> from <c>RdpSessionResult</c>.
+    /// The gateway chain the tunnel carrying this pane's connection was opened through, supplied
+    /// by <c>EmbeddedSessionManager</c> from <c>RdpSessionResult</c>.
     /// </summary>
     /// <remarks>
-    /// <para><b>Deliberately not the same thing as <c>_settings</c>, and never merged into
-    /// it.</b> <c>_settings</c> is the snapshot the pane was materialised with, and every
-    /// resolution, redirection and timeout the pane reads from it is a question about how to
-    /// present a session that is already opening. The certificate question asks something else -
-    /// which machine the certificate arrived from - and only the connect-time instance can answer
-    /// it. Materialisation happens after the connect, and settings are handed out as a fresh deep
+    /// <para><b>Deliberately not derived from <c>_settings</c>, and never merged into it.</b>
+    /// <c>_settings</c> is the snapshot the pane was materialised with, and every resolution,
+    /// redirection and timeout the pane reads from it is a question about how to present a
+    /// session that is already opening. The certificate question asks something else - which
+    /// machine the certificate arrived from - and only the tunnel that dialled it can answer.
+    /// Materialisation happens after the connect, and settings are handed out as a fresh deep
     /// clone, so the two genuinely differ once a gateway is edited during a slow establishment.
     /// </para>
-    /// <para>Null when nothing recorded it. The route line then says nothing rather than
-    /// something it cannot stand behind: see
-    /// <see cref="Services.RdpTrustPromptRoute.DescribeConnection"/>.</para>
+    /// <para>Null for a direct connection, and for a tunnel whose opening nothing recorded. The
+    /// route line then says nothing rather than something it cannot stand behind.</para>
     /// </remarks>
-    internal AppSettings? ConnectionSettings { get; set; }
+    internal string? GatewayRoute { get; set; }
 
     /// <summary>
     /// Raised when the user clicks the Split button in the header strip.
@@ -3327,13 +3326,11 @@ public partial class EmbeddedRdpView
         // question back into this pane instead of onto the application's main window, and a
         // request that loses it is refused rather than asked somewhere else.
         //
-        // The inventory is read here because the builder cannot reach it and must not invert the
-        // session-identifier mint on an identifier a profile really has: an import keeps whatever
-        // identifier its file carried, so "prod_deadbeef" is an ordinary profile, and decoding it
-        // filed its approval in the trust set of the unrelated profile "prod".
-        Func<string, bool> isInventoryProfileId = await InventoryProfileIds.LoadPredicateAsync((Application.Current as App)?.Services?.GetService<IConfigManager>());
-
-        RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(server, target.Value, _trustPromptScopeId, isInventoryProfileId);
+        // Which profile the approval belongs to is settled inside the builder, from the codec's
+        // record of the mint. The inventory used to be read here and passed in; it cannot answer
+        // the question, because a profile deleted while this very connection is being established
+        // is missing from it for the same reason a minted identifier is.
+        RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(server, target.Value, _trustPromptScopeId);
 
         // Past this point a probe runs and a trust question may be asked. The question is put to
         // a person inside this pane and may go unanswered indefinitely, so the connect watchdog
@@ -3440,15 +3437,14 @@ public partial class EmbeddedRdpView
     /// it.</para>
     /// <para><b>And the endpoint alone is still not an identity.</b> Two profiles reaching one
     /// short name through two different gateways are two machines whose endpoint text differs
-    /// only by an ephemeral local port. The gateway chain is resolved here, from the profile
-    /// rather than from the live tunnel, because this question is asked during Preparing - before
-    /// the tab's own route string has been filled in.</para>
-    /// <para><b>From the connection's own settings, never the application's current ones.</b>
-    /// <see cref="ConnectionSettings"/> is the instance the chain was resolved from at connect
-    /// time; <c>_settings</c> is a later clone taken when the pane was materialised. Reading the
-    /// second is how a gateway edited during a slow tunnel establishment came to be named under
-    /// "Reached through" for a certificate that had arrived through the first. With no carrier
-    /// the line says nothing at all, which is the one honest answer available then.</para>
+    /// only by an ephemeral local port. Naming the chain is what separates them, and it must be
+    /// available during Preparing - before the tab's own route string has been filled in.</para>
+    /// <para><b>From what the tunnel was dialled through, never re-resolved here.</b>
+    /// <see cref="GatewayRoute"/> was composed by the tunnel layer at the dial; <c>_settings</c>
+    /// is a later clone taken when the pane was materialised. Resolving from the second is how a
+    /// gateway edited during a slow tunnel establishment came to be named under "Reached through"
+    /// for a certificate that had arrived through the first - and resolving from the profile at
+    /// all is wrong for a reused tunnel, which an earlier connection dialled.</para>
     /// <para><b>The tab is named as it is announced, not as it is displayed.</b>
     /// <c>DisplayTitle</c> is identical by construction for two sessions of one profile, so it
     /// added nothing precisely where two same-named sessions were the problem;
@@ -3459,7 +3455,7 @@ public partial class EmbeddedRdpView
     {
         ServerProfileDto? server = _server;
         string endpoint = server is null ? string.Empty : BuildEndpointText(server);
-        string? route = RdpTrustPromptRoute.DescribeConnection(server, ConnectionSettings);
+        string? route = GatewayRoute;
 
         return new RdpTrustPromptOrigin(
             string.IsNullOrWhiteSpace(endpoint) ? context.Host : endpoint,
@@ -3495,15 +3491,35 @@ public partial class EmbeddedRdpView
     /// question, had it discarded, and watched the pane adopt the other pane's approval and
     /// connect.</para>
     /// <para><b>Background, not Normal.</b> Background sits below Input, so a click already
-    /// queued is dispatched before the withdrawal and counts as the answer to a question its
-    /// user could still see. At Normal the withdrawal would overtake that click and lose it,
-    /// which is the same defect in a shorter window.</para>
+    /// queued is dispatched before the withdrawal. At Normal the withdrawal would overtake that
+    /// click and discard it, which is the same defect in a shorter window.</para>
+    /// <para><b>What that ordering does and does not buy.</b> The queued click reaches its
+    /// handler, so a refusal already pressed is recorded as a refusal. It does not follow that
+    /// every queued click becomes this pane's answer: an approval arriving after another pane
+    /// has published one is declined on its own terms, and the pane then adopts the published
+    /// answer. Refusal is the case the ordering protects, because it is the one where discarding
+    /// the press would connect a session its user had just declined.</para>
+    /// <para><b>And the operation is watched, because a queued one can simply be dropped.</b> A
+    /// dispatcher that is shutting down aborts what is still in its queue without raising
+    /// anything here, so the catch below - which only sees a dispatcher already shut down at the
+    /// moment of posting - does not cover it. An aborted withdrawal would leave the connection
+    /// waiting on a completion nobody will ever settle, through an application exit whose later
+    /// cleanup is itself reached only if the exit handler runs to its end.</para>
     /// </remarks>
     private void PostTrustPromptWithdrawal(Action withdrawal)
     {
         try
         {
-            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, withdrawal);
+            DispatcherOperation operation = Dispatcher.BeginInvoke(DispatcherPriority.Background, withdrawal);
+
+            operation.Aborted += (_, _) =>
+            {
+                Core.Logging.FileLogger.Warn(
+                    "EmbeddedRDP's certificate question withdrawal was aborted by dispatcher "
+                    + "shutdown before it ran; applying it directly so the connection is not "
+                    + "left waiting for an answer that can no longer arrive.");
+                withdrawal();
+            };
         }
         catch (InvalidOperationException ex)
         {

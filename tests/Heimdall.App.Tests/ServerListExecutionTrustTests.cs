@@ -21,6 +21,7 @@ using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -78,7 +79,11 @@ public sealed class ServerListExecutionTrustTests
         await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(true);
         ServerProfileDto storedProfile = CreateLocalShellProfile("local-1");
         await fixture.ConfigManager.SaveServersAsync(new List<ServerProfileDto> { storedProfile });
-        ServerProfileDto promptProfile = CreateLocalShellProfile("local-1_abcdef12");
+
+        // Minted, not written out. The two are indistinguishable as text, and only the mint says
+        // this session belongs to "local-1" - which is the whole reason an identifier of this
+        // shape is no longer decoded on sight.
+        ServerProfileDto promptProfile = CreateLocalShellProfile(SessionIdCodec.Create("local-1"));
 
         bool result = await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
         List<ServerProfileDto> storedProfiles = await fixture.ConfigManager.LoadServersAsync();
@@ -93,10 +98,11 @@ public sealed class ServerListExecutionTrustTests
     public async Task ConfirmAndTrustExecutionAsync_ImportedIdOfMintedShape_TrustsThatProfileAlone()
     {
         // Both halves of one rule at this site, so it cannot silently become a bare decode
-        // again: "local-1_abcdef12" above names no profile and is decoded, while this one is a
-        // profile in its own right - an import keeps the identifier its file carried - and must
-        // not hand execution trust to the profile its prefix names. The certificate question
-        // applies the same rule from another layer, and the two now run the same code.
+        // again: the identifier above was minted for "local-1" and resolves to it, while this
+        // one is a profile in its own right - an import keeps the identifier its file carried -
+        // and must not hand execution trust to the profile its prefix names. Both are the same
+        // shape; only the mint separates them. The certificate question applies the same rule
+        // from another layer, and the two now run the same code.
         await using ServerListExecutionTrustFixture fixture =
             await ServerListExecutionTrustFixture.CreateAsync(true);
         await fixture.ConfigManager.SaveServersAsync(new List<ServerProfileDto>

@@ -41,37 +41,32 @@ public sealed record ConnectionResult(
 /// <summary>Wraps a <see cref="ServerProfileDto"/> for embedded RDP sessions.</summary>
 /// <param name="Server">The profile the session runs on.</param>
 /// <param name="TunnelPort">Local end of the SSH tunnel, or null for a direct connection.</param>
-/// <param name="ConnectionSettings">
-/// The settings instance this connection was made with, or null when nothing recorded it.
+/// <param name="GatewayRoute">
+/// The gateway chain the tunnel carrying this connection was opened through, as it read when
+/// that tunnel was dialled; null for a direct connection and for a tunnel nothing recorded.
 /// </param>
 /// <remarks>
-/// <para><b>Why the settings travel with the result.</b> The pane is built from the profile
-/// snapshot the connection used, but it used to read the gateway list from whatever settings the
-/// application held at the moment the pane was materialised. Those are two different instants,
-/// and settings are read as a fresh deep clone each time
+/// <para><b>Why the route travels with the result rather than being resolved on arrival.</b> The
+/// pane is built from the profile snapshot the connection used, but it used to read the gateway
+/// list from whatever settings the application held at the moment the pane was materialised.
+/// Those are two different instants, and settings are read as a fresh deep clone each time
 /// <c>ConfigManager.CurrentSettings</c> is asked, so the second instant genuinely carries edits
 /// the first one never saw. Editing a gateway's host during a slow tunnel establishment then
 /// named the new host in the certificate question while the certificate had come from the old
 /// one - and the question's route line exists precisely to tell two machines apart.</para>
-/// <para><b>What this instance is.</b> The one <c>ITunnelService.SetupTunnelIfNeededAsync</c> was
-/// handed, which is the one <c>TunnelService.EstablishTunnelAsync</c> resolved the gateway chain
-/// from. Not a copy of it and not a re-read: the same object, so what is read back here is what
-/// the chain was resolved from.</para>
-/// <para><b>And null exactly when it would not describe the wire.</b> A tunnel that was already
-/// open is reused when its chain hashes the same, and that hash is over gateway identifiers,
-/// which an edit leaves alone - so a reused tunnel can have been opened from an older settings
-/// instance than this one, through a gateway host that has since changed. Nothing records the
-/// chain a live tunnel was opened from, so on reuse <c>RdpHandler</c> passes null here rather
-/// than an instance whose gateway list describes a route this connection did not take.
-/// <c>RdpTrustPromptRoute.DescribeConnection</c> answers null without a carrier, so the
-/// question shows no route line at all in that case - which is what makes the line's own
-/// wording true wherever it appears, instead of true only for a tunnel this connection
-/// opened.</para>
+/// <para><b>Text, not the settings instance it came from.</b> Carrying the instance made this
+/// record answerable only for a tunnel the same connection had just opened: a reused tunnel was
+/// dialled by an earlier connection, possibly from settings this one never held, so there was
+/// nothing truthful to hand over and <c>RdpHandler</c> passed null. That silence was itself the
+/// defect - two identically named profiles reaching two different sites are exactly what the
+/// line exists to distinguish, and both of them reusing a tunnel is precisely when both lines
+/// vanished. <c>TunnelService</c> now records what each live tunnel was dialled through and
+/// hands it back on reuse, so the answer is the same kind of fact in both cases.</para>
 /// </remarks>
 public sealed record RdpSessionResult(
     ServerProfileDto Server,
     int? TunnelPort = null,
-    AppSettings? ConnectionSettings = null) : ISessionResult;
+    string? GatewayRoute = null) : ISessionResult;
 
 /// <summary>Wraps an SSH.NET shell session.</summary>
 public sealed record SshSessionResult(

@@ -721,8 +721,7 @@ public sealed class SplitServiceTests : IDisposable
             .Select(profile => RdpCertificateVerificationRequestBuilder.Build(
                 profile,
                 new RdpCertificateProbeTarget("127.0.0.1", 53211),
-                "pane-" + profile.Id,
-                inventoryIds.Contains))
+                "pane-" + profile.Id))
             .ToList();
 
         Assert.All(requests, request => Assert.Equal(inventoryServerId, request.ProfileId));

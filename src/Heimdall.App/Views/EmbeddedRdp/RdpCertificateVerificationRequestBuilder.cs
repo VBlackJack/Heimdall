@@ -47,23 +47,16 @@ internal static class RdpCertificateVerificationRequestBuilder
     /// <param name="server">The profile about to be connected.</param>
     /// <param name="target">The endpoint the probe will dial.</param>
     /// <param name="promptScopeId">The token identifying the surface that must ask.</param>
-    /// <param name="isInventoryProfileId">
-    /// Whether an identifier names a profile the inventory holds. Supplied by the caller because
-    /// this type cannot reach the inventory itself, and required rather than optional so a call
-    /// site cannot omit it and silently go back to inverting the mint unconditionally.
-    /// </param>
     public static RdpCertificateVerificationRequest Build(
         ServerProfileDto server,
         RdpCertificateProbeTarget target,
-        string promptScopeId,
-        Func<string, bool> isInventoryProfileId)
+        string promptScopeId)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentException.ThrowIfNullOrWhiteSpace(promptScopeId);
-        ArgumentNullException.ThrowIfNull(isInventoryProfileId);
 
         return new RdpCertificateVerificationRequest(
-            ResolveTrustProfileId(server.Id, isInventoryProfileId),
+            ResolveTrustProfileId(server.Id),
             string.IsNullOrWhiteSpace(server.DisplayName)
                 ? server.RemoteServer
                 : server.DisplayName,
@@ -80,10 +73,8 @@ internal static class RdpCertificateVerificationRequestBuilder
     /// <param name="runtimeProfileId">
     /// The <c>Id</c> the profile copy this pane runs on carries.
     /// </param>
-    /// <param name="isInventoryProfileId">
-    /// Whether an identifier names a profile the inventory holds.
-    /// </param>
-    /// <returns>The inventory profile, or the argument unchanged when it is already one.</returns>
+    /// <returns>The profile that identifier was minted for, or it unchanged when it is a
+    /// profile's own.</returns>
     /// <remarks>
     /// <para><b>Trust is a property of the profile, not of the pane.</b> A session-scoped key is
     /// minted per pane so tunnel lifetime and error recovery stay independent, and it is written
@@ -91,35 +82,20 @@ internal static class RdpCertificateVerificationRequestBuilder
     /// Nothing about that is wrong; what was wrong was letting it reach the trust store, which
     /// stores one set of approved thumbprints per profile and is read again on the next
     /// connection, long after every key minted for this one has gone.</para>
-    /// <para><b>Recovered from the identifier rather than carried beside it</b>, because the pane
-    /// copy is made in more than one place - a split, an ad-hoc reconnect, a multi-monitor
-    /// coercion - and only the shape of the identifier is common to all of them.
-    /// <see cref="SessionIdCodec"/> mints that shape and is the only thing that inverts it. A
-    /// field written where the mint happens would have to be written at every one of those
-    /// places and stay written through every copy taken afterwards; a site that forgot it would
-    /// fail silently, and there is no compiler census of a field nobody is required to set.</para>
-    /// <para><b>But never inverted unconditionally, which is what shipped and what this fixes.</b>
-    /// An import preserves the identifier its file carried, so a profile genuinely called
-    /// <c>prod_deadbeef</c> is an ordinary inventory profile with an identifier of the minted
-    /// shape. Inverting it decoded that profile to <c>prod</c>, and an approval given for
-    /// <c>prod_deadbeef</c> was written into the trust set of the unrelated profile <c>prod</c>,
-    /// which then opened sessions on that certificate without asking. The inventory therefore
-    /// decides: the exact identifier is looked up first and the mint is inverted only when it
-    /// names no profile, which is the rule the callers that already hold the inventory apply -
-    /// see <c>ServerListViewModel.PersistExecutionTrustAsync</c>, whose lookup is now the same
-    /// <see cref="SessionIdCodec.ResolveInventoryId"/> call as this one.</para>
-    /// <para><b>The residual ambiguity, narrowed rather than closed.</b> With both <c>prod</c>
-    /// and <c>prod_deadbeef</c> in the inventory, a session minted for <c>prod</c> whose
-    /// discriminator is exactly <c>deadbeef</c> still resolves to <c>prod_deadbeef</c>. That
-    /// needs an eight-hexadecimal-character collision out of a GUID against an identifier that
-    /// already exists, where the unconditional inversion needed only the profile to exist. When
-    /// the inventory cannot be read at all, and equally when it loads and holds no profile, the
-    /// caller says so by reporting every identifier as an inventory one, so nothing is decoded:
-    /// a split pane is then asked about its certificate again next time, which is the harmless
-    /// half of the failure.</para>
+    /// <para><b>Read back from the mint, which is where the answer actually is.</b> The pane copy
+    /// is made in more than one place - a split, an ad-hoc reconnect, a multi-monitor coercion -
+    /// but all of them get their identifier from <see cref="SessionIdCodec.Create"/>, so
+    /// recording the profile there covers every one of them and no call site can forget to.</para>
+    /// <para><b>Two weaker answers were shipped before it, and both misfiled an approval.</b>
+    /// Inverting the identifier's shape unconditionally read the imported profile
+    /// <c>prod_deadbeef</c> as a mint for <c>prod</c> and wrote its approval into that unrelated
+    /// profile's trust set. Asking the inventory first - exact identifier, invert only when it
+    /// names nothing - fixed that case and not the one where <c>prod_deadbeef</c> is deleted
+    /// while its own connection is still being established: deleting a profile does not end the
+    /// connection it started, so the question still carries the deleted profile's name while the
+    /// approval lands under <c>prod</c> again. Absence from the inventory is not evidence of a
+    /// mint, and no lookup can make it so.</para>
     /// </remarks>
-    internal static string ResolveTrustProfileId(
-        string runtimeProfileId,
-        Func<string, bool> isInventoryProfileId)
-        => SessionIdCodec.ResolveInventoryId(runtimeProfileId, isInventoryProfileId);
+    internal static string ResolveTrustProfileId(string runtimeProfileId)
+        => SessionIdCodec.ResolveInventoryId(runtimeProfileId);
 }

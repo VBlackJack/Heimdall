@@ -368,8 +368,14 @@ public sealed class RdpCertificatePromptSurfaceTests
         // is still announced and still runs nothing, the keystroke goes on to the button, and
         // ButtonBase.OnKeyDown does the real click that executes the command.
         //
-        // So the shipped handler needed both halves to break Enter, and a fix that had only
-        // stopped it raising the click event would have left the question answerable.
+        // So the marking is what broke Enter, on its own: DeliverEnter stops at the preview once
+        // it is handled, exactly as the input manager does, and KeyDown never reaches the button.
+        // The by-hand click was not the other half of the break - a handler that only raised it,
+        // without marking, would have left Enter working. What it did was make the shipped
+        // handler look like it was answering: one click announced, nothing executed, and a
+        // question that stayed on screen with no record of the press.
+        //
+        // Which is why the fix deleted the handler rather than either line of it.
         Press press = StaRunner.Run(
             () => PressEnterThroughAByHandClickHandler(marksTheKeystrokeHandled: false));
 

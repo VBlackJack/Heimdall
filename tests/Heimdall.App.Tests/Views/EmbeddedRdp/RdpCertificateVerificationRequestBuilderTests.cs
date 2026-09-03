@@ -37,8 +37,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             Profile(displayName: "Production"),
             new RdpCertificateProbeTarget("127.0.0.1", 53211),
-            "pane-7",
-            Inventory("profile-1"));
+            "pane-7");
 
         Assert.Equal("pane-7", request.PromptScopeId);
     }
@@ -51,8 +50,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             Profile(displayName: "Production"),
             new RdpCertificateProbeTarget("127.0.0.1", 53211),
-            "pane-7",
-            Inventory("profile-1"));
+            "pane-7");
 
         Assert.Equal("127.0.0.1", request.Host);
         Assert.Equal(53211, request.Port);
@@ -64,8 +62,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             Profile(displayName: "Production"),
             new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
-            "pane-7",
-            Inventory("profile-1"));
+            "pane-7");
 
         Assert.Equal("Production", request.ProfileName);
         Assert.Equal("profile-1", request.ProfileId);
@@ -81,8 +78,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             Profile(displayName),
             new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
-            "pane-7",
-            Inventory("profile-1"));
+            "pane-7");
 
         Assert.Equal("dc-pool.example.com", request.ProfileName);
     }
@@ -99,8 +95,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
             () => RdpCertificateVerificationRequestBuilder.Build(
                 Profile("Production"),
                 new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
-                scopeId!,
-                Inventory("profile-1")));
+                scopeId!));
     }
 
     [Fact]
@@ -116,8 +111,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             paneScoped,
             new RdpCertificateProbeTarget("127.0.0.1", 53211),
-            "pane-7",
-            Inventory("profile-1"));
+            "pane-7");
 
         Assert.NotEqual("profile-1", paneScoped.Id);
         Assert.Equal("profile-1", request.ProfileId);
@@ -137,13 +131,11 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest first = RdpCertificateVerificationRequestBuilder.Build(
             firstPane,
             new RdpCertificateProbeTarget("127.0.0.1", 53211),
-            "pane-7",
-            Inventory("profile-1"));
+            "pane-7");
         RdpCertificateVerificationRequest second = RdpCertificateVerificationRequestBuilder.Build(
             secondPane,
             new RdpCertificateProbeTarget("127.0.0.1", 53212),
-            "pane-8",
-            Inventory("profile-1"));
+            "pane-8");
 
         Assert.NotEqual(firstPane.Id, secondPane.Id);
         Assert.Equal("profile-1", first.ProfileId);
@@ -165,8 +157,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             server,
             new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
-            "pane-7",
-            Inventory(inventoryProfileId));
+            "pane-7");
 
         Assert.Equal(inventoryProfileId, request.ProfileId);
     }
@@ -188,48 +179,32 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             imported,
             new RdpCertificateProbeTarget("lab01", 3389),
-            "pane-7",
-            Inventory("prod", importedId));
+            "pane-7");
 
         Assert.Equal(importedId, request.ProfileId);
     }
 
     [Fact]
-    public void AMintedIdentifierIsStillDecodedWhenNoProfileCarriesIt()
+    public void AMintedIdentifierIsFiledUnderTheProfileItWasMintedFor()
     {
-        // And the other half of the same rule, which the exact-first ordering must not cost: a
-        // key minted for a pane names no profile, so it is the one case where the mint is
-        // inverted. Lose this and a split pane's approval is filed under an identifier that
-        // dies with the pane.
+        // And the other half of the same rule, which telling imports apart must not cost: a key
+        // minted for a pane belongs to the profile it was minted for. Lose this and a split
+        // pane's approval is filed under an identifier that dies with the pane, so the
+        // certificate is asked about again every time the split is recreated.
+        //
+        // Minted here rather than written out, which is the whole distinction: the string below
+        // is indistinguishable from the imported identifiers above, and only the mint says which
+        // profile it belongs to.
         ServerProfileDto paneScoped = Profile("Production");
-        paneScoped.Id = "prod_deadbeef";
+        paneScoped.Id = SessionIdCodec.Create("prod");
 
         RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder.Build(
             paneScoped,
             new RdpCertificateProbeTarget("127.0.0.1", 53211),
-            "pane-7",
-            Inventory("prod"));
+            "pane-7");
 
         Assert.Equal("prod", request.ProfileId);
     }
-
-    [Fact]
-    public void ARequestWithNoWayToConsultTheInventoryIsRefusedAtTheSource()
-    {
-        // Rather than defaulted to inverting unconditionally, which is the shape that shipped.
-        // A call site that cannot say which identifiers real profiles have has no business
-        // deciding whose trust set an approval belongs in.
-        _ = Assert.Throws<ArgumentNullException>(
-            () => RdpCertificateVerificationRequestBuilder.Build(
-                Profile("Production"),
-                new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
-                "pane-7",
-                null!));
-    }
-
-    /// <summary>The inventory as the builder is allowed to see it: identifiers, nothing else.</summary>
-    private static Func<string, bool> Inventory(params string[] profileIds) =>
-        new HashSet<string>(profileIds, StringComparer.Ordinal).Contains;
 
     private static ServerProfileDto Profile(string? displayName) => new()
     {

@@ -32,11 +32,23 @@ public sealed record TunnelSetupOutcome(
     /// Whether an already-open tunnel was handed back rather than a new one opened.
     /// </summary>
     /// <remarks>
-    /// Carried out of the tunnel layer so a caller can decline to describe this connection's
-    /// route. <see cref="TunnelResult.ReusedExistingTunnel"/> says why the two can disagree: the
-    /// reuse key hashes gateway identifiers, which an edit leaves alone.
+    /// Carried out of the tunnel layer because a reused tunnel's route is not the one this
+    /// connection resolved. <see cref="TunnelResult.ReusedExistingTunnel"/> says why the two can
+    /// disagree: the reuse key hashes gateway identifiers, which an edit leaves alone.
     /// </remarks>
     public bool ReusedExistingTunnel { get; init; }
+
+    /// <summary>
+    /// The gateway chain the tunnel this connection is on was opened through, as it read when
+    /// that tunnel was dialled; null for a direct connection and for a tunnel this process did
+    /// not open.
+    /// </summary>
+    /// <remarks>
+    /// The route a certificate question may name, and the reason it can be named at all for a
+    /// reused tunnel. See <see cref="TunnelResult.GatewayRoute"/> for why it is recorded at the
+    /// dial rather than resolved by whoever asks.
+    /// </remarks>
+    public string? GatewayRoute { get; init; }
 
     /// <summary>
     /// Five-value deconstruction kept for source compatibility with the previous tuple

@@ -192,11 +192,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
             var (runtimeServer, multimonFallbackStatusKey) = ResolveEmbeddedRdpRuntimeServer(rdp.Server);
             view.SessionLoggingOverride = runtimeServer.SessionLoggingOverride;
 
-            // The settings the connection resolved its gateway chain from, kept apart from the
-            // materialisation snapshot below. Only the certificate question reads it, and only to
-            // name the gateway the certificate actually arrived through: rdpSettings is a later
-            // clone and carries any gateway edited while the tunnel was still being established.
-            view.ConnectionSettings = rdp.ConnectionSettings;
+            // The route the tunnel carrying this connection was dialled through, composed at the
+            // dial and kept apart from the materialisation snapshot below. Only the certificate
+            // question reads it, and only to name the gateway the certificate actually arrived
+            // through: rdpSettings is a later clone and carries any gateway edited while the
+            // tunnel was still being established.
+            view.GatewayRoute = rdp.GatewayRoute;
             var globalResizeDelay = settings?.RdpResizeEnableDelayMs ?? DefaultRdpResizeEnableDelayMs;
             if (globalResizeDelay < 0)
             {

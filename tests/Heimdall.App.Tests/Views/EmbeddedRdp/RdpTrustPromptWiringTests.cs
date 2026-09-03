@@ -74,7 +74,16 @@ public sealed class RdpTrustPromptWiringTests
     // decides whether a click already queued is dispatched before the withdrawal or lost to it:
     // Background sits below Input, Normal above it, and the method name is unchanged either way.
     private const string PostWithdrawalStatement =
-        "_ = Dispatcher.BeginInvoke(DispatcherPriority.Background, withdrawal);";
+        "DispatcherOperation operation = Dispatcher.BeginInvoke(DispatcherPriority.Background,"
+        + " withdrawal);";
+
+    // And the operation being watched, which the post above cannot imply. A dispatcher that is
+    // shutting down aborts what is still queued WITHOUT throwing, so the catch around this post
+    // - which only sees a dispatcher already shut down at the moment of posting - never runs and
+    // the withdrawal silently never happens. The connection is then left waiting on a completion
+    // nobody will settle, through an exit whose later cleanup runs only if its handler reaches
+    // the end.
+    private const string AbortedStatement = "operation.Aborted += (_, _) =>";
 
     private const string PostWithdrawalMember =
         "private void PostTrustPromptWithdrawal(Action withdrawal)";
@@ -88,20 +97,16 @@ public sealed class RdpTrustPromptWiringTests
     // The request, carried whole rather than by the builder's bare name. Drop the scope
     // argument and the name stays exactly where it was while every question is refused; pass
     // another pane's scope and the question is asked at a machine the user is not connecting.
-    // The fourth argument is the same kind of load-bearing: replace it with a predicate that
-    // answers no and the builder inverts the session-identifier mint on every profile again,
-    // which is what filed one profile's approval in another profile's trust set.
+    //
+    // Which profile the approval belongs to is no longer an argument here at all: it is settled
+    // inside the builder from the codec's record of the mint, and measured behaviourally in
+    // RdpTrustIdentityCollisionTests. A predicate used to be passed in from an inventory read,
+    // and the inventory turned out to be unable to answer the question - a profile deleted while
+    // its own connection was still being established is missing from it exactly as a minted
+    // identifier is.
     private const string RequestStatement =
         "RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder"
-        + ".Build(server, target.Value, _trustPromptScopeId, isInventoryProfileId);";
-
-    // And where that predicate comes from, carried whole. Handing the loader a null service
-    // provider is indistinguishable at the call site from handing it the real one, and it makes
-    // the loader report every identifier as an inventory identifier - which is safe, and which
-    // also silently stops a split pane's approval from ever being found again.
-    private const string InventoryPredicateStatement =
-        "Func<string, bool> isInventoryProfileId = await InventoryProfileIds.LoadPredicateAsync("
-        + "(Application.Current as App)?.Services?.GetService<IConfigManager>());";
+        + ".Build(server, target.Value, _trustPromptScopeId);";
 
     private const string UnregisterStatement = "_trustPromptRegistration?.Dispose();";
     private const string CloseStatement = "_trustPrompt.Close();";
@@ -179,29 +184,12 @@ public sealed class RdpTrustPromptWiringTests
                 + "routed to the pane that asked it.");
     }
 
+    // Positive control 10. The pane's own scope replaced by another pane's, which leaves the
+    // builder's name, the argument count and every other token standing exactly where a laxer
+    // reading would have anchored - and routes this pane's question to a surface the user is not
+    // looking at.
     [Fact]
-    public void TheTrustIdentityIsDecidedAgainstTheInventoryThePaneReads()
-    {
-        // InventoryProfileIdsTests pins what the loader decides and
-        // RdpCertificateVerificationRequestBuilderTests pins what the builder does with it.
-        // Neither fails if the pane stops reading the inventory and hands the builder a
-        // predicate of its own, and the shape that shipped needed no predicate at all: it
-        // inverted the session-identifier mint on every profile, so an approval given for the
-        // imported profile "prod_deadbeef" was filed in the trust set of the unrelated profile
-        // "prod", which then connected on that certificate without asking.
-        Assert.True(
-            ViewSource.IsStatementOfTheMethodBody(
-                ViewSource.HandlerLogic(VerifyCertificate), InventoryPredicateStatement),
-            "The certificate check no longer loads the inventory from the application's own "
-                + "service provider as a step of its own body, so what it hands the builder is "
-                + "no longer a statement about which identifiers real profiles have.");
-    }
-
-    // Positive control 10. The predicate replaced by one that answers no, which is exactly the
-    // unconditional inversion that shipped - and which leaves the builder's name, the scope
-    // argument and the argument count all standing where a laxer reading would have anchored.
-    [Fact]
-    public void TheRequestIsNotFoundWhenTheInventoryPredicateIsReplacedByAConstant()
+    public void TheRequestIsNotFoundWhenItIsBuiltWithAnotherPanesScope()
         => Assert.False(
             ViewSource.IsStatementOfTheMethodBody(
                 LogicOf(
@@ -209,12 +197,12 @@ public sealed class RdpTrustPromptWiringTests
                         RequestStatement,
                         "RdpCertificateVerificationRequest request = "
                         + "RdpCertificateVerificationRequestBuilder.Build(server, target.Value, "
-                        + "_trustPromptScopeId, static _ => false);"),
+                        + "_otherPaneScopeId);"),
                     VerifyCertificate),
                 RequestStatement),
-            "A request whose trust identity is decided without the inventory satisfies this "
-                + "file's reading of the view, so the reading cannot tell an approval filed "
-                + "under the profile that gave it from one filed under a stranger.");
+            "A request built with a scope that is not this pane's satisfies this file's reading "
+                + "of the view, so the reading cannot tell a question asked where the user is "
+                + "looking from one asked somewhere else.");
 
     [Fact]
     public void TheStoppedConnectionSaysWhichOfTheTwoWaysItStopped()
@@ -300,6 +288,13 @@ public sealed class RdpTrustPromptWiringTests
                 + "try. Above Input, the withdrawal overtakes a click already queued and the "
                 + "press is lost again; not posting at all puts the settlement back on the "
                 + "cancelling thread.");
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                TryBlock(ViewSource.HandlerLogic(PostWithdrawalMember)),
+                AbortedStatement),
+            "The hand-over no longer watches the operation it posted, so a withdrawal the "
+                + "dispatcher drops during shutdown is never applied and never reported.");
     }
 
     // Positive control 8. The wiring commented out, which is the mutant a wiring test is owed:
@@ -327,13 +322,31 @@ public sealed class RdpTrustPromptWiringTests
                 LogicOf(
                     Mutate(
                         PostWithdrawalStatement,
-                        "_ = Dispatcher.BeginInvoke(DispatcherPriority.Normal, withdrawal);"),
+                        "DispatcherOperation operation = Dispatcher.BeginInvoke("
+                        + "DispatcherPriority.Normal, withdrawal);"),
                     PostWithdrawalMember,
                     TryBlock),
                 PostWithdrawalStatement),
             "A withdrawal posted above Input satisfies this file's reading of the view, so the "
                 + "reading cannot tell a press that is honoured from one the withdrawal "
                 + "overtakes.");
+
+    // Positive control 9b. The operation discarded again, which is the shape that shipped: the
+    // post reads identically, the priority is right, and an abort during shutdown is silent.
+    [Fact]
+    public void TheAbortWatchIsNotFoundWhenTheOperationIsDiscarded()
+        => Assert.False(
+            ViewSource.IsStatementOfTheMethodBody(
+                LogicOf(
+                    Mutate(
+                        AbortedStatement,
+                        "// " + AbortedStatement),
+                    PostWithdrawalMember,
+                    TryBlock),
+                AbortedStatement),
+            "A hand-over that drops the operation on the floor satisfies this file's reading, "
+                + "so the reading cannot tell a withdrawal that always happens from one the "
+                + "dispatcher may discard.");
 
     [Fact]
     public void TearingThePaneDownUnregistersItAndSettlesWhateverItWasAsking()
