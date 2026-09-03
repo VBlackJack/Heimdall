@@ -19,7 +19,8 @@ using Heimdall.Core.Configuration;
 namespace Heimdall.App.Services;
 
 /// <summary>
-/// Names the SSH gateways a tunnelled session's traffic passes through, in travel order.
+/// Names the SSH gateways a tunnelled profile is configured to reach its target through, in
+/// travel order.
 /// </summary>
 /// <remarks>
 /// <para><b>This is the half of the machine's identity the question was missing.</b> A tunnelled
@@ -29,10 +30,27 @@ namespace Heimdall.App.Services;
 /// questions read identically apart from an ephemeral local port the user has never seen. The
 /// gateway is what tells them apart, and it is the one part of the route the endpoint text
 /// looked at - to choose its format string - and then discarded.</para>
-/// <para><b>Resolved from the profile, not from the live tunnel.</b> The question is asked during
-/// Preparing, before the session is ready, and the tab's route string is filled in when the
-/// session completes. Reading the profile's own gateway chain gives the same names without
-/// depending on how far the connection has got.</para>
+/// <para><b>This describes the configuration, and says so; it does not measure the
+/// connection.</b> The question is asked during Preparing, before the session is ready and
+/// before the tab's own route string is filled in, so the live session cannot be read for it.
+/// What is read instead is the gateway chain as configured in the settings instance THIS
+/// connection resolved its chain from, carried to the pane on <c>RdpSessionResult</c> and reached
+/// through <see cref="DescribeConnection"/>. The wording above the value is what keeps that
+/// honest - it announces a configured route, not a route that was travelled.</para>
+/// <para><b>Reading the application's current settings instead was a defect, not a
+/// shortcut.</b> Those are re-read when the pane is materialised, which is later than the
+/// connect, and each read is a fresh deep clone: a gateway edited during a slow tunnel
+/// establishment named the new host here for a certificate that arrived from the old one. Two
+/// machines told apart by a line that could name either of them is worse than no line, because
+/// the user acts on it.</para>
+/// <para><b>Why not the route the connection took, even now.</b> Nothing records it. The
+/// resolved chain is a local of <c>TunnelService.EstablishTunnelAsync</c> and does not survive
+/// establishment; what survives on <c>TunnelInfo</c> is the last hop's host and a SHA-256 over
+/// the chain's gateway identifiers. That hash is invariant under editing a gateway, because an
+/// edit leaves its identifier alone, so an already-open tunnel is still reused for a chain whose
+/// hosts have since changed and the connect-time settings of the pane REUSING it are not the
+/// ones the tunnel was opened from. Recording the resolved chain on the tunnel is what would
+/// close that last case; it is not a change this type can make on its own.</para>
 /// <para>Pure and free of WPF, so two routes can be compared in a test without a window.</para>
 /// </remarks>
 public static class RdpTrustPromptRoute
@@ -44,7 +62,46 @@ public static class RdpTrustPromptRoute
     /// </remarks>
     public const string ChainSeparator = " \u2192 ";
 
-    /// <summary>The gateways this profile reaches its target through, or null when it is direct.</summary>
+    /// <summary>
+    /// The same, for one connection, read from the settings that connection was made with.
+    /// </summary>
+    /// <param name="profile">The profile the pane is running, or null before it has one.</param>
+    /// <param name="connectionSettings">
+    /// The settings instance the connection resolved its gateway chain from, carried on
+    /// <c>RdpSessionResult</c>. Null when nothing recorded it.
+    /// </param>
+    /// <returns>The route, or null when this cannot be said about THIS connection.</returns>
+    /// <remarks>
+    /// <para><b>No carrier means no line, and that is the whole point of the overload.</b> The
+    /// obvious spelling - passing <c>connectionSettings?.SshGateways</c> straight to
+    /// <see cref="Describe"/> - is not equivalent: with no gateway list to walk, that returns the
+    /// raw gateway identifier, so an absent carrier would still put a line under "Reached
+    /// through". A line naming the wrong machine is worse than no line, because the user acts on
+    /// it, and so is a line whose provenance nobody can establish. Saying nothing is the only
+    /// answer this can give without a carrier.</para>
+    /// <para>Reaching for the application's current settings instead is exactly the defect this
+    /// exists to close: those are re-read at pane materialisation, after the connection resolved
+    /// its chain, and they carry every edit made in between.</para>
+    /// </remarks>
+    public static string? DescribeConnection(
+        ServerProfileDto? profile,
+        AppSettings? connectionSettings)
+    {
+        if (profile is null || connectionSettings is null)
+        {
+            return null;
+        }
+
+        return Describe(
+            profile.UseDirectConnection,
+            profile.SshGatewayId,
+            connectionSettings.SshGateways);
+    }
+
+    /// <summary>
+    /// The gateways this profile is configured to reach its target through, or null when it is
+    /// direct.
+    /// </summary>
     /// <param name="useDirectConnection">Whether the profile bypasses every gateway.</param>
     /// <param name="sshGatewayId">The gateway the profile enters the chain at.</param>
     /// <param name="gateways">Every configured gateway, for walking the chain.</param>

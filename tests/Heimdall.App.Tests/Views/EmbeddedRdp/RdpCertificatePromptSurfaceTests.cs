@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Xml.Linq;
 
 namespace Heimdall.App.Tests.Views.EmbeddedRdp;
@@ -243,6 +246,155 @@ public sealed class RdpCertificatePromptSurfaceTests
             "The fingerprint box is not a tab stop, so removing the nested cycle above buys "
                 + "nothing: Tab still walks past the one thing the question exists to have the "
                 + "user read.");
+    }
+
+    /// <summary>The three answers, named as their markup names them.</summary>
+    public static TheoryData<string> Answers() =>
+    [
+        "CertificatePromptRefuseButton",
+        "CertificatePromptTrustOnceButton",
+        "CertificatePromptTrustButton",
+    ];
+
+    [Theory]
+    [MemberData(nameof(Answers))]
+    public void EnterOnAnAnswerRunsThatAnswer(string answerName)
+    {
+        // The defect this replaces, and it is not a keyboard nicety: a person could press
+        // "Do not connect" and watch the session open.
+        //
+        // Each answer is a bound Command, and the view delivered Enter by raising
+        // ButtonBase.ClickEvent on the focused button. WPF's OnClick raises that event AND THEN
+        // executes the command source, so raising it alone announced a click and ran nothing:
+        // Enter recorded no answer at all, the pane reported NotAsked, and it then adopted the
+        // approval given in another pane and connected. The handler was copied from the
+        // reconnect overlay above, whose buttons carry Click handlers and for which raising the
+        // event really is the whole click.
+        //
+        // What answers Enter now is the framework's own hook: ButtonBase.OnKeyDown clicks the
+        // focused button when KeyboardNavigation.AcceptsReturn is set on it, and that click is a
+        // real OnClick - the event and the command source both. The value is taken from the
+        // shipped markup rather than assumed, so dropping the attribute fails here.
+        XElement answer = ViewSource.NamedElement(answerName);
+
+        Assert.False(
+            string.IsNullOrWhiteSpace((string?)answer.Attribute("Command")),
+            answerName + " is no longer driven by a bound command, so what this measures no "
+                + "longer describes how the question is answered.");
+
+        Press press = StaRunner.Run(() => PressEnter(AcceptsReturn(answer)));
+
+        Assert.Equal(1, press.Executed);
+        Assert.True(
+            press.Handled,
+            "Enter on " + answerName + " is left unhandled, so the keystroke goes on to "
+                + "whatever stands behind the question.");
+    }
+
+    [Fact]
+    public void EnterRunsNothingOnAnAnswerThatDoesNotAcceptReturn()
+    {
+        // The control for the theory above, which would otherwise pass on any markup at all -
+        // including markup that answers nothing. This is the framework fact the fix rests on,
+        // measured rather than quoted: without the attribute WPF's ButtonBase ignores Enter
+        // entirely, so the theory above is red the moment an answer loses it.
+        Press press = StaRunner.Run(() => PressEnter(acceptsReturn: false));
+
+        Assert.Equal(0, press.Executed);
+        Assert.Equal(0, press.Clicked);
+        Assert.False(press.Handled);
+    }
+
+    [Fact]
+    public void RaisingTheClickEventOnAnAnswerRunsNoCommand()
+    {
+        // The shipped defect itself, played out on a real Button: the click is announced to
+        // every Click handler and the bound command is not run. Kept as a test rather than as a
+        // sentence in a comment because it is the whole reason the handler could not stay - and
+        // because it is what makes the reconnect overlay's identical-looking handler correct
+        // there and wrong here.
+        Press press = StaRunner.Run(RaiseClickOnly);
+
+        Assert.Equal(1, press.Clicked);
+        Assert.Equal(0, press.Executed);
+    }
+
+    /// <summary>Whether an answer's markup lets WPF click it on Enter.</summary>
+    private static bool AcceptsReturn(XElement answer) =>
+        string.Equals(
+            (string?)answer.Attribute("KeyboardNavigation.AcceptsReturn"),
+            "True",
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>What one keystroke or one raised event actually ran.</summary>
+    private readonly record struct Press(int Clicked, int Executed, bool Handled);
+
+    /// <summary>Presses Enter on a real answer button carrying a bound command.</summary>
+    /// <remarks>
+    /// No window and no <c>HwndSource</c>: the key event is routed straight at the button, which
+    /// is all <c>ButtonBase.OnKeyDown</c> reads. The source is a stand-in because
+    /// <see cref="KeyEventArgs"/> refuses a null one, and nothing on the path under test looks
+    /// at it.
+    /// </remarks>
+    private static Press PressEnter(bool acceptsReturn)
+    {
+        CountingCommand command = new();
+        Button button = new() { Command = command };
+        int clicked = 0;
+        button.Click += (_, _) => clicked++;
+        KeyboardNavigation.SetAcceptsReturn(button, acceptsReturn);
+
+        KeyEventArgs key = new(Keyboard.PrimaryDevice, new DetachedSource(), 0, Key.Enter)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent,
+        };
+        button.RaiseEvent(key);
+
+        return new Press(clicked, command.Executed, key.Handled);
+    }
+
+    /// <summary>Raises the click event on an answer button, and nothing else.</summary>
+    private static Press RaiseClickOnly()
+    {
+        CountingCommand command = new();
+        Button button = new() { Command = command };
+        int clicked = 0;
+        button.Click += (_, _) => clicked++;
+
+        button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, button));
+
+        return new Press(clicked, command.Executed, Handled: false);
+    }
+
+    /// <summary>An answer's command, which counts what was actually asked of it.</summary>
+    private sealed class CountingCommand : System.Windows.Input.ICommand
+    {
+        public int Executed { get; private set; }
+
+        // Declared without a backing field: nothing here ever re-queries CanExecute, and an
+        // unused event would be a warning in a repository that builds warnings as errors.
+        public event EventHandler? CanExecuteChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public bool CanExecute(object? parameter) => true;
+
+        public void Execute(object? parameter) => Executed++;
+    }
+
+    /// <summary>
+    /// A presentation source that presents nothing, so a key event can be built off any window.
+    /// </summary>
+    private sealed class DetachedSource : PresentationSource
+    {
+        public override System.Windows.Media.Visual? RootVisual { get; set; }
+
+        public override bool IsDisposed => false;
+
+        protected override System.Windows.Media.CompositionTarget GetCompositionTargetCore() =>
+            null!;
     }
 
     [Fact]

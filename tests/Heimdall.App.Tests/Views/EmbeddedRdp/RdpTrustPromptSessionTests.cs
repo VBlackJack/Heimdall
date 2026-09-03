@@ -82,7 +82,9 @@ public sealed class RdpTrustPromptSessionTests
         // NotAsked rather than Refuse, and that is the whole point of the value. Refuse is what
         // a person pressed, and the pane says so out loud - "you did not approve the certificate
         // this server presented". Reporting a teardown as Refuse puts that sentence in front of
-        // a user who was asked nothing. Both still stop the connection.
+        // a user who was asked nothing. Neither is approval; what NotAsked does not carry is
+        // "the connection stops", which belongs to RdpTrustQuestionCoalescer and is measured in
+        // RdpTrustQuestionCoalescerTests.
         RdpTrustPromptSession session = new();
         RdpCertificatePromptDialogViewModel question = await QuestionAsync();
         Task<RdpTrustAnswer> pending = session.AskAsync(question, CancellationToken.None);
@@ -256,8 +258,12 @@ public sealed class RdpTrustPromptSessionTests
         // wins". A refusal decides something still open - whether this pane connects. An
         // approval decides the certificate, which was decided elsewhere the moment the
         // withdrawal was raised, and honouring it would write the trust store from a question
-        // the application had already taken back. The connection stops, and one reconnect asks
-        // again.
+        // the application had already taken back.
+        //
+        // What the pane then does is NOT stated here, and saying that it stops was the defect in
+        // the note this path logs: the pane reports NotAsked and the coalescer hands it the
+        // answer the question was withdrawn for, which is usually the approval that withdrew it.
+        // The test below reads that note.
         Queue<Action> display = new();
         RdpTrustPromptSession session = new(display.Enqueue);
         using CancellationTokenSource cts = new();
@@ -365,6 +371,32 @@ public sealed class RdpTrustPromptSessionTests
 
         Assert.Equal(0, changes);
         await Task.CompletedTask;
+    }
+
+    [Theory]
+    [InlineData(RdpTrustAnswer.TrustPermanently)]
+    [InlineData(RdpTrustAnswer.TrustForSession)]
+    public void ThePressThatIsNotHonoured_IsNotWrittenDownAsAStoppedConnection(
+        RdpTrustAnswer pressed)
+    {
+        // The line above used to end "and the connection stops", and the connection does not
+        // stop: the press is declined, the pane reports NotAsked, and the coalescer then hands
+        // it the answer the question was withdrawn for - an approval, in the case this line is
+        // most often written for. It announced an outcome the code does not perform, in the one
+        // log someone reads while trying to work out why a session opened.
+        //
+        // Frozen whole, because the mutant is the sentence: any rewording is red and has to be
+        // argued for. What it may not say is measured separately, so the reason survives the
+        // wording.
+        string note = RdpTrustPromptSession.LateAnswerNote(pressed);
+
+        Assert.Equal(
+            $"[RdpCertPrompt] '{pressed}' was pressed after the question had been withdrawn; it "
+                + "does not settle this pane, whose outcome was decided where the question was "
+                + "withdrawn.",
+            note);
+        Assert.Contains(pressed.ToString(), note, StringComparison.Ordinal);
+        Assert.DoesNotContain("stops", note, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void Execute(

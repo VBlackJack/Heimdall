@@ -41,12 +41,30 @@ namespace Heimdall.App.Services;
 /// the certificate this server presented" - a sentence about an answer that pane was never
 /// asked for.</description></item>
 /// </list>
-/// <para><b>The decision taken instead.</b> Every pane that meets the certificate displays the
-/// question itself, and the first real answer settles it for all of them and withdraws it from
+/// <para><b>The decision taken instead.</b> Every pane that meets the certificate puts the
+/// question up itself, and the first real answer settles it for all of them and withdraws it from
 /// the others. Coalescing is kept where it was worth having - the user answers once, not once
 /// per pane - and dropped where it was doing harm: no pane holds a question that decides
 /// something happening elsewhere, and no pane is handed an outcome produced by a teardown in
 /// another pane.</para>
+/// <para><b>What binds a pane is the question it JOINED, not the question it displayed.</b> The
+/// claim once made here - that every pane bound by an answer had been shown the question it
+/// answers - is false as built, and was false the day it was written. A pane joins under the lock
+/// and reaches its display afterwards; an answer given in that gap withdraws the pane's
+/// participation before it draws anything, so the pane shows nothing and takes the answer below.
+/// Nothing distinguishes "never displayed" from "displayed and then withdrawn", and nothing is
+/// added to distinguish them, because the two deserve the same outcome: that is the coalescing
+/// itself, seen at its narrowest. The alternative - a pane that never displayed asks afresh -
+/// buys no safety and costs a second question about a certificate the same person approved a
+/// moment earlier, for the same profile, at the same host.</para>
+/// <para><b>The property that does hold, and it is the one worth having.</b> An answer binds a
+/// pane only when that pane was asking THE SAME question - same profile, same host, same
+/// certificate, which is what <see cref="TrustPromptKey"/> carries - and was still asking it when
+/// the answer was given. It never crosses to another question, and it never reaches a pane that
+/// arrived after the question was forgotten. Both of those are measured in
+/// <c>PaneRdpCertificateTrustPromptTests</c>, and the pane that is bound without displaying is
+/// measured in <c>RdpTrustQuestionCoalescerTests</c> - so what is written above is a decision
+/// that was taken, rather than an accident nobody wrote down.</para>
 /// <para><b>A pane whose answer settled reports that answer, never the shared one.</b> Two
 /// answers racing is not a case one human produces, but the rule costs nothing and removes the
 /// ordinary way this type could tell a user the opposite of what they pressed.</para>
@@ -126,6 +144,11 @@ internal sealed class RdpTrustQuestionCoalescer
         {
             // Joined a question a person has just answered. The display is withdrawn before it
             // is ever entered, so this pane shows nothing and takes the answer below.
+            //
+            // Unreachable by construction today: the answer and the forgetting happen under one
+            // lock, so a pane that still finds the entry finds it unanswered. Kept because it is
+            // the forgetting that makes it so, and because the branch it guards - joining an
+            // answered question - is the one shape here that must never reach a display.
             participation.Withdraw();
         }
 

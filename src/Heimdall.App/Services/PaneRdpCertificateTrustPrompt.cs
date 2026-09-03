@@ -24,12 +24,20 @@ namespace Heimdall.App.Services;
 /// </summary>
 /// <remarks>
 /// <para><b>Every path that is not an answer returns <see cref="RdpTrustAnswer.NotAsked"/>, and
-/// every one of them still stops the connection.</b> No registered surface, a cancelled token, a
-/// pane closed by its user: none of those is approval, and the alternative is opening a session
-/// nobody approved. What the separate value buys is the sentence the pane then shows. Refusing
-/// on those paths made "you did not approve the certificate this server presented" the report of
-/// a question nobody was ever shown, which is a false claim shipped by a change whose subject is
-/// false claims.</para>
+/// none of them is approval.</b> No registered surface, a cancelled token, a pane closed by its
+/// user: nobody decided anything in that pane. What the separate value buys is the sentence the
+/// pane then shows. Refusing on those paths made "you did not approve the certificate this server
+/// presented" the report of a question nobody was ever shown, which is a false claim shipped by a
+/// change whose subject is false claims.</para>
+/// <para><b>What a display returning it does NOT settle is whether the connection stops.</b> This
+/// type hands the value to <see cref="RdpTrustQuestionCoalescer"/>, which reads it as "nobody
+/// answered in that pane" and then looks for an answer given in another pane holding the same
+/// question. A pane whose question was withdrawn because someone else approved is handed that
+/// approval and connects. Only a pane asking alone, or one whose own connection was given up,
+/// stops on it. The value this type finally RETURNS does stop the connection, because by then it
+/// is the answer nobody gave anywhere - but that is a property of the return, not of the paths
+/// above, and the two were written as one claim for long enough to be worth separating here.
+/// </para>
 /// <para><b>The question is asked where the connection is, and nowhere else.</b> It used to be a
 /// top-level <c>Window</c> shown with <c>ShowDialog()</c>, owned by whatever the application
 /// called its main window. Two consequences, and the second is the reason this type exists.
@@ -96,8 +104,12 @@ internal sealed class PaneRdpCertificateTrustPrompt(
     /// The scope token is deliberately NOT part of it. It identifies a pane, and two panes of
     /// one profile meeting one certificate are asking one question: keying on the pane would
     /// turn the coalescing off exactly where it is wanted, and make the user answer the same
-    /// question twice. The question IS drawn in both panes - that part is not coalesced - but
-    /// the first answer settles it everywhere and takes it off the other screens.
+    /// question twice. Each pane runs its own display rather than sharing one - that part is not
+    /// coalesced - and the first answer settles the question everywhere and takes it off the
+    /// other screens. What is NOT promised is that every bound pane drew anything: a pane joins
+    /// under the lock and reaches its display afterwards, so an answer given in that gap
+    /// withdraws it before it draws, and it takes the answer without having shown it. That is
+    /// deliberate, and <see cref="RdpTrustQuestionCoalescer"/> is where the reasoning lives.
     /// </para>
     /// <para>
     /// The port is not part of it either: the thumbprint already identifies the certificate,
@@ -127,10 +139,13 @@ internal sealed class PaneRdpCertificateTrustPrompt(
             // not a graceful degradation: it is how a question about one machine came to be
             // answered at another machine's window. Reporting it as a refusal was a smaller
             // version of the same lie, told to the user instead of to the trust store.
+            // The sentence stops at what this method knows. It used to end "the connection
+            // stops", which the coalescer above may well not do: another pane holding the same
+            // question can have answered, and this connection is then handed that answer.
             FileLogger.Warn(
                 "[RdpCertPrompt] no session surface is registered for scope "
                 + $"'{context.PromptScopeId}' (profile '{context.ProfileName}'); the question "
-                + "was not asked, so the connection stops without recording an answer.");
+                + "was not asked here, and no answer was recorded for it.");
             return Task.FromResult(RdpTrustAnswer.NotAsked);
         }
 

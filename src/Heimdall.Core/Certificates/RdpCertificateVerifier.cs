@@ -124,12 +124,21 @@ public enum RdpTrustAnswer
     /// Nobody was asked, so nobody answered.
     /// </summary>
     /// <remarks>
-    /// <b>Every way of not answering resolves here, and every one of them still stops the
-    /// connection.</b> The surface torn down, the pane closed, the question withdrawn because
-    /// another pane answered it first: none is approval, and the safety rule is unchanged.
-    /// What changes is that the caller can now tell those apart from
-    /// <see cref="Refuse"/> - an answer a person gave - and so can say which of the two
-    /// happened instead of attributing to the user a decision they never made.
+    /// <para><b>Every way of not answering resolves here, and none of them is approval.</b> The
+    /// surface torn down, the pane closed, the question withdrawn because another pane answered
+    /// it first: nobody decided anything in that place. What the separate value buys is that the
+    /// caller can tell those apart from <see cref="Refuse"/> - an answer a person gave - and so
+    /// can say which of the two happened instead of attributing to the user a decision they never
+    /// made.</para>
+    /// <para><b>What it does NOT mean is "the connection stops".</b> It means that here, where
+    /// this value reaches <see cref="RdpCertificateVerifier"/>, because no approval was given and
+    /// the check refuses without one. It does not mean it wherever the value is produced. A
+    /// presentation layer may share one answer between several sessions asking about the same
+    /// certificate, and a session that produced this value by being withdrawn is then handed the
+    /// answer that withdrew it - an approval included - before anything reaches this assembly.
+    /// That sharing is the presentation layer's decision and is documented where it is taken;
+    /// what belongs here is only that this value is not an approval. Every sentence written about
+    /// a session that produced it must say what happened in that session and stop there.</para>
     /// </remarks>
     NotAsked,
 }

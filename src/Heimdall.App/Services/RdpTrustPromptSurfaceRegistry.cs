@@ -31,11 +31,18 @@ internal interface IRdpTrustPromptSurface
     /// <param name="context">What the user needs in order to answer.</param>
     /// <param name="cancellationToken">Withdraws the question.</param>
     /// <remarks>
-    /// Blocks the caller, which is the connection this surface is opening, and nothing else.
-    /// Every way of not answering - the surface torn down, the token cancelled, the question
-    /// withdrawn because another pane answered it - resolves to
-    /// <see cref="RdpTrustAnswer.NotAsked"/>, which stops the connection without reporting an
-    /// answer the user never gave.
+    /// <para>Blocks the caller, which is the connection this surface is opening, and nothing
+    /// else. Every way of not answering - the surface torn down, the token cancelled, the
+    /// question withdrawn because another pane answered it - resolves to
+    /// <see cref="RdpTrustAnswer.NotAsked"/>: nobody decided anything in THIS surface, reported
+    /// without attributing to its user an answer they never gave.</para>
+    /// <para><b>An implementation may not read that value as "the connection stops", and may not
+    /// say so either.</b> What it returns is what happened here; the outcome is
+    /// <see cref="RdpTrustQuestionCoalescer"/>'s, and a surface whose question was withdrawn
+    /// because another pane answered is handed that other answer - an approval included - and
+    /// connects. Only a surface asking alone, or one whose own connection was given up, stops on
+    /// this value. Any sentence an implementation writes about returning it must describe this
+    /// surface and stop there.</para>
     /// </remarks>
     Task<RdpTrustAnswer> AskAsync(
         RdpCertificatePromptContext context,

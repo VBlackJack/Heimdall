@@ -31,11 +31,18 @@ namespace Heimdall.App.Views.EmbeddedRdp;
 /// now a completion source, and the blocking is now "this connection, and nothing else". Both
 /// are decisions with edges - a pane torn down mid-question, a token cancelled, an answer
 /// arriving after either - and all of them are playable here against no WPF at all.</para>
-/// <para><b>Every exit that is not an answer is <see cref="RdpTrustAnswer.NotAsked"/>, and every
-/// one of them still stops the connection.</b> The pane closing, the request being withdrawn, a
-/// second question arriving while one is open: none of those is approval, and the alternative is
-/// opening a session nobody approved. This is the same rule the window enforced through "the
-/// title-bar cross is not an answer", moved to where the question now lives.</para>
+/// <para><b>Every exit that is not an answer is <see cref="RdpTrustAnswer.NotAsked"/>, and none
+/// of them is approval.</b> The pane closing, the request being withdrawn, a second question
+/// arriving while one is open: this pane's user decided nothing, which is the same rule the
+/// window enforced through "the title-bar cross is not an answer", moved to where the question
+/// now lives.</para>
+/// <para><b>What NotAsked does NOT mean is "the connection stops".</b> It used to, while this
+/// type was the whole path. It is now the value <c>RdpTrustQuestionCoalescer</c> reads as "nobody
+/// answered HERE", and a pane sharing its question with another pane is then handed the answer
+/// given there - an approval included. Only a pane that is asking alone, or whose own connection
+/// was given up, stops on it. Every sentence written from this type must therefore say what this
+/// pane's user did and stop there; a line here that promises a stopped connection is describing a
+/// decision taken somewhere else.</para>
 /// <para><b>Why it is not <see cref="RdpTrustAnswer.Refuse"/>.</b> Refuse is what a person
 /// pressed, and the pane says so out loud: "you did not approve the certificate this server
 /// presented". A teardown reported as Refuse puts that sentence in front of a user who was asked
@@ -61,7 +68,9 @@ namespace Heimdall.App.Views.EmbeddedRdp;
 /// application had already taken back. A refusal still counts, because it decides something that
 /// is still open - whether THIS pane connects - and a person who presses Do-not-connect must not
 /// watch the session open. Both directions are the same rule the lot is built on: a pane reports
-/// what its own user did, and the safe direction is a stopped connection.</para>
+/// what its own user did. What the declined press leaves behind is NotAsked, so the pane goes on
+/// to take the answer the question was withdrawn for, which may well open the session - see
+/// <see cref="LateAnswerNote"/>, which is worded for that and not for a stop.</para>
 /// <para>Thread-safe. <see cref="AskAsync"/> is called by the trust-prompt coordinator, the
 /// cancellation callback fires on whichever thread cancelled and hands its settlement to the
 /// display thread, and an answer arrives on the display thread already.
@@ -136,8 +145,9 @@ internal sealed class RdpTrustPromptSession
         {
             if (_closed)
             {
-                // The pane is gone, so the question reached nobody. It still stops the
-                // connection; it is simply not reported as an answer the user gave.
+                // The pane is gone, so the question reached nobody, and that is all this
+                // reports. Whether the connection stops is the coalescer's to decide; a
+                // pane already closed has nowhere to open a session in any case.
                 FileLogger.Info(
                     "[RdpCertPrompt] question arrived after the pane closed; it was not asked.");
                 return Task.FromResult(RdpTrustAnswer.NotAsked);
@@ -148,7 +158,7 @@ internal sealed class RdpTrustPromptSession
                 // Unreachable by construction: one verification runs per view, once. Turning it
                 // away rather than replacing keeps the invariant honest if that ever changes -
                 // overwriting would leave the first caller waiting on a question nobody can
-                // see, which is a hang, and the safe direction here is a stopped connection.
+                // see, which is a hang. NotAsked at least lets the second caller finish.
                 FileLogger.Warn(
                     "[RdpCertPrompt] a second question arrived while one was open; it was not "
                     + "asked.");
@@ -174,9 +184,9 @@ internal sealed class RdpTrustPromptSession
 
     /// <summary>Ends the pane, abandoning anything it was still asking.</summary>
     /// <remarks>
-    /// Idempotent, and permanent: a pane does not reopen. The question it was holding stops the
-    /// connection but is not recorded as an answer, because closing a pane is something the user
-    /// did to the pane and not something they said about the certificate.
+    /// Idempotent, and permanent: a pane does not reopen. The question it was holding settles as
+    /// <see cref="RdpTrustAnswer.NotAsked"/> rather than as an answer, because closing a pane is
+    /// something the user did to the pane and not something they said about the certificate.
     /// </remarks>
     public void Close()
     {
@@ -237,20 +247,34 @@ internal sealed class RdpTrustPromptSession
             // Pressed on a question the application has already taken back, because the
             // certificate was decided in another pane. A refusal below still settles this pane -
             // whether THIS session opens is still the person's to decide - but an approval here
-            // would write the trust store from a question that no longer exists, and the
-            // reconnect that asks it again costs them one click.
+            // would write the trust store from a question that no longer exists.
             //
             // The press does stay on the question: RdpCertificatePromptDialogViewModel.Record
             // has already written it, and its first-press rule then holds for anything pressed
             // after it. What is refused here is letting it settle the connection.
-            FileLogger.Info(
-                $"[RdpCertPrompt] '{answer}' was pressed after the question had been withdrawn; "
-                + "it does not settle this pane, and the connection stops.");
+            FileLogger.Info(LateAnswerNote(answer));
             return;
         }
 
         Settle(pending, answer);
     }
+
+    /// <summary>What is written when a press lands on a question already taken back.</summary>
+    /// <remarks>
+    /// <para>Extracted so the sentence itself can be read by a test, because the sentence is
+    /// where this went wrong. It used to end "and the connection stops", and the connection does
+    /// not stop: the press is declined, the pane reports
+    /// <see cref="RdpTrustAnswer.NotAsked"/>, and <c>RdpTrustQuestionCoalescer</c> then hands it
+    /// the answer the question was withdrawn for - an approval in the case this line is most
+    /// often written for. The line announced an outcome the code does not perform, in a log read
+    /// precisely when someone is trying to work out why a session opened.</para>
+    /// <para>What it says instead is the whole of what this type knows: the press was declined
+    /// here, and the outcome belongs to whatever withdrew the question.</para>
+    /// </remarks>
+    /// <param name="pressed">The answer the person pressed, which is not being honoured.</param>
+    internal static string LateAnswerNote(RdpTrustAnswer pressed) =>
+        $"[RdpCertPrompt] '{pressed}' was pressed after the question had been withdrawn; it does "
+        + "not settle this pane, whose outcome was decided where the question was withdrawn.";
 
     private void Settle(Pending pending, RdpTrustAnswer answer)
     {

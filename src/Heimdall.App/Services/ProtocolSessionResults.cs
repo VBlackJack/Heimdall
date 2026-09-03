@@ -39,7 +39,35 @@ public sealed record ConnectionResult(
     string? Warning = null);
 
 /// <summary>Wraps a <see cref="ServerProfileDto"/> for embedded RDP sessions.</summary>
-public sealed record RdpSessionResult(ServerProfileDto Server, int? TunnelPort = null) : ISessionResult;
+/// <param name="Server">The profile the session runs on.</param>
+/// <param name="TunnelPort">Local end of the SSH tunnel, or null for a direct connection.</param>
+/// <param name="ConnectionSettings">
+/// The settings instance this connection was made with, or null when nothing recorded it.
+/// </param>
+/// <remarks>
+/// <para><b>Why the settings travel with the result.</b> The pane is built from the profile
+/// snapshot the connection used, but it used to read the gateway list from whatever settings the
+/// application held at the moment the pane was materialised. Those are two different instants,
+/// and settings are read as a fresh deep clone each time
+/// <c>ConfigManager.CurrentSettings</c> is asked, so the second instant genuinely carries edits
+/// the first one never saw. Editing a gateway's host during a slow tunnel establishment then
+/// named the new host in the certificate question while the certificate had come from the old
+/// one - and the question's route line exists precisely to tell two machines apart.</para>
+/// <para><b>What this instance is.</b> The one <c>ITunnelService.SetupTunnelIfNeededAsync</c> was
+/// handed, which is the one <c>TunnelService.EstablishTunnelAsync</c> resolved the gateway chain
+/// from. Not a copy of it and not a re-read: the same object, so what is read back here is what
+/// the chain was resolved from.</para>
+/// <para><b>What it is still not.</b> A record of the route the connection travelled. A tunnel
+/// that was already open is reused when its chain hashes the same, and that hash is over gateway
+/// identifiers, which an edit leaves alone - so a reused tunnel can have been opened from an
+/// older settings instance than this one. Recording the resolved chain on the tunnel is what
+/// would settle that; this carrier narrows the disagreement to a reused tunnel rather than
+/// removing it, and nothing written from it may claim to describe the wire.</para>
+/// </remarks>
+public sealed record RdpSessionResult(
+    ServerProfileDto Server,
+    int? TunnelPort = null,
+    AppSettings? ConnectionSettings = null) : ISessionResult;
 
 /// <summary>Wraps an SSH.NET shell session.</summary>
 public sealed record SshSessionResult(

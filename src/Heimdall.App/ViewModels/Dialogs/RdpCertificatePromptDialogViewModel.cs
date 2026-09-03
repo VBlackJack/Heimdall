@@ -172,11 +172,17 @@ public partial class RdpCertificatePromptDialogViewModel : ObservableObject
     /// <summary>What the user answered, or null while nobody has answered.</summary>
     /// <remarks>
     /// <para>Null is not an answer, and it is not a refusal either. It means nobody decided
-    /// anything, which the connection path carries as <see cref="RdpTrustAnswer.NotAsked"/>:
-    /// the question was withdrawn because another pane answered it, or the pane holding it was
-    /// torn down. Reading null as a refusal is what made a pane tell its user "you did not
-    /// approve the certificate this server presented" about a question they were never shown.
-    /// Both still stop the connection; only one of them is true.</para>
+    /// anything in THIS pane, which the connection path carries as
+    /// <see cref="RdpTrustAnswer.NotAsked"/>: the question was withdrawn because another pane
+    /// answered it, or the pane holding it was torn down. Reading null as a refusal is what made
+    /// a pane tell its user "you did not approve the certificate this server presented" about a
+    /// question they were never shown - a sentence that is false, where NotAsked is merely
+    /// silent.</para>
+    /// <para>Nor does null stop the connection on its own. A pane that was sharing its question
+    /// with another pane is handed the answer given there, approval included; only a pane asking
+    /// alone, or one whose own connection was given up, stops on it. That is
+    /// <c>RdpTrustQuestionCoalescer</c>'s decision and not this type's, and nothing written here
+    /// may promise otherwise.</para>
     /// <para>There is no window to close any more, so none of the window's exits reach this
     /// type: <c>RdpTrustPromptSession</c> settles them, and never through
     /// <see cref="RefuseFromDismissal"/>.</para>

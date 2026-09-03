@@ -159,7 +159,16 @@ internal sealed class RdpHandler : IProtocolHandler
         if (isEmbedded)
         {
             int? effectiveTunnelPort = usesTunnel ? targetPort : null;
-            return new ConnectionResult(true, null, new RdpSessionResult(server, effectiveTunnelPort));
+
+            // The settings argument travels with the result because it is the instance the
+            // gateway chain above was resolved from. The pane otherwise reads the gateway list
+            // at materialisation time, which is a later instant and a different clone: a gateway
+            // edited during the establishment delay then names one machine in the certificate
+            // question while the certificate arrived from another.
+            return new ConnectionResult(
+                true,
+                null,
+                new RdpSessionResult(server, effectiveTunnelPort, settings));
         }
 
         string? rdpPassword = null;

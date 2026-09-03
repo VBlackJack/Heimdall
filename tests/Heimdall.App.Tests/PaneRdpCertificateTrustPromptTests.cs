@@ -38,10 +38,20 @@ namespace Heimdall.App.Tests;
 /// collapsed surface and answering it opened a different pane's session. Closing the displaying
 /// pane settled the shared question as a refusal, so the other pane reported "you did not approve
 /// the certificate this server presented" about a question it had never shown.</para>
-/// <para><b>What is shared now is the answer, not the display.</b> Every pane draws the question;
-/// the first real answer settles them all and takes it off the other screens. The user still
-/// answers once, no pane holds a question that decides something elsewhere, and no pane is handed
-/// an outcome produced by a teardown in another pane.</para>
+/// <para><b>What is shared now is the answer, not the display.</b> Each pane runs its own
+/// display rather than waiting on another pane's; the first real answer settles them all and
+/// takes it off the other screens. The user still answers once, no pane holds a question that
+/// decides something elsewhere, and no pane is handed an outcome produced by a teardown in
+/// another pane.</para>
+/// <para><b>"Every pane draws the question" is NOT what is claimed, and this file is not where
+/// that claim would be measured.</b> A pane joins the question under the lock and reaches its
+/// display afterwards, so an answer given in that gap withdraws it before it draws anything and
+/// it takes the answer having shown nothing. That is a deliberate decision - the alternative
+/// asks a second question about a certificate the same person approved a moment earlier - and it
+/// is stated in <c>RdpTrustQuestionCoalescer</c> and measured in
+/// <c>RdpTrustQuestionCoalescerTests</c>. What the tests below establish is the property that
+/// does hold: an answer binds a pane only when that pane was asking the SAME question and was
+/// still asking it when the answer was given.</para>
 /// <para>No window and no <c>UserControl</c> is built here: the surface is an interface, and
 /// building a WPF <c>Window</c> in a test seals application-level styles onto the shared
 /// dispatcher and takes unrelated tests down with it.</para>
@@ -79,7 +89,11 @@ public sealed class PaneRdpCertificateTrustPromptTests
         // NotAsked and not Refuse: reporting it as a refusal was a smaller version of the same
         // lie, told to the user instead of to the trust store - the pane would have said "you
         // did not approve the certificate this server presented" about a question that reached
-        // nobody. It still stops the connection.
+        // nobody.
+        //
+        // Nothing is opened here, because this is the only pane asking and so there is no other
+        // answer to fall back on. That is a property of THIS arrangement and not of NotAsked: a
+        // pane sharing its question with another is handed the answer given there.
         RdpTrustPromptSurfaceRegistry registry = new();
         RecordingSurface elsewhere = new(RdpTrustAnswer.TrustPermanently);
         using IDisposable registration = registry.Register("pane-elsewhere", elsewhere);

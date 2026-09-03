@@ -350,6 +350,26 @@ public sealed class RdpTrustPromptWiringTests
     }
 
     [Fact]
+    public void TheKeyHandlerLeavesEnterToTheAnswerThatHasTheFocus()
+    {
+        // Enter is answered by ButtonBase itself, through KeyboardNavigation.AcceptsReturn on
+        // each answer - measured on a real Button in RdpCertificatePromptSurfaceTests, together
+        // with the fact that makes it necessary: the handler used to raise
+        // ButtonBase.ClickEvent on the focused button, and OnClick raises that event AND THEN
+        // executes the command source, so the raise announced a click and ran no command. Enter
+        // on "Do not connect" recorded nothing, and the pane adopted the approval given in
+        // another pane and connected.
+        //
+        // Any test on Enter here takes the keystroke off the button before it can see it,
+        // whatever it then does with the keystroke, so what this guard forbids is the test.
+        //
+        // An assertion of absence, which inverts the risk the presence readings above carry:
+        // folding a statement away cannot break it, and the only way to is to write back the
+        // text it forbids.
+        Assert.DoesNotContain("Key.Enter", ViewSource.HandlerLogic(KeyMember));
+    }
+
+    [Fact]
     public void EscapeRefusesTheQuestionRatherThanDismissingIt()
     {
         Assert.True(

@@ -775,6 +775,14 @@
                             and none of them becomes one here. A screen reader reads them from
                             the dialog's content; making them focusable to satisfy a sentence
                             would lengthen the tab cycle of a security question for nothing.
+
+                            KeyboardNavigation.AcceptsReturn on each answer, and it is not
+                            decoration: it is the only thing that makes Enter answer at all.
+                            ButtonBase.OnKeyDown reads it and clicks the focused button, which is
+                            a real OnClick - the Click event AND the command source. These three
+                            answers are bound commands, so the code-behind's old habit of raising
+                            ButtonBase.ClickEvent by hand ran nothing: Enter on "Do not connect"
+                            recorded no refusal and the pane adopted another pane's approval.
                         -->
                         <WrapPanel x:Name="CertificatePromptAnswers"
                                    Orientation="Horizontal"
@@ -782,6 +790,7 @@
                                    Margin="0,12,0,0">
                             <Button x:Name="CertificatePromptRefuseButton"
                                     TabIndex="0"
+                                    KeyboardNavigation.AcceptsReturn="True"
                                     MinWidth="140"
                                     Margin="0,0,8,0"
                                     Padding="14,6"
@@ -789,6 +798,7 @@
                                     Command="{Binding RefuseCommand}"/>
                             <Button x:Name="CertificatePromptTrustOnceButton"
                                     TabIndex="1"
+                                    KeyboardNavigation.AcceptsReturn="True"
                                     MinWidth="150"
                                     MaxWidth="240"
                                     Margin="0,0,8,0"
@@ -801,6 +811,7 @@
                             </Button>
                             <Button x:Name="CertificatePromptTrustButton"
                                     TabIndex="2"
+                                    KeyboardNavigation.AcceptsReturn="True"
                                     MinWidth="200"
                                     MaxWidth="300"
                                     Padding="14,6"
