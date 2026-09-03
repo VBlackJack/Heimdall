@@ -31,6 +31,44 @@ public static class SessionIdCodec
     }
 
     /// <summary>
+    /// The inventory profile a runtime identifier belongs to, decided with the inventory in hand.
+    /// </summary>
+    /// <param name="runtimeId">The identifier a session or pane is running under.</param>
+    /// <param name="isInventoryId">
+    /// Whether the argument names a profile the inventory holds.
+    /// </param>
+    /// <returns>
+    /// <paramref name="runtimeId"/> itself whenever it names an inventory profile, the decoded
+    /// prefix when it does not and it carries a minted discriminator, and
+    /// <paramref name="runtimeId"/> unchanged otherwise.
+    /// </returns>
+    /// <remarks>
+    /// <para><b>Exact first, and that ordering is the whole point.</b> The mint appends an
+    /// underscore and eight hexadecimal characters, and nothing stops a profile identifier from
+    /// having that shape already: an import preserves the identifier its file carried, so
+    /// <c>prod_deadbeef</c> can be a profile in its own right. Inverting the mint on it without
+    /// asking the inventory decodes it to <c>prod</c> and hands one profile's state - a trust
+    /// set, most consequentially - to an unrelated one.</para>
+    /// <para><b>The residual ambiguity, which the ordering narrows rather than closes.</b> If the
+    /// inventory holds both <c>prod</c> and <c>prod_deadbeef</c>, then a session minted for
+    /// <c>prod</c> whose discriminator happens to be exactly <c>deadbeef</c> resolves to
+    /// <c>prod_deadbeef</c>. That needs a specific eight-hexadecimal-character collision out of
+    /// a GUID, against an identifier that already exists; the unconditional inversion needed
+    /// only the profile to exist.</para>
+    /// </remarks>
+    public static string ResolveInventoryId(string runtimeId, Func<string, bool> isInventoryId)
+    {
+        ArgumentNullException.ThrowIfNull(isInventoryId);
+
+        if (string.IsNullOrWhiteSpace(runtimeId) || isInventoryId(runtimeId))
+        {
+            return runtimeId;
+        }
+
+        return TryGetInventoryId(runtimeId, out string inventoryId) ? inventoryId : runtimeId;
+    }
+
+    /// <summary>
     /// Attempts to recover the inventory identifier from a generated session identifier.
     /// </summary>
     public static bool TryGetInventoryId(string sessionId, out string inventoryId)

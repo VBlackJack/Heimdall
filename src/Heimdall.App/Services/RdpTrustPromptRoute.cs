@@ -30,27 +30,32 @@ namespace Heimdall.App.Services;
 /// questions read identically apart from an ephemeral local port the user has never seen. The
 /// gateway is what tells them apart, and it is the one part of the route the endpoint text
 /// looked at - to choose its format string - and then discarded.</para>
-/// <para><b>This describes the configuration, and says so; it does not measure the
-/// connection.</b> The question is asked during Preparing, before the session is ready and
-/// before the tab's own route string is filled in, so the live session cannot be read for it.
-/// What is read instead is the gateway chain as configured in the settings instance THIS
-/// connection resolved its chain from, carried to the pane on <c>RdpSessionResult</c> and reached
-/// through <see cref="DescribeConnection"/>. The wording above the value is what keeps that
-/// honest - it announces a configured route, not a route that was travelled.</para>
+/// <para><b>What makes this the route the connection took.</b> The question is asked during
+/// Preparing, before the session is ready and before the tab's own route string is filled in, so
+/// the live session cannot be read for it. What is read instead is the gateway chain as
+/// configured in the settings instance THIS connection resolved its chain from - the same object
+/// <c>TunnelService.EstablishTunnelAsync</c> walked to build the hops it dialled, carried to the
+/// pane on <c>RdpSessionResult</c> and reached through <see cref="DescribeConnection"/>. For a
+/// tunnel this connection opened, that instance IS the evidence: the chain was resolved from it
+/// and immediately dialled, with no re-read in between. It is not evidence for a tunnel that was
+/// already open, which is why the carrier is withheld in that case and no line is shown.</para>
 /// <para><b>Reading the application's current settings instead was a defect, not a
 /// shortcut.</b> Those are re-read when the pane is materialised, which is later than the
 /// connect, and each read is a fresh deep clone: a gateway edited during a slow tunnel
 /// establishment named the new host here for a certificate that arrived from the old one. Two
 /// machines told apart by a line that could name either of them is worse than no line, because
 /// the user acts on it.</para>
-/// <para><b>Why not the route the connection took, even now.</b> Nothing records it. The
-/// resolved chain is a local of <c>TunnelService.EstablishTunnelAsync</c> and does not survive
-/// establishment; what survives on <c>TunnelInfo</c> is the last hop's host and a SHA-256 over
-/// the chain's gateway identifiers. That hash is invariant under editing a gateway, because an
-/// edit leaves its identifier alone, so an already-open tunnel is still reused for a chain whose
-/// hosts have since changed and the connect-time settings of the pane REUSING it are not the
-/// ones the tunnel was opened from. Recording the resolved chain on the tunnel is what would
-/// close that last case; it is not a change this type can make on its own.</para>
+/// <para><b>The route the connection took is not recorded anywhere, so a reused tunnel gets no
+/// line at all.</b> The resolved chain is a local of <c>TunnelService.EstablishTunnelAsync</c>
+/// and does not survive establishment; what survives on <c>TunnelInfo</c> is the last hop's host
+/// and a SHA-256 over the chain's gateway identifiers. That hash is invariant under editing a
+/// gateway, because an edit leaves its identifier alone, so an already-open tunnel is still
+/// reused for a chain whose hosts have since changed - and the connect-time settings of the
+/// connection REUSING it are not the ones the tunnel was opened from. <c>RdpHandler</c>
+/// therefore withholds the carrier when <c>TunnelSetupOutcome.ReusedExistingTunnel</c> is set,
+/// and <see cref="DescribeConnection"/> answers null without one. The line is shown when it can
+/// be proven and omitted when it cannot, which is what the wording above it needs in order not
+/// to overclaim.</para>
 /// <para>Pure and free of WPF, so two routes can be compared in a test without a window.</para>
 /// </remarks>
 public static class RdpTrustPromptRoute

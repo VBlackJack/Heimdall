@@ -159,7 +159,10 @@ public sealed class TunnelService : ITunnelService
         // for it so it cannot mislabel a later, unrelated disconnect.
         _forwardedPortFailures.Clear(localPort);
         var localBindHost = tunnelResult.Tunnel?.LocalBindHost ?? LoopbackBinding.DefaultHost;
-        return new TunnelSetupOutcome(true, true, localBindHost, localPort, null, null);
+        return new TunnelSetupOutcome(true, true, localBindHost, localPort, null, null)
+        {
+            ReusedExistingTunnel = tunnelResult.ReusedExistingTunnel,
+        };
     }
 
     /// <summary>
@@ -221,7 +224,15 @@ public sealed class TunnelService : ITunnelService
             _connectionSm.SetTunnelInfo(serverId, existing.LocalPort, 0);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.EstablishingTunnel);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
-            return new TunnelResult(true, existing, null, null);
+
+            // Reported, because the chain resolved above is NOT what this tunnel was opened
+            // through. The reuse key hashes gateway identifiers and an edit leaves those alone,
+            // so the tunnel handed back here can have been opened from an older settings
+            // instance - through a gateway host that has since been changed.
+            return new TunnelResult(true, existing, null, null)
+            {
+                ReusedExistingTunnel = true,
+            };
         }
 
         _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.EstablishingTunnel);

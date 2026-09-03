@@ -90,6 +90,37 @@ public sealed class ServerListExecutionTrustTests
     }
 
     [Fact]
+    public async Task ConfirmAndTrustExecutionAsync_ImportedIdOfMintedShape_TrustsThatProfileAlone()
+    {
+        // Both halves of one rule at this site, so it cannot silently become a bare decode
+        // again: "local-1_abcdef12" above names no profile and is decoded, while this one is a
+        // profile in its own right - an import keeps the identifier its file carried - and must
+        // not hand execution trust to the profile its prefix names. The certificate question
+        // applies the same rule from another layer, and the two now run the same code.
+        await using ServerListExecutionTrustFixture fixture =
+            await ServerListExecutionTrustFixture.CreateAsync(true);
+        await fixture.ConfigManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            CreateLocalShellProfile("local"),
+            CreateLocalShellProfile("local_deadbeef"),
+        });
+        ServerProfileDto promptProfile = CreateLocalShellProfile("local_deadbeef");
+
+        bool result = await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
+        List<ServerProfileDto> storedProfiles = await fixture.ConfigManager.LoadServersAsync();
+
+        Assert.True(result);
+        Assert.True(
+            storedProfiles
+                .Single(profile => string.Equals(profile.Id, "local_deadbeef", StringComparison.Ordinal))
+                .ExecutionConfirmed);
+        Assert.False(
+            storedProfiles
+                .Single(profile => string.Equals(profile.Id, "local", StringComparison.Ordinal))
+                .ExecutionConfirmed);
+    }
+
+    [Fact]
     public async Task ConfirmAndTrustPostConnectAsync_Confirmed_PersistsExecutionConfirmed()
     {
         await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(true);

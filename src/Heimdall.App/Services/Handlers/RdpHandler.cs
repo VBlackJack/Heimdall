@@ -136,14 +136,14 @@ internal sealed class RdpHandler : IProtocolHandler
             }
         }
 
-        var (tunnelOk, usesTunnel, targetHost, targetPort, tunnelError) =
-            await _tunnelService.SetupTunnelIfNeededAsync(
-                    server,
-                    server.RemotePort,
-                    settings,
-                    ct,
-                    preferDistinctLoopback: !isEmbedded)
-                .ConfigureAwait(false);
+        TunnelSetupOutcome tunnelOutcome = await _tunnelService.SetupTunnelIfNeededAsync(
+                server,
+                server.RemotePort,
+                settings,
+                ct,
+                preferDistinctLoopback: !isEmbedded)
+            .ConfigureAwait(false);
+        var (tunnelOk, usesTunnel, targetHost, targetPort, tunnelError) = tunnelOutcome;
 
         if (!tunnelOk)
         {
@@ -165,10 +165,23 @@ internal sealed class RdpHandler : IProtocolHandler
             // at materialisation time, which is a later instant and a different clone: a gateway
             // edited during the establishment delay then names one machine in the certificate
             // question while the certificate arrived from another.
+            //
+            // And it travels ONLY when this connection actually opened the tunnel. A reused
+            // tunnel was opened by an earlier connection, possibly from an older settings
+            // instance: the reuse key hashes gateway identifiers, which an edit leaves alone, so
+            // a tunnel dialled through Paris is still reused by a profile whose settings now say
+            // Berlin. Withholding the carrier is what stops the question claiming Berlin for a
+            // certificate that answered at the end of the Paris tunnel;
+            // RdpTrustPromptRoute.DescribeConnection says nothing without one, which is the only
+            // honest answer available here, and a line naming the wrong machine is worse than no
+            // line because the user acts on it.
+            AppSettings? routeEvidence =
+                tunnelOutcome.ReusedExistingTunnel ? null : settings;
+
             return new ConnectionResult(
                 true,
                 null,
-                new RdpSessionResult(server, effectiveTunnelPort, settings));
+                new RdpSessionResult(server, effectiveTunnelPort, routeEvidence));
         }
 
         string? rdpPassword = null;

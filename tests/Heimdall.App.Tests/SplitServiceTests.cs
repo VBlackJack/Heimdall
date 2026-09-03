@@ -711,11 +711,18 @@ public sealed class SplitServiceTests : IDisposable
             connectionService.Profiles,
             profile => Assert.NotEqual(inventoryServerId, profile.Id));
 
+        // The inventory as the pane reads it, so the seam is measured with the same information
+        // the view supplies: the pane keys are absent from it and the inventory profile is in it.
+        HashSet<string> inventoryIds = new(
+            (await _configManager.LoadServersAsync()).Select(profile => profile.Id),
+            StringComparer.Ordinal);
+
         List<RdpCertificateVerificationRequest> requests = connectionService.Profiles
             .Select(profile => RdpCertificateVerificationRequestBuilder.Build(
                 profile,
                 new RdpCertificateProbeTarget("127.0.0.1", 53211),
-                "pane-" + profile.Id))
+                "pane-" + profile.Id,
+                inventoryIds.Contains))
             .ToList();
 
         Assert.All(requests, request => Assert.Equal(inventoryServerId, request.ProfileId));

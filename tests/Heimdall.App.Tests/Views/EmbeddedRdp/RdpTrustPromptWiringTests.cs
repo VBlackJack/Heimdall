@@ -88,9 +88,20 @@ public sealed class RdpTrustPromptWiringTests
     // The request, carried whole rather than by the builder's bare name. Drop the scope
     // argument and the name stays exactly where it was while every question is refused; pass
     // another pane's scope and the question is asked at a machine the user is not connecting.
+    // The fourth argument is the same kind of load-bearing: replace it with a predicate that
+    // answers no and the builder inverts the session-identifier mint on every profile again,
+    // which is what filed one profile's approval in another profile's trust set.
     private const string RequestStatement =
         "RdpCertificateVerificationRequest request = RdpCertificateVerificationRequestBuilder"
-        + ".Build(server, target.Value, _trustPromptScopeId);";
+        + ".Build(server, target.Value, _trustPromptScopeId, isInventoryProfileId);";
+
+    // And where that predicate comes from, carried whole. Handing the loader a null service
+    // provider is indistinguishable at the call site from handing it the real one, and it makes
+    // the loader report every identifier as an inventory identifier - which is safe, and which
+    // also silently stops a split pane's approval from ever being found again.
+    private const string InventoryPredicateStatement =
+        "Func<string, bool> isInventoryProfileId = await InventoryProfileIds.LoadPredicateAsync("
+        + "(Application.Current as App)?.Services?.GetService<IConfigManager>());";
 
     private const string UnregisterStatement = "_trustPromptRegistration?.Dispose();";
     private const string CloseStatement = "_trustPrompt.Close();";
@@ -167,6 +178,43 @@ public sealed class RdpTrustPromptWiringTests
                 + "condition, or its arguments changed. Either way the question is no longer "
                 + "routed to the pane that asked it.");
     }
+
+    [Fact]
+    public void TheTrustIdentityIsDecidedAgainstTheInventoryThePaneReads()
+    {
+        // InventoryProfileIdsTests pins what the loader decides and
+        // RdpCertificateVerificationRequestBuilderTests pins what the builder does with it.
+        // Neither fails if the pane stops reading the inventory and hands the builder a
+        // predicate of its own, and the shape that shipped needed no predicate at all: it
+        // inverted the session-identifier mint on every profile, so an approval given for the
+        // imported profile "prod_deadbeef" was filed in the trust set of the unrelated profile
+        // "prod", which then connected on that certificate without asking.
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                ViewSource.HandlerLogic(VerifyCertificate), InventoryPredicateStatement),
+            "The certificate check no longer loads the inventory from the application's own "
+                + "service provider as a step of its own body, so what it hands the builder is "
+                + "no longer a statement about which identifiers real profiles have.");
+    }
+
+    // Positive control 10. The predicate replaced by one that answers no, which is exactly the
+    // unconditional inversion that shipped - and which leaves the builder's name, the scope
+    // argument and the argument count all standing where a laxer reading would have anchored.
+    [Fact]
+    public void TheRequestIsNotFoundWhenTheInventoryPredicateIsReplacedByAConstant()
+        => Assert.False(
+            ViewSource.IsStatementOfTheMethodBody(
+                LogicOf(
+                    Mutate(
+                        RequestStatement,
+                        "RdpCertificateVerificationRequest request = "
+                        + "RdpCertificateVerificationRequestBuilder.Build(server, target.Value, "
+                        + "_trustPromptScopeId, static _ => false);"),
+                    VerifyCertificate),
+                RequestStatement),
+            "A request whose trust identity is decided without the inventory satisfies this "
+                + "file's reading of the view, so the reading cannot tell an approval filed "
+                + "under the profile that gave it from one filed under a stranger.");
 
     [Fact]
     public void TheStoppedConnectionSaysWhichOfTheTwoWaysItStopped()
