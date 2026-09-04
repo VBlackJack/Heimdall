@@ -33,6 +33,21 @@ public partial class ServerItemViewModel
 
     public bool IsOriginBadgeVisible => Origin != ProfileOrigin.Manual;
 
+    /// <summary>
+    /// Whether this row is a destination typed into the command palette rather than a saved
+    /// profile.
+    /// </summary>
+    /// <remarks>
+    /// <para>Set only where the palette mints such a row, and by nothing that reads a profile
+    /// from disk: <see cref="FromDto"/> and <see cref="UpdateFromDto"/> leave it false. The
+    /// palette used to tell the two apart by the identifier's prefix, so a saved profile whose
+    /// identifier happened to carry that prefix was dialled as a typed destination, through a
+    /// bare profile that had lost its gateway, ports, credentials and RDP settings. A mark that
+    /// only palette code can set cannot be produced by a hand-edited or imported file, which is
+    /// why it is not a persisted <see cref="ProfileOrigin"/> value.</para>
+    /// </remarks>
+    public bool IsTypedDestination { get; init; }
+
     partial void OnOriginChanged(ProfileOrigin value)
     {
         OnPropertyChanged(nameof(OriginBadgeCode));

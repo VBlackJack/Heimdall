@@ -505,11 +505,10 @@ public sealed class ProfileImportService(
     /// lets a profile keep its trust and its history across an export and a re-import.</para>
     /// <para><b>Except in the palette's destination namespace, which no saved profile may
     /// occupy.</b> The palette mints <c>adhoc-rdp-&lt;host&gt;</c> for a destination typed by hand
-    /// and keys that destination's certificate approval on it, and it decides whether an entry is
-    /// a saved profile or a typed destination by testing the same prefix. A profile importable
-    /// into that namespace therefore shared both: approving a certificate for the imported profile
-    /// let a quick connect to the matching host connect on it with no question, and the palette
-    /// offered the profile the actions of a typed destination.</para>
+    /// and keys that destination's certificate approval on it. A profile importable into that
+    /// namespace therefore shared the key: approving a certificate for the imported profile let a
+    /// quick connect to the matching host connect on it with no question. The legacy import
+    /// applies the same reservation in <c>MigrationService</c>.</para>
     /// <para>Reminted rather than refused, so an import of an otherwise valid profile still
     /// succeeds - the identifier is not something the user chose to see.</para>
     /// </remarks>
@@ -524,10 +523,7 @@ public sealed class ProfileImportService(
 
         if (AdHocProfileIds.IsAdHoc(candidateId))
         {
-            Core.Logging.FileLogger.Warn(
-                $"Imported profile carried the identifier '{candidateId}', which belongs to the "
-                + "quick-connect namespace; a fresh identifier was assigned so it cannot share a "
-                + "certificate approval with a destination typed by hand.");
+            Core.Logging.FileLogger.Warn(AdHocProfileIds.DescribeRemint(candidateId));
         }
 
         return Guid.NewGuid().ToString();

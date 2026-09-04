@@ -229,6 +229,7 @@ public sealed partial class CommandPaletteViewModel
             var ssh = new ServerItemViewModel
             {
                 Id = $"{AdHocProfileIds.Prefix}ssh-{query}",
+                IsTypedDestination = true,
                 DisplayName = _localizer.Format("QuickConnectSshTo", query),
                 RemoteServer = query,
                 Endpoint = query,
@@ -238,6 +239,7 @@ public sealed partial class CommandPaletteViewModel
             var rdp = new ServerItemViewModel
             {
                 Id = $"{AdHocProfileIds.Prefix}rdp-{query}",
+                IsTypedDestination = true,
                 DisplayName = _localizer.Format("QuickConnectRdpTo", query),
                 RemoteServer = query,
                 Endpoint = query,
@@ -451,6 +453,7 @@ public sealed partial class CommandPaletteViewModel
         var vm = new ServerItemViewModel
         {
             Id = $"{AdHocProfileIds.Prefix}{Guid.NewGuid():N}",
+            IsTypedDestination = true,
             DisplayName = $"{user}@{host}:{port}",
             RemoteServer = host,
             ConnectionType = "SSH",

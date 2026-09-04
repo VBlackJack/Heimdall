@@ -358,6 +358,16 @@ public sealed class MigrationService
 
         // Identity
         MapString(legacy, "Id", v => dto.Id = v);
+
+        // The ordinary import turns a quick-connect identifier away in
+        // ProfileImportService.BuildUniqueId; this mapper never passes through it, so the
+        // legacy file stayed a second door into that namespace until this check.
+        if (AdHocProfileIds.IsAdHoc(dto.Id))
+        {
+            Core.Logging.FileLogger.Warn(AdHocProfileIds.DescribeRemint(dto.Id));
+            dto.Id = Guid.NewGuid().ToString();
+        }
+
         MapString(legacy, "DisplayName", v => dto.DisplayName = v);
         MapString(legacy, "RemoteServer", v => dto.RemoteServer = v);
         MapInt(legacy, "RemotePort", v => dto.RemotePort = v);

@@ -194,6 +194,44 @@ public class MigrationServiceTests : IDisposable
         Assert.Contains(servers, s => s.Id == "srv-002" && s.ConnectionType == "SSH");
     }
 
+    // The legacy mapper copies the identifier out of the old file onto the profile and never
+    // passes ProfileImportService.BuildUniqueId, so after the ordinary import was closed to the
+    // quick-connect namespace in v2026.090401 this stayed a second door into it. A profile that
+    // holds an identifier in that namespace shares the certificate trust store's key with a
+    // destination typed by hand. The test above is the control: an ordinary identifier is kept.
+    [Fact]
+    public async Task ImportFromLegacyAsync_RemintsAnIdentifierInTheQuickConnectNamespace()
+    {
+        const string ReservedId = "adhoc-rdp-prod.example";
+        WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");
+        WriteLegacyFile(Path.Combine("config", "servers.json"),
+            $$"""
+            [
+              {
+                "Id": "{{ReservedId}}",
+                "DisplayName": "Prod",
+                "RemoteServer": "prod.example",
+                "RemotePort": 3389,
+                "ConnectionType": "RDP"
+              }
+            ]
+            """);
+
+        var result = await _service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, result.ServersImported);
+        Assert.Empty(result.Warnings);
+
+        var stored = Assert.Single(await _configManager.LoadServersAsync());
+
+        // Imported, kept, usable - only its identifier changed.
+        Assert.Equal("Prod", stored.DisplayName);
+        Assert.Equal("prod.example", stored.RemoteServer);
+        Assert.NotEqual(ReservedId, stored.Id);
+        Assert.False(AdHocProfileIds.IsAdHoc(stored.Id));
+    }
+
     [Fact]
     public async Task ImportFromLegacyAsync_PreservesEncryptedSshPasswordAndMacAddressExactly()
     {
