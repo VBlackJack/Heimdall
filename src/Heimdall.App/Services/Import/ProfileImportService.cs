@@ -352,11 +352,12 @@ public sealed class ProfileImportService(
 
                         case RdpConflictResolution.Replace:
                             // Through the same reservation as every other branch. The identifier
-                            // kept here is the EXISTING profile's, which the startup migration
-                            // keeps out of the quick-connect namespace - but a branch that reads
-                            // an identifier without checking it is a hole waiting for the day
-                            // that stops being true, and this one was written as if the check
-                            // above covered it.
+                            // kept here is the EXISTING profile's, and an existing profile CAN be
+                            // in the quick-connect namespace - one imported before the reservation
+                            // existed stays there, since the startup migration that moved such
+                            // profiles was withdrawn for doing more harm than it repaired. So this
+                            // branch checks rather than assuming, and a replace of such a profile
+                            // gives it an identifier outside the namespace.
                             candidate.Id = BuildUniqueId(
                                 inventory[existingIndex].Id,
                                 inventory.Where((_, index) => index != existingIndex).ToList());

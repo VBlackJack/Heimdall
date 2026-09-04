@@ -278,10 +278,15 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
         // to fall back to the first profile with a matching DISPLAY NAME whenever the identifier
         // failed to resolve - and display names are not unique, so a task whose profile had been
         // deleted or re-identified opened a session on a different machine, unattended.
+        // AllServers, not Servers: the latter is the sidebar's FILTERED view, and a task asks a
+        // question about the inventory, not about what the user is currently looking at. Reading
+        // the filtered view meant a filter could hide the profile a task names - after which the
+        // name rule found a different profile of that name among the visible ones and connected
+        // to it, which is the outcome the rule exists to prevent.
         var server = ScheduledTaskServerResolver.Resolve(
             task.ServerId,
             task.ServerName,
-            _main.ServerList.Servers,
+            _main.ServerList.AllServers,
             s => s.Id,
             s => s.DisplayName);
 
