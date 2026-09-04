@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the palette dials a saved profile as a saved profile
+## Unreleased: the palette dials a saved profile as a saved profile, and the out-of-range warning says what the loader does
 
 ### A saved profile with a quick-connect identifier keeps its settings
 
@@ -40,6 +40,21 @@ import does.
 What this does not do: it does not separate the certificate approvals of a saved profile and a
 typed destination that share an identifier. That store is still keyed by the identifier alone,
 and the separation is a change of its own.
+
+### An out-of-range setting is logged as kept, not as corrected
+
+A setting outside its range, edited into `settings.json` by hand, was logged as "outside the
+valid range" and then used exactly as written: a 240 second tunnel delay was warned about and
+waited out in full. The loader preserves what the file says by contract, so that a file written
+by a newer Heimdall survives an older one, and whether an out-of-range value then bites is decided
+at its use site, setting by setting. The sentence was the only part that was wrong: it read as a
+correction the loader never made. It now says that the value is outside the recommended range
+and that the loader keeps it as written.
+
+What this does not do: it does not clamp anything. The three settings that defer a security
+event (the idle lock, the Windows Hello grace period, the master-password deadline) still honour
+an out-of-range value. Carrying the bound inside the setting's own type, so that the check and
+the value cannot drift apart, is a separate change.
 
 ## 2026-09-04: the network tools follow a gateway edit, and a split pane lists the gateways (v2026.090406)
 

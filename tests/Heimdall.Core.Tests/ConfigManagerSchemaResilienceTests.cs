@@ -112,6 +112,32 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
         Assert.DoesNotContain(nameof(AppSettings.DefaultTheme), logContent, StringComparison.Ordinal);
     }
 
+    // The reported case: a hand-edited 240 s tunnel delay was warned about as "outside the valid
+    // range" and then waited out in full. The load path keeps the value by contract (the two tests
+    // above); what was wrong was the sentence, which read as a correction the loader never made.
+    // Both halves are pinned here: the value survives, and the log says that it does.
+    [Fact]
+    public async Task LoadSettingsAsync_OutOfRangeValue_IsKeptAsWrittenAndTheLogSaysSo()
+    {
+        const int OutOfRangeDelayMs = 240000;
+        await WriteUtf8Async(
+            _manager.SettingsPath,
+            $$"""
+            {
+              "tunnelEstablishmentDelayMs": {{OutOfRangeDelayMs}}
+            }
+            """);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        Assert.Equal(OutOfRangeDelayMs, settings.TunnelEstablishmentDelayMs);
+        string logContent = ReadLogContent();
+        Assert.Contains("[Warning]", logContent, StringComparison.Ordinal);
+        Assert.Contains(nameof(AppSettings.TunnelEstablishmentDelayMs), logContent, StringComparison.Ordinal);
+        Assert.Contains("the loader keeps it as written", logContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("valid range", logContent, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task LoadServersAsync_UnknownConnectionType_LoadsAndWarns()
     {
