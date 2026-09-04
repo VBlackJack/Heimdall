@@ -476,6 +476,26 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         OnPropertyChanged(nameof(RowTooltipText));
     }
 
+    /// <summary>
+    /// Re-resolves this row's gateway against a newer inventory.
+    /// </summary>
+    /// <remarks>
+    /// The map handed in at construction is a snapshot, and everything the row shows about its
+    /// gateway - the badge, its tooltip, the screen-reader name, the detail line - is resolved
+    /// from it once and then cached in settable properties. Renaming a gateway changes the
+    /// inventory and nothing else, so without this the row keeps the name the gateway had when
+    /// the row was built. <see cref="RefreshLocalizedState" /> re-runs the same resolution but
+    /// against the captured map, which is why it cannot serve here.
+    /// </remarks>
+    internal void RefreshGatewayState(IReadOnlyDictionary<string, SshGatewayDto>? gatewayMap)
+    {
+        _gatewayMap = gatewayMap;
+        if (_sourceDto is not null)
+        {
+            ApplyGatewayState(_sourceDto.SshGatewayId, _gatewayMap);
+        }
+    }
+
     private static string FormatEndpoint(ServerProfileDto dto)
     {
         var type = dto.ConnectionType?.ToUpperInvariant();
