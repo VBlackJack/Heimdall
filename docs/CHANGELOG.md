@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: a namespace nobody owned, and a tool that blocked its own cleanup
+
+Two defects that predate the certificate work but contradict what v2026.090301 published about it.
+
+### A typed destination could inherit a saved profile's approval
+
+The command palette mints `adhoc-rdp-<host>` for a destination typed by hand, keys that
+destination's certificate approval on it, and decides in six places whether an entry is a saved
+profile or a typed destination by testing the same prefix. Nothing reserved that namespace, and an
+import preserves the identifier its file carried - so a profile could arrive holding
+`adhoc-rdp-prod.example` and share both the classification and the trust key with a quick connect
+to `prod.example`. Approving a certificate for the imported profile then let the typed destination
+connect on it with no question.
+
+Reserving a prefix is not the mistake the three identity fixes above were about. Those tried to
+recover a role from a string, which cannot work because the same string can legitimately be two
+things. This is the opposite: the palette owns the namespace and mints every identifier in it, so
+the only question is whether a foreign identifier may enter - enforced at the one door foreign
+identifiers come through, which already reminted a colliding one.
+
+### A busy tool blocked the cleanup that would have stopped it
+
+An external tool pane refuses to close while its process is running, which is right for a close the
+user asked for and wrong for the close at application exit: there is nowhere later for the refusal
+to be honoured, and nothing cleans up behind it. The tool's own teardown - the one that cancels it
+and kills the child process - therefore never ran, and Windows does not end a child with its
+parent, so a long-running command outlived the application that started it. The close arbiter
+beside this check had always exempted a silent close; this check simply never got the same rule.
+
 ## Unreleased: three answers to a question a string cannot hold
 
 A third review round. Both remaining blockers were places where a fix had closed the case it was
@@ -74,9 +103,10 @@ open, which is the shape this whole campaign keeps taking.
 
 The gateway route reached the tunnel record on the paths that were looked at and not on the rest:
 a chained open with a single gateway delegates to the simple open and dropped the route on the
-way, and both manual tunnel openings never carried one at all - so a hand-opened tunnel, once
-reused by a profile, produced a question with no route. The parameter is now required and sits
-before the optional tail on every one of those calls, so forgetting it does not compile.
+way, and both manual tunnel openings never carried one at all. The parameter is now required where
+a tunnel record is built and where the Plink fallback builds its own, so no new construction can
+omit it; the two public open methods still take it as an optional argument whose default means
+"no route", which is the direction that shows nothing rather than the wrong thing.
 
 The unguarded teardown had two more of itself, in the single-pane close and in the orphan cleanup,
 and the session's cancellation ran above all of them catching only `ObjectDisposedException` while

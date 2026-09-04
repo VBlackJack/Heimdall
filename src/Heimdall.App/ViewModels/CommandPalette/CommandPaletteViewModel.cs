@@ -308,7 +308,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
                 return;
             }
 
-            if (!item.Id.StartsWith("adhoc-", StringComparison.Ordinal))
+            if (!AdHocProfileIds.IsAdHoc(item.Id))
             {
                 _main.SplitSessionWithServerAsync(splitSession, item.Id, splitOrientation, splitPaneId)
                     .SafeFireAndForget();
@@ -345,7 +345,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         IsOpen = false;
 
         // If the palette was opened in split mode, route to split logic
-        if (splitSession is not null && !server.Id.StartsWith("adhoc-", StringComparison.Ordinal))
+        if (splitSession is not null && !AdHocProfileIds.IsAdHoc(server.Id))
         {
             // Check if this is an active session merge
             if (server.Id.StartsWith("session-", StringComparison.Ordinal))
@@ -378,7 +378,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         {
             HandleSnippetSelection(server);
         }
-        else if (server.Id.StartsWith("adhoc-", StringComparison.Ordinal))
+        else if (AdHocProfileIds.IsAdHoc(server.Id))
         {
             await ConnectAdHocAsync(server);
         }
@@ -407,7 +407,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         {
             HandleSnippetSelection(server);
         }
-        else if (server.Id.StartsWith("adhoc-", StringComparison.Ordinal))
+        else if (AdHocProfileIds.IsAdHoc(server.Id))
         {
             await ConnectAdHocAsync(server);
         }
@@ -456,11 +456,11 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         }
 
         var activeSession = _main.Connection.ActiveSession;
-        if (activeSession is not null && !server.Id.StartsWith("adhoc-", StringComparison.Ordinal))
+        if (activeSession is not null && !AdHocProfileIds.IsAdHoc(server.Id))
         {
             await _main.SplitSessionWithServerAsync(activeSession, server.Id, SplitOrientation.Vertical);
         }
-        else if (server.Id.StartsWith("adhoc-", StringComparison.Ordinal))
+        else if (AdHocProfileIds.IsAdHoc(server.Id))
         {
             await ConnectAdHocAsync(server);
         }
@@ -480,7 +480,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     private async Task ConnectAdHocAsync(ServerItemViewModel server)
     {
         var connType = server.ConnectionType?.ToUpperInvariant() ?? "SSH";
-        var isAdHoc = server.Id.StartsWith("adhoc-", StringComparison.Ordinal);
+        var isAdHoc = AdHocProfileIds.IsAdHoc(server.Id);
 
         var dto = new ServerProfileDto
         {

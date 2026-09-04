@@ -482,10 +482,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         var label = string.IsNullOrWhiteSpace(vm.Label) ? null : vm.Label.Trim();
 
         // The chain this dial is about to make, named as the certificate question names it.
-        // Recorded even though nothing here displays it: a tunnel opened by hand is reusable, and
-        // the connection that reuses it reads its route off the record rather than resolving one
-        // of its own. A manual tunnel that carried none was a session whose question showed no
-        // route at all, for no reason the user could see.
+        //
+        // Recorded because the record is the one place a tunnel's route lives, and the builder
+        // requires it - not because a profile can reuse this tunnel today. It cannot: reuse
+        // matches on the gateway chain KEY, which a manual open leaves empty and a profile always
+        // computes non-empty, so the two never match. If that ever changes, the route is already
+        // on the record and correct; leaving it null here would be a hole waiting for it.
         var gatewayRoute = Heimdall.App.Services.RdpTrustPromptRoute.Describe(
             useDirectConnection: false,
             vm.SelectedGateway!.Id,

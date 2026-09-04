@@ -952,14 +952,25 @@ public sealed class SplitService : ISplitService
                 : PaneCloseResult.Blocked(reasonKey);
         }
 
-        // Check CanClose for all tool panes before proceeding (any busy tool blocks the close)
-        foreach (var pane in leaves)
+        // Check CanClose for all tool panes before proceeding (any busy tool blocks the close).
+        //
+        // Interactive requests only, which the arbiter above has done all along and this check
+        // never did. A busy tool refusing a SILENT close is refusing the one close that cannot be
+        // deferred to: at application exit it blocked its own teardown, so the Dispose that
+        // cancels the tool and kills its child process never ran - and Windows does not end a
+        // child with its parent, so a long-running ping outlived the application that started it.
+        // There is nowhere later for the refusal to be honoured, and nothing else cleans up
+        // behind it.
+        if (request.IsInteractive)
         {
-            if (ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType)
-                && pane.HostControl is IToolView toolView
-                && !toolView.CanClose())
+            foreach (var pane in leaves)
             {
-                return PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedTool);
+                if (ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType)
+                    && pane.HostControl is IToolView toolView
+                    && !toolView.CanClose())
+                {
+                    return PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedTool);
+                }
             }
         }
 

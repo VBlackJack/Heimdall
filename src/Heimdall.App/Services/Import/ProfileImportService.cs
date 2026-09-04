@@ -490,12 +490,35 @@ public sealed class ProfileImportService(
         return -1;
     }
 
+    /// <summary>The identifier an imported profile may keep, or a fresh one when it may not.</summary>
+    /// <remarks>
+    /// <para>An import preserves the identifier its file carried, which is deliberate: it is what
+    /// lets a profile keep its trust and its history across an export and a re-import.</para>
+    /// <para><b>Except in the palette's destination namespace, which no saved profile may
+    /// occupy.</b> The palette mints <c>adhoc-rdp-&lt;host&gt;</c> for a destination typed by hand
+    /// and keys that destination's certificate approval on it, and it decides whether an entry is
+    /// a saved profile or a typed destination by testing the same prefix. A profile importable
+    /// into that namespace therefore shared both: approving a certificate for the imported profile
+    /// let a quick connect to the matching host connect on it with no question, and the palette
+    /// offered the profile the actions of a typed destination.</para>
+    /// <para>Reminted rather than refused, so an import of an otherwise valid profile still
+    /// succeeds - the identifier is not something the user chose to see.</para>
+    /// </remarks>
     private static string BuildUniqueId(string? candidateId, IReadOnlyList<ServerProfileDto> inventory)
     {
         if (!string.IsNullOrWhiteSpace(candidateId) &&
+            !AdHocProfileIds.IsAdHoc(candidateId) &&
             inventory.All(server => !string.Equals(server.Id, candidateId, StringComparison.OrdinalIgnoreCase)))
         {
             return candidateId;
+        }
+
+        if (AdHocProfileIds.IsAdHoc(candidateId))
+        {
+            Core.Logging.FileLogger.Warn(
+                $"Imported profile carried the identifier '{candidateId}', which belongs to the "
+                + "quick-connect namespace; a fresh identifier was assigned so it cannot share a "
+                + "certificate approval with a destination typed by hand.");
         }
 
         return Guid.NewGuid().ToString();
