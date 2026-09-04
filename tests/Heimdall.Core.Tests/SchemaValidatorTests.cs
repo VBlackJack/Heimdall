@@ -234,9 +234,11 @@ public class SchemaValidatorTests
     }
 
     [Theory]
+    // 0 is the value that turns the timer off and is declared as such; 3600 is the ceiling the
+    // settings screen has always accepted. Both used to be warned about by the loader alone.
     [InlineData(9)]
-    [InlineData(601)]
-    [InlineData(0)]
+    [InlineData(3601)]
+    [InlineData(1)]
     [InlineData(-5)]
     public void ValidateSettings_AntiIdleIntervalSeconds_OutOfRange_ReturnsError(int value)
     {
@@ -249,8 +251,10 @@ public class SchemaValidatorTests
     }
 
     [Theory]
+    [InlineData(0)]
     [InlineData(10)]
     [InlineData(600)]
+    [InlineData(3600)]
     public void ValidateSettings_AntiIdleIntervalSeconds_BoundaryValues_IsValid(int value)
     {
         var settings = new AppSettings { AntiIdleIntervalSeconds = value };

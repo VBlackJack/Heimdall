@@ -226,6 +226,20 @@ Purely organisational: it changes nothing about how a connection is made.
 The editor opened when you edit a remote file over SFTP. Left empty, Windows opens the file with
 whatever it associates with that extension.
 
+## Where a setting's range lives, and what happens outside it
+
+Every numeric setting that has a recommended range declares it once, on the setting itself, in
+`AppSettings`. The loader, the settings screen, the message the screen shows and both
+translations read that one declaration; none of them holds a number of its own. Before this,
+the same bound was written in four places by hand and they had drifted apart.
+
+The two readers do different things with a value outside the range. The settings screen refuses
+to save it and names the bound. The loader, reading `settings.json`, keeps the value exactly as
+written and logs a warning saying so: a file written by a newer Heimdall must survive an older
+one, so the loader never rewrites what it does not understand. Whether an out-of-range value
+then has an effect is decided where the setting is used. A setting whose "off" value is zero
+declares that too, and zero is accepted without a warning.
+
 ## Related
 
 - [RDP memory and session tuning](RDP-PERFORMANCE.md)

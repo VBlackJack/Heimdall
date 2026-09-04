@@ -379,6 +379,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public bool RdpRedirectSmartCards { get; set; }
     public bool RdpRedirectWebcam { get; set; }
     public bool RdpRedirectUsb { get; set; }
+    [SettingRange(0, 2)]
     public int RdpAudioMode { get; set; }
     public bool RdpAudioCapture { get; set; }
     public bool RdpMultiMonitor { get; set; }
@@ -386,6 +387,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public bool RdpDynamicResolution { get; set; } = true;
     public bool RdpNla { get; set; } = true;
     public bool RdpStrictServerAuthentication { get; set; }
+    [SettingRange(8, 32)]
     public int RdpColorDepth { get; set; } = 32;
     public bool RdpBitmapCaching { get; set; } = true;
     public bool RdpCompression { get; set; } = true;

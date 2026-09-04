@@ -27,26 +27,9 @@ public static partial class SchemaValidator
 {
     private const int MinPort = 1;
     private const int MaxPort = 65535;
-    private const int MinResolution = RdpDisplayLimits.MinimumSessionResolution;
-    private const int MaxResolution = RdpDisplayLimits.MaximumSessionResolution;
     private const int MinRdpFixedDimension = RdpDisplayLimits.MinimumFixedDimension;
     private const int MaxRdpFixedWidth = RdpDisplayLimits.MaximumFixedWidth;
     private const int MaxRdpFixedHeight = RdpDisplayLimits.MaximumFixedHeight;
-    private const int MinColorDepth = 8;
-    private const int MaxColorDepth = 32;
-    private const int DisabledRdpResizeDelayMs = 0;
-    private const int MinRdpResizeDelayMs = 1000;
-    private const int MaxRdpResizeDelayMs = 60000;
-    private const int DisabledRdpConnectWatchdogTimeoutMs = 0;
-    private const int MinRdpConnectWatchdogTimeoutMs = 5000;
-    private const int MaxRdpConnectWatchdogTimeoutMs = 600000;
-    private const int MinRdpAutoReconnectMaxAttempts = 1;
-    private const int MaxRdpAutoReconnectMaxAttempts = AppSettings.DefaultRdpAutoReconnectMaxAttempts;
-    private const int MinRdpKeepAliveIntervalMs = 5000;
-    private const int MaxRdpKeepAliveIntervalMs = 300000;
-    private const int MaxEmbeddedSessionsLimit = 20;
-    private const int MinAntiIdleInterval = 10;
-    private const int MaxAntiIdleInterval = 600;
 
     private static readonly HashSet<string> ValidLocales = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -72,83 +55,14 @@ public static partial class SchemaValidator
 
         var errors = new List<string>();
 
-        ValidateRange(errors, settings.DefaultResolutionWidth,
-            MinResolution, MaxResolution, nameof(settings.DefaultResolutionWidth));
-        ValidateRange(errors, settings.DefaultResolutionHeight,
-            MinResolution, MaxResolution, nameof(settings.DefaultResolutionHeight));
+        // Every numeric bound, from the one declaration each setting carries. Spelling a bound
+        // here again is how the loader and the settings screen came to disagree.
+        ValidateDeclaredRanges(errors, settings);
 
         if (!ValidLocales.Contains(settings.DefaultLocale))
         {
             errors.Add($"{nameof(settings.DefaultLocale)}: unsupported locale '{settings.DefaultLocale}'.");
         }
-
-        ValidateRange(errors, settings.TunnelEstablishmentDelayMs, 0, 60000,
-            nameof(settings.TunnelEstablishmentDelayMs));
-        ValidateRange(errors, settings.TunnelRetryDelayMs, 0, 60000,
-            nameof(settings.TunnelRetryDelayMs));
-        ValidateRange(errors, settings.ProcessKillTimeoutMs, 0, 60000,
-            nameof(settings.ProcessKillTimeoutMs));
-
-        ValidateRange(errors, settings.HostKeyProbeTimeoutMs, 1000, 120000,
-            nameof(settings.HostKeyProbeTimeoutMs));
-        ValidateRange(errors, settings.TelnetConnectTimeoutMs, 1000, 120000,
-            nameof(settings.TelnetConnectTimeoutMs));
-        ValidateRange(errors, settings.CredentialProviderTimeoutMs, 1000, 120000,
-            nameof(settings.CredentialProviderTimeoutMs));
-        ValidateRange(errors, settings.WindowsHelloGraceMinutes, 0, 1440,
-            nameof(settings.WindowsHelloGraceMinutes));
-        ValidateRange(errors, settings.AutoLockIdleMinutes, 0, 1440,
-            nameof(settings.AutoLockIdleMinutes));
-        ValidateRange(errors, settings.VaultHelloMaxDaysBeforeMasterPassword, 0, 3650,
-            nameof(settings.VaultHelloMaxDaysBeforeMasterPassword));
-        ValidateRange(errors, settings.RdpCredentialAutofillTimeoutMs, 5000, 300000,
-            nameof(settings.RdpCredentialAutofillTimeoutMs));
-        ValidateRange(errors, settings.RdpArtifactCleanupDelayMs, 1000, 60000,
-            nameof(settings.RdpArtifactCleanupDelayMs));
-        ValidateRdpResizeDelay(errors, settings.RdpResizeEnableDelayMs,
-            nameof(settings.RdpResizeEnableDelayMs));
-        ValidateRdpConnectWatchdogTimeout(errors, settings.RdpConnectWatchdogTimeoutMs,
-            nameof(settings.RdpConnectWatchdogTimeoutMs));
-        ValidateRange(errors, settings.RdpAutoReconnectMaxAttempts,
-            MinRdpAutoReconnectMaxAttempts, MaxRdpAutoReconnectMaxAttempts,
-            nameof(settings.RdpAutoReconnectMaxAttempts));
-        ValidateRange(errors, settings.RdpKeepAliveIntervalMs,
-            MinRdpKeepAliveIntervalMs, MaxRdpKeepAliveIntervalMs,
-            nameof(settings.RdpKeepAliveIntervalMs));
-        ValidateRange(errors, settings.SshKeepAliveIntervalSeconds, 5, 600,
-            nameof(settings.SshKeepAliveIntervalSeconds));
-        ValidateRange(errors, settings.SshAutoReconnectAttempts, 1, 10,
-            nameof(settings.SshAutoReconnectAttempts));
-        ValidateRange(errors, settings.SshAutoReconnectFirstDelaySeconds, 1, 600,
-            nameof(settings.SshAutoReconnectFirstDelaySeconds));
-        ValidateRange(errors, settings.SshAutoReconnectSecondDelaySeconds, 1, 600,
-            nameof(settings.SshAutoReconnectSecondDelaySeconds));
-        ValidateRange(errors, settings.SshAutoReconnectSubsequentDelaySeconds, 1, 600,
-            nameof(settings.SshAutoReconnectSubsequentDelaySeconds));
-        ValidateRange(errors, settings.SshConnectTimeExitWindowSeconds, 0, 600,
-            nameof(settings.SshConnectTimeExitWindowSeconds));
-        ValidateRange(errors, settings.SshTmoutResetIntervalSeconds, 0, 3600,
-            nameof(settings.SshTmoutResetIntervalSeconds));
-        ValidateRange(errors, settings.PlinkPortCheckIntervalMs, 500, 30000,
-            nameof(settings.PlinkPortCheckIntervalMs));
-        ValidateRange(errors, settings.PlinkKillGracePeriodMs, 500, 30000,
-            nameof(settings.PlinkKillGracePeriodMs));
-        ValidateRange(errors, settings.SftpUploadDebounceMs, 500, 30000,
-            nameof(settings.SftpUploadDebounceMs));
-        ValidateRange(errors, settings.ServerShutdownTimeoutMs, 500, 30000,
-            nameof(settings.ServerShutdownTimeoutMs));
-        ValidateRange(errors, settings.SleepPreventionIntervalSeconds, 10, 600,
-            nameof(settings.SleepPreventionIntervalSeconds));
-        ValidateRange(errors, settings.FileLoggerFlushIntervalMs, 500, 30000,
-            nameof(settings.FileLoggerFlushIntervalMs));
-        ValidateRange(errors, settings.DefaultRdpTunnelPort, 1, 65535,
-            nameof(settings.DefaultRdpTunnelPort));
-        ValidateRange(errors, settings.DefaultSshTunnelPort, 1, 65535,
-            nameof(settings.DefaultSshTunnelPort));
-        ValidateRange(errors, settings.EphemeralHttpPort, 1, 65535,
-            nameof(settings.EphemeralHttpPort));
-        ValidateRange(errors, settings.EphemeralTftpPort, 1, 65535,
-            nameof(settings.EphemeralTftpPort));
 
         if (!string.IsNullOrWhiteSpace(settings.PowerShellExecutionPolicy)
             && !Security.InputValidator.IsValidExecutionPolicy(settings.PowerShellExecutionPolicy))
@@ -165,14 +79,6 @@ public static partial class SchemaValidator
         {
             errors.Add($"{nameof(settings.RdpDefaultMode)}: must be 'External' or 'Embedded'.");
         }
-
-        ValidateRange(errors, settings.AntiIdleIntervalSeconds,
-            MinAntiIdleInterval, MaxAntiIdleInterval, nameof(settings.AntiIdleIntervalSeconds));
-        ValidateRange(errors, settings.RdpDefaultColorDepth,
-            MinColorDepth, MaxColorDepth, nameof(settings.RdpDefaultColorDepth));
-        ValidateRange(errors, settings.MaxEmbeddedSessions,
-            1, MaxEmbeddedSessionsLimit, nameof(settings.MaxEmbeddedSessions));
-        ValidateRange(errors, settings.SidebarWidth, 0, 1000, nameof(settings.SidebarWidth));
 
         ValidateVault(errors, settings);
 
@@ -290,9 +196,7 @@ public static partial class SchemaValidator
             errors.Add($"{nameof(server.RdpAspectRatio)}: unsupported aspect ratio '{server.RdpAspectRatio}'.");
         }
 
-        ValidateRange(errors, server.RdpColorDepth,
-            MinColorDepth, MaxColorDepth, nameof(server.RdpColorDepth));
-        ValidateRange(errors, server.RdpAudioMode, 0, 2, nameof(server.RdpAudioMode));
+        ValidateDeclaredRanges(errors, server);
         ValidateRdpResolutionProfile(errors, server);
         ValidateWinRmTransport(errors, server);
 
@@ -355,35 +259,38 @@ public static partial class SchemaValidator
 
         if (server.RdpResizeEnableDelayMs.HasValue)
         {
-            ValidateRdpResizeDelay(errors, server.RdpResizeEnableDelayMs.Value,
-                nameof(server.RdpResizeEnableDelayMs));
+            // The per-profile override means the same thing as the application setting, so it is
+            // bounded by that setting's one declaration rather than by a second spelling here.
+            SettingRange range = SettingRanges.Of(nameof(AppSettings.RdpResizeEnableDelayMs));
+            int value = server.RdpResizeEnableDelayMs.Value;
+            if (!range.Accepts(value))
+            {
+                ValidateRange(errors, value, range.Min, range.Max, nameof(server.RdpResizeEnableDelayMs));
+            }
         }
     }
 
-    private static void ValidateRdpResizeDelay(List<string> errors, int value, string fieldName)
+    /// <summary>
+    /// Diagnoses every <see cref="SettingRangeAttribute"/> the object's type declares.
+    /// </summary>
+    /// <remarks>
+    /// The one range pass. A declared "off" value (zero, by <see cref="SettingRangeAttribute.ZeroMeansOff"/>)
+    /// is accepted without a word, which is what the two hand-written zero-or-range methods this
+    /// replaces used to do for their two settings, and what the loader wrongly did not do for the
+    /// anti-idle interval.
+    /// </remarks>
+    private static void ValidateDeclaredRanges(List<string> errors, object target)
     {
-        // Zero explicitly disables the resize lockout; 1..999 ms is too short to be meaningful.
-        if (value == DisabledRdpResizeDelayMs)
+        foreach (SettingRange range in SettingRanges.For(target.GetType()).Values)
         {
-            return;
+            int value = SettingRanges.ValueOf(target, range.PropertyName);
+            if (range.DisabledValue.HasValue && value == range.DisabledValue.Value)
+            {
+                continue;
+            }
+
+            ValidateRange(errors, value, range.Min, range.Max, range.PropertyName);
         }
-
-        ValidateRange(errors, value, MinRdpResizeDelayMs, MaxRdpResizeDelayMs, fieldName);
-    }
-
-    private static void ValidateRdpConnectWatchdogTimeout(List<string> errors, int value, string fieldName)
-    {
-        if (value == DisabledRdpConnectWatchdogTimeoutMs)
-        {
-            return;
-        }
-
-        ValidateRange(
-            errors,
-            value,
-            MinRdpConnectWatchdogTimeoutMs,
-            MaxRdpConnectWatchdogTimeoutMs,
-            fieldName);
     }
 
     /// <summary>

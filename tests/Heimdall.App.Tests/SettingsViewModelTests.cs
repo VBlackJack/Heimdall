@@ -1203,6 +1203,34 @@ public sealed class SettingsViewModelTests
         Assert.False(viewModel.HasAdvancedTabErrors);
     }
 
+    // Through the real view model with a loaded localizer: the message the user reads carries the
+    // declared bounds, in order, and no placeholder. The two numbers come from the declaration on
+    // AppSettings, not from the translation, which is a template.
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    public async Task ScreenMessage_ThroughTheViewModel_CarriesTheDeclaredBoundsInOrder(string locale)
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+        SettingRange range = SettingRanges.Of(nameof(AppSettings.ExternalToolTimeoutMs));
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+
+        viewModel.ExternalToolTimeoutMs = range.Max + 1;
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        string message = Assert.IsType<string>(viewModel.ValidationSummary);
+        string min = range.Min.ToString(CultureInfo.InvariantCulture);
+        string max = range.Max.ToString(CultureInfo.InvariantCulture);
+        Assert.DoesNotContain("{0}", message, StringComparison.Ordinal);
+        Assert.Contains(min, message, StringComparison.Ordinal);
+        Assert.Contains(max, message, StringComparison.Ordinal);
+        Assert.True(
+            message.IndexOf(min, StringComparison.Ordinal) < message.IndexOf(max, StringComparison.Ordinal),
+            $"the bounds are formatted in the wrong order: {message}");
+    }
+
     [Fact]
     public async Task SaveAsync_InvalidAdvancedSettingUpdatesOnlyAdvancedTabErrorBadge()
     {
@@ -1437,9 +1465,10 @@ public sealed class SettingsViewModelTests
         AssertOnlyBadgeLit(viewModel, expectedBadge);
     }
 
-    // The bounds on this screen and the bounds the schema enforces are one decision written in two
-    // places. Let them drift and a value the screen accepts is written and refused on the next
-    // load, with the complaint attached to a file rather than to the box that produced it.
+    // The bounds on this screen and the bounds the schema enforces used to be one decision written
+    // in two places, and they drifted. They are now one declaration on the setting, read by both;
+    // this measures that the screen's attribute names that declaration and that the loader agrees
+    // at the ends, so a field re-annotated with its own numbers is caught here.
     [Theory]
     [InlineData(nameof(SettingsViewModel.DefaultResolutionWidth))]
     [InlineData(nameof(SettingsViewModel.DefaultResolutionHeight))]
@@ -1452,12 +1481,12 @@ public sealed class SettingsViewModelTests
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(backing);
 
-        var range = backing!
-            .GetCustomAttribute<System.ComponentModel.DataAnnotations.RangeAttribute>();
-        Assert.NotNull(range);
+        SettingRangeOfAttribute? bound = backing!.GetCustomAttribute<SettingRangeOfAttribute>();
+        Assert.NotNull(bound);
+        Assert.Equal(propertyName, bound!.SettingsPropertyName);
 
-        int minimum = (int)range!.Minimum;
-        int maximum = (int)range.Maximum;
+        int minimum = bound.Range.Min;
+        int maximum = bound.Range.Max;
 
         Assert.True(SchemaAccepts(propertyName, minimum), $"the schema refuses {propertyName} = {minimum}");
         Assert.True(SchemaAccepts(propertyName, maximum), $"the schema refuses {propertyName} = {maximum}");
