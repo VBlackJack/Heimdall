@@ -48,9 +48,11 @@ public static class AdHocProfileIds
     /// Whether <paramref name="profileId"/> belongs to the palette's destination namespace.
     /// </summary>
     /// <remarks>
-    /// Ordinal, like every other identifier comparison on this path: the trust store keys
-    /// ordinally, so a reservation that matched case-insensitively would leave
-    /// <c>ADHOC-rdp-x</c> importable and colliding under a store that treats it as distinct.
+    /// Ordinal, because that is what the trust store and the palette both compare with. A
+    /// case-insensitive reservation would be STRICTER, not looser - it would remint
+    /// <c>ADHOC-rdp-x</c> as well - and it would be reserving a string the palette never mints
+    /// and the store keys distinctly, so nothing could collide with it. Matching the consumers
+    /// is the property that matters; reserving more than they can produce is only noise.
     /// </remarks>
     public static bool IsAdHoc(string? profileId) =>
         profileId is not null && profileId.StartsWith(Prefix, StringComparison.Ordinal);

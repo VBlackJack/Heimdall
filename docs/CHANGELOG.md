@@ -12,6 +12,24 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the reservation, applied to what was already there
+
+The previous entry says the quick-connect namespace is reserved at the door foreign identifiers
+come through. That door was not the only one, and the entry should not have been written as though
+it were.
+
+A profile saved before the reservation existed keeps its identifier across the upgrade, and the
+durable approvals granted for it stay filed under that identifier - so a destination typed by hand
+still inherits them. The import's Replace branch also kept an existing identifier without
+consulting the reservation.
+
+A startup migration now moves any saved profile out of the namespace and takes its approved
+certificates with it, removing them from the old identifier rather than leaving them there. A
+reserved key with no profile behind it is a typed destination's own approval and is left alone; a
+key that belonged to a profile since deleted cannot be told apart from that one, and is left alone
+for the same reason. That residue is bounded: from this version, no profile can enter the
+namespace, so no new key of that shape belongs to one.
+
 ## Unreleased: a namespace nobody owned, and a tool that blocked its own cleanup
 
 Two defects that predate the certificate work but contradict what v2026.090301 published about it.

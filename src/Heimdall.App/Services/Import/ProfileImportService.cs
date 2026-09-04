@@ -351,7 +351,15 @@ public sealed class ProfileImportService(
                             continue;
 
                         case RdpConflictResolution.Replace:
-                            candidate.Id = inventory[existingIndex].Id;
+                            // Through the same reservation as every other branch. The identifier
+                            // kept here is the EXISTING profile's, which the startup migration
+                            // keeps out of the quick-connect namespace - but a branch that reads
+                            // an identifier without checking it is a hole waiting for the day
+                            // that stops being true, and this one was written as if the check
+                            // above covered it.
+                            candidate.Id = BuildUniqueId(
+                                inventory[existingIndex].Id,
+                                inventory.Where((_, index) => index != existingIndex).ToList());
                             inventory[existingIndex] = candidate;
                             appliedServers.Add(candidate);
                             replacedCount++;
