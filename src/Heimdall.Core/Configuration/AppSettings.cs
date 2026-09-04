@@ -18,6 +18,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Models;
+using Heimdall.Core.Rdp;
 using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Ssh;
 
@@ -38,7 +39,9 @@ public sealed class AppSettings
         new(StringComparer.Ordinal);
 
     // Display
+    [SettingRange(RdpDisplayLimits.MinimumSessionResolution, RdpDisplayLimits.MaximumSessionResolution)]
     public int DefaultResolutionWidth { get; set; } = 1920;
+    [SettingRange(RdpDisplayLimits.MinimumSessionResolution, RdpDisplayLimits.MaximumSessionResolution)]
     public int DefaultResolutionHeight { get; set; } = 1080;
     public bool FullScreen { get; set; } = true;
     public bool AdminMode { get; set; } = true;
@@ -53,6 +56,7 @@ public sealed class AppSettings
 
     // Updates
     public bool UpdateCheckEnabled { get; set; } = true;
+    [SettingRange(1, 8760)]
     public int UpdateCheckIntervalHours { get; set; } = 24;
     public string? UpdateLastCheckUtc { get; set; } = null;   // ISO 8601 round-trip (UTC)
     public string? UpdateSkippedVersion { get; set; } = null;
@@ -64,35 +68,59 @@ public sealed class AppSettings
     public string? LegacyMigrationDeclinedSourceFingerprint { get; set; }
 
     // Tunnels
+    [SettingRange(0, 60000)]
     public int TunnelEstablishmentDelayMs { get; set; } = 2500;
+    [SettingRange(0, 60000)]
     public int TunnelRetryDelayMs { get; set; } = 1500;
+    [SettingRange(0, 60000)]
     public int ProcessKillTimeoutMs { get; set; } = 2000;
+    [SettingRange(5000, 600000)]
     public int ExternalToolTimeoutMs { get; set; } = 60000;
 
     // Infrastructure timeouts (centralized from previously hardcoded values)
+    [SettingRange(1000, 120000)]
     public int HostKeyProbeTimeoutMs { get; set; } = 8000;
+    [SettingRange(1000, 120000)]
     public int TelnetConnectTimeoutMs { get; set; } = 15000;
+    [SettingRange(1000, 120000)]
     public int CredentialProviderTimeoutMs { get; set; } = 10000;
+    [SettingRange(5000, 300000)]
     public int RdpCredentialAutofillTimeoutMs { get; set; } = 90000;
+    [SettingRange(1000, 60000)]
     public int RdpArtifactCleanupDelayMs { get; set; } = 10000;
+    [SettingRange(1000, 60000, ZeroMeansOff = true)]
     public int RdpResizeEnableDelayMs { get; set; } = 10000;
+    [SettingRange(5000, 600000, ZeroMeansOff = true)]
     public int RdpConnectWatchdogTimeoutMs { get; set; } = 45000;
     public const int DefaultRdpAutoReconnectMaxAttempts = 20;
+    [SettingRange(1, DefaultRdpAutoReconnectMaxAttempts)]
     public int RdpAutoReconnectMaxAttempts { get; set; } = DefaultRdpAutoReconnectMaxAttempts;
+    [SettingRange(5000, 300000)]
     public int RdpKeepAliveIntervalMs { get; set; } = 60000;
     public const int DefaultSshKeepAliveIntervalSeconds = 30;
+    [SettingRange(5, 600)]
     public int SshKeepAliveIntervalSeconds { get; set; } = DefaultSshKeepAliveIntervalSeconds;
     public const int DefaultPlinkPortCheckIntervalMs = 2000;
+    [SettingRange(500, 30000)]
     public int PlinkPortCheckIntervalMs { get; set; } = DefaultPlinkPortCheckIntervalMs;
     public const int DefaultPlinkKillGracePeriodMs = 2000;
+    [SettingRange(500, 30000)]
     public int PlinkKillGracePeriodMs { get; set; } = DefaultPlinkKillGracePeriodMs;
+    [SettingRange(500, 30000)]
     public int SftpUploadDebounceMs { get; set; } = 2000;
+    [SettingRange(500, 30000)]
     public int ServerShutdownTimeoutMs { get; set; } = 2000;
+    [SettingRange(10, 600)]
     public int SleepPreventionIntervalSeconds { get; set; } = 60;
+    [SettingRange(500, 30000)]
     public int FileLoggerFlushIntervalMs { get; set; } = 2000;
+    [SettingRange(1, 65535)]
     public int DefaultRdpTunnelPort { get; set; } = DefaultPorts.RdpTunnel;
+    [SettingRange(1, 65535)]
     public int DefaultSshTunnelPort { get; set; } = DefaultPorts.SshTunnel;
+    [SettingRange(1, 65535)]
     public int EphemeralHttpPort { get; set; } = 8080;
+    [SettingRange(1, 65535)]
     public int EphemeralTftpPort { get; set; } = 69;
     public bool FileShareEnableTftp { get; set; }
 
@@ -120,6 +148,7 @@ public sealed class AppSettings
 
     // Terminal appearance
     public string TerminalFontFamily { get; set; } = "Consolas";
+    [SettingRange(8, 72)]
     public int TerminalFontSize { get; set; } = 14;
     public string TerminalColorScheme { get; set; } = "Dracula";
     public string PowerShellExecutionPolicy { get; set; } = "Default";
@@ -129,14 +158,21 @@ public sealed class AppSettings
     [JsonConverter(typeof(JsonStringEnumConverter<SshAgentPreference>))]
     public SshAgentPreference SshAgentPreference { get; set; } = SshAgentPreference.AutoOpenSshFirst;
     public bool SyncKnownHostsAtStartup { get; set; }
+    [SettingRange(10, 3600, ZeroMeansOff = true)]
     public int AntiIdleIntervalSeconds { get; set; } = 60;
     public const int DefaultSshTmoutResetIntervalSeconds = 240;
+    [SettingRange(0, 3600)]
     public int SshTmoutResetIntervalSeconds { get; set; } = DefaultSshTmoutResetIntervalSeconds;
     public bool SshAutoReconnect { get; set; }
+    [SettingRange(1, 10)]
     public int SshAutoReconnectAttempts { get; set; } = 3;
+    [SettingRange(1, 600)]
     public int SshAutoReconnectFirstDelaySeconds { get; set; } = 2;
+    [SettingRange(1, 600)]
     public int SshAutoReconnectSecondDelaySeconds { get; set; } = 5;
+    [SettingRange(1, 600)]
     public int SshAutoReconnectSubsequentDelaySeconds { get; set; } = 15;
+    [SettingRange(0, 600)]
     public int SshConnectTimeExitWindowSeconds { get; set; } = 15;
 
     // RDP defaults
@@ -154,6 +190,7 @@ public sealed class AppSettings
     public bool RdpDefaultDynamicResolution { get; set; } = true;
     public bool RdpDefaultNla { get; set; } = true;
     public bool RdpDefaultStrictServerAuthentication { get; set; }
+    [SettingRange(8, 32)]
     public int RdpDefaultColorDepth { get; set; } = 32;
     public bool RdpDefaultBitmapCaching { get; set; } = true;
     public bool RdpDefaultCompression { get; set; } = true;
@@ -198,6 +235,7 @@ public sealed class AppSettings
     // Session
     public bool EnableSessionPersistence { get; set; }
     public const int DefaultMaxEmbeddedSessions = 10;
+    [SettingRange(1, 20)]
     public int MaxEmbeddedSessions { get; set; } = DefaultMaxEmbeddedSessions;
     public int EmbeddedIdleTimeoutMs { get; set; }
     public bool SftpBrowserEnabled { get; set; } = true;
@@ -228,6 +266,7 @@ public sealed class AppSettings
     public bool CollapseTunnelsPanelByDefault { get; set; } = true;
 
     public bool SidebarCollapsed { get; set; }
+    [SettingRange(0, 1000)]
     public int SidebarWidth { get; set; } = 220;
     public bool ShowToolsPanel { get; set; }
     public Dictionary<string, bool> SidebarExpandedCategories { get; set; } = new();
@@ -341,6 +380,7 @@ public sealed class AppSettings
 
     // Minutes a successful verification is remembered (in-memory, not persisted across
     // restarts) before the user is prompted again. 0 = always re-verify.
+    [SettingRange(0, 1440)]
     public int WindowsHelloGraceMinutes { get; set; } = DefaultWindowsHelloGraceMinutes;
 
     // External tools (launched from server context menu)
@@ -357,8 +397,11 @@ public sealed class AppSettings
 
     // Session health monitor (background reachability probe of the inventory)
     public bool SessionHealthMonitorEnabled { get; set; } = true;
+    [SettingRange(15, 3600)]
     public int SessionHealthCheckIntervalSeconds { get; set; } = 60;
+    [SettingRange(250, 30000)]
     public int SessionHealthProbeTimeoutMs { get; set; } = 2000;
+    [SettingRange(1, 50)]
     public int SessionHealthMaxConcurrent { get; set; } = 10;
 
     // Command Library Git Sync
@@ -413,6 +456,7 @@ public sealed class AppSettings
     /// Maximum days before requiring a master-password unlock instead of Hello.
     /// 0 disables the periodic re-authentication policy.
     /// </summary>
+    [SettingRange(0, 3650)]
     public int VaultHelloMaxDaysBeforeMasterPassword { get; set; }
 
     /// <summary>
@@ -434,6 +478,7 @@ public sealed class AppSettings
     /// <summary>Idle auto-lock threshold in minutes for the master-password workspace.
     /// 0 disables idle auto-lock. Measured system-wide (GetLastInputInfo). Only active
     /// when the vault is enabled.</summary>
+    [SettingRange(0, 1440)]
     public int AutoLockIdleMinutes { get; set; }
 
     /// <summary>When true, locking the workspace also disconnects every active session
