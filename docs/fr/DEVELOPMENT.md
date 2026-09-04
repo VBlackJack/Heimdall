@@ -158,7 +158,13 @@ emplacement habituel (`README.md`, `docs/*.md`) ; le français vit en miroir (`R
 `docs/fr/*.md`). Chaque version pointe vers l'autre sous son titre. Une modification de l'une n'est
 pas terminée tant que l'autre ne dit pas la même chose.
 
-**Les notes de version publiées** sont en anglais par défaut, dans `docs/release-notes/v<version>.md`.
+**Les notes de version publiées** sont en anglais seul, dans `docs/release-notes/v<version>.md`.
+Elles sont lues depuis une page de release GitHub et depuis le programme de mise à jour intégré, par
+des gens qui n'ont jamais choisi de langue, et elles sont la seule catégorie publique qui ne vit pas
+en miroir : une moitié française double la maintenance et divise par deux l'attention portée à la
+moitié anglaise. `ReleaseNotesLanguageGuardTests` applique cette règle à partir de la v2026.083101.
+Les notes publiées avant cette version sont antérieures à la règle et restent telles qu'elles ont été
+publiées : réécrire le corps d'une release lui ferait dire ce que la release n'a jamais dit.
 
 `docs/CHANGELOG.md` reste en anglais seul. C'est un journal chronologique d'ingénierie, du même
 genre que les notes de version, et le traduire imposerait une double maintenance perpétuelle sans
