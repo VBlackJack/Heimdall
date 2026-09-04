@@ -211,13 +211,26 @@ would turn a verification step into a new way to fail on a path that worked
 before; accepting one as verified would be strictly worse than never having
 built any of this.
 
-**Approval is per profile, and per thumbprint.** Trusting adds to the set and
-never replaces it; re-approving a thumbprint keeps its original timestamp.
-"Just this once" is held in memory for the run and is never written to disk.
-Durable entries live in `trustedRdpCertificates` in `settings.json`, keyed by
-profile id, each carrying the thumbprint, when it was first trusted, and the
-subject and issuer the probe read, so a future settings screen can name the
-machine rather than show forty hexadecimal pairs.
+**Approval is per owner, and per thumbprint.** An owner is either a saved
+profile or a destination typed by hand, and the two are kept apart even when
+they carry the same identifier: the command palette mints `adhoc-rdp-<host>` for
+a typed destination, and a profile imported before that namespace was reserved
+can hold the very same string. An approval given for one never silences the
+question for the other, and one question never writes trust under both. The
+owner is decided by the code that built the connection (the palette and the
+server row mark what they mint), never by reading the identifier's shape.
+Trusting adds to the set and never replaces it; re-approving a thumbprint keeps
+its original timestamp. "Just this once" is held in memory for the run, per
+owner, and is never written to disk. Durable entries live in `settings.json`:
+`trustedRdpCertificates`, keyed by profile id, and
+`trustedRdpCertificatesForTypedDestinations`, keyed by the typed host in lower
+case. A typed destination is keyed by its host because that is all the user
+typed, and because the server row mints a fresh identifier per launch under
+which an approval could never be found again. Each entry carries the
+thumbprint, when it was first trusted, and the subject and issuer the probe
+read, so the settings screen can name the machine rather than show forty
+hexadecimal pairs; a typed destination's row is shown under its host with a
+"Quick connect" badge.
 
 **Known limitation, and the reason the set matters.** Nothing guarantees that
 the ActiveX control reconnects to the same machine the probe inspected - on a

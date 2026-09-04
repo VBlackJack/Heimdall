@@ -231,14 +231,29 @@ transformerait une étape de vérification en une nouvelle façon d'échouer sur
 chemin qui fonctionnait avant ; en accepter un comme vérifié serait strictement
 pire que de n'avoir jamais construit tout ceci.
 
-**L'approbation est par profil et par empreinte.** Approuver ajoute à l'ensemble
-et ne remplace jamais ; réapprouver une empreinte conserve son horodatage
-d'origine. "Juste cette fois" vit en mémoire pour la durée de l'exécution et
-n'est jamais écrit sur disque. Les entrées durables vivent dans
-`trustedRdpCertificates` de `settings.json`, indexées par identifiant de profil,
-chacune portant l'empreinte, la date de première approbation, ainsi que le sujet
-et l'émetteur lus par la sonde, afin qu'un futur écran de réglages puisse nommer
-la machine plutôt qu'afficher quarante paires hexadécimales.
+**L'approbation est par propriétaire et par empreinte.** Un propriétaire est
+soit un profil enregistré, soit une destination saisie à la main, et les deux
+restent séparés même lorsqu'ils portent le même identifiant : la palette de
+commandes frappe `adhoc-rdp-<hote>` pour une destination saisie, et un profil
+importé avant que cet espace de noms soit réservé peut porter exactement la
+même chaîne. Une approbation donnée à l'un ne fait jamais taire la question
+pour l'autre, et une question n'écrit jamais la confiance sous les deux. Le
+propriétaire est décidé par le code qui a construit la connexion (la palette et
+la ligne serveur marquent ce qu'elles frappent), jamais en lisant la forme de
+l'identifiant. Approuver ajoute à l'ensemble et ne remplace jamais ; réapprouver
+une empreinte conserve son horodatage d'origine. "Juste cette fois" vit en
+mémoire pour la durée de l'exécution, par propriétaire, et n'est jamais écrit
+sur disque. Les entrées durables vivent dans `settings.json` :
+`trustedRdpCertificates`, indexées par identifiant de profil, et
+`trustedRdpCertificatesForTypedDestinations`, indexées par l'hôte saisi en
+minuscules. Une destination saisie est indexée par son hôte parce que c'est
+tout ce que l'utilisateur a tapé, et parce que la ligne serveur frappe un
+identifiant neuf à chaque lancement, sous lequel une approbation ne serait
+jamais retrouvée. Chaque entrée porte l'empreinte, la date de première
+approbation, ainsi que le sujet et l'émetteur lus par la sonde, afin que
+l'écran de réglages puisse nommer la machine plutôt qu'afficher quarante paires
+hexadécimales ; la ligne d'une destination saisie est affichée sous son hôte
+avec un badge "Connexion rapide".
 
 **Limitation connue, et raison d'être de l'ensemble.** Rien ne garantit que le
 contrôle ActiveX se reconnecte à la machine que la sonde a inspectée - sur un
