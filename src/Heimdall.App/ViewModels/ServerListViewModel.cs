@@ -71,6 +71,21 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private bool _disposed;
 
     private List<ServerItemViewModel> _allServers = [];
+
+    /// <summary>
+    /// Every saved profile, whatever the sidebar is currently showing.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>Servers</c> is the FILTERED view: applying a filter replaces its contents with the
+    /// visible results. Anything that answers a question about the inventory rather than about the
+    /// list on screen must read this instead, or the answer changes when the user types in the
+    /// search box.</para>
+    /// <para>That is not hypothetical. The scheduler resolved a task's profile from the filtered
+    /// view, so with a filter active it could not see the profile the task names - and then found
+    /// a DIFFERENT profile of the same display name among the visible ones, and connected to it.
+    /// No deletion and no stale reference required; a filter was enough.</para>
+    /// </remarks>
+    internal IReadOnlyList<ServerItemViewModel> AllServers => _allServers;
     private readonly Dictionary<string, ServerItemViewModel> _healthServerById =
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _lastHealthGenerationByServerId =
