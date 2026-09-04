@@ -202,6 +202,83 @@ public sealed class AppStartupTests
             "ssh-rsa",
             HostKeySource.UserConfirmed);
 
+    // The startup's load, run against a real store and settings holding both dictionaries. The
+    // store replaces its durable state wholesale on every load, so a startup that loaded the two
+    // dictionaries in two calls would keep only the second and look, from each call, exactly
+    // like the load it replaced. Both scopes must come back from the one call.
+    [Fact]
+    public void LoadTrustedRdpCertificates_LoadsBothScopesInOneCall_AndBothAreTrusted()
+    {
+        var stamp = new DateTimeOffset(2026, 9, 4, 12, 0, 0, TimeSpan.Zero);
+        var settings = new AppSettings();
+        settings.TrustedRdpCertificates["adhoc-rdp-prod.example"] =
+            [new RdpCertificateEntry("SHA256:AA:BB:01", stamp)];
+        settings.TrustedRdpCertificatesForTypedDestinations["prod.example"] =
+            [new RdpCertificateEntry("SHA256:AA:BB:02", stamp)];
+        var store = new RdpCertificateTrustStore();
+
+        App.LoadTrustedRdpCertificates(store, settings);
+
+        RdpTrustKey profileOwner = RdpTrustKey.ForProfile("adhoc-rdp-prod.example");
+        RdpTrustKey typedOwner = RdpTrustKey.ForTypedDestination("prod.example");
+        Assert.Equal(RdpCertificateTrustVerdict.Trusted, store.Evaluate(profileOwner, "SHA256:AA:BB:01").Verdict);
+        Assert.Equal(RdpCertificateTrustVerdict.Trusted, store.Evaluate(typedOwner, "SHA256:AA:BB:02").Verdict);
+
+        // And neither scope reads the other's set.
+        Assert.Equal(RdpCertificateTrustVerdict.Unknown, store.Evaluate(profileOwner, "SHA256:AA:BB:02").Verdict);
+        Assert.Equal(RdpCertificateTrustVerdict.Unknown, store.Evaluate(typedOwner, "SHA256:AA:BB:01").Verdict);
+    }
+
+    // A typed destination's approvals go to their own dictionary, keyed by the host, and come
+    // back through the one-call reader alongside the profiles'. A persistence that wrote both
+    // scopes to one dictionary would be the old collision with one more file.
+    [Fact]
+    public async Task PersistTrustedRdpCertificates_TypedDestination_RoundTripsInItsOwnDictionary()
+    {
+        string rootPath = CreateTemporaryRoot();
+        try
+        {
+            var stamp = new DateTimeOffset(2026, 9, 4, 12, 0, 0, TimeSpan.Zero);
+            var configManager = new ConfigManager(rootPath);
+            await configManager.InitializeAsync();
+            RdpTrustKey profileOwner = RdpTrustKey.ForProfile("prod.example");
+            RdpTrustKey typedOwner = RdpTrustKey.ForTypedDestination("PROD.example");
+
+            await App.PersistTrustedRdpCertificatesAsync(
+                configManager,
+                profileOwner,
+                [new RdpCertificateEntry("SHA256:AA:BB:01", stamp)]);
+            await App.PersistTrustedRdpCertificatesAsync(
+                configManager,
+                typedOwner,
+                [new RdpCertificateEntry("SHA256:AA:BB:02", stamp)]);
+
+            AppSettings reloaded = await ReloadSettingsAsync(rootPath);
+            Assert.Equal(
+                "SHA256:AA:BB:01",
+                Assert.Single(reloaded.TrustedRdpCertificates["prod.example"]).Thumbprint);
+            Assert.Equal(
+                "SHA256:AA:BB:02",
+                Assert.Single(reloaded.TrustedRdpCertificatesForTypedDestinations["prod.example"]).Thumbprint);
+
+            var read = App.ReadTrustedRdpCertificates(reloaded)
+                .ToDictionary(pair => pair.Key, pair => pair.Entries.Select(e => e.Thumbprint).ToArray());
+            Assert.Equal(["SHA256:AA:BB:01"], read[profileOwner]);
+            Assert.Equal(["SHA256:AA:BB:02"], read[typedOwner]);
+
+            // Forgetting the typed owner's last certificate leaves no host key behind, and does
+            // not touch the profile's dictionary.
+            await App.PersistTrustedRdpCertificatesAsync(configManager, typedOwner, []);
+            AppSettings afterForget = await ReloadSettingsAsync(rootPath);
+            Assert.DoesNotContain("prod.example", afterForget.TrustedRdpCertificatesForTypedDestinations);
+            Assert.Single(afterForget.TrustedRdpCertificates["prod.example"]);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task PersistTrustedRdpCertificates_ReloadKeepsEveryCertificateOfTheProfile()
     {
@@ -215,7 +292,7 @@ public sealed class AppStartupTests
 
             await App.PersistTrustedRdpCertificatesAsync(
                 configManager,
-                profileId,
+                RdpTrustKey.ForProfile(profileId),
                 [
                     new RdpCertificateEntry("SHA256:AA:BB:01", stamp),
                     new RdpCertificateEntry("SHA256:AA:BB:02", stamp.AddDays(1)),
@@ -252,10 +329,10 @@ public sealed class AppStartupTests
             await configManager.InitializeAsync();
             await App.PersistTrustedRdpCertificatesAsync(
                 configManager,
-                profileId,
+                RdpTrustKey.ForProfile(profileId),
                 [new RdpCertificateEntry("SHA256:AA:BB:01", DateTimeOffset.UtcNow)]);
 
-            await App.PersistTrustedRdpCertificatesAsync(configManager, profileId, []);
+            await App.PersistTrustedRdpCertificatesAsync(configManager, RdpTrustKey.ForProfile(profileId), []);
 
             // An empty list left behind would be a profile that "has a trust set" holding
             // nothing - a distinction with no meaning that a settings screen would have to
@@ -278,7 +355,7 @@ public sealed class AppStartupTests
         // user is asked again next time, which is the safe direction.
         await App.PersistTrustedRdpCertificatesAsync(
             configManager,
-            "profile",
+            RdpTrustKey.ForProfile("profile"),
             [new RdpCertificateEntry("SHA256:AA:BB:01", DateTimeOffset.UtcNow)]);
     }
 

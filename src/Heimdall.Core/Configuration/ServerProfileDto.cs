@@ -111,6 +111,37 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
         Id = sessionId;
     }
+
+    /// <summary>
+    /// Whether this profile stands for a destination the user typed by hand rather than for a
+    /// profile in the inventory.
+    /// </summary>
+    /// <remarks>
+    /// <para>Transient and never serialized, like <see cref="SessionOriginProfileId"/>, and for
+    /// the same reason: it records what this OBJECT is, which only the code that built it knows.
+    /// A typed destination's identifier is minted in a namespace a saved profile can also hold -
+    /// through an old import, an old installation or a hand edit - so the identifier's text
+    /// cannot say which of the two a profile is. The RDP certificate check reads this mark to
+    /// file an approval under the typed destination's host instead of under a profile identifier
+    /// that a saved profile may share.</para>
+    /// <para><b>Forgetting to set it is the safe direction.</b> An unmarked typed destination is
+    /// treated as a profile named by its minted identifier, which is what every typed destination
+    /// was before this mark existed: no approval reaches an owner that did not earn it, and the
+    /// only cost is the collision this mark was added to end.</para>
+    /// <para>Survives <see cref="CloneFaithfully"/>, which is how a reconnect and a duplicate
+    /// reach the pane; does not survive a JSON round trip or the save-as-profile dialog, which
+    /// builds a new profile under a new identifier - a saved profile is not a typed destination,
+    /// whatever it was saved from.</para>
+    /// </remarks>
+    [JsonIgnore]
+    public bool IsTypedDestination { get; private set; }
+
+    /// <summary>Records that this profile was built for a destination typed by hand.</summary>
+    /// <remarks>
+    /// The only way to set <see cref="IsTypedDestination"/>, so the mark is placed where the
+    /// profile is minted and nowhere else - never by anything that reads a profile from disk.
+    /// </remarks>
+    public void MarkAsTypedDestination() => IsTypedDestination = true;
     public string DisplayName { get; set; } = string.Empty;
     /// <summary>
     /// Provenance tag. Profiles serialized before b63 omit this field and therefore

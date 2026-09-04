@@ -3245,6 +3245,21 @@
                                                                                    FontSize="10"
                                                                                    VerticalAlignment="Center"/>
                                                                     </Border>
+                                                                    <!-- A destination typed by hand: no profile owns this decision, so it is
+                                                                         shown under its host with a badge of its own rather than under the
+                                                                         "profile deleted" badge, which would be false. -->
+                                                                    <Border Background="{DynamicResource InfoBrush}"
+                                                                            CornerRadius="{StaticResource CornerRadiusSm}"
+                                                                            Padding="5,0"
+                                                                            Margin="6,0,0,0"
+                                                                            VerticalAlignment="Center"
+                                                                            ToolTip="{loc:Translate TipTrustedRdpCertificateTypedDestination}"
+                                                                            Visibility="{Binding IsTypedDestination, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                                        <TextBlock Text="{loc:Translate LblTrustedRdpCertificateTypedDestination}"
+                                                                                   Foreground="{DynamicResource BadgeTextBrush}"
+                                                                                   FontSize="10"
+                                                                                   VerticalAlignment="Center"/>
+                                                                    </Border>
                                                                 </StackPanel>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>

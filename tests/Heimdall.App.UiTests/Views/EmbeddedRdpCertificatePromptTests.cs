@@ -273,7 +273,7 @@ public sealed class EmbeddedRdpCertificatePromptTests
             new RdpCertificatePromptContext(
                 "Production", TunnelEndpoint, Thumbprint, "CN=dc04", 0)
             {
-                ProfileId = "profile-1",
+                TrustKey = RdpTrustKey.ForProfile("profile-1"),
             },
             CancellationToken.None);
 

@@ -2575,6 +2575,8 @@
   "ToastTrustedRdpCertificateForgetFailed": "Le certificat a \u00e9t\u00e9 conserv\u00e9 : la confirmation n'a pas pu \u00eatre affich\u00e9e ({0}).",
   "ToastTrustedRdpCertificatesLoadFailed": "Les noms de serveurs n'ont pas pu \u00eatre lus ({0}) ; les identifiants de profils sont affich\u00e9s \u00e0 la place.",
   "LblTrustedRdpCertificateProfileMissing": "Profil supprim\u00e9",
+  "LblTrustedRdpCertificateTypedDestination": "Connexion rapide",
+  "TipTrustedRdpCertificateTypedDestination": "Approuv\u00e9 pour une destination saisie \u00e0 la main et conserv\u00e9 sous son h\u00f4te. Aucun profil enregistr\u00e9 ne poss\u00e8de cette d\u00e9cision.",
   "LblTrustedRdpCertificateFieldUnknown": "Non enregistr\u00e9",
   "EmptyStateNoTrustedRdpCertificates": "Aucun certificat RDP approuv\u00e9",
   "EmptyStateNoTrustedRdpCertificatesHint": "Les certificats que vous acceptez en vous connectant \u00e0 un bureau distant sont list\u00e9s ici, et peuvent y \u00eatre r\u00e9voqu\u00e9s.",

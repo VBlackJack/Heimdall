@@ -95,11 +95,14 @@ internal sealed class PaneRdpCertificateTrustPrompt(
     /// <summary>Builds the key that decides which questions are the same question.</summary>
     /// <param name="context">The certificate being asked about.</param>
     /// <remarks>
-    /// <b>The profile is part of the key.</b> RDP trust is stored per profile, so two
-    /// profiles that meet the same unknown certificate at the same moment are asking two
-    /// different questions. Coalescing them would show one question, naming one profile,
+    /// <b>The owner is part of the key, scope included.</b> RDP trust is stored per owner, so two
+    /// owners that meet the same unknown certificate at the same moment are asking two
+    /// different questions. Coalescing them would show one question, naming one owner,
     /// and write the answer into both trust sets - durable trust granted from a question
-    /// the user was never shown.
+    /// the user was never shown. The scope travels with the identity because a saved profile
+    /// and a destination typed by hand can share an identity string while reaching the same
+    /// host with the same certificate, which is exactly when their two questions would
+    /// otherwise become one answer written under two owners.
     /// <para>
     /// The scope token is deliberately NOT part of it. It identifies a pane, and two panes of
     /// one profile meeting one certificate are asking one question: keying on the pane would
@@ -124,7 +127,7 @@ internal sealed class PaneRdpCertificateTrustPrompt(
             context.Host,
             port: 0,
             context.Thumbprint,
-            scope: context.ProfileId ?? string.Empty);
+            scope: context.TrustKey?.ToString() ?? string.Empty);
     }
 
     private Task<RdpTrustAnswer> DisplayAsync(

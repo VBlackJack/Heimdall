@@ -32,6 +32,19 @@ public class MainViewModelConnectAsTests
             ConnectionType = connectionType
         };
 
+    // The second of the two sites that mint a typed destination. A fresh identifier is minted per
+    // launch, so an RDP certificate approval keyed on it would never be found again; the mark
+    // makes the check key on the host.
+    [Theory]
+    [InlineData("RDP")]
+    [InlineData("SSH")]
+    public void BuildTransientProfile_MarksTheProfileAsATypedDestination(string protocol)
+    {
+        var dto = MainViewModel.BuildTransientProfile(Server("host.example.com", "alice", "RDP"), protocol);
+
+        Assert.True(dto.IsTypedDestination);
+    }
+
     [Fact]
     public void BuildTransientProfile_Ssh_CarriesHostUsernameAndDefaultPort_NoPassword()
     {

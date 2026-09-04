@@ -911,7 +911,7 @@ public sealed class SplitServiceTests : IDisposable
                 "pane-" + profile.Id))
             .ToList();
 
-        Assert.All(requests, request => Assert.Equal(inventoryServerId, request.ProfileId));
+        Assert.All(requests, request => Assert.Equal(inventoryServerId, request.Key.Identity));
     }
 
     [Theory]

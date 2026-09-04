@@ -61,7 +61,7 @@ public sealed class RdpTrustIdentityCollisionTests
         Assert.Equal(1, prompt.Asked);
 
         // Production now meets the same certificate. It has approved nothing, so it must ask.
-        RdpCertificateTrustDecision seenByProduction = store.Evaluate(ProductionId, Thumbprint);
+        RdpCertificateTrustDecision seenByProduction = store.Evaluate(RdpTrustKey.ForProfile(ProductionId), Thumbprint);
         Assert.Equal(RdpCertificateTrustVerdict.Unknown, seenByProduction.Verdict);
         Assert.Equal(0, seenByProduction.AlreadyTrustedCount);
 
@@ -133,7 +133,7 @@ public sealed class RdpTrustIdentityCollisionTests
         Assert.Equal(RdpVerificationOutcome.TrustedByUser, again);
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate(LabId, Thumbprint).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(LabId), Thumbprint).Verdict);
     }
 
     // The case the inventory lookup could not reach, and the reason nothing reads an inventory
@@ -165,13 +165,13 @@ public sealed class RdpTrustIdentityCollisionTests
 
         Assert.Equal(
             RdpCertificateTrustVerdict.Trusted,
-            store.Evaluate(LabId, Thumbprint).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(LabId), Thumbprint).Verdict);
 
         // The whole point: Production, which is still very much in the inventory, learned
         // nothing.
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate(ProductionId, Thumbprint).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(ProductionId), Thumbprint).Verdict);
     }
 
     private static RdpCertificateVerificationRequest RequestFor(
@@ -217,7 +217,7 @@ public sealed class RdpTrustIdentityCollisionTests
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(context);
-            _profileIdsAsked.Add(context.ProfileId ?? string.Empty);
+            _profileIdsAsked.Add(context.TrustKey?.Identity ?? string.Empty);
             return Task.FromResult(answer);
         }
     }

@@ -56,7 +56,7 @@ internal static class RdpCertificateVerificationRequestBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(promptScopeId);
 
         return new RdpCertificateVerificationRequest(
-            ResolveTrustProfileId(server),
+            ResolveTrustKey(server),
             string.IsNullOrWhiteSpace(server.DisplayName)
                 ? server.RemoteServer
                 : server.DisplayName,
@@ -95,11 +95,20 @@ internal static class RdpCertificateVerificationRequestBuilder
     /// mint. Each answer asked what a string WAS; none could, because the same string can be both
     /// a mint and a profile's name. What distinguishes them is the object's role, and only the
     /// code that assigned the identifier ever holds it.</para>
+    /// <para><b>The same rule decides the scope.</b> A destination typed by hand carries an
+    /// identifier a saved profile can also hold, so the identifier's text cannot say which of the
+    /// two a copy is; <see cref="ServerProfileDto.IsTypedDestination"/> is set by the two sites
+    /// that mint a typed destination and by nothing that reads a profile from disk. A typed
+    /// destination is then keyed by its host - the only thing the user typed, and the only thing
+    /// that finds the approval again on the next launch, since the server row mints a fresh
+    /// identifier per launch.</para>
     /// </remarks>
-    internal static string ResolveTrustProfileId(ServerProfileDto server)
+    internal static RdpTrustKey ResolveTrustKey(ServerProfileDto server)
     {
         ArgumentNullException.ThrowIfNull(server);
 
-        return server.InventoryProfileId;
+        return server.IsTypedDestination
+            ? RdpTrustKey.ForTypedDestination(server.RemoteServer)
+            : RdpTrustKey.ForProfile(server.InventoryProfileId);
     }
 }

@@ -278,7 +278,7 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
 
         // Remove raises TrustChanged, which the startup wiring turns into the settings write and
         // which this screen turns into the row disappearing. Nothing else has to be done here.
-        if (_store.Remove(row.ProfileId, row.Thumbprint))
+        if (_store.Remove(row.Key, row.Thumbprint))
         {
             StatusMessage = _localizer.Format(
                 "ToastTrustedRdpCertificateForgotten",
@@ -293,12 +293,12 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
     private void RebuildRows()
     {
         _allRows.Clear();
-        foreach ((string profileId, IReadOnlyCollection<RdpCertificateEntry> entries)
+        foreach ((RdpTrustKey key, IReadOnlyCollection<RdpCertificateEntry> entries)
             in _store.GetAllApproved())
         {
             foreach (RdpCertificateEntry entry in entries)
             {
-                _allRows.Add(CreateRow(profileId, entry));
+                _allRows.Add(CreateRow(key, entry));
             }
         }
 
@@ -333,8 +333,25 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
         OnPropertyChanged(nameof(IsEmptyStateVisible));
     }
 
-    private TrustedRdpCertificateRowViewModel CreateRow(string profileId, RdpCertificateEntry entry)
+    private TrustedRdpCertificateRowViewModel CreateRow(RdpTrustKey key, RdpCertificateEntry entry)
     {
+        if (key.Scope == RdpTrustScope.TypedDestination)
+        {
+            // A destination typed by hand is its host and nothing else: no profile owns it, so
+            // the inventory is not consulted and the "profile deleted" badge can never apply.
+            // The grid shows the host and a badge of its own saying what kind of owner this is.
+            return new TrustedRdpCertificateRowViewModel(
+                key,
+                key.Identity,
+                isProfileMissing: false,
+                entry,
+                Describe(entry.Subject),
+                Describe(entry.Issuer),
+                entry.FirstTrusted.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
+                ThumbprintDisplayLength);
+        }
+
+        string profileId = key.Identity;
         bool known = _profileNames.TryGetValue(profileId, out string? name)
             && !string.IsNullOrWhiteSpace(name);
 
@@ -350,7 +367,7 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
         // make the cell unsortable against the named rows, unsearchable by the identifier the
         // user reads in settings.json, and untranslatable once copied out.
         return new TrustedRdpCertificateRowViewModel(
-            profileId,
+            key,
             known ? name! : profileId,
             missing,
             entry,
@@ -376,7 +393,7 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
     /// wrong row to revoke. The symmetric case, a profile deleted after the snapshot, kept its
     /// friendly name and lost its badge.
     /// </remarks>
-    private void OnTrustChanged(string profileId, IReadOnlyCollection<RdpCertificateEntry> entries)
+    private void OnTrustChanged(RdpTrustKey key, IReadOnlyCollection<RdpCertificateEntry> entries)
         => _dispatcher.Invoke(() => _ = ReloadProfileNamesAndRebuildAsync());
 
     private async Task ReloadProfileNamesAndRebuildAsync()
@@ -424,7 +441,7 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
 public sealed class TrustedRdpCertificateRowViewModel
 {
     internal TrustedRdpCertificateRowViewModel(
-        string profileId,
+        RdpTrustKey key,
         string profileDisplay,
         bool isProfileMissing,
         RdpCertificateEntry entry,
@@ -433,7 +450,9 @@ public sealed class TrustedRdpCertificateRowViewModel
         string firstTrustedDisplay,
         int thumbprintDisplayLength)
     {
-        ProfileId = profileId;
+        Key = key;
+        ProfileId = key.Identity;
+        IsTypedDestination = key.Scope == RdpTrustScope.TypedDestination;
         ProfileDisplay = profileDisplay;
         IsProfileMissing = isProfileMissing;
         Entry = entry;
@@ -447,8 +466,19 @@ public sealed class TrustedRdpCertificateRowViewModel
         FirstTrustedDisplay = firstTrustedDisplay;
     }
 
-    /// <summary>The identifier the store keys this decision by.</summary>
+    /// <summary>The owner the store keys this decision by, scope and identity together.</summary>
+    /// <remarks>
+    /// What a revocation must name. Two rows can show the same identity string under two
+    /// scopes - a saved profile holding a quick-connect identifier, and the host typed by hand -
+    /// and forgetting one must not touch the other.
+    /// </remarks>
+    public RdpTrustKey Key { get; }
+
+    /// <summary>The identity half of <see cref="Key"/>: a profile identifier, or a host.</summary>
     public string ProfileId { get; }
+
+    /// <summary>Whether this decision belongs to a destination typed by hand rather than a profile.</summary>
+    public bool IsTypedDestination { get; }
 
     /// <summary>The server's name, or its identifier when the profile is gone.</summary>
     public string ProfileDisplay { get; }

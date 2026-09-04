@@ -82,15 +82,16 @@ public sealed record RdpCertificatePromptContext(
     int AlreadyTrustedCount)
 {
     /// <summary>
-    /// Identifies the profile whose trust set the answer will be written to.
+    /// Identifies the owner whose trust set the answer will be written to.
     /// </summary>
     /// <remarks>
-    /// Carried so a presenter can keep questions for different profiles apart.
-    /// Trust is per profile, so one dialog naming profile A must never supply the
-    /// answer for profile B - that would grant durable trust from a question the
-    /// user was never shown.
+    /// Carried so a presenter can keep questions for different owners apart. Trust is per
+    /// owner, so one dialog naming owner A must never supply the answer for owner B - that
+    /// would grant durable trust from a question the user was never shown. The whole key,
+    /// scope included: a saved profile and a typed destination can share an identity string,
+    /// and a presenter keying on the string alone would merge their two questions into one.
     /// </remarks>
-    public string? ProfileId { get; init; }
+    public RdpTrustKey? TrustKey { get; init; }
 
     /// <summary>
     /// Identifies the surface that must display this question, so it is put where the user is
@@ -155,12 +156,12 @@ public interface IRdpCertificateTrustPrompt
 }
 
 /// <summary>What is being connected.</summary>
-/// <param name="ProfileId">Identifies the profile whose trust set applies.</param>
+/// <param name="Key">The owner whose trust set applies: a saved profile, or a typed destination.</param>
 /// <param name="ProfileName">How the user named it.</param>
 /// <param name="Host">Address to probe.</param>
 /// <param name="Port">Port to probe.</param>
 public sealed record RdpCertificateVerificationRequest(
-    string ProfileId,
+    RdpTrustKey Key,
     string ProfileName,
     string Host,
     int Port)
@@ -226,7 +227,7 @@ public sealed class RdpCertificateVerifier(
         }
 
         RdpCertificateTrustDecision decision =
-            _store.Evaluate(request.ProfileId, probed.Thumbprint);
+            _store.Evaluate(request.Key, probed.Thumbprint);
 
         if (decision.Verdict != RdpCertificateTrustVerdict.Unknown)
         {
@@ -241,16 +242,16 @@ public sealed class RdpCertificateVerifier(
                 probed.Subject,
                 decision.AlreadyTrustedCount)
             {
-                ProfileId = request.ProfileId,
+                TrustKey = request.Key,
                 PromptScopeId = request.PromptScopeId,
             },
             cancellationToken);
 
-        return Remember(request.ProfileId, probed, answer);
+        return Remember(request.Key, probed, answer);
     }
 
     private RdpVerificationOutcome Remember(
-        string profileId,
+        RdpTrustKey key,
         RdpProbeResult probed,
         RdpTrustAnswer answer)
     {
@@ -258,7 +259,7 @@ public sealed class RdpCertificateVerifier(
         {
             case RdpTrustAnswer.TrustPermanently:
                 _store.Trust(
-                    profileId,
+                    key,
                     new RdpCertificateEntry(probed.Thumbprint!, DateTimeOffset.UtcNow)
                     {
                         Subject = probed.Subject,
@@ -267,7 +268,7 @@ public sealed class RdpCertificateVerifier(
                 return RdpVerificationOutcome.TrustedByUser;
 
             case RdpTrustAnswer.TrustForSession:
-                _store.TrustForSession(profileId, probed.Thumbprint!);
+                _store.TrustForSession(key, probed.Thumbprint!);
                 return RdpVerificationOutcome.TrustedByUser;
 
             case RdpTrustAnswer.NotAsked:

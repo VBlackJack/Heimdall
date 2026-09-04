@@ -494,6 +494,10 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
             RemoteServer = server.RemoteServer ?? "",
             ConnectionType = connType,
         };
+        // Minted here for a destination typed by hand, and said so on the profile itself: the
+        // RDP certificate check files its approval under the host, not under an identifier a
+        // saved profile may share.
+        dto.MarkAsTypedDestination();
 
         if (connType == "SSH")
         {
