@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the palette dials a saved profile as a saved profile
+
+### A saved profile with a quick-connect identifier keeps its settings
+
+The command palette told a saved profile from a destination typed by hand by looking at the
+identifier: anything beginning with the quick-connect prefix was treated as typed. A saved
+profile whose identifier carried that prefix - imported before v2026.090401 reserved the
+namespace, edited into the inventory by hand, or brought in by the legacy import - was therefore
+connected as a typed destination: the palette rebuilt a bare profile from the row, with the host,
+the protocol and its default port, and dropped the saved gateway, ports, credentials and RDP
+settings on the way.
+
+The palette now routes by where the row came from. A row minted for a typed destination carries a
+mark that only the palette sets and that nothing reading a profile from disk can set, and the
+routing reads that mark. A saved profile is dialled through the server list with its whole
+profile, whatever its identifier says. A guard test keeps a prefix test out of the palette.
+
+### The legacy import respects the reserved namespace
+
+The import of an old installation copied each profile's identifier verbatim and never passed the
+door where the ordinary import turns a quick-connect identifier away, so a first launch that
+accepted an old configuration could still create a profile in the reserved namespace. The legacy
+mapper now assigns a fresh identifier to such a profile and logs the same sentence the ordinary
+import does.
+
+What this does not do: it does not separate the certificate approvals of a saved profile and a
+typed destination that share an identifier. That store is still keyed by the identifier alone,
+and the separation is a change of its own.
+
 ## 2026-09-04: the network tools follow a gateway edit, and a split pane lists the gateways (v2026.090406)
 
 ### "Route via" follows the gateway that was edited

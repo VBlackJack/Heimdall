@@ -308,7 +308,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
                 return;
             }
 
-            if (!AdHocProfileIds.IsAdHoc(item.Id))
+            if (!item.IsTypedDestination)
             {
                 _main.SplitSessionWithServerAsync(splitSession, item.Id, splitOrientation, splitPaneId)
                     .SafeFireAndForget();
@@ -345,7 +345,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         IsOpen = false;
 
         // If the palette was opened in split mode, route to split logic
-        if (splitSession is not null && !AdHocProfileIds.IsAdHoc(server.Id))
+        if (splitSession is not null && !server.IsTypedDestination)
         {
             // Check if this is an active session merge
             if (server.Id.StartsWith("session-", StringComparison.Ordinal))
@@ -378,7 +378,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         {
             HandleSnippetSelection(server);
         }
-        else if (AdHocProfileIds.IsAdHoc(server.Id))
+        else if (server.IsTypedDestination)
         {
             await ConnectAdHocAsync(server);
         }
@@ -407,7 +407,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         {
             HandleSnippetSelection(server);
         }
-        else if (AdHocProfileIds.IsAdHoc(server.Id))
+        else if (server.IsTypedDestination)
         {
             await ConnectAdHocAsync(server);
         }
@@ -456,11 +456,11 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         }
 
         var activeSession = _main.Connection.ActiveSession;
-        if (activeSession is not null && !AdHocProfileIds.IsAdHoc(server.Id))
+        if (activeSession is not null && !server.IsTypedDestination)
         {
             await _main.SplitSessionWithServerAsync(activeSession, server.Id, SplitOrientation.Vertical);
         }
-        else if (AdHocProfileIds.IsAdHoc(server.Id))
+        else if (server.IsTypedDestination)
         {
             await ConnectAdHocAsync(server);
         }
@@ -473,14 +473,19 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     // ── Connection helpers ───────────────────────────────────────────
 
     /// <summary>
-    /// Connects an ad-hoc server (SSH or RDP) by building a temporary DTO
+    /// Connects a destination typed by hand (SSH or RDP) by building a temporary DTO
     /// from the palette item and calling the shared ConnectionService
     /// directly. Supports <c>user@host:port</c> style input for SSH.
     /// </summary>
+    /// <remarks>
+    /// Reached only through <see cref="ServerItemViewModel.IsTypedDestination"/>, never by
+    /// the identifier's text: a saved profile whose identifier sits in the quick-connect
+    /// namespace is dialled by the server list with its full profile, not rebuilt here as a
+    /// bare one.
+    /// </remarks>
     private async Task ConnectAdHocAsync(ServerItemViewModel server)
     {
         var connType = server.ConnectionType?.ToUpperInvariant() ?? "SSH";
-        var isAdHoc = AdHocProfileIds.IsAdHoc(server.Id);
 
         var dto = new ServerProfileDto
         {
@@ -492,7 +497,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 
         if (connType == "SSH")
         {
-            dto.SshPort = 22;
+            dto.SshPort = DefaultPorts.Ssh;
             dto.SshUsername = server.DisplayName.Contains('@')
                 ? server.DisplayName.Split('@')[0]
                 : "";
@@ -537,10 +542,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
                 return;
             }
 
-            if (isAdHoc)
-            {
-                tab.MarkAsAdHoc(dto);
-            }
+            tab.MarkAsAdHoc(dto);
 
             tab.HostControl = _embeddedSessionManager.CreateHostControl(
                 tab, dto.DisplayName, connType, result.Session, settings);
@@ -557,12 +559,9 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         {
             // External mode: process launched; keep a lightweight tab so ad-hoc
             // connections can still be persisted from the tab context menu.
-            if (isAdHoc)
-            {
-                var tab = _main.Connection.AddSession(dto.Id, dto.DisplayName, connType);
-                tab.MarkAsAdHoc(dto);
-                tab.Status = SessionStatusTokens.LaunchedExternalClient;
-            }
+            var tab = _main.Connection.AddSession(dto.Id, dto.DisplayName, connType);
+            tab.MarkAsAdHoc(dto);
+            tab.Status = SessionStatusTokens.LaunchedExternalClient;
 
             _main.StatusText = _localizer["StatusLaunchedExternalClient"];
         }

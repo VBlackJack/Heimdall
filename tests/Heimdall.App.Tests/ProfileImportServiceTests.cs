@@ -86,11 +86,11 @@ public sealed class ProfileImportServiceTests
     // trust and its history across an export and a re-import. The palette's destination namespace
     // is the one place that must not be preservable.
     //
-    // The palette mints "adhoc-rdp-<host>" for a destination typed by hand, keys that
-    // destination's certificate approval on it, and decides in six places whether an entry is a
-    // saved profile or a typed destination by testing the same prefix. A profile importable into
-    // that namespace shared both: approving its certificate let a quick connect to the matching
-    // host connect without a question, and the palette offered it a typed destination's actions.
+    // The palette mints "adhoc-rdp-<host>" for a destination typed by hand and keys that
+    // destination's certificate approval on it. A profile importable into that namespace shared
+    // the key: approving its certificate let a quick connect to the matching host connect without
+    // a question. (The palette routes a row by provenance, not by this prefix; see
+    // PaletteRoutingByProvenanceGuardTests.)
     [Theory]
     [InlineData("adhoc-rdp-prod.example")]
     [InlineData("adhoc-ssh-prod.example")]
