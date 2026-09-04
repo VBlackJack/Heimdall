@@ -489,11 +489,25 @@ public static partial class SchemaValidator
         }
     }
 
+    /// <summary>
+    /// Records a value outside its recommended range, without altering it.
+    /// </summary>
+    /// <remarks>
+    /// The sentence says what the loader does, which is nothing: every range check reaches the
+    /// log through <see cref="DiagnoseSettingsLoad"/> or <see cref="DiagnoseServerLoad"/>, and the
+    /// load path preserves what the file said by contract, so that a file written by a newer
+    /// build survives an older one. Whether an out-of-range value then bites is decided at its
+    /// use site, setting by setting. The old sentence, "outside the valid range", read as a
+    /// correction the loader never made: a 240000 ms tunnel delay was warned about and then waited
+    /// out in full.
+    /// </remarks>
     private static void ValidateRange(List<string> errors, int value, int min, int max, string name)
     {
         if (value < min || value > max)
         {
-            errors.Add($"{name}: value {value} is outside the valid range [{min}..{max}].");
+            errors.Add(
+                $"{name}: value {value} is outside the recommended range [{min}..{max}]; "
+                + "the loader keeps it as written.");
         }
     }
 
