@@ -1077,7 +1077,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [CustomValidation(typeof(ServerDialogViewModel), nameof(ValidateRdpResizeEnableDelayMsValue))]
+    [SettingRangeOf(nameof(AppSettings.RdpResizeEnableDelayMs))]
     private int? _rdpResizeEnableDelayMs;
 
     [ObservableProperty]
@@ -2699,26 +2699,9 @@ public partial class ServerDialogViewModel : ObservableValidator
         ["Color depth must be between 8 and 32."] = "ValidationColorDepth",
         [RdpDisplayLimits.FixedWidthRangeMessage] = "ValidationRdpFixedWidthRange",
         [RdpDisplayLimits.FixedHeightRangeMessage] = "ValidationRdpFixedHeightRange",
-        ["RDP resize delay must be inherited, zero, or between 1000 and 60000 ms."] = "ValidationRdpResizeEnableDelayRange",
         ["FTP port must be between 1 and 65535."] = "ValidationFtpPortRange",
         ["VNC port must be between 1 and 65535."] = "ValidationVncPortRange",
     };
-
-    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateRdpResizeEnableDelayMsValue(
-        int? value,
-        ValidationContext context)
-    {
-        _ = context;
-
-        // Zero explicitly disables the resize lockout; 1..999 is too short to be meaningful.
-        if (!value.HasValue || value.Value == 0 || value.Value is >= 1000 and <= 60000)
-        {
-            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
-        }
-
-        return new System.ComponentModel.DataAnnotations.ValidationResult(
-            "RDP resize delay must be inherited, zero, or between 1000 and 60000 ms.");
-    }
 
     private string? GetEndpointPortError()
     {
@@ -2729,6 +2712,20 @@ public partial class ServerDialogViewModel : ObservableValidator
         if (IsSshFamilyConnection) return GetLocalizedFieldError(nameof(SshPort));
         return null;
     }
+
+    /// <summary>
+    /// The locale key of a field bounded by a settings declaration, keyed by that settings property.
+    /// </summary>
+    /// <remarks>
+    /// The message is a template and the declared bounds are formatted into it, so the number the
+    /// dialog refuses is the number the loader warns about and the one the settings screen refuses:
+    /// one declaration, on <see cref="AppSettings"/>. The other ranges of this dialog (ports, audio
+    /// mode, colour depth, fixed dimensions) are not settings and keep their own annotations.
+    /// </remarks>
+    private static readonly Dictionary<string, string> ValidationKeyByDeclaredSetting = new(StringComparer.Ordinal)
+    {
+        [nameof(AppSettings.RdpResizeEnableDelayMs)] = "ValidationRdpResizeEnableDelayRange",
+    };
 
     private string? GetLocalizedFieldError(string propertyName)
     {
@@ -2741,6 +2738,13 @@ public partial class ServerDialogViewModel : ObservableValidator
             && ValidationKeyMap.TryGetValue(message, out string? key))
         {
             return Localizer[key];
+        }
+
+        if (message is not null && Localizer is not null
+            && ValidationKeyByDeclaredSetting.TryGetValue(message, out string? declaredKey))
+        {
+            SettingRange range = SettingRanges.Of(message);
+            return Localizer.Format(declaredKey, range.Min, range.Max);
         }
 
         return message;

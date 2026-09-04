@@ -98,7 +98,7 @@ public sealed class SessionHealthMonitor : IDisposable
                 return;
             }
 
-            var intervalSeconds = Math.Max(15, settings.SessionHealthCheckIntervalSeconds);
+            var intervalSeconds = Math.Max(SettingRanges.Of(nameof(AppSettings.SessionHealthCheckIntervalSeconds)).Min, settings.SessionHealthCheckIntervalSeconds);
 
             _cycleCts = new CancellationTokenSource();
             if (armTimer)
@@ -176,7 +176,7 @@ public sealed class SessionHealthMonitor : IDisposable
         if (settings is null) return;
 
         long generation = Interlocked.Increment(ref _nextGeneration);
-        var maxConcurrent = Math.Max(1, settings.SessionHealthMaxConcurrent);
+        var maxConcurrent = Math.Max(SettingRanges.Of(nameof(AppSettings.SessionHealthMaxConcurrent)).Min, settings.SessionHealthMaxConcurrent);
         var profiles = await _configManager.LoadServersAsync().ConfigureAwait(false);
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
 

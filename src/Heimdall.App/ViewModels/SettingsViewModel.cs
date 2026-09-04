@@ -197,7 +197,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 20, ErrorMessage = "Max embedded sessions must be between 1 and 20.")]
+    [SettingRangeOf(nameof(AppSettings.MaxEmbeddedSessions))]
     private int _maxEmbeddedSessions = 10;
 
     /// <summary>Text of the field that edits <see cref="MaxEmbeddedSessions"/>.</summary>
@@ -235,7 +235,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 8760, ErrorMessage = "Update check interval must be between 1 and 8760 hours.")]
+    [SettingRangeOf(nameof(AppSettings.UpdateCheckIntervalHours))]
     private int _updateCheckIntervalHours = 24;
 
     /// <summary>Text of the field that edits <see cref="UpdateCheckIntervalHours"/>.</summary>
@@ -281,7 +281,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(8, 72, ErrorMessage = "Terminal font size must be between 8 and 72.")]
+    [SettingRangeOf(nameof(AppSettings.TerminalFontSize))]
     private int _terminalFontSize = 14;
 
     /// <summary>Text of the field that edits <see cref="TerminalFontSize"/>.</summary>
@@ -315,7 +315,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(0, 3600, ErrorMessage = "Anti-idle interval must be between 0 and 3600 seconds.")]
+    [SettingRangeOf(nameof(AppSettings.AntiIdleIntervalSeconds))]
     private int _antiIdleInterval = 60;
 
     /// <summary>Text of the field that edits <see cref="AntiIdleInterval"/>.</summary>
@@ -329,7 +329,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(0, 3600, ErrorMessage = "SSH TMOUT reset interval must be between 0 and 3600 seconds.")]
+    [SettingRangeOf(nameof(AppSettings.SshTmoutResetIntervalSeconds))]
     private int _sshTmoutResetInterval = 240;
 
     /// <summary>Text of the field that edits <see cref="SshTmoutResetInterval"/>.</summary>
@@ -346,7 +346,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 10, ErrorMessage = "SSH auto-reconnect attempts must be between 1 and 10.")]
+    [SettingRangeOf(nameof(AppSettings.SshAutoReconnectAttempts))]
     private int _sshAutoReconnectAttempts = 3;
 
     /// <summary>Text of the field that edits <see cref="SshAutoReconnectAttempts"/>.</summary>
@@ -413,8 +413,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // screen accepted and the schema refused would be written here and rejected on the next load.
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(RdpDisplayLimits.MinimumSessionResolution, RdpDisplayLimits.MaximumSessionResolution,
-        ErrorMessage = RdpDisplayLimits.DefaultResolutionWidthRangeMessage)]
+    [SettingRangeOf(nameof(AppSettings.DefaultResolutionWidth))]
     private int _defaultResolutionWidth = 1920;
 
     /// <summary>Text of the field that edits <see cref="DefaultResolutionWidth"/>.</summary>
@@ -428,8 +427,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(RdpDisplayLimits.MinimumSessionResolution, RdpDisplayLimits.MaximumSessionResolution,
-        ErrorMessage = RdpDisplayLimits.DefaultResolutionHeightRangeMessage)]
+    [SettingRangeOf(nameof(AppSettings.DefaultResolutionHeight))]
     private int _defaultResolutionHeight = 1080;
 
     /// <summary>Text of the field that edits <see cref="DefaultResolutionHeight"/>.</summary>
@@ -651,7 +649,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(0, 1440, ErrorMessage = "Windows Hello grace period must be between 0 and 1440 minutes.")]
+    [SettingRangeOf(nameof(AppSettings.WindowsHelloGraceMinutes))]
     private int _windowsHelloGraceMinutes = AppSettings.DefaultWindowsHelloGraceMinutes;
 
     /// <summary>Text of the field that edits <see cref="WindowsHelloGraceMinutes"/>.</summary>
@@ -670,7 +668,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// </remarks>
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(0, 1440, ErrorMessage = "Idle auto-lock threshold must be between 0 and 1440 minutes.")]
+    [SettingRangeOf(nameof(AppSettings.AutoLockIdleMinutes))]
     private int _autoLockIdleMinutes;
 
     /// <summary>Text of the field that edits <see cref="AutoLockIdleMinutes"/>.</summary>
@@ -769,7 +767,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(0, 30000, ErrorMessage = "Tunnel establishment delay must be between 0 and 30000 ms.")]
+    [SettingRangeOf(nameof(AppSettings.TunnelEstablishmentDelayMs))]
     private int _tunnelEstablishmentDelayMs = 2500;
 
     /// <summary>Text of the field that edits <see cref="TunnelEstablishmentDelayMs"/>.</summary>
@@ -783,7 +781,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateRdpConnectWatchdogTimeoutMsValue))]
+    [SettingRangeOf(nameof(AppSettings.RdpConnectWatchdogTimeoutMs))]
     private int _rdpConnectWatchdogTimeoutMs = 45000;
 
     /// <summary>Text of the field that edits <see cref="RdpConnectWatchdogTimeoutMs"/>.</summary>
@@ -797,7 +795,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(5000, 600000, ErrorMessage = "External tool timeout must be between 5000 and 600000 ms.")]
+    [SettingRangeOf(nameof(AppSettings.ExternalToolTimeoutMs))]
     private int _externalToolTimeoutMs = 60000;
 
     /// <summary>Text of the field that edits <see cref="ExternalToolTimeoutMs"/>.</summary>
@@ -811,7 +809,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateRdpResizeEnableDelayMsValue))]
+    [SettingRangeOf(nameof(AppSettings.RdpResizeEnableDelayMs))]
     private int _rdpResizeEnableDelayMs = 10000;
 
     /// <summary>Text of the field that edits <see cref="RdpResizeEnableDelayMs"/>.</summary>
@@ -825,7 +823,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1000, 60000, ErrorMessage = "RDP artifact cleanup delay must be between 1000 and 60000 ms.")]
+    [SettingRangeOf(nameof(AppSettings.RdpArtifactCleanupDelayMs))]
     private int _rdpArtifactCleanupDelayMs = 10000;
 
     /// <summary>Text of the field that edits <see cref="RdpArtifactCleanupDelayMs"/>.</summary>
@@ -839,7 +837,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(5000, 300000, ErrorMessage = "RDP credential autofill timeout must be between 5000 and 300000 ms.")]
+    [SettingRangeOf(nameof(AppSettings.RdpCredentialAutofillTimeoutMs))]
     private int _rdpCredentialAutofillTimeoutMs = 90000;
 
     /// <summary>Text of the field that edits <see cref="RdpCredentialAutofillTimeoutMs"/>.</summary>
@@ -853,7 +851,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, AppSettings.DefaultRdpAutoReconnectMaxAttempts, ErrorMessage = "RDP auto-reconnect maximum attempts must be between 1 and 20.")]
+    [SettingRangeOf(nameof(AppSettings.RdpAutoReconnectMaxAttempts))]
     private int _rdpAutoReconnectMaxAttempts = AppSettings.DefaultRdpAutoReconnectMaxAttempts;
 
     /// <summary>Text of the field that edits <see cref="RdpAutoReconnectMaxAttempts"/>.</summary>
@@ -867,7 +865,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(5000, 300000, ErrorMessage = "RDP keep-alive interval must be between 5000 and 300000 ms.")]
+    [SettingRangeOf(nameof(AppSettings.RdpKeepAliveIntervalMs))]
     private int _rdpKeepAliveIntervalMs = 60000;
 
     /// <summary>Text of the field that edits <see cref="RdpKeepAliveIntervalMs"/>.</summary>
@@ -886,7 +884,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(15, 3600, ErrorMessage = "Health check interval must be between 15 and 3600 seconds.")]
+    [SettingRangeOf(nameof(AppSettings.SessionHealthCheckIntervalSeconds))]
     private int _sessionHealthCheckIntervalSeconds = 60;
 
     /// <summary>Text of the field that edits <see cref="SessionHealthCheckIntervalSeconds"/>.</summary>
@@ -900,7 +898,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(250, 30000, ErrorMessage = "Probe timeout must be between 250 and 30000 ms.")]
+    [SettingRangeOf(nameof(AppSettings.SessionHealthProbeTimeoutMs))]
     private int _sessionHealthProbeTimeoutMs = 2000;
 
     /// <summary>Text of the field that edits <see cref="SessionHealthProbeTimeoutMs"/>.</summary>
@@ -914,7 +912,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 50, ErrorMessage = "Max concurrent probes must be between 1 and 50.")]
+    [SettingRangeOf(nameof(AppSettings.SessionHealthMaxConcurrent))]
     private int _sessionHealthMaxConcurrent = 10;
 
     /// <summary>Text of the field that edits <see cref="SessionHealthMaxConcurrent"/>.</summary>
@@ -3318,60 +3316,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnSecurityTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasSecurityTabErrors));
 
     /// <summary>
-    /// Validates the global RDP resize lockout delay while preserving zero as the explicit disable value.
-    /// </summary>
-    /// <param name="value">The configured delay in milliseconds.</param>
-    /// <param name="context">The validation context supplied by the data annotations pipeline.</param>
-    /// <returns>A validation error when the value is neither zero nor within the supported range.</returns>
-    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateRdpResizeEnableDelayMsValue(
-        int value,
-        ValidationContext context)
-    {
-        _ = context;
-
-        // Zero explicitly disables the resize lockout; 1..999 ms is too short to be meaningful.
-        if (value == 0 || value is >= 1000 and <= 60000)
-        {
-            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
-        }
-
-        return new System.ComponentModel.DataAnnotations.ValidationResult(
-            "RDP resize delay must be zero or between 1000 and 60000 ms.");
-    }
-
-    /// <summary>
-    /// Validates the RDP connection watchdog timeout while preserving zero as the explicit disable
-    /// value.
-    /// </summary>
-    /// <param name="value">The configured timeout in milliseconds.</param>
-    /// <param name="context">The validation context supplied by the data annotations pipeline.</param>
-    /// <returns>A validation error when the value is neither zero nor within the supported range.</returns>
-    /// <remarks>
-    /// <para>The bounds come from <see cref="Views.EmbeddedRdp.RdpConnectWatchdogPolicy"/>, the type
-    /// the watchdog itself reads, rather than being written out again here. A plain range attribute
-    /// could not express "zero, or five seconds to ten minutes", so it declared the range alone and
-    /// rejected the disable value that both the schema and the watchdog accept. A settings file with
-    /// the watchdog disabled therefore opened with an error on a field the user had set correctly,
-    /// and blocked saving anything else until it was changed.</para>
-    /// </remarks>
-    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateRdpConnectWatchdogTimeoutMsValue(
-        int value,
-        ValidationContext context)
-    {
-        _ = context;
-
-        if (value == Views.EmbeddedRdp.RdpConnectWatchdogPolicy.DisabledTimeoutMs
-            || (value >= Views.EmbeddedRdp.RdpConnectWatchdogPolicy.MinTimeoutMs
-                && value <= Views.EmbeddedRdp.RdpConnectWatchdogPolicy.MaxTimeoutMs))
-        {
-            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
-        }
-
-        return new System.ComponentModel.DataAnnotations.ValidationResult(
-            "RDP connection watchdog timeout must be zero or between 5000 and 600000 ms.");
-    }
-
-    /// <summary>
     /// Validates the text of a settings field that edits a whole number.
     /// </summary>
     /// <param name="value">The text currently in the field.</param>
@@ -3429,27 +3373,41 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         // Not per-field: every number field raises this one when its text is not a number at all.
         ["This setting must be a whole number."] = "ValidationSettingsWholeNumber",
-        ["Max embedded sessions must be between 1 and 20."] = "ValidationSettingsMaxSessions",
-        ["Update check interval must be between 1 and 8760 hours."] = "ValidationSettingsUpdateCheckInterval",
-        ["RDP keep-alive interval must be between 5000 and 300000 ms."] = "ValidationSettingsRdpKeepAlive",
-        ["Terminal font size must be between 8 and 72."] = "ValidationSettingsFontSize",
-        ["Anti-idle interval must be between 0 and 3600 seconds."] = "ValidationSettingsAntiIdle",
-        ["SSH TMOUT reset interval must be between 0 and 3600 seconds."] = "ValidationSettingsTmoutReset",
-        ["SSH auto-reconnect attempts must be between 1 and 10."] = "ValidationSettingsSshAutoReconnectAttempts",
-        ["Tunnel establishment delay must be between 0 and 30000 ms."] = "ValidationSettingsTunnelDelay",
-        ["RDP connection watchdog timeout must be zero or between 5000 and 600000 ms."] = "ValidationSettingsRdpTimeout",
-        ["RDP resize delay must be zero or between 1000 and 60000 ms."] = "ValidationSettingsRdpResizeDelay",
-        ["RDP artifact cleanup delay must be between 1000 and 60000 ms."] = "ValidationSettingsRdpArtifactCleanupDelay",
-        ["RDP credential autofill timeout must be between 5000 and 300000 ms."] = "ValidationSettingsRdpCredentialAutofillTimeout",
-        ["RDP auto-reconnect maximum attempts must be between 1 and 20."] = "ValidationSettingsRdpAutoReconnectMaxAttempts",
-        [RdpDisplayLimits.DefaultResolutionWidthRangeMessage] = "ValidationSettingsRdpWidth",
-        [RdpDisplayLimits.DefaultResolutionHeightRangeMessage] = "ValidationSettingsRdpHeight",
-        ["Windows Hello grace period must be between 0 and 1440 minutes."] = "ValidationSettingsWindowsHelloGrace",
-        ["Idle auto-lock threshold must be between 0 and 1440 minutes."] = "ValidationSettingsAutoLockIdle",
-        ["External tool timeout must be between 5000 and 600000 ms."] = "ValidationSettingsExtToolTimeout",
-        ["Health check interval must be between 15 and 3600 seconds."] = "ValidationSettingsHealthCheckInterval",
-        ["Probe timeout must be between 250 and 30000 ms."] = "ValidationSettingsHealthProbeTimeout",
-        ["Max concurrent probes must be between 1 and 50."] = "ValidationSettingsHealthMaxConcurrent",
+    };
+
+    /// <summary>
+    /// The locale key of each ranged setting message, keyed by the settings property whose
+    /// declared range the field validates against.
+    /// </summary>
+    /// <remarks>
+    /// The message itself is a template: the declared minimum and maximum are formatted into it
+    /// at display time, so neither this map nor the translations spell a bound. This map used to
+    /// be keyed by the English sentence the range attribute produced, numbers included, which was
+    /// the fourth place a bound had to be kept in step by hand.
+    /// </remarks>
+    private static readonly Dictionary<string, string> SettingsValidationKeyByProperty = new(StringComparer.Ordinal)
+    {
+        [nameof(AppSettings.MaxEmbeddedSessions)] = "ValidationSettingsMaxSessions",
+        [nameof(AppSettings.UpdateCheckIntervalHours)] = "ValidationSettingsUpdateCheckInterval",
+        [nameof(AppSettings.RdpKeepAliveIntervalMs)] = "ValidationSettingsRdpKeepAlive",
+        [nameof(AppSettings.TerminalFontSize)] = "ValidationSettingsFontSize",
+        [nameof(AppSettings.AntiIdleIntervalSeconds)] = "ValidationSettingsAntiIdle",
+        [nameof(AppSettings.SshTmoutResetIntervalSeconds)] = "ValidationSettingsTmoutReset",
+        [nameof(AppSettings.SshAutoReconnectAttempts)] = "ValidationSettingsSshAutoReconnectAttempts",
+        [nameof(AppSettings.TunnelEstablishmentDelayMs)] = "ValidationSettingsTunnelDelay",
+        [nameof(AppSettings.RdpConnectWatchdogTimeoutMs)] = "ValidationSettingsRdpTimeout",
+        [nameof(AppSettings.RdpResizeEnableDelayMs)] = "ValidationSettingsRdpResizeDelay",
+        [nameof(AppSettings.RdpArtifactCleanupDelayMs)] = "ValidationSettingsRdpArtifactCleanupDelay",
+        [nameof(AppSettings.RdpCredentialAutofillTimeoutMs)] = "ValidationSettingsRdpCredentialAutofillTimeout",
+        [nameof(AppSettings.RdpAutoReconnectMaxAttempts)] = "ValidationSettingsRdpAutoReconnectMaxAttempts",
+        [nameof(AppSettings.DefaultResolutionWidth)] = "ValidationSettingsRdpWidth",
+        [nameof(AppSettings.DefaultResolutionHeight)] = "ValidationSettingsRdpHeight",
+        [nameof(AppSettings.WindowsHelloGraceMinutes)] = "ValidationSettingsWindowsHelloGrace",
+        [nameof(AppSettings.AutoLockIdleMinutes)] = "ValidationSettingsAutoLockIdle",
+        [nameof(AppSettings.ExternalToolTimeoutMs)] = "ValidationSettingsExtToolTimeout",
+        [nameof(AppSettings.SessionHealthCheckIntervalSeconds)] = "ValidationSettingsHealthCheckInterval",
+        [nameof(AppSettings.SessionHealthProbeTimeoutMs)] = "ValidationSettingsHealthProbeTimeout",
+        [nameof(AppSettings.SessionHealthMaxConcurrent)] = "ValidationSettingsHealthMaxConcurrent",
     };
 
     private static readonly string[] GeneralValidatedSettingPropertyNames =
@@ -3595,10 +3553,22 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             .FirstOrDefault();
 
         var message = error?.ErrorMessage;
-        if (message is not null
-            && SettingsValidationKeyMap.TryGetValue(message, out var key))
+        if (message is null)
+        {
+            return null;
+        }
+
+        if (SettingsValidationKeyMap.TryGetValue(message, out var key))
         {
             return _localizer[key];
+        }
+
+        // A ranged field reports the settings property it is bound by; the numbers come from
+        // that property declaration, never from the message or the translation.
+        if (SettingsValidationKeyByProperty.TryGetValue(message, out var rangedKey))
+        {
+            SettingRange range = SettingRanges.Of(message);
+            return _localizer.Format(rangedKey, range.Min, range.Max);
         }
 
         return message;

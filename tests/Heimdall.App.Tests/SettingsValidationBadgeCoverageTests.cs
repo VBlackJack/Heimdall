@@ -140,7 +140,43 @@ public sealed class SettingsValidationBadgeCoverageTests
             }
         }
 
-        Assert.True(messages >= 22, $"only {messages} validation messages found, so nothing was checked");
+        // The ranged fields no longer carry a sentence: they report the settings property they are
+        // bound by, and the view model maps that property to a locale key. Every such field must
+        // have its key, and the key must exist in both languages.
+        var keyByProperty = (System.Collections.Generic.Dictionary<string, string>)typeof(Heimdall.App.ViewModels.SettingsViewModel)
+            .GetField("SettingsValidationKeyByProperty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        int rangedFields = 0;
+        foreach (System.Reflection.FieldInfo field in typeof(Heimdall.App.ViewModels.SettingsViewModel)
+            .GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))
+        {
+            var bound = field.GetCustomAttribute<Heimdall.App.ViewModels.SettingRangeOfAttribute>();
+            if (bound is null)
+            {
+                continue;
+            }
+
+            rangedFields++;
+            if (!keyByProperty.TryGetValue(bound.SettingsPropertyName, out string? rangedKey))
+            {
+                problems.Add($"no localization key for the ranged setting {bound.SettingsPropertyName}");
+                continue;
+            }
+
+            if (!english.ContainsKey(rangedKey))
+            {
+                problems.Add($"'{rangedKey}' is missing from en.json");
+            }
+
+            if (!french.ContainsKey(rangedKey))
+            {
+                problems.Add($"'{rangedKey}' is missing from fr.json");
+            }
+        }
+
+        // The whole-number message is the one sentence left; the ranged fields are the rest.
+        Assert.True(messages >= 1, $"only {messages} validation messages found, so nothing was checked");
+        Assert.True(rangedFields >= 21, $"only {rangedFields} ranged settings fields found, so nothing was checked");
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
