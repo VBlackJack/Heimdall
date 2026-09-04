@@ -31,26 +31,50 @@ namespace Heimdall.App.Tests.Views.EmbeddedRdp;
 /// </remarks>
 public sealed class RdpAutofillLauncherTests
 {
+    // What must not happen is the watcher's first scan running INSIDE the call, on the caller's
+    // thread - that caller is the UI thread, mid render-priority operation, with the control's
+    // OnConnected queued behind it.
+    //
+    // This asserted a different MANAGED THREAD ID instead, which is not the same property and is
+    // not guaranteed. `Task.Run` queues the delegate, and the queue is served by the thread pool -
+    // whose threads include the one the test itself is running on. Once the test awaits, that
+    // thread goes back to the pool and may legitimately pick up the very work it queued. The
+    // assertion held on a quiet machine and failed on a loaded CI runner, which is the behaviour
+    // of a wrong oracle rather than of a slow one.
+    //
+    // Monitor.IsEntered is true only on a thread that holds the lock, and only while it holds it.
+    // Read from inside the body it answers exactly the question: did this run synchronously,
+    // inside the call, on the thread that made it. A pool thread that happens to carry the same
+    // id later answers false, which is correct - that costs the UI thread nothing.
     [Fact]
-    public async Task TheWatcherBodyDoesNotRunOnTheStartingThread()
+    public async Task TheWatcherBodyDoesNotRunInsideTheCall()
     {
-        int startingThread = Environment.CurrentManagedThreadId;
-        int observedThread = 0;
+        object callerHeld = new();
+        bool ranInsideTheCall = false;
         var entered = new TaskCompletionSource();
 
-        Task started = RdpAutofillLauncher.StartAsync(
-            _ =>
-            {
-                observedThread = Environment.CurrentManagedThreadId;
-                entered.SetResult();
-                return Task.CompletedTask;
-            },
-            CancellationToken.None);
+        Task started;
+        lock (callerHeld)
+        {
+            started = RdpAutofillLauncher.StartAsync(
+                _ =>
+                {
+                    ranInsideTheCall = Monitor.IsEntered(callerHeld);
+                    entered.SetResult();
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+        }
 
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         await started.WaitAsync(TimeSpan.FromSeconds(30));
 
-        Assert.NotEqual(startingThread, observedThread);
+        Assert.False(
+            ranInsideTheCall,
+            "The watcher ran synchronously inside StartAsync, on the caller's thread - which is "
+                + "the UI thread, inside the render-priority operation that has just called "
+                + "Connect(). Its first scan enumerates every visible window and snapshots the "
+                + "process table for each one.");
     }
 
     [Fact]
