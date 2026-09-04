@@ -85,7 +85,7 @@ public sealed class RdpCertificateVerifierTests
     public async Task Verify_AlreadyTrusted_DoesNotAskAgain()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(ProfileId, Thumb);
+        store.Trust(RdpTrustKey.ForProfile(ProfileId), Thumb);
         FakePrompt prompt = new(RdpTrustAnswer.Refuse);
 
         RdpVerificationOutcome outcome = await Build(Obtained(Thumb), store, prompt)
@@ -100,8 +100,8 @@ public sealed class RdpCertificateVerifierTests
     public async Task Verify_UnknownCertificate_AsksAndSaysHowManyAreAlreadyTrusted()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(ProfileId, "SHA256:AA:BB:02");
-        store.Trust(ProfileId, "SHA256:AA:BB:03");
+        store.Trust(RdpTrustKey.ForProfile(ProfileId), "SHA256:AA:BB:02");
+        store.Trust(RdpTrustKey.ForProfile(ProfileId), "SHA256:AA:BB:03");
         FakePrompt prompt = new(RdpTrustAnswer.TrustPermanently);
 
         await Build(Obtained(Thumb, subject: "CN=dc04"), store, prompt).VerifyAsync(Request(), default);
@@ -129,7 +129,7 @@ public sealed class RdpCertificateVerifierTests
         // Subject and issuer are carried across so a settings screen can name the machine
         // rather than show forty hexadecimal pairs.
         Assert.Equal(RdpVerificationOutcome.TrustedByUser, outcome);
-        RdpCertificateEntry stored = Assert.Single(store.GetApproved(ProfileId));
+        RdpCertificateEntry stored = Assert.Single(store.GetApproved(RdpTrustKey.ForProfile(ProfileId)));
         Assert.Equal(Thumb, stored.Thumbprint);
         Assert.Equal("CN=dc04", stored.Subject);
         Assert.Equal("CN=dc04", stored.Issuer);
@@ -149,10 +149,10 @@ public sealed class RdpCertificateVerifierTests
         // The connection is allowed, and nothing is written. "Just this once" that quietly
         // persisted would be a promise broken where it costs most.
         Assert.Equal(RdpVerificationOutcome.TrustedByUser, outcome);
-        Assert.Empty(store.GetApproved(ProfileId));
+        Assert.Empty(store.GetApproved(RdpTrustKey.ForProfile(ProfileId)));
         Assert.Equal(
             RdpCertificateTrustVerdict.TrustedForSession,
-            store.Evaluate(ProfileId, Thumb).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(ProfileId), Thumb).Verdict);
     }
 
     [Fact]
@@ -168,10 +168,10 @@ public sealed class RdpCertificateVerifierTests
 
         // A refusal that still allowed the session would make the question decorative.
         Assert.Equal(RdpVerificationOutcome.RefusedByUser, outcome);
-        Assert.Empty(store.GetApproved(ProfileId));
+        Assert.Empty(store.GetApproved(RdpTrustKey.ForProfile(ProfileId)));
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate(ProfileId, Thumb).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(ProfileId), Thumb).Verdict);
     }
 
     [Fact]
@@ -194,17 +194,17 @@ public sealed class RdpCertificateVerifierTests
 
         // Nothing was approved, so nothing is written - the same as a refusal, and the reason
         // the distinction is safe to make at all.
-        Assert.Empty(store.GetApproved(ProfileId));
+        Assert.Empty(store.GetApproved(RdpTrustKey.ForProfile(ProfileId)));
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate(ProfileId, Thumb).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(ProfileId), Thumb).Verdict);
     }
 
     [Fact]
     public async Task Verify_TrustIsPerProfile_SoAnotherProfileIsStillAsked()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust("some-other-profile", Thumb);
+        store.Trust(RdpTrustKey.ForProfile("some-other-profile"), Thumb);
         FakePrompt prompt = new(RdpTrustAnswer.Refuse);
 
         await Build(Obtained(Thumb), store, prompt).VerifyAsync(Request(), default);
@@ -223,11 +223,11 @@ public sealed class RdpCertificateVerifierTests
         // Trust is per profile, so a presenter has to be able to keep two profiles'
         // questions apart. Without this, one dialog naming profile A could supply the
         // answer for profile B - durable trust granted from a question never shown.
-        Assert.Equal(ProfileId, Assert.Single(prompt.Contexts).ProfileId);
+        Assert.Equal(RdpTrustKey.ForProfile(ProfileId), Assert.Single(prompt.Contexts).TrustKey);
     }
 
     private static RdpCertificateVerificationRequest Request()
-        => new(ProfileId, "DC pool", "dc-pool.example.com", 3389);
+        => new(RdpTrustKey.ForProfile(ProfileId), "DC pool", "dc-pool.example.com", 3389);
 
     private static RdpProbeResult Obtained(
         string thumbprint,

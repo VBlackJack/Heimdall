@@ -42,8 +42,8 @@ public sealed class RdpCertificateTrustTests
     {
         RdpCertificateTrustStore store = new();
 
-        store.Trust(Profile, FirstDc);
-        store.Trust(Profile, SecondDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), SecondDc);
 
         // THE defect, stated as an assertion. A store that replaced instead of adding
         // would still let the connection just accepted succeed, and only the NEXT one
@@ -51,10 +51,10 @@ public sealed class RdpCertificateTrustTests
         // into Heimdall rather than fixed.
         Assert.Equal(
             RdpCertificateTrustVerdict.Trusted,
-            store.Evaluate(Profile, FirstDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc).Verdict);
         Assert.Equal(
             RdpCertificateTrustVerdict.Trusted,
-            store.Evaluate(Profile, SecondDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), SecondDc).Verdict);
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public sealed class RdpCertificateTrustTests
         {
             Assert.Equal(
                 RdpCertificateTrustVerdict.Unknown,
-                store.Evaluate(Profile, thumbprint).Verdict);
-            store.Trust(Profile, thumbprint);
+                store.Evaluate(RdpTrustKey.ForProfile(Profile), thumbprint).Verdict);
+            store.Trust(RdpTrustKey.ForProfile(Profile), thumbprint);
         }
 
         // Convergence is the whole promise: asked once per machine, then never again.
@@ -76,17 +76,17 @@ public sealed class RdpCertificateTrustTests
             new[] { FirstDc, SecondDc, ThirdDc },
             thumbprint => Assert.Equal(
                 RdpCertificateTrustVerdict.Trusted,
-                store.Evaluate(Profile, thumbprint).Verdict));
+                store.Evaluate(RdpTrustKey.ForProfile(Profile), thumbprint).Verdict));
     }
 
     [Fact]
     public void Evaluate_UnknownThumbprint_SaysHowManyAreAlreadyTrusted()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(Profile, FirstDc);
-        store.Trust(Profile, SecondDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), SecondDc);
 
-        RdpCertificateTrustDecision decision = store.Evaluate(Profile, ThirdDc);
+        RdpCertificateTrustDecision decision = store.Evaluate(RdpTrustKey.ForProfile(Profile), ThirdDc);
 
         // The arbitration of 2026-08-23. Without this count the third prompt reads as the
         // same alarm as the first, when it in fact means "another machine behind this
@@ -100,7 +100,7 @@ public sealed class RdpCertificateTrustTests
     {
         RdpCertificateTrustStore store = new();
 
-        RdpCertificateTrustDecision decision = store.Evaluate(Profile, FirstDc);
+        RdpCertificateTrustDecision decision = store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // The count has to distinguish "you have never approved anything here" from
         // "you already approved others", because the two deserve different wording.
@@ -112,18 +112,18 @@ public sealed class RdpCertificateTrustTests
     public void TrustForSession_IsNotDurableAndNeverReachesTheConfiguration()
     {
         RdpCertificateTrustStore store = new();
-        List<string> persisted = [];
-        store.TrustChanged += (profileId, _) => persisted.Add(profileId);
+        List<RdpTrustKey> persisted = [];
+        store.TrustChanged += (key, _) => persisted.Add(key);
 
-        store.TrustForSession(Profile, FirstDc);
+        store.TrustForSession(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // "Just this once" must not silently become forever. The verdict is distinct so a
         // settings screen can show the durable set without inventing an entry, and nothing
         // is offered to the writer.
         Assert.Equal(
             RdpCertificateTrustVerdict.TrustedForSession,
-            store.Evaluate(Profile, FirstDc).Verdict);
-        Assert.Empty(store.GetApproved(Profile));
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc).Verdict);
+        Assert.Empty(store.GetApproved(RdpTrustKey.ForProfile(Profile)));
         Assert.Empty(persisted);
     }
 
@@ -134,9 +134,9 @@ public sealed class RdpCertificateTrustTests
         List<IReadOnlyCollection<RdpCertificateEntry>> writes = [];
         store.TrustChanged += (_, set) => writes.Add(set);
 
-        store.Trust(Profile, FirstDc);
-        store.Trust(Profile, SecondDc);
-        store.Trust(Profile, SecondDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), SecondDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), SecondDc);
 
         // The writer receives the SET, not the delta, so a persist cannot narrow it. The
         // duplicate raises nothing: re-approving is not a change.
@@ -149,54 +149,54 @@ public sealed class RdpCertificateTrustTests
     public void Remove_ForgetsOneCertificateAndLeavesTheOthers()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(Profile, FirstDc);
-        store.Trust(Profile, SecondDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), SecondDc);
 
-        Assert.True(store.Remove(Profile, FirstDc));
+        Assert.True(store.Remove(RdpTrustKey.ForProfile(Profile), FirstDc));
 
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate(Profile, FirstDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc).Verdict);
         Assert.Equal(
             RdpCertificateTrustVerdict.Trusted,
-            store.Evaluate(Profile, SecondDc).Verdict);
-        Assert.False(store.Remove(Profile, FirstDc));
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), SecondDc).Verdict);
+        Assert.False(store.Remove(RdpTrustKey.ForProfile(Profile), FirstDc));
     }
 
     [Fact]
     public void Evaluate_TrustIsPerProfile_AndDoesNotLeakToAnother()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(Profile, FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // Two profiles may point at the same name with different expectations; approving
         // for one says nothing about the other.
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate("another-profile", FirstDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile("another-profile"), FirstDc).Verdict);
     }
 
     [Fact]
     public void LoadFromConfig_ReplacesDurableTrustAndLeavesSessionTrustAlone()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(Profile, FirstDc);
-        store.TrustForSession(Profile, ThirdDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.TrustForSession(RdpTrustKey.ForProfile(Profile), ThirdDc);
 
-        store.LoadFromConfig([(Profile, new[] { Entry(SecondDc) })]);
+        store.LoadFromConfig([(RdpTrustKey.ForProfile(Profile), new[] { Entry(SecondDc) })]);
 
         // A load is the file speaking, so it replaces what the file owns - and only that.
         // Session trust belongs to the run; dropping it here would re-ask for a machine
         // the user accepted minutes ago.
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate(Profile, FirstDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc).Verdict);
         Assert.Equal(
             RdpCertificateTrustVerdict.Trusted,
-            store.Evaluate(Profile, SecondDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), SecondDc).Verdict);
         Assert.Equal(
             RdpCertificateTrustVerdict.TrustedForSession,
-            store.Evaluate(Profile, ThirdDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), ThirdDc).Verdict);
     }
 
     [Fact]
@@ -219,11 +219,11 @@ public sealed class RdpCertificateTrustTests
         FakeTimeProvider clock = new(new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
         RdpCertificateTrustStore store = new(clock);
 
-        store.Trust(Profile, FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // Asserted against a known instant rather than "a stamp exists", which passes
         // whatever the code writes there.
-        RdpCertificateEntry entry = Assert.Single(store.GetApproved(Profile));
+        RdpCertificateEntry entry = Assert.Single(store.GetApproved(RdpTrustKey.ForProfile(Profile)));
         Assert.Equal(clock.GetUtcNow(), entry.FirstTrusted);
     }
 
@@ -232,15 +232,15 @@ public sealed class RdpCertificateTrustTests
     {
         FakeTimeProvider clock = new(new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
         RdpCertificateTrustStore store = new(clock);
-        store.Trust(Profile, FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
         DateTimeOffset firstApproval = clock.GetUtcNow();
 
         clock.Advance(TimeSpan.FromDays(3));
-        store.Trust(Profile, FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // The stamp answers "since when has this been trusted". Refreshing it on every
         // reconnection would erase the only fact it carries.
-        RdpCertificateEntry entry = Assert.Single(store.GetApproved(Profile));
+        RdpCertificateEntry entry = Assert.Single(store.GetApproved(RdpTrustKey.ForProfile(Profile)));
         Assert.Equal(firstApproval, entry.FirstTrusted);
     }
 
@@ -249,11 +249,11 @@ public sealed class RdpCertificateTrustTests
     {
         FakeTimeProvider clock = new(new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
         RdpCertificateTrustStore writer = new(clock);
-        Dictionary<string, IReadOnlyCollection<RdpCertificateEntry>> persisted = [];
-        writer.TrustChanged += (profileId, set) => persisted[profileId] = set;
+        Dictionary<RdpTrustKey, IReadOnlyCollection<RdpCertificateEntry>> persisted = [];
+        writer.TrustChanged += (key, set) => persisted[key] = set;
 
-        writer.Trust(Profile, FirstDc);
-        writer.Trust(Profile, SecondDc);
+        writer.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        writer.Trust(RdpTrustKey.ForProfile(Profile), SecondDc);
 
         RdpCertificateTrustStore reloaded = new(clock);
         reloaded.LoadFromConfig(persisted.Select(pair => (pair.Key, (IEnumerable<RdpCertificateEntry>)pair.Value)));
@@ -265,10 +265,10 @@ public sealed class RdpCertificateTrustTests
             new[] { FirstDc, SecondDc },
             thumbprint => Assert.Equal(
                 RdpCertificateTrustVerdict.Trusted,
-                reloaded.Evaluate(Profile, thumbprint).Verdict));
+                reloaded.Evaluate(RdpTrustKey.ForProfile(Profile), thumbprint).Verdict));
         Assert.Equal(
             clock.GetUtcNow(),
-            reloaded.GetApproved(Profile).First().FirstTrusted);
+            reloaded.GetApproved(RdpTrustKey.ForProfile(Profile)).First().FirstTrusted);
     }
 
     [Fact]
@@ -278,9 +278,9 @@ public sealed class RdpCertificateTrustTests
         List<IReadOnlyCollection<RdpCertificateEntry>> writes = [];
         store.TrustChanged += (_, set) => writes.Add(set);
 
-        store.Trust(Profile, FirstDc);
-        store.Trust(Profile, SecondDc);
-        store.Remove(Profile, FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), SecondDc);
+        store.Remove(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // A persister that received a delta could write a narrower set than the one held,
         // which is the same loss as replacing - just one layer out.
@@ -293,13 +293,13 @@ public sealed class RdpCertificateTrustTests
     public void Decide_CountsEachCertificateOnce_SessionAndDurableTogether()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(Profile, FirstDc);
-        store.TrustForSession(Profile, FirstDc);
-        store.TrustForSession(Profile, SecondDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.TrustForSession(RdpTrustKey.ForProfile(Profile), FirstDc);
+        store.TrustForSession(RdpTrustKey.ForProfile(Profile), SecondDc);
 
         // What the user reads is "you already trust N certificates for this name", so N
         // counts machines, not decisions - the same thumbprint approved twice is one.
-        Assert.Equal(2, store.Evaluate(Profile, ThirdDc).AlreadyTrustedCount);
+        Assert.Equal(2, store.Evaluate(RdpTrustKey.ForProfile(Profile), ThirdDc).AlreadyTrustedCount);
     }
 
     [Fact]
@@ -311,11 +311,11 @@ public sealed class RdpCertificateTrustTests
         // a lower-case thumbprint in the file is a reachable state. The probe always
         // renders upper case, so both halves have to state ONE rule about case, or the
         // profile is asked about a machine it already trusts on every single connect.
-        store.LoadFromConfig([(Profile, new[] { Entry(LowerCaseFirstDc) })]);
+        store.LoadFromConfig([(RdpTrustKey.ForProfile(Profile), new[] { Entry(LowerCaseFirstDc) })]);
 
         Assert.Equal(
             RdpCertificateTrustVerdict.Trusted,
-            store.Evaluate(Profile, FirstDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc).Verdict);
     }
 
     [Fact]
@@ -325,13 +325,13 @@ public sealed class RdpCertificateTrustTests
         List<IReadOnlyCollection<RdpCertificateEntry>> writes = [];
         store.TrustChanged += (_, set) => writes.Add(set);
 
-        store.Trust(Profile, LowerCaseFirstDc);
-        store.Trust(Profile, FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), LowerCaseFirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // Dedupe and lookup have to agree. When they do not, the second call is swallowed
         // as a duplicate while the lookup keeps missing, and no answer the user gives can
         // ever end the question.
-        RdpCertificateEntry stored = Assert.Single(store.GetApproved(Profile));
+        RdpCertificateEntry stored = Assert.Single(store.GetApproved(RdpTrustKey.ForProfile(Profile)));
         Assert.Equal(FirstDc, stored.Thumbprint);
         Assert.Single(writes);
     }
@@ -341,25 +341,25 @@ public sealed class RdpCertificateTrustTests
     {
         RdpCertificateTrustStore store = new();
 
-        store.TrustForSession(Profile, LowerCaseFirstDc);
+        store.TrustForSession(RdpTrustKey.ForProfile(Profile), LowerCaseFirstDc);
 
         Assert.Equal(
             RdpCertificateTrustVerdict.TrustedForSession,
-            store.Evaluate(Profile, FirstDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc).Verdict);
     }
 
     [Fact]
     public void Remove_ThumbprintGivenInAnotherCase_ForgetsTheStoredOne()
     {
         RdpCertificateTrustStore store = new();
-        store.Trust(Profile, FirstDc);
+        store.Trust(RdpTrustKey.ForProfile(Profile), FirstDc);
 
         // The revocation half of the same rule: a caller that spells the thumbprint the
         // other way must not be told there was nothing to forget.
-        Assert.True(store.Remove(Profile, LowerCaseFirstDc));
+        Assert.True(store.Remove(RdpTrustKey.ForProfile(Profile), LowerCaseFirstDc));
         Assert.Equal(
             RdpCertificateTrustVerdict.Unknown,
-            store.Evaluate(Profile, FirstDc).Verdict);
+            store.Evaluate(RdpTrustKey.ForProfile(Profile), FirstDc).Verdict);
     }
 
     private static RdpCertificateEntry Entry(string thumbprint)

@@ -931,6 +931,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             RemoteServer = host,
             ConnectionType = connType,
         };
+        // A fresh identifier per launch, so an RDP certificate approval keyed on it would never
+        // be found again; the mark makes the check key on the host instead.
+        dto.MarkAsTypedDestination();
 
         switch (connType)
         {

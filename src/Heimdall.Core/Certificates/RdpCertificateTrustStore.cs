@@ -17,7 +17,7 @@
 namespace Heimdall.Core.Certificates;
 
 /// <summary>
-/// The RDP certificates each profile trusts - a SET per profile, never one.
+/// The RDP certificates each owner trusts - a SET per owner, never one.
 /// </summary>
 /// <remarks>
 /// <b>The cardinality is the feature.</b> Windows keeps exactly one thumbprint per host
@@ -32,6 +32,13 @@ namespace Heimdall.Core.Certificates;
 /// entry per host. Reuse its vocabulary, never its arity.
 /// </para>
 /// <para>
+/// <b>An owner is an <see cref="RdpTrustKey"/>, not a string.</b> A saved profile and a
+/// destination typed by hand can carry the same identifier string, and a store keyed by the
+/// string alone let an approval given for one silence the question for the other. Both the
+/// durable sets and the session sets are keyed by scope and identity together; there is no
+/// per-scope store to fall through to, so nothing here can serve one owner's set to the other.
+/// </para>
+/// <para>
 /// Durable trust carries an <see cref="RdpCertificateEntry"/>; session trust carries only a
 /// thumbprint, because nothing outlives the run to describe.
 /// </para>
@@ -41,16 +48,14 @@ namespace Heimdall.Core.Certificates;
 /// <see cref="StringComparer.Ordinal"/> on the result.</b> The lookup is a byte-exact
 /// fixed-time comparison, so the sets may not dedupe by a looser rule than the one the
 /// lookup applies: when they did, an entry stored in another case was invisible to
-/// <see cref="Evaluate"/> and simultaneously made <see cref="Trust(string, string)"/> a
+/// <see cref="Evaluate"/> and simultaneously made <see cref="Trust(RdpTrustKey, string)"/> a
 /// no-op for the correctly-cased one, and the question could never be answered.
 /// </para>
 /// </remarks>
 public sealed class RdpCertificateTrustStore
 {
-    private readonly Dictionary<string, Dictionary<string, RdpCertificateEntry>> _approved =
-        new(StringComparer.Ordinal);
-
-    private readonly Dictionary<string, HashSet<string>> _session = new(StringComparer.Ordinal);
+    private readonly Dictionary<RdpTrustKey, Dictionary<string, RdpCertificateEntry>> _approved = [];
+    private readonly Dictionary<RdpTrustKey, HashSet<string>> _session = [];
     private readonly Lock _gate = new();
     private readonly TimeProvider _timeProvider;
 
@@ -63,67 +68,71 @@ public sealed class RdpCertificateTrustStore
     public RdpCertificateTrustStore(TimeProvider? timeProvider = null)
         => _timeProvider = timeProvider ?? TimeProvider.System;
 
-    /// <summary>Raised when the durable set of a profile changes, so it can be persisted.</summary>
-    public event Action<string, IReadOnlyCollection<RdpCertificateEntry>>? TrustChanged;
+    /// <summary>Raised when the durable set of an owner changes, so it can be persisted.</summary>
+    public event Action<RdpTrustKey, IReadOnlyCollection<RdpCertificateEntry>>? TrustChanged;
 
     /// <summary>Loads the durable sets read from configuration at startup.</summary>
-    /// <param name="entries">One entry per profile that has any trusted certificate.</param>
+    /// <param name="entries">One entry per owner that has any trusted certificate, both scopes together.</param>
     /// <remarks>
-    /// Replaces the durable state wholesale, as a load should. Session trust is untouched:
+    /// <para>Replaces the durable state wholesale, as a load should. Session trust is untouched:
     /// it belongs to the run, not to the file - dropping it here would re-ask about a
-    /// machine the user accepted minutes earlier.
+    /// machine the user accepted minutes earlier.</para>
+    /// <para><b>One call carries both scopes.</b> A load per scope would wipe the scope loaded
+    /// before it, and it would do so invisibly, since each call on its own looks like the
+    /// load it replaced.</para>
     /// </remarks>
     public void LoadFromConfig(
-        IEnumerable<(string ProfileId, IEnumerable<RdpCertificateEntry> Entries)> entries)
+        IEnumerable<(RdpTrustKey Key, IEnumerable<RdpCertificateEntry> Entries)> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
         lock (_gate)
         {
             _approved.Clear();
-            foreach ((string profileId, IEnumerable<RdpCertificateEntry> profileEntries) in entries)
+            foreach ((RdpTrustKey key, IEnumerable<RdpCertificateEntry> ownerEntries) in entries)
             {
-                if (string.IsNullOrWhiteSpace(profileId))
+                if (string.IsNullOrWhiteSpace(key.Identity))
                 {
                     continue;
                 }
 
-                _approved[profileId] = Normalize(profileEntries);
+                _approved[key] = Normalize(ownerEntries);
             }
         }
     }
 
-    /// <summary>Decides what a profile makes of the certificate it was just shown.</summary>
-    /// <param name="profileId">The profile the connection belongs to.</param>
+    /// <summary>Decides what an owner makes of the certificate it was just shown.</summary>
+    /// <param name="key">The owner the connection belongs to.</param>
     /// <param name="presented">The observed thumbprint.</param>
-    public RdpCertificateTrustDecision Evaluate(string profileId, string presented)
+    public RdpCertificateTrustDecision Evaluate(RdpTrustKey key, string presented)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key.Identity);
 
         lock (_gate)
         {
             return RdpCertificateTrust.Decide(
                 presented,
-                ApprovedThumbprints(profileId),
-                SessionThumbprints(profileId));
+                ApprovedThumbprints(key),
+                SessionThumbprints(key));
         }
     }
 
-    /// <summary>Remembers a thumbprint for this profile, across restarts.</summary>
-    /// <param name="profileId">The profile the connection belongs to.</param>
+    /// <summary>Remembers a thumbprint for this owner, across restarts.</summary>
+    /// <param name="key">The owner the connection belongs to.</param>
     /// <param name="thumbprint">The thumbprint the user approved.</param>
-    public void Trust(string profileId, string thumbprint)
+    public void Trust(RdpTrustKey key, string thumbprint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(thumbprint);
+
         Trust(
-            profileId,
+            key,
             new RdpCertificateEntry(
                 RdpCertificateTrust.Normalize(thumbprint),
                 _timeProvider.GetUtcNow()));
     }
 
-    /// <summary>Remembers a certificate for this profile, across restarts.</summary>
-    /// <param name="profileId">The profile the connection belongs to.</param>
+    /// <summary>Remembers a certificate for this owner, across restarts.</summary>
+    /// <param name="key">The owner the connection belongs to.</param>
     /// <param name="entry">What was approved, and what was known about it.</param>
     /// <remarks>
     /// <b>Adds. Never replaces.</b> Replacing here is exactly the Windows behaviour this
@@ -136,19 +145,19 @@ public sealed class RdpCertificateTrustStore
     /// erase the only fact it carries.
     /// </para>
     /// </remarks>
-    public void Trust(string profileId, RdpCertificateEntry entry)
+    public void Trust(RdpTrustKey key, RdpCertificateEntry entry)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key.Identity);
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.Thumbprint);
 
         IReadOnlyCollection<RdpCertificateEntry> updated;
         lock (_gate)
         {
-            if (!_approved.TryGetValue(profileId, out Dictionary<string, RdpCertificateEntry>? set))
+            if (!_approved.TryGetValue(key, out Dictionary<string, RdpCertificateEntry>? set))
             {
                 set = new Dictionary<string, RdpCertificateEntry>(StringComparer.Ordinal);
-                _approved[profileId] = set;
+                _approved[key] = set;
             }
 
             string thumbprint = RdpCertificateTrust.Normalize(entry.Thumbprint);
@@ -161,27 +170,27 @@ public sealed class RdpCertificateTrustStore
             updated = [.. set.Values];
         }
 
-        TrustChanged?.Invoke(profileId, updated);
+        TrustChanged?.Invoke(key, updated);
     }
 
     /// <summary>Remembers a thumbprint for this run only.</summary>
-    /// <param name="profileId">The profile the connection belongs to.</param>
+    /// <param name="key">The owner the connection belongs to.</param>
     /// <param name="thumbprint">The thumbprint the user approved once.</param>
     /// <remarks>
     /// Deliberately does NOT raise <see cref="TrustChanged"/>: nothing about this decision
     /// may reach the configuration file, or "just this once" would silently become forever.
     /// </remarks>
-    public void TrustForSession(string profileId, string thumbprint)
+    public void TrustForSession(RdpTrustKey key, string thumbprint)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key.Identity);
         ArgumentException.ThrowIfNullOrWhiteSpace(thumbprint);
 
         lock (_gate)
         {
-            if (!_session.TryGetValue(profileId, out HashSet<string>? set))
+            if (!_session.TryGetValue(key, out HashSet<string>? set))
             {
                 set = new HashSet<string>(StringComparer.Ordinal);
-                _session[profileId] = set;
+                _session[key] = set;
             }
 
             set.Add(RdpCertificateTrust.Normalize(thumbprint));
@@ -189,7 +198,7 @@ public sealed class RdpCertificateTrustStore
     }
 
     /// <summary>Forgets one durable certificate.</summary>
-    /// <param name="profileId">The profile the certificate belongs to.</param>
+    /// <param name="key">The owner the certificate belongs to.</param>
     /// <param name="thumbprint">The thumbprint to forget.</param>
     /// <returns><see langword="true"/> when something was removed.</returns>
     /// <remarks>
@@ -203,15 +212,15 @@ public sealed class RdpCertificateTrustStore
     /// that removes without that subscription in place forgets only until the next launch.
     /// </para>
     /// </remarks>
-    public bool Remove(string profileId, string thumbprint)
+    public bool Remove(RdpTrustKey key, string thumbprint)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key.Identity);
         ArgumentException.ThrowIfNullOrWhiteSpace(thumbprint);
 
         IReadOnlyCollection<RdpCertificateEntry> updated;
         lock (_gate)
         {
-            if (!_approved.TryGetValue(profileId, out Dictionary<string, RdpCertificateEntry>? set)
+            if (!_approved.TryGetValue(key, out Dictionary<string, RdpCertificateEntry>? set)
                 || !set.Remove(RdpCertificateTrust.Normalize(thumbprint)))
             {
                 return false;
@@ -220,43 +229,41 @@ public sealed class RdpCertificateTrustStore
             updated = [.. set.Values];
         }
 
-        TrustChanged?.Invoke(profileId, updated);
+        TrustChanged?.Invoke(key, updated);
         return true;
     }
 
-    /// <summary>The durable certificates a profile trusts, in no particular order.</summary>
-    /// <param name="profileId">The profile to read.</param>
-    public IReadOnlyCollection<RdpCertificateEntry> GetApproved(string profileId)
+    /// <summary>The durable certificates an owner trusts, in no particular order.</summary>
+    /// <param name="key">The owner to read.</param>
+    public IReadOnlyCollection<RdpCertificateEntry> GetApproved(RdpTrustKey key)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key.Identity);
 
         lock (_gate)
         {
-            return _approved.TryGetValue(profileId, out Dictionary<string, RdpCertificateEntry>? set)
+            return _approved.TryGetValue(key, out Dictionary<string, RdpCertificateEntry>? set)
                 ? [.. set.Values]
                 : [];
         }
     }
 
-    /// <summary>Every profile trusting at least one certificate.</summary>
+    /// <summary>Every owner trusting at least one certificate.</summary>
     /// <remarks>
     /// Shaped for, and read by, <c>TrustedRdpCertificatesSettingsViewModel</c>: one row per
-    /// certificate, grouped under the profile that approved it. A profile holding an empty
+    /// certificate, grouped under the owner that approved it. An owner holding an empty
     /// set is omitted rather than returned empty, so the screen never draws a server with
     /// nothing under it.
     /// </remarks>
-    public IReadOnlyDictionary<string, IReadOnlyCollection<RdpCertificateEntry>> GetAllApproved()
+    public IReadOnlyDictionary<RdpTrustKey, IReadOnlyCollection<RdpCertificateEntry>> GetAllApproved()
     {
         lock (_gate)
         {
-            Dictionary<string, IReadOnlyCollection<RdpCertificateEntry>> all =
-                new(StringComparer.Ordinal);
-
-            foreach ((string profileId, Dictionary<string, RdpCertificateEntry> set) in _approved)
+            Dictionary<RdpTrustKey, IReadOnlyCollection<RdpCertificateEntry>> all = [];
+            foreach ((RdpTrustKey key, Dictionary<string, RdpCertificateEntry> set) in _approved)
             {
                 if (set.Count > 0)
                 {
-                    all[profileId] = [.. set.Values];
+                    all[key] = [.. set.Values];
                 }
             }
 
@@ -264,20 +271,19 @@ public sealed class RdpCertificateTrustStore
         }
     }
 
-    private IReadOnlyCollection<string> ApprovedThumbprints(string profileId)
-        => _approved.TryGetValue(profileId, out Dictionary<string, RdpCertificateEntry>? set)
+    private IReadOnlyCollection<string> ApprovedThumbprints(RdpTrustKey key)
+        => _approved.TryGetValue(key, out Dictionary<string, RdpCertificateEntry>? set)
             ? [.. set.Keys]
             : [];
 
-    private IReadOnlyCollection<string> SessionThumbprints(string profileId)
-        => _session.TryGetValue(profileId, out HashSet<string>? set) ? [.. set] : [];
+    private IReadOnlyCollection<string> SessionThumbprints(RdpTrustKey key)
+        => _session.TryGetValue(key, out HashSet<string>? set) ? [.. set] : [];
 
     private static Dictionary<string, RdpCertificateEntry> Normalize(
         IEnumerable<RdpCertificateEntry> entries)
     {
         Dictionary<string, RdpCertificateEntry> set =
             new(StringComparer.Ordinal);
-
         foreach (RdpCertificateEntry entry in entries ?? [])
         {
             if (entry is null || string.IsNullOrWhiteSpace(entry.Thumbprint))

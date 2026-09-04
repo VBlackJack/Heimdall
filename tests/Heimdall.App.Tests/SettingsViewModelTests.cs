@@ -2678,7 +2678,7 @@ public sealed class SettingsViewModelTests
     {
         var store = new RdpCertificateTrustStore();
         store.Trust(
-            "srv-1",
+            RdpTrustKey.ForProfile("srv-1"),
             new RdpCertificateEntry("SHA256:AA:BB:01", new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero)));
 
         FakeConfigManager config = new();
@@ -2723,11 +2723,11 @@ public sealed class SettingsViewModelTests
             store, localizer, dialog);
         SettingsViewModel viewModel = CreateViewModelOver(config, panel, localizer, dialog);
 
-        store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", stamp));
+        store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", stamp));
         Assert.Equal(["SHA256:AA:BB:01"], panel.Rows.Select(row => row.Thumbprint));
 
         viewModel.Dispose();
-        store.Trust("srv-2", new RdpCertificateEntry("SHA256:AA:BB:02", stamp));
+        store.Trust(RdpTrustKey.ForProfile("srv-2"), new RdpCertificateEntry("SHA256:AA:BB:02", stamp));
 
         Assert.Equal(["SHA256:AA:BB:01"], panel.Rows.Select(row => row.Thumbprint));
     }

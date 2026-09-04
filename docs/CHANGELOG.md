@@ -12,7 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the palette dials a saved profile as a saved profile, and the out-of-range warning says what the loader does
+## Unreleased: certificate trust has two owners, the palette dials a saved profile as a saved profile, and the out-of-range warning says what the loader does
+
+### A saved profile and a typed destination no longer share certificate trust
+
+The RDP certificate trust store keyed every approval by one string, the profile identifier. A
+destination typed into the command palette runs under `adhoc-rdp-<host>`, and a profile imported
+before v2026.090401 reserved that namespace, edited into the inventory by hand, or brought in by
+the legacy import, can hold the very same string. Approving a certificate for one silenced the
+question for the other, the two questions coalesced into one when both reached the same host at
+the same moment, and the settings screen listed the shared entry under whichever name it could
+resolve. Four earlier attempts read the identifier's shape to tell the two apart, and each handed
+one owner's approval to the other.
+
+Trust is now keyed by an owner: a saved profile, identified by its inventory identifier, or a
+destination typed by hand, identified by its host. The owner is decided by the code that builds
+the connection, which marks what it mints; nothing reads the identifier's text. The durable
+store, the session-only store and the coalescing of questions all carry the owner, so an
+approval under one never answers for the other, and one press never writes under both. Typed
+destinations' approvals live in a new `trustedRdpCertificatesForTypedDestinations` entry in
+settings.json, keyed by the host in lower case, so a quick connect is asked once per host
+however its identifier was minted. The trusted certificates screen shows a typed destination
+under its host with a "Quick connect" badge, never as a deleted profile, and forgets it without
+touching a profile that shares its identifier.
+
+What this costs: approvals given to typed destinations before this version stay under the
+profile key they were written with. They are not moved, because nothing on disk says which
+owner wrote them and deciding by the identifier's shape is the mistake being ended. A quick
+connect to such a host is asked once more; the old entry stays listed on the screen and can be
+forgotten there.
 
 ### A saved profile with a quick-connect identifier keeps its settings
 

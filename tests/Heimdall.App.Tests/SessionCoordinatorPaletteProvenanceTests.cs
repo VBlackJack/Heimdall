@@ -89,6 +89,10 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal(SavedSshPort, dialled.SshPort);
         Assert.Equal(SavedSshUsername, dialled.SshUsername);
 
+        // A saved profile is never a typed destination, whatever its identifier says: its RDP
+        // certificate approvals stay filed under the profile.
+        Assert.False(dialled.IsTypedDestination);
+
         // Let the pipeline the click fired finish before the harness is torn down.
         await WaitUntilAsync(() => !harness.Main.ServerList.ConnectCommand.IsRunning);
     }
@@ -124,6 +128,11 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal(ReservedSshProfileId, dialled.Id);
         Assert.Equal(DefaultPorts.Ssh, dialled.SshPort);
         Assert.NotEqual(SavedSshUsername, dialled.SshUsername);
+
+        // The palette is one of the two sites that mint a typed destination, and the mark is
+        // what files its RDP certificate approvals under the host rather than under this
+        // identifier, which the saved profile above shares.
+        Assert.True(dialled.IsTypedDestination);
 
         // The typed route reports the refusal on the status line once it is done.
         await WaitUntilAsync(() => string.Equals(harness.Main.StatusText, Refusal, StringComparison.Ordinal));

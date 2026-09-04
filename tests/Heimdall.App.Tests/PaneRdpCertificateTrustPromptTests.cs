@@ -428,7 +428,7 @@ public sealed class PaneRdpCertificateTrustPromptTests
         string thumbprint = "SHA256:AA:BB:01")
         => new("DC pool", "dc-pool.example.com", thumbprint, "CN=dc04", 0)
         {
-            ProfileId = profileId,
+            TrustKey = RdpTrustKey.ForProfile(profileId),
             PromptScopeId = scopeId,
         };
 

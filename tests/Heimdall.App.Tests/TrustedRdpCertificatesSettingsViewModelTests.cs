@@ -72,7 +72,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         Assert.False(fixture.ViewModel.HasRows);
         Assert.True(fixture.ViewModel.IsEmptyStateVisible);
 
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
 
         Assert.True(fixture.ViewModel.HasRows);
@@ -84,12 +84,12 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     {
         var fixture = await VmFixture.CreateAsync();
         fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp)
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp)
         {
             Subject = "CN=dc-a.corp.example",
             Issuer = "CN=corp-ca"
         });
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:02", Stamp.AddDays(1)));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:02", Stamp.AddDays(1)));
 
         await fixture.ViewModel.RefreshAsync();
 
@@ -105,13 +105,109 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         Assert.False(row.IsProfileMissing);
     }
 
+    // A destination typed by hand owns its approvals under its host. No profile in the inventory
+    // names it, and that is not a deletion: the row shows the host and its own badge, never the
+    // "profile deleted" one, even when the inventory was read and could be cited as evidence.
+    [Fact]
+    public async Task Row_ForATypedDestination_ShowsTheHostAndIsNeverFlaggedDeleted()
+    {
+        var fixture = await VmFixture.CreateAsync();
+        fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
+        fixture.Store.Trust(
+            RdpTrustKey.ForTypedDestination("PROD.example"),
+            new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+
+        await fixture.ViewModel.RefreshAsync();
+
+        var row = Assert.Single(fixture.ViewModel.Rows);
+        Assert.True(row.IsTypedDestination);
+        Assert.Equal(RdpTrustKey.ForTypedDestination("prod.example"), row.Key);
+        Assert.Equal("prod.example", row.ProfileDisplay);
+        Assert.False(row.IsProfileMissing);
+
+        // Searching by the host the user typed finds it.
+        fixture.ViewModel.SearchText = "prod";
+        Assert.Single(fixture.ViewModel.Rows);
+    }
+
+    // The two owners can share an identity string, and the screen must then show two rows and
+    // forget them one at a time. Proven through the application's persistence method and a
+    // reload from disk, as the profile-only case above is: a Remove under the wrong scope would
+    // report success on the screen and leave the file untouched.
+    [Fact]
+    public async Task Forget_ATypedDestinationsRow_LeavesTheProfileSharingItsIdentityAlone()
+    {
+        string rootPath = Path.Combine(
+            Path.GetTempPath(),
+            "Heimdall-TrustedRdpCertificatesSettingsViewModelTests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootPath);
+        try
+        {
+            var configManager = new ConfigManager(rootPath);
+            await configManager.InitializeAsync();
+            RdpTrustKey profileOwner = RdpTrustKey.ForProfile("prod.example");
+            RdpTrustKey typedOwner = RdpTrustKey.ForTypedDestination("prod.example");
+            await App.PersistTrustedRdpCertificatesAsync(
+                configManager,
+                profileOwner,
+                [new RdpCertificateEntry("SHA256:AA:BB:01", Stamp)]);
+            await App.PersistTrustedRdpCertificatesAsync(
+                configManager,
+                typedOwner,
+                [new RdpCertificateEntry("SHA256:AA:BB:01", Stamp)]);
+            AppSettings settings = await configManager.LoadSettingsAsync();
+
+            // Positive control: both owners reached the file, each in its own dictionary.
+            Assert.Single(settings.TrustedRdpCertificates["prod.example"]);
+            Assert.Single(settings.TrustedRdpCertificatesForTypedDestinations["prod.example"]);
+
+            var fixture = await VmFixture.CreateAsync();
+            fixture.Profiles.Add(Profile("prod.example", "Production"));
+            fixture.Store.LoadFromConfig(App.ReadTrustedRdpCertificates(settings));
+            var persisted = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            fixture.Store.TrustChanged += (key, entries) =>
+            {
+                _ = App.PersistTrustedRdpCertificatesAsync(configManager, key, entries)
+                    .ContinueWith(
+                        _ => persisted.TrySetResult(true),
+                        TaskScheduler.Default);
+            };
+
+            await fixture.ViewModel.RefreshAsync();
+            Assert.Equal(2, fixture.ViewModel.Rows.Count);
+            var typedRow = fixture.ViewModel.Rows.Single(r => r.IsTypedDestination);
+            var profileRow = fixture.ViewModel.Rows.Single(r => !r.IsTypedDestination);
+            Assert.Equal("Production", profileRow.ProfileDisplay);
+            Assert.Equal("prod.example", typedRow.ProfileDisplay);
+
+            fixture.Dialog.ConfirmResult = true;
+            await fixture.ViewModel.ForgetCommand.ExecuteAsync(typedRow);
+            await persisted.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+            var reloadedManager = new ConfigManager(rootPath);
+            await reloadedManager.InitializeAsync();
+            AppSettings reloaded = await reloadedManager.LoadSettingsAsync();
+            Assert.DoesNotContain("prod.example", reloaded.TrustedRdpCertificatesForTypedDestinations);
+            Assert.Single(reloaded.TrustedRdpCertificates["prod.example"]);
+
+            var remaining = Assert.Single(fixture.ViewModel.Rows);
+            Assert.False(remaining.IsTypedDestination);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task Row_WhoseProfileNoLongerExists_FallsBackToTheProfileIdAndIsMarked()
     {
         var fixture = await VmFixture.CreateAsync();
         fixture.Profiles.Add(Profile("srv-live", "Still here"));
-        fixture.Store.Trust("srv-live", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
-        fixture.Store.Trust("srv-deleted", new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-live"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-deleted"), new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
 
         await fixture.ViewModel.RefreshAsync();
 
@@ -131,7 +227,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     public async Task Row_WithoutSubjectOrIssuer_ShowsTheUnknownLabelRatherThanBlank()
     {
         var fixture = await VmFixture.CreateAsync();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
 
         await fixture.ViewModel.RefreshAsync();
 
@@ -152,31 +248,31 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     public async Task Forget_AsksForConfirmationBeforeTouchingTheStore()
     {
         var fixture = await VmFixture.CreateAsync();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
         fixture.Dialog.ConfirmResult = true;
 
         int approvedWhileAsking = -1;
-        fixture.Dialog.OnConfirm = () => approvedWhileAsking = fixture.Store.GetApproved("srv-1").Count;
+        fixture.Dialog.OnConfirm = () => approvedWhileAsking = fixture.Store.GetApproved(RdpTrustKey.ForProfile("srv-1")).Count;
 
         await fixture.ViewModel.ForgetCommand.ExecuteAsync(fixture.ViewModel.Rows[0]);
 
         Assert.Equal(1, fixture.Dialog.ConfirmCount);
         Assert.Equal(1, approvedWhileAsking);
-        Assert.Empty(fixture.Store.GetApproved("srv-1"));
+        Assert.Empty(fixture.Store.GetApproved(RdpTrustKey.ForProfile("srv-1")));
     }
 
     [Fact]
     public async Task Forget_RefusedConfirmation_LeavesTheEntryAlone()
     {
         var fixture = await VmFixture.CreateAsync();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
         fixture.Dialog.ConfirmResult = false;
 
         await fixture.ViewModel.ForgetCommand.ExecuteAsync(fixture.ViewModel.Rows[0]);
 
-        Assert.Single(fixture.Store.GetApproved("srv-1"));
+        Assert.Single(fixture.Store.GetApproved(RdpTrustKey.ForProfile("srv-1")));
         Assert.Single(fixture.ViewModel.Rows);
     }
 
@@ -184,7 +280,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     public async Task Forget_ConfirmationThatThrows_IsNotReadAsAYes()
     {
         var fixture = await VmFixture.CreateAsync();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
         fixture.Dialog.ConfirmThrows = true;
 
@@ -192,7 +288,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
 
         // A dialog that could not be shown is not an approval. Letting the exception stand in
         // for a yes would revoke trust the user never agreed to revoke.
-        Assert.Single(fixture.Store.GetApproved("srv-1"));
+        Assert.Single(fixture.Store.GetApproved(RdpTrustKey.ForProfile("srv-1")));
         Assert.Single(fixture.ViewModel.Rows);
         Assert.True(fixture.ViewModel.HasStatusMessage);
     }
@@ -201,15 +297,15 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     public async Task Forget_Confirmed_RemovesTheEntryAndDropsTheRow()
     {
         var fixture = await VmFixture.CreateAsync();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
         await fixture.ViewModel.RefreshAsync();
         fixture.Dialog.ConfirmResult = true;
 
         var target = fixture.ViewModel.Rows.Single(r => r.Thumbprint == "SHA256:AA:BB:01");
         await fixture.ViewModel.ForgetCommand.ExecuteAsync(target);
 
-        Assert.Equal(["SHA256:AA:BB:02"], fixture.Store.GetApproved("srv-1").Select(e => e.Thumbprint));
+        Assert.Equal(["SHA256:AA:BB:02"], fixture.Store.GetApproved(RdpTrustKey.ForProfile("srv-1")).Select(e => e.Thumbprint));
         Assert.Equal(["SHA256:AA:BB:02"], fixture.ViewModel.Rows.Select(r => r.Thumbprint));
         Assert.True(fixture.ViewModel.HasStatusMessage);
     }
@@ -245,7 +341,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
             await configManager.InitializeAsync();
             await App.PersistTrustedRdpCertificatesAsync(
                 configManager,
-                "srv-1",
+                RdpTrustKey.ForProfile("srv-1"),
                 [
                     new RdpCertificateEntry("SHA256:AA:BB:01", Stamp),
                     new RdpCertificateEntry("SHA256:AA:BB:02", Stamp),
@@ -261,14 +357,13 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
                 settings.TrustedRdpCertificates["srv-1"].Select(e => e.Thumbprint));
 
             var fixture = await VmFixture.CreateAsync();
-            fixture.Store.LoadFromConfig(settings.TrustedRdpCertificates.Select(
-                pair => (pair.Key, (IEnumerable<RdpCertificateEntry>)pair.Value)));
+            fixture.Store.LoadFromConfig(App.ReadTrustedRdpCertificates(settings));
 
             var persisted = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            fixture.Store.TrustChanged += (profileId, entries) =>
+            fixture.Store.TrustChanged += (key, entries) =>
             {
-                _ = App.PersistTrustedRdpCertificatesAsync(configManager, profileId, entries)
+                _ = App.PersistTrustedRdpCertificatesAsync(configManager, key, entries)
                     .ContinueWith(
                         _ => persisted.TrySetResult(true),
                         TaskScheduler.Default);
@@ -299,7 +394,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     public async Task Forget_TheLastCertificateOfAProfile_LeavesNoProfileBehind()
     {
         var fixture = await VmFixture.CreateAsync();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
         fixture.Dialog.ConfirmResult = true;
 
@@ -315,8 +410,8 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         var fixture = await VmFixture.CreateAsync();
         fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
         fixture.Profiles.Add(Profile("srv-2", "Build agent"));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
-        fixture.Store.Trust("srv-2", new RdpCertificateEntry("SHA256:CC:DD:02", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-2"), new RdpCertificateEntry("SHA256:CC:DD:02", Stamp));
         await fixture.ViewModel.RefreshAsync();
 
         fixture.ViewModel.SearchText = "build";
@@ -339,7 +434,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     public async Task Refresh_WhenTheProfileInventoryCannotBeRead_StillListsTheTrustDecisions()
     {
         var fixture = await VmFixture.CreateAsync();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         fixture.ProfilesThrow = true;
 
         await fixture.ViewModel.RefreshAsync();
@@ -369,7 +464,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     {
         var fixture = await VmFixture.CreateAsync();
         fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
         Assert.False(fixture.ViewModel.Rows[0].IsProfileMissing);
 
@@ -413,7 +508,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
 
         // Add Server, then a connection that asks about the certificate and is answered.
         fixture.Profiles.Add(Profile("srv-new", "Lab DC"));
-        fixture.Store.Trust("srv-new", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-new"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
 
         var row = Assert.Single(fixture.ViewModel.Rows);
         Assert.Equal("Lab DC", row.ProfileDisplay);
@@ -436,7 +531,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         await fixture.ViewModel.RefreshAsync();
 
         fixture.Profiles.Clear();
-        fixture.Store.Trust("srv-gone", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-gone"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
 
         var row = Assert.Single(fixture.ViewModel.Rows);
         Assert.Equal("srv-gone", row.ProfileDisplay);
@@ -460,7 +555,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         await fixture.ViewModel.RefreshAsync();
 
         fixture.ProfilesThrow = true;
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
 
         var row = Assert.Single(fixture.ViewModel.Rows);
         Assert.Equal("Domain controller A", row.ProfileDisplay);
@@ -490,7 +585,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     {
         var fixture = await VmFixture.CreateAsync();
         fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
         Assert.False(fixture.ViewModel.Rows[0].IsProfileMissing);
 
@@ -502,7 +597,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         Assert.False(fixture.ViewModel.Rows[0].IsProfileMissing);
 
         // A trust decision taken elsewhere, with the inventory still unreadable.
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
 
         Assert.Equal(2, fixture.ViewModel.Rows.Count);
         Assert.All(fixture.ViewModel.Rows, row => Assert.False(row.IsProfileMissing));
@@ -511,7 +606,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         // badge is owed and appears - off the same reload path, without a refresh.
         fixture.ProfilesThrow = false;
         fixture.Profiles.Clear();
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:03", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:03", Stamp));
 
         Assert.Equal(3, fixture.ViewModel.Rows.Count);
         Assert.All(fixture.ViewModel.Rows, row => Assert.True(row.IsProfileMissing));
@@ -533,8 +628,8 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     {
         var fixture = await VmFixture.CreateAsync();
         fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
         await fixture.ViewModel.RefreshAsync();
         fixture.Dialog.ConfirmResult = true;
 
@@ -571,11 +666,11 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         var fixture = await VmFixture.CreateAsync();
         await fixture.ViewModel.RefreshAsync();
 
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         Assert.Single(fixture.ViewModel.Rows);
 
         fixture.ViewModel.Dispose();
-        fixture.Store.Trust("srv-2", new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-2"), new RdpCertificateEntry("SHA256:AA:BB:02", Stamp));
 
         Assert.Single(fixture.ViewModel.Rows);
     }
@@ -602,7 +697,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     {
         var fixture = await VmFixture.CreateAsync();
         fixture.Profiles.Add(Profile("srv-1", "Domain controller A"));
-        fixture.Store.Trust("srv-1", new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), new RdpCertificateEntry("SHA256:AA:BB:01", Stamp));
         await fixture.ViewModel.RefreshAsync();
         fixture.Dialog.ConfirmResult = false;
 

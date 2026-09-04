@@ -65,7 +65,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
             "pane-7");
 
         Assert.Equal("Production", request.ProfileName);
-        Assert.Equal("profile-1", request.ProfileId);
+        Assert.Equal("profile-1", request.Key.Identity);
     }
 
     [Theory]
@@ -114,7 +114,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
             "pane-7");
 
         Assert.NotEqual("profile-1", paneScoped.Id);
-        Assert.Equal("profile-1", request.ProfileId);
+        Assert.Equal("profile-1", request.Key.Identity);
     }
 
     [Fact]
@@ -138,8 +138,8 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
             "pane-8");
 
         Assert.NotEqual(firstPane.Id, secondPane.Id);
-        Assert.Equal("profile-1", first.ProfileId);
-        Assert.Equal(first.ProfileId, second.ProfileId);
+        Assert.Equal("profile-1", first.Key.Identity);
+        Assert.Equal(first.Key.Identity, second.Key.Identity);
     }
 
     [Theory]
@@ -159,7 +159,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
             new RdpCertificateProbeTarget("dc-pool.example.com", 3389),
             "pane-7");
 
-        Assert.Equal(inventoryProfileId, request.ProfileId);
+        Assert.Equal(inventoryProfileId, request.Key.Identity);
     }
 
     [Theory]
@@ -181,7 +181,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
             new RdpCertificateProbeTarget("lab01", 3389),
             "pane-7");
 
-        Assert.Equal(importedId, request.ProfileId);
+        Assert.Equal(importedId, request.Key.Identity);
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public sealed class RdpCertificateVerificationRequestBuilderTests
             new RdpCertificateProbeTarget("127.0.0.1", 53211),
             "pane-7");
 
-        Assert.Equal("prod", request.ProfileId);
+        Assert.Equal("prod", request.Key.Identity);
     }
 
     private static ServerProfileDto Profile(string? displayName) => new()

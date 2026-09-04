@@ -295,12 +295,10 @@ public partial class App : System.Windows.Application
             };
 
             var rdpCertificateStore = _serviceProvider.GetRequiredService<RdpCertificateTrustStore>();
-            rdpCertificateStore.LoadFromConfig(
-                settings.TrustedRdpCertificates.Select(
-                    pair => (pair.Key, (IEnumerable<RdpCertificateEntry>)(pair.Value ?? []))));
-            rdpCertificateStore.TrustChanged += (profileId, entries) =>
+            LoadTrustedRdpCertificates(rdpCertificateStore, settings);
+            rdpCertificateStore.TrustChanged += (key, entries) =>
             {
-                _ = PersistTrustedRdpCertificatesAsync(configManager, profileId, entries);
+                _ = PersistTrustedRdpCertificatesAsync(configManager, key, entries);
             };
 
             _serviceProvider.GetRequiredService<KnownHostsStartupSync>().StartIfEnabled(settings);
@@ -874,28 +872,77 @@ public partial class App : System.Windows.Application
     /// last certificate leaves no trace of the profile in the file.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Every durable RDP certificate approval the settings hold, both owners' scopes together, in
+    /// the shape <see cref="RdpCertificateTrustStore.LoadFromConfig"/> takes.
+    /// </summary>
+    /// <remarks>
+    /// One sequence for one load call: the store replaces its durable state wholesale on each
+    /// load, so loading the two dictionaries in two calls would keep only the second.
+    /// </remarks>
+    internal static IEnumerable<(RdpTrustKey Key, IEnumerable<RdpCertificateEntry> Entries)>
+        ReadTrustedRdpCertificates(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        foreach (KeyValuePair<string, List<RdpCertificateEntry>> pair in settings.TrustedRdpCertificates)
+        {
+            if (!string.IsNullOrWhiteSpace(pair.Key))
+            {
+                yield return (RdpTrustKey.ForProfile(pair.Key), pair.Value ?? []);
+            }
+        }
+
+        foreach (KeyValuePair<string, List<RdpCertificateEntry>> pair
+            in settings.TrustedRdpCertificatesForTypedDestinations)
+        {
+            if (!string.IsNullOrWhiteSpace(pair.Key))
+            {
+                yield return (RdpTrustKey.ForTypedDestination(pair.Key), pair.Value ?? []);
+            }
+        }
+    }
+
+    /// <summary>Loads both trust scopes into the store, in the one call the store requires.</summary>
+    /// <remarks>
+    /// A method of its own so a test can run the startup's load against a real store and real
+    /// settings holding both dictionaries, and read both scopes back. The startup sequence
+    /// itself runs inside a try block that no source reading in this repository can reach.
+    /// </remarks>
+    internal static void LoadTrustedRdpCertificates(RdpCertificateTrustStore store, AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        store.LoadFromConfig(ReadTrustedRdpCertificates(settings));
+    }
+
     internal static async Task PersistTrustedRdpCertificatesAsync(
         IConfigManager configManager,
-        string profileId,
+        RdpTrustKey key,
         IReadOnlyCollection<RdpCertificateEntry> entries)
     {
         try
         {
             await configManager.MergeSettingAsync(settings =>
             {
+                Dictionary<string, List<RdpCertificateEntry>> owners = key.Scope switch
+                {
+                    RdpTrustScope.TypedDestination => settings.TrustedRdpCertificatesForTypedDestinations,
+                    _ => settings.TrustedRdpCertificates,
+                };
+
                 if (entries.Count == 0)
                 {
-                    settings.TrustedRdpCertificates.Remove(profileId);
+                    owners.Remove(key.Identity);
                     return;
                 }
 
-                settings.TrustedRdpCertificates[profileId] = [.. entries];
+                owners[key.Identity] = [.. entries];
             });
         }
         catch (Exception ex)
         {
             Heimdall.Core.Logging.FileLogger.Warn(
-                $"Failed to persist trusted RDP certificates for {profileId}: {ex.Message}");
+                $"Failed to persist trusted RDP certificates for {key}: {ex.Message}");
         }
     }
 

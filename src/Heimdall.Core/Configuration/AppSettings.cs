@@ -286,6 +286,24 @@ public sealed class AppSettings
     /// </remarks>
     public Dictionary<string, List<RdpCertificateEntry>> TrustedRdpCertificates { get; set; } = new();
 
+    /// <summary>
+    /// RDP certificates approved for destinations typed by hand, keyed by the normalized host.
+    /// </summary>
+    /// <remarks>
+    /// <para>A separate dictionary from <see cref="TrustedRdpCertificates"/> because a typed
+    /// destination and a saved profile can share an identifier string, and one dictionary keyed
+    /// by that string gave an approval two possible owners. A typed destination is a host and
+    /// nothing else, so its approvals are keyed by the host - see
+    /// <c>RdpTrustKey.ForTypedDestination</c> for the one spelling of it.</para>
+    /// <para>Approvals written before this dictionary existed stay in
+    /// <see cref="TrustedRdpCertificates"/> under the identifier the palette minted at the time.
+    /// They are not moved: nothing on disk says which owner wrote them, and deciding by the
+    /// identifier's shape is the mistake this dictionary ends. A typed destination is asked once
+    /// more per host, and the settings screen still lists the old entries so they can be
+    /// forgotten.</para>
+    /// </remarks>
+    public Dictionary<string, List<RdpCertificateEntry>> TrustedRdpCertificatesForTypedDestinations { get; set; } = new();
+
     // Scheduled connections
     public List<ScheduledTaskDto> ScheduledTasks { get; set; } = new();
 

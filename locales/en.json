@@ -2575,6 +2575,8 @@
   "ToastTrustedRdpCertificateForgetFailed": "The certificate was kept: the confirmation could not be shown ({0}).",
   "ToastTrustedRdpCertificatesLoadFailed": "Server names could not be read ({0}); profile identifiers are shown instead.",
   "LblTrustedRdpCertificateProfileMissing": "Profile deleted",
+  "LblTrustedRdpCertificateTypedDestination": "Quick connect",
+  "TipTrustedRdpCertificateTypedDestination": "Approved for a destination typed by hand and kept under its host. No saved profile owns this decision.",
   "LblTrustedRdpCertificateFieldUnknown": "Not recorded",
   "EmptyStateNoTrustedRdpCertificates": "No trusted RDP certificates",
   "EmptyStateNoTrustedRdpCertificatesHint": "Certificates you accept when connecting to a remote desktop are listed here, and can be revoked from here.",
