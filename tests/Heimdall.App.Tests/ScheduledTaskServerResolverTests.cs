@@ -37,7 +37,24 @@ public sealed class ScheduledTaskServerResolverTests
             taskName,
             servers,
             s => s.Id,
-            s => s.DisplayName);
+            s => s.DisplayName,
+            out _);
+
+    private static ScheduledTaskResolution Outcome(
+        string? taskId,
+        string? taskName,
+        params Server[] servers)
+    {
+        _ = ScheduledTaskServerResolver.Resolve(
+            taskId,
+            taskName,
+            servers,
+            s => s.Id,
+            s => s.DisplayName,
+            out ScheduledTaskResolution outcome);
+
+        return outcome;
+    }
 
     [Fact]
     public void ATaskIsAnsweredByTheIdentifierItRecorded()
@@ -142,6 +159,33 @@ public sealed class ScheduledTaskServerResolverTests
     // Case-sensitive on the identifier, like every other identifier comparison on this path. The
     // single same-named profile is then found by the unambiguous-name rule, which is the intended
     // outcome - what must not happen is the identifier matching loosely.
+    // The three ways of answering nothing are three different sentences in the log, and a caller
+    // that guessed produced one of them for all three: the first version told every user their
+    // profile had been deleted, including the ones whose two same-named profiles were both still
+    // in the inventory and had never been touched.
+    [Fact]
+    public void RefusingBecauseTheIdentifierIsGoneIsNotRefusingBecauseTheNameIsAmbiguous()
+    {
+        Assert.Equal(
+            ScheduledTaskResolution.IdentifierNotFound,
+            Outcome("id-gone", "Production", new Server("id-b", "Production")));
+
+        // No deletion anywhere: an older task with no identifier, two profiles that both exist.
+        Assert.Equal(
+            ScheduledTaskResolution.NameAmbiguous,
+            Outcome(null, "Production",
+                new Server("id-a", "Production"),
+                new Server("id-b", "Production")));
+
+        Assert.Equal(
+            ScheduledTaskResolution.NameNotFound,
+            Outcome(null, "Production", new Server("id-a", "Lab")));
+
+        Assert.Equal(
+            ScheduledTaskResolution.Resolved,
+            Outcome("id-a", "Production", new Server("id-a", "Production")));
+    }
+
     [Fact]
     public void AnIdentifierIsMatchedExactlyAndDoesNotResolveByCase()
     {

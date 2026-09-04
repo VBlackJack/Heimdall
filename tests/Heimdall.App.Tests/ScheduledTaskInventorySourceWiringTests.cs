@@ -47,7 +47,8 @@ public sealed class ScheduledTaskInventorySourceWiringTests
     // identifier inside an argument list, which no reading anchored on the call's name could see.
     private const string ResolveStatement =
         "var server = ScheduledTaskServerResolver.Resolve(task.ServerId, task.ServerName, "
-        + "_main.ServerList.AllServers, s => s.Id, s => s.DisplayName);";
+        + "_main.ServerList.AllServers, s => s.Id, s => s.DisplayName, "
+        + "out ScheduledTaskResolution resolution);";
 
     [Fact]
     public void TheSchedulerResolvesAgainstTheWholeInventory()

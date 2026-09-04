@@ -43,6 +43,29 @@ namespace Heimdall.App.ViewModels.Scheduled;
 /// display name, and still only when exactly one profile carries it. There the name is the only
 /// thing recorded, so refusing it would break every such task rather than protect anything.</para>
 /// </remarks>
+/// <summary>Why a scheduled task could not be matched to a profile.</summary>
+/// <remarks>
+/// Reported rather than re-derived by the caller, because there are three ways to answer nothing
+/// and they need three different sentences. A caller that worked them out for itself would be a
+/// second copy of the rule, and the first version of this log had exactly one sentence - it told
+/// every user their profile had been "deleted or re-identified", including the ones whose two
+/// same-named profiles were both still there.
+/// </remarks>
+internal enum ScheduledTaskResolution
+{
+    /// <summary>A profile was found.</summary>
+    Resolved,
+
+    /// <summary>The task names an identifier and no profile carries it.</summary>
+    IdentifierNotFound,
+
+    /// <summary>The task names no identifier, and no profile carries its display name.</summary>
+    NameNotFound,
+
+    /// <summary>The task names no identifier, and several profiles carry its display name.</summary>
+    NameAmbiguous,
+}
+
 internal static class ScheduledTaskServerResolver
 {
     /// <summary>The profile to run, or null when the task cannot be answered safely.</summary>
@@ -54,7 +77,8 @@ internal static class ScheduledTaskServerResolver
         string? taskServerName,
         IEnumerable<TServer> servers,
         Func<TServer, string?> identifierOf,
-        Func<TServer, string?> displayNameOf)
+        Func<TServer, string?> displayNameOf,
+        out ScheduledTaskResolution outcome)
         where TServer : class
     {
         ArgumentNullException.ThrowIfNull(servers);
@@ -65,8 +89,13 @@ internal static class ScheduledTaskServerResolver
         {
             // That identifier or nothing. No name is consulted here: a name that has become
             // unique because the task's own profile was deleted names a different machine.
-            return servers.FirstOrDefault(
+            TServer? byIdentifier = servers.FirstOrDefault(
                 server => string.Equals(identifierOf(server), taskServerId, StringComparison.Ordinal));
+
+            outcome = byIdentifier is null
+                ? ScheduledTaskResolution.IdentifierNotFound
+                : ScheduledTaskResolution.Resolved;
+            return byIdentifier;
         }
 
         // Only for a task that recorded no identifier, and only when the name is unambiguous.
@@ -76,6 +105,13 @@ internal static class ScheduledTaskServerResolver
                 taskServerName,
                 StringComparison.OrdinalIgnoreCase))];
 
-        return byName.Count == 1 ? byName[0] : null;
+        outcome = byName.Count switch
+        {
+            1 => ScheduledTaskResolution.Resolved,
+            0 => ScheduledTaskResolution.NameNotFound,
+            _ => ScheduledTaskResolution.NameAmbiguous,
+        };
+
+        return outcome == ScheduledTaskResolution.Resolved ? byName[0] : null;
     }
 }
