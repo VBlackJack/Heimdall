@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections;
 using System.ComponentModel;
 using System.IO;
 using System.Text;
@@ -60,7 +59,7 @@ public partial class DefaultCredentialView : UserControl, IToolView
     private LocalizationManager? _localizer;
     private bool _disposed;
     private Action<bool>? _setBusy;
-    private List<SshGatewayDto>? _gateways;
+    private GatewayRouteSelector? _routeSelector;
 
     public DefaultCredentialView()
     {
@@ -87,12 +86,8 @@ public partial class DefaultCredentialView : UserControl, IToolView
 
         ApplyLocalization();
 
-        if (context?.SshGateways is IList gateways)
-        {
-            _gateways = gateways.Cast<SshGatewayDto>().ToList();
-        }
-
-        PopulateRouteSelector();
+        _routeSelector?.Dispose();
+        _routeSelector = new GatewayRouteSelector(CmbRouteVia, context, L, OnGatewaySelected, ReportRouteStatus);
         ChkAutoDetect.IsChecked = true;
         ChkShowPasswords.IsChecked = false;
         RefreshUiFromVm();
@@ -143,24 +138,6 @@ public partial class DefaultCredentialView : UserControl, IToolView
         TxtHost.Tag = L("ToolWatermarkHostnameOrIp");
     }
 
-    private void PopulateRouteSelector()
-    {
-        CmbRouteVia.Items.Clear();
-        CmbRouteVia.Items.Add(new ComboBoxItem { Content = L("ToolTunnelDirect") });
-
-        if (_gateways is not null)
-        {
-            foreach (var gateway in _gateways)
-            {
-                var label = $"{gateway.Name} ({gateway.Host}:{gateway.Port})";
-                CmbRouteVia.Items.Add(new ComboBoxItem { Content = label, Tag = gateway });
-            }
-        }
-
-        CmbRouteVia.SelectedIndex = 0;
-        _vm.SetGateway(null);
-    }
-
     private void OnHelpClick(object sender, RoutedEventArgs e)
     {
         if (HelpPanel.Visibility == Visibility.Visible)
@@ -209,11 +186,8 @@ public partial class DefaultCredentialView : UserControl, IToolView
         }
     }
 
-    private void OnRouteViaChanged(object sender, SelectionChangedEventArgs e)
+    private void OnGatewaySelected(SshGatewayDto? gateway)
     {
-        var gateway = CmbRouteVia.SelectedItem is ComboBoxItem item && item.Tag is SshGatewayDto dto
-            ? dto
-            : null;
         _vm.SetGateway(gateway);
     }
 
@@ -393,6 +367,14 @@ public partial class DefaultCredentialView : UserControl, IToolView
 
     public bool CanClose() => !_vm.IsScanning;
 
+    private void ReportRouteStatus(string message)
+    {
+        // Through the ViewModel, which is what the view's own refresh reads back.
+        _vm.ShowError = false;
+        _vm.ErrorMessage = message;
+        _vm.ShowError = true;
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -401,6 +383,7 @@ public partial class DefaultCredentialView : UserControl, IToolView
         }
 
         _disposed = true;
+        _routeSelector?.Dispose();
         TxtHost.KeyDown -= OnInputKeyDown;
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _setBusy?.Invoke(false);

@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
@@ -38,7 +37,7 @@ public partial class TcpTracerouteView : UserControl, IToolView
 {
     private LocalizationManager? _localizer;
     private bool _disposed;
-    private List<SshGatewayDto>? _gateways;
+    private GatewayRouteSelector? _routeSelector;
     private SshGatewayDto? _selectedGateway;
     private Action<bool>? _setBusy;
     private readonly ToolAsyncStateController _viewState;
@@ -81,12 +80,8 @@ public partial class TcpTracerouteView : UserControl, IToolView
             TxtHost.Text = context.TargetHost.Trim();
         }
 
-        if (context?.SshGateways is IList gateways)
-        {
-            _gateways = gateways.Cast<SshGatewayDto>().ToList();
-        }
-
-        PopulateRouteSelector();
+        _routeSelector?.Dispose();
+        _routeSelector = new GatewayRouteSelector(CmbRouteVia, context, L, OnGatewaySelected, ReportRouteStatus);
         _vm.SetGateway(_selectedGateway);
 
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
@@ -130,35 +125,10 @@ public partial class TcpTracerouteView : UserControl, IToolView
         TxtHost.Tag = L("ToolWatermarkHostnameOrIp");
     }
 
-    private void PopulateRouteSelector()
+    private void OnGatewaySelected(SshGatewayDto? gateway)
     {
-        CmbRouteVia.Items.Clear();
-        CmbRouteVia.Items.Add(new ComboBoxItem { Content = L("ToolTunnelDirect") });
-
-        if (_gateways is not null)
-        {
-            foreach (var gateway in _gateways)
-            {
-                var label = $"{gateway.Name} ({gateway.Host}:{gateway.Port})";
-                CmbRouteVia.Items.Add(new ComboBoxItem { Content = label, Tag = gateway });
-            }
-        }
-
-        CmbRouteVia.SelectedIndex = 0;
-    }
-
-    private void OnRouteViaChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (CmbRouteVia.SelectedItem is ComboBoxItem item && item.Tag is SshGatewayDto gateway)
-        {
-            _selectedGateway = gateway;
-        }
-        else
-        {
-            _selectedGateway = null;
-        }
-
-        _vm.SetGateway(_selectedGateway);
+        _selectedGateway = gateway;
+        _vm.SetGateway(gateway);
     }
 
     private void OnHostKeyDown(object sender, KeyEventArgs e)
@@ -349,6 +319,14 @@ public partial class TcpTracerouteView : UserControl, IToolView
 
     public bool CanClose() => !_vm.IsTracing;
 
+    private void ReportRouteStatus(string message)
+    {
+        // Through the ViewModel, which is what the view's own refresh reads back.
+        _vm.ShowError = false;
+        _vm.ErrorText = message;
+        _vm.ShowError = true;
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -357,6 +335,7 @@ public partial class TcpTracerouteView : UserControl, IToolView
         }
 
         _disposed = true;
+        _routeSelector?.Dispose();
         TxtHost.KeyDown -= OnHostKeyDown;
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.Hops.CollectionChanged -= OnHopsCollectionChanged;

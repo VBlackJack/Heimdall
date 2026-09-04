@@ -45,7 +45,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
     private CancellationTokenSource? _cts;
     private bool _isAuditing;
     private bool _disposed;
-    private List<Heimdall.Core.Configuration.SshGatewayDto>? _gateways;
+    private GatewayRouteSelector? _routeSelector;
     private Heimdall.Core.Configuration.SshGatewayDto? _selectedGateway;
     private Action<bool>? _setBusy;
     private CancellationTokenSource? _subnetDetectCts;
@@ -90,11 +90,8 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
             }
         }
 
-        if (context?.SshGateways is System.Collections.IList gateways)
-        {
-            _gateways = gateways.Cast<Heimdall.Core.Configuration.SshGatewayDto>().ToList();
-        }
-        PopulateRouteSelector();
+        _routeSelector?.Dispose();
+        _routeSelector = new GatewayRouteSelector(CmbRouteVia, context, L, OnGatewaySelected, ReportRouteStatus);
 
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
         {
@@ -152,25 +149,11 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
     // ── Gateway selector ─────────────────────────────────────────────
 
-    private void PopulateRouteSelector()
+    private void OnGatewaySelected(Heimdall.Core.Configuration.SshGatewayDto? gateway)
     {
-        CmbRouteVia.Items.Clear();
-        CmbRouteVia.Items.Add(L("ToolTunnelDirect"));
-        if (_gateways is not null)
+        _selectedGateway = gateway;
+        if (gateway is null)
         {
-            foreach (var gw in _gateways)
-            {
-                CmbRouteVia.Items.Add($"{gw.Name} ({gw.Host}:{gw.Port})");
-            }
-        }
-        CmbRouteVia.SelectedIndex = 0;
-    }
-
-    private void OnRouteViaChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (CmbRouteVia.SelectedIndex <= 0 || _gateways is null)
-        {
-            _selectedGateway = null;
             // Revert to local subnet when switching back to Direct
             var localCidr = SubnetDetector.DetectLocalSubnet();
             if (localCidr is not null)
@@ -179,13 +162,8 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
             }
             return;
         }
-        var idx = CmbRouteVia.SelectedIndex - 1;
-        _selectedGateway = idx < _gateways.Count ? _gateways[idx] : null;
 
-        if (_selectedGateway is not null)
-        {
-            _ = DetectRemoteSubnetsAsync(_selectedGateway);
-        }
+        _ = DetectRemoteSubnetsAsync(gateway);
     }
 
     private async Task DetectRemoteSubnetsAsync(Heimdall.Core.Configuration.SshGatewayDto gateway)
@@ -888,11 +866,18 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
     public bool CanClose() => !_isAuditing;
 
+    private void ReportRouteStatus(string message)
+    {
+        TxtError.Text = message;
+        TxtError.Visibility = Visibility.Visible;
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        _routeSelector?.Dispose();
         StopAudit();
         GC.SuppressFinalize(this);
     }

@@ -162,7 +162,6 @@
                                VerticalAlignment="Center" />
                     <ComboBox x:Name="CmbRouteVia"
                               Width="240"
-                              SelectionChanged="OnRouteViaChanged"
                               Background="{DynamicResource CardBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"

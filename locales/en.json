@@ -4875,6 +4875,7 @@
   "ToolTunnelConnecting": "Connecting to gateway...",
   "ToolTunnelConnected": "Connected via {0}",
   "ToolTunnelFailed": "Gateway connection failed: {0}",
+  "ToolTunnelGatewayRemoved": "Gateway \"{0}\" was removed from the settings. This tool now connects directly.",
   "ToolDnsNoResults": "No results",
 
   "PaletteToolNetMap": "Network Cartography",

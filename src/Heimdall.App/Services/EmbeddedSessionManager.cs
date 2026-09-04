@@ -58,6 +58,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     private readonly PooledRdpHostProvider _rdpHostProvider = new();
     private readonly ISessionOperationLog _sessionOperationLog;
     private readonly ConfigManager _configManager;
+    private ConfigGatewayInventory? _gatewayInventory;
 
     /// <summary>
     /// Optional callback invoked when a terminal view broadcasts input.
@@ -1259,6 +1260,15 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         }
 
         var view = _toolRegistry.CreateView(toolId);
+
+        // The gateways a tool lists and dials follow the settings from here on, through one
+        // inventory shared by every tool tab. The snapshot list below is kept as the seed for a
+        // context built without the inventory.
+        _gatewayInventory ??= new ConfigGatewayInventory(_configManager, () => _configManager.CurrentSettings);
+        context = (context ?? new ToolContext()) with
+        {
+            GatewayInventory = _gatewayInventory
+        };
 
         // Enrich context with SSH gateways so tools can offer "Route via" tunnel support
         if (settings?.SshGateways is { Count: > 0 } gateways)

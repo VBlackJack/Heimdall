@@ -215,8 +215,12 @@ atteignez en SSH.
 
 Renommer une passerelle se répercute aussitôt sur chaque session qui passe par elle : le badge
 et l'infobulle dans l'arbre, le panneau de détail et la variable `{Gateway}` des outils
-externes. Ce qu'une connexion ouverte affiche sur son onglet, dans le panneau Tunnels et sur
-une question de certificat est le nom par lequel la connexion a été établie, et le reste.
+externes. Modifier une passerelle atteint aussi la liste "Via" de chaque outil réseau ouvert,
+qui garde sa sélection et compose l'hôte modifié à sa prochaine exécution ; une exécution déjà
+en cours garde le tunnel qu'elle a ouvert. Supprimer la passerelle sélectionnée remet l'outil en
+connexion directe et le dit sur sa ligne d'erreur. Ce qu'une connexion ouverte affiche sur son
+onglet, dans le panneau Tunnels et sur une question de certificat est le nom par lequel la
+connexion a été établie, et le reste.
 
 **Chemin de plink.exe** n'est nécessaire que pour les chemins passant par PuTTY : clés Pageant,
 serveurs en keyboard-interactive, et le repli sur Plink. Des fichiers de clés seuls n'en ont pas

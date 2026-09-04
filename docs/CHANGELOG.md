@@ -12,6 +12,49 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the network tools follow a gateway edit, and a split pane lists the gateways
+
+### "Route via" follows the gateway that was edited
+
+The sixteen network tools that can tunnel through an SSH gateway built their "Route via" list
+once, from the settings as they stood when the tab was opened, and tagged each entry with that
+snapshot. The entry the user picked was the object the tool dialled. A gateway edited while the tab
+stayed open therefore kept its old name in the list and, worse, its old host, port and credentials
+on the wire, for as long as the tab lived.
+
+v2026.090405 shipped that as a known limit. Its notes said: The "Route via" selectors inside the
+network tools still list the gateways as they were when the tool tab was opened; reopen the tab
+after editing a gateway. This change lifts that limit, and the notes of the next version must say
+so against that sentence.
+
+The sixteen views now share one selector, fed by a live inventory the session manager hands to
+every tool. On a save the list is rebuilt from the new inventory and the pick is kept by gateway
+id, which is the one thing an edit keeps. A picked gateway that was edited is handed to the tool
+again, so the next run dials the new host. A picked gateway that was deleted falls the tool back
+to a direct connection and says so on the tool's own error line. A save that leaves the picked
+gateway as it was tells the tool nothing: two of these tools answer a gateway change with a
+remote subnet probe over SSH, and would otherwise probe on every unrelated save.
+
+What this does not do: a run already in progress keeps the tunnel it opened. Every tool, the
+network cartography included, reads the gateway once when the run starts and holds it for the
+run; the edited gateway is dialled by the next run, not the current one.
+
+One side effect was removed with the old handlers. Each view raised its own selection event once
+while filling the list at initialisation, and the SecNumCloud audit answered that event by
+replacing the target host it had just been given with the local subnet. A tool opened from a
+server now keeps the host it was opened with.
+
+### A tool opened into a split pane lists the gateways
+
+The split service opened a tool into a pane without handing it the settings, so the "Route via"
+list of a tool in a split pane held "Direct connection" and nothing else, whatever the settings
+said. The inventory is now read from the configuration itself and shared by every tool, so a
+split pane lists the same gateways as a tab and follows the same edits.
+
+A source guard holds the shape: every view that declares a "Route via" combo builds the shared
+selector as a step of its initialisation and releases it as a step of its disposal, with none of
+the per-view machinery left behind.
+
 ## 2026-09-04: sessions closed before exit, gateway renames that reach every row, and a log that names its refusal (v2026.090405)
 
 Three merges that each said they should ride with the next substantive change. The first is
