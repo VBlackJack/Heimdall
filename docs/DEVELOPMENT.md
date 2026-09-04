@@ -149,7 +149,12 @@ there is published.
 (`README.md`, `docs/*.md`); French mirrors it (`README.fr.md`, `docs/fr/*.md`). Each version links
 to the other under its title. A change to one is not finished until the other says the same thing.
 
-**Published release notes** are English by default, in `docs/release-notes/v<version>.md`.
+**Published release notes** are English only, in `docs/release-notes/v<version>.md`. They are read
+from a GitHub release page and from the in-app updater, by people who never chose a locale, and they
+are the one public category that is not mirrored: a French half doubles the maintenance and halves
+the attention the English half gets. `ReleaseNotesLanguageGuardTests` enforces this from
+v2026.083101 on. Notes published before that version predate the rule and are kept exactly as they
+were published: rewriting a release body would make it say something the release never said.
 
 `docs/CHANGELOG.md` is English only. It is a chronological engineering record of the same genre as
 the release notes, and translating it would impose permanent double maintenance with no reader.
