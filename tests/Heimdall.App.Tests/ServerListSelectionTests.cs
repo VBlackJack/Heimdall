@@ -955,7 +955,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
             ServerListViewModel viewModel,
             ConnectionStateMachine stateMachine,
             RecentConnectionTracker recentConnections,
-            SessionHealthMonitor? healthMonitor)
+            SessionHealthMonitor? healthMonitor,
+            FakeUiDispatcher dispatcher)
         {
             _rootPath = rootPath;
             ConfigManager = configManager;
@@ -963,9 +964,12 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
             StateMachine = stateMachine;
             RecentConnections = recentConnections;
             HealthMonitor = healthMonitor;
+            Dispatcher = dispatcher;
         }
 
         public IConfigManager ConfigManager { get; }
+
+        public FakeUiDispatcher Dispatcher { get; }
 
         public ServerListViewModel ViewModel { get; }
 
@@ -1023,7 +1027,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
                 viewModel,
                 stateMachine,
                 recentConnections,
-                healthMonitor);
+                healthMonitor,
+                uiDispatcher);
         }
 
         public AppSettings ExpandGroups(params string[] groups)

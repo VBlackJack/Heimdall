@@ -224,10 +224,50 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         InitializeFilterOptions();
         InitializeSelectionModel();
         _connectionSm.StateChanged += OnConnectionStateChanged;
+        _configManager.SettingsChanged += OnSettingsChanged;
         if (_healthMonitor is not null)
         {
             _healthMonitor.StatusChanged += OnServerHealthChanged;
         }
+    }
+
+    /// <summary>
+    /// Re-resolves every row's gateway when the configuration changes underneath the list.
+    /// </summary>
+    /// <remarks>
+    /// Rows resolve their gateway once, against the inventory they were built with. A gateway
+    /// renamed in the Settings tab changes that inventory and nothing about the profiles, so no
+    /// row is rebuilt and every one of them keeps the old name - in the badge, its tooltip, the
+    /// name a screen reader announces, and the detail pane. Seen live on 2026-09-04: two rows
+    /// showed two different names for one gateway id at the same instant, the one that happened
+    /// to have been saved through the editor being the only one to have picked up the rename.
+    ///
+    /// This re-resolves rather than reloading the list. A reload would rebuild every row and
+    /// discard what the rows carry and the configuration does not: selection, expansion, health
+    /// verdicts, connection state.
+    ///
+    /// It refreshes <see cref="_currentSettings" /> for the same reason
+    /// <see cref="RereadSettingsAfterDialogAsync" /> does: a field left describing the
+    /// pre-change configuration is a defect waiting on whichever path reads it next.
+    /// </remarks>
+    private void OnSettingsChanged(AppSettings settings)
+    {
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _currentSettings = settings;
+            Dictionary<string, SshGatewayDto> gatewayMap = BuildGatewayMap(settings);
+            foreach (ServerItemViewModel server in _allServers)
+            {
+                server.RefreshGatewayState(gatewayMap);
+            }
+
+            RefreshLookupCollections(settings);
+        });
     }
 
     private readonly SessionHealthMonitor? _healthMonitor;
@@ -315,6 +355,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         _connectionSm.StateChanged -= OnConnectionStateChanged;
+        _configManager.SettingsChanged -= OnSettingsChanged;
         if (_healthMonitor is not null)
         {
             _healthMonitor.StatusChanged -= OnServerHealthChanged;

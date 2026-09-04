@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: renaming a gateway reaches the rows that were not edited
+
+A session row resolved its gateway's name once, against the inventory it was built with, and
+nothing re-resolved it afterwards. Renaming a gateway changes that inventory and nothing about the
+profiles, so no row was rebuilt and every one of them kept the old name.
+
+Seen live on 2026-09-04: two rows showed two different names for one gateway at the same instant.
+The one that happened to have been saved through the session editor had picked up the rename; the
+one nobody had touched had not. The name a screen reader announces, the tooltip, the detail pane
+line and the external-tool `{gateway}` token all come from that one resolution, so all four said
+the old name together.
+
+The list now re-resolves every row when the configuration changes underneath it. It re-resolves
+rather than reloading: a reload would rebuild each row and discard what the rows carry and the
+configuration does not, which is selection, expansion, health verdicts and connection state.
+
 ## Unreleased: the log says which of the three refusals it made
 
 The refusal added last change was right and its explanation was not. A scheduled task can fail to
