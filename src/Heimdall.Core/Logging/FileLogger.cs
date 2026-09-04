@@ -95,6 +95,19 @@ public sealed class FileLogger : IDisposable
     /// </remarks>
     public static void ErrorDetailed(string message, Exception ex) => Log("ERROR", $"{message}: {ex}");
 
+    /// <summary>
+    /// Records a contained fault with the exception's type, its stack, and the inner chain.
+    /// </summary>
+    /// <remarks>
+    /// The counterpart of <see cref="ErrorDetailed"/> for a fault that was caught and worked
+    /// around rather than fatal. The session teardown at exit logged only
+    /// <see cref="Exception.Message"/>, and a NullReferenceException's message names no
+    /// reference: a whole shutdown's worth of that line could not say which one was null.
+    /// Reserved, like its counterpart, for a catch whose message alone has already proven
+    /// insufficient.
+    /// </remarks>
+    public static void WarnDetailed(string message, Exception ex) => Log("WARN", $"{message}: {ex}");
+
     /// <summary>Flushes all queued log entries to disk immediately.</summary>
     public static void Flush() => _instance?.FlushInternal();
 

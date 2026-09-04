@@ -1299,8 +1299,10 @@ public sealed class SplitService : ISplitService
         }
         catch (Exception ex)
         {
-            Core.Logging.FileLogger.Warn(
-                $"DisconnectSession failed for pane '{pane.PaneId}' reason={reason}: {ex.Message}");
+            // The stack, not the message: a NullReferenceException's message names no reference,
+            // and one shutdown's worth of this line could not say which one was null.
+            Core.Logging.FileLogger.WarnDetailed(
+                $"DisconnectSession failed for pane '{pane.PaneId}' reason={reason}", ex);
         }
     }
 

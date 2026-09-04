@@ -12,6 +12,30 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: exit closes the sessions before WPF has torn the application down
+
+`App.OnExit` is asynchronous, and WPF calls it from inside its own shutdown, which clears
+`Application.Current` and the main window the moment the override returns. For an asynchronous
+override that moment is its first incomplete await. The session snapshot save was that await, and
+the session close came after it, so every host was torn down inside an application that no longer
+existed.
+
+The shipped logs show what that cost: "UI dispatcher is not available" from every connection state
+observer, and a NullReferenceException from the one pane control still loaded, whose
+main-view-model lookup dereferenced the cleared singleton. The RDP teardown logged a second
+NullReferenceException on every pane, with a message that names no reference.
+
+The sessions are now closed before the sequence first yields, and the snapshot entries are
+captured before the close empties the collection they come from. The main-view-model lookup is
+null-safe on the application itself, not only on the window, through one helper for its four call
+sites. The three catch sites on the exit path record the exception's type and stack rather than
+its message, so the next fault on this path says where it was.
+
+What this does not claim: the second exception, inside the RDP view's teardown between the trust
+prompt being unregistered and the host teardown sequence starting, has not been reproduced and its
+site has not been identified. It ran with the application singleton cleared and it no longer will,
+but the log line it would leave if it recurs is evidence this change adds, not a fix.
+
 ## Unreleased: renaming a gateway reaches the rows that were not edited
 
 A session row resolved its gateway's name once, against the inventory it was built with, and

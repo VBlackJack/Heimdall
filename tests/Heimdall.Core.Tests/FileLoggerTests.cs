@@ -127,6 +127,23 @@ public class FileLoggerTests : IDisposable
         Assert.Contains("BuildNestedException", content);
     }
 
+    [Fact]
+    public void WarnDetailed_RecordsTheStackAndTheInnerChain_AsAWarning()
+    {
+        FileLogger.Initialize(_tempDir);
+        FileLogger.WarnDetailed("Silent close failed", BuildNestedException());
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
+
+        Assert.Contains("[WARN]", content);
+        Assert.DoesNotContain("[ERROR]", content);
+        Assert.Contains("outer failure", content);
+        Assert.Contains("inner failure", content);
+        Assert.Contains("InvalidOperationException", content);
+        Assert.Contains("BuildNestedException", content);
+    }
+
     /// <summary>
     /// Thrown and caught for real, because an exception that was never thrown carries
     /// no stack trace and the assertion above would pass for the wrong reason.

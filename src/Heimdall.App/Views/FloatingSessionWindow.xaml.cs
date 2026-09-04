@@ -100,8 +100,7 @@ public partial class FloatingSessionWindow : Window
     {
         if (_reattached) return;
 
-        var mainWindow = Application.Current.MainWindow;
-        if (mainWindow?.DataContext is not MainViewModel vm) return;
+        if (MainViewModelLocator.FindCurrent() is not MainViewModel vm) return;
 
         _reattached = true;
 
@@ -194,8 +193,7 @@ public partial class FloatingSessionWindow : Window
         if (!_reattached)
         {
             // The session was not reattached; dispose it properly via ConnectionViewModel
-            var mainWindow = Application.Current.MainWindow;
-            if (mainWindow?.DataContext is MainViewModel vm)
+            if (MainViewModelLocator.FindCurrent() is MainViewModel vm)
             {
                 // Detach host control from this window before ConnectionViewModel disposes it
                 SessionHost.Content = null;

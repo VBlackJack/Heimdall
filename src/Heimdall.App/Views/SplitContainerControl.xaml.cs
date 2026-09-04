@@ -18,6 +18,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Heimdall.App.Services;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
@@ -213,7 +214,7 @@ public partial class SplitContainerControl : UserControl
 
     private string L(string key)
     {
-        var vm = Application.Current.MainWindow?.DataContext as ViewModels.MainViewModel;
+        var vm = MainViewModelLocator.FindCurrent();
         return vm?.GetLocalizer()[key] ?? key;
     }
 
