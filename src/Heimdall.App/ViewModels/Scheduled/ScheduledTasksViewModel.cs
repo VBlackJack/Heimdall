@@ -288,15 +288,30 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
             task.ServerName,
             _main.ServerList.AllServers,
             s => s.Id,
-            s => s.DisplayName);
+            s => s.DisplayName,
+            out ScheduledTaskResolution resolution);
 
         if (server is null)
         {
+            // The reason comes from the resolver rather than being guessed here. There are three
+            // ways to answer nothing and they need three different sentences: the first version of
+            // this line told every user their profile had been deleted, including the ones whose
+            // two same-named profiles were both still in the inventory.
+            string diagnosis = resolution switch
+            {
+                ScheduledTaskResolution.IdentifierNotFound =>
+                    "no profile carries that identifier - it was deleted or re-identified, and "
+                    + "another profile of the same name is NOT assumed to be its replacement",
+                ScheduledTaskResolution.NameAmbiguous =>
+                    "this task records no profile identifier and several profiles carry that "
+                    + "name, so which one it means cannot be established",
+                _ =>
+                    "this task records no profile identifier and no profile carries that name",
+            };
+
             FileLogger.Warn(
-                $"Scheduled task '{task.ServerName}' (serverId={task.ServerId}) matched no "
-                + "profile in the inventory, so nothing was connected. The profile it names was "
-                + "deleted or re-identified; another profile of the same name is NOT assumed to "
-                + "be its replacement. Re-point the task at the profile you mean.");
+                $"Scheduled task '{task.ServerName}' (serverId={task.ServerId}) connected nothing: "
+                + $"{diagnosis}. Re-point the task at the profile you mean.");
             _main.StatusText = _localizer.Format("ErrorScheduledTaskFailed",
                 $"Server '{task.ServerName}' not found");
             return;

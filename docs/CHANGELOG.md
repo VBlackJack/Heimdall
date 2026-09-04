@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the log says which of the three refusals it made
+
+The refusal added last change was right and its explanation was not. A scheduled task can fail to
+match a profile in three ways - the identifier it records is gone, it records no identifier and no
+profile carries its name, or it records no identifier and several profiles do - and the log
+reported all three as a profile that had been deleted or re-identified.
+
+That is a wrong diagnosis, not a vague one: an older task with no identifier and two same-named
+profiles, none of them ever deleted, was told its profile had disappeared, sending the reader to
+look for something that had not happened.
+
+The resolver now reports which of the three it made, and the log says it. Guessing in the caller
+would have been a second copy of the rule; the first version of the sentence is what that guess
+looks like.
+
 ## Unreleased: a unique name is not evidence
 
 v2026.090403 made a scheduled task fall back to a display name when its identifier no longer
