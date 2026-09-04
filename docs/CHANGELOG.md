@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the network tools follow a gateway edit, and a split pane lists the gateways
+## 2026-09-04: the network tools follow a gateway edit, and a split pane lists the gateways (v2026.090406)
 
 ### "Route via" follows the gateway that was edited
 
