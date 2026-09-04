@@ -293,7 +293,10 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
         if (server is null)
         {
             FileLogger.Warn(
-                $"Scheduled task '{task.ServerName}': server not found in inventory. Skipping.");
+                $"Scheduled task '{task.ServerName}' (serverId={task.ServerId}) matched no "
+                + "profile in the inventory, so nothing was connected. The profile it names was "
+                + "deleted or re-identified; another profile of the same name is NOT assumed to "
+                + "be its replacement. Re-point the task at the profile you mean.");
             _main.StatusText = _localizer.Format("ErrorScheduledTaskFailed",
                 $"Server '{task.ServerName}' not found");
             return;

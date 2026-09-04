@@ -24,21 +24,24 @@ namespace Heimdall.App.ViewModels.Scheduled;
 /// <c>ScheduledTasksViewModel.OnTaskDueAsync</c> it sat behind a live main view-model, a session
 /// coordinator and a timer, and a rule reachable only through all of that ends up asserted by
 /// reading source text instead - or not at all, which is what happened.</para>
-/// <para><b>The identifier first, and the name only when it answers unambiguously.</b> The
+/// <para><b>A task that names an identifier is answered by that identifier or not at all.</b> The
 /// fallback used to take the FIRST profile with a matching display name whenever the identifier
 /// failed to resolve. Display names are not unique - two profiles are routinely both called
-/// "Production" - so a task whose profile had been deleted, replaced by an import or given a new
-/// identifier opened a session on a DIFFERENT machine, unattended, on a schedule, with nothing on
-/// screen to notice it.</para>
-/// <para><b>Refusing the fallback outright is the wrong correction, and this is the second
-/// version.</b> A dangling identifier with exactly ONE profile of that name is the ordinary case -
-/// a profile deleted and re-created, or re-identified by a migration - and there the name answers
-/// with no ambiguity at all. Refusing it turns a task that was working into a silent no-op: the
-/// scheduler stamps LastRun before it calls this, so the grid shows the task ran while nothing
-/// connected. Ambiguity is what makes the fallback dangerous, not the fallback.</para>
-/// <para>So: the identifier when it resolves; otherwise the name when exactly one profile carries
-/// it; otherwise nothing. A task naming no identifier at all - what an older file holds - is
-/// answered by the same unambiguous-name rule.</para>
+/// "Production" - so a task whose profile had been deleted opened a session on a DIFFERENT
+/// machine, unattended, on a schedule.</para>
+/// <para><b>Requiring the name to be unique does not fix that, which is the correction this
+/// version makes.</b> Delete the profile a task names and the remaining same-named profile becomes
+/// the unique match - and it is a different machine. "Deleted and re-created under a new
+/// identifier" and "deleted, and an unrelated profile happens to share the name" produce the same
+/// inventory; nothing recorded anywhere can separate them. Uniqueness is a property of the list,
+/// not evidence about the destination.</para>
+/// <para><b>The cost of refusing is real and is the lesser one.</b> A task whose profile was
+/// deleted and re-created stops running, and the scheduler stamps its last-run time before calling
+/// this, so the grid says it ran. That is bad and it is discoverable - the log names the task and
+/// the identifier it could not find. Connecting to a machine nobody chose is neither.</para>
+/// <para>A task naming no identifier at all - what an older file holds - is still answered by
+/// display name, and still only when exactly one profile carries it. There the name is the only
+/// thing recorded, so refusing it would break every such task rather than protect anything.</para>
 /// </remarks>
 internal static class ScheduledTaskServerResolver
 {
@@ -60,17 +63,13 @@ internal static class ScheduledTaskServerResolver
 
         if (!string.IsNullOrEmpty(taskServerId))
         {
-            TServer? byIdentifier = servers.FirstOrDefault(
+            // That identifier or nothing. No name is consulted here: a name that has become
+            // unique because the task's own profile was deleted names a different machine.
+            return servers.FirstOrDefault(
                 server => string.Equals(identifierOf(server), taskServerId, StringComparison.Ordinal));
-
-            if (byIdentifier is not null)
-            {
-                return byIdentifier;
-            }
         }
 
-        // Single, or nothing. Two profiles of one name cannot say which the task meant, and
-        // guessing there is what connected to the wrong machine.
+        // Only for a task that recorded no identifier, and only when the name is unambiguous.
         List<TServer> byName = [.. servers.Where(
             server => string.Equals(
                 displayNameOf(server),

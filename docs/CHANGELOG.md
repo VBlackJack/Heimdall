@@ -12,6 +12,31 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: a unique name is not evidence
+
+v2026.090403 made a scheduled task fall back to a display name when its identifier no longer
+resolved, provided exactly one profile carried that name. The uniqueness requirement looked like
+the safe half of the rule. It is not evidence about anything.
+
+Two profiles both called "Production", on two different machines; a task names one of them by
+identifier; the user deletes that profile. The name is now unique - and it names the other machine.
+"Deleted and re-created under a new identifier" and "deleted, and an unrelated profile happens to
+share the name" leave exactly the same inventory behind, and nothing recorded anywhere separates
+them.
+
+A task that records an identifier is now answered by that identifier or not at all. A task that
+records no identifier - what an older file holds - is still answered by an unambiguous name, because
+there the name is the only thing there is.
+
+The cost is stated rather than discovered: a profile deleted and re-created under a new identifier
+stops running its task, and the scheduler stamps the task's last-run time before it runs, so the
+grid will say it ran. The log now names the task, the identifier it could not find, and says that
+another profile of the same name is deliberately not assumed to be its replacement. That is worse
+than a task that keeps working and better than a session opened on a machine nobody chose.
+
+The release notes for v2026.090403 stated that a scheduled task no longer connects to the wrong
+machine. With a profile deleted, it still could.
+
 ## Unreleased: a migration withdrawn, and a scheduled task that stops guessing
 
 The startup migration added in the previous entry is removed. It did more harm than it repaired.
