@@ -12,7 +12,12 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: exit closes the sessions before WPF has torn the application down
+## 2026-09-04: sessions closed before exit, gateway renames that reach every row, and a log that names its refusal (v2026.090405)
+
+Three merges that each said they should ride with the next substantive change. The first is
+that change.
+
+### Exit closes the sessions before WPF has torn the application down
 
 `App.OnExit` is asynchronous, and WPF calls it from inside its own shutdown, which clears
 `Application.Current` and the main window the moment the override returns. For an asynchronous
@@ -36,7 +41,7 @@ prompt being unregistered and the host teardown sequence starting, has not been 
 site has not been identified. It ran with the application singleton cleared and it no longer will,
 but the log line it would leave if it recurs is evidence this change adds, not a fix.
 
-## Unreleased: renaming a gateway reaches the rows that were not edited
+### Renaming a gateway reaches the rows that were not edited
 
 A session row resolved its gateway's name once, against the inventory it was built with, and
 nothing re-resolved it afterwards. Renaming a gateway changes that inventory and nothing about the
@@ -52,7 +57,7 @@ The list now re-resolves every row when the configuration changes underneath it.
 rather than reloading: a reload would rebuild each row and discard what the rows carry and the
 configuration does not, which is selection, expansion, health verdicts and connection state.
 
-## Unreleased: the log says which of the three refusals it made
+### The log says which of the three refusals it made
 
 The refusal added last change was right and its explanation was not. A scheduled task can fail to
 match a profile in three ways - the identifier it records is gone, it records no identifier and no
@@ -67,7 +72,7 @@ The resolver now reports which of the three it made, and the log says it. Guessi
 would have been a second copy of the rule; the first version of the sentence is what that guess
 looks like.
 
-## Unreleased: a unique name is not evidence
+## 2026-09-04: a unique name is not evidence (v2026.090404)
 
 v2026.090403 made a scheduled task fall back to a display name when its identifier no longer
 resolved, provided exactly one profile carried that name. The uniqueness requirement looked like
@@ -92,7 +97,7 @@ than a task that keeps working and better than a session opened on a machine nob
 The release notes for v2026.090403 stated that a scheduled task no longer connects to the wrong
 machine. With a profile deleted, it still could.
 
-## Unreleased: a migration withdrawn, and a scheduled task that stops guessing
+## 2026-09-04: a migration withdrawn, and a scheduled task that stops guessing (v2026.090403)
 
 The startup migration added in the previous entry is removed. It did more harm than it repaired.
 
@@ -119,7 +124,7 @@ The collision these changes circle - a saved profile and a typed destination sha
 - is NOT fixed here. It is documented in `local/trust-namespace-collision-open.md` with the three
 attempts that failed and the analysis that killed a fourth before it was written.
 
-## Unreleased: the reservation, applied to what was already there
+## 2026-09-04: the reservation, applied to what was already there (v2026.090402)
 
 The previous entry says the quick-connect namespace is reserved at the door foreign identifiers
 come through. That door was not the only one, and the entry should not have been written as though
@@ -137,7 +142,7 @@ key that belonged to a profile since deleted cannot be told apart from that one,
 for the same reason. That residue is bounded: from this version, no profile can enter the
 namespace, so no new key of that shape belongs to one.
 
-## Unreleased: a namespace nobody owned, and a tool that blocked its own cleanup
+## 2026-09-04: a namespace nobody owned, and a tool that blocked its own cleanup (v2026.090401)
 
 Two defects that predate the certificate work but contradict what v2026.090301 published about it.
 
@@ -166,7 +171,7 @@ and kills the child process - therefore never ran, and Windows does not end a ch
 parent, so a long-running command outlived the application that started it. The close arbiter
 beside this check had always exempted a silent close; this check simply never got the same rule.
 
-## Unreleased: three answers to a question a string cannot hold
+## 2026-09-03: three answers to a question a string cannot hold (v2026.090301)
 
 A third review round. Both remaining blockers were places where a fix had closed the case it was
 shown and left a sibling open.
@@ -250,7 +255,7 @@ and the session's cancellation ran above all of them catching only `ObjectDispos
   the hand-back rather than the recording. It is replaced by tests over the record's construction
   and over each copy taken between there and the caller.
 
-## Unreleased: two answers that were safe and still wrong
+## 2026-09-03: two answers that were safe and still wrong (v2026.090301, same release)
 
 An external review blocked the certificate-question work twice more. Both blockers came from the
 same habit: answering a question with the safest thing available, rather than with the fact.

@@ -197,6 +197,11 @@ for the length of the transfer, and turn it off afterwards.
 sessions through it to machines that are not reachable directly. This is the setting to look for
 when a server is only accessible from inside a network you reach over SSH.
 
+Renaming a gateway is reflected at once on every session that routes through it: the badge
+and tooltip in the tree, the detail pane, and the `{Gateway}` token of external tools. What an
+open connection shows on its tab, in the Tunnels panel and on a certificate question is the
+name the connection was made through, and it stays so.
+
 **Path to plink.exe** is needed only for the PuTTY-based paths: Pageant keys,
 keyboard-interactive servers, and the Plink fallback. Key files alone need nothing here.
 **PuTTY path** is needed only when SSH mode is set to External; left blank it is looked for next

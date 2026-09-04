@@ -213,6 +213,11 @@ transiter par elle les sessions vers des machines qui ne le sont pas directement
 réglage à chercher quand un serveur n'est accessible que depuis l'intérieur d'un réseau que vous
 atteignez en SSH.
 
+Renommer une passerelle se répercute aussitôt sur chaque session qui passe par elle : le badge
+et l'infobulle dans l'arbre, le panneau de détail et la variable `{Gateway}` des outils
+externes. Ce qu'une connexion ouverte affiche sur son onglet, dans le panneau Tunnels et sur
+une question de certificat est le nom par lequel la connexion a été établie, et le reste.
+
 **Chemin de plink.exe** n'est nécessaire que pour les chemins passant par PuTTY : clés Pageant,
 serveurs en keyboard-interactive, et le repli sur Plink. Des fichiers de clés seuls n'en ont pas
 besoin. **Chemin de PuTTY** n'est nécessaire que si le mode SSH est réglé sur External ; laissé

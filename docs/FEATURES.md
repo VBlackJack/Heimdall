@@ -155,6 +155,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 ### Scheduled Tasks
 - Daily or interval-based automatic connection scheduler
 - Background timer with proper async dispatch and semaphore-guarded ticks
+- A task targets a profile by identifier. A task saved without one (older task files) matches by display name only when exactly one profile carries it; when the identifier is gone, when the name is missing, or when several profiles share it, nothing is connected and the log names which of the three it was
 
 ### External Tools
 - Configurable tools in server context menu with inline edit panel

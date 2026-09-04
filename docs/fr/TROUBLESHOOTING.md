@@ -64,6 +64,7 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 47. [Passerelle WinRM - réponse serveur invalide HTTP 12152](#winrm-gateway-12152)
 48. [Fournisseur d'identifiants KeePassXC - pièges courants](#keepassxc-credential-provider)
 49. [RDP embarqué - session coupée peu après la connexion](#rdp-slow-server-cutoff)
+50. [Tâche planifiée - exécutée mais rien de connecté](#scheduled-task-connected-nothing)
 
 ---
 
@@ -917,3 +918,13 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Solution** : aucune pour l'instant. Ce qui trancherait est une capture propre couvrant toute la séquence, avec l'heure de coupure notée à la main : voir [repro/capture-rdp-slow-server-cutoff-log.md](repro/capture-rdp-slow-server-cutoff-log.md). La procédure est écrite pour quiconque peut reproduire la panne, et une seule capture qui la suit suffit à départager les trois candidats.
 
 **Fichiers** : aucun tant que la cause n'est pas confirmée.
+
+## 50. Tâche planifiée - exécutée mais rien de connecté {#scheduled-task-connected-nothing}
+
+**Symptôme** : l'onglet Scheduled affiche une exécution récente pour une tâche, aucune session ne s'est ouverte, et le journal contient une ligne commençant par `Scheduled task '<nom>' (serverId=<id>) connected nothing:`.
+
+**Cause racine** : la tâche n'a correspondu à aucun profil. La suite de la ligne dit lequel des trois cas s'est produit : aucun profil ne porte l'identifiant enregistré par la tâche (le profil a été supprimé ou recréé, et un profil du même nom n'est jamais présumé le remplacer) ; la tâche n'enregistre aucun identifiant et aucun profil ne porte son nom ; ou la tâche n'enregistre aucun identifiant et plusieurs profils portent son nom, si bien que celui qu'elle vise ne peut pas être établi. L'heure de dernière exécution est écrite avant que la tâche s'exécute, ce qui explique l'exécution affichée.
+
+**Solution** : modifiez la tâche et pointez-la sur le profil voulu. Une tâche enregistrée depuis la version courante mémorise l'identifiant de ce profil et ne dépend plus de son nom.
+
+**Fichiers** : `src/Heimdall.App/ViewModels/Scheduled/ScheduledTaskServerResolver.cs`, `src/Heimdall.App/ViewModels/Scheduled/ScheduledTasksViewModel.cs`

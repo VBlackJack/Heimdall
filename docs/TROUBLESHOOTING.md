@@ -64,6 +64,7 @@ Index of all issues encountered during development and their solutions.
 47. [WinRM Gateway - HTTP 12152 Invalid Server Response](#winrm-gateway-12152)
 48. [KeePassXC Credential Provider - Common Gotchas](#keepassxc-credential-provider)
 49. [RDP Embedded - Session Cut Off Shortly After Connecting](#rdp-slow-server-cutoff)
+50. [Scheduled Task - Ran But Connected Nothing](#scheduled-task-connected-nothing)
 
 ---
 
@@ -917,3 +918,13 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Solution**: None yet. What settles it is one clean capture covering the whole sequence, with the cutoff time noted by hand: see [repro/capture-rdp-slow-server-cutoff-log.md](repro/capture-rdp-slow-server-cutoff-log.md). The procedure is written for whoever can reproduce the failure, and one capture following it is enough to tell the three candidates apart.
 
 **Files**: none until the cause is confirmed.
+
+## 50. Scheduled Task - Ran But Connected Nothing {#scheduled-task-connected-nothing}
+
+**Symptom**: The Scheduled tab shows a recent run for a task, no session was opened, and the log holds a line beginning with `Scheduled task '<name>' (serverId=<id>) connected nothing:`.
+
+**Root cause**: The task matched no profile. The rest of the line says which of three cases it was: no profile carries the identifier the task records (the profile was deleted or re-created, and a profile with the same name is never assumed to be its replacement); the task records no identifier and no profile carries its name; or the task records no identifier and several profiles carry its name, so which one it means cannot be established. The last-run time is stamped before the task runs, which is why the tab shows a run.
+
+**Solution**: Edit the task and point it at the profile you mean. A task saved from the current version records that profile's identifier and no longer depends on its name.
+
+**Files**: `src/Heimdall.App/ViewModels/Scheduled/ScheduledTaskServerResolver.cs`, `src/Heimdall.App/ViewModels/Scheduled/ScheduledTasksViewModel.cs`

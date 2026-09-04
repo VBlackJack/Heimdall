@@ -155,6 +155,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 ### Tâches planifiées
 - Planificateur de connexions automatiques quotidiennes ou par intervalle
 - Minuteur en arrière-plan avec dispatch asynchrone correct et ticks protégés par sémaphore
+- Une tâche cible un profil par son identifiant. Une tâche enregistrée sans identifiant (anciens fichiers de tâches) ne correspond par nom affiché que si un seul profil le porte ; identifiant disparu, nom absent ou nom partagé par plusieurs profils, rien n'est connecté et le journal dit lequel des trois cas s'est produit
 
 ### Outils externes
 - Outils configurables dans le menu contextuel des serveurs, avec panneau d'édition en ligne
