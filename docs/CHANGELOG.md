@@ -12,7 +12,31 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: certificate trust has two owners, the palette dials a saved profile as a saved profile, and the out-of-range warning says what the loader does
+## Unreleased: every setting bound is declared once, certificate trust has two owners, the palette dials a saved profile as a saved profile, and the out-of-range warning says what the loader does
+
+### A setting's range is declared once, and the loader and the screen agree on it
+
+A numeric setting's bound was written in four places by hand: in the loader's validator, in the
+settings screen's own range annotation, in the map from that annotation's English sentence to a
+translation key, and inside the English and French translations themselves. Nothing tied them
+together, and they had drifted: the screen refused a tunnel establishment delay above 30 seconds
+that the loader accepted up to 60, and the loader warned about an anti-idle interval of 0, which
+is the value that turns the timer off and which the screen had always accepted. Six settings had
+a bound on the screen and none in the loader at all.
+
+Each ranged setting now carries its bound as one declaration on the setting itself, and every
+reader derives from it: the loader's diagnostics, the screen's validation, the message the screen
+shows, and both translations, which are now templates the declared numbers are formatted into.
+A setting whose "off" value is zero declares that too, so the loader stops warning about it.
+
+Two bounds moved, by decision, where the loader and the screen had disagreed: the tunnel
+establishment delay is 0 to 60000 ms on both (the loader's value; the screen used to stop at
+30000), and the anti-idle interval is 0 for off or 10 to 3600 seconds on both (the screen's
+ceiling; the loader used to warn above 600 and on 0). Six settings the screen bounded on its own
+now carry that bound in the loader too, so a hand-edited file outside it is warned about: the
+update check interval, the terminal font size, the external tool timeout, and the three session
+health monitor settings. Nothing is clamped: the loader still keeps a value outside the range as
+written and says so.
 
 ### A saved profile and a typed destination no longer share certificate trust
 

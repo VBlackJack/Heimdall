@@ -243,6 +243,22 @@ dessus. Purement organisationnel : cela ne change rien à la façon dont une con
 L'éditeur ouvert quand vous modifiez un fichier distant en SFTP. Laissé vide, Windows ouvre le
 fichier avec ce qu'il associe à cette extension.
 
+## Où vit la plage d'un réglage, et ce qui se passe en dehors
+
+Chaque réglage numérique qui a une plage recommandée la déclare une seule fois, sur le réglage
+lui-même, dans `AppSettings`. Le chargeur, l'écran de réglages, le message que l'écran affiche
+et les deux traductions lisent cette déclaration unique ; aucun d'eux ne porte de nombre en
+propre. Auparavant, la même borne était écrite à quatre endroits à la main, et elles avaient
+divergé.
+
+Les deux lecteurs font des choses différentes d'une valeur hors plage. L'écran de réglages
+refuse de l'enregistrer et nomme la borne. Le chargeur, qui lit `settings.json`, garde la valeur
+exactement telle qu'elle est écrite et journalise un avertissement qui le dit : un fichier écrit
+par un Heimdall plus récent doit survivre à un plus ancien, donc le chargeur ne réécrit jamais
+ce qu'il ne comprend pas. Qu'une valeur hors plage ait ensuite un effet se décide là où le
+réglage est utilisé. Un réglage dont la valeur "désactivé" est zéro le déclare aussi, et zéro est
+accepté sans avertissement.
+
 ## Voir aussi
 
 - [Mémoire RDP et réglage des sessions](RDP-PERFORMANCE.md)
