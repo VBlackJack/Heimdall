@@ -291,16 +291,6 @@ public partial class App : System.Windows.Application
                 _ = PersistTrustedFtpsCertificateEntryAsync(configManager, key, entry);
             };
 
-            // Before the store reads anything: a profile saved before the quick-connect namespace
-            // was reserved still holds an identifier in it, and its durable approvals are filed
-            // under that identifier. Left alone, the palette mints the same identifier for a
-            // destination typed by hand and that destination inherits the approval.
-            //
-            // Reserving the namespace at the import door only stopped NEW profiles entering it;
-            // this is what deals with the ones already there, and it moves their approvals with
-            // them rather than leaving them behind under the old key.
-            await MigrateAdHocNamespaceAsync(configManager, settings);
-
             var rdpCertificateStore = _serviceProvider.GetRequiredService<RdpCertificateTrustStore>();
             rdpCertificateStore.LoadFromConfig(
                 settings.TrustedRdpCertificates.Select(
@@ -881,52 +871,6 @@ public partial class App : System.Windows.Application
     /// last certificate leaves no trace of the profile in the file.
     /// </para>
     /// </remarks>
-    /// <summary>
-    /// Moves any saved profile out of the quick-connect identifier namespace, with its approvals.
-    /// </summary>
-    /// <remarks>
-    /// <para>Runs before the certificate store reads anything, so the store never sees a profile's
-    /// approval under an identifier the palette mints for a typed destination.</para>
-    /// <para>The decision itself is <see cref="AdHocNamespaceMigration"/>, which is pure and
-    /// measured by running it. What lives here is only the reading, the two writes and the log -
-    /// and the guard that keeps a failure here from stopping the application, since a startup that
-    /// refuses to launch is worse than one that logs a migration it could not perform.</para>
-    /// </remarks>
-    private static async Task MigrateAdHocNamespaceAsync(IConfigManager configManager, AppSettings settings)
-    {
-        try
-        {
-            List<ServerProfileDto> servers = await configManager.LoadServersAsync().ConfigureAwait(false);
-            IReadOnlyDictionary<string, string> renames =
-                AdHocNamespaceMigration.Plan(servers, () => Guid.NewGuid().ToString());
-
-            if (renames.Count == 0)
-            {
-                return;
-            }
-
-            if (!AdHocNamespaceMigration.Apply(renames, servers, settings.TrustedRdpCertificates))
-            {
-                return;
-            }
-
-            await configManager.SaveServersAsync(servers).ConfigureAwait(false);
-            await configManager.SaveSettingsAsync(settings).ConfigureAwait(false);
-
-            Heimdall.Core.Logging.FileLogger.Info(
-                $"Moved {renames.Count} profile(s) out of the quick-connect identifier namespace, "
-                + "with their approved certificates, so a destination typed by hand cannot inherit "
-                + "an approval given for a saved profile.");
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"Could not move profiles out of the quick-connect identifier namespace: {ex.Message}. "
-                + "Any profile still holding such an identifier shares a certificate approval with "
-                + "the destination the palette mints it for.");
-        }
-    }
-
     internal static async Task PersistTrustedRdpCertificatesAsync(
         IConfigManager configManager,
         string profileId,

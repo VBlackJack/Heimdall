@@ -12,6 +12,33 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: a migration withdrawn, and a scheduled task that stops guessing
+
+The startup migration added in the previous entry is removed. It did more harm than it repaired.
+
+It wrote two files with no transaction between them, so an interruption left an approval orphaned
+under the old identifier with no reserved profile remaining for it to be noticed by - the fix
+manufacturing the residue it claimed to preserve deliberately. And an approval under a reserved
+identifier has two possible owners: a typed destination that earned it before the colliding profile
+was imported, or the profile. Nothing on disk records which, so moving it to the profile is a
+guess, and half the time it is a transfer of trust to a different machine.
+
+Renaming an identifier also breaks what refers to it. A scheduled task recorded the identifier of
+the profile it runs, and the lookup fell back to the FIRST profile with a matching display name
+when that identifier no longer resolved - so a task could open a session on a different machine,
+unattended, on a schedule. Display names are not unique; two profiles are routinely both called
+"Production".
+
+The lookup now answers by identifier, and by name only when exactly one profile carries it. That
+keeps working the ordinary case - a profile deleted and re-created, or re-identified - and refuses
+the ambiguous one, which is where the harm was. Refusing the fallback outright was the first
+correction and it was also wrong: the scheduler stamps the task's last-run time before it runs, so
+a refusal would have shown the task as having run while nothing connected.
+
+The collision these changes circle - a saved profile and a typed destination sharing one trust key
+- is NOT fixed here. It is documented in `local/trust-namespace-collision-open.md` with the three
+attempts that failed and the analysis that killed a fourth before it was written.
+
 ## Unreleased: the reservation, applied to what was already there
 
 The previous entry says the quick-connect namespace is reserved at the door foreign identifiers

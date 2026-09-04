@@ -274,12 +274,16 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
         _main.StatusText = _localizer.Format(
             "StatusScheduledTaskTriggered", task.ServerName, task.ConnectionType);
 
-        // Find the server in the current server list by ID or name fallback
-        var server = _main.ServerList.Servers.FirstOrDefault(
-            s => !string.IsNullOrEmpty(task.ServerId)
-                 && string.Equals(s.Id, task.ServerId, StringComparison.Ordinal))
-            ?? _main.ServerList.Servers.FirstOrDefault(
-                s => string.Equals(s.DisplayName, task.ServerName, StringComparison.OrdinalIgnoreCase));
+        // The rule lives in ScheduledTaskServerResolver, where it can be run by a test. It used
+        // to fall back to the first profile with a matching DISPLAY NAME whenever the identifier
+        // failed to resolve - and display names are not unique, so a task whose profile had been
+        // deleted or re-identified opened a session on a different machine, unattended.
+        var server = ScheduledTaskServerResolver.Resolve(
+            task.ServerId,
+            task.ServerName,
+            _main.ServerList.Servers,
+            s => s.Id,
+            s => s.DisplayName);
 
         if (server is null)
         {
