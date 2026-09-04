@@ -228,7 +228,7 @@ public sealed partial class CommandPaletteViewModel
         {
             var ssh = new ServerItemViewModel
             {
-                Id = $"adhoc-ssh-{query}",
+                Id = $"{AdHocProfileIds.Prefix}ssh-{query}",
                 DisplayName = _localizer.Format("QuickConnectSshTo", query),
                 RemoteServer = query,
                 Endpoint = query,
@@ -237,7 +237,7 @@ public sealed partial class CommandPaletteViewModel
             };
             var rdp = new ServerItemViewModel
             {
-                Id = $"adhoc-rdp-{query}",
+                Id = $"{AdHocProfileIds.Prefix}rdp-{query}",
                 DisplayName = _localizer.Format("QuickConnectRdpTo", query),
                 RemoteServer = query,
                 Endpoint = query,
@@ -450,7 +450,7 @@ public sealed partial class CommandPaletteViewModel
 
         var vm = new ServerItemViewModel
         {
-            Id = $"adhoc-{Guid.NewGuid():N}",
+            Id = $"{AdHocProfileIds.Prefix}{Guid.NewGuid():N}",
             DisplayName = $"{user}@{host}:{port}",
             RemoteServer = host,
             ConnectionType = "SSH",

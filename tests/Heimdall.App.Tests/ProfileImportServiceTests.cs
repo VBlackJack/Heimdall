@@ -82,6 +82,71 @@ public sealed class ProfileImportServiceTests
         Assert.True(stored.RdpMultiMonitor);
     }
 
+    // An import preserves the identifier its file carried - deliberately, so a profile keeps its
+    // trust and its history across an export and a re-import. The palette's destination namespace
+    // is the one place that must not be preservable.
+    //
+    // The palette mints "adhoc-rdp-<host>" for a destination typed by hand, keys that
+    // destination's certificate approval on it, and decides in six places whether an entry is a
+    // saved profile or a typed destination by testing the same prefix. A profile importable into
+    // that namespace shared both: approving its certificate let a quick connect to the matching
+    // host connect without a question, and the palette offered it a typed destination's actions.
+    [Theory]
+    [InlineData("adhoc-rdp-prod.example")]
+    [InlineData("adhoc-ssh-prod.example")]
+    [InlineData("adhoc-anything-at-all")]
+    public async Task ImportFromPathAsync_Json_RemintsAnIdentifierInTheQuickConnectNamespace(
+        string reservedId)
+    {
+        using ProfileImportFixture fixture = new();
+        string path = await fixture.WriteJsonAsync("servers.json",
+        [
+            new ServerProfileDto
+            {
+                Id = reservedId,
+                DisplayName = "Lab",
+                ConnectionType = "RDP",
+                RemoteServer = "lab.example",
+                RemotePort = 3389
+            }
+        ]);
+
+        var result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+        var servers = await fixture.ConfigManager.LoadServersAsync();
+
+        Assert.True(result.HasChanges);
+        var stored = Assert.Single(servers);
+
+        // Imported, kept, usable - only its identifier changed.
+        Assert.Equal("Lab", stored.DisplayName);
+        Assert.NotEqual(reservedId, stored.Id);
+        Assert.False(AdHocProfileIds.IsAdHoc(stored.Id));
+    }
+
+    // The control that keeps the assertions above meaningful: an ordinary identifier IS preserved,
+    // so the reminting measures the reservation and not a service that remints everything.
+    [Fact]
+    public async Task ImportFromPathAsync_Json_KeepsAnOrdinaryIdentifier()
+    {
+        using ProfileImportFixture fixture = new();
+        string path = await fixture.WriteJsonAsync("servers.json",
+        [
+            new ServerProfileDto
+            {
+                Id = "not-adhoc-prod.example",
+                DisplayName = "Lab",
+                ConnectionType = "RDP",
+                RemoteServer = "lab.example",
+                RemotePort = 3389
+            }
+        ]);
+
+        _ = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+        var servers = await fixture.ConfigManager.LoadServersAsync();
+
+        Assert.Equal("not-adhoc-prod.example", Assert.Single(servers).Id);
+    }
+
     [Fact]
     public async Task ImportFromPathAsync_Json_UsesPreviewAndImportsSelection()
     {
@@ -245,7 +310,7 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        var servers = await fixture.ConfigManager.LoadServersAsync();
         AppSettings reloadedSettings = await fixture.ConfigManager.LoadSettingsAsync();
         Assert.True(result.HasChanges);
         Assert.Equal(0, result.GatewayCreatedCount);
@@ -348,7 +413,7 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        var servers = await fixture.ConfigManager.LoadServersAsync();
         Assert.True(result.HasChanges);
         Assert.Equal(1, result.GatewayOrphanCount);
         Assert.Equal("missing-gateway", Assert.Single(servers).SshGatewayId);
@@ -425,7 +490,7 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        var servers = await fixture.ConfigManager.LoadServersAsync();
         Assert.True(result.IsFailure);
         Assert.Contains("Import file is too large", result.ErrorMessage, StringComparison.Ordinal);
         Assert.Contains("10 B", result.ErrorMessage, StringComparison.Ordinal);
@@ -451,7 +516,7 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        var servers = await fixture.ConfigManager.LoadServersAsync();
         RdpImportRowViewModel row = Assert.Single(fixture.Dialog.LastRdpImportViewModel!.Rows);
         Assert.False(result.HasChanges);
         Assert.Empty(servers);
@@ -477,7 +542,7 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        var servers = await fixture.ConfigManager.LoadServersAsync();
         RdpImportRowViewModel row = Assert.Single(fixture.Dialog.LastRdpImportViewModel!.Rows);
         Assert.False(result.HasChanges);
         Assert.Empty(servers);
@@ -505,7 +570,7 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        var servers = await fixture.ConfigManager.LoadServersAsync();
         RdpImportRowViewModel row = Assert.Single(fixture.Dialog.LastRdpImportViewModel!.Rows);
         Assert.False(result.HasChanges);
         Assert.Equal(1, result.SkippedCount);
@@ -582,7 +647,7 @@ public sealed class ProfileImportServiceTests
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
         Assert.Equal(1, result.RenamedCount);
-        List<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        var servers = await fixture.ConfigManager.LoadServersAsync();
         ServerProfileDto renamed = Assert.Single(
             servers,
             (ServerProfileDto server) => !string.Equals(server.Id, "existing-profile", StringComparison.Ordinal));

@@ -460,6 +460,32 @@ public sealed class SplitServiceTests : IDisposable
         Assert.True(closableView.Disposed);
     }
 
+    // The same busy tool, asked silently. A silent close is application exit: there is nowhere
+    // later for a refusal to be honoured, and nothing else cleans up behind it. Refusing here
+    // meant the tool's Dispose never ran, so the cancel-and-kill it performs never happened - and
+    // Windows does not end a child process with its parent, so a long-running ping outlived the
+    // application that started it.
+    //
+    // The close arbiter above this check has always answered Allow for a silent request without
+    // consulting a guard; this check simply never got the same rule.
+    [Fact]
+    public void CloseAllPanes_SilentRequest_ClosesAndDisposesEvenABusyToolPane()
+    {
+        var session = new SessionTabViewModel();
+        var toolPane = MakePane(connectionType: "TOOL:PING");
+        var blockingView = new StubToolView(canClose: false);
+        toolPane.HostControl = blockingView;
+        session.RootContent = toolPane;
+
+        var result = _sut.CloseAllPanes(session, CloseRequest.Silent(DisconnectReason.UserAction));
+
+        Assert.True(result.IsClosed);
+        Assert.Null(toolPane.HostControl);
+
+        // Dispose is what cancels the tool and kills its child process.
+        Assert.True(blockingView.Disposed);
+    }
+
     [Fact]
     public void CloseAllPanes_ToolPaneBlocking_ReturnsFalse_AndPreservesHostControl()
     {

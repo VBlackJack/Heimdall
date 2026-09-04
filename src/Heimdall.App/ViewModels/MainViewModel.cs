@@ -926,7 +926,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         var dto = new ServerProfileDto
         {
-            Id = "adhoc-" + Guid.NewGuid().ToString("N"),
+            Id = AdHocProfileIds.Prefix + Guid.NewGuid().ToString("N"),
             DisplayName = displayName,
             RemoteServer = host,
             ConnectionType = connType,
