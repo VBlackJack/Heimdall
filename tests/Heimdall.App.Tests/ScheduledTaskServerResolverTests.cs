@@ -67,24 +67,40 @@ public sealed class ScheduledTaskServerResolverTests
         Assert.Null(resolved);
     }
 
-    // And the correction to the correction. Refusing the fallback outright breaks the ordinary
-    // case - a profile deleted and re-created, or re-identified by a migration - where exactly one
-    // profile carries the name and there is no ambiguity to be wrong about. Worse than breaking
-    // it: the scheduler stamps LastRun before calling this, so the grid would show the task ran
-    // while nothing connected.
+    // The case that made "unique name" insufficient, and the reason this refuses instead.
+    //
+    // Two profiles named Production, on two different machines; a task names one of them by
+    // identifier; the user deletes that profile. The name is now unique - and it names the OTHER
+    // machine. "Deleted and re-created under a new identifier" and "deleted, and an unrelated
+    // profile happens to share the name" leave the same inventory behind, so uniqueness is a
+    // property of the list rather than evidence about the destination.
     [Fact]
-    public void ATaskWhoseIdentifierIsGoneStillFindsAnUnambiguousName()
+    public void DeletingTheProfileATaskNamesDoesNotTransferItToTheSurvivingHomonym()
     {
         Server? resolved = Resolve(
-            "id-gone",
-            "PROD-DC01",
-            new Server("id-a", "Lab"),
-            new Server("id-b", "PROD-DC01"));
+            "id-A",
+            "Production",
+            new Server("id-B", "Production"));
 
-        Assert.Equal("id-b", resolved?.Id);
+        Assert.Null(resolved);
     }
 
-    // The control that keeps the assertion above from being "the resolver always returns null":
+    // The cost, stated as a test so it is not discovered as a surprise: a profile deleted and
+    // re-created under a new identifier stops running its task. That is the lesser harm - the log
+    // names the task and the identifier it could not find, whereas connecting to a machine nobody
+    // chose says nothing at all.
+    [Fact]
+    public void ATaskWhoseProfileWasRecreatedUnderANewIdentifierStopsRunning()
+    {
+        Server? resolved = Resolve(
+            "id-old",
+            "PROD-DC01",
+            new Server("id-new", "PROD-DC01"));
+
+        Assert.Null(resolved);
+    }
+
+    // The control that keeps the assertions above from being "the resolver always returns null":
     // the same inventory, the same names, and an identifier that DOES resolve.
     [Fact]
     public void TheSameInventoryStillAnswersATaskWhoseIdentifierResolves()
