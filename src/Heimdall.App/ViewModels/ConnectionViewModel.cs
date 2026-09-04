@@ -575,9 +575,9 @@ public partial class ConnectionViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                Core.Logging.FileLogger.Warn(
-                    $"Silent close failed for session '{session.Title}': {ex.Message}. "
-                    + "Continuing with the remaining sessions.");
+                Core.Logging.FileLogger.WarnDetailed(
+                    $"Silent close failed for session '{session.Title}', continuing with the remaining sessions",
+                    ex);
             }
         }
     }

@@ -78,6 +78,9 @@ public partial class App : System.Windows.Application
 
     public bool IsShuttingDown { get; internal set; }
 
+    /// <summary>How long exit waits for the session snapshot to reach disk.</summary>
+    private static readonly TimeSpan ExitSnapshotSaveBudget = TimeSpan.FromSeconds(2);
+
     // WPF's startup hook is event-like. Keeping async void here lets the splash
     // stay visible while awaited initialization completes on the dispatcher.
     protected override async void OnStartup(StartupEventArgs e)
@@ -1292,39 +1295,24 @@ public partial class App : System.Windows.Application
 
         if (_serviceProvider is not null)
         {
-            try
+            // The sessions are closed BEFORE this method first yields, and the sequence records
+            // why: WPF clears Application.Current the moment an asynchronous OnExit returns to
+            // DoShutdown, which is its first incomplete await. The snapshot save is that await.
+            // Closing after it tore every host down inside an application that no longer existed.
+            ISessionSnapshotService? snapshotService = _mainViewModel is null
+                ? null
+                : _serviceProvider.GetService<ISessionSnapshotService>();
+            if (snapshotService is not null)
             {
-                var snapshotService = _serviceProvider.GetService<ISessionSnapshotService>();
-                if (snapshotService is not null)
-                {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                    _mainViewModel!.StatusText = _mainViewModel.Localize("StatusSnapshotSaving");
-                    var sessions = _mainViewModel.GetSessionSnapshotEntries();
-                    if (sessions.Count > 0)
-                    {
-                        await snapshotService.SaveAsync(sessions, cts.Token);
-                    }
-                    else
-                    {
-                        await snapshotService.ClearAsync(cts.Token);
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                Core.Logging.FileLogger.Warn("[App] session snapshot save timed out during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn($"[App] session snapshot save failed: {ex.Message}");
+                _mainViewModel!.StatusText = _mainViewModel.Localize("StatusSnapshotSaving");
             }
 
-            // Close all active sessions (SSH, SFTP, RDP, Local - disposes host controls + kills processes)
-            try
-            {
-                _mainViewModel?.Connection.CloseAllSessionsSilently();
-            }
-            catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] session cleanup: {ex.Message}"); }
+            await ApplicationExitSequence.SaveSnapshotAndCloseSessionsAsync(
+                () => _mainViewModel!.GetSessionSnapshotEntries(),
+                () => _mainViewModel?.Connection.CloseAllSessionsSilently(),
+                snapshotService,
+                ExitSnapshotSaveBudget,
+                Core.Logging.FileLogger.Warn);
 
             // Close all active tunnels (Plink tunnel processes)
             try

@@ -678,8 +678,9 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
                 }
                 catch (Exception ex)
                 {
-                    Core.Logging.FileLogger.Warn(
-                        $"EmbeddedSessionManager.DisconnectSession host dispose failed paneId={pane.PaneId} reason={reason}: {ex.Message}");
+                    Core.Logging.FileLogger.WarnDetailed(
+                        $"EmbeddedSessionManager.DisconnectSession host dispose failed paneId={pane.PaneId} reason={reason}",
+                        ex);
                 }
                 break;
 

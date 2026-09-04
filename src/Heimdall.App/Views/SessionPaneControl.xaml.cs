@@ -336,10 +336,7 @@ public partial class SessionPaneControl : UserControl
         return false;
     }
 
-    private MainViewModel? FindMainViewModel()
-    {
-        return Application.Current.MainWindow?.DataContext as MainViewModel;
-    }
+    private static MainViewModel? FindMainViewModel() => MainViewModelLocator.FindCurrent();
 
     private static bool IsApplicationShuttingDown()
     {
