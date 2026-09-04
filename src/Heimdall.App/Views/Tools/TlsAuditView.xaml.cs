@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Automation;
@@ -64,7 +63,7 @@ public partial class TlsAuditView : UserControl, IToolView
     private LocalizationManager? _localizer;
     private bool _disposed;
     private Action<bool>? _setBusy;
-    private List<SshGatewayDto>? _gateways;
+    private GatewayRouteSelector? _routeSelector;
 
     public TlsAuditView()
     {
@@ -93,10 +92,8 @@ public partial class TlsAuditView : UserControl, IToolView
         if (!string.IsNullOrWhiteSpace(context?.Argument))
             ParseArgument(context.Argument);
 
-        if (context?.SshGateways is IList gateways)
-            _gateways = gateways.Cast<SshGatewayDto>().ToList();
-
-        PopulateRouteSelector();
+        _routeSelector?.Dispose();
+        _routeSelector = new GatewayRouteSelector(CmbRouteVia, context, L, OnGatewaySelected, ReportRouteStatus);
         RefreshUiFromVm();
 
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
@@ -197,29 +194,8 @@ public partial class TlsAuditView : UserControl, IToolView
             _ = _vm.RunAuditCommand.ExecuteAsync(null);
     }
 
-    private void PopulateRouteSelector()
+    private void OnGatewaySelected(SshGatewayDto? gateway)
     {
-        CmbRouteVia.Items.Clear();
-        CmbRouteVia.Items.Add(new ComboBoxItem { Content = L("ToolTunnelDirect") });
-
-        if (_gateways is not null)
-        {
-            foreach (var gateway in _gateways)
-            {
-                var label = $"{gateway.Name} ({gateway.Host}:{gateway.Port})";
-                CmbRouteVia.Items.Add(new ComboBoxItem { Content = label, Tag = gateway });
-            }
-        }
-
-        CmbRouteVia.SelectedIndex = 0;
-        _vm.SetGateway(null);
-    }
-
-    private void OnRouteViaChanged(object sender, SelectionChangedEventArgs e)
-    {
-        var gateway = CmbRouteVia.SelectedItem is ComboBoxItem item && item.Tag is SshGatewayDto dto
-            ? dto
-            : null;
         _vm.SetGateway(gateway);
     }
 
@@ -431,12 +407,21 @@ public partial class TlsAuditView : UserControl, IToolView
 
     private string L(string key) => _localizer?[key] ?? key;
 
+    private void ReportRouteStatus(string message)
+    {
+        // Through the ViewModel, which is what the view's own refresh reads back.
+        _vm.ShowError = false;
+        _vm.ErrorMessage = message;
+        _vm.ShowError = true;
+    }
+
     public void Dispose()
     {
         if (_disposed)
             return;
 
         _disposed = true;
+        _routeSelector?.Dispose();
         _setBusy?.Invoke(false);
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.Dispose();

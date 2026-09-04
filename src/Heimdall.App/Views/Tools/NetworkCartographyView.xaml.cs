@@ -41,7 +41,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
     private LocalizationManager? _localizer;
     private bool _disposed;
     private List<(string FileName, DateTime Timestamp, string Subnet)> _historyList = [];
-    private List<Heimdall.Core.Configuration.SshGatewayDto>? _gateways;
+    private GatewayRouteSelector? _routeSelector;
     private Action<string, string, ToolContext?>? _openToolAction;
     private Action<bool>? _setBusy;
     private int _renderedHostCount;
@@ -111,12 +111,8 @@ public partial class NetworkCartographyView : UserControl, IToolView
             }
         }
 
-        if (context?.SshGateways is System.Collections.IList gateways)
-        {
-            _gateways = gateways.Cast<Heimdall.Core.Configuration.SshGatewayDto>().ToList();
-        }
-
-        PopulateRouteSelector();
+        _routeSelector?.Dispose();
+        _routeSelector = new GatewayRouteSelector(CmbRouteVia, context, L, OnGatewaySelected, ReportRouteStatus);
         PopulateHistory();
         UpdateResponsiveLayout(ActualWidth);
         RefreshUiFromVm();
@@ -674,35 +670,12 @@ public partial class NetworkCartographyView : UserControl, IToolView
         _vm.CompareWithHistory(_historyList[index].FileName);
     }
 
-    private void PopulateRouteSelector()
+    private async void OnGatewaySelected(Heimdall.Core.Configuration.SshGatewayDto? gateway)
     {
-        CmbRouteVia.Items.Clear();
-        CmbRouteVia.Items.Add(L("ToolTunnelDirect"));
-        if (_gateways is not null)
-        {
-            foreach (var gateway in _gateways)
-            {
-                CmbRouteVia.Items.Add($"{gateway.Name} ({gateway.Host}:{gateway.Port})");
-            }
-        }
-
-        CmbRouteVia.SelectedIndex = 0;
-    }
-
-    private async void OnRouteViaChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (CmbRouteVia.SelectedIndex <= 0 || _gateways is null)
-        {
-            _vm.SetGateway(null);
-            TxtSubnet.ToolTip = null;
-            return;
-        }
-
-        var index = CmbRouteVia.SelectedIndex - 1;
-        var gateway = index < _gateways.Count ? _gateways[index] : null;
         _vm.SetGateway(gateway);
         if (gateway is null)
         {
+            TxtSubnet.ToolTip = null;
             return;
         }
 
@@ -823,6 +796,11 @@ public partial class NetworkCartographyView : UserControl, IToolView
 
     public bool CanClose() => !_vm.IsScanning;
 
+    private void ReportRouteStatus(string message)
+    {
+        _vm.StatusText = message;
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -832,6 +810,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         }
 
         _disposed = true;
+        _routeSelector?.Dispose();
         TxtSubnet.KeyDown -= OnSubnetKeyDown;
         ResultsGrid.PreviewMouseRightButtonDown -= ToolContextMenuHelper.SelectRowOnRightClick;
         ResultsGrid.ContextMenuOpening -= OnResultsContextMenuOpening;

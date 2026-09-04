@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Automation;
@@ -38,7 +37,7 @@ public partial class WhoisLookupView : UserControl, IToolView
     private bool _disposed;
     private Action<bool>? _setBusy;
     private readonly ToolAsyncStateController _viewState;
-    private List<SshGatewayDto>? _gateways;
+    private GatewayRouteSelector? _routeSelector;
     private SshGatewayDto? _selectedGateway;
 
     public WhoisLookupView()
@@ -85,12 +84,8 @@ public partial class WhoisLookupView : UserControl, IToolView
             _vm.SearchWith(context.TargetHost!);
         }
 
-        if (context?.SshGateways is IList gateways)
-        {
-            _gateways = gateways.Cast<SshGatewayDto>().ToList();
-        }
-
-        PopulateRouteSelector();
+        _routeSelector?.Dispose();
+        _routeSelector = new GatewayRouteSelector(CmbRouteVia, context, L, OnGatewaySelected, ReportRouteStatus);
         _vm.SetGateway(_selectedGateway);
         RefreshUiFromVm();
 
@@ -103,6 +98,14 @@ public partial class WhoisLookupView : UserControl, IToolView
 
     public bool CanClose() => !_vm.IsBusy;
 
+    private void ReportRouteStatus(string message)
+    {
+        // Through the ViewModel, which is what the view's own refresh reads back.
+        _vm.ShowError = false;
+        _vm.ErrorText = message;
+        _vm.ShowError = true;
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -111,6 +114,7 @@ public partial class WhoisLookupView : UserControl, IToolView
         }
 
         _disposed = true;
+        _routeSelector?.Dispose();
 
         if (_localizer is not null)
         {
@@ -125,49 +129,16 @@ public partial class WhoisLookupView : UserControl, IToolView
 
     private void ApplyLocalization()
     {
-        PopulateRouteSelector();
+        _routeSelector?.Relocalize();
         ApplyBusyButtonState();
         AutomationProperties.SetName(CmbRouteVia, L("ToolTunnelRouteVia"));
         AutomationProperties.SetName(LoadingBar, L("ToolWhoisStatusQuerying"));
     }
 
-    private void PopulateRouteSelector()
+    private void OnGatewaySelected(SshGatewayDto? gateway)
     {
-        var selectedGateway = _selectedGateway;
-
-        CmbRouteVia.Items.Clear();
-        CmbRouteVia.Items.Add(new ComboBoxItem { Content = L("ToolTunnelDirect") });
-
-        var selectedIndex = 0;
-        if (_gateways is not null)
-        {
-            for (var i = 0; i < _gateways.Count; i++)
-            {
-                var gateway = _gateways[i];
-                var label = $"{gateway.Name} ({gateway.Host}:{gateway.Port})";
-                CmbRouteVia.Items.Add(new ComboBoxItem { Content = label, Tag = gateway });
-                if (ReferenceEquals(selectedGateway, gateway))
-                {
-                    selectedIndex = i + 1;
-                }
-            }
-        }
-
-        CmbRouteVia.SelectedIndex = selectedIndex;
-    }
-
-    private void OnRouteViaChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (CmbRouteVia.SelectedItem is ComboBoxItem item && item.Tag is SshGatewayDto gateway)
-        {
-            _selectedGateway = gateway;
-        }
-        else
-        {
-            _selectedGateway = null;
-        }
-
-        _vm.SetGateway(_selectedGateway);
+        _selectedGateway = gateway;
+        _vm.SetGateway(gateway);
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)

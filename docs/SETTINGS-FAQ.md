@@ -198,9 +198,12 @@ sessions through it to machines that are not reachable directly. This is the set
 when a server is only accessible from inside a network you reach over SSH.
 
 Renaming a gateway is reflected at once on every session that routes through it: the badge
-and tooltip in the tree, the detail pane, and the `{Gateway}` token of external tools. What an
-open connection shows on its tab, in the Tunnels panel and on a certificate question is the
-name the connection was made through, and it stays so.
+and tooltip in the tree, the detail pane, and the `{Gateway}` token of external tools. Editing a
+gateway also reaches the "Route via" list of every open network tool, which keeps its selection
+and dials the edited host on its next run; a run already in progress keeps the tunnel it opened.
+Deleting the selected gateway puts the tool back on a direct connection and says so on its error
+line. What an open connection shows on its tab, in the Tunnels panel and on a certificate
+question is the name the connection was made through, and it stays so.
 
 **Path to plink.exe** is needed only for the PuTTY-based paths: Pageant keys,
 keyboard-interactive servers, and the Plink fallback. Key files alone need nothing here.

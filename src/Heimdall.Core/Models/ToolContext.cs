@@ -36,4 +36,5 @@ public sealed record ToolContext(
     Action<bool>? SetBusyAction = null,
     Action<string>? SendCommandAction = null,
     Func<bool>? CanSendToTerminal = null,
-    string? InitialActionId = null);
+    string? InitialActionId = null,
+    IGatewayInventory? GatewayInventory = null);

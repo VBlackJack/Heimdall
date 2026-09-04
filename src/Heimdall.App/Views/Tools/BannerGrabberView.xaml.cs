@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -40,7 +39,7 @@ public partial class BannerGrabberView : UserControl, IToolView
 {
     private LocalizationManager? _localizer;
     private bool _disposed;
-    private List<SshGatewayDto>? _gateways;
+    private GatewayRouteSelector? _routeSelector;
     private Action<string, string, ToolContext?>? _openToolAction;
     private Action<bool>? _setBusy;
     private readonly ToolAsyncStateController _viewState;
@@ -89,12 +88,8 @@ public partial class BannerGrabberView : UserControl, IToolView
             TxtHost.Text = context.TargetHost;
         }
 
-        if (context?.SshGateways is IList gateways)
-        {
-            _gateways = gateways.Cast<SshGatewayDto>().ToList();
-        }
-
-        PopulateRouteSelector();
+        _routeSelector?.Dispose();
+        _routeSelector = new GatewayRouteSelector(CmbRouteVia, context, L, OnGatewaySelected, ReportRouteStatus);
         _results.Clear();
         _viewState.Reset();
         RefreshUiFromVm();
@@ -227,33 +222,9 @@ public partial class BannerGrabberView : UserControl, IToolView
         ChkBannerOnly.IsEnabled = enabled;
     }
 
-    private void PopulateRouteSelector()
+    private void OnGatewaySelected(SshGatewayDto? gateway)
     {
-        CmbRouteVia.Items.Clear();
-        CmbRouteVia.Items.Add(new ComboBoxItem { Content = L("ToolTunnelDirect") });
-
-        if (_gateways is not null)
-        {
-            foreach (var gateway in _gateways)
-            {
-                var label = $"{gateway.Name} ({gateway.Host}:{gateway.Port})";
-                CmbRouteVia.Items.Add(new ComboBoxItem { Content = label, Tag = gateway });
-            }
-        }
-
-        CmbRouteVia.SelectedIndex = 0;
-    }
-
-    private void OnRouteViaChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (CmbRouteVia.SelectedItem is ComboBoxItem item && item.Tag is SshGatewayDto gateway)
-        {
-            _vm.SetGateway(gateway);
-        }
-        else
-        {
-            _vm.SetGateway(null);
-        }
+        _vm.SetGateway(gateway);
     }
 
     private void OnPresetClick(object sender, RoutedEventArgs e)
@@ -506,6 +477,14 @@ public partial class BannerGrabberView : UserControl, IToolView
 
     public bool CanClose() => !_vm.IsGrabbing;
 
+    private void ReportRouteStatus(string message)
+    {
+        // Through the ViewModel, which is what the view's own refresh reads back.
+        _vm.ShowError = false;
+        _vm.ErrorText = message;
+        _vm.ShowError = true;
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -514,6 +493,7 @@ public partial class BannerGrabberView : UserControl, IToolView
         }
 
         _disposed = true;
+        _routeSelector?.Dispose();
         _vm.PropertyChanged -= OnVmPropertyChanged;
         TxtHost.KeyDown -= OnHostKeyDown;
         TxtPorts.KeyDown -= OnHostKeyDown;

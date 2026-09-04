@@ -180,6 +180,29 @@ public sealed class ToolRegistry
     }
 
     /// <summary>
+    /// Registers one tool under the external overlay with a factory the caller supplies.
+    /// </summary>
+    /// <remarks>
+    /// A test seam, and nothing else uses it: every built-in tool is a XAML view that resolves
+    /// application resources, so a test that must open a tool through the session manager
+    /// without building an application registers a probe view here instead. The built-in list is
+    /// untouched; the entry is merged the way a scanned external tool is.
+    /// </remarks>
+    internal void RegisterToolForTests(ToolDescriptor descriptor, Func<IToolView> factory)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentNullException.ThrowIfNull(factory);
+
+        lock (_externalLock)
+        {
+            var entry = new ToolEntry(descriptor, factory);
+            _externalEntries.Add(entry);
+            _externalById[descriptor.Id] = entry;
+            All = _entries.Concat(_externalEntries).Select(e => e.Descriptor).ToList();
+        }
+    }
+
+    /// <summary>
     /// Looks up a tool by its short ID (e.g. "PING") or external ID (e.g. "EXT:SYSINTERNALS:PSEXEC").
     /// Also accepts the prefixed form "TOOL:PING" - the prefix is stripped automatically.
     /// </summary>

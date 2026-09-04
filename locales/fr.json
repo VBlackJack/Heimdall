@@ -4874,6 +4874,7 @@
   "ToolTunnelConnecting": "Connexion \u00e0 la passerelle...",
   "ToolTunnelConnected": "Connect\u00e9 via {0}",
   "ToolTunnelFailed": "\u00c9chec de connexion \u00e0 la passerelle : {0}",
+  "ToolTunnelGatewayRemoved": "La passerelle \"{0}\" a \u00e9t\u00e9 supprim\u00e9e des param\u00e8tres. Cet outil se connecte d\u00e9sormais en direct.",
   "ToolDnsNoResults": "Aucun r\u00e9sultat",
 
   "PaletteToolNetMap": "Cartographie r\u00e9seau",

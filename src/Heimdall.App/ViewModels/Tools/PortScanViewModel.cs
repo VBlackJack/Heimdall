@@ -56,8 +56,15 @@ public sealed partial class PortScanViewModel : ObservableObject, IDisposable
 
     public void SetGateway(SshGatewayDto? gateway)
     {
+        CurrentGateway = gateway;
         _service.SetGateway(gateway);
     }
+
+    /// <summary>
+    /// The gateway the next scan dials, null for direct. Observable so a test can tell which DTO
+    /// the view handed over without reaching into the service.
+    /// </summary>
+    internal SshGatewayDto? CurrentGateway { get; private set; }
 
     public (List<int>? Ports, string? ErrorKey) ParseAndValidatePorts(string portsText)
     {

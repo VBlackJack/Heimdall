@@ -83,7 +83,6 @@
                                    FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" Margin="{StaticResource MarginInlineXs}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <ComboBox x:Name="CmbRouteVia" Width="180"
-                                  SelectionChanged="OnRouteViaChanged"
                                   Background="{DynamicResource CardBrush}"
                                   Foreground="{DynamicResource TextPrimaryBrush}"
                                   BorderBrush="{DynamicResource BorderBrush}"

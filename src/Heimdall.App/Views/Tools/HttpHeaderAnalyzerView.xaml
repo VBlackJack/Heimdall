@@ -126,7 +126,6 @@
                               Background="{DynamicResource CardBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
-                              SelectionChanged="OnRouteViaChanged"
                               TabIndex="2"
                               VerticalAlignment="Center"/>
                 </DockPanel>
