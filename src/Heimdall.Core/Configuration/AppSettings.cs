@@ -84,12 +84,25 @@ public sealed class AppSettings
     public int TelnetConnectTimeoutMs { get; set; } = 15000;
     [SettingRange(1000, 120000)]
     public int CredentialProviderTimeoutMs { get; set; } = 10000;
+    /// <summary>
+    /// How long the credential autofill watcher searches for the remote logon prompt by default,
+    /// in milliseconds. Restated here so the surfaces that fall back to it when no settings are
+    /// reachable read the one value.
+    /// </summary>
+    public const int DefaultRdpCredentialAutofillTimeoutMs = 90000;
+
+    /// <summary>
+    /// How long a freshly connected session waits before its first dynamic resolution update
+    /// by default, in milliseconds. Same reason as the autofill default above.
+    /// </summary>
+    public const int DefaultRdpResizeEnableDelayMs = 10000;
+
     [SettingRange(5000, 300000)]
-    public int RdpCredentialAutofillTimeoutMs { get; set; } = 90000;
+    public int RdpCredentialAutofillTimeoutMs { get; set; } = DefaultRdpCredentialAutofillTimeoutMs;
     [SettingRange(1000, 60000)]
     public int RdpArtifactCleanupDelayMs { get; set; } = 10000;
     [SettingRange(1000, 60000, ZeroMeansOff = true)]
-    public int RdpResizeEnableDelayMs { get; set; } = 10000;
+    public int RdpResizeEnableDelayMs { get; set; } = DefaultRdpResizeEnableDelayMs;
     [SettingRange(5000, 600000, ZeroMeansOff = true)]
     public int RdpConnectWatchdogTimeoutMs { get; set; } = 45000;
     public const int DefaultRdpAutoReconnectMaxAttempts = 20;

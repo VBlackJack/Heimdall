@@ -37,7 +37,7 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposable
 {
-    internal const int DefaultRdpResizeEnableDelayMs = 10000;
+    internal const int DefaultRdpResizeEnableDelayMs = AppSettings.DefaultRdpResizeEnableDelayMs;
     private static readonly ConditionalWeakTable<SessionTabViewModel, PendingReconnectState>
         PendingReconnectStates = new ConditionalWeakTable<SessionTabViewModel, PendingReconnectState>();
 

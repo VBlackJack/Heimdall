@@ -65,6 +65,111 @@ public sealed class ServerDialogViewModelRdpOptionsTests
         Assert.Null(vm.ToDto().RdpDomain);
     }
 
+    // Same rule as the domain, for the same reason: the gateway is validated and written as an
+    // address by the .rdp generator and by the embedded host, and " gw.corp " is not gw.corp to
+    // either. It was the one address in the dialog that reached them untrimmed.
+    [Theory]
+    [InlineData("  gw.corp.example  ", "gw.corp.example")]
+    [InlineData("\tgw.corp.example\r\n", "gw.corp.example")]
+    [InlineData("gw.corp.example", "gw.corp.example")]
+    public void ToDto_TrimsTheGateway(string typed, string expected)
+    {
+        ServerDialogViewModel vm = RdpProfile();
+        vm.RdpGateway = typed;
+
+        Assert.Equal(expected, vm.ToDto().RdpGateway);
+    }
+
+    // A malformed gateway used to be saved as typed and refused at connect time, by the
+    // attestation sentence the generator and the host raise once the session was already asked
+    // for. The same address rule now refuses it at the box, on the tab that shows the box.
+    [Fact]
+    public void Validate_RefusesAMalformedGateway_AndNamesTheBox()
+    {
+        ServerDialogViewModel vm = RdpProfile();
+        vm.RdpGateway = "gw..corp";
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.NotNull(vm.RdpGatewayError);
+        Assert.Equal(vm.RdpGatewayError, vm.ValidationError);
+        Assert.Equal(nameof(ServerDialogViewModel.RdpGateway), vm.FirstInvalidField);
+        Assert.Equal(1, vm.NetworkTabErrorCount);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("gw.corp.example")]
+    [InlineData(" gw.corp.example ")]
+    [InlineData("10.0.0.5")]
+    public void Validate_AcceptsAnEmptyOrWellFormedGateway(string typed)
+    {
+        ServerDialogViewModel vm = RdpProfile();
+        vm.RdpGateway = typed;
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.Null(vm.RdpGatewayError);
+        Assert.Equal(0, vm.NetworkTabErrorCount);
+    }
+
+    // The error clears as the user types, so the box does not keep refusing a value that has
+    // become valid until the next Save.
+    [Fact]
+    public void Validate_ClearsTheGatewayError_OnceTheValueIsValid()
+    {
+        ServerDialogViewModel vm = RdpProfile();
+        vm.RdpGateway = "gw..corp";
+        vm.ValidateCommand.Execute(null);
+        Assert.NotNull(vm.RdpGatewayError);
+
+        vm.RdpGateway = "gw.corp.example";
+
+        Assert.Null(vm.RdpGatewayError);
+        Assert.Null(vm.ValidationError);
+    }
+
+    // The two halves fail independently: a name in the chain with no case in the focus switch
+    // leaves the refused Save selecting nothing and focusing nothing. Read as statements of the
+    // case's own block, not as a fragment of text.
+    [Fact]
+    public void TheFocusSwitch_CarriesTheGatewayCase()
+    {
+        string repoRoot = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        string path = Path.Combine(
+            repoRoot, "src", "Heimdall.App", "Views", "Dialogs", "ServerDialog.xaml.cs");
+        Assert.True(File.Exists(path), $"Server dialog code-behind not found: {path}");
+
+        string focusMethod = Views.EmbeddedRdp.ViewSource.HandlerBody(
+            Views.EmbeddedRdp.ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(path)),
+            "private void FocusFirstInvalidField(");
+
+        // The case's statements, wrapped as one body: the label itself is dropped because a
+        // statement is only read as one when a brace or a semicolon precedes it.
+        const string CaseLabel = "case nameof(ServerDialogViewModel.RdpGateway):";
+        string gatewayCase = "{" + Views.EmbeddedRdp.ViewSource.HandlerBody(focusMethod, CaseLabel)[CaseLabel.Length..];
+
+        Assert.True(
+            Views.EmbeddedRdp.ViewSource.IsStatementOfTheMethodBody(
+                gatewayCase,
+                "MainTabControl.SelectedItem = DlgSrv_TabNetwork;"),
+            "The gateway case does not select the Network tab, where the gateway box lives.");
+        Assert.True(
+            Views.EmbeddedRdp.ViewSource.IsStatementOfTheMethodBody(
+                gatewayCase,
+                "target = DlgSrv_RdpGatewayBox;"),
+            "The gateway case does not focus the gateway box.");
+    }
+
+    private static ServerDialogViewModel RdpProfile() => new()
+    {
+        DisplayName = "RDP host",
+        RemoteServer = "host.example.com",
+        ConnectionType = "RDP"
+    };
+
     [Fact]
     public void Default_values_for_external_mode_fields_are_false()
     {

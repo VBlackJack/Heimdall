@@ -45,6 +45,19 @@ public sealed class AppSettingsRdpDefaultsTests
         Assert.False(settings.RdpDefaultStrictServerAuthentication);
     }
 
+    // The two values were restated as literals by four surfaces that fall back to them when no
+    // settings are reachable; the constants are what those surfaces read now.
+    [Fact]
+    public void RdpTimingDefaults_MatchConstants()
+    {
+        AppSettings settings = new AppSettings();
+
+        Assert.Equal(90000, AppSettings.DefaultRdpCredentialAutofillTimeoutMs);
+        Assert.Equal(AppSettings.DefaultRdpCredentialAutofillTimeoutMs, settings.RdpCredentialAutofillTimeoutMs);
+        Assert.Equal(10000, AppSettings.DefaultRdpResizeEnableDelayMs);
+        Assert.Equal(AppSettings.DefaultRdpResizeEnableDelayMs, settings.RdpResizeEnableDelayMs);
+    }
+
     [Fact]
     public void SshTunnelTimingDefaults_MatchConstants()
     {

@@ -32,11 +32,22 @@ public static class RdpFileParser
         string? fullAddress = null;
         string? alternateFullAddress = null;
         string? username = null;
+        string? domain = null;
         int? audioMode = null;
+        bool? audioCaptureMode = null;
         bool? redirectClipboard = null;
         bool? redirectPrinters = null;
         bool? redirectSmartCards = null;
+        bool? redirectComPorts = null;
+        bool? redirectDrives = null;
         string? drivesToRedirect = null;
+        string? usbDevicesToRedirect = null;
+        string? camerasToRedirect = null;
+        bool? administrativeSession = null;
+        bool? compression = null;
+        bool? bitmapCachePersistEnable = null;
+        bool? autoReconnectionEnabled = null;
+        bool? dynamicResolution = null;
         int? screenModeId = null;
         bool? useMultiMon = null;
         int? desktopWidth = null;
@@ -80,43 +91,27 @@ public static class RdpFileParser
             switch (lowerKey)
             {
                 case "full address":
-                    if (IsStringType(type))
-                    {
-                        fullAddress = value.Trim();
-                    }
-                    else
-                    {
-                        unknownKeys[lowerKey] = value;
-                    }
-
+                    fullAddress = TryParseString(type, value, lowerKey, unknownKeys);
                     break;
 
                 case "alternate full address":
-                    if (IsStringType(type))
-                    {
-                        alternateFullAddress = value.Trim();
-                    }
-                    else
-                    {
-                        unknownKeys[lowerKey] = value;
-                    }
-
+                    alternateFullAddress = TryParseString(type, value, lowerKey, unknownKeys);
                     break;
 
                 case "username":
-                    if (IsStringType(type))
-                    {
-                        username = value.Trim();
-                    }
-                    else
-                    {
-                        unknownKeys[lowerKey] = value;
-                    }
+                    username = TryParseString(type, value, lowerKey, unknownKeys);
+                    break;
 
+                case "domain":
+                    domain = TryParseString(type, value, lowerKey, unknownKeys);
                     break;
 
                 case "audiomode":
                     audioMode = TryParseInt(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "audiocapturemode":
+                    audioCaptureMode = TryParseBool(type, value, lowerKey, unknownKeys);
                     break;
 
                 case "redirectclipboard":
@@ -131,16 +126,44 @@ public static class RdpFileParser
                     redirectSmartCards = TryParseBool(type, value, lowerKey, unknownKeys);
                     break;
 
-                case "drivestoredirect":
-                    if (IsStringType(type))
-                    {
-                        drivesToRedirect = value.Trim();
-                    }
-                    else
-                    {
-                        unknownKeys[lowerKey] = value;
-                    }
+                case "redirectcomports":
+                    redirectComPorts = TryParseBool(type, value, lowerKey, unknownKeys);
+                    break;
 
+                case "redirectdrives":
+                    redirectDrives = TryParseBool(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "drivestoredirect":
+                    drivesToRedirect = TryParseString(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "usbdevicestoredirect":
+                    usbDevicesToRedirect = TryParseString(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "camerastoredirect":
+                    camerasToRedirect = TryParseString(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "administrative session":
+                    administrativeSession = TryParseBool(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "compression":
+                    compression = TryParseBool(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "bitmapcachepersistenable":
+                    bitmapCachePersistEnable = TryParseBool(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "autoreconnection enabled":
+                    autoReconnectionEnabled = TryParseBool(type, value, lowerKey, unknownKeys);
+                    break;
+
+                case "dynamic resolution":
+                    dynamicResolution = TryParseBool(type, value, lowerKey, unknownKeys);
                     break;
 
                 case "screen mode id":
@@ -172,15 +195,7 @@ public static class RdpFileParser
                     break;
 
                 case "gatewayhostname":
-                    if (IsStringType(type))
-                    {
-                        gatewayHostname = value.Trim();
-                    }
-                    else
-                    {
-                        unknownKeys[lowerKey] = value;
-                    }
-
+                    gatewayHostname = TryParseString(type, value, lowerKey, unknownKeys);
                     break;
 
                 case "gatewayusagemethod":
@@ -198,11 +213,22 @@ public static class RdpFileParser
             FullAddress = fullAddress,
             AlternateFullAddress = alternateFullAddress,
             Username = username,
+            Domain = domain,
             AudioMode = audioMode,
+            AudioCaptureMode = audioCaptureMode,
             RedirectClipboard = redirectClipboard,
             RedirectPrinters = redirectPrinters,
             RedirectSmartCards = redirectSmartCards,
+            RedirectComPorts = redirectComPorts,
+            RedirectDrives = redirectDrives,
             DrivesToRedirect = drivesToRedirect,
+            UsbDevicesToRedirect = usbDevicesToRedirect,
+            CamerasToRedirect = camerasToRedirect,
+            AdministrativeSession = administrativeSession,
+            Compression = compression,
+            BitmapCachePersistEnable = bitmapCachePersistEnable,
+            AutoReconnectionEnabled = autoReconnectionEnabled,
+            DynamicResolution = dynamicResolution,
             ScreenModeId = screenModeId,
             UseMultiMon = useMultiMon,
             DesktopWidth = desktopWidth,
@@ -256,6 +282,21 @@ public static class RdpFileParser
         if (int.TryParse(value.Trim(), out var parsed))
         {
             return parsed;
+        }
+
+        unknownKeys[key] = value;
+        return null;
+    }
+
+    private static string? TryParseString(
+        string type,
+        string value,
+        string key,
+        IDictionary<string, string> unknownKeys)
+    {
+        if (IsStringType(type))
+        {
+            return value.Trim();
         }
 
         unknownKeys[key] = value;

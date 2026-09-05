@@ -60,7 +60,8 @@ public partial class EmbeddedRdpView
     private const int BeginConnectMaxAttempts = 10;
     private const int MaxReconnectAttemptTimestamps = 3;
 
-    private TimeSpan _initialResizeEnableDelay = TimeSpan.FromSeconds(10);
+    private TimeSpan _initialResizeEnableDelay =
+        TimeSpan.FromMilliseconds(AppSettings.DefaultRdpResizeEnableDelayMs);
     private static readonly TimeSpan BeginConnectRetryDelay = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan ResizeDebounceInterval = TimeSpan.FromMilliseconds(1000);
     private static readonly TimeSpan AutofillFilledDisplayDuration = TimeSpan.FromSeconds(3);
@@ -492,7 +493,7 @@ public partial class EmbeddedRdpView
         int antiIdleIntervalSeconds = 60,
         Core.Localization.LocalizationManager? localizer = null,
         int? tunnelPort = null,
-        int resizeEnableDelayMs = 10000,
+        int resizeEnableDelayMs = AppSettings.DefaultRdpResizeEnableDelayMs,
         ConnectionStateMachine? connectionStateMachine = null,
         string? connectStatusOverrideKey = null,
         Func<int, Heimdall.Ssh.TunnelForwardedPortFailure?>? tunnelFailureLookup = null)
@@ -2054,6 +2055,18 @@ public partial class EmbeddedRdpView
             UpdateRedirectionIndicators();
             FlushLayoutPipeline("on-connected");
 
+            // The flush pumps messages, and a tab close dispatched inside the pump tears this
+            // view down. Everything below this line holds a resource on behalf of the session:
+            // the anti-idle timer, and above all the sleep-prevention count, whose release ran
+            // inside that Dispose and would never run again for an acquisition made here. The
+            // process then held the machine awake until it exited, one session at a time.
+            if (_disposed)
+            {
+                Core.Logging.FileLogger.Info(
+                    "EmbeddedRDP OnConnected abandoned: the view was torn down while its layout was flushed.");
+                return;
+            }
+
             if (_server is not null && _server.RdpAntiIdle && _antiIdleIntervalSeconds > 0)
             {
                 StartAntiIdleTimer(_antiIdleIntervalSeconds);
@@ -2521,7 +2534,8 @@ public partial class EmbeddedRdpView
     {
         try
         {
-            var timeoutMs = _settings?.RdpCredentialAutofillTimeoutMs ?? 90000;
+            var timeoutMs = _settings?.RdpCredentialAutofillTimeoutMs
+            ?? AppSettings.DefaultRdpCredentialAutofillTimeoutMs;
             var filled = await CredentialAutofill.WaitAndFillAsync(
                 Environment.ProcessId,
                 hostHint,
@@ -4722,7 +4736,7 @@ public partial class EmbeddedRdpView
     {
         if (_server is null)
         {
-            return (1024, 768);
+            return (RdpSessionState.DefaultWidth, RdpSessionState.DefaultHeight);
         }
 
         // Manual resolution override - use exact dimensions if set
@@ -4736,7 +4750,7 @@ public partial class EmbeddedRdpView
 
         if (logicalWidth <= 2 || logicalHeight <= 2)
         {
-            return (1024, 768);
+            return (RdpSessionState.DefaultWidth, RdpSessionState.DefaultHeight);
         }
 
         // Convert WPF logical pixels (DIPs) to physical pixels for the ActiveX control.
@@ -4902,7 +4916,8 @@ public partial class EmbeddedRdpView
             // observation callback on CredentialAutofill.WaitAndFillAsync, which lives in
             // Heimdall.Rdp; until that exists the trigger stays where it is rather than being
             // moved to a signal that arrives after the credential wait is already over.
-            int autofillTimeoutMs = _settings?.RdpCredentialAutofillTimeoutMs ?? 90000;
+            int autofillTimeoutMs = _settings?.RdpCredentialAutofillTimeoutMs
+            ?? AppSettings.DefaultRdpCredentialAutofillTimeoutMs;
             timeoutMs = RdpConnectWatchdogPolicy.ResolveStageTwoTimeoutMs(configuredTimeoutMs, autofillTimeoutMs);
             stage = "two";
         }
@@ -5087,14 +5102,9 @@ public partial class EmbeddedRdpView
             IntPtr hwnd = _rdpHost.HostHandle;
             if (hwnd != IntPtr.Zero)
             {
-                // Drill to the deepest child window (the ActiveX rendering surface)
-                IntPtr target = hwnd;
-                IntPtr child = NativeMethods.FindWindowEx(hwnd, IntPtr.Zero, null, null);
-                while (child != IntPtr.Zero)
-                {
-                    target = child;
-                    child = NativeMethods.FindWindowEx(target, IntPtr.Zero, null, null);
-                }
+                // The deepest child window is the ActiveX rendering surface, and the same walk
+                // the Send Keys menu uses to reach it.
+                IntPtr target = FindDeepestRdpChildWindow(hwnd);
 
                 NativeMethods.PostMessage(
                     target,

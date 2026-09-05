@@ -69,7 +69,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     private LocalizationManager? _localizer;
     private int _defaultRdpTunnelPort = DefaultPorts.RdpTunnel;
     private int _defaultSshTunnelPort = DefaultPorts.SshTunnel;
-    private int _defaultRdpResizeEnableDelayMs = 10000;
+    private int _defaultRdpResizeEnableDelayMs = AppSettings.DefaultRdpResizeEnableDelayMs;
     private SshAgentPreference _sshAgentPreference = SshAgentPreference.AutoOpenSshFirst;
     private bool? _rdpDialogAdvancedDefault;
     private bool _hasAppliedRdpDialogAdvancedDefault;
@@ -1253,6 +1253,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(RdpFixedWidthError),
         nameof(RdpFixedHeightError),
         nameof(RdpResizeEnableDelayMsError),
+        nameof(RdpGatewayError),
         nameof(GeneralTabErrorCount),
         nameof(NetworkTabErrorCount),
         nameof(OptionsTabErrorCount),
@@ -1357,6 +1358,9 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     private string? _rdpResizeEnableDelayMsError;
+
+    [ObservableProperty]
+    private string? _rdpGatewayError;
 
     // Tab error counts for badge display
     [ObservableProperty]
@@ -1658,6 +1662,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         RdpFixedWidthError = null;
         RdpFixedHeightError = null;
         RdpResizeEnableDelayMsError = null;
+        RdpGatewayError = null;
         GeneralTabErrorCount = 0;
         NetworkTabErrorCount = 0;
         OptionsTabErrorCount = 0;
@@ -1668,13 +1673,14 @@ public partial class ServerDialogViewModel : ObservableValidator
     private void RefreshValidationSummary()
     {
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? EndpointPortError
-            ?? LocalPortError ?? AudioModeError ?? ColorDepthError
+            ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
-        NetworkTabErrorCount = LocalPortError is not null ? 1 : 0;
+        NetworkTabErrorCount = (LocalPortError is not null ? 1 : 0)
+            + (RdpGatewayError is not null ? 1 : 0);
         OptionsTabErrorCount = (AudioModeError is not null ? 1 : 0)
             + (ColorDepthError is not null ? 1 : 0)
             + (RdpFixedWidthError is not null ? 1 : 0)
@@ -1735,6 +1741,13 @@ public partial class ServerDialogViewModel : ObservableValidator
             LocalPortError = L("ValidationTunnelPortRequired");
         }
 
+        // The RD Gateway is checked here by the rule the connect path applies to it, so a
+        // malformed host is refused at the box and not by the attestation sentence the .rdp
+        // generator and the embedded host raise after the session was already asked for.
+        RdpGatewayError = IsRdpConnection && !IsValidRdpGateway(RdpGateway)
+            ? L("ValidationRdpGatewayInvalid")
+            : null;
+
         // Options tab errors (RDP-specific)
         AudioModeError = IsRdpConnection ? GetLocalizedFieldError(nameof(RdpAudioMode)) : null;
         ColorDepthError = IsRdpConnection ? GetLocalizedFieldError(nameof(RdpColorDepth)) : null;
@@ -1749,7 +1762,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
-        NetworkTabErrorCount = LocalPortError is not null ? 1 : 0;
+        NetworkTabErrorCount = (LocalPortError is not null ? 1 : 0)
+            + (RdpGatewayError is not null ? 1 : 0);
         OptionsTabErrorCount = (AudioModeError is not null ? 1 : 0)
             + (ColorDepthError is not null ? 1 : 0)
             + (RdpFixedWidthError is not null ? 1 : 0)
@@ -1765,6 +1779,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             : SshUsernameError is not null ? nameof(SshUsername)
             : EndpointPortError is not null ? "EndpointPort"
             : LocalPortError is not null ? nameof(LocalPort)
+            : RdpGatewayError is not null ? nameof(RdpGateway)
             : AudioModeError is not null ? nameof(RdpAudioMode)
             : ColorDepthError is not null ? nameof(RdpColorDepth)
             : RdpFixedWidthError is not null ? nameof(RdpFixedWidth)
@@ -1774,8 +1789,28 @@ public partial class ServerDialogViewModel : ObservableValidator
 
         // Aggregate summary
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? EndpointPortError
-            ?? LocalPortError ?? AudioModeError ?? ColorDepthError
+            ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
+    }
+
+    /// <summary>
+    /// Whether an RD Gateway value can be written to a profile: empty means no gateway, and
+    /// anything else has to pass the same address rule the .rdp generator and the embedded host
+    /// apply before they route a session through it.
+    /// </summary>
+    internal static bool IsValidRdpGateway(string? gateway)
+        => string.IsNullOrWhiteSpace(gateway)
+            || Heimdall.Core.Security.InputValidator.Validate(gateway.Trim(), "Address");
+
+    partial void OnRdpGatewayChanged(string value)
+    {
+        if (RdpGatewayError is not null)
+        {
+            RdpGatewayError = IsRdpConnection && !IsValidRdpGateway(value)
+                ? L("ValidationRdpGatewayInvalid")
+                : null;
+            RefreshValidationSummary();
+        }
     }
 
     partial void OnRdpPerformanceFlagsChanged(int value)
@@ -2195,7 +2230,9 @@ public partial class ServerDialogViewModel : ObservableValidator
             RdpFullScreen = RdpFullScreen,
             RdpPerformanceFlags = ComposePerformanceFlags(),
             RdpDisableUdp = RdpDisableUdp,
-            RdpGateway = string.IsNullOrWhiteSpace(RdpGateway) ? null : RdpGateway,
+            // Trimmed like the domain: the value is validated and written as an address by the
+            // .rdp generator and the embedded host, and " gw.corp " is not gw.corp to either.
+            RdpGateway = string.IsNullOrWhiteSpace(RdpGateway) ? null : RdpGateway.Trim(),
             SshGatewayId = !supportsGateway || DirectConnection || string.IsNullOrWhiteSpace(SelectedGatewayId)
                 ? null
                 : SelectedGatewayId,

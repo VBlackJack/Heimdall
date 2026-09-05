@@ -2937,6 +2937,7 @@
   "ValidationAudioMode": "Le mode audio doit \u00eatre 0 (d\u00e9sactiv\u00e9), 1 (local) ou 2 (distant).",
   "ValidationColorDepth": "La profondeur de couleur doit \u00eatre comprise entre 8 et 32.",
   "ValidationRdpFixedWidthRange": "La largeur RDP fixe doit \u00eatre comprise entre 200 et 7680.",
+  "ValidationRdpGatewayInvalid": "La passerelle RD doit \u00eatre un nom d'h\u00f4te ou une adresse IP valide.",
   "ValidationRdpFixedHeightRange": "La hauteur RDP fixe doit \u00eatre comprise entre 200 et 4320.",
   "ValidationRdpResizeEnableDelayRange": "Laissez le d\u00e9lai de redimensionnement RDP vide pour h\u00e9riter de la valeur globale, saisissez 0 pour d\u00e9sactiver le verrouillage, ou saisissez une valeur de {0} \u00e0 {1} ms.",
   "ValidationSettingsUpdateCheckInterval": "L'intervalle de v\u00e9rification des mises \u00e0 jour doit \u00eatre compris entre {0} et {1} heures.",

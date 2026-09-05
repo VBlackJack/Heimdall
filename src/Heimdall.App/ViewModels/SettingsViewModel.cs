@@ -838,7 +838,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [SettingRangeOf(nameof(AppSettings.RdpCredentialAutofillTimeoutMs))]
-    private int _rdpCredentialAutofillTimeoutMs = 90000;
+    private int _rdpCredentialAutofillTimeoutMs = AppSettings.DefaultRdpCredentialAutofillTimeoutMs;
 
     /// <summary>Text of the field that edits <see cref="RdpCredentialAutofillTimeoutMs"/>.</summary>
     [ObservableProperty]

@@ -84,6 +84,79 @@ public sealed class CredentialAutofillTests : IDisposable
         Assert.DoesNotMatch(CredentialAutofill.TitlePattern, title);
     }
 
+    // The title pattern above recognises a dialog in eight locales; the confirmation button has
+    // to be recognised in the same eight, or the UI Automation path falls through to "the first
+    // enabled button", which on the Windows Security dialog can be the choices link.
+    [Theory]
+    [InlineData("OK")]
+    [InlineData("&OK")]
+    [InlineData("Sign in")]
+    [InlineData("Connect")]
+    [InlineData("Se connecter")]
+    [InlineData("Connexion")]
+    [InlineData("Anmelden")]
+    [InlineData("Verbinden")]
+    [InlineData("Iniciar sesi\u00f3n")]
+    [InlineData("Conectar")]
+    [InlineData("Aceptar")]
+    [InlineData("Accedi")]
+    [InlineData("Connetti")]
+    [InlineData("Entrar")]
+    [InlineData("Ligar")]
+    [InlineData("Aanmelden")]
+    [InlineData("Verbinding maken")]
+    [InlineData("Zaloguj si\u0119")]
+    [InlineData("Po\u0142\u0105cz")]
+    public void OkButtonPattern_MatchesTheConfirmationOfEveryClaimedLocale(string label)
+    {
+        Assert.Matches(CredentialAutofill.OkButtonPattern, label);
+    }
+
+    [Theory]
+    [InlineData("Cancel")]
+    [InlineData("Annuler")]
+    [InlineData("Abbrechen")]
+    [InlineData("More choices")]
+    [InlineData("Weitere Optionen")]
+    [InlineData("")]
+    public void OkButtonPattern_DoesNotMatchTheOtherButtons(string label)
+    {
+        Assert.DoesNotMatch(CredentialAutofill.OkButtonPattern, label);
+    }
+
+    [Theory]
+    [InlineData("Password")]
+    [InlineData("Mot de passe")]
+    [InlineData("Kennwort")]
+    [InlineData("Contrase\u00f1a")]
+    [InlineData("Senha")]
+    [InlineData("Wachtwoord")]
+    [InlineData("Has\u0142o")]
+    public void PasswordFieldPattern_MatchesTheFieldOfEveryClaimedLocale(string name)
+    {
+        Assert.Matches(CredentialAutofill.PasswordFieldPattern, name);
+    }
+
+    // One process handle per process for the life of the watcher, not one per visible window
+    // per scan.
+    [Fact]
+    public void ResolveProcessName_ResolvesEachProcessOnce()
+    {
+        Dictionary<int, string> cache = new();
+        int calls = 0;
+        string Resolve(int pid)
+        {
+            calls++;
+            return "process-" + pid;
+        }
+
+        Assert.Equal("process-7", CredentialAutofill.ResolveProcessName(7, cache, Resolve));
+        Assert.Equal("process-7", CredentialAutofill.ResolveProcessName(7, cache, Resolve));
+        Assert.Equal("process-9", CredentialAutofill.ResolveProcessName(9, cache, Resolve));
+
+        Assert.Equal(2, calls);
+    }
+
     [Theory]
     [InlineData(0x50000020L, true)]
     [InlineData(0x50000000L, false)]

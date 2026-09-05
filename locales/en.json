@@ -2940,6 +2940,7 @@
   "ValidationAudioMode": "Audio mode must be 0 (disabled), 1 (local), or 2 (remote).",
   "ValidationColorDepth": "Color depth must be between 8 and 32.",
   "ValidationRdpFixedWidthRange": "RDP fixed width must be between 200 and 7680.",
+  "ValidationRdpGatewayInvalid": "The RD Gateway must be a valid host name or IP address.",
   "ValidationRdpFixedHeightRange": "RDP fixed height must be between 200 and 4320.",
   "ValidationRdpResizeEnableDelayRange": "Leave the RDP resize delay empty to inherit the global default, enter 0 to disable the lockout, or enter a value from {0} to {1} ms.",
   "ValidationSettingsUpdateCheckInterval": "Update check interval must be between {0} and {1} hours.",

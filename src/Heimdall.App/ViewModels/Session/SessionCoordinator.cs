@@ -1253,7 +1253,14 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
-            await _main.ServerList.RestoreServerAsync(serverId, CancellationToken.None);
+            // The tab's forced mode travels with the reconnect. A session opened as "force
+            // embedded" over a profile whose mode is External used to reconnect from the profile,
+            // so the overlay's Reconnect button launched the external client and closed the
+            // embedded tab whose title still carried the forced suffix.
+            await _main.ServerList.RestoreServerAsync(
+                serverId,
+                CancellationToken.None,
+                tab.RdpModeOverride);
         }
         catch (Exception ex)
         {
@@ -1283,7 +1290,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         {
             restored = await _main.ServerList.RestoreServerAsync(
                 reconnectChain.ServerId,
-                reconnectChain.CancellationSource.Token);
+                reconnectChain.CancellationSource.Token,
+                reconnectChain.SourceTab.RdpModeOverride);
         }
         catch (OperationCanceledException) when (reconnectChain.CancellationSource.IsCancellationRequested)
         {
