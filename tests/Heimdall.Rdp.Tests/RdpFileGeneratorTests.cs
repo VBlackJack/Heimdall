@@ -246,6 +246,27 @@ public class RdpFileGeneratorTests
         Assert.Contains("redirectdrives:i:1", content);
     }
 
+    // mstsc 10.0.26100 reads both drive keys, and "drivestoredirect:s:*" wins over
+    // "redirectdrives:i:0" (measured 2026-09-05 in the mstsc /edit dialog). A generator that
+    // emitted the newer key unconditionally would therefore redirect drives on a profile that
+    // said no. The file carries the one key mstsc itself writes, and never the other.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Generate_NeverEmitsDrivesToRedirect_WhateverTheDrivesSetting(bool drives)
+    {
+        var options = new RdpFileOptions
+        {
+            Host = "srv",
+            Redirections = new RdpRedirectionOptions { Drives = drives }
+        };
+
+        var content = RdpFileGenerator.Generate(options);
+
+        Assert.DoesNotContain("drivestoredirect", content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"redirectdrives:i:{(drives ? 1 : 0)}", content);
+    }
+
     [Fact]
     public void Generate_PrintersEnabled_RedirectPrinters1()
     {

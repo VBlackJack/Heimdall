@@ -84,7 +84,11 @@ public static class RdpFileGenerator
             sb.AppendLine("administrative session:i:1");
         }
 
-        // Redirections
+        // Redirections. Drives use the "redirectdrives" key on purpose: it is the key mstsc
+        // 10.0.26100 reads (measured 2026-09-05 in its /edit dialog: :i:1 checks Drives, :i:0
+        // and no key leave it clear) and the one it writes back when it saves a file. The newer
+        // "drivestoredirect:s:*" is also read and WINS over redirectdrives:i:0, so emitting it
+        // unconditionally would redirect drives on a profile that said no. Never add it here.
         var r = options.Redirections;
         sb.AppendLine($"redirectclipboard:i:{BoolToInt(r.Clipboard)}");
         sb.AppendLine($"redirectdrives:i:{BoolToInt(r.Drives)}");
