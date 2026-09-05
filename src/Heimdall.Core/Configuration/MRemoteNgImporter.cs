@@ -188,7 +188,9 @@ public static class MRemoteNgImporter
             var colors = node.Attribute("Colors")?.Value;
             if (colors is not null)
             {
-                dto.RdpColorDepth = colors switch
+                // 256 colours and 15-bit are below the depth the profile may carry; they land on
+                // the 16-bit floor, which is what the connect-time resolver made of them anyway.
+                dto.RdpColorDepth = Heimdall.Core.Rdp.RdpDisplayLimits.NormalizeColorDepth(colors switch
                 {
                     "Colors256" => 8,
                     "Colors15Bit" => 15,
@@ -196,7 +198,7 @@ public static class MRemoteNgImporter
                     "Colors24Bit" => 24,
                     "Colors32Bit" => 32,
                     _ => 32
-                };
+                });
                 carriesPerProfileSettings = true;
             }
 

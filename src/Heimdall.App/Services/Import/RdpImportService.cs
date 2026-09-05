@@ -470,7 +470,9 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
 
         if (schema.SessionBpp.HasValue)
         {
-            candidate.RdpColorDepth = schema.SessionBpp.Value;
+            // A file can say 8 or 15; the profile carries 16, 24 or 32, and the floor is what
+            // the connect-time resolver made of the lower values anyway.
+            candidate.RdpColorDepth = Heimdall.Core.Rdp.RdpDisplayLimits.NormalizeColorDepth(schema.SessionBpp.Value);
             carriesPerProfileSettings = true;
         }
 

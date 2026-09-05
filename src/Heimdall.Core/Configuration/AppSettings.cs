@@ -232,8 +232,8 @@ public sealed class AppSettings
     public bool RdpDefaultDynamicResolution { get; set; } = true;
     public bool RdpDefaultNla { get; set; } = true;
     public bool RdpDefaultStrictServerAuthentication { get; set; }
-    [SettingRange(8, 32)]
-    public int RdpDefaultColorDepth { get; set; } = 32;
+    [SettingRange(RdpDisplayLimits.MinimumColorDepth, RdpDisplayLimits.MaximumColorDepth)]
+    public int RdpDefaultColorDepth { get; set; } = RdpDisplayLimits.MaximumColorDepth;
     public bool RdpDefaultBitmapCaching { get; set; } = true;
     public bool RdpDefaultCompression { get; set; } = true;
 

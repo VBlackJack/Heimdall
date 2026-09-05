@@ -443,8 +443,11 @@ public class MRemoteNgImporterTests
 
         Assert.Equal(16, result.Servers.First(s => s.DisplayName == "C16").RdpColorDepth);
         Assert.Equal(24, result.Servers.First(s => s.DisplayName == "C24").RdpColorDepth);
-        Assert.Equal(15, result.Servers.First(s => s.DisplayName == "C15").RdpColorDepth);
-        Assert.Equal(8, result.Servers.First(s => s.DisplayName == "C256").RdpColorDepth);
+
+        // Below the 16-bit floor a profile may carry: both land on it, as the connect-time
+        // resolver made of them before the floor was declared.
+        Assert.Equal(16, result.Servers.First(s => s.DisplayName == "C15").RdpColorDepth);
+        Assert.Equal(16, result.Servers.First(s => s.DisplayName == "C256").RdpColorDepth);
     }
 
     [Fact]
