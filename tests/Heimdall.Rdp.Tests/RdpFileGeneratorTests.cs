@@ -646,8 +646,11 @@ public class RdpFileGeneratorTests
         Assert.Contains("allow desktop composition:i:1", content);
     }
 
+    // A zero mask is an answer, not an absence of one: a file silent on these keys hands the
+    // decision to whatever the client's own Default.rdp remembers, while the embedded host writes
+    // PerformanceFlags on every connect. The seven keys are therefore written as zeros.
     [Fact]
-    public void Generate_PerformanceFlagsZero_OmitsPerformanceSettings()
+    public void Generate_PerformanceFlagsZero_WritesEveryPerformanceSettingAsZero()
     {
         var options = new RdpFileOptions
         {
@@ -657,8 +660,13 @@ public class RdpFileGeneratorTests
 
         var content = RdpFileGenerator.Generate(options);
 
-        Assert.DoesNotContain("disable wallpaper:i:", content);
-        Assert.DoesNotContain("allow font smoothing:i:", content);
+        Assert.Contains("disable wallpaper:i:0", content);
+        Assert.Contains("disable full window drag:i:0", content);
+        Assert.Contains("disable menu anims:i:0", content);
+        Assert.Contains("disable themes:i:0", content);
+        Assert.Contains("disable cursor setting:i:0", content);
+        Assert.Contains("allow font smoothing:i:0", content);
+        Assert.Contains("allow desktop composition:i:0", content);
     }
 
     // ── DisableUdp / network auto-detect ─────────────────────────────

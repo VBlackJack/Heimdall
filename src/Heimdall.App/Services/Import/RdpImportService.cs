@@ -355,6 +355,18 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             candidate.RdpUsername = schema.Username;
         }
 
+        // Credential identity and the console switch are read from the profile on every path,
+        // whether or not it follows the application defaults, so neither raises the flag below.
+        if (!string.IsNullOrWhiteSpace(schema.Domain))
+        {
+            candidate.RdpDomain = schema.Domain;
+        }
+
+        if (schema.AdministrativeSession.HasValue)
+        {
+            candidate.RdpAdminMode = schema.AdministrativeSession.Value;
+        }
+
         // Every assignment below writes a per-profile RDP setting, which the connect-time resolver
         // only reads once the profile stops following the application defaults.
         var carriesPerProfileSettings = false;
@@ -362,6 +374,12 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         if (schema.AudioMode.HasValue)
         {
             candidate.RdpAudioMode = MapAudioMode(schema.AudioMode.Value);
+            carriesPerProfileSettings = true;
+        }
+
+        if (schema.AudioCaptureMode.HasValue)
+        {
+            candidate.RdpAudioCapture = schema.AudioCaptureMode.Value;
             carriesPerProfileSettings = true;
         }
 
@@ -383,14 +401,22 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             carriesPerProfileSettings = true;
         }
 
-        if (schema.DrivesToRedirect is not null)
+        if (schema.RedirectComPorts.HasValue)
         {
-            candidate.RdpRedirectDrives = !string.IsNullOrWhiteSpace(schema.DrivesToRedirect);
+            candidate.RdpRedirectComPorts = schema.RedirectComPorts.Value;
+            carriesPerProfileSettings = true;
+        }
+
+        bool? redirectDrives = ResolveDriveRedirection(schema.RedirectDrives, schema.DrivesToRedirect);
+        if (redirectDrives.HasValue)
+        {
+            candidate.RdpRedirectDrives = redirectDrives.Value;
             carriesPerProfileSettings = true;
 
             // The profile carries a single all-drives flag, so a scoped list such as "C:;" is
             // committed as "redirect every local drive". Disclose the widening instead of hiding it.
             if (candidate.RdpRedirectDrives
+                && !string.IsNullOrWhiteSpace(schema.DrivesToRedirect)
                 && !string.Equals(schema.DrivesToRedirect.Trim(), AllDrivesToken, StringComparison.Ordinal))
             {
                 skippedMappings.Add("drivestoredirect");
@@ -398,6 +424,42 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                     "[RdpImport] 'drivestoredirect' names specific drives; the profile can only store " +
                     "an all-drives flag.");
             }
+        }
+
+        if (schema.UsbDevicesToRedirect is not null)
+        {
+            candidate.RdpRedirectUsb = !string.IsNullOrWhiteSpace(schema.UsbDevicesToRedirect);
+            carriesPerProfileSettings = true;
+        }
+
+        if (schema.CamerasToRedirect is not null)
+        {
+            candidate.RdpRedirectWebcam = !string.IsNullOrWhiteSpace(schema.CamerasToRedirect);
+            carriesPerProfileSettings = true;
+        }
+
+        if (schema.Compression.HasValue)
+        {
+            candidate.RdpCompression = schema.Compression.Value;
+            carriesPerProfileSettings = true;
+        }
+
+        if (schema.BitmapCachePersistEnable.HasValue)
+        {
+            candidate.RdpBitmapCaching = schema.BitmapCachePersistEnable.Value;
+            carriesPerProfileSettings = true;
+        }
+
+        if (schema.AutoReconnectionEnabled.HasValue)
+        {
+            candidate.RdpAutoReconnect = schema.AutoReconnectionEnabled.Value;
+            carriesPerProfileSettings = true;
+        }
+
+        if (schema.DynamicResolution.HasValue)
+        {
+            candidate.RdpDynamicResolution = schema.DynamicResolution.Value;
+            carriesPerProfileSettings = true;
         }
 
         if (schema.UseMultiMon.HasValue)
@@ -459,6 +521,36 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The drive redirection a file asks for, from the two keys that can carry it.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>redirectdrives:i:</c> is the key the Remote Desktop client reads and the one it
+    /// writes back when it saves a file; <c>drivestoredirect:s:</c> is the newer key, which the
+    /// client also reads and which wins when both are present (measured on mstsc 10.0.26100,
+    /// 2026-09-05: <c>drivestoredirect:s:*</c> beside <c>redirectdrives:i:0</c> redirects). The
+    /// import used to read the newer key alone, so every file the client itself had saved lost
+    /// its drives on the way in.</para>
+    /// <para>An empty <c>drivestoredirect</c> beside a <c>redirectdrives</c> switch defers to the
+    /// switch: the empty value was not measured against it, and the switch is the client's own
+    /// record of the answer.</para>
+    /// </remarks>
+    /// <returns>True or false when the file says, null when it carries neither key.</returns>
+    internal static bool? ResolveDriveRedirection(bool? redirectDrives, string? drivesToRedirect)
+    {
+        if (!string.IsNullOrWhiteSpace(drivesToRedirect))
+        {
+            return true;
+        }
+
+        if (redirectDrives.HasValue)
+        {
+            return redirectDrives.Value;
+        }
+
+        return drivesToRedirect is null ? null : false;
     }
 
     private static int MapAudioMode(int value) => value switch
@@ -611,6 +703,8 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             RemotePort = candidate.RemotePort,
             ConnectionType = candidate.ConnectionType,
             RdpUsername = candidate.RdpUsername,
+            RdpDomain = candidate.RdpDomain,
+            RdpAdminMode = candidate.RdpAdminMode,
             RdpMode = candidate.RdpMode,
             RdpUseGlobalDefaults = candidate.RdpUseGlobalDefaults,
             RdpRedirectClipboard = candidate.RdpRedirectClipboard,

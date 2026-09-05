@@ -64,6 +64,74 @@ public sealed class RdpFileParserTests
         Assert.Equal(1, schema.GatewayUsageMethod);
     }
 
+    // The Remote Desktop client saves redirectdrives:i: and never drivestoredirect (measured on
+    // mstsc 10.0.26100, 2026-09-05), and writes the domain as its own key. A parser that read
+    // only the newer drive key and no domain lost both on every file the client itself had saved.
+    [Fact]
+    public void Parse_ReadsTheKeysTheClientWrites()
+    {
+        RdpFileSchema schema = RdpFileParser.Parse(
+            """
+            full address:s:rdp.example.com
+            domain:s:CORP
+            redirectdrives:i:1
+            redirectcomports:i:1
+            audiocapturemode:i:1
+            administrative session:i:1
+            compression:i:0
+            bitmapcachepersistenable:i:0
+            autoreconnection enabled:i:0
+            usbdevicestoredirect:s:*
+            camerastoredirect:s:*
+            dynamic resolution:i:1
+            """
+        );
+
+        Assert.Equal("CORP", schema.Domain);
+        Assert.True(schema.RedirectDrives);
+        Assert.True(schema.RedirectComPorts);
+        Assert.True(schema.AudioCaptureMode);
+        Assert.True(schema.AdministrativeSession);
+        Assert.False(schema.Compression);
+        Assert.False(schema.BitmapCachePersistEnable);
+        Assert.False(schema.AutoReconnectionEnabled);
+        Assert.Equal("*", schema.UsbDevicesToRedirect);
+        Assert.Equal("*", schema.CamerasToRedirect);
+        Assert.True(schema.DynamicResolution);
+        Assert.Empty(schema.UnknownKeys);
+    }
+
+    [Fact]
+    public void Parse_RedirectDrivesSwitch_IsReadBesideDrivesToRedirect()
+    {
+        RdpFileSchema schema = RdpFileParser.Parse(
+            """
+            redirectdrives:i:0
+            drivestoredirect:s:*
+            """
+        );
+
+        Assert.False(schema.RedirectDrives);
+        Assert.Equal("*", schema.DrivesToRedirect);
+    }
+
+    // A key of the wrong type is reported rather than read: the same contract every other
+    // curated key already follows.
+    [Fact]
+    public void Parse_ClientWrittenKeysOfTheWrongType_AreReportedUnknown()
+    {
+        RdpFileSchema schema = RdpFileParser.Parse(
+            """
+            domain:i:1
+            redirectdrives:s:yes
+            """
+        );
+
+        Assert.Null(schema.Domain);
+        Assert.Null(schema.RedirectDrives);
+        Assert.Equal(2, schema.UnknownKeys.Count);
+    }
+
     [Fact]
     public void Parse_ReadsCredSspSupportIndependentlyOfAuthenticationLevel()
     {

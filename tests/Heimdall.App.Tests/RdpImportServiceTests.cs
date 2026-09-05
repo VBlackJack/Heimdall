@@ -176,6 +176,172 @@ public sealed class RdpImportServiceTests
         Assert.Equal(2, candidate.RdpAudioMode);
     }
 
+    // What the Remote Desktop client writes when it saves a file: redirectdrives:i: and never
+    // drivestoredirect, the domain as its own key, and the switches below. The import read the
+    // newer drive key alone and no domain, so a client-saved file lost its drives and its logon
+    // domain on the way in, with the file's keys counted as "unknown".
+    [Fact]
+    public async Task PreviewAsync_MapsTheKeysAClientSavedFileCarries()
+    {
+        using RdpImportFixture fixture = new RdpImportFixture();
+        string path = await fixture.WriteRdpAsync(
+            "Saved.rdp",
+            """
+            full address:s:rdp.example.com
+            username:s:demo
+            domain:s:CORP
+            redirectdrives:i:1
+            redirectcomports:i:1
+            audiocapturemode:i:1
+            administrative session:i:1
+            compression:i:0
+            bitmapcachepersistenable:i:0
+            autoreconnection enabled:i:0
+            usbdevicestoredirect:s:*
+            camerastoredirect:s:*
+            dynamic resolution:i:0
+            """
+        );
+
+        RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+        RdpImportPreviewEntry entry = preview.Entries[0];
+        ServerProfileDto candidate = entry.Candidate;
+
+        Assert.Equal("CORP", candidate.RdpDomain);
+        Assert.True(candidate.RdpRedirectDrives);
+        Assert.True(candidate.RdpRedirectComPorts);
+        Assert.True(candidate.RdpAudioCapture);
+        Assert.True(candidate.RdpAdminMode);
+        Assert.False(candidate.RdpCompression);
+        Assert.False(candidate.RdpBitmapCaching);
+        Assert.False(candidate.RdpAutoReconnect);
+        Assert.True(candidate.RdpRedirectUsb);
+        Assert.True(candidate.RdpRedirectWebcam);
+        Assert.False(candidate.RdpDynamicResolution);
+        Assert.False(candidate.RdpUseGlobalDefaults);
+        Assert.Equal(0, entry.UnknownKeyCount);
+        Assert.DoesNotContain("drivestoredirect", entry.SkippedMappings);
+    }
+
+    // The precedence the client applies, measured in its own editor: the newer key wins over the
+    // switch when it names drives, an empty list defers to the switch, and neither key means the
+    // file said nothing.
+    [Theory]
+    [InlineData(null, "*", true)]
+    [InlineData(false, "*", true)]
+    [InlineData(true, null, true)]
+    [InlineData(false, null, false)]
+    [InlineData(true, "", true)]
+    [InlineData(null, "", false)]
+    [InlineData(null, null, null)]
+    public void ResolveDriveRedirection_FollowsTheClientsPrecedence(
+        bool? redirectDrives,
+        string? drivesToRedirect,
+        bool? expected)
+    {
+        Assert.Equal(expected, RdpImportService.ResolveDriveRedirection(redirectDrives, drivesToRedirect));
+    }
+
+    // Round trip through the generator: a profile exported by Heimdall and imported back keeps
+    // every field the .rdp format can carry. The generator and the parser are two sides of one
+    // format, and this is the only place they are measured against each other.
+    [Fact]
+    public async Task PreviewAsync_ReadsBackWhatTheGeneratorWrites()
+    {
+        using RdpImportFixture fixture = new RdpImportFixture();
+        string content = RdpFileGenerator.Generate(new RdpFileOptions
+        {
+            Host = "rdp.example.com",
+            Port = 3390,
+            Username = "demo",
+            Domain = "CORP",
+            AdminMode = true,
+            Redirections = new RdpRedirectionOptions
+            {
+                Clipboard = false,
+                Drives = true,
+                Printers = true,
+                ComPorts = true,
+                SmartCards = true,
+                Usb = true,
+                Webcam = true,
+                AudioCapture = true,
+                AudioMode = 2,
+                DynamicResolution = true,
+                Nla = true,
+                StrictServerAuthentication = true,
+                BitmapCaching = false,
+                Compression = false,
+                AutoReconnect = false
+            }
+        });
+        string path = await fixture.WriteRdpAsync("Generated.rdp", content);
+
+        RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+        RdpImportPreviewEntry entry = preview.Entries[0];
+        ServerProfileDto candidate = entry.Candidate;
+
+        Assert.False(entry.HasParseError);
+        Assert.Equal("rdp.example.com", candidate.RemoteServer);
+        Assert.Equal(3390, candidate.RemotePort);
+        Assert.Equal("demo", candidate.RdpUsername);
+        Assert.Equal("CORP", candidate.RdpDomain);
+        Assert.True(candidate.RdpAdminMode);
+        Assert.False(candidate.RdpRedirectClipboard);
+        Assert.True(candidate.RdpRedirectDrives);
+        Assert.True(candidate.RdpRedirectPrinters);
+        Assert.True(candidate.RdpRedirectComPorts);
+        Assert.True(candidate.RdpRedirectSmartCards);
+        Assert.True(candidate.RdpRedirectUsb);
+        Assert.True(candidate.RdpRedirectWebcam);
+        Assert.True(candidate.RdpAudioCapture);
+        Assert.Equal(2, candidate.RdpAudioMode);
+        Assert.True(candidate.RdpDynamicResolution);
+        Assert.True(candidate.RdpNla);
+        Assert.True(candidate.RdpStrictServerAuthentication);
+        Assert.False(candidate.RdpBitmapCaching);
+        Assert.False(candidate.RdpCompression);
+        Assert.False(candidate.RdpAutoReconnect);
+    }
+
+    // The two fields are read from the profile on every connect path, so the candidate has to
+    // carry them into the inventory and not only into the preview.
+    [Fact]
+    public async Task ApplyAsync_KeepsTheDomainAndTheConsoleSwitchOnTheImportedProfile()
+    {
+        using RdpImportFixture fixture = new RdpImportFixture();
+        string path = await fixture.WriteRdpAsync(
+            "Console.rdp",
+            """
+            full address:s:rdp.example.com
+            domain:s:CORP
+            administrative session:i:1
+            """
+        );
+        RdpImportPreview preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+
+        await fixture.Service.ApplyAsync(
+            preview,
+            new RdpImportSelection
+            {
+                Entries =
+                [
+                    new RdpImportSelectionEntry
+                    {
+                        SourceFilePath = path,
+                        IsSelected = true,
+                        ConflictResolution = RdpConflictResolution.AutoRename
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        IReadOnlyList<ServerProfileDto> servers = await fixture.ConfigManager.LoadServersAsync();
+        ServerProfileDto imported = Assert.Single(servers);
+        Assert.Equal("CORP", imported.RdpDomain);
+        Assert.True(imported.RdpAdminMode);
+    }
+
     [Fact]
     public async Task PreviewAsync_MapsAuthenticationLevel1ToStrictServerAuthentication()
     {

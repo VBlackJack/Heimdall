@@ -29,7 +29,13 @@ public sealed class RdpFileSchema
 
     public string? Username { get; init; }
 
+    /// <summary>Value of <c>domain:s:</c>, the logon domain kept apart from the user name.</summary>
+    public string? Domain { get; init; }
+
     public int? AudioMode { get; init; }
+
+    /// <summary>Value of <c>audiocapturemode:i:</c>, the microphone redirection switch.</summary>
+    public bool? AudioCaptureMode { get; init; }
 
     public bool? RedirectClipboard { get; init; }
 
@@ -37,7 +43,42 @@ public sealed class RdpFileSchema
 
     public bool? RedirectSmartCards { get; init; }
 
+    /// <summary>Value of <c>redirectcomports:i:</c>.</summary>
+    public bool? RedirectComPorts { get; init; }
+
+    /// <summary>
+    /// Value of <c>redirectdrives:i:</c>, the drive switch the Remote Desktop client reads and the
+    /// one it writes back when it saves a file (measured on mstsc 10.0.26100, 2026-09-05). A file
+    /// saved by the client carries this key and never <c>drivestoredirect</c>.
+    /// </summary>
+    public bool? RedirectDrives { get; init; }
+
+    /// <summary>
+    /// Value of <c>drivestoredirect:s:</c>. When both keys are present this one wins, which is
+    /// what the client does with them.
+    /// </summary>
     public string? DrivesToRedirect { get; init; }
+
+    /// <summary>Value of <c>usbdevicestoredirect:s:</c>; a non-empty value redirects USB devices.</summary>
+    public string? UsbDevicesToRedirect { get; init; }
+
+    /// <summary>Value of <c>camerastoredirect:s:</c>; a non-empty value redirects cameras.</summary>
+    public string? CamerasToRedirect { get; init; }
+
+    /// <summary>Value of <c>administrative session:i:</c>, the console (/admin) switch.</summary>
+    public bool? AdministrativeSession { get; init; }
+
+    /// <summary>Value of <c>compression:i:</c>.</summary>
+    public bool? Compression { get; init; }
+
+    /// <summary>Value of <c>bitmapcachepersistenable:i:</c>.</summary>
+    public bool? BitmapCachePersistEnable { get; init; }
+
+    /// <summary>Value of <c>autoreconnection enabled:i:</c>.</summary>
+    public bool? AutoReconnectionEnabled { get; init; }
+
+    /// <summary>Value of <c>dynamic resolution:i:</c>.</summary>
+    public bool? DynamicResolution { get; init; }
 
     public int? ScreenModeId { get; init; }
 

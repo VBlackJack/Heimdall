@@ -141,18 +141,18 @@ public static class RdpFileGenerator
         if (r.Usb) sb.AppendLine("usbdevicestoredirect:s:*");
         if (r.Webcam) sb.AppendLine("camerastoredirect:s:*");
 
-        // Performance experience flags
+        // Performance experience flags. Written for every profile, a zero mask included: the
+        // embedded host writes PerformanceFlags unconditionally for the same reason, and a file
+        // that stays silent on these keys leaves the client to whatever its own Default.rdp
+        // remembers from the last session someone ran by hand.
         var pf = r.PerformanceFlags;
-        if (pf > 0)
-        {
-            sb.AppendLine($"disable wallpaper:i:{((pf & 0x01) != 0 ? 1 : 0)}");
-            sb.AppendLine($"disable full window drag:i:{((pf & 0x02) != 0 ? 1 : 0)}");
-            sb.AppendLine($"disable menu anims:i:{((pf & 0x04) != 0 ? 1 : 0)}");
-            sb.AppendLine($"disable themes:i:{((pf & 0x08) != 0 ? 1 : 0)}");
-            sb.AppendLine($"disable cursor setting:i:{((pf & 0x20) != 0 ? 1 : 0)}");
-            sb.AppendLine($"allow font smoothing:i:{((pf & 0x80) != 0 ? 1 : 0)}");
-            sb.AppendLine($"allow desktop composition:i:{((pf & 0x100) != 0 ? 1 : 0)}");
-        }
+        sb.AppendLine($"disable wallpaper:i:{((pf & 0x01) != 0 ? 1 : 0)}");
+        sb.AppendLine($"disable full window drag:i:{((pf & 0x02) != 0 ? 1 : 0)}");
+        sb.AppendLine($"disable menu anims:i:{((pf & 0x04) != 0 ? 1 : 0)}");
+        sb.AppendLine($"disable themes:i:{((pf & 0x08) != 0 ? 1 : 0)}");
+        sb.AppendLine($"disable cursor setting:i:{((pf & 0x20) != 0 ? 1 : 0)}");
+        sb.AppendLine($"allow font smoothing:i:{((pf & 0x80) != 0 ? 1 : 0)}");
+        sb.AppendLine($"allow desktop composition:i:{((pf & 0x100) != 0 ? 1 : 0)}");
 
         // Suppress the UDP probe by disabling network auto-detection and declaring an explicit
         // connection type. This does not force TCP: no client-side setting can.
