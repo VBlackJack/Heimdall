@@ -104,6 +104,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private long _expandSaveVersion;
     private bool _expandStateSavePending;
     private bool _expandStateFlushInProgress;
+
+    /// <summary>
+    /// The selection the settings file holds, so the close flush writes only when the user has
+    /// moved on from it.
+    /// </summary>
+    private string? _persistedSelectionId;
     private int _searchFilterVersion;
     private static readonly TimeSpan ExpandStateSaveDelay = TimeSpan.FromMilliseconds(500);
 
@@ -462,7 +468,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     public void LoadServers(List<ServerProfileDto> serverDtos, AppSettings settings)
     {
         _currentSettings = settings;
-        var selectedServerId = SelectedServer?.Id;
+
+        // Nothing selected yet is a fresh start: open on the session the previous run left
+        // selected. A reload after a folder operation keeps whatever is selected now.
+        var selectedServerId = SelectedServer?.Id ?? settings.LastSelectedServerId;
+        _persistedSelectionId = settings.LastSelectedServerId;
         var projectMap = BuildProjectMap(settings);
 
         // Restore expand state from settings
@@ -1985,12 +1995,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     }
 
     /// <summary>
-    /// Debounced save of TreeExpandedNodes - waits 500ms after last toggle
-    /// before writing to disk, to avoid spamming settings.json on rapid clicks.
+    /// Debounced save of the tree state - the expanded nodes and the selected session - that
+    /// waits 500ms after the last toggle before writing to disk, to avoid spamming settings.json
+    /// on rapid clicks.
     /// </summary>
     private void ScheduleExpandStateSave()
     {
         ImmutableArray<string> expandedNodes = [.. _expandedNodes];
+        string? selectedId = SelectedServer?.Id;
         lock (_expandSaveSync)
         {
             long version = ++_expandSaveVersion;
@@ -2004,14 +2016,17 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             }
 
             _expandSaveTimer = new System.Threading.Timer(
-                _ => StartExpandStateSave(version, expandedNodes),
+                _ => StartExpandStateSave(version, expandedNodes, selectedId),
                 null,
                 ExpandStateSaveDelay,
                 Timeout.InfiniteTimeSpan);
         }
     }
 
-    private void StartExpandStateSave(long version, ImmutableArray<string> expandedNodes)
+    private void StartExpandStateSave(
+        long version,
+        ImmutableArray<string> expandedNodes,
+        string? selectedId)
     {
         lock (_expandSaveSync)
         {
@@ -2023,13 +2038,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             _expandSaveTimer?.Dispose();
             _expandSaveTimer = null;
             _expandStateSavePending = false;
-            _expandSaveTask = SaveExpandStateAfterAsync(_expandSaveTask, expandedNodes);
+            _expandSaveTask = SaveExpandStateAfterAsync(_expandSaveTask, expandedNodes, selectedId);
         }
     }
 
     private async Task SaveExpandStateAfterAsync(
         Task precedingSave,
-        ImmutableArray<string> expandedNodes)
+        ImmutableArray<string> expandedNodes,
+        string? selectedId)
     {
         try
         {
@@ -2043,7 +2059,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         try
         {
-            await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
+            await SaveExpandStateCoreAsync(expandedNodes, selectedId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -2056,8 +2072,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// Cancels the expand-state debounce, drains any active persistence callback,
     /// and best-effort persists the latest pending snapshot before interactive close.
     /// </summary>
+    /// <remarks>
+    /// The selection rides along: it is written with the next snapshot, and when no expansion
+    /// change is pending but the selection differs from what the settings hold, the flush writes
+    /// for the selection alone. Nothing is written when neither changed.
+    /// </remarks>
     internal async Task FlushExpandStateForCloseAsync()
     {
+        string? selectedId = SelectedServer?.Id;
+        bool selectionChanged = !string.Equals(selectedId, _persistedSelectionId, StringComparison.Ordinal);
+
         lock (_expandSaveSync)
         {
             _expandStateFlushInProgress = true;
@@ -2074,18 +2098,19 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             lock (_expandSaveSync)
             {
                 activeSave = _expandSaveTask;
-                hasPendingSnapshot = _expandStateSavePending;
+                hasPendingSnapshot = _expandStateSavePending || selectionChanged;
                 if (hasPendingSnapshot)
                 {
                     expandedNodes = [.. _expandedNodes];
                     _expandStateSavePending = false;
+                    selectionChanged = false;
                 }
             }
 
             await activeSave.ConfigureAwait(false);
             if (hasPendingSnapshot)
             {
-                await SaveExpandStateBestEffortAsync(expandedNodes).ConfigureAwait(false);
+                await SaveExpandStateBestEffortAsync(expandedNodes, selectedId).ConfigureAwait(false);
             }
 
             lock (_expandSaveSync)
@@ -2099,17 +2124,21 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
     }
 
-    private async Task SaveExpandStateCoreAsync(ImmutableArray<string> expandedNodes)
+    private async Task SaveExpandStateCoreAsync(ImmutableArray<string> expandedNodes, string? selectedId)
     {
-        await _configManager.MergeSettingAsync(
-            settings => settings.TreeExpandedNodes = [.. expandedNodes]).ConfigureAwait(false);
+        await _configManager.MergeSettingAsync(settings =>
+        {
+            settings.TreeExpandedNodes = [.. expandedNodes];
+            settings.LastSelectedServerId = selectedId;
+        }).ConfigureAwait(false);
+        _persistedSelectionId = selectedId;
     }
 
-    private async Task SaveExpandStateBestEffortAsync(ImmutableArray<string> expandedNodes)
+    private async Task SaveExpandStateBestEffortAsync(ImmutableArray<string> expandedNodes, string? selectedId)
     {
         try
         {
-            await SaveExpandStateCoreAsync(expandedNodes).ConfigureAwait(false);
+            await SaveExpandStateCoreAsync(expandedNodes, selectedId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
