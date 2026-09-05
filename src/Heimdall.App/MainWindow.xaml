@@ -632,7 +632,7 @@
                                             Padding="4,3,6,3"
                                             MinHeight="26"
                                             Background="Transparent"
-                                            ToolTip="{Binding FullPath}">
+                                            ToolTip="{Binding TooltipText}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -798,8 +798,12 @@
                                         </Grid>
                                     </Border>
                                     <DataTemplate.Triggers>
+                                        <!-- Every selected row carries the accent edge, not only the one WPF's own
+                                             single selection happens to rest on: without it a selected row and a
+                                             hovered row were painted alike. -->
                                         <DataTrigger Binding="{Binding IsSelected, FallbackValue=False}" Value="True">
                                             <Setter TargetName="ServerSelectionChrome" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                                            <Setter TargetName="ServerSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>
@@ -1392,7 +1396,7 @@
                           Visibility="{Binding Connection.HasActiveSessions, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
                         <!-- Server detail panel (shown when a non-tool server is selected) -->
                         <Border x:Name="SessionDetailPanel"
-                                Visibility="{Binding ServerList.HasSelection, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Visibility="{Binding ServerList.ShowSessionDetail, Converter={StaticResource BoolToVisibilityConverter}}"
                                 Padding="{StaticResource SpacingXl}">
                             <StackPanel VerticalAlignment="Top">
                                 <TextBlock Text="{Binding ServerList.SelectedServer.DisplayName}"
@@ -1584,7 +1588,7 @@
 
                         <!-- Tool detail panel (shown when a TOOL:* entry is selected) -->
                         <Border x:Name="ToolDetailPanel"
-                                Visibility="Collapsed"
+                                Visibility="{Binding ServerList.ShowToolDetail, Converter={StaticResource BoolToVisibilityConverter}}"
                                 Padding="{StaticResource SpacingXl}">
                             <StackPanel VerticalAlignment="Top">
                                 <TextBlock x:Name="Mw_ToolDetailName"

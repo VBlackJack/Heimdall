@@ -428,7 +428,7 @@ public partial class ServerListViewModel
             .Select(group => group.Last())
             .ToArray();
         GatewayOption[] gatewayOptions = BuildGatewayOptions(canonicalGateways)
-            .OrderBy(option => option.DisplayText, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(option => option.DisplayText, DisplayNameOrdering.Comparer)
             .ToArray();
 
         ServerBulkEditGatewayResult? result = await _dialogService.ShowBulkEditGatewayAsync(
@@ -890,7 +890,7 @@ public partial class ServerListViewModel
             Environment.NewLine,
             selectedItems
                 .Select(item => item.DisplayName)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, DisplayNameOrdering.Comparer)
                 .Select(name => $"- {name}"));
 
         return _localizer.Format(

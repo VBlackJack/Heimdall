@@ -15,6 +15,7 @@
  */
 
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -890,6 +891,88 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         Assert.True(stateMachine.TryTransition(sessionId, ConnectionState.ValidatingConfig));
         Assert.True(stateMachine.TryTransition(sessionId, ConnectionState.LaunchingSsh));
         Assert.True(stateMachine.TryTransition(sessionId, ConnectionState.Connected));
+    }
+
+    [Fact]
+    public async Task DetailPaneFlags_FollowThePrimarySelection()
+    {
+        // The panes bind to these two flags and to nothing else; the window used to write their
+        // visibility as local values, which severed the binding on the first click.
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        ServerProfileDto tool = CreateServer("ping", "Ping", "ops");
+        tool.ConnectionType = ConnectionTypeCatalog.ToolPrefix + "PING";
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            tool);
+        List<string?> changed = [];
+        fixture.ViewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        Assert.True(fixture.ViewModel.ShowSessionDetail);
+        Assert.False(fixture.ViewModel.ShowToolDetail);
+
+        fixture.ViewModel.SelectSingle(fixture.ServerById("ping"));
+        Assert.False(fixture.ViewModel.ShowSessionDetail);
+        Assert.True(fixture.ViewModel.ShowToolDetail);
+
+        fixture.ViewModel.ClearSelection();
+        Assert.False(fixture.ViewModel.ShowSessionDetail);
+        Assert.False(fixture.ViewModel.ShowToolDetail);
+
+        Assert.Contains(nameof(ServerListViewModel.ShowSessionDetail), changed);
+        Assert.Contains(nameof(ServerListViewModel.ShowToolDetail), changed);
+    }
+
+    [Fact]
+    public async Task DetailPaneFlags_ClearWhenAFilterEmptiesTheSelection()
+    {
+        // The case the severed binding hid: a search with no match empties the selection from
+        // inside the view model, with no tree handler on the path.
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        Assert.True(fixture.ViewModel.ShowSessionDetail);
+
+        fixture.ViewModel.FavoriteFilterEnabled = true;
+
+        Assert.Null(fixture.ViewModel.SelectedServer);
+        Assert.False(fixture.ViewModel.ShowSessionDetail);
+    }
+
+    [Fact]
+    public async Task TreeOrder_PlacesAccentedNamesWithTheirBaseLetter()
+    {
+        // Ordinal order put every accented initial after "z"; the projection now sorts under the
+        // culture in effect when it is built.
+        CultureInfo original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+        try
+        {
+            await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+            fixture.LoadServers(
+                fixture.ExpandGroups("ops"),
+                CreateServer("zurich", "Zurich", "ops"),
+                CreateServer("etudes", "\u00c9tudes", "ops"),
+                CreateServer("alpha", "Alpha", "ops"),
+                CreateServer("z-folder", "Server", "Zulu"),
+                CreateServer("e-folder", "Server", "\u00c9coles"),
+                CreateServer("a-folder", "Server", "Alpha"));
+
+            Assert.Equal(
+                ["Alpha", "\u00c9coles", "ops", "Zulu"],
+                fixture.ViewModel.GroupedServers.Select(folder => folder.Name));
+            FolderViewModel ops = Assert.Single(fixture.ViewModel.GroupedServers, folder => folder.Name == "ops");
+            Assert.Equal(
+                ["Alpha", "\u00c9tudes", "Zurich"],
+                ops.Servers.Select(server => server.DisplayName));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 
     private static ServerProfileDto CreateServer(string id, string displayName, string group, int sortOrder = 0) =>

@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -34,6 +33,13 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     public FolderViewModel(LocalizationManager? localizer = null)
     {
         _localizer = localizer;
+
+        // The field initializers bypass the generated setters, so the collections a folder is
+        // born with would otherwise never report their changes: a server added to a fresh
+        // folder used to be picked up only because the projection was rebuilt on a count
+        // mismatch at the next read.
+        _subFolders.CollectionChanged += OnCollectionInvalidated;
+        _servers.CollectionChanged += OnCollectionInvalidated;
     }
 
     [ObservableProperty]
@@ -42,6 +48,15 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     /// <summary>Full path from root (e.g., "ADSEC/Gateway/Linux").</summary>
     [ObservableProperty]
     private string _fullPath = "";
+
+    /// <summary>
+    /// The path shown on hover, or <see langword="null"/> for the root "no group" folder.
+    /// </summary>
+    /// <remarks>
+    /// WPF opens no tooltip for a null content but does open an empty one for an empty string,
+    /// which is what the "no group" folder's empty <see cref="FullPath"/> produced.
+    /// </remarks>
+    public string? TooltipText => string.IsNullOrEmpty(FullPath) ? null : FullPath;
 
     [ObservableProperty]
     private string _color = "";
@@ -113,28 +128,23 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
         }
     }
 
-    private ArrayList? _childrenCache;
     private int? _serverCountCache;
 
     /// <summary>
     /// Combined collection for the TreeView: sub-folders first, then servers.
     /// WPF resolves the correct DataTemplate by type.
-    /// Cached to avoid re-allocation on each access (perf with 768+ items).
     /// </summary>
-    public IList Children
-    {
-        get
-        {
-            if (_childrenCache is null || _childrenCache.Count != SubFolders.Count + Servers.Count)
-            {
-                _childrenCache = new ArrayList(SubFolders.Count + Servers.Count);
-                foreach (var f in SubFolders) _childrenCache.Add(f);
-                foreach (var s in Servers) _childrenCache.Add(s);
-            }
-
-            return _childrenCache;
-        }
-    }
+    /// <remarks>
+    /// One instance for the folder's whole life, brought up to date in place by a diff. It used
+    /// to be a fresh <c>ArrayList</c> after every invalidation, and a new <c>ItemsSource</c>
+    /// instance is a Reset to the item container generator: every child container was discarded
+    /// and regenerated on every filter pass, which threw keyboard focus out of the tree whenever
+    /// a session crossed the Connected filter or a search keystroke landed. Measured on
+    /// 2026-09-05: after one invalidation the container of the focused row was a different
+    /// instance, the old one was gone from the visual tree, and the window had no focused
+    /// element left.
+    /// </remarks>
+    public ObservableCollection<object> Children { get; } = [];
 
     /// <summary>
     /// Applies visible membership changes as an ordered diff while retaining
@@ -163,13 +173,35 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
         InvalidateChildren();
     }
 
-    /// <summary>Invalidate the Children and ServerCount caches when sub-collections change.</summary>
+    /// <summary>
+    /// Brings <see cref="Children"/> in line with the sub-collections and drops the
+    /// <see cref="ServerCount"/> cache.
+    /// </summary>
     public void InvalidateChildren()
     {
-        _childrenCache = null;
         _serverCountCache = null;
-        OnPropertyChanged(nameof(Children));
+        SynchronizeChildrenProjection();
         OnPropertyChanged(nameof(ServerCount));
+    }
+
+    /// <summary>
+    /// Diffs <see cref="Children"/> against sub-folders then servers, so the collection the tree
+    /// is bound to is edited rather than replaced.
+    /// </summary>
+    private void SynchronizeChildrenProjection()
+    {
+        List<object> target = new(SubFolders.Count + Servers.Count);
+        foreach (FolderViewModel folder in SubFolders)
+        {
+            target.Add(folder);
+        }
+
+        foreach (ServerItemViewModel server in Servers)
+        {
+            target.Add(server);
+        }
+
+        SynchronizeCollection(Children, target);
     }
 
     /// <summary>Total server count (direct + recursive). Cached; call InvalidateChildren() on structural changes.</summary>
@@ -177,6 +209,8 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
         _serverCountCache ??= Servers.Count + SubFolders.Sum(f => f.ServerCount);
 
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
+
+    partial void OnFullPathChanged(string value) => OnPropertyChanged(nameof(TooltipText));
 
     internal void RefreshLocalizedState()
     {

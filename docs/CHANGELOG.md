@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the colour depth bound says what the session gets
+## Unreleased: the tree keeps its focus, the detail pane follows the selection, and the colour depth bound says what the session gets
 
 ### The colour depth floor is 16 bits
 
@@ -25,6 +25,41 @@ that could produce a lower depth - the mRemoteNG importer for its 256-colour and
 .rdp importer for a `session bpp` below 16 - bring it onto the floor, which is what the session got
 before. An existing profile carrying 8 still connects at 16; the dialog asks for a valid value the
 next time it is edited.
+
+### A filter pass no longer throws keyboard focus out of the sessions tree
+
+Every folder handed the tree a fresh list of its children after each filter pass, and a new list
+is a reset to WPF's container generator: every row under the folder was discarded and rebuilt, and
+the row that held keyboard focus went with it. With the Connected filter on, a session connecting
+or disconnecting anywhere in the inventory was enough to leave the tree without a focused row,
+after which Shift+F10, Enter, Delete and F2 had nothing to act on. Each search keystroke did the
+same. A folder now keeps one child collection for its whole life and edits it in place; a test pins
+that the focused row survives a pass with its container and its focus.
+
+### The detail pane follows the selection wherever the selection comes from
+
+The tree handlers wrote the detail pane's visibility and the Connect button's label directly, and a
+value written that way replaces the binding the markup declares. From the first click on, the pane
+only moved when a tree handler moved it: a search with no match emptied the selection but left the
+pane open with a blank title and an inert Connect button, and so did collapsing the folder that
+held the selected session. After a language change the Connect button kept its old label until the
+next click. The two panes now bind to the view model and nothing in the window writes them.
+
+### Names sort by the reader's alphabet
+
+Folders and sessions were ordered by code point, which ranks every accented capital after "z": a
+folder or a session whose name starts with an accented letter sat at the bottom of the tree, below
+"Zurich". The tree, the folder pickers, the project list and the bulk-delete summary now sort under
+the current culture, case-insensitively, through one shared comparer.
+
+### Smaller corrections
+
+- A session row announces its keyboard gestures to assistive technology: Enter, F2, Ctrl+Space,
+  Shift+Up, Shift+Down and Shift+F10. Folders already announced theirs; the rows carrying the
+  custom multi-selection announced nothing.
+- Every selected row carries the accent edge, not only the one WPF's own selection rests on. A
+  second selected row and a hovered row were painted alike.
+- Hovering the "No group" folder no longer opens an empty tooltip.
 
 ## 2026-09-05: the .rdp import reads what the client writes, and a session torn down mid-connect no longer holds the machine awake (v2026.090504)
 
