@@ -200,6 +200,88 @@ public sealed class CredentialAutofillTests : IDisposable
             && line.Contains("CredentialAutofill broker match outcome", StringComparison.Ordinal));
     }
 
+    private const int OwnProcessId = 777;
+    private static readonly IntPtr SurfaceA = new(0xA000);
+    private static readonly IntPtr SurfaceB = new(0xB000);
+
+    private static List<CredentialAutofill.WindowInfo> TwoInProcessPrompts(IntPtr ownerOfFirst, IntPtr ownerOfSecond) =>
+    [
+        new(new IntPtr(0x3001), "Windows Security", "Credential Dialog Xaml Host", OwnProcessId, "Heimdall", ownerOfFirst),
+        new(new IntPtr(0x3002), "Windows Security", "Credential Dialog Xaml Host", OwnProcessId, "Heimdall", ownerOfSecond)
+    ];
+
+    private static bool OwnerEquals(IntPtr owner, IntPtr surface) => owner == surface;
+
+    // Two embedded sessions prompting at once raise two identical dialogs in this process. The
+    // process match cannot tell them apart, and the first-in-list pick used to hand the second
+    // session's prompt this session's password. The owner window is what says whose it is.
+    [Fact]
+    public void SelectCredentialDialogTarget_TwoInProcessPrompts_PicksTheOneOwnedByThisSurface()
+    {
+        var windows = TwoInProcessPrompts(SurfaceA, SurfaceB);
+
+        var result = CredentialAutofill.SelectCredentialDialogTarget(
+            mstscProcessId: OwnProcessId,
+            hostHintPattern: null,
+            candidates: windows,
+            scan: 1,
+            sessionSurfaceHandle: SurfaceB,
+            isOwnedBySurface: OwnerEquals);
+
+        Assert.NotNull(result);
+        Assert.Equal(new IntPtr(0x3002), result.Value.Handle);
+    }
+
+    [Fact]
+    public void SelectCredentialDialogTarget_PromptOwnedByAnotherSurface_IsLeftToItsOwnWatcher()
+    {
+        var windows = TwoInProcessPrompts(SurfaceA, SurfaceA);
+
+        var result = CredentialAutofill.SelectCredentialDialogTarget(
+            mstscProcessId: OwnProcessId,
+            hostHintPattern: null,
+            candidates: windows,
+            scan: 1,
+            sessionSurfaceHandle: SurfaceB,
+            isOwnedBySurface: OwnerEquals);
+
+        Assert.Null(result);
+    }
+
+    // Positive control for the fallback: when no prompt carries an owner at all, nothing is known
+    // about ownership and the process match decides as it did before this existed.
+    [Fact]
+    public void SelectCredentialDialogTarget_NoPromptCarriesAnOwner_FallsBackToTheProcessMatch()
+    {
+        var windows = TwoInProcessPrompts(IntPtr.Zero, IntPtr.Zero);
+
+        var result = CredentialAutofill.SelectCredentialDialogTarget(
+            mstscProcessId: OwnProcessId,
+            hostHintPattern: null,
+            candidates: windows,
+            scan: 1,
+            sessionSurfaceHandle: SurfaceB,
+            isOwnedBySurface: OwnerEquals);
+
+        Assert.NotNull(result);
+        Assert.Equal(new IntPtr(0x3001), result.Value.Handle);
+    }
+
+    [Fact]
+    public void SelectCredentialDialogTarget_NoSurfaceNamed_IgnoresOwnership()
+    {
+        var windows = TwoInProcessPrompts(SurfaceA, SurfaceB);
+
+        var result = CredentialAutofill.SelectCredentialDialogTarget(
+            mstscProcessId: OwnProcessId,
+            hostHintPattern: null,
+            candidates: windows,
+            scan: 1,
+            isOwnedBySurface: (_, _) => throw new InvalidOperationException("ownership must not be consulted"));
+
+        Assert.NotNull(result);
+    }
+
     [Fact]
     public void SelectCredentialDialogTarget_BrokerEnumerationException_LogsWarning()
     {

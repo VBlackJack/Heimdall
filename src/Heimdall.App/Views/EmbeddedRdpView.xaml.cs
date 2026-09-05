@@ -2455,6 +2455,11 @@ public partial class EmbeddedRdpView
         _autofillCts = new CancellationTokenSource();
         var token = _autofillCts.Token;
 
+        // The window the prompt will be owned by, read here on the UI thread. It is what lets
+        // the watcher tell this session's prompt from another embedded session's: both are
+        // raised in this process, both are titled "Windows Security", and neither names a host.
+        IntPtr sessionSurfaceHandle = _rdpHost?.HostHandle ?? IntPtr.Zero;
+
         // The view-side state belongs to the caller's thread, which is the UI thread at both call
         // sites. The watcher does not: its first scan enumerates every visible top-level window,
         // resolves a process name for each one and walks this process's threads, with nothing
@@ -2467,11 +2472,15 @@ public partial class EmbeddedRdpView
         });
 
         _ = RdpAutofillLauncher.StartAsync(
-            watcherToken => TryAutofillCredentialsAsync(password, hostHint, watcherToken),
+            watcherToken => TryAutofillCredentialsAsync(password, hostHint, sessionSurfaceHandle, watcherToken),
             token);
     }
 
-    private async Task TryAutofillCredentialsAsync(string password, string hostHint, CancellationToken cancellationToken)
+    private async Task TryAutofillCredentialsAsync(
+        string password,
+        string hostHint,
+        IntPtr sessionSurfaceHandle,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -2481,7 +2490,8 @@ public partial class EmbeddedRdpView
                 hostHint,
                 password,
                 TimeSpan.FromMilliseconds(timeoutMs),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                sessionSurfaceHandle).ConfigureAwait(false);
 
             if (filled)
             {
