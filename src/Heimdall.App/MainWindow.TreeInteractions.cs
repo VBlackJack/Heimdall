@@ -111,38 +111,89 @@ public partial class MainWindow
             || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None;
         _treeState.SuppressSelectedItemSync = false;
 
-        if (preserveMultiSelection)
+        if (sender is TreeView treeView
+            && ShouldClearNativeSelection(preserveMultiSelection, e.NewValue, vm.ServerList.SelectedItems.Contains))
         {
-            if (sender is TreeView treeView && e.NewValue is FolderViewModel folder)
+            // The native flag comes off; focus stays where WPF put it.
+            TreeViewItem? container = TreeInteractionState.FindTreeViewItemContainer(treeView, e.NewValue);
+            if (container is not null)
             {
-                var container = TreeInteractionState.FindTreeViewItemContainer(treeView, folder);
-                if (container is not null)
-                {
-                    container.IsSelected = false;
-                }
+                container.IsSelected = false;
             }
-
-            ShowTreeSelection(vm, vm.ServerList.SelectedServer);
-            return;
         }
 
-        if (e.NewValue is ServerItemViewModel server)
+        if (!preserveMultiSelection && e.NewValue is ServerItemViewModel server)
         {
             vm.ServerList.SelectSingle(server);
             ShowTreeSelection(vm, server);
+            return;
         }
-        else
-        {
-            if (sender is TreeView treeView && e.NewValue is FolderViewModel folder)
-            {
-                var container = TreeInteractionState.FindTreeViewItemContainer(treeView, folder);
-                if (container is not null)
-                {
-                    container.IsSelected = false;
-                }
-            }
 
-            ShowTreeSelection(vm, vm.ServerList.SelectedServer);
+        ShowTreeSelection(vm, vm.ServerList.SelectedServer);
+    }
+
+    /// <summary>
+    /// Decides whether the row WPF has just selected must have its native flag cleared.
+    /// </summary>
+    /// <remarks>
+    /// Folders are never selected, so theirs always comes off. A session row comes off when a
+    /// modifier gesture is preserving the multi-selection and the row is not part of it: WPF
+    /// selects whatever it focuses, so Ctrl+Down walked the focus onto a row and dressed it as
+    /// selected while the selection the modifier was protecting sat elsewhere - the same orphan
+    /// Ctrl+click used to leave. Enter already refused such a row; now it does not look selected
+    /// either.
+    /// </remarks>
+    /// <param name="preserveMultiSelection">Whether the change arrived under a modifier or a suppressed sync.</param>
+    /// <param name="newValue">The item WPF has just selected.</param>
+    /// <param name="isSelected">Reports whether a session belongs to the view model's selection.</param>
+    internal static bool ShouldClearNativeSelection(
+        bool preserveMultiSelection,
+        object? newValue,
+        Func<ServerItemViewModel, bool> isSelected)
+    {
+        ArgumentNullException.ThrowIfNull(isSelected);
+
+        if (newValue is FolderViewModel)
+        {
+            return true;
+        }
+
+        return preserveMultiSelection
+            && newValue is ServerItemViewModel server
+            && !isSelected(server);
+    }
+
+    /// <summary>
+    /// Selects a session from code: the view model first, then WPF's own row flag with the sync
+    /// suppressed.
+    /// </summary>
+    /// <remarks>
+    /// Setting the native flag alone left the decision to the selection-changed handler, which
+    /// reads the modifier keys: a reveal deferred to the dispatcher while Ctrl was still down from
+    /// the gesture that asked for it was taken for a multi-selection gesture, and the view model
+    /// never learned of the selection. Selecting the view model here and suppressing the sync
+    /// makes the outcome the same whatever is held down when the deferred action runs.
+    /// </remarks>
+    internal static void SelectRowProgrammatically(
+        TreeInteractionState treeState,
+        TreeViewItem container,
+        ServerItemViewModel server,
+        Action<ServerItemViewModel> selectSingle)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(container);
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentNullException.ThrowIfNull(selectSingle);
+
+        selectSingle(server);
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            container.IsSelected = true;
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
         }
     }
 
@@ -1183,7 +1234,7 @@ public partial class MainWindow
     /// </remarks>
     private void RestoreTreeSelectionRow(ServerItemViewModel? server)
     {
-        if (server is null)
+        if (server is null || DataContext is not MainViewModel vm)
         {
             return;
         }
@@ -1198,16 +1249,7 @@ public partial class MainWindow
                     return;
                 }
 
-                _treeState.SuppressSelectedItemSync = true;
-                try
-                {
-                    container.IsSelected = true;
-                }
-                finally
-                {
-                    _treeState.SuppressSelectedItemSync = false;
-                }
-
+                SelectRowProgrammatically(_treeState, container, server, vm.ServerList.SelectSingle);
                 container.BringIntoView();
             }));
     }
