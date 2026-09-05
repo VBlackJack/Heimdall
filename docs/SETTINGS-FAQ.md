@@ -136,7 +136,8 @@ of an *external* mstsc session in order to fill it. It does not affect embedded 
 
 **.rdp file and credential cleanup delay** - external mode writes a temporary `.rdp` file and a
 credential; this is how long Heimdall waits before deleting them, so `mstsc.exe` has time to
-read them.
+read them. If Heimdall exits before the delay elapses, both are released at exit; after a
+crash, they are reclaimed at the next startup or the next external launch.
 
 **Session keep-alive interval** and **Anti-idle interval** are different things. Keep-alive is
 protocol traffic that stops the *server* dropping an idle session. Anti-idle simulates activity

@@ -201,6 +201,16 @@ the same `authentication level:i:0` into the generated `.rdp` file that the
 embedded path applies to the control. On that path the Windows check is relaxed
 and nothing replaces it.
 
+**The `TERMSRV` credential is session-scoped and swept.** The entry is written
+with `CRED_PERSIST_SESSION` and a Heimdall ownership marker, released after the
+configurable cleanup delay, and released at once when Heimdall exits with a
+cleanup still pending. What a crash leaves behind is reclaimed by
+`CredentialManagerHelper.SweepStaleOwnedCredentials`, which runs at startup and
+before every external launch: it enumerates `TERMSRV/*` and deletes the
+domain-password entries whose marker is older than the live-launch window,
+whatever process wrote them. An entry without a Heimdall marker, or with the
+older marker format that carries no timestamp, is never touched.
+
 **Every outcome other than an explicit refusal proceeds.** `RdpCertificateProbe`
 opens its own TCP connection, performs the X.224 negotiation, and reads the
 certificate offered by the TLS layer. If the endpoint is unreachable, keeps

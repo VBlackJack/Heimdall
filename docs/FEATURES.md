@@ -36,7 +36,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - **Edit profile always reachable from the reconnect overlay**: every disconnect code (network, transient, security) keeps the `Edit profile` button visible so users can tweak resolution, gateway or multi-monitor without closing the overlay first
 - Credential autofill for CredUI dialogs (EnumThreadWindows + UI Automation), with Debug broker-window diagnostics limited to metadata such as title, handle, PID, and process name; credential fields are never logged (`1d7c78c`)
 - **Honest external-launch state**: when an external mstsc client is spawned, the session shows up in warning color with a dedicated *External client launched* status, signalling that Heimdall cannot directly observe the remote session beyond the launch itself
-- **Unified RDP import**: `.rdp` files dragged onto the main window or imported from `Settings → Import` go through the same preview/conflict resolution flow
+- **Unified RDP import**: `.rdp` files dragged onto the main window or imported from `Settings → Import` go through the same preview/conflict resolution flow; replacing an existing profile keeps every field the file cannot carry (fixed resolution, domain, saved password, post-connect steps)
 - **Performance**: COM pre-warm at startup, DNS pre-resolution on server selection, per-server experience flags (wallpaper/themes/animations), UDP transport probe suppression for firewall-heavy environments (the Remote Desktop client exposes no way for an application to force TCP; what this removes is the probe that times out when UDP is dropped)
 
 ### SSH Terminal
@@ -275,9 +275,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - `Settings > SSH & SFTP > Host keys` sub-tab: dense auditable grid of every trusted host key with source provenance, import from `~/.ssh/known_hosts`, export to it, explicit per-row conflict resolution ("Keep existing" default), and copy/remove row actions
 - Opt-in `known_hosts` synchronization at startup so Heimdall, OpenSSH CLI, and Plink share one view of trust
 - Plink fallback sessions enforce pinned `-hostkey` fingerprints from the shared trust store and refuse to launch when Heimdall cannot resolve a pinned/probed fingerprint safely
-- Credential broker autofill requires an RDP host-title match before injecting passwords
+- Credential broker autofill requires an RDP host-title match before injecting a password into an external client's prompt; inside Heimdall, the prompt of an embedded session is matched by the window that owns it, so two sessions prompting at once each fill their own
 - Known security limitations and threat model notes are tracked in [docs/SECURITY.md](SECURITY.md)
-- Session-scoped CredMan entries with deterministic cleanup
+- Session-scoped CredMan entries with deterministic cleanup: released after the cleanup delay, flushed when Heimdall exits, and swept at startup and before every external launch when an earlier process left one behind
 
 ### Import and Migration
 - Migration from Heimdall v1 (DPAPI-encrypted credentials preserved)

@@ -220,6 +220,18 @@ certificat côté Heimdall, tandis que `RdpFileGenerator` inscrit dans le fichie
 au contrôle. Sur ce chemin, la vérification de Windows est relâchée et rien ne
 la remplace.
 
+**L'identifiant `TERMSRV` est circonscrit à la session et balayé.** L'entrée est
+écrite avec `CRED_PERSIST_SESSION` et un marqueur de propriété Heimdall,
+supprimée après le délai de nettoyage configurable, et supprimée immédiatement
+quand Heimdall se ferme avec un nettoyage encore en attente. Ce qu'un plantage
+laisse derrière lui est récupéré par
+`CredentialManagerHelper.SweepStaleOwnedCredentials`, qui s'exécute au démarrage
+et avant chaque lancement externe : elle énumère `TERMSRV/*` et supprime les
+entrées de type mot de passe de domaine dont le marqueur est plus ancien que la
+fenêtre de lancement vivant, quel que soit le processus qui les a écrites. Une
+entrée sans marqueur Heimdall, ou portant l'ancien format de marqueur sans
+horodatage, n'est jamais touchée.
+
 **Toute issue autre qu'un refus explicite laisse passer la connexion.**
 `RdpCertificateProbe` ouvre sa propre connexion TCP, effectue la négociation
 X.224 et lit le certificat présenté par la couche TLS. Si le point de

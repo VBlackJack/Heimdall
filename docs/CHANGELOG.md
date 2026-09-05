@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the vault tests own their baseline, and the RDP audit closes eleven findings
+## 2026-09-05: the RDP audit closes eleven findings, and the vault tests own their baseline (v2026.090502)
 
 ### An interrupted external launch no longer leaves its password in the Credential Manager
 

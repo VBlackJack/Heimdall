@@ -147,7 +147,9 @@ sessions embarquées.
 
 **Délai de nettoyage du fichier .rdp et des identifiants** - le mode externe écrit un fichier
 `.rdp` temporaire et un identifiant ; c'est le délai avant suppression, pour laisser à
-`mstsc.exe` le temps de les lire.
+`mstsc.exe` le temps de les lire. Si Heimdall se ferme avant la fin du délai, les deux sont
+supprimés à la fermeture ; après un plantage, ils sont récupérés au démarrage suivant ou au
+prochain lancement externe.
 
 **Intervalle de maintien de session** et **Intervalle anti-inactivité** sont deux choses
 différentes. Le maintien est du trafic protocolaire qui empêche le *serveur* de couper une

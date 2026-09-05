@@ -36,7 +36,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - **Édition du profil toujours accessible depuis la surcouche de reconnexion** : quel que soit le code de déconnexion (réseau, transitoire, sécurité), le bouton `Edit profile` reste visible pour ajuster la résolution, la passerelle ou le multi-écran sans fermer la surcouche au préalable
 - Remplissage automatique des identifiants pour les boîtes CredUI (EnumThreadWindows + UI Automation), avec des diagnostics Debug de fenêtre broker limités aux métadonnées : titre, handle, PID et nom de processus ; les champs d'identifiants ne sont jamais journalisés (`1d7c78c`)
 - **État de lancement externe honnête** : lorsqu'un client mstsc externe est lancé, la session apparaît en couleur d'avertissement avec un état dédié *External client launched*, signalant que Heimdall ne peut pas observer directement la session distante au-delà du lancement lui-même
-- **Import RDP unifié** : les fichiers `.rdp` déposés sur la fenêtre principale ou importés depuis `Settings -> Import` empruntent le même flux d'aperçu et de résolution de conflits
+- **Import RDP unifié** : les fichiers `.rdp` déposés sur la fenêtre principale ou importés depuis `Settings -> Import` empruntent le même flux d'aperçu et de résolution de conflits ; remplacer un profil existant conserve tous les champs que le fichier ne peut pas porter (résolution fixe, domaine, mot de passe enregistré, étapes post-connexion)
 - **Performance** : préchauffage COM au démarrage, pré-résolution DNS à la sélection d'un serveur, indicateurs d'expérience par serveur (fond d'écran/thèmes/animations), suppression de la sonde de transport UDP pour les environnements très filtrés (le client Bureau à distance n'expose aucun moyen, pour une application, de forcer TCP ; ce qui disparaît, c'est la sonde qui expire quand UDP est bloqué)
 
 ### Terminal SSH
@@ -275,9 +275,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Sous-onglet `Settings > SSH & SFTP > Clés d'hôtes` : grille dense et auditable de chaque clé d'hôte de confiance avec provenance de la source, import depuis `~/.ssh/known_hosts`, export vers ce même fichier, résolution de conflit explicite ligne par ligne ("Keep existing" par défaut) et actions de copie/suppression de ligne
 - Synchronisation optionnelle de `known_hosts` au démarrage, afin que Heimdall, la CLI OpenSSH et Plink partagent une vue unique de la confiance
 - Les sessions de repli Plink imposent des empreintes `-hostkey` épinglées issues du magasin de confiance partagé et refusent de se lancer quand Heimdall ne peut pas résoudre une empreinte épinglée ou sondée en toute sécurité
-- Le remplissage automatique via le broker d'identifiants exige une correspondance du titre de l'hôte RDP avant d'injecter un mot de passe
+- Le remplissage automatique via le broker d'identifiants exige une correspondance du titre de l'hôte RDP avant d'injecter un mot de passe dans l'invite d'un client externe ; dans Heimdall, l'invite d'une session embarquée est reconnue par la fenêtre qui la possède, donc deux sessions qui invitent en même temps remplissent chacune la leur
 - Les limitations de sécurité connues et les notes de modèle de menace sont suivies dans [docs/fr/SECURITY.md](SECURITY.md)
-- Entrées CredMan circonscrites à la session, avec nettoyage déterministe
+- Entrées CredMan circonscrites à la session, avec nettoyage déterministe : supprimées après le délai de nettoyage, vidées à la fermeture de Heimdall, et balayées au démarrage et avant chaque lancement externe quand un processus précédent en a laissé une
 
 ### Import et migration
 - Migration depuis Heimdall v1 (identifiants chiffrés DPAPI préservés)
