@@ -31,6 +31,12 @@ guard test keeps both rules closed over the Core test sources, membership and sc
 it reached the six known classes so an empty scan cannot pass. The same mutant is harmless on
 this tree.
 
+The App side had the same shape: five writers with hand-written resets, three readers with no
+baseline, and a membership guard that checked the collection and nothing else. It gets a twin of
+the scope (the App test project does not reference the Core one, and its collection definition
+was already a duplicate for that reason), the same lifetime changes, and the existing guard now
+checks the scope rule and its own reach.
+
 ## 2026-09-05: certificate trust has two owners, the palette dials a saved profile as a saved profile, and every setting bound is declared once (v2026.090501)
 
 ### The line-endings gate measures the bytes

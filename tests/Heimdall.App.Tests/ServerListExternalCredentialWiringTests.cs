@@ -39,10 +39,18 @@ namespace Heimdall.App.Tests;
 /// fake <see cref="ICredentialProviderFactory"/> and stub <see cref="ICredentialProvider"/>
 /// (no external processes are spawned).
 /// </summary>
-// Touches the static CredentialProtector; serialized with the vault tests.
+// Touches the static CredentialProtector; serialized with the vault tests, and pinned to the
+// no-vault baseline so a writer scheduled before this class cannot leave it locked.
 [Collection(CredentialProtectorAppCollection.Name)]
-public sealed class ServerListExternalCredentialWiringTests
+public sealed class ServerListExternalCredentialWiringTests : IDisposable
 {
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
+
     [Fact]
     public async Task ResolveCredentials_ProviderDisabled_ReturnsFalseAndFactoryNeverCalled()
     {

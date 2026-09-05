@@ -36,6 +36,7 @@ public sealed class CommandLibrarySettingsServiceTokenTests : IDisposable
     private readonly string _tempDir;
     private readonly ConfigManager _configManager;
     private readonly CommandLibrarySettingsService _service;
+    private readonly CredentialProtectorStateScope _scope;
 
     public CommandLibrarySettingsServiceTokenTests()
     {
@@ -45,16 +46,12 @@ public sealed class CommandLibrarySettingsServiceTokenTests : IDisposable
         _configManager.InitializeAsync().GetAwaiter().GetResult();
         _service = new CommandLibrarySettingsService(_configManager, new LocalizationManager());
 
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(HmacIntegrity.GenerateRawKey());
+        _scope = new CredentialProtectorStateScope(HmacIntegrity.GenerateRawKey());
     }
 
     public void Dispose()
     {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        _scope.Dispose();
 
         try
         {

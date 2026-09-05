@@ -46,9 +46,9 @@ public sealed class WorkspaceLockServiceTests : IAsyncLifetime
         _configManager = new ConfigManager(_tempDir);
         await _configManager.InitializeAsync();
 
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(HmacIntegrity.GenerateRawKey());
+        // xUnit drives this lifetime without a constructor, so the baseline is established
+        // here rather than in a field initializer: no vault, no DEK, a fresh HMAC key.
+        CredentialProtectorStateScope.Reset(HmacIntegrity.GenerateRawKey());
 
         _lifecycle = new VaultLifecycleService(_configManager);
         await _lifecycle.EnableAsync(MasterPassword.ToCharArray(), FastParams); // leaves the vault unlocked
@@ -57,9 +57,7 @@ public sealed class WorkspaceLockServiceTests : IAsyncLifetime
     public Task DisposeAsync()
     {
         _lifecycle.Dispose();
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        CredentialProtectorStateScope.Reset();
         try
         {
             Directory.Delete(_tempDir, recursive: true);

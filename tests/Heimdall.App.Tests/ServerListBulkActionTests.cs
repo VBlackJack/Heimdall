@@ -33,10 +33,18 @@ using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
 namespace Heimdall.App.Tests;
 
-// Bulk password mutation encrypts via CredentialProtector; serialized with the vault tests.
+// Bulk password mutation encrypts via CredentialProtector; serialized with the vault tests, and
+// pinned to the no-vault baseline so a writer scheduled before this class cannot leave it locked.
 [Collection(CredentialProtectorAppCollection.Name)]
-public sealed class ServerListBulkActionTests
+public sealed class ServerListBulkActionTests : IDisposable
 {
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
+
     [Fact]
     public async Task DeleteSelectedAsync_WhenConfirmed_RemovesSelectedAndClearsSelection()
     {
