@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the tree keeps its focus, the detail pane follows the selection, and the colour depth bound says what the session gets
+## 2026-09-05: the sessions tree, audited and reworked, and the colour depth floor is 16 bits (v2026.090505)
 
 ### The colour depth floor is 16 bits
 

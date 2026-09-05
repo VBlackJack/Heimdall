@@ -204,6 +204,9 @@ Press **F1** at any time for the full list. The ones that pay for themselves imm
 | `Ctrl+F` | Jump to the search box |
 | `F11` | Fullscreen, `Escape` to leave it |
 | `Ctrl+Shift+T` | Switch the left panel between Sessions and Tools |
+| `Ctrl+A` | In the sessions tree, select every session in the open folders |
+| `Alt+Up` / `Alt+Down` | Move the focused session within its folder |
+| `F2` | Rename the selected session or folder |
 
 ---
 
