@@ -183,7 +183,8 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                 HasParseError = hasParseError,
                 ParseErrorMessage = parseErrorMessage,
                 UnknownKeyCount = schema.UnknownKeys.Count,
-                SkippedMappings = skippedMappings
+                SkippedMappings = skippedMappings,
+                Schema = schema
             });
         }
 
@@ -208,7 +209,8 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                     HasNameConflict = !entry.HasParseError && (hasExistingConflict || hasBatchConflict),
                     ConflictingExistingName = hasExistingConflict ? conflictingName : hasBatchConflict ? entry.ProposedName : null,
                     UnknownKeyCount = entry.UnknownKeyCount,
-                    SkippedMappings = entry.SkippedMappings
+                    SkippedMappings = entry.SkippedMappings,
+                    Schema = entry.Schema
                 };
             })
             .ToList();
@@ -278,7 +280,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                             continue;
 
                         case RdpConflictResolution.Replace:
-                            inventory[existingIndex] = ReplaceExisting(inventory[existingIndex], previewEntry.Candidate);
+                            inventory[existingIndex] = ReplaceExisting(inventory[existingIndex], previewEntry);
                             replacedCount++;
                             LogImport(previewEntry, "replaced");
                             continue;
@@ -562,57 +564,40 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         return _localizer["DialogImportRdpFallbackName"];
     }
 
-    private static ServerProfileDto ReplaceExisting(ServerProfileDto existing, ServerProfileDto candidate)
+    /// <summary>
+    /// Writes what the file carries onto the existing profile, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <para>The replacement used to be rebuilt from the candidate field by field, which reset
+    /// everything a .rdp file cannot express: the fixed resolution the import itself reports as
+    /// a skipped mapping, the domain, the aspect ratio, anti-idle, the admin and full-screen
+    /// switches, the post-connect steps, and the saved password - the file's own password blob
+    /// was announced as "not imported" while the profile's was silently erased. Three fields had
+    /// been rescued one at a time (the SSH gateway, the local port, the vault entry); the rest
+    /// had the same shape.</para>
+    /// <para>So the existing profile is cloned and the file's schema is mapped onto the clone by
+    /// the same code the preview used. A field the file names is overwritten; a field it does
+    /// not name keeps the value the user had. The identity, the name and the address are the
+    /// three things a Replace always takes from the file.</para>
+    /// </remarks>
+    private ServerProfileDto ReplaceExisting(ServerProfileDto existing, RdpImportPreviewEntry previewEntry)
     {
-        return new ServerProfileDto
+        ServerProfileDto candidate = previewEntry.Candidate;
+        ServerProfileDto replaced = existing.CloneFaithfully();
+        replaced.DisplayName = candidate.DisplayName;
+        replaced.Origin = ProfileOrigin.ImportRdp;
+        replaced.ConnectionType = "RDP";
+        replaced.RemoteServer = candidate.RemoteServer;
+        replaced.RemotePort = candidate.RemotePort;
+
+        if (previewEntry.Schema is not null)
         {
-            Id = existing.Id,
-            DisplayName = candidate.DisplayName,
-            Origin = ProfileOrigin.ImportRdp,
-            RemoteServer = candidate.RemoteServer,
-            RemotePort = candidate.RemotePort,
-            Group = existing.Group,
-            // A .rdp file describes an RDP endpoint, not how Heimdall reaches it and not which
-            // vault entry holds its credential. Replace must leave those to the existing profile,
-            // or a bastion-tunnelled profile silently becomes a direct connection.
-            SshGatewayId = existing.SshGatewayId,
-            LocalPort = existing.LocalPort,
-            VaultEntryName = existing.VaultEntryName,
-            RdpUsername = candidate.RdpUsername,
-            RdpPasswordEncrypted = null,
-            UseDirectConnection = existing.UseDirectConnection,
-            ProjectId = existing.ProjectId,
-            ConnectionType = "RDP",
-            IsFavorite = existing.IsFavorite,
-            SortOrder = existing.SortOrder,
-            Tags = existing.Tags,
-            RdpMode = candidate.RdpMode,
-            RdpUseGlobalDefaults = candidate.RdpUseGlobalDefaults,
-            RdpRedirectClipboard = candidate.RdpRedirectClipboard,
-            RdpRedirectDrives = candidate.RdpRedirectDrives,
-            RdpRedirectPrinters = candidate.RdpRedirectPrinters,
-            RdpRedirectComPorts = candidate.RdpRedirectComPorts,
-            RdpRedirectSmartCards = candidate.RdpRedirectSmartCards,
-            RdpRedirectWebcam = candidate.RdpRedirectWebcam,
-            RdpRedirectUsb = candidate.RdpRedirectUsb,
-            RdpAudioMode = candidate.RdpAudioMode,
-            RdpAudioCapture = candidate.RdpAudioCapture,
-            RdpMultiMonitor = candidate.RdpMultiMonitor,
-            RdpSelectedMonitorIndices = [.. candidate.RdpSelectedMonitorIndices],
-            RdpDynamicResolution = candidate.RdpDynamicResolution,
-            RdpNla = candidate.RdpNla,
-            RdpStrictServerAuthentication = candidate.RdpStrictServerAuthentication,
-            RdpColorDepth = candidate.RdpColorDepth,
-            RdpBitmapCaching = candidate.RdpBitmapCaching,
-            RdpCompression = candidate.RdpCompression,
-            RdpHardwareAcceleration = candidate.RdpHardwareAcceleration,
-            RdpAutoReconnect = candidate.RdpAutoReconnect,
-            RdpPerformanceFlags = candidate.RdpPerformanceFlags,
-            RdpDisableUdp = candidate.RdpDisableUdp,
-            RdpGateway = candidate.RdpGateway,
-            Environment = existing.Environment,
-            MacAddress = existing.MacAddress
-        };
+            // The mapping already ran once on the candidate, so it cannot fail here; the skipped
+            // mappings it reports were shown in the preview.
+            _ = TryMapSchema(previewEntry.Schema, replaced, new List<string>());
+        }
+
+        return replaced;
     }
 
     private static ServerProfileDto CloneCandidate(ServerProfileDto candidate)
