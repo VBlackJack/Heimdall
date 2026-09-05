@@ -46,8 +46,11 @@ public sealed class RdpSessionState
     /// <summary>TCP keep-alive interval in milliseconds.</summary>
     public const int DefaultKeepAliveIntervalMs = 60_000;
 
-    internal const int DefaultWidth = 1024;
-    internal const int DefaultHeight = 768;
+    /// <summary>Desktop size a session starts from before the display resolver has run.</summary>
+    public const int DefaultWidth = 1024;
+
+    /// <summary>Desktop size a session starts from before the display resolver has run.</summary>
+    public const int DefaultHeight = 768;
     internal const int DefaultColorDepth = 32;
     internal const uint DefaultScaleFactor = 100;
     internal const double DefaultDpiScale = 1.0;
