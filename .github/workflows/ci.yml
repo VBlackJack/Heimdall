@@ -15,23 +15,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Measures the bytes of the indexed blobs, not only the `i/` column of
+      # `git ls-files --eol`: a blob git classes binary from its content (a lone
+      # carriage return is enough) is never normalized and never reported as
+      # `i/crlf`, so the one-line grep this step used to be had a blind spot on
+      # exactly the kind of data file one adds to a repository (BL-0100).
       - name: Check committed line endings
-        shell: bash
+        shell: pwsh
         run: |
-          violations="$(git ls-files --eol | grep -E '^i/(crlf|mixed)' || true)"
-          if [ -n "$violations" ]; then
-            echo "Committed blobs must be stored with LF (see .gitattributes):"
-            echo "$violations"
-            echo
-            echo "These blobs were committed with CRLF, bypassing the clean filter."
-            echo "Do not fix this by replaying the offending commit: a pure"
-            echo "line-ending renormalization cannot be rebased, and the branch stays"
-            echo "permanently dirty. Regenerate it instead - rebase --onto the target"
-            echo "branch, stop after the offending commit, then run"
-            echo "git add --renormalize on the offending paths and commit that."
-            exit 1
-          fi
-          echo "All tracked blobs are stored with LF."
+          ./scripts/CommittedLineEndingsGuard.ps1
+          # The script runs in a child scope, so its `exit 1` does not end this block.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # And the guard's own suite, so a gate that stopped seeing fails under its
+      # own name rather than staying silently green.
+      - name: Check the line-endings guard sees what it must
+        shell: pwsh
+        run: |
+          ./scripts/Test-CommittedLineEndingsGuard.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Placed with the other cheap fail-fast gates, before the SDK is even set
       # up: the typography guard is pure PowerShell over docs/release-notes, so it

@@ -14,6 +14,17 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased: every setting bound is declared once, certificate trust has two owners, the palette dials a saved profile as a saved profile, and the out-of-range warning says what the loader does
 
+### The line-endings gate measures the bytes
+
+The CI gate that refuses a blob committed with CRLF read one column of `git ls-files --eol`.
+A blob git classes as binary from its content is neither normalized nor reported in that
+column, and one lone carriage return in a text file is enough for that classification: a 34 KB
+data file went into the index with CRLF on every line and the gate said nothing (BL-0100). The
+gate is now a script that also reads the bytes of every blob git classed binary without a
+declared `binary` attribute, and refuses one that holds no NUL byte and holds a CRLF. Its own
+test suite runs in CI beside it, on throwaway repositories, including the lone-carriage-return
+case the old grep missed.
+
 ### A setting's range is declared once, and the loader and the screen agree on it
 
 A numeric setting's bound was written in four places by hand: in the loader's validator, in the
