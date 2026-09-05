@@ -46,6 +46,11 @@ public static class CredentialManagerHelper
     /// </summary>
     internal static readonly TimeSpan LiveLaunchMarkerWindow = TimeSpan.FromSeconds(90);
 
+    /// <summary>
+    /// Enumeration filter matching every credential the RDP client reads for a host.
+    /// </summary>
+    internal const string RdpCredentialTargetFilter = "TERMSRV/*";
+
     #endregion
 
     #region P/Invoke
@@ -102,6 +107,207 @@ public static class CredentialManagerHelper
 
     [DllImport("advapi32.dll", EntryPoint = "CredFree")]
     private static extern void CredFree(IntPtr buffer);
+
+    [DllImport("advapi32.dll", EntryPoint = "CredEnumerateW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CredEnumerate(
+        string? filter,
+        uint flags,
+        out uint count,
+        out IntPtr credentials);
+
+    #endregion
+
+    #region Stale credential sweep
+
+    /// <summary>
+    /// What the sweep needs to know about one stored credential: enough to decide, and no secret.
+    /// </summary>
+    internal readonly record struct StoredCredentialSummary(string TargetName, uint Type, string? Comment);
+
+    /// <summary>
+    /// Lists the credentials matching a target filter. Returns false with a Win32 error code when
+    /// the enumeration itself failed; an empty list when nothing matched.
+    /// </summary>
+    internal delegate bool CredentialEnumerateOperation(
+        string filter,
+        out IReadOnlyList<StoredCredentialSummary> credentials,
+        out int errorCode);
+
+    /// <summary>
+    /// Removes the <c>TERMSRV/*</c> entries an earlier launch wrote and never cleaned up.
+    /// </summary>
+    /// <remarks>
+    /// The deferred cleanup that follows an external launch only runs while the process that
+    /// scheduled it lives. A crash, a kill or an exit inside that window strands the entry, and
+    /// a stranded <c>CRED_PERSIST_SESSION</c> entry stays readable through <c>CredRead</c> until
+    /// the Windows session ends. The temporary .rdp files have had a janitor for this since
+    /// v2026.090201; this is the same janitor for the half that carries the password.
+    /// </remarks>
+    /// <returns>The number of entries deleted.</returns>
+    public static int SweepStaleOwnedCredentials(Action<string>? warn = null)
+    {
+        return SweepStaleOwnedCredentials(
+            DateTime.UtcNow,
+            EnumerateCredentials,
+            (target, type) =>
+            {
+                bool deleted = CredDelete(target, type, 0);
+                return new CredentialDeleteResult(
+                    deleted,
+                    deleted ? 0 : Marshal.GetLastWin32Error());
+            },
+            warn);
+    }
+
+    internal static int SweepStaleOwnedCredentials(
+        DateTime utcNow,
+        CredentialEnumerateOperation enumerateCredentials,
+        Func<string, uint, CredentialDeleteResult> deleteCredential,
+        Action<string>? warn)
+    {
+        ArgumentNullException.ThrowIfNull(enumerateCredentials);
+        ArgumentNullException.ThrowIfNull(deleteCredential);
+
+        if (!enumerateCredentials(
+                RdpCredentialTargetFilter,
+                out IReadOnlyList<StoredCredentialSummary> credentials,
+                out int errorCode))
+        {
+            if (errorCode != ErrorNotFound)
+            {
+                warn?.Invoke($"Stale RDP credential sweep: enumeration failed with WIN32_ERROR_{errorCode}");
+            }
+
+            return 0;
+        }
+
+        int deleted = 0;
+        foreach (StoredCredentialSummary credential in credentials)
+        {
+            if (credential.Type != CredTypeDomainPassword
+                || !IsStaleOwnedMarker(credential.Comment, utcNow))
+            {
+                continue;
+            }
+
+            CredentialDeleteResult result = deleteCredential(credential.TargetName, credential.Type);
+            if (result.Success)
+            {
+                deleted++;
+            }
+            else if (result.ErrorCode != ErrorNotFound)
+            {
+                // The target is a host name, which is not a secret; the comment and the blob
+                // are never logged.
+                warn?.Invoke(
+                    $"Stale RDP credential sweep: could not delete '{credential.TargetName}': WIN32_ERROR_{result.ErrorCode}");
+            }
+        }
+
+        return deleted;
+    }
+
+    /// <summary>
+    /// Decides whether a stored ownership marker describes a launch that can no longer be
+    /// waiting on the credential, whichever process wrote it.
+    /// </summary>
+    /// <remarks>
+    /// <para>Only a marker carrying a timestamp can be judged. The pre-existing single-field
+    /// format has none, and deleting it on the strength of its prefix alone would reach into a
+    /// launch an older build may still be running; those entries are left to the next launch to
+    /// the same host, which overwrites them as it always has.</para>
+    /// <para>The process identifier is deliberately not compared. A marker older than the live
+    /// window belongs to a cleanup that has either run or been lost, and the window is above
+    /// the longest cleanup delay the settings schema allows, so this process's own pending
+    /// cleanup is never raced.</para>
+    /// </remarks>
+    internal static bool IsStaleOwnedMarker(string? marker, DateTime utcNow)
+    {
+        if (marker is null ||
+            !marker.StartsWith(DomainCredentialOwnershipPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string[] fields = marker[DomainCredentialOwnershipPrefix.Length..]
+            .Split(OwnershipMarkerFieldSeparator);
+        if (fields.Length != OwnershipMarkerFieldCount)
+        {
+            return false;
+        }
+
+        if (!long.TryParse(
+                fields[1],
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out long ticks) ||
+            ticks < 0 ||
+            ticks > DateTime.MaxValue.Ticks)
+        {
+            return false;
+        }
+
+        TimeSpan age = utcNow - new DateTime(ticks, DateTimeKind.Utc);
+        return age >= LiveLaunchMarkerWindow;
+    }
+
+    private static bool EnumerateCredentials(
+        string filter,
+        out IReadOnlyList<StoredCredentialSummary> credentials,
+        out int errorCode)
+    {
+        credentials = [];
+        errorCode = 0;
+
+        IntPtr credentialArray = IntPtr.Zero;
+        try
+        {
+            if (!CredEnumerate(filter, 0, out uint count, out credentialArray))
+            {
+                errorCode = Marshal.GetLastWin32Error();
+                return false;
+            }
+
+            List<StoredCredentialSummary> summaries = new((int)count);
+            for (int index = 0; index < count; index++)
+            {
+                IntPtr credentialPointer = Marshal.ReadIntPtr(credentialArray, index * IntPtr.Size);
+                if (credentialPointer == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                summaries.Add(ReadCredentialSummary(credentialPointer));
+            }
+
+            credentials = summaries;
+            return true;
+        }
+        finally
+        {
+            if (credentialArray != IntPtr.Zero)
+            {
+                CredFree(credentialArray);
+            }
+        }
+    }
+
+    private static StoredCredentialSummary ReadCredentialSummary(IntPtr credentialPointer)
+    {
+        int typeOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.Type)).ToInt32();
+        int targetNameOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.TargetName)).ToInt32();
+        int commentOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.Comment)).ToInt32();
+
+        uint type = unchecked((uint)Marshal.ReadInt32(credentialPointer, typeOffset));
+        string targetName = Marshal.PtrToStringUni(Marshal.ReadIntPtr(credentialPointer, targetNameOffset))
+            ?? string.Empty;
+        string? comment = Marshal.PtrToStringUni(Marshal.ReadIntPtr(credentialPointer, commentOffset));
+        return new StoredCredentialSummary(targetName, type, comment);
+    }
 
     #endregion
 
