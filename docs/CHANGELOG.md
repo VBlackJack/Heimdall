@@ -110,6 +110,9 @@ back to the saved one.
 
 ### Smaller corrections
 
+- Enter on a focused folder opens or closes it, as Left and Right Arrow do and as every other
+  tree does; the folder help text says so. A folder holding the focus still never connects a
+  session selected elsewhere.
 - A session row announces its keyboard gestures to assistive technology: Enter, F2, Ctrl+Space,
   Shift+Up, Shift+Down and Shift+F10. Folders already announced theirs; the rows carrying the
   custom multi-selection announced nothing.
