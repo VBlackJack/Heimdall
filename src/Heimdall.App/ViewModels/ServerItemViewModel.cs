@@ -254,11 +254,15 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             ? ConnectionStateDisplayName
             : HealthTooltipText);
 
-    /// <summary>
-    /// No keyboard guidance to announce for a server row. Folders carry one because they
-    /// expand and collapse; a server row does nothing a screen reader needs told in advance.
-    /// </summary>
-    public string? AccessibleHelpText => null;
+    /// <summary>Localized keyboard guidance exposed to UI Automation clients.</summary>
+    /// <remarks>
+    /// It used to be null, on the reasoning that a session row does nothing a screen reader
+    /// needs told in advance. The opposite is true: the row's multi-selection is not WPF's, so
+    /// Ctrl+Space and Shift+Up/Down exist nowhere a screen reader could infer them from, and
+    /// Enter, F2 and Shift+F10 are just as invisible. Folders announced their two gestures while
+    /// the rows carrying the custom ones announced nothing.
+    /// </remarks>
+    public string? AccessibleHelpText => T("SessionTreeServerAccessibleHelp");
 
     /// <summary>
     /// Hover text for the row, or <see langword="null"/> when the row already shows everything
@@ -468,6 +472,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         }
 
         OnPropertyChanged(nameof(OriginDisplayName));
+        OnPropertyChanged(nameof(AccessibleHelpText));
         OnPropertyChanged(nameof(HealthTooltipText));
         OnPropertyChanged(nameof(ConnectionStateDisplayName));
         OnPropertyChanged(nameof(ConnectionStateTooltip));
@@ -599,6 +604,8 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionAuthNoneSaved" => "No saved credentials",
         "SessionAuthCurrentUser" => "Current user",
         "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
+        "SessionTreeServerAccessibleHelp" =>
+            "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Shift+F10 lists the actions.",
         "SessionTreeRowTooltipHost" => "Host: {0}",
         "SessionTreeRowTooltipUser" => "User: {0}",
         "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
