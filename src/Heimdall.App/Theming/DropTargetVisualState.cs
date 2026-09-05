@@ -21,8 +21,34 @@ namespace Heimdall.App.Theming;
 /// <summary>
 /// Shared attached visual state for controls that can accept a drag-drop item.
 /// </summary>
+/// <summary>Where a positioned drop would put the dragged rows relative to the row under the pointer.</summary>
+public enum DropInsertion
+{
+    None,
+    Before,
+    After
+}
+
 public static class DropTargetVisualState
 {
+    /// <summary>The insertion edge a row shows while a positioned drop hovers it.</summary>
+    public static readonly DependencyProperty InsertionProperty =
+        DependencyProperty.RegisterAttached(
+            "Insertion",
+            typeof(DropInsertion),
+            typeof(DropTargetVisualState),
+            new FrameworkPropertyMetadata(DropInsertion.None));
+
+    public static void SetInsertion(DependencyObject element, DropInsertion value)
+    {
+        element.SetValue(InsertionProperty, value);
+    }
+
+    public static DropInsertion GetInsertion(DependencyObject element)
+    {
+        return (DropInsertion)element.GetValue(InsertionProperty);
+    }
+
     public static readonly DependencyProperty IsDropTargetProperty =
         DependencyProperty.RegisterAttached(
             "IsDropTarget",

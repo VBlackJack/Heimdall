@@ -591,6 +591,29 @@ public partial class MainWindow
             }
         }
 
+        if (e.Key is Key.Up or Key.Down
+            && modifiers == ModifierKeys.Alt
+            && DataContext is MainViewModel nudgeViewModel
+            && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            ServerItemViewModel? nudged =
+                FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext
+                    as ServerItemViewModel;
+            if (nudged is null)
+            {
+                return;
+            }
+
+            // Consumed before the write: Alt+Up left unhandled reaches the tree's own navigation.
+            e.Handled = true;
+            if (await nudgeViewModel.ServerList.NudgeServerAsync(nudged, e.Key == Key.Up ? -1 : 1))
+            {
+                RefocusSessionRow(nudged);
+            }
+
+            return;
+        }
+
         if (e.Key == Key.A
             && modifiers == ModifierKeys.Control
             && DataContext is MainViewModel selectAllViewModel
@@ -1099,6 +1122,26 @@ public partial class MainWindow
     internal static bool IsInlineRenameEditorSource(DependencyObject? source)
         => FindAncestor<WpfTextBox>(source) is not null;
 
+    /// <summary>
+    /// Puts keyboard focus back on a session's row after a rebuild replaced its container.
+    /// </summary>
+    private void RefocusSessionRow(ServerItemViewModel server)
+    {
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            new Action(() =>
+            {
+                TreeViewItem? container = GetOrRealizeSessionTreeItem(server);
+                if (container is null)
+                {
+                    return;
+                }
+
+                container.BringIntoView();
+                container.Focus();
+            }));
+    }
+
     private TreeViewItem? GetOrRealizeSessionTreeItem(object? item)
     {
         TreeViewItem? realized =
@@ -1407,8 +1450,32 @@ public partial class MainWindow
         if (_treeState.LastDropHighlight is not null)
         {
             DropTargetVisualState.SetIsDropTarget(_treeState.LastDropHighlight, false);
+            DropTargetVisualState.SetInsertion(_treeState.LastDropHighlight, DropInsertion.None);
             _treeState.LastDropHighlight = null;
         }
+    }
+
+    /// <summary>
+    /// The session row under the pointer and the side of it a drop would insert on, when the
+    /// pointer is over a session row at all.
+    /// </summary>
+    private static bool TryResolveRowInsertion(
+        System.Windows.DragEventArgs e,
+        [NotNullWhen(true)] out TreeViewItem? row,
+        [NotNullWhen(true)] out ServerItemViewModel? anchor,
+        out DropInsertion insertion)
+    {
+        row = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        anchor = row?.DataContext as ServerItemViewModel;
+        if (row is null || anchor is null)
+        {
+            row = null;
+            insertion = DropInsertion.None;
+            return false;
+        }
+
+        insertion = TreeInteractionState.ResolveInsertion(e.GetPosition(row).Y, row.ActualHeight);
+        return true;
     }
 
     private void OnTreeViewDragOver(object sender, System.Windows.DragEventArgs e)
@@ -1426,6 +1493,21 @@ public partial class MainWindow
         TreeViewItem? targetContainer;
         if (TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload))
         {
+            // Over a session row the drop is positioned: before or after that row, in its
+            // folder. The folder highlight is for a drop on the folder's own row.
+            if (TryResolveRowInsertion(e, out TreeViewItem? row, out ServerItemViewModel? anchor, out DropInsertion insertion))
+            {
+                if (!TreeInteractionState.CanReorderOnto(payload.Servers, anchor))
+                {
+                    return;
+                }
+
+                e.Effects = System.Windows.DragDropEffects.Move;
+                DropTargetVisualState.SetInsertion(row, insertion);
+                _treeState.LastDropHighlight = row;
+                return;
+            }
+
             allowed = TryResolveTreeGroupDropTarget(sender, e, vm, out targetContainer, out string? targetGroup, out _)
                 && vm.ServerList.IsBulkMoveTargetEnabled(payload.Servers, targetGroup);
         }
@@ -1480,6 +1562,19 @@ public partial class MainWindow
 
         if (!TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload))
         {
+            return;
+        }
+
+        if (TryResolveRowInsertion(e, out _, out ServerItemViewModel? anchor, out DropInsertion insertion))
+        {
+            if (TreeInteractionState.CanReorderOnto(payload.Servers, anchor))
+            {
+                await vm.ServerList.ReorderServersAsync(
+                    payload.Servers,
+                    anchor,
+                    placeAfter: insertion == DropInsertion.After);
+            }
+
             return;
         }
 

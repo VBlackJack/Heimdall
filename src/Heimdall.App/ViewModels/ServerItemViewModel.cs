@@ -648,7 +648,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionAuthCurrentUser" => "Current user",
         "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
         "SessionTreeServerAccessibleHelp" =>
-            "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Ctrl+A selects every visible session, Shift+F10 lists the actions.",
+            "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Ctrl+A selects every visible session, Alt+Up and Alt+Down move it within its folder, Shift+F10 lists the actions.",
         "SessionTreeRowTooltipHost" => "Host: {0}",
         "SessionTreeRowTooltipUser" => "User: {0}",
         "SessionTreeRowTooltipProtocol" => "Protocol: {0}",

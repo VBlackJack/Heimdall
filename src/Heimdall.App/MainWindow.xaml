@@ -934,6 +934,14 @@
                                                     <Trigger Property="IsKeyboardFocused" Value="True">
                                                         <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     </Trigger>
+                                                    <Trigger Property="theming:DropTargetVisualState.Insertion" Value="Before">
+                                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,2,0,0"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                    </Trigger>
+                                                    <Trigger Property="theming:DropTargetVisualState.Insertion" Value="After">
+                                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,0,0,2"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                    </Trigger>
                                                     <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
                                                         <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                                                         <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
@@ -1003,6 +1011,14 @@
                                                                 <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                             </Trigger>
                                                             <Trigger Property="IsKeyboardFocused" Value="True">
+                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                            </Trigger>
+                                                            <Trigger Property="theming:DropTargetVisualState.Insertion" Value="Before">
+                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,2,0,0"/>
+                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                            </Trigger>
+                                                            <Trigger Property="theming:DropTargetVisualState.Insertion" Value="After">
+                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,0,0,2"/>
                                                                 <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                             </Trigger>
                                                             <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">

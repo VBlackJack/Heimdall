@@ -42,6 +42,7 @@ public sealed class ServerItemViewModelAccessibleHelpTests
         Assert.Contains("Ctrl+Space", help, StringComparison.Ordinal);
         Assert.Contains("Shift+Up", help, StringComparison.Ordinal);
         Assert.Contains("Ctrl+A", help, StringComparison.Ordinal);
+        Assert.Contains("Alt+Up", help, StringComparison.Ordinal);
         Assert.Contains("Shift+F10", help, StringComparison.Ordinal);
     }
 

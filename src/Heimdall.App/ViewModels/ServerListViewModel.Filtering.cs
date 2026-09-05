@@ -516,7 +516,7 @@ public partial class ServerListViewModel
 
         SortStableTree(_stableTreeRoot);
         _stableServerOrder = _allServers
-            .OrderBy(server => server.SortOrder)
+            .OrderBy(server => SessionOrdering.RankOf(server.SortOrder))
             .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
             .ToList();
         StableTreeBuildCount++;
@@ -583,7 +583,7 @@ public partial class ServerListViewModel
     {
         SortStableTree(_stableTreeRoot);
         _stableServerOrder = _allServers
-            .OrderBy(server => server.SortOrder)
+            .OrderBy(server => SessionOrdering.RankOf(server.SortOrder))
             .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
             .ToList();
 
@@ -615,7 +615,7 @@ public partial class ServerListViewModel
         });
         node.Servers.Sort((left, right) =>
         {
-            int order = left.SortOrder.CompareTo(right.SortOrder);
+            int order = SessionOrdering.RankOf(left.SortOrder).CompareTo(SessionOrdering.RankOf(right.SortOrder));
             return order != 0
                 ? order
                 : names.Compare(left.DisplayName, right.DisplayName);

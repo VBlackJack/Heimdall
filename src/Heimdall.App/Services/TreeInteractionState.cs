@@ -420,6 +420,25 @@ public sealed class TreeInteractionState
     }
 
     /// <summary>
+    /// Which side of a row a pointer at <paramref name="pointerY"/> would insert on.
+    /// </summary>
+    public static Theming.DropInsertion ResolveInsertion(double pointerY, double rowHeight) =>
+        rowHeight > 0 && pointerY >= rowHeight / 2
+            ? Theming.DropInsertion.After
+            : Theming.DropInsertion.Before;
+
+    /// <summary>
+    /// Whether <paramref name="dragged"/> can be placed relative to <paramref name="anchor"/>:
+    /// a row cannot be positioned relative to itself.
+    /// </summary>
+    public static bool CanReorderOnto(IReadOnlyList<ServerItemViewModel> dragged, ServerItemViewModel anchor)
+    {
+        ArgumentNullException.ThrowIfNull(dragged);
+        ArgumentNullException.ThrowIfNull(anchor);
+        return !dragged.Contains(anchor);
+    }
+
+    /// <summary>
     /// Whether dropping <paramref name="folderPath"/> on <paramref name="targetParentPath"/>
     /// (null for the top level) would move it anywhere it can go.
     /// </summary>
