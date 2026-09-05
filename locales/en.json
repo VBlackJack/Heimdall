@@ -400,6 +400,7 @@
   "RdpErrorCancelReconnectFailed": "Could not cancel the reconnection.",
   "RdpErrorCancelConnectFailed": "Could not cancel the connection.",
   "RdpErrorStartEmbeddedSessionFailed": "Unable to start the embedded Remote Desktop session.",
+  "RdpConnectVaultLocked": "Unlock the vault before starting this Remote Desktop session.",
   "CredentialGuardEnabled": "Credential Guard: Enabled",
   "CredentialGuardDisabled": "Credential Guard: Not available",
   "SettingsSectionData": "Data Management",
