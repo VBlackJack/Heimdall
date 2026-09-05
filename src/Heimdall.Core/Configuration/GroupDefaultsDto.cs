@@ -42,6 +42,15 @@ public sealed class GroupDefaultsDto
     public string? Environment { get; set; }
 
     /// <summary>
+    /// Colour of the folder's icon in the sessions tree, as a hex string from the badge palette.
+    /// </summary>
+    /// <remarks>
+    /// A folder property rather than a server default: it is never resolved onto a server and
+    /// never applied to a profile. Sub-folders inherit it until they set their own.
+    /// </remarks>
+    public string? Color { get; set; }
+
+    /// <summary>
     /// Resolves inherited defaults for a server by walking up the group hierarchy.
     /// For group "PROD/Linux/Web", checks "PROD/Linux/Web" → "PROD/Linux" → "PROD".
     /// </summary>

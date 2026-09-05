@@ -98,6 +98,7 @@ public partial class ServerListViewModel
         }
 
         RefreshLookupCollections(result.Settings);
+        RefreshFolderColors();
         ResortStableTreeProjection();
         ApplyFilter();
     }

@@ -566,6 +566,18 @@
                                                AutomationProperties.Name="{Binding ServerList.FilterResultCountText}"
                                                AutomationProperties.LiveSetting="Polite"
                                                behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+
+                                <!-- Empty for zero or one session: a single row announces itself. -->
+                                <TextBlock x:Name="Mw_SelectionCount"
+                                           Text="{Binding ServerList.SelectionCountText, NotifyOnTargetUpdated=True}"
+                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="2,4,0,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           Visibility="{Binding ServerList.HasMultiSelection, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           AutomationProperties.Name="{Binding ServerList.SelectionCountText}"
+                                           AutomationProperties.LiveSetting="Polite"
+                                           behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                                 </StackPanel>
 
                                 <Border x:Name="SessionTreeNoGroupDropZone"
@@ -654,10 +666,21 @@
                                             </Grid.ColumnDefinitions>
                                             <Path Grid.Column="0"
                                                   Data="{StaticResource Geo.Tree.Group}"
-                                                  Fill="{DynamicResource InfoBrush}"
                                                   Width="13" Height="13"
                                                   Stretch="Uniform"
-                                                  VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                                  VerticalAlignment="Center" Margin="0,0,7,0">
+                                                <!-- A folder given a colour paints its icon with it; the rest keep the theme's. -->
+                                                <Path.Style>
+                                                    <Style TargetType="Path">
+                                                        <Setter Property="Fill" Value="{DynamicResource InfoBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasColor}" Value="True">
+                                                                <Setter Property="Fill" Value="{Binding Color, Converter={StaticResource StringToBrushConverter}}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Path.Style>
+                                            </Path>
                                             <Grid Grid.Column="1">
                                                 <TextBlock Text="{Binding Name}"
                                                            FontSize="{StaticResource FontSizeCaption}"
@@ -1605,6 +1628,7 @@
                                 Padding="{StaticResource SpacingXl}">
                             <StackPanel VerticalAlignment="Top">
                                 <TextBlock x:Name="Mw_ToolDetailName"
+                                           Text="{Binding ServerList.ToolDetailName}"
                                            FontSize="{StaticResource FontSizeDisplay}" FontWeight="Bold"
                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"/>
@@ -1613,6 +1637,7 @@
                                     <Border CornerRadius="{StaticResource CornerRadiusSm}" Padding="6,2" Margin="0,0,8,0"
                                             Background="{DynamicResource ToolBadgeBrush}">
                                         <TextBlock x:Name="Mw_ToolDetailCategory"
+                                                   Text="{Binding ServerList.ToolDetailCategory}"
                                                    FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource BadgeTextBrush}"
                                                    TextTrimming="CharacterEllipsis"/>
@@ -1620,10 +1645,11 @@
                                 </StackPanel>
 
                                 <TextBlock x:Name="Mw_ToolDetailDescription"
+                                           Text="{Binding ServerList.ToolDetailDescription}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,0"
                                            FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
 
-                                <Button x:Name="Mw_ToolDetailOpenBtn" Content=""
+                                <Button x:Name="Mw_ToolDetailOpenBtn" Content="{loc:Translate DetailBtnOpenInTab}"
                                         Command="{Binding ServerList.ConnectCommand}"
                                         CommandParameter="{Binding ServerList.SelectedServer}"
                                         Style="{DynamicResource PrimaryButtonStyle}"

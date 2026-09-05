@@ -268,6 +268,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             }
 
             RefreshLookupCollections(settings);
+            RefreshFolderColors();
         });
     }
 
@@ -520,6 +521,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             folder.ViewModel!.RefreshLocalizedState();
         }
+
+        OnPropertyChanged(nameof(SelectionCountText));
+        NotifyToolDetailChanged();
     }
 
     /// <summary>
