@@ -239,6 +239,36 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// Resolves the folder an Enter press opens or closes, without reading global keyboard state.
+    /// </summary>
+    /// <remarks>
+    /// Left and Right Arrow already do this; Enter is what every other tree does with a folder,
+    /// and what a user who has not read the help tries first. The same guards as the session
+    /// activation apply: no modifier, not from the rename editor, and not from auto-repeat, which
+    /// would flap the branch thirty times a second.
+    /// </remarks>
+    /// <param name="key">The key raised by the sessions tree.</param>
+    /// <param name="modifiers">The exact modifier combination for the gesture.</param>
+    /// <param name="isInlineRenameEditorSource">Whether the event originated inside the rename editor.</param>
+    /// <param name="isRepeat">Whether the key press comes from keyboard auto-repeat.</param>
+    /// <param name="focusedNode">The data context of the container owning keyboard focus.</param>
+    /// <returns>The folder to toggle, or <see langword="null"/> when the gesture is not a folder toggle.</returns>
+    internal static FolderViewModel? ResolveTreeFolderActivation(
+        Key key,
+        ModifierKeys modifiers,
+        bool isInlineRenameEditorSource,
+        bool isRepeat,
+        object? focusedNode)
+    {
+        if (key != Key.Enter || modifiers != ModifierKeys.None || isInlineRenameEditorSource || isRepeat)
+        {
+            return null;
+        }
+
+        return focusedNode as FolderViewModel;
+    }
+
+    /// <summary>
     /// Routes a resolved activation target to the tool tab or to the connect command.
     /// </summary>
     /// <param name="server">The session to activate, or null when the gesture resolved to nothing.</param>
@@ -641,12 +671,32 @@ public partial class MainWindow
         // commits the pending edit in OnInlineRenameEditorPreviewKeyDown.
         if (e.Key == Key.Enter && DataContext is MainViewModel activationViewModel)
         {
+            object? focusedNode =
+                FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext;
+            bool isInlineRenameEditorSource = IsInlineRenameEditorSource(e.OriginalSource as DependencyObject);
+
+            // A folder answers Enter itself, by opening or closing; the session resolver below
+            // keeps refusing it, so a folder holding the focus never connects a session
+            // selected elsewhere.
+            FolderViewModel? folderToToggle = ResolveTreeFolderActivation(
+                e.Key,
+                modifiers,
+                isInlineRenameEditorSource,
+                e.IsRepeat,
+                focusedNode);
+            if (folderToToggle is not null)
+            {
+                folderToToggle.IsExpanded = !folderToToggle.IsExpanded;
+                e.Handled = true;
+                return;
+            }
+
             ServerItemViewModel? activationTarget = ResolveTreeActivationTarget(
                 e.Key,
                 modifiers,
-                IsInlineRenameEditorSource(e.OriginalSource as DependencyObject),
+                isInlineRenameEditorSource,
                 e.IsRepeat,
-                FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext,
+                focusedNode,
                 SessionTreeView.SelectedItem,
                 activationViewModel.ServerList.SelectedItems.Contains);
             e.Handled = ApplyTreeActivation(

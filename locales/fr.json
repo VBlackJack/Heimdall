@@ -2266,7 +2266,7 @@
   "SessionAuthCurrentUser": "Utilisateur actuel",
   "SessionTreeServerAccessibleName": "{0}, protocole {1}, \u00e9tat {2}",
   "SessionTreeFolderAccessibleName": "{0}, dossier",
-  "SessionTreeFolderAccessibleHelp": "Dossier. Utilisez les fl\u00e8ches gauche et droite pour r\u00e9duire ou d\u00e9velopper. Appuyez sur Maj+F10 pour les actions.",
+  "SessionTreeFolderAccessibleHelp": "Dossier. Utilisez les fl\u00e8ches gauche et droite ou Entr\u00e9e pour r\u00e9duire ou d\u00e9velopper. Appuyez sur Maj+F10 pour les actions.",
   "SessionTreeServerAccessibleHelp": "Session. Entr\u00e9e l'ouvre, F2 la renomme, Ctrl+Espace l'ajoute \u00e0 la s\u00e9lection ou l'en retire, Maj+Haut et Maj+Bas \u00e9tendent la s\u00e9lection, Ctrl+A s\u00e9lectionne toutes les sessions visibles, Alt+Haut et Alt+Bas la d\u00e9placent dans son dossier, Maj+F10 liste les actions.",
   "DetailLabelAuth": "Identifiants enregistr\u00e9s :",
   "DetailLabelTags": "Tags :",

@@ -32,6 +32,7 @@ public sealed class FolderViewModelAccessibilityTests
 
         Assert.Equal("Production, folder", folder.AccessibleName);
         Assert.StartsWith("Folder.", folder.AccessibleHelpText, StringComparison.Ordinal);
+        Assert.Contains("Enter", folder.AccessibleHelpText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -45,6 +46,7 @@ public sealed class FolderViewModelAccessibilityTests
 
         Assert.Equal("Production, dossier", folder.AccessibleName);
         Assert.Contains("Maj+F10", folder.AccessibleHelpText, StringComparison.Ordinal);
+        Assert.Contains("Entr\u00e9e", folder.AccessibleHelpText, StringComparison.Ordinal);
     }
 
     [Fact]

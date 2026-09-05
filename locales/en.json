@@ -2266,7 +2266,7 @@
   "SessionAuthCurrentUser": "Current user",
   "SessionTreeServerAccessibleName": "{0}, protocol {1}, state {2}",
   "SessionTreeFolderAccessibleName": "{0}, folder",
-  "SessionTreeFolderAccessibleHelp": "Folder. Use Left and Right Arrow to collapse or expand. Press Shift+F10 for actions.",
+  "SessionTreeFolderAccessibleHelp": "Folder. Use Left and Right Arrow or Enter to collapse or expand. Press Shift+F10 for actions.",
   "SessionTreeServerAccessibleHelp": "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Ctrl+A selects every visible session, Alt+Up and Alt+Down move it within its folder, Shift+F10 lists the actions.",
   "DetailLabelAuth": "Saved credentials:",
   "DetailLabelTags": "Tags:",
