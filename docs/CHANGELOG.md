@@ -62,6 +62,18 @@ which was noise rather than information. With the badge hidden, the row's hover 
 gateway instead, and a missing gateway keeps its badge whatever the preference says, because that
 badge is a warning.
 
+### Folders take a colour, Ctrl+A selects the visible sessions, and the tool pane follows the selection
+
+A folder's context menu gains a Colour submenu with the eight palette colours project badges
+already use, plus a way back to the themed default. The colour paints the folder icon and is
+inherited by sub-folders until they choose their own; it is stored with the folder's defaults, so
+renaming or deleting the folder carries or drops it like the rest. Ctrl+A in the tree selects
+every session inside an expanded branch, the same set a Shift range walks, and the row help text
+says so. Screen readers get the selection size as a live region once more than one session is
+selected; a single row still announces itself. The tool detail pane's name, category and
+description are bound to the view model, so a selection reaching the pane by any path shows the
+tool selected rather than the previous one.
+
 ### Smaller corrections
 
 - A session row announces its keyboard gestures to assistive technology: Enter, F2, Ctrl+Space,
