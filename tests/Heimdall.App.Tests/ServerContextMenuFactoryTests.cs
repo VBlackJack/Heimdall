@@ -392,6 +392,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                     harness.Main.Localize("AddMenuTool"),
                     "<separator>",
                     harness.Main.Localize("TreeCtxRename"),
+                    harness.Main.Localize("TreeCtxFolderColor"),
                     harness.Main.Localize("TreeCtxDeleteGroup")
                 ],
                 GetTopLevelMenuShape(folderMenu));

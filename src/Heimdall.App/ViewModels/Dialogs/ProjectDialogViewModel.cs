@@ -31,11 +31,7 @@ public partial class ProjectDialogViewModel : ObservableValidator
     /// <summary>
     /// Predefined color palette for project badges.
     /// </summary>
-    public static readonly string[] AvailableColors =
-    [
-        "#3B82F6", "#22C55E", "#EF4444", "#F59E0B",
-        "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"
-    ];
+    public static readonly string[] AvailableColors = BadgeColorPalette.Colors;
 
     /// <summary>
     /// Localizer for translating validation error messages. Set by the dialog service.

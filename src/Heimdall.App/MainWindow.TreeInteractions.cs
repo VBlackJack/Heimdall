@@ -36,8 +36,8 @@ namespace Heimdall.App;
 /// (<see cref="TreeInteractionState"/>) and, for the selection warm-up alone, in
 /// <c>_dnsWarmupGate</c> and <c>_dnsWarmupCancellation</c>; this file only contains the WPF
 /// event handlers that mutate that state and poke the named XAML elements
-/// (<c>SessionTreeView</c>, <c>SessionTreeNoGroupDropZone</c>, <c>Mw_ToolDetail*</c>).
-/// The visibility of the two detail panes is bound to the view model and never written here.
+/// (<c>SessionTreeView</c>, <c>SessionTreeNoGroupDropZone</c>). Both detail panes, their
+/// visibility and their texts, are bound to the view model and never written here.
 /// </summary>
 public partial class MainWindow
 {
@@ -144,25 +144,6 @@ public partial class MainWindow
 
             ShowTreeSelection(vm, vm.ServerList.SelectedServer);
         }
-    }
-
-    /// <summary>
-    /// Populates the tool-specific detail panel with name, category, and description.
-    /// </summary>
-    private void UpdateToolDetailPanel(MainViewModel vm, string connectionType)
-    {
-        var toolId = ConnectionTypeCatalog.StripToolPrefix(connectionType);
-        var desc = ToolRegistry.GetById(toolId);
-        if (desc is null) return;
-
-        Mw_ToolDetailName.Text = vm.Localize(desc.LabelKey);
-        Mw_ToolDetailCategory.Text = vm.Localize(desc.CategoryLabelKey);
-
-        var descKey = desc.DescriptionKey ?? $"ToolDesc{desc.Id}";
-        var description = vm.Localize(descKey);
-        Mw_ToolDetailDescription.Text = description != descKey ? description : "";
-
-        Mw_ToolDetailOpenBtn.Content = vm.Localize("DetailBtnOpenInTab");
     }
 
     // ── Activation (double-click / Enter) → connect / open tool ──────
@@ -608,6 +589,17 @@ public partial class MainWindow
 
                 return;
             }
+        }
+
+        if (e.Key == Key.A
+            && modifiers == ModifierKeys.Control
+            && DataContext is MainViewModel selectAllViewModel
+            && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
+        {
+            selectAllViewModel.ServerList.SelectAllVisible();
+            ShowTreeSelection(selectAllViewModel, selectAllViewModel.ServerList.SelectedServer);
+            e.Handled = true;
+            return;
         }
 
         if (e.Key == Key.F2
@@ -1246,8 +1238,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Reacts to a session being shown in the tree: warms its DNS entry and fills the tool
-    /// detail pane when the session is a tool.
+    /// Reacts to a session being shown in the tree: warms its DNS entry.
     /// </summary>
     /// <remarks>
     /// Which detail pane is on screen is not decided here. It used to be: this method wrote
@@ -1260,19 +1251,14 @@ public partial class MainWindow
     /// Connect button inert. The panes now bind to
     /// <see cref="ServerListViewModel.ShowSessionDetail"/> and
     /// <see cref="ServerListViewModel.ShowToolDetail"/>, and nothing in code-behind writes them.
+    /// The tool pane's texts followed for the same reason: written from here, they described the
+    /// previous tool after any selection that did not come through a tree handler.
     /// </remarks>
     private void ShowTreeSelection(MainViewModel vm, ServerItemViewModel? server)
     {
-        if (server is null)
+        if (server is not null)
         {
-            return;
-        }
-
-        WarmDns(server);
-
-        if (ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType))
-        {
-            UpdateToolDetailPanel(vm, server.ConnectionType!);
+            WarmDns(server);
         }
     }
 

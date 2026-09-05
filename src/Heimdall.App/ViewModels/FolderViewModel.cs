@@ -58,8 +58,12 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     /// </remarks>
     public string? TooltipText => string.IsNullOrEmpty(FullPath) ? null : FullPath;
 
+    /// <summary>Hex colour of the folder icon, or empty for the themed default.</summary>
     [ObservableProperty]
     private string _color = "";
+
+    /// <summary>Whether the icon takes <see cref="Color"/> rather than the themed default.</summary>
+    public bool HasColor => !string.IsNullOrWhiteSpace(Color);
 
     /// <summary>
     /// Whether this folder is expanded in the TreeView.
@@ -211,6 +215,8 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
 
     partial void OnFullPathChanged(string value) => OnPropertyChanged(nameof(TooltipText));
+
+    partial void OnColorChanged(string value) => OnPropertyChanged(nameof(HasColor));
 
     internal void RefreshLocalizedState()
     {

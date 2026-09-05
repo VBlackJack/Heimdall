@@ -114,6 +114,20 @@ public sealed class FolderViewModelProjectionTests
     }
 
     [Fact]
+    public void HasColor_FollowsColor()
+    {
+        FolderViewModel folder = new() { Name = "Linux", FullPath = "Prod/Linux" };
+        List<string?> changed = [];
+        folder.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        Assert.False(folder.HasColor);
+
+        folder.Color = "#EF4444";
+
+        Assert.True(folder.HasColor);
+        Assert.Contains(nameof(FolderViewModel.HasColor), changed);
+    }
+
+    [Fact]
     public void TooltipText_FollowsFullPath()
     {
         FolderViewModel folder = new() { Name = "Linux", FullPath = "Prod/Linux" };

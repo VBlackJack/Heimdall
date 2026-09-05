@@ -48,6 +48,33 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
         SelectedServer is { } selected
         && ConnectionTypeCatalog.IsToolConnectionType(selected.ConnectionType);
 
+    /// <summary>Whether more than one session is selected.</summary>
+    public bool HasMultiSelection => SelectionCount > 1;
+
+    /// <summary>
+    /// The selection size, spelled out for the live region; empty for zero or one session.
+    /// </summary>
+    /// <remarks>
+    /// A single row announces itself when it takes focus, so a count of one would be said
+    /// twice. The multi-selection is the part a screen reader cannot see on the rows.
+    /// </remarks>
+    public string SelectionCountText =>
+        HasMultiSelection ? _localizer.Format("SessionTreeSelectionCount", SelectionCount) : "";
+
+    /// <summary>
+    /// Selects every session on screen, in tree order, keeping the current primary when it is
+    /// among them.
+    /// </summary>
+    /// <remarks>
+    /// Visible means inside an expanded branch, which is the same set every range gesture
+    /// walks; a collapsed branch keeps its sessions out, as it keeps them out of a Shift range.
+    /// </remarks>
+    public void SelectAllVisible()
+    {
+        List<ServerItemViewModel> visible = SelectionHelpers.EnumerateVisibleLeaves(GroupedServers).ToList();
+        ApplySelection(visible, SelectedServer, _selectionAnchor, updateSelectedServer: true);
+    }
+
     private void InitializeSelectionModel()
     {
         SelectedItems.CollectionChanged += OnSelectedItemsChanged;
@@ -57,6 +84,8 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
     {
         OnPropertyChanged(nameof(SelectionCount));
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(HasMultiSelection));
+        OnPropertyChanged(nameof(SelectionCountText));
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         MoveSelectedToProjectCommand.NotifyCanExecuteChanged();
@@ -194,6 +223,7 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
     {
         OnPropertyChanged(nameof(ShowSessionDetail));
         OnPropertyChanged(nameof(ShowToolDetail));
+        NotifyToolDetailChanged();
 
         if (_suppressSelectedServerSync)
         {

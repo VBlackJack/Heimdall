@@ -391,6 +391,90 @@ public partial class ServerListViewModel
     }
 
     /// <summary>
+    /// The colour a folder icon takes: its own, else the nearest ancestor's, else none.
+    /// </summary>
+    private string ResolveFolderColor(string folderPath)
+    {
+        Dictionary<string, GroupDefaultsDto>? defaults = _currentSettings?.GroupDefaults;
+        if (defaults is null || defaults.Count == 0)
+        {
+            return "";
+        }
+
+        string? path = folderPath;
+        while (!string.IsNullOrEmpty(path))
+        {
+            if (defaults.TryGetValue(path, out GroupDefaultsDto? entry)
+                && !string.IsNullOrWhiteSpace(entry.Color))
+            {
+                return entry.Color;
+            }
+
+            int separator = path.LastIndexOf('/');
+            path = separator > 0 ? path[..separator] : null;
+        }
+
+        return "";
+    }
+
+    /// <summary>Re-reads every folder's colour from the current settings.</summary>
+    private void RefreshFolderColors()
+    {
+        foreach (StableFolderNode node in EnumerateStableFolders(_stableTreeRoot))
+        {
+            if (!node.IsNoGroup)
+            {
+                node.ViewModel!.Color = ResolveFolderColor(node.ViewModel.FullPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Persists a folder's icon colour and shows it at once.
+    /// </summary>
+    /// <param name="folderPath">The folder's full path.</param>
+    /// <param name="color">A palette hex string, or null to return to the themed default.</param>
+    /// <remarks>
+    /// The settings change the write raises re-reads every folder, so a sub-folder that inherited
+    /// the old colour follows without a rebuild; the direct assignment only spares the user the
+    /// dispatcher hop between the click and the icon.
+    /// </remarks>
+    public async Task SetFolderColorAsync(string folderPath, string? color)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+
+        string? normalized = string.IsNullOrWhiteSpace(color) ? null : color.Trim();
+        if (_stableFoldersByPath.TryGetValue(folderPath, out StableFolderNode? node))
+        {
+            node.ViewModel!.Color = normalized ?? ResolveFolderColor(ParentPath(folderPath));
+        }
+
+        try
+        {
+            await _configManager.MergeSettingAsync(settings =>
+            {
+                if (!settings.GroupDefaults.TryGetValue(folderPath, out GroupDefaultsDto? entry))
+                {
+                    entry = new GroupDefaultsDto();
+                    settings.GroupDefaults[folderPath] = entry;
+                }
+
+                entry.Color = normalized;
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Failed to save the colour of folder '{folderPath}': {ex.Message}");
+        }
+    }
+
+    private static string ParentPath(string folderPath)
+    {
+        int separator = folderPath.LastIndexOf('/');
+        return separator > 0 ? folderPath[..separator] : "";
+    }
+
+    /// <summary>
     /// Rebuilds canonical folder metadata only after inventory structure
     /// changes. Filter passes never call this method.
     /// </summary>
@@ -481,7 +565,8 @@ public partial class ServerListViewModel
             {
                 Name = segment,
                 FullPath = currentPath,
-                IsExpanded = _expandedNodes.Contains(currentPath)
+                IsExpanded = _expandedNodes.Contains(currentPath),
+                Color = ResolveFolderColor(currentPath)
             };
             viewModel.PropertyChanged += OnFolderExpandedChanged;
 

@@ -56,6 +56,7 @@ public sealed class HardcodedColorGuardTests
             // Project color swatches: user-selectable data values, not chrome.
             [@"Views\Dialogs\ProjectDialog.xaml"] = "project color swatch picker (data)",
             [@"ViewModels\Dialogs\ProjectDialogViewModel.cs"] = "project color swatch data + default",
+            [@"ViewModels\BadgeColorPalette.cs"] = "the one declaration of the badge and folder colour palette",
             [@"ViewModels\ProjectItemViewModel.cs"] = "project color default (data)",
             // TODO(ux-audit): the duplicated "#3B82F6" project-color default in
             // SettingsViewModel belongs in a single named constant shared with

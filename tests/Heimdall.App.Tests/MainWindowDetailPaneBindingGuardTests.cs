@@ -39,7 +39,11 @@ public sealed class MainWindowDetailPaneBindingGuardTests
     [
         "SessionDetailPanel.Visibility =",
         "ToolDetailPanel.Visibility =",
-        "Mw_DetailConnectBtn.Content ="
+        "Mw_DetailConnectBtn.Content =",
+        "Mw_ToolDetailName.Text =",
+        "Mw_ToolDetailCategory.Text =",
+        "Mw_ToolDetailDescription.Text =",
+        "Mw_ToolDetailOpenBtn.Content ="
     ];
 
     [Fact]
@@ -84,6 +88,21 @@ public sealed class MainWindowDetailPaneBindingGuardTests
         Assert.True(element is not null, $"{elementName} is no longer a named element in MainWindow.xaml.");
         Assert.Equal("Border", element.Name.LocalName);
         Assert.Equal(expectedVisibility, (string?)element.Attribute("Visibility"));
+    }
+
+    [Theory]
+    [InlineData("Mw_ToolDetailName", "{Binding ServerList.ToolDetailName}")]
+    [InlineData("Mw_ToolDetailCategory", "{Binding ServerList.ToolDetailCategory}")]
+    [InlineData("Mw_ToolDetailDescription", "{Binding ServerList.ToolDetailDescription}")]
+    public void EachToolPaneTextBindsToTheViewModel(string elementName, string expectedText)
+    {
+        XDocument markup = XDocument.Load(Path.Combine(FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+        XName name = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml") + "Name";
+        XElement? element = markup.Descendants()
+            .FirstOrDefault(candidate => (string?)candidate.Attribute(name) == elementName);
+
+        Assert.True(element is not null, $"{elementName} is no longer a named element in MainWindow.xaml.");
+        Assert.Equal(expectedText, (string?)element.Attribute("Text"));
     }
 
     private static string FindRepoRoot()

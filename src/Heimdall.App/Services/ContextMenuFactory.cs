@@ -565,6 +565,7 @@ public sealed class ContextMenuFactory
             };
             renameItem.Click += (_, _) => callbacks.BeginInlineRename(folder);
             menu.Items.Add(renameItem);
+            menu.Items.Add(CreateFolderColorMenu(vm, folder));
 
             // Delete folder (move servers to root)
             var deleteItem = new MenuItem
@@ -596,6 +597,67 @@ public sealed class ContextMenuFactory
         }
 
         return menu;
+    }
+
+    /// <summary>Side of the colour swatch drawn beside a palette entry.</summary>
+    private const double FolderColorSwatchSize = 12;
+
+    /// <summary>Corner radius of that swatch.</summary>
+    private const double FolderColorSwatchRadius = 2;
+
+    /// <summary>
+    /// The palette a folder icon can take, shared with project badges, plus a way back to the
+    /// themed default.
+    /// </summary>
+    private static MenuItem CreateFolderColorMenu(MainViewModel vm, FolderViewModel folder)
+    {
+        MenuItem colorMenu = new() { Header = vm.Localize("TreeCtxFolderColor") };
+        foreach ((string color, string labelKey) in BadgeColorPalette.Entries)
+        {
+            colorMenu.Items.Add(CreateFolderColorItem(vm, folder, color, vm.Localize(labelKey)));
+        }
+
+        colorMenu.Items.Add(new Separator());
+        colorMenu.Items.Add(CreateFolderColorItem(
+            vm,
+            folder,
+            color: null,
+            vm.Localize("TreeCtxFolderColorNone")));
+        return colorMenu;
+    }
+
+    private static MenuItem CreateFolderColorItem(
+        MainViewModel vm,
+        FolderViewModel folder,
+        string? color,
+        string header)
+    {
+        bool isCurrent = color is null
+            ? !folder.HasColor
+            : string.Equals(folder.Color, color, StringComparison.OrdinalIgnoreCase);
+        MenuItem item = new()
+        {
+            Header = header,
+            IsCheckable = true,
+            IsChecked = isCurrent,
+            Tag = color
+        };
+
+        if (color is not null)
+        {
+            item.Icon = new System.Windows.Shapes.Rectangle
+            {
+                Width = FolderColorSwatchSize,
+                Height = FolderColorSwatchSize,
+                RadiusX = FolderColorSwatchRadius,
+                RadiusY = FolderColorSwatchRadius,
+                Fill = new SolidColorBrush(
+                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color))
+            };
+        }
+
+        item.Click += async (_, _) => await vm.ServerList.SetFolderColorAsync(folder.FullPath, color);
+        return item;
     }
 
     /// <summary>

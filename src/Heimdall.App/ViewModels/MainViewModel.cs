@@ -413,6 +413,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             dialogService,
             localizer);
         ServerList = serverList;
+        ServerList.ToolDescriptorResolver = toolRegistry.GetById;
         Connection = connection;
         Settings = settings;
         Update = update;
