@@ -27,6 +27,16 @@ public enum FolderRenameValidationError
 }
 
 /// <summary>
+/// Describes why a requested folder move is invalid.
+/// </summary>
+public enum FolderMoveValidationError
+{
+    None,
+    IntoItself,
+    SiblingCollision
+}
+
+/// <summary>
 /// Immutable mapping from one folder path to another.
 /// </summary>
 public sealed record FolderRenamePlan(string OldPath, string NewPath)
@@ -101,6 +111,74 @@ public static class FolderPath
         plan = new FolderRenamePlan(oldPath, newPath);
         error = FolderRenameValidationError.None;
         return true;
+    }
+
+    /// <summary>
+    /// Creates the migration plan that re-parents <paramref name="folderPath"/> under
+    /// <paramref name="targetParentPath"/>, or at the top level when that is null or empty.
+    /// </summary>
+    /// <remarks>
+    /// The leaf name travels unchanged, so the only checks are the target not lying inside the
+    /// folder itself and the leaf not colliding with a sibling already under the target. A move
+    /// to the folder's current parent yields a plan whose two paths are equal; the caller treats
+    /// that as nothing to do.
+    /// </remarks>
+    public static bool TryCreateMove(
+        string folderPath,
+        string? targetParentPath,
+        IEnumerable<string?> existingPaths,
+        out FolderRenamePlan? plan,
+        out FolderMoveValidationError error)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+        ArgumentNullException.ThrowIfNull(existingPaths);
+
+        string parent = targetParentPath?.Trim() ?? string.Empty;
+        if (parent.Length > 0 && IsSelfOrDescendant(parent, folderPath))
+        {
+            plan = null;
+            error = FolderMoveValidationError.IntoItself;
+            return false;
+        }
+
+        string leaf = LeafOf(folderPath);
+        string newPath = parent.Length == 0 ? leaf : $"{parent}{Separator}{leaf}";
+
+        foreach (string? candidate in existingPaths)
+        {
+            if (string.IsNullOrWhiteSpace(candidate) ||
+                IsSelfOrDescendant(candidate, folderPath))
+            {
+                continue;
+            }
+
+            if (IsSelfOrDescendant(candidate, newPath))
+            {
+                plan = null;
+                error = FolderMoveValidationError.SiblingCollision;
+                return false;
+            }
+        }
+
+        plan = new FolderRenamePlan(folderPath, newPath);
+        error = FolderMoveValidationError.None;
+        return true;
+    }
+
+    /// <summary>The path above <paramref name="path"/>, or empty for a top-level folder.</summary>
+    public static string ParentOf(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        int lastSeparator = path.LastIndexOf(Separator);
+        return lastSeparator > 0 ? path[..lastSeparator] : string.Empty;
+    }
+
+    /// <summary>The last segment of <paramref name="path"/>.</summary>
+    public static string LeafOf(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        int lastSeparator = path.LastIndexOf(Separator);
+        return lastSeparator >= 0 ? path[(lastSeparator + 1)..] : path;
     }
 
     /// <summary>

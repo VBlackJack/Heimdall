@@ -23,7 +23,7 @@ using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
 
-public sealed class TreeDragSourceTests
+public sealed partial class TreeDragSourceTests
 {
     [Fact]
     public void DragThreshold_UsesPressedServerInsteadOfHoveredServer()
@@ -43,7 +43,7 @@ public sealed class TreeDragSourceTests
                 isLeftButtonPressed: true,
                 hasDisallowedModifiers: false,
                 out TreeViewItem? resolvedContainer,
-                out ServerItemViewModel? resolvedServer);
+                out object? resolvedServer);
 
             Assert.True(started);
             Assert.Same(pressedContainer, resolvedContainer);
@@ -64,8 +64,8 @@ public sealed class TreeDragSourceTests
                 Header = "folder",
                 DataContext = new FolderViewModel
                 {
-                    Name = "folder",
-                    FullPath = "folder"
+                    Name = "No group",
+                    FullPath = ""
                 }
             };
             TreeViewItem hoveredContainer = Container("hovered");
@@ -78,7 +78,7 @@ public sealed class TreeDragSourceTests
                 isLeftButtonPressed: true,
                 hasDisallowedModifiers: false,
                 out TreeViewItem? folderSource,
-                out ServerItemViewModel? folderServer);
+                out object? folderServer);
 
             state.CaptureDragCandidate(startPoint, pressedContainer);
             state.CaptureDragCandidate(startPoint, pressedContainer: null);
@@ -87,7 +87,7 @@ public sealed class TreeDragSourceTests
                 isLeftButtonPressed: true,
                 hasDisallowedModifiers: false,
                 out TreeViewItem? blankSource,
-                out ServerItemViewModel? blankServer);
+                out object? blankServer);
 
             Assert.False(folderStarted);
             Assert.Null(folderSource);
@@ -119,7 +119,7 @@ public sealed class TreeDragSourceTests
                 isLeftButtonPressed,
                 hasDisallowedModifiers,
                 out TreeViewItem? resolvedContainer,
-                out ServerItemViewModel? resolvedServer);
+                out object? resolvedServer);
 
             Assert.False(started);
             Assert.Null(resolvedContainer);
@@ -145,7 +145,7 @@ public sealed class TreeDragSourceTests
                 isLeftButtonPressed: true,
                 hasDisallowedModifiers: false,
                 out TreeViewItem? resolvedContainer,
-                out ServerItemViewModel? resolvedServer);
+                out object? resolvedServer);
 
             Assert.False(started);
             Assert.Null(resolvedContainer);
@@ -171,7 +171,7 @@ public sealed class TreeDragSourceTests
                 isLeftButtonPressed: true,
                 hasDisallowedModifiers: false,
                 out TreeViewItem? resolvedContainer,
-                out ServerItemViewModel? resolvedServer);
+                out object? resolvedServer);
 
             Assert.True(started);
             InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>

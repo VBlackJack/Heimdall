@@ -109,7 +109,7 @@ public sealed class MainWindowTreeDeferredSelectionTests
                 isLeftButtonPressed: true,
                 hasDisallowedModifiers: false,
                 out TreeViewItem? sourceContainer,
-                out ServerItemViewModel? sourceServer));
+                out object? sourceServer));
 
             // An executor that returns without dropping is what a cancelled DoDragDrop looks like.
             MainWindow.ExecuteTreeDrag(

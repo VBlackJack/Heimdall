@@ -393,6 +393,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                     "<separator>",
                     harness.Main.Localize("TreeCtxRename"),
                     harness.Main.Localize("TreeCtxFolderColor"),
+                    harness.Main.Localize("TreeCtxMoveFolderTo"),
                     harness.Main.Localize("TreeCtxDeleteGroup")
                 ],
                 GetTopLevelMenuShape(folderMenu));

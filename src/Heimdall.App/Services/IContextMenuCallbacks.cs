@@ -65,4 +65,10 @@ public interface IContextMenuCallbacks
     void SelectFolder(string fullPath)
     {
     }
+
+    /// <summary>
+    /// Re-parents a folder under <paramref name="targetParentPath"/>, or at the top level when
+    /// that is null, reporting refusals to the user.
+    /// </summary>
+    Task MoveFolderAsync(FolderViewModel folder, string? targetParentPath) => Task.CompletedTask;
 }
