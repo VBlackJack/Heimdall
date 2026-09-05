@@ -96,6 +96,26 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     [ObservableProperty]
     private bool _isGatewayMissing;
 
+    /// <summary>Whether the session is routed through an SSH gateway, present or missing.</summary>
+    /// <remarks>
+    /// Distinct from <see cref="IsGatewayBadgeVisible"/> since the badge became optional: the
+    /// filter facet and the tooltip need the fact, the row chrome needs the preference.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _hasGateway;
+
+    /// <summary>
+    /// Whether a resolved gateway shows its "via" badge on the row. A missing gateway keeps its
+    /// badge whatever this says: that one is a warning, not decoration.
+    /// </summary>
+    /// <remarks>
+    /// One gateway in front of every session is a common shape, and it painted the same badge on
+    /// every row, which is noise rather than information. The list owner pushes the persisted
+    /// preference here on every filter pass, so rows created by any path pick it up.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _showGatewayBadge = true;
+
     [ObservableProperty]
     private string _gatewayBadgeText = "";
 
@@ -304,6 +324,14 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
                 lines.Add(Format(
                     "SessionTreeRowTooltipProtocol",
                     ConnectionType.ToUpperInvariant()));
+            }
+
+            // With the badge hidden the row no longer says where it routes; the hover does, so
+            // the fact stays one gesture away. With the badge shown, the badge's own tooltip
+            // already says it and repeating it here would be the redundancy the dot avoids.
+            if (HasGateway && !IsGatewayBadgeVisible)
+            {
+                lines.Add(Format("SessionTreeRowTooltipGateway", GatewayName));
             }
 
             return lines.Count == 0
@@ -551,15 +579,16 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             || gatewayMap is null)
         {
             GatewayName = "";
-            IsGatewayBadgeVisible = false;
+            HasGateway = false;
             IsGatewayMissing = false;
             GatewayBadgeText = "";
             GatewayBadgeTooltip = "";
             GatewayDetailText = "";
+            RefreshGatewayBadgeVisibility();
             return;
         }
 
-        IsGatewayBadgeVisible = true;
+        HasGateway = true;
         if (gatewayMap.TryGetValue(gatewayId, out var gateway))
         {
             var gatewayName = gateway.Name ?? "";
@@ -568,6 +597,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             GatewayBadgeText = Format("SessionGatewayBadgeVia", gatewayName);
             GatewayBadgeTooltip = Format("SessionGatewayBadgeTooltipVia", gatewayName);
             GatewayDetailText = gatewayName;
+            RefreshGatewayBadgeVisibility();
             return;
         }
 
@@ -576,6 +606,19 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         GatewayBadgeText = T("SessionGatewayBadgeMissing");
         GatewayBadgeTooltip = Format("SessionGatewayBadgeTooltipMissing", gatewayId);
         GatewayDetailText = Format("SessionGatewayMissingDetail", gatewayId);
+        RefreshGatewayBadgeVisibility();
+    }
+
+    partial void OnShowGatewayBadgeChanged(bool value) => RefreshGatewayBadgeVisibility();
+
+    /// <summary>
+    /// The badge shows for a routed session unless the user hid it; a missing gateway always
+    /// shows, because hiding it would hide a session that will not connect.
+    /// </summary>
+    private void RefreshGatewayBadgeVisibility()
+    {
+        IsGatewayBadgeVisible = HasGateway && (ShowGatewayBadge || IsGatewayMissing);
+        OnPropertyChanged(nameof(RowTooltipText));
     }
 
     private string T(string key) => _localizer?.HasKey(key) == true ? _localizer[key] : Fallback(key);
@@ -609,6 +652,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionTreeRowTooltipHost" => "Host: {0}",
         "SessionTreeRowTooltipUser" => "User: {0}",
         "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
+        "SessionTreeRowTooltipGateway" => "Gateway: {0}",
         "SessionStatusConnected" => "Connected",
         "StatusLaunchedExternalClient" => "External client launched",
         "StatusLaunchedExternalClientTooltip" => "The external client was launched.",

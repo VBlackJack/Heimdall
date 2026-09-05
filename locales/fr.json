@@ -329,6 +329,7 @@
   "ServerDialogPostConnectInputPlaceholder": "Commande \u00e0 envoyer, par exemple : sudo -i",
   "SessionTreeRowTooltipHost": "H\u00f4te : {0}",
   "SessionTreeRowTooltipProtocol": "Protocole : {0}",
+  "SessionTreeRowTooltipGateway": "Passerelle : {0}",
   "SessionTreeRowTooltipUser": "Utilisateur : {0}",
   "SettingsLanguageApplyFailedMessage": "Le fichier de langue pour {0} n'a pas pu \u00eatre charg\u00e9. L'interface reste dans la langue qu'elle utilisait d\u00e9j\u00e0.",
   "SettingsLanguageApplyFailedTitle": "Langue non chang\u00e9e",
@@ -5130,6 +5131,10 @@
   "FilterFavoriteAutomationName": "Afficher uniquement les sessions favorites",
   "FilterConnected": "Connect\u00e9es",
   "FilterConnectedAutomationName": "Afficher uniquement les sessions connect\u00e9es",
+  "FilterGateway": "Via passerelle",
+  "FilterGatewayAutomationName": "Afficher uniquement les sessions passant par une passerelle SSH",
+  "FilterShowGatewayBadge": "Afficher le badge passerelle",
+  "FilterShowGatewayBadgeAutomationName": "Afficher le badge passerelle sur les lignes de session",
 
   "AccessDetailConnect": "Se connecter \u00e0 la session s\u00e9lectionn\u00e9e",
   "AccessDetailOpen": "Ouvrir l'outil s\u00e9lectionn\u00e9",

@@ -329,6 +329,7 @@
   "ServerDialogPostConnectInputPlaceholder": "Command to send, for example: sudo -i",
   "SessionTreeRowTooltipHost": "Host: {0}",
   "SessionTreeRowTooltipProtocol": "Protocol: {0}",
+  "SessionTreeRowTooltipGateway": "Gateway: {0}",
   "SessionTreeRowTooltipUser": "User: {0}",
   "SettingsLanguageApplyFailedMessage": "The language file for {0} could not be loaded. The interface stays in the language it was already using.",
   "SettingsLanguageApplyFailedTitle": "Language not changed",
@@ -5131,6 +5132,10 @@
   "FilterFavoriteAutomationName": "Show favorite sessions only",
   "FilterConnected": "Connected",
   "FilterConnectedAutomationName": "Show connected sessions only",
+  "FilterGateway": "Via gateway",
+  "FilterGatewayAutomationName": "Show sessions routed through an SSH gateway only",
+  "FilterShowGatewayBadge": "Show gateway badge",
+  "FilterShowGatewayBadgeAutomationName": "Show the gateway badge on session rows",
 
   "AccessDetailConnect": "Connect to selected session",
   "AccessDetailOpen": "Open selected tool",

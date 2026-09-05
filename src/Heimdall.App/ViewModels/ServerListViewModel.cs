@@ -260,6 +260,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             }
 
             _currentSettings = settings;
+            ApplyPersistedViewPreferences(settings);
             Dictionary<string, SshGatewayDto> gatewayMap = BuildGatewayMap(settings);
             foreach (ServerItemViewModel server in _allServers)
             {
@@ -486,6 +487,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         RefreshLookupCollections(settings);
         IsSidebarVisible = !settings.SidebarCollapsed;
+        ApplyPersistedViewPreferences(settings);
         RebuildStableTreeProjection();
         ApplyFilter(selectedServerId);
     }

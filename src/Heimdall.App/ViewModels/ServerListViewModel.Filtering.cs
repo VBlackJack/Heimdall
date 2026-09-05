@@ -52,6 +52,25 @@ public partial class ServerListViewModel
     [ObservableProperty]
     private bool _connectedFilterEnabled;
 
+    /// <summary>Keeps only the sessions routed through an SSH gateway, present or missing.</summary>
+    [ObservableProperty]
+    private bool _gatewayFilterEnabled;
+
+    /// <summary>
+    /// Whether rows show the "via gateway" badge. Persisted, and pushed to every row on each
+    /// filter pass so a row created by any path carries it.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showGatewayBadge = true;
+
+    /// <summary>
+    /// Set while a persisted value is being applied, so applying it does not write it back.
+    /// </summary>
+    private bool _applyingPersistedViewPreferences;
+
+    /// <summary>The write of the last badge preference change; tests await it.</summary>
+    internal Task ViewPreferencePersistence { get; private set; } = Task.CompletedTask;
+
     [ObservableProperty]
     private bool _isFilterPending;
 
@@ -66,6 +85,7 @@ public partial class ServerListViewModel
     public bool HasActiveFacetFilter =>
         FavoriteFilterEnabled
         || ConnectedFilterEnabled
+        || GatewayFilterEnabled
         || ProtocolFilters.Any(option => option.IsSelected);
 
     public bool ShowNoGroupDropZone =>
@@ -131,6 +151,54 @@ public partial class ServerListViewModel
 
     partial void OnConnectedFilterEnabledChanged(bool value) => ApplyDiscreteFilter();
 
+    partial void OnGatewayFilterEnabledChanged(bool value) => ApplyDiscreteFilter();
+
+    partial void OnShowGatewayBadgeChanged(bool value)
+    {
+        ApplyGatewayBadgePreference();
+        if (_applyingPersistedViewPreferences)
+        {
+            return;
+        }
+
+        ViewPreferencePersistence = PersistShowGatewayBadgeAsync(value);
+    }
+
+    /// <summary>Takes the view preferences a settings object carries without writing them back.</summary>
+    private void ApplyPersistedViewPreferences(AppSettings settings)
+    {
+        _applyingPersistedViewPreferences = true;
+        try
+        {
+            ShowGatewayBadge = settings.ShowGatewayBadge;
+        }
+        finally
+        {
+            _applyingPersistedViewPreferences = false;
+        }
+    }
+
+    private void ApplyGatewayBadgePreference()
+    {
+        foreach (ServerItemViewModel server in _allServers)
+        {
+            server.ShowGatewayBadge = ShowGatewayBadge;
+        }
+    }
+
+    private async Task PersistShowGatewayBadgeAsync(bool value)
+    {
+        try
+        {
+            await _configManager.MergeSettingAsync(
+                settings => settings.ShowGatewayBadge = value).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Failed to save the gateway badge preference: {ex.Message}");
+        }
+    }
+
     private void ApplyDiscreteFilter()
     {
         OnPropertyChanged(nameof(HasActiveFacetFilter));
@@ -186,7 +254,8 @@ public partial class ServerListViewModel
                 .Select(option => option.Protocol),
             FavoriteFilterEnabled,
             ConnectedFilterEnabled,
-            SelectedProject);
+            SelectedProject,
+            GatewayFilterEnabled);
     }
 
     private bool ApplyFilterPass(
@@ -201,6 +270,7 @@ public partial class ServerListViewModel
         }
 
         var stopwatch = Stopwatch.StartNew();
+        ApplyGatewayBadgePreference();
         var filteredServers = new List<ServerItemViewModel>(_stableServerOrder.Count);
         foreach (ServerItemViewModel server in _stableServerOrder)
         {

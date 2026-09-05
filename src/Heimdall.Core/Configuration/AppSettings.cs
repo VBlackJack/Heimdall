@@ -311,6 +311,13 @@ public sealed class AppSettings
     [SettingRange(0, 1000)]
     public int SidebarWidth { get; set; } = 220;
     public bool ShowToolsPanel { get; set; }
+
+    /// <summary>
+    /// Whether session rows show the "via gateway" badge. A missing gateway always shows its
+    /// badge regardless. Off is for the inventory that routes everything through one gateway,
+    /// where the badge on every row says nothing.
+    /// </summary>
+    public bool ShowGatewayBadge { get; set; } = true;
     public Dictionary<string, bool> SidebarExpandedCategories { get; set; } = new();
     public List<string> FavoriteToolIds { get; set; } = new();
     public bool OnboardingCompleted { get; set; }
