@@ -56,6 +56,28 @@ public sealed class TreeServerDragPayload
 }
 
 /// <summary>
+/// The folder a drag out of the session tree carries.
+/// </summary>
+/// <remarks>
+/// Sessions and folders travel under different formats so a drop can tell them apart without
+/// inspecting the object: a folder drop re-parents a subtree, a session drop moves rows.
+/// </remarks>
+public sealed class TreeFolderDragPayload
+{
+    /// <summary>The drag-and-drop format name this payload travels under.</summary>
+    public const string DataFormat = "HeimdallFolder";
+
+    public TreeFolderDragPayload(FolderViewModel folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        Folder = folder;
+    }
+
+    /// <summary>The folder the pointer went down on.</summary>
+    public FolderViewModel Folder { get; }
+}
+
+/// <summary>
 /// Holds transient state for the session <see cref="TreeView"/> interactions
 /// in <c>MainWindow</c>: drag-drop tracking and right-click /
 /// keyboard-context-menu targeting. Also exposes a pure static helper for
@@ -66,7 +88,7 @@ public sealed class TreeServerDragPayload
 public sealed class TreeInteractionState
 {
     private TreeViewItem? _dragSourceContainer;
-    private ServerItemViewModel? _dragSourceServer;
+    private object? _dragSourceItem;
     private ServerItemViewModel? _deferredSingleSelection;
 
     /// <summary>Mouse position captured on left button down - start of a potential drag.</summary>
@@ -76,8 +98,9 @@ public sealed class TreeInteractionState
     public bool DragInProgress { get; set; }
 
     /// <summary>
-    /// Captures the only container and server that may become the source of the
-    /// current pointer gesture. Non-server presses deliberately leave no candidate.
+    /// Captures the only container and item that may become the source of the current pointer
+    /// gesture: a session row, or a named folder. The "no group" folder and any other press
+    /// deliberately leave no candidate.
     /// </summary>
     internal void CaptureDragCandidate(
         System.Windows.Point startPoint,
@@ -85,15 +108,20 @@ public sealed class TreeInteractionState
     {
         ResetDrag();
 
-        if (pressedContainer?.DataContext is not ServerItemViewModel pressedServer)
+        if (!IsDragSource(pressedContainer?.DataContext))
         {
             return;
         }
 
         DragStartPoint = startPoint;
         _dragSourceContainer = pressedContainer;
-        _dragSourceServer = pressedServer;
+        _dragSourceItem = pressedContainer!.DataContext;
     }
+
+    /// <summary>Whether a bound item may start a drag.</summary>
+    internal static bool IsDragSource(object? item) =>
+        item is ServerItemViewModel
+        || item is FolderViewModel { FullPath.Length: > 0 };
 
     /// <summary>
     /// Resolves a threshold-crossing gesture from the immutable mouse-down snapshot.
@@ -103,10 +131,10 @@ public sealed class TreeInteractionState
         bool isLeftButtonPressed,
         bool hasDisallowedModifiers,
         out TreeViewItem? sourceContainer,
-        out ServerItemViewModel? sourceServer)
+        out object? sourceItem)
     {
         sourceContainer = null;
-        sourceServer = null;
+        sourceItem = null;
 
         if (!isLeftButtonPressed || hasDisallowedModifiers)
         {
@@ -127,15 +155,15 @@ public sealed class TreeInteractionState
         }
 
         if (_dragSourceContainer is null
-            || _dragSourceServer is null
-            || !ReferenceEquals(_dragSourceContainer.DataContext, _dragSourceServer))
+            || _dragSourceItem is null
+            || !ReferenceEquals(_dragSourceContainer.DataContext, _dragSourceItem))
         {
             ResetDrag();
             return false;
         }
 
         sourceContainer = _dragSourceContainer;
-        sourceServer = _dragSourceServer;
+        sourceItem = _dragSourceItem;
         DragInProgress = true;
         return true;
     }
@@ -175,7 +203,7 @@ public sealed class TreeInteractionState
         DragStartPoint = default;
         DragInProgress = false;
         _dragSourceContainer = null;
-        _dragSourceServer = null;
+        _dragSourceItem = null;
         _deferredSingleSelection = null;
     }
 
@@ -389,6 +417,30 @@ public sealed class TreeInteractionState
 
         targetGroup = null;
         return acceptsRootTarget;
+    }
+
+    /// <summary>
+    /// Whether dropping <paramref name="folderPath"/> on <paramref name="targetParentPath"/>
+    /// (null for the top level) would move it anywhere it can go.
+    /// </summary>
+    /// <remarks>
+    /// Two refusals are decided here because the pointer needs the answer on every move: the
+    /// target lying inside the folder itself, and the target being the parent the folder already
+    /// has. A sibling collision is not known until the inventory is read, so the drop learns it
+    /// from the service and reports it.
+    /// </remarks>
+    public static bool IsFolderMoveTarget(string folderPath, string? targetParentPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+
+        string target = targetParentPath?.Trim() ?? string.Empty;
+        if (string.Equals(target, Heimdall.Core.Configuration.FolderPath.ParentOf(folderPath), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return target.Length == 0
+            || !Heimdall.Core.Configuration.FolderPath.IsSelfOrDescendant(target, folderPath);
     }
 
     private static TreeViewItem? RealizeDirectChildContainer(

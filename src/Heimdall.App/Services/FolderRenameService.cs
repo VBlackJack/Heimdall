@@ -75,14 +75,39 @@ public sealed class FolderRenameService
             return new FolderRenameResult(FolderRenameStatus.NoChange, plan.NewPath);
         }
 
+        (List<ServerProfileDto> migratedServers, AppSettings migratedSettings) =
+            await MigrateAsync(_configManager, plan).ConfigureAwait(false);
+
+        return new FolderRenameResult(
+            FolderRenameStatus.Renamed,
+            plan.NewPath,
+            migratedServers,
+            migratedSettings);
+    }
+
+    /// <summary>
+    /// Rewrites every path-keyed record from <c>plan.OldPath</c> to <c>plan.NewPath</c> without
+    /// exposing a state in which an inventory path has lost its inherited settings.
+    /// </summary>
+    /// <remarks>
+    /// Shared by the rename and the move: both are the same migration under a different new
+    /// path, and one copy of the three-step write is one place for its ordering to be right.
+    /// </remarks>
+    internal static async Task<(List<ServerProfileDto> Servers, AppSettings Settings)> MigrateAsync(
+        IConfigManager configManager,
+        FolderRenamePlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(configManager);
+        ArgumentNullException.ThrowIfNull(plan);
+
         // Stage both path variants first. If execution stops before the inventory
         // write, servers still resolve through the old paths. If it stops after the
         // inventory write but before cleanup, the new paths already resolve.
-        await _configManager.MergeSettingAsync(current => StageSettings(current, plan))
+        await configManager.MergeSettingAsync(current => StageSettings(current, plan))
             .ConfigureAwait(false);
 
         List<ServerProfileDto> migratedServers =
-            await _configManager.MutateServersAsync(inventory =>
+            await configManager.MutateServersAsync(inventory =>
             {
                 foreach (ServerProfileDto server in inventory)
                 {
@@ -95,18 +120,15 @@ public sealed class FolderRenameService
                 return inventory;
             }).ConfigureAwait(false);
 
-        await _configManager.MergeSettingAsync(current => FinalizeSettings(current, plan))
+        await configManager.MergeSettingAsync(current => FinalizeSettings(current, plan))
             .ConfigureAwait(false);
 
-        AppSettings migratedSettings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
-        return new FolderRenameResult(
-            FolderRenameStatus.Renamed,
-            plan.NewPath,
-            migratedServers,
-            migratedSettings);
+        AppSettings migratedSettings = await configManager.LoadSettingsAsync().ConfigureAwait(false);
+        return (migratedServers, migratedSettings);
     }
 
-    private static List<string?> BuildExistingPaths(
+    /// <summary>Every path a folder operation must not collide with.</summary>
+    internal static List<string?> BuildExistingPaths(
         IEnumerable<ServerProfileDto> servers,
         AppSettings settings)
     {

@@ -74,6 +74,17 @@ selected; a single row still announces itself. The tool detail pane's name, cate
 description are bound to the view model, so a selection reaching the pane by any path shows the
 tool selected rather than the previous one.
 
+### A folder can be moved by dragging it, or from its menu
+
+A folder dragged onto another folder becomes its sub-folder; dropped on the "No group" zone or
+on the empty area of the tree, it returns to the top level. Its sub-folders, its sessions, its
+colour and its other defaults travel with it, through the same staged migration a rename runs,
+so no path is ever left without the settings it inherits. A drop is refused where it makes no
+sense: onto the folder itself, onto one of its sub-folders, or onto the parent it already has;
+a name already taken under the target is reported the way a rename reports it. The folder menu
+gains a "Move to" submenu listing the top level and every folder the drop would accept, so the
+same move is one keystroke sequence away.
+
 ### Smaller corrections
 
 - A session row announces its keyboard gestures to assistive technology: Enter, F2, Ctrl+Space,

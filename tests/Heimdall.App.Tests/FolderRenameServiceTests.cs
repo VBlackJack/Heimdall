@@ -21,7 +21,7 @@ using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
 
-public sealed class FolderRenameServiceTests
+public sealed partial class FolderRenameServiceTests
 {
     [Fact]
     public async Task RenameFolder_MigratesDescendantsGroupsEmptyGroupsDefaultsAndExpansion()

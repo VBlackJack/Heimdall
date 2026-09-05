@@ -566,6 +566,7 @@ public sealed class ContextMenuFactory
             renameItem.Click += (_, _) => callbacks.BeginInlineRename(folder);
             menu.Items.Add(renameItem);
             menu.Items.Add(CreateFolderColorMenu(vm, folder));
+            menu.Items.Add(CreateMoveFolderMenu(vm, folder, callbacks));
 
             // Delete folder (move servers to root)
             var deleteItem = new MenuItem
@@ -597,6 +598,46 @@ public sealed class ContextMenuFactory
         }
 
         return menu;
+    }
+
+    /// <summary>
+    /// Every place a folder can be moved to, the top level first: the keyboard route to what a
+    /// drag does with the pointer. The folder itself, its descendants and its current parent are
+    /// left out or disabled, which is the same rule the drop applies.
+    /// </summary>
+    private static MenuItem CreateMoveFolderMenu(
+        MainViewModel vm,
+        FolderViewModel folder,
+        IContextMenuCallbacks callbacks)
+    {
+        MenuItem item = new() { Header = vm.Localize("TreeCtxMoveFolderTo") };
+        string currentParent = FolderPath.ParentOf(folder.FullPath);
+
+        MenuItem topLevel = new()
+        {
+            Header = vm.Localize("TreeCtxMoveFolderToTopLevel"),
+            IsEnabled = TreeInteractionState.IsFolderMoveTarget(folder.FullPath, null)
+        };
+        topLevel.Click += async (_, _) => await callbacks.MoveFolderAsync(folder, null);
+        item.Items.Add(topLevel);
+
+        foreach (GroupTarget group in vm.ServerList.GetGroupTargets(includeNoGroup: false))
+        {
+            if (FolderPath.IsSelfOrDescendant(group.GroupName, folder.FullPath))
+            {
+                continue;
+            }
+
+            MenuItem child = new()
+            {
+                Header = group.DisplayName,
+                IsEnabled = !string.Equals(group.GroupName, currentParent, StringComparison.OrdinalIgnoreCase)
+            };
+            child.Click += async (_, _) => await callbacks.MoveFolderAsync(folder, group.GroupName);
+            item.Items.Add(child);
+        }
+
+        return item;
     }
 
     /// <summary>Side of the colour swatch drawn beside a palette entry.</summary>

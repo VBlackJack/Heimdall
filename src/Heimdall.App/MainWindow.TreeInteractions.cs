@@ -1185,21 +1185,39 @@ public partial class MainWindow
                 e.LeftButton == MouseButtonState.Pressed,
                 hasDisallowedModifiers,
                 out TreeViewItem? sourceContainer,
-                out ServerItemViewModel? sourceServer)
-            || sourceContainer is null
-            || sourceServer is null)
+                out object? sourceItem)
+            || sourceContainer is null)
         {
             return;
         }
 
-        ExecuteTreeDrag(
-            _treeState,
-            sourceContainer,
-            new TreeServerDragPayload(
-                sourceServer,
-                vm.ServerList.ResolveDragSelection(sourceServer)),
-            static (container, data) =>
-                DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
+        switch (sourceItem)
+        {
+            case ServerItemViewModel sourceServer:
+                ExecuteTreeDrag(
+                    _treeState,
+                    sourceContainer,
+                    new TreeServerDragPayload(
+                        sourceServer,
+                        vm.ServerList.ResolveDragSelection(sourceServer)),
+                    static (container, data) =>
+                        DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
+                break;
+
+            case FolderViewModel sourceFolder:
+                ExecuteTreeDrag(
+                    _treeState,
+                    sourceContainer,
+                    TreeFolderDragPayload.DataFormat,
+                    new TreeFolderDragPayload(sourceFolder),
+                    static (container, data) =>
+                        DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
+                break;
+
+            default:
+                _treeState.ResetDrag();
+                break;
+        }
     }
 
     internal static void ExecuteTreeDrag(
@@ -1208,12 +1226,24 @@ public partial class MainWindow
         TreeServerDragPayload payload,
         Action<TreeViewItem, System.Windows.DataObject> executeDrag)
     {
+        ArgumentNullException.ThrowIfNull(payload);
+        ExecuteTreeDrag(treeState, sourceContainer, TreeServerDragPayload.DataFormat, payload, executeDrag);
+    }
+
+    internal static void ExecuteTreeDrag(
+        TreeInteractionState treeState,
+        TreeViewItem sourceContainer,
+        string dataFormat,
+        object payload,
+        Action<TreeViewItem, System.Windows.DataObject> executeDrag)
+    {
         ArgumentNullException.ThrowIfNull(treeState);
         ArgumentNullException.ThrowIfNull(sourceContainer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataFormat);
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentNullException.ThrowIfNull(executeDrag);
 
-        System.Windows.DataObject data = new(TreeServerDragPayload.DataFormat, payload);
+        System.Windows.DataObject data = new(dataFormat, payload);
         try
         {
             executeDrag(sourceContainer, data);
@@ -1233,6 +1263,19 @@ public partial class MainWindow
     {
         payload = data.GetDataPresent(TreeServerDragPayload.DataFormat)
             ? data.GetData(TreeServerDragPayload.DataFormat) as TreeServerDragPayload
+            : null;
+        return payload is not null;
+    }
+
+    /// <summary>
+    /// Reads the folder payload out of a drag, when the drag is one of ours.
+    /// </summary>
+    private static bool TryGetTreeFolderDragPayload(
+        System.Windows.IDataObject data,
+        [NotNullWhen(true)] out TreeFolderDragPayload? payload)
+    {
+        payload = data.GetDataPresent(TreeFolderDragPayload.DataFormat)
+            ? data.GetData(TreeFolderDragPayload.DataFormat) as TreeFolderDragPayload
             : null;
         return payload is not null;
     }
@@ -1371,24 +1414,33 @@ public partial class MainWindow
     private void OnTreeViewDragOver(object sender, System.Windows.DragEventArgs e)
     {
         e.Effects = System.Windows.DragDropEffects.None;
+        ClearDropHighlight();
+        e.Handled = true;
 
-        if (!TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload)
-            || DataContext is not MainViewModel vm)
+        if (DataContext is not MainViewModel vm)
         {
-            ClearDropHighlight();
-            e.Handled = true;
             return;
         }
 
-        ClearDropHighlight();
-
-        var resolved = TryResolveTreeGroupDropTarget(sender, e, vm, out var targetContainer, out var targetGroup, out _);
-        var allowed = resolved
-            && vm.ServerList.IsBulkMoveTargetEnabled(payload.Servers, targetGroup);
-
-        if (!resolved || !allowed)
+        bool allowed;
+        TreeViewItem? targetContainer;
+        if (TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload))
         {
-            e.Handled = true;
+            allowed = TryResolveTreeGroupDropTarget(sender, e, vm, out targetContainer, out string? targetGroup, out _)
+                && vm.ServerList.IsBulkMoveTargetEnabled(payload.Servers, targetGroup);
+        }
+        else if (TryGetTreeFolderDragPayload(e.Data, out TreeFolderDragPayload? folderPayload))
+        {
+            allowed = TryResolveTreeGroupDropTarget(sender, e, vm, out targetContainer, out string? targetParent, out _)
+                && TreeInteractionState.IsFolderMoveTarget(folderPayload.Folder.FullPath, targetParent);
+        }
+        else
+        {
+            return;
+        }
+
+        if (!allowed)
+        {
             return;
         }
 
@@ -1399,8 +1451,6 @@ public partial class MainWindow
             DropTargetVisualState.SetIsDropTarget(targetContainer, true);
             _treeState.LastDropHighlight = targetContainer;
         }
-
-        e.Handled = true;
     }
 
     private void OnTreeViewDragLeave(object sender, System.Windows.DragEventArgs e)
@@ -1412,8 +1462,23 @@ public partial class MainWindow
     {
         ClearDropHighlight();
 
-        if (!TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload)
-            || DataContext is not MainViewModel vm)
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        if (TryGetTreeFolderDragPayload(e.Data, out TreeFolderDragPayload? folderPayload))
+        {
+            if (TryResolveTreeGroupDropTarget(sender, e, vm, out _, out string? targetParent, out _)
+                && TreeInteractionState.IsFolderMoveTarget(folderPayload.Folder.FullPath, targetParent))
+            {
+                await ((IContextMenuCallbacks)this).MoveFolderAsync(folderPayload.Folder, targetParent);
+            }
+
+            return;
+        }
+
+        if (!TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload))
         {
             return;
         }
@@ -1481,6 +1546,70 @@ public partial class MainWindow
         }
 
         return true;
+    }
+
+    /// <inheritdoc />
+    async Task IContextMenuCallbacks.MoveFolderAsync(FolderViewModel folder, string? targetParentPath)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        try
+        {
+            // A debounced expand-state save still holding the old paths would land after the
+            // reload and put them back; the deletion flushes for the same reason.
+            await vm.ServerList.FlushExpandStateForCloseAsync();
+            FolderMoveResult result =
+                await new FolderMoveService(vm.ConfigManager).MoveAsync(folder.FullPath, targetParentPath);
+
+            switch (result.Status)
+            {
+                case FolderMoveStatus.Moved:
+                    vm.ServerList.LoadServers(
+                        result.Servers
+                            ?? throw new InvalidOperationException("A completed move must return the inventory."),
+                        result.Settings
+                            ?? throw new InvalidOperationException("A completed move must return the settings."));
+                    vm.StatusText = string.Format(
+                        vm.Localize("StatusFolderMoved"),
+                        folder.Name,
+                        string.IsNullOrEmpty(targetParentPath)
+                            ? vm.Localize("TreeCtxMoveFolderToTopLevel")
+                            : targetParentPath);
+                    ((IContextMenuCallbacks)this).SelectFolder(
+                        result.NewPath
+                            ?? throw new InvalidOperationException("A completed move must return the new path."));
+                    break;
+
+                case FolderMoveStatus.NoChange:
+                    break;
+
+                case FolderMoveStatus.IntoItself:
+                    vm.DialogService.ShowWarning(
+                        vm.Localize("MoveFolderDialogTitle"),
+                        vm.Localize("MoveFolderErrorIntoItself"));
+                    break;
+
+                case FolderMoveStatus.SiblingCollision:
+                    vm.DialogService.ShowWarning(
+                        vm.Localize("MoveFolderDialogTitle"),
+                        vm.Localize("RenameGroupErrorSiblingCollision"));
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"Unexpected folder move status: {result.Status}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Folder move failed", ex);
+            vm.DialogService.ShowError(
+                vm.Localize("MoveFolderDialogTitle"),
+                vm.Localize("RenameGroupErrorPersistence"));
+        }
     }
 
     private static TreeViewItem? FindAncestorFolderTreeViewItem(DependencyObject? current)
