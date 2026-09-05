@@ -363,7 +363,7 @@ public partial class ServerListViewModel
         SortStableTree(_stableTreeRoot);
         _stableServerOrder = _allServers
             .OrderBy(server => server.SortOrder)
-            .ThenBy(server => server.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
             .ToList();
         StableTreeBuildCount++;
     }
@@ -429,7 +429,7 @@ public partial class ServerListViewModel
         SortStableTree(_stableTreeRoot);
         _stableServerOrder = _allServers
             .OrderBy(server => server.SortOrder)
-            .ThenBy(server => server.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
             .ToList();
 
         _stableFoldersByPath.Clear();
@@ -442,7 +442,10 @@ public partial class ServerListViewModel
         }
     }
 
-    private static void SortStableTree(StableFolderNode node)
+    private static void SortStableTree(StableFolderNode node) =>
+        SortStableTree(node, DisplayNameOrdering.Comparer);
+
+    private static void SortStableTree(StableFolderNode node, StringComparer names)
     {
         node.Children.Sort((left, right) =>
         {
@@ -451,7 +454,7 @@ public partial class ServerListViewModel
                 return left.IsNoGroup ? 1 : -1;
             }
 
-            return StringComparer.OrdinalIgnoreCase.Compare(
+            return names.Compare(
                 left.ViewModel!.Name,
                 right.ViewModel!.Name);
         });
@@ -460,12 +463,12 @@ public partial class ServerListViewModel
             int order = left.SortOrder.CompareTo(right.SortOrder);
             return order != 0
                 ? order
-                : StringComparer.OrdinalIgnoreCase.Compare(left.DisplayName, right.DisplayName);
+                : names.Compare(left.DisplayName, right.DisplayName);
         });
 
         foreach (StableFolderNode child in node.Children)
         {
-            SortStableTree(child);
+            SortStableTree(child, names);
         }
     }
 

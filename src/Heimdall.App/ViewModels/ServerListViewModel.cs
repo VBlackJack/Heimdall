@@ -553,7 +553,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             .Concat(_currentSettings?.EmptyGroups ?? [])
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, DisplayNameOrdering.Comparer)
             .Select(path => new GroupTarget(path, path));
 
         targets.AddRange(groupTargets);
@@ -2115,7 +2115,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         _projectTargets = settings.Projects
             .Where(project => !string.IsNullOrWhiteSpace(project.Id) && !string.IsNullOrWhiteSpace(project.Name))
-            .OrderBy(project => project.Name, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(project => project.Name, DisplayNameOrdering.Comparer)
             .Select(project => new ProjectTarget(project.Id, project.Name, project.Color ?? string.Empty))
             .ToList();
 
@@ -2126,7 +2126,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 .Where(server => !string.IsNullOrWhiteSpace(server.Group))
                 .Select(server => server.Group)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+                .OrderBy(name => name, DisplayNameOrdering.Comparer));
     }
 
     /// <summary>

@@ -15,6 +15,7 @@
  */
 
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -939,6 +940,39 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         Assert.Null(fixture.ViewModel.SelectedServer);
         Assert.False(fixture.ViewModel.ShowSessionDetail);
+    }
+
+    [Fact]
+    public async Task TreeOrder_PlacesAccentedNamesWithTheirBaseLetter()
+    {
+        // Ordinal order put every accented initial after "z"; the projection now sorts under the
+        // culture in effect when it is built.
+        CultureInfo original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+        try
+        {
+            await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+            fixture.LoadServers(
+                fixture.ExpandGroups("ops"),
+                CreateServer("zurich", "Zurich", "ops"),
+                CreateServer("etudes", "\u00c9tudes", "ops"),
+                CreateServer("alpha", "Alpha", "ops"),
+                CreateServer("z-folder", "Server", "Zulu"),
+                CreateServer("e-folder", "Server", "\u00c9coles"),
+                CreateServer("a-folder", "Server", "Alpha"));
+
+            Assert.Equal(
+                ["Alpha", "\u00c9coles", "ops", "Zulu"],
+                fixture.ViewModel.GroupedServers.Select(folder => folder.Name));
+            FolderViewModel ops = Assert.Single(fixture.ViewModel.GroupedServers, folder => folder.Name == "ops");
+            Assert.Equal(
+                ["Alpha", "\u00c9tudes", "Zurich"],
+                ops.Servers.Select(server => server.DisplayName));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 
     private static ServerProfileDto CreateServer(string id, string displayName, string group, int sortOrder = 0) =>
