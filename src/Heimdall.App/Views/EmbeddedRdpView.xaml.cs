@@ -4481,7 +4481,7 @@ public partial class EmbeddedRdpView
 
         // A fatal error carries no extended reason: it does not come from a disconnect.
         return IsFatalErrorDiagnostic(diagnostic)
-            ? $"RDP_FATAL_ERROR \u00B7 {code}"
+            ? $"RDP_FATAL_ERROR{RdpActiveXHost.DisconnectCodeSeparator}{code}"
             : RdpActiveXHost.FormatDisconnectCode(code, extendedReason);
     }
 
