@@ -39,6 +39,12 @@ public sealed record ServerFilterSpec
 
     public bool ConnectedOnly { get; init; }
 
+    /// <summary>
+    /// Keeps only the sessions routed through an SSH gateway, whether that gateway still exists
+    /// or not: a session whose gateway is missing is exactly the one this facet is used to find.
+    /// </summary>
+    public bool GatewayOnly { get; init; }
+
     public string ProjectName { get; init; } = "";
 
     public bool IsActive =>
@@ -46,6 +52,7 @@ public sealed record ServerFilterSpec
         || Protocols.Count > 0
         || FavoritesOnly
         || ConnectedOnly
+        || GatewayOnly
         || ProjectName.Length > 0;
 
     public static ServerFilterSpec Create(
@@ -53,7 +60,8 @@ public sealed record ServerFilterSpec
         IEnumerable<string>? protocols = null,
         bool favoritesOnly = false,
         bool connectedOnly = false,
-        string? projectName = null)
+        string? projectName = null,
+        bool gatewayOnly = false)
     {
         return new ServerFilterSpec
         {
@@ -63,6 +71,7 @@ public sealed record ServerFilterSpec
                 .ToFrozenSet(StringComparer.OrdinalIgnoreCase),
             FavoritesOnly = favoritesOnly,
             ConnectedOnly = connectedOnly,
+            GatewayOnly = gatewayOnly,
             ProjectName = projectName?.Trim() ?? ""
         };
     }
@@ -80,6 +89,7 @@ public sealed record ServerFilterSpec
             && (!FavoritesOnly || server.IsFavorite)
             && (!ConnectedOnly
                 || ConnectionStateSets.IsConnected(server.ConnectionState))
+            && (!GatewayOnly || server.HasGateway)
             && (ProjectName.Length == 0
                 || string.Equals(
                     server.ProjectName,

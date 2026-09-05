@@ -464,6 +464,19 @@
                                                               IsChecked="{Binding ServerList.ConnectedFilterEnabled, Mode=TwoWay}"
                                                               StaysOpenOnClick="True"
                                                               AutomationProperties.Name="{loc:Translate FilterConnectedAutomationName}"/>
+                                                    <MenuItem Header="{loc:Translate FilterGateway}"
+                                                              IsCheckable="True"
+                                                              IsChecked="{Binding ServerList.GatewayFilterEnabled, Mode=TwoWay}"
+                                                              StaysOpenOnClick="True"
+                                                              AutomationProperties.Name="{loc:Translate FilterGatewayAutomationName}"/>
+                                                    <Separator/>
+                                                    <!-- A view preference, not a facet: it changes what a row shows,
+                                                         never which rows are listed, so the facet dot ignores it. -->
+                                                    <MenuItem Header="{loc:Translate FilterShowGatewayBadge}"
+                                                              IsCheckable="True"
+                                                              IsChecked="{Binding ServerList.ShowGatewayBadge, Mode=TwoWay}"
+                                                              StaysOpenOnClick="True"
+                                                              AutomationProperties.Name="{loc:Translate FilterShowGatewayBadgeAutomationName}"/>
                                                 </ContextMenu>
                                             </Button.ContextMenu>
                                         </Button>
