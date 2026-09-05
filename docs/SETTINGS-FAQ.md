@@ -103,7 +103,11 @@ sessions, so a reconnection can reuse it instead of redrawing. **It does not con
 cache.** Turning it off frees no memory and costs you the disk cache. Leave it on.
 
 **Color depth** - 32-bit by default. Lowering it to 16-bit saved no measurable memory in
-testing. Lower it if you are short of bandwidth, not if you are short of memory.
+testing. Lower it if you are short of bandwidth, not if you are short of memory. The accepted
+values are 16, 24 and 32: those are the depths the Remote Desktop control and the `.rdp` format
+know, and a lower depth in an imported file (a 256-colour or 15-bit mRemoteNG profile, a
+`session bpp` below 16) is brought to 16, which is what the session was given before the bound
+said so.
 
 **Resolution mode, Width, Height** - the other settings measured to change memory use. A smaller
 session costs about 86 MB less than 1920x1080. `Auto` follows the Heimdall window, `Fixed` pins

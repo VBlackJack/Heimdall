@@ -111,7 +111,10 @@ vous coûte le cache disque. Laissez-la active.
 
 **Profondeur de couleur** - 32 bits par défaut. La baisser à 16 bits n'a économisé aucune
 mémoire mesurable. Baissez-la si vous manquez de bande passante, pas si vous manquez de
-mémoire.
+mémoire. Les valeurs acceptées sont 16, 24 et 32 : ce sont les profondeurs que le contrôle
+Bureau à distance et le format `.rdp` connaissent, et une profondeur plus basse dans un fichier
+importé (un profil mRemoteNG en 256 couleurs ou 15 bits, un `session bpp` sous 16) est ramenée
+à 16, ce que la session recevait déjà avant que la borne ne le dise.
 
 **Mode de résolution, Largeur, Hauteur** - les autres réglages dont l'effet sur la mémoire a été
 mesuré. Une session plus petite coûte environ 86 Mo de moins qu'en 1920x1080. `Auto` suit la
