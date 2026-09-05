@@ -108,6 +108,23 @@ WPF's own row selection in place. A selection cleared before closing is remember
 reload after a folder operation keeps whatever is selected at that moment rather than jumping
 back to the saved one.
 
+### Three hypotheses from the tree audit, measured and closed
+
+- A row's automation peer kept listening to its session after the tree had discarded the row:
+  WPF puts its disconnected sentinel into a discarded row's DataContext without raising the
+  event the peer relied on. A session lives as long as the inventory, so every discarded row and
+  its visual subtree lived as long, once a UI Automation client had touched the tree. The peer
+  now drops the subscription when the row leaves the screen and takes it back when the row
+  returns; a test reads the session's listener list before and after the discard.
+- Ctrl+Down and Ctrl+Up walked the focus onto a row and dressed it as selected, because WPF
+  selects what it focuses, while the selection the modifier was protecting sat elsewhere. Such a
+  row now has its native flag cleared, as a folder always had; the focus stays on it and Enter
+  keeps refusing it.
+- A reveal from the command palette selected the row through the tree's own handler, which reads
+  the modifier keys: with Ctrl still down from the gesture, the reveal was taken for a
+  multi-selection gesture and the view model never learned of it. Every programmatic selection
+  now sets the view model first and the native flag under a suppressed sync.
+
 ### Smaller corrections
 
 - Enter on a focused folder opens or closes it, as Left and Right Arrow do and as every other
