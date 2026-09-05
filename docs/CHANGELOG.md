@@ -12,7 +12,57 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the vault tests own their baseline
+## Unreleased: the vault tests own their baseline, and the RDP audit closes eleven findings
+
+### An interrupted external launch no longer leaves its password in the Credential Manager
+
+An external RDP launch writes a `TERMSRV/<host>` entry with the profile password and releases
+it from a deferred task nobody awaits. A crash, a kill or an exit inside that window stranded
+the entry, readable through `CredRead` until the Windows session ended. The temporary `.rdp`
+files have had a janitor since v2026.090201; the half that carries the password had none.
+
+`CredentialManagerHelper` now enumerates `TERMSRV/*` and deletes the domain-password entries
+whose Heimdall marker is older than the live-launch window, whatever process wrote them. A
+marker without a timestamp cannot be judged and is left alone. The sweep runs at startup, off
+the startup path, and before every external launch beside the file sweep. `RdpHandler` records
+each deferred cleanup and releases the ones still pending when the application exits; the
+delayed task then finds nothing left to do.
+
+### Two embedded sessions prompting at once each fill their own prompt
+
+Two embedded sessions raising the Windows Security prompt at the same time show two identical
+dialogs in one process, and the autofill watcher chose between them by title, then by foreground
+window, neither of which names a session. The second session's prompt could receive the first
+session's password. The prompt is owned by a window of the control that raised it, so the scan
+now records each candidate's owner and, when the session names its surface, only a prompt owned
+by that surface is eligible; one owned by another surface is left to its own watcher. When no
+candidate carries an owner at all, the process match decides as it did before.
+
+### Replacing a profile from a .rdp file keeps what the file cannot say
+
+The Replace resolution of the `.rdp` import rebuilt the profile from the file field by field,
+which reset everything a `.rdp` file cannot express: the fixed resolution the import itself
+reports as a skipped mapping, the domain, the aspect ratio, anti-idle, the admin and full-screen
+switches, the post-connect steps, and the saved password, while the preview only mentioned the
+file's own password blob. The existing profile is now cloned and the file's schema is mapped
+onto the clone by the same code the preview used: a field the file names is overwritten, a field
+it does not name keeps the value the user had.
+
+### Smaller RDP corrections from the same audit
+
+- A connect attempted while the vault is locked says "unlock the vault" in the session header,
+  as the Citrix launcher already did, instead of the generic start failure followed by an
+  exception message.
+- The status line and the health dot announce to a screen reader once per change. Every handler
+  on a transition rewrote them with the same words, and one connection announced six times.
+- A tab closed while the connect attempt was flushing its layout no longer dereferences a
+  control that has already been handed back to the pool.
+- The letterbox hint falls back to its locale key rather than an English sentence.
+- `SetResilienceOptions` records its two values instead of re-applying every redirection
+  setting, gateway attestation included, that `Connect()` was about to write anyway.
+- The vtable slot `put_UseMultimon` is called through is pinned against the control's type
+  library, as the event DispIds already were; `ClearPassword`, which had no caller and could not
+  have one, is gone.
 
 ### A test class no longer inherits the vault mode the previous one left behind
 
