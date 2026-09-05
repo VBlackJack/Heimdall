@@ -42,9 +42,9 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
         _configManager = new ConfigManager(_tempDir);
         await _configManager.InitializeAsync();
 
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(HmacIntegrity.GenerateRawKey());
+        // xUnit drives this lifetime without a constructor, so the baseline is established
+        // here rather than in a field initializer: no vault, no DEK, a fresh HMAC key.
+        CredentialProtectorStateScope.Reset(HmacIntegrity.GenerateRawKey());
     }
 
     public Task DisposeAsync()
@@ -54,9 +54,7 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
             service.Dispose();
         }
 
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        CredentialProtectorStateScope.Reset();
 
         try
         {

@@ -25,17 +25,18 @@ namespace Heimdall.Core.Tests.Vault;
 /// <summary>
 /// Exercises the version-aware v2 vault path of <see cref="CredentialProtector"/>.
 /// Shares the <see cref="CredentialProtectorStaticCollection"/> so it never runs
-/// concurrently with other classes that drive the static HMAC/DEK slots; each
-/// test resets both static slots on dispose.
+/// concurrently with other classes that drive the static HMAC/DEK slots; a
+/// <see cref="CredentialProtectorStateScope"/> pins the baseline around each test.
 /// </summary>
 [Collection(CredentialProtectorStaticCollection.Name)]
 [SupportedOSPlatform("windows")]
 public sealed class CredentialProtectorVaultTests : IDisposable
 {
+    private readonly CredentialProtectorStateScope _scope = new();
+
     public void Dispose()
     {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.Initialize(null);
+        _scope.Dispose();
     }
 
     [Fact]

@@ -32,6 +32,10 @@ public class ConfigManagerTests : IDisposable
     private readonly string _tempDir;
     private readonly ConfigManager _manager;
 
+    // The manager protects credentials through the process-global protector: the scope pins
+    // "no vault, no key" on entry so a writer scheduled before this class cannot leave it locked.
+    private readonly CredentialProtectorStateScope _scope = new();
+
     public ConfigManagerTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), "Heimdall.Tests." + Guid.NewGuid().ToString("N"));
@@ -41,6 +45,7 @@ public class ConfigManagerTests : IDisposable
 
     public void Dispose()
     {
+        _scope.Dispose();
         try
         {
             if (Directory.Exists(_tempDir))

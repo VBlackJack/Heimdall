@@ -24,8 +24,17 @@ namespace Heimdall.Core.Tests;
 
 [Collection(CredentialProtectorStaticCollection.Name)]
 [SupportedOSPlatform("windows")]
-public class CredentialProtectorTests
+public class CredentialProtectorTests : IDisposable
 {
+    // Every test here installs the HMAC key it needs and assumes no vault: the scope pins that
+    // baseline on entry instead of inheriting whatever the previous member left behind.
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
+
     /// <summary>
     /// Helper to generate a valid 256-bit HMAC key for testing.
     /// </summary>

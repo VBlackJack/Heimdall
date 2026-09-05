@@ -12,6 +12,25 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the vault tests own their baseline
+
+### A test class no longer inherits the vault mode the previous one left behind
+
+`CredentialProtector` keeps the vault-enabled flag, the borrowed DEK and the legacy HMAC key in
+static slots shared by every test in the assembly. The six Core test classes that drive them
+share an xUnit collection, which removes concurrency and nothing else: a class ran in whatever
+mode the previously scheduled class left behind, and the protection was 23 hand-written reset
+calls spread over four writer classes, while the two reader classes had no baseline of their own
+(BL-0099). Dropping one `SetVaultEnabled(false)` from one writer and scheduling its locked-vault
+test last made two `ConfigManagerTests` cases throw `VaultLockedException`.
+
+Each member now owns a `CredentialProtectorStateScope` that establishes a declared baseline on
+entry and re-establishes it on exit: vault disabled, no DEK, the HMAC key the class asks for.
+The previous values are deliberately not snapshotted, since inheriting them is the defect. A
+guard test keeps both rules closed over the Core test sources, membership and scope, and asserts
+it reached the six known classes so an empty scan cannot pass. The same mutant is harmless on
+this tree.
+
 ## 2026-09-05: certificate trust has two owners, the palette dials a saved profile as a saved profile, and every setting bound is declared once (v2026.090501)
 
 ### The line-endings gate measures the bytes
