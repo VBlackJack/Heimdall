@@ -3027,6 +3027,30 @@
                                          <CheckBox x:Name="Mw_SettingsRdpAutoReconnect" Content="{loc:Translate SettingsLabelRdpAutoReconnect}" IsChecked="{Binding Settings.RdpDefaultAutoReconnect}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpAutoReconnectHint}"/>
                                          <CheckBox x:Name="Mw_SettingsRdpNla" Content="{loc:Translate SettingsLabelRdpNla}" IsChecked="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpDefaultNlaHint}"/>
                                          <CheckBox x:Name="Mw_SettingsRdpStrictServerAuth" Content="{loc:Translate SettingsLabelRdpStrictServerAuth}" IsChecked="{Binding Settings.RdpDefaultStrictServerAuthentication}" IsEnabled="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpStrictServerAuthHint}"/>
+
+                                         <TextBlock x:Name="Mw_SettingsRdpHostPoolCapacityLabel"
+                                                    Text="{loc:Translate SettingsLabelRdpHostPoolCapacity}"
+                                                    Foreground="{DynamicResource TextSecondaryBrush}"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    Margin="0,12,0,4"/>
+                                         <TextBox Text="{Binding Settings.RdpHostPoolCapacityText, UpdateSourceTrigger=PropertyChanged}"
+                                                  Width="120"
+                                                  HorizontalAlignment="Left"
+                                                  ToolTip="{loc:Translate RdpHostPoolCapacityHint}"
+                                                  AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpHostPoolCapacityLabel}"/>
+
+                                         <TextBlock x:Name="Mw_SettingsRdpHostPoolIdleExpiryLabel"
+                                                    Text="{loc:Translate SettingsLabelRdpHostPoolIdleExpiry}"
+                                                    Foreground="{DynamicResource TextSecondaryBrush}"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    Margin="0,12,0,4"/>
+                                         <StackPanel Orientation="Horizontal">
+                                             <TextBox Text="{Binding Settings.RdpHostPoolIdleExpiryMinutesText, UpdateSourceTrigger=PropertyChanged}"
+                                                      Width="120"
+                                                      ToolTip="{loc:Translate RdpHostPoolIdleExpiryHint}"
+                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpHostPoolIdleExpiryLabel}"/>
+                                             <TextBlock Text="min" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                         </StackPanel>
                                      </StackPanel>
                                 </Border>
                                         </StackPanel>

@@ -24,6 +24,8 @@
     "rdpResizeEnableDelayMs": 10000,
     "rdpConnectWatchdogTimeoutMs": 45000,
     "rdpKeepAliveIntervalMs": 60000,
+    "rdpHostPoolCapacity": 2,
+    "rdpHostPoolIdleExpiryMinutes": 5,
     "sshKeepAliveIntervalSeconds": 30,
     "plinkPortCheckIntervalMs": 2000,
     "plinkKillGracePeriodMs": 2000,

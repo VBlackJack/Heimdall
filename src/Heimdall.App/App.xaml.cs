@@ -1362,7 +1362,15 @@ public partial class App : System.Windows.Application
 
             await ApplicationExitSequence.SaveSnapshotAndCloseSessionsAsync(
                 () => _mainViewModel!.GetSessionSnapshotEntries(),
-                () => _mainViewModel?.Connection.CloseAllSessionsSilently(),
+                () =>
+                {
+                    _mainViewModel?.Connection.CloseAllSessionsSilently();
+
+                    // The closed sessions hand their RDP controls back to the pool; release
+                    // the pool here, on the UI thread and before the first await, so the idle
+                    // controls are torn down inside an application that still exists.
+                    _serviceProvider.GetService<EmbeddedSessionManager>()?.Dispose();
+                },
                 snapshotService,
                 ExitSnapshotSaveBudget,
                 Core.Logging.FileLogger.Warn);

@@ -35,7 +35,7 @@ namespace Heimdall.App.Services;
 /// Creates visual hosts for connection sessions so the shell can render
 /// embedded protocol surfaces without teaching the ViewModel layer about WPF.
 /// </summary>
-public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
+public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposable
 {
     internal const int DefaultRdpResizeEnableDelayMs = 10000;
     private static readonly ConditionalWeakTable<SessionTabViewModel, PendingReconnectState>
@@ -55,7 +55,15 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
     /// inherit its RDP control. Creating a control that ever connects costs a measured 66
     /// kernel handles the operating system never returns; reusing one costs about 3.
     /// </summary>
-    private readonly PooledRdpHostProvider _rdpHostProvider = new();
+    /// <remarks>
+    /// Its capacity and idle expiry are read from the live settings on every release and
+    /// trim, so the settings screen applies without a restart; a manager built without a
+    /// configuration source runs on the pool's own defaults. Disposed with the manager, which
+    /// the application does before its first exit await, so the idle controls do not outlive
+    /// the sessions they served.
+    /// </remarks>
+    private readonly PooledRdpHostProvider _rdpHostProvider;
+    private bool _disposed;
     private readonly ISessionOperationLog _sessionOperationLog;
     private readonly ConfigManager _configManager;
     private ConfigGatewayInventory? _gatewayInventory;
@@ -146,6 +154,24 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager
         _sessionEventLog = sessionEventLog;
         _sessionOperationLog = sessionOperationLog;
         _configManager = configManager;
+        _rdpHostProvider = new PooledRdpHostProvider(
+            () => PooledRdpHostProvider.ResolveCapacity(_configManager?.CurrentSettings),
+            () => PooledRdpHostProvider.ResolveIdleExpiry(_configManager?.CurrentSettings));
+    }
+
+    /// <summary>The pool the RDP session views draw their controls from. Exposed for diagnostics and tests.</summary>
+    internal PooledRdpHostProvider RdpHostProvider => _rdpHostProvider;
+
+    /// <summary>Releases the idle RDP controls. Idempotent.</summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _rdpHostProvider.Dispose();
     }
 
     /// <summary>

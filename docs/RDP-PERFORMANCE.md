@@ -80,7 +80,7 @@ not less. The scaling happens in the window drawing layer, not in the control's 
 **Compression.** This is a bandwidth setting. It was not measured to affect memory and there is
 no mechanism by which it would.
 
-## Memory that is not returned when you close a tab
+## Memory that is not returned when you close a tab, and for how long
 
 Heimdall keeps up to two RDP controls alive after their tabs are closed, so the next connection
 is fast and does not re-pay a leak inside `mstscax.dll` that costs about 66 kernel handles per
@@ -90,8 +90,15 @@ Measured: closing all three sessions returned the process to 799 MB rather than 
 baseline, and it stayed there 25 minutes later. **The amount is bounded, not a runaway**: a
 second open-and-close cycle added 9.7 MB, not another 600.
 
-Practically, a Heimdall that has been used sits higher than one just started. Giving those idle
-controls an expiry is planned work.
+Since v2026.090601 an idle control is released after **five minutes** by default, and the pool
+is a pair of settings on the **RDP** tab, under the **Performance** sub-tab: **Idle Remote
+Desktop controls kept for reuse** (0 to 8; 0 creates a control per session, as before pooling
+existed) and **Idle control expiry** in minutes (0 keeps them until Heimdall exits, which is
+what every earlier version did). Both apply without a restart: the next tab you close and the
+next expiry check read the new values. The idle controls are also released when Heimdall exits.
+
+So a Heimdall that has been used still sits higher than one just started, but only for as long
+as the expiry says, and the expiry is yours to set.
 
 ## Against other clients
 
