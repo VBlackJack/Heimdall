@@ -24,20 +24,20 @@ namespace Heimdall.Core.Tests.Vault;
 [SupportedOSPlatform("windows")]
 public sealed class VaultMigrationEngineTests : IDisposable
 {
+    private readonly CredentialProtectorStateScope _scope;
     private readonly VaultDekHolder _dek;
 
     public VaultMigrationEngineTests()
     {
-        CredentialProtector.Initialize(HmacIntegrity.GenerateRawKey());
+        _scope = new CredentialProtectorStateScope(HmacIntegrity.GenerateRawKey());
         _dek = VaultKeyManager.GenerateDek();
         CredentialProtector.SetVaultKey(_dek);
     }
 
     public void Dispose()
     {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        // The scope drops the protector's borrowed reference before the holder is disposed.
+        _scope.Dispose();
         _dek.Dispose();
     }
 

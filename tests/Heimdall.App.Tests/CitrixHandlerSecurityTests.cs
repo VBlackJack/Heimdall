@@ -32,18 +32,11 @@ namespace Heimdall.App.Tests;
 [SupportedOSPlatform("windows")]
 public sealed class CitrixHandlerCredentialProtectorTests : IDisposable
 {
-    public CitrixHandlerCredentialProtectorTests()
-    {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
-    }
+    private readonly CredentialProtectorStateScope _scope = new();
 
     public void Dispose()
     {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        _scope.Dispose();
     }
 
     [Fact]

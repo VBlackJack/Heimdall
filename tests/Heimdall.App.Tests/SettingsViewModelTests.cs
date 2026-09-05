@@ -39,8 +39,17 @@ using Heimdall.Ssh;
 namespace Heimdall.App.Tests;
 
 [Collection(CredentialProtectorAppCollection.Name)]
-public sealed class SettingsViewModelTests
+public sealed class SettingsViewModelTests : IDisposable
 {
+    // A few tests below enable the vault inside a try and restore it in the finally; the scope
+    // pins the same baseline around every test of this class, whatever the previous member left.
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
+
     // There has to be a way back into the welcome tour. One reflex Escape used to end it
     // permanently: SkipAsync and EscapeAsync are both bare calls to CompleteAsync, which persists
     // OnboardingCompleted, and that flag had exactly one reader in the product - the first-launch
@@ -3216,9 +3225,7 @@ public sealed class SettingsViewModelTests
 
     private static void ResetCredentialProtector()
     {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        CredentialProtectorStateScope.Reset();
     }
 
     private static async Task<AppSettings> LoadExpectedFactoryDefaultsAsync()

@@ -28,11 +28,11 @@ namespace Heimdall.Core.Tests.Vault;
 [SupportedOSPlatform("windows")]
 public sealed class CredentialProtectorWriteDowngradeTests : IDisposable
 {
+    private readonly CredentialProtectorStateScope _scope = new();
+
     public void Dispose()
     {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        _scope.Dispose();
     }
 
     [Fact]

@@ -24,24 +24,18 @@ namespace Heimdall.App.Tests;
 /// <summary>
 /// Verifies the vault-aware Git token reader: v2 when unlocked, legacy DPAPI when
 /// no vault (backward compat), and Git deferred (null, no throw) when a v2 token
-/// is read while locked. Resets the static CredentialProtector slots per test.
+/// is read while locked. A <see cref="CredentialProtectorStateScope"/> pins the static slots
+/// around each test, with a fresh HMAC key on entry.
 /// </summary>
 [Collection(CredentialProtectorAppCollection.Name)]
 [SupportedOSPlatform("windows")]
 public sealed class GitTokenReaderTests : IDisposable
 {
-    public GitTokenReaderTests()
-    {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(HmacIntegrity.GenerateRawKey());
-    }
+    private readonly CredentialProtectorStateScope _scope = new(HmacIntegrity.GenerateRawKey());
 
     public void Dispose()
     {
-        CredentialProtector.ClearVaultKey();
-        CredentialProtector.SetVaultEnabled(false);
-        CredentialProtector.Initialize(null);
+        _scope.Dispose();
     }
 
     [Fact]

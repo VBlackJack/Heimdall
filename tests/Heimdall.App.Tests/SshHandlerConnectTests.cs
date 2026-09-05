@@ -37,9 +37,18 @@ using Heimdall.Ssh.Plink;
 namespace Heimdall.App.Tests;
 
 [Collection(CredentialProtectorAppCollection.Name)]
-public sealed class SshHandlerConnectTests
+public sealed class SshHandlerConnectTests : IDisposable
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
+    // Protects passwords through the process-global protector: pinned to the no-vault baseline
+    // so a writer scheduled before this class cannot leave it locked.
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
 
     [Fact]
     public async Task ConnectAsync_CallerCancellation_PropagatesAndReleasesTunnel()
