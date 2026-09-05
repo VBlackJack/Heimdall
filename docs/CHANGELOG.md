@@ -12,6 +12,56 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the .rdp import reads what the client writes, and a session torn down mid-connect no longer holds the machine awake
+
+### The .rdp import reads the keys the Remote Desktop client itself writes
+
+The 2026-09-05 measurement established that the Remote Desktop client saves drive redirection as
+`redirectdrives:i:1` and never writes `drivestoredirect`. The import read only the newer key, so
+every file the client had saved - and every file Heimdall's own generator had written since that
+measurement - came in with drive redirection off, and the key counted as "unknown" in the preview.
+The logon domain had the same fate: `domain:s:` was never read, so a `DOMAIN\user` profile
+exported with its domain in the separate key lost it on the way back in.
+
+The parser now reads `redirectdrives`, `domain`, `redirectcomports`, `audiocapturemode`,
+`administrative session`, `compression`, `bitmapcachepersistenable`, `autoreconnection enabled`,
+`usbdevicestoredirect`, `camerastoredirect` and `dynamic resolution`, and the import maps each onto
+the profile field it belongs to. When a file carries both drive keys the newer one wins, which is
+the precedence the client applies. A round-trip test now reads a generated file back through the
+import and checks every field the format can carry.
+
+The generator writes its seven performance keys for every profile, a zero mask included. A file
+silent on them left the client to whatever its own `Default.rdp` remembered from the last session
+someone ran by hand, while the embedded host has always written the mask unconditionally.
+
+### A session torn down while it was connecting no longer holds the machine awake
+
+The connected handler flushes the layout after a connect, and that flush pumps messages. A tab
+closed inside the pump disposed the view, which released its sleep-prevention count; the handler
+then acquired that count again on the disposed view, and nothing released it a second time. The
+process kept the machine awake until it exited, one session at a time. The handler re-checks
+disposal after the flush and leaves, as the connect path has done since v2026.090502.
+
+### Smaller corrections
+
+- A reconnect keeps the RDP mode the user forced on the tab. A session opened as "force embedded"
+  over a profile whose mode is External reconnected from the profile, so the overlay's Reconnect
+  button launched the external client and closed the embedded tab under a title that still carried
+  the forced suffix.
+- The RD Gateway field is trimmed and validated when the profile is saved, by the address rule the
+  .rdp generator and the embedded host apply before they route a session through it. A malformed
+  host used to be saved as typed and refused at connect time by the attestation sentence.
+- The credential autofill recognises the confirmation button and the password field in every
+  locale it recognises the dialog in. The title pattern claimed eight locales while the button
+  pattern named the labels of two; on the other six the UI Automation path fell through to the
+  first enabled button.
+- The autofill watcher resolves each process name once for its lifetime instead of opening one
+  process handle per visible window on every half-second scan.
+- The credential autofill timeout and the resize-enable delay have named defaults on the
+  settings type; the four surfaces that restated them as literals read those constants now.
+- The anti-idle tick reaches the rendering surface through the same helper the Send Keys menu
+  uses, instead of a second copy of the window walk.
+
 ## 2026-09-05: idle Remote Desktop controls expire, the disconnect code is ASCII, and the drive key is measured (v2026.090503)
 
 ### An idle Remote Desktop control gives its memory back
