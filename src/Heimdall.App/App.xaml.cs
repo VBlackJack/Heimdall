@@ -216,6 +216,12 @@ public partial class App : System.Windows.Application
                     Heimdall.Core.Logging.FileLogger.Info(
                         $"Swept {removed} stale editor working director{(removed == 1 ? "y" : "ies")}");
                 }
+
+                // The same janitor for external RDP launches: the temporary .rdp file and the
+                // Credential Manager entry a launch writes are both released by a deferred task
+                // that dies with the process. Before this ran only ahead of the next external
+                // launch, so a stranded password waited for one.
+                RdpHandler.SweepStaleArtifactsAtStartup();
             });
 
             // Respect Windows "Show animations" accessibility setting (WCAG 2.1 § 2.3.3).
@@ -1360,6 +1366,19 @@ public partial class App : System.Windows.Application
                 snapshotService,
                 ExitSnapshotSaveBudget,
                 Core.Logging.FileLogger.Warn);
+
+            // Release the .rdp files and Credential Manager entries whose deferred cleanup has
+            // not fired yet. The cleanup task is unobserved and dies with the process; without
+            // this an exit inside the window leaves the password readable until logoff.
+            try
+            {
+                foreach (RdpHandler rdpHandler in
+                    _serviceProvider.GetServices<IProtocolHandler>().OfType<RdpHandler>())
+                {
+                    rdpHandler.FlushPendingCleanups();
+                }
+            }
+            catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] RDP artifact cleanup: {ex.Message}"); }
 
             // Close all active tunnels (Plink tunnel processes)
             try

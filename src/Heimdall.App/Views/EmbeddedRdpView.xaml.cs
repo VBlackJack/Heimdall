@@ -108,6 +108,8 @@ public partial class EmbeddedRdpView
     private readonly List<DateTime> _reconnectAttemptTimestampsUtc = new(MaxReconnectAttemptTimestamps);
     private readonly LetterboxHintState _letterboxHintState = new();
     private readonly RdpConnectWatchdogArbiter _connectWatchdogArbiter;
+    private readonly RdpAnnouncementLatch _statusAnnouncements = new();
+    private readonly RdpAnnouncementLatch _healthDotAnnouncements = new();
 
     /// <summary>
     /// The connect attempt in flight: its abandonment state, and every decision that follows.
@@ -388,6 +390,7 @@ public partial class EmbeddedRdpView
         internal const string CertificateNotVerifiableToast = "RdpCertificateNotVerifiableToast";
         internal const string ResolutionHeaderFormat = "RdpResolutionHeaderFormat";
         internal const string ResolutionHeaderWithSizeFormat = "RdpResolutionHeaderWithSizeFormat";
+        internal const string LetterboxHintFormat = "RdpLetterboxHintFormat";
     }
 
     private void ShowTransientToast(string message)
@@ -1461,10 +1464,10 @@ public partial class EmbeddedRdpView
     {
         var width = (int)Math.Round(contentWidth);
         var height = (int)Math.Round(contentHeight);
-        return _localizer?.Format("RdpLetterboxHintFormat", width, height)
+        return _localizer?.Format(LocaleKeys.LetterboxHintFormat, width, height)
             ?? string.Format(
                 CultureInfo.CurrentCulture,
-                "Fixed {0}x{1} - resize the window or change resolution to fill.",
+                L(LocaleKeys.LetterboxHintFormat),
                 width,
                 height);
     }
@@ -1727,6 +1730,17 @@ public partial class EmbeddedRdpView
             EnsureHostHandle();
             FlushLayoutPipeline("post-handle");
 
+            // Both flushes pump messages, and a tab close dispatched inside the pump tears this
+            // view down: the host is handed back and the field is cleared. Re-read the field
+            // here rather than the copy the guard above took, or the next line dereferences a
+            // control that now belongs to the pool and reports a failure on a pane that is gone.
+            if (_disposed || _rdpHost is null)
+            {
+                Core.Logging.FileLogger.Info(
+                    "EmbeddedRDP BeginConnect abandoned: the view was torn down while its layout was flushed.");
+                return;
+            }
+
             var connectHost = ResolveConnectHost(_server);
             var connectPort = ResolveConnectPort(_server);
             (string username, string? domain) = RdpProfileResolver.ResolveCredentialIdentity(
@@ -1792,10 +1806,33 @@ public partial class EmbeddedRdpView
         {
             HandleGatewayAttestationFailure(ex);
         }
+        catch (Exception ex) when (RdpConnectRefusal.StatusKeyFor(ex) is string refusalKey)
+        {
+            HandleConnectRefused(refusalKey, ex);
+        }
         catch (Exception ex)
         {
             HandleFailure(L(LocaleKeys.ErrorStartEmbeddedSessionFailed), ex);
         }
+    }
+
+    /// <summary>
+    /// Ends an attempt the user can retry once they have acted, with a sentence saying what to do.
+    /// </summary>
+    /// <remarks>
+    /// Same teardown as <see cref="HandleFailure"/>, without the exception text: a locked vault
+    /// is not a fault, and the developer message it would append names nothing the user can act on.
+    /// </remarks>
+    private void HandleConnectRefused(string statusKey, Exception ex)
+    {
+        Core.Logging.FileLogger.Warn(
+            $"EmbeddedRDP connect refused: {statusKey} ({ex.GetType().Name})");
+        _allowResolutionUpdates = false;
+        StopReconnectElapsedTracking();
+        TransitionPhase(RdpConnectionPhase.None);
+        HideRedirectionIndicators();
+        UpdateSessionStatus(RdpSessionStatus.Error);
+        SetStatusText(L(statusKey));
     }
 
     /// <summary>Waits out a render pass, then resumes <paramref name="attempt"/>.</summary>
@@ -2455,6 +2492,11 @@ public partial class EmbeddedRdpView
         _autofillCts = new CancellationTokenSource();
         var token = _autofillCts.Token;
 
+        // The window the prompt will be owned by, read here on the UI thread. It is what lets
+        // the watcher tell this session's prompt from another embedded session's: both are
+        // raised in this process, both are titled "Windows Security", and neither names a host.
+        IntPtr sessionSurfaceHandle = _rdpHost?.HostHandle ?? IntPtr.Zero;
+
         // The view-side state belongs to the caller's thread, which is the UI thread at both call
         // sites. The watcher does not: its first scan enumerates every visible top-level window,
         // resolves a process name for each one and walks this process's threads, with nothing
@@ -2467,11 +2509,15 @@ public partial class EmbeddedRdpView
         });
 
         _ = RdpAutofillLauncher.StartAsync(
-            watcherToken => TryAutofillCredentialsAsync(password, hostHint, watcherToken),
+            watcherToken => TryAutofillCredentialsAsync(password, hostHint, sessionSurfaceHandle, watcherToken),
             token);
     }
 
-    private async Task TryAutofillCredentialsAsync(string password, string hostHint, CancellationToken cancellationToken)
+    private async Task TryAutofillCredentialsAsync(
+        string password,
+        string hostHint,
+        IntPtr sessionSurfaceHandle,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -2481,7 +2527,8 @@ public partial class EmbeddedRdpView
                 hostHint,
                 password,
                 TimeSpan.FromMilliseconds(timeoutMs),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                sessionSurfaceHandle).ConfigureAwait(false);
 
             if (filled)
             {
@@ -2797,7 +2844,11 @@ public partial class EmbeddedRdpView
 
         var label = L(ResolveHealthDotLabelKey(state));
         AutomationProperties.SetName(HealthDot, label);
-        _ = RdpLiveRegion.Announce(HealthDot);
+        if (_healthDotAnnouncements.ShouldAnnounce(label))
+        {
+            _ = RdpLiveRegion.Announce(HealthDot);
+        }
+
         var endpoint = _server is null ? string.Empty : BuildEndpointText(_server);
         HealthDot.ToolTip = string.IsNullOrWhiteSpace(endpoint)
             ? label
@@ -4027,7 +4078,13 @@ public partial class EmbeddedRdpView
     private void SetStatusText(string text)
     {
         StatusTextBlock.Text = text;
-        _ = RdpLiveRegion.Announce(StatusTextBlock);
+
+        // Announced only when the line moved: the handlers on a transition rewrite it several
+        // times with the same words, and a screen reader hears each rewrite as news.
+        if (_statusAnnouncements.ShouldAnnounce(text))
+        {
+            _ = RdpLiveRegion.Announce(StatusTextBlock);
+        }
     }
 
     private void RequestSkipStabilization()
@@ -5117,14 +5174,20 @@ public partial class EmbeddedRdpView
             localPort);
     }
 
-    private static string? TryDecryptPassword(ServerProfileDto server)
+    /// <summary>
+    /// Decrypts a stored profile password. Replaceable so a test can hand the connect a password,
+    /// or a locked vault, without a protector or a key on the machine.
+    /// </summary>
+    internal Func<string?, string?> DecryptPassword { get; set; } = CredentialProtector.Unprotect;
+
+    private string? TryDecryptPassword(ServerProfileDto server)
     {
         if (string.IsNullOrWhiteSpace(server.RdpPasswordEncrypted))
         {
             return null;
         }
 
-        return CredentialProtector.Unprotect(server.RdpPasswordEncrypted);
+        return DecryptPassword(server.RdpPasswordEncrypted);
     }
 
     /// <summary>

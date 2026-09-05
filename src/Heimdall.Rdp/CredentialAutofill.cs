@@ -81,12 +81,32 @@ public static partial class CredentialAutofill
     [LibraryImport("user32.dll", EntryPoint = "SendMessageW", StringMarshalling = StringMarshalling.Utf16)]
     private static partial IntPtr SendMessageString(IntPtr hWnd, uint msg, IntPtr wParam, string lParam);
 
+    [LibraryImport("user32.dll", EntryPoint = "GetWindow")]
+    private static partial IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool IsChild(IntPtr hWndParent, IntPtr hWnd);
+
     private const int GWL_STYLE = -16;
     private const long ES_PASSWORD = 0x0020L;
     private const uint WM_SETTEXT = 0x000C;
     private const uint BM_CLICK = 0x00F5;
+    private const uint GW_OWNER = 4;
 
     #endregion
+
+    /// <summary>
+    /// Whether a dialog's owner window is the given session surface, or sits inside it.
+    /// </summary>
+    /// <remarks>
+    /// The credential prompt the embedded control raises is owned by a window of the control that
+    /// raised it, so the owner is what tells two sessions' prompts apart inside one process: their
+    /// titles are the same word and neither carries a host.
+    /// </remarks>
+    private static bool IsOwnedBySurface(IntPtr ownerHandle, IntPtr surfaceHandle)
+        => ownerHandle != IntPtr.Zero
+            && (ownerHandle == surfaceHandle || IsChild(surfaceHandle, ownerHandle));
 
     internal static bool HasPasswordStyle(long style) => (style & ES_PASSWORD) != 0;
 
@@ -156,13 +176,20 @@ public static partial class CredentialAutofill
     /// <param name="password">Cleartext password to inject.</param>
     /// <param name="timeout">Maximum time to wait for the credential dialog to appear.</param>
     /// <param name="cancellationToken">Cancellation token to abort the operation.</param>
+    /// <param name="sessionSurfaceHandle">
+    /// For a prompt raised inside this process: the window of the session the prompt must be
+    /// owned by. Two embedded sessions prompting at once show two identical dialogs, and the
+    /// owner is the only thing that says which belongs to which. <see cref="IntPtr.Zero"/> for
+    /// an external client, whose prompts are already told apart by process.
+    /// </param>
     /// <returns>True if the password was successfully injected, false if timed out or cancelled.</returns>
     public static async Task<bool> WaitAndFillAsync(
         int mstscProcessId,
         string targetHost,
         string password,
         TimeSpan timeout,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IntPtr sessionSurfaceHandle = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
 
@@ -175,7 +202,7 @@ public static partial class CredentialAutofill
         var scan = 0;
 
         FileLogger.Info(
-            $"CredentialAutofill started: pid={mstscProcessId} hostHint={targetHost} timeout={timeout.TotalSeconds:0}s interval={DefaultScanInterval.TotalMilliseconds:0}ms");
+            $"CredentialAutofill started: pid={mstscProcessId} hostHint={targetHost} timeout={timeout.TotalSeconds:0}s interval={DefaultScanInterval.TotalMilliseconds:0}ms surface=0x{sessionSurfaceHandle.ToInt64():X}");
 
         try
         {
@@ -184,7 +211,12 @@ public static partial class CredentialAutofill
                 cancellationToken.ThrowIfCancellationRequested();
                 scan++;
 
-                var target = FindCredentialDialog(mstscProcessId, targetHost, hostHintPattern, scan);
+                var target = FindCredentialDialog(
+                    mstscProcessId,
+                    targetHost,
+                    hostHintPattern,
+                    scan,
+                    sessionSurfaceHandle);
                 if (target is not null)
                 {
                     FileLogger.Info(
@@ -223,7 +255,8 @@ public static partial class CredentialAutofill
         int mstscProcessId,
         string targetHost,
         Regex? hostHintPattern,
-        int scan)
+        int scan,
+        IntPtr sessionSurfaceHandle)
     {
         var windows = GetVisibleWindows();
         var candidates = windows.Where(IsCredentialDialogCandidate).ToList();
@@ -234,7 +267,8 @@ public static partial class CredentialAutofill
             candidates,
             scan,
             targetHost,
-            windows.Count);
+            windows.Count,
+            sessionSurfaceHandle: sessionSurfaceHandle);
     }
 
     internal static WindowInfo? SelectCredentialDialogTarget(
@@ -244,7 +278,9 @@ public static partial class CredentialAutofill
         int scan,
         string? targetHost = null,
         int? visibleWindowCount = null,
-        Func<WindowInfo, bool>? isCredentialBroker = null)
+        Func<WindowInfo, bool>? isCredentialBroker = null,
+        IntPtr sessionSurfaceHandle = default,
+        Func<IntPtr, IntPtr, bool>? isOwnedBySurface = null)
     {
         var evaluation = EvaluateCredentialDialogTarget(
             mstscProcessId,
@@ -253,7 +289,9 @@ public static partial class CredentialAutofill
             scan,
             targetHost,
             visibleWindowCount,
-            isCredentialBroker ?? (window => IsCredentialBroker(window.ProcessId, window.ProcessName)));
+            isCredentialBroker ?? (window => IsCredentialBroker(window.ProcessId, window.ProcessName)),
+            sessionSurfaceHandle,
+            isOwnedBySurface ?? IsOwnedBySurface);
 
         // OS window titles are already public desktop metadata; log them as-is for diagnostics.
         FileLogger.Debug(
@@ -286,7 +324,9 @@ public static partial class CredentialAutofill
         int scan,
         string? targetHost,
         int? visibleWindowCount,
-        Func<WindowInfo, bool> isCredentialBroker)
+        Func<WindowInfo, bool> isCredentialBroker,
+        IntPtr sessionSurfaceHandle,
+        Func<IntPtr, IntPtr, bool> isOwnedBySurface)
     {
         var selected = (WindowInfo?)null;
         var outcome = "no-match";
@@ -297,15 +337,41 @@ public static partial class CredentialAutofill
         var ownedByTarget = candidates.Where(w => w.ProcessId == mstscProcessId).ToList();
         if (ownedByTarget.Count > 0)
         {
-            selected = SelectBestMatch(ownedByTarget, hostHintPattern);
-            outcome = "matched-target-process";
-            foreach (var candidate in candidates)
+            // Inside this process every embedded session is "the target process", so the process
+            // alone cannot say whose prompt this is. The prompt's owner window can: it is a window
+            // of the control that raised it. When a surface is named and any candidate carries an
+            // owner, only the candidates owned by that surface are eligible; the rest belong to
+            // another session, whose own watcher will fill them. When no candidate carries an
+            // owner at all, nothing is known and the process match stands as it always has.
+            var ownedBySurface = sessionSurfaceHandle == IntPtr.Zero
+                ? null
+                : ownedByTarget.Where(w => isOwnedBySurface(w.OwnerHandle, sessionSurfaceHandle)).ToList();
+            var ownershipKnown = ownedBySurface is not null
+                && ownedByTarget.Any(w => w.OwnerHandle != IntPtr.Zero);
+
+            if (ownershipKnown && ownedBySurface!.Count == 0)
             {
-                decisions[candidate.Handle] = candidate.Handle == selected.Value.Handle
-                    ? ("accepted", "owned-by-target-process")
-                    : candidate.ProcessId == mstscProcessId
-                        ? ("rejected", "owned-by-target-process-not-selected")
-                        : ("rejected", "target-process-match-took-priority");
+                outcome = "no-match-owner";
+                foreach (var candidate in candidates)
+                {
+                    decisions[candidate.Handle] = candidate.ProcessId == mstscProcessId
+                        ? ("rejected", "owned-by-another-session-surface")
+                        : ("rejected", "not-target-process");
+                }
+            }
+            else
+            {
+                var eligible = ownershipKnown ? ownedBySurface! : ownedByTarget;
+                selected = SelectBestMatch(eligible, hostHintPattern);
+                outcome = ownershipKnown ? "matched-session-surface" : "matched-target-process";
+                foreach (var candidate in candidates)
+                {
+                    decisions[candidate.Handle] = candidate.Handle == selected.Value.Handle
+                        ? ("accepted", ownershipKnown ? "owned-by-session-surface" : "owned-by-target-process")
+                        : candidate.ProcessId == mstscProcessId
+                            ? ("rejected", "owned-by-target-process-not-selected")
+                            : ("rejected", "target-process-match-took-priority");
+                }
             }
         }
         else
@@ -819,12 +885,18 @@ public static partial class CredentialAutofill
 
     #region Window Enumeration
 
+    /// <summary>One visible window, as the scan saw it.</summary>
+    /// <param name="OwnerHandle">
+    /// The window that owns this one, or <see cref="IntPtr.Zero"/> when it has no owner. Filled
+    /// for top-level windows only; a descendant has a parent, not an owner.
+    /// </param>
     internal readonly record struct WindowInfo(
         IntPtr Handle,
         string Title,
         string ClassName,
         int ProcessId,
-        string ProcessName);
+        string ProcessName,
+        IntPtr OwnerHandle = default);
 
     internal readonly record struct PasswordFieldCandidate<T>(
         T Element,
@@ -892,7 +964,7 @@ public static partial class CredentialAutofill
                 return true;
             }
 
-            result.Add(new WindowInfo(hWnd, title, className, pid, processName));
+            result.Add(new WindowInfo(hWnd, title, className, pid, processName, GetWindow(hWnd, GW_OWNER)));
 
             return true;
         }, IntPtr.Zero);
@@ -917,7 +989,13 @@ public static partial class CredentialAutofill
                     if (!string.IsNullOrWhiteSpace(title) || CredentialDialogClassNames.Any(cn =>
                         className.Contains(cn, StringComparison.OrdinalIgnoreCase)))
                     {
-                        result.Add(new WindowInfo(hWnd, title, className, pid, GetProcessName(pid)));
+                        result.Add(new WindowInfo(
+                            hWnd,
+                            title,
+                            className,
+                            pid,
+                            GetProcessName(pid),
+                            GetWindow(hWnd, GW_OWNER)));
                         existingHandles.Add(hWnd);
                     }
                     return true;

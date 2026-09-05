@@ -556,6 +556,132 @@ public sealed class RdpHandlerTests
         Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
     }
 
+    // The deferred cleanup is a task nobody awaits, so it dies with the process. An exit inside
+    // the window releases the entry itself, and the delayed task then finds nothing left to do.
+    [Fact]
+    public async Task FlushPendingCleanups_ReleasesTheCredentialAndTheFileOnce_BeforeTheDelayElapses()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        TaskCompletionSource cleanupDelayElapsed =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        List<string> deletedFiles = [];
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            deleteRdpFile: path =>
+            {
+                deletedFiles.Add(path);
+                File.Delete(path);
+            },
+            artifactCleanupDelay: _ => cleanupDelayElapsed.Task);
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 60000,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+        Assert.True(result.Success);
+        Assert.Equal(0, credentialManager.DeleteCalls);
+
+        int flushed = handler.FlushPendingCleanups();
+
+        Assert.Equal(1, flushed);
+        Assert.Equal(1, credentialManager.DeleteCalls);
+        Assert.Equal(credentialManager.LastWriteMarker, credentialManager.LastDeleteMarker);
+        Assert.Equal([launcher.LastRdpFilePath!], deletedFiles);
+
+        // The delay now elapses in a process that is still alive: the entry is already gone.
+        cleanupDelayElapsed.SetResult();
+        await Task.Delay(50);
+        Assert.Equal(1, credentialManager.DeleteCalls);
+        Assert.Single(deletedFiles);
+        Assert.Equal(0, handler.FlushPendingCleanups());
+    }
+
+    [Fact]
+    public async Task FlushPendingCleanups_AfterTheDelayRan_HasNothingLeftToFlush()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            deleteRdpFile: File.Delete,
+            artifactCleanupDelay: _ => Task.CompletedTask);
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+        Assert.True(result.Success);
+        await credentialManager.DeleteObserved.Task.WaitAsync(CleanupObservationBudget);
+
+        Assert.Equal(0, handler.FlushPendingCleanups());
+        Assert.Equal(1, credentialManager.DeleteCalls);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ForceExternal_DefaultSweepAlsoSweepsStaleCredentials()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            new LocalizationManager(),
+            deleteRdpFile: File.Delete,
+            artifactCleanupDelay: _ => Task.CompletedTask);
+        ServerProfileDto server = CreateCredentialedServer();
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, credentialManager.SweepCalls);
+    }
+
     [Fact]
     public async Task ConnectAsync_LauncherReturnsNull_DeletesRdpFileBeforeReturningAndReleasesCredentialOnce()
     {
@@ -1317,6 +1443,14 @@ public sealed class RdpHandlerTests
             error = null;
             DeleteObserved.TrySetResult();
             return true;
+        }
+
+        public int SweepCalls { get; private set; }
+
+        public int SweepStaleCredentials(Action<string>? warn)
+        {
+            SweepCalls++;
+            return 0;
         }
     }
 

@@ -40,6 +40,14 @@ internal sealed class RdpHandler : IProtocolHandler
     private readonly Func<TimeSpan, Task> _artifactCleanupDelay;
     private readonly Action _sweepStaleRdpArtifacts;
 
+    /// <summary>
+    /// The deferred cleanups that have not run yet, keyed by artifact path. Consulted by
+    /// <see cref="FlushPendingCleanups"/> so an application exit inside the cleanup window does
+    /// not strand the credential the way a crash would.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, PendingRdpCleanup> _pendingCleanups =
+        new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Prefix of every temporary .rdp artifact this handler creates.</summary>
     internal const string RdpArtifactFileNamePrefix = "heimdall_";
 
@@ -83,10 +91,92 @@ internal sealed class RdpHandler : IProtocolHandler
         _credentialGuardService = credentialGuardService ?? new CredentialGuardService();
         _credentialManager = credentialManager ?? new RdpCredentialManager();
         _decryptPassword = decryptPassword ?? ConnectionHelpers.DecryptPassword;
-        _credentialAutofill = credentialAutofill ?? Heimdall.Rdp.CredentialAutofill.WaitAndFillAsync;
+        _credentialAutofill = credentialAutofill
+            ?? ((processId, host, secret, timeout, cancellationToken) =>
+                Heimdall.Rdp.CredentialAutofill.WaitAndFillAsync(processId, host, secret, timeout, cancellationToken));
         _deleteRdpFile = deleteRdpFile ?? File.Delete;
         _artifactCleanupDelay = artifactCleanupDelay ?? (delay => Task.Delay(delay));
-        _sweepStaleRdpArtifacts = sweepStaleRdpArtifacts ?? SweepStaleRdpArtifactsInTempDirectory;
+        _sweepStaleRdpArtifacts = sweepStaleRdpArtifacts ?? SweepStaleArtifactsBeforeLaunch;
+    }
+
+    /// <summary>
+    /// Reclaims what earlier processes left behind: the temporary .rdp files in the temp
+    /// directory and the Credential Manager entries written for them. Never throws.
+    /// </summary>
+    /// <remarks>
+    /// Called at application startup, off the startup path, as well as before every external
+    /// launch. The deferred cleanup only runs while Heimdall lives, and both halves of a launch
+    /// outlive a crash; a stranded credential is the more expensive of the two, since it stays
+    /// readable until the Windows session ends.
+    /// </remarks>
+    public static void SweepStaleArtifactsAtStartup()
+    {
+        SweepStaleRdpArtifactsInTempDirectory();
+        SweepStaleOwnedCredentials();
+    }
+
+    private void SweepStaleArtifactsBeforeLaunch()
+    {
+        SweepStaleRdpArtifactsInTempDirectory();
+        try
+        {
+            int deleted = _credentialManager.SweepStaleCredentials(Core.Logging.FileLogger.Warn);
+            if (deleted > 0)
+            {
+                Core.Logging.FileLogger.Info($"Stale RDP launch sweep removed {deleted} orphaned Windows store entr{(deleted == 1 ? "y" : "ies")}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Stale RDP credential sweep threw: {ex.GetType().FullName}");
+        }
+    }
+
+    private static void SweepStaleOwnedCredentials()
+    {
+        try
+        {
+            int deleted = Heimdall.Rdp.CredentialManagerHelper.SweepStaleOwnedCredentials(Core.Logging.FileLogger.Warn);
+            if (deleted > 0)
+            {
+                Core.Logging.FileLogger.Info($"Stale RDP launch sweep removed {deleted} orphaned Windows store entr{(deleted == 1 ? "y" : "ies")}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Stale RDP credential sweep threw: {ex.GetType().FullName}");
+        }
+    }
+
+    /// <summary>
+    /// Runs every deferred cleanup now, for an application that is exiting.
+    /// </summary>
+    /// <remarks>
+    /// The delayed cleanup is a task nobody awaits, so it dies with the process. Running it here
+    /// costs the client that is still negotiating its credential, which the delay exists to
+    /// protect; but the process is leaving and the alternative is a password left in the
+    /// Credential Manager until logoff. Each entry is released once: the delayed task finds it
+    /// gone and does nothing.
+    /// </remarks>
+    /// <returns>The number of cleanups run.</returns>
+    public int FlushPendingCleanups()
+    {
+        int flushed = 0;
+        foreach (string artifactPath in _pendingCleanups.Keys)
+        {
+            if (_pendingCleanups.TryRemove(artifactPath, out PendingRdpCleanup? pending))
+            {
+                RunCleanup(pending);
+                flushed++;
+            }
+        }
+
+        if (flushed > 0)
+        {
+            Core.Logging.FileLogger.Info($"RDP cleanup flushed {flushed} pending launch artifact(s) at exit");
+        }
+
+        return flushed;
     }
 
     public string Protocol => "RDP";
@@ -477,16 +567,16 @@ internal sealed class RdpHandler : IProtocolHandler
             }
 
             var cleanupDelay = TimeSpan.FromMilliseconds(settings.RdpArtifactCleanupDelayMs);
+
+            // Registered here, before the task starts, so an exit flush that runs between this
+            // return and the task's first instruction still finds the entry to release.
+            PendingRdpCleanup pendingCleanup = new(rdpFile, credentialCleanupTarget, credentialOwnershipMarker);
+            _pendingCleanups[rdpFile] = pendingCleanup;
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await CleanupRdpArtifactsAsync(
-                            rdpFile,
-                            credentialCleanupTarget,
-                            credentialOwnershipMarker,
-                            cleanupDelay)
-                        .ConfigureAwait(false);
+                    await CleanupRdpArtifactsAsync(pendingCleanup, cleanupDelay).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -571,21 +661,33 @@ internal sealed class RdpHandler : IProtocolHandler
     /// command is re-executed, and cancelling it used to bring the deletion forward instead
     /// of holding it back, pulling the credential out from under a client still negotiating.
     /// </summary>
-    private async Task CleanupRdpArtifactsAsync(
-        string rdpFile,
-        string? credentialCleanupTarget,
-        string? credentialOwnershipMarker,
-        TimeSpan cleanupDelay)
+    private async Task CleanupRdpArtifactsAsync(PendingRdpCleanup pending, TimeSpan cleanupDelay)
     {
         await _artifactCleanupDelay(cleanupDelay).ConfigureAwait(false);
 
-        DeleteRdpArtifact(rdpFile);
-
-        if (credentialCleanupTarget is not null && credentialOwnershipMarker is not null)
+        // Whoever removes the entry runs the cleanup, so an exit flush that got there first
+        // leaves nothing for this task to do.
+        if (_pendingCleanups.TryRemove(pending.RdpFile, out _))
         {
-            ReleaseOwnedCredential(credentialCleanupTarget, credentialOwnershipMarker);
+            RunCleanup(pending);
         }
     }
+
+    private void RunCleanup(PendingRdpCleanup pending)
+    {
+        DeleteRdpArtifact(pending.RdpFile);
+
+        if (pending.CredentialTarget is not null && pending.OwnershipMarker is not null)
+        {
+            ReleaseOwnedCredential(pending.CredentialTarget, pending.OwnershipMarker);
+        }
+    }
+
+    /// <summary>One launch's artifacts awaiting their deferred cleanup.</summary>
+    private sealed record PendingRdpCleanup(
+        string RdpFile,
+        string? CredentialTarget,
+        string? OwnershipMarker);
 
     private static void SweepStaleRdpArtifactsInTempDirectory()
     {
@@ -719,6 +821,11 @@ internal interface IRdpCredentialManager
         string ownershipMarker,
         out bool credentialDeleted,
         out string? error);
+
+    /// <summary>
+    /// Deletes the entries an earlier launch wrote and never released. Returns how many.
+    /// </summary>
+    int SweepStaleCredentials(Action<string>? warn);
 }
 
 internal delegate Task<bool> RdpCredentialAutofillOperation(
@@ -763,5 +870,10 @@ internal sealed class RdpCredentialManager : IRdpCredentialManager
             ownershipMarker,
             out credentialDeleted,
             out error);
+    }
+
+    public int SweepStaleCredentials(Action<string>? warn)
+    {
+        return Heimdall.Rdp.CredentialManagerHelper.SweepStaleOwnedCredentials(warn);
     }
 }

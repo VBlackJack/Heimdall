@@ -369,6 +369,79 @@ public sealed class RdpImportServiceTests
         Assert.Equal(1, result.ReplacedCount);
     }
 
+    // A .rdp file cannot carry a fixed resolution, a domain, anti-idle, an aspect ratio, the
+    // post-connect steps or a saved password. Replace used to rebuild the profile from the file
+    // and reset all of them; the fixed size it reset is the very mapping the preview reports as
+    // skipped, and the saved password vanished while the preview only mentioned the file's blob.
+    [Fact]
+    public async Task ApplyAsync_ReplaceConflict_KeepsEveryFieldTheFileCannotCarry()
+    {
+        using var fixture = new RdpImportFixture();
+        await fixture.SaveServersAsync(new ServerProfileDto
+        {
+            Id = "keep-me",
+            DisplayName = "ReplaceMe",
+            ConnectionType = "RDP",
+            RemoteServer = "old",
+            RemotePort = 3389,
+            RdpUsername = "alice",
+            RdpDomain = "CORP",
+            RdpPasswordEncrypted = "enc-secret",
+            RdpUseGlobalDefaults = false,
+            RdpResolutionMode = RdpResolutionMode.Fixed,
+            RdpFixedWidth = 1600,
+            RdpFixedHeight = 900,
+            RdpInitialSmartSizing = false,
+            RdpAntiIdle = true,
+            RdpAspectRatio = "16:9",
+            RdpAdminMode = true,
+            RdpFullScreen = true,
+            RdpRedirectDrives = true,
+            RdpGateway = "gw.example",
+            SshGatewayId = "bastion",
+            PostConnectSteps = [new PostConnectStep { Input = "whoami" }],
+            SessionLoggingOverride = true
+        });
+        var path = await fixture.WriteRdpAsync(
+            "ReplaceMe.rdp",
+            "full address:s:new.example.com:3390\r\nusername:s:bob\r\naudiomode:i:2\r\n");
+        var preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
+
+        var result = await fixture.Service.ApplyAsync(
+            preview,
+            SelectOne(path, RdpConflictResolution.Replace),
+            CancellationToken.None);
+
+        Assert.Equal(1, result.ReplacedCount);
+        ServerProfileDto replaced = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+
+        // What the file carries wins.
+        Assert.Equal("keep-me", replaced.Id);
+        Assert.Equal("new.example.com", replaced.RemoteServer);
+        Assert.Equal(3390, replaced.RemotePort);
+        Assert.Equal("bob", replaced.RdpUsername);
+        Assert.Equal(0, replaced.RdpAudioMode);
+        Assert.False(replaced.RdpUseGlobalDefaults);
+        Assert.Equal(ProfileOrigin.ImportRdp, replaced.Origin);
+
+        // What it cannot carry stays.
+        Assert.Equal("CORP", replaced.RdpDomain);
+        Assert.Equal("enc-secret", replaced.RdpPasswordEncrypted);
+        Assert.Equal(RdpResolutionMode.Fixed, replaced.RdpResolutionMode);
+        Assert.Equal(1600, replaced.RdpFixedWidth);
+        Assert.Equal(900, replaced.RdpFixedHeight);
+        Assert.False(replaced.RdpInitialSmartSizing);
+        Assert.True(replaced.RdpAntiIdle);
+        Assert.Equal("16:9", replaced.RdpAspectRatio);
+        Assert.True(replaced.RdpAdminMode);
+        Assert.True(replaced.RdpFullScreen);
+        Assert.True(replaced.RdpRedirectDrives);
+        Assert.Equal("gw.example", replaced.RdpGateway);
+        Assert.Equal("bastion", replaced.SshGatewayId);
+        Assert.Equal("whoami", Assert.Single(replaced.PostConnectSteps).Input);
+        Assert.True(replaced.SessionLoggingOverride);
+    }
+
     [Fact]
     public async Task ApplyAsync_AutoRename_AppendsDeterministicSuffix()
     {

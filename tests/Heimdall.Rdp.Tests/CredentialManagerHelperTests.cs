@@ -260,4 +260,150 @@ public sealed class CredentialManagerHelperTests
         Assert.False(commentRead);
         Assert.False(freeCalled);
     }
+
+    private static readonly DateTime SweepNow = new(2026, 9, 5, 12, 0, 0, DateTimeKind.Utc);
+
+    private static string MarkerAgedBy(TimeSpan age, int processId = 4242)
+        => CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(processId, SweepNow - age);
+
+    [Fact]
+    public void IsStaleOwnedMarker_OlderThanTheLiveWindow_IsStaleWhateverTheProcess()
+    {
+        string ownMarker = MarkerAgedBy(TimeSpan.FromMinutes(2), Environment.ProcessId);
+        string foreignMarker = MarkerAgedBy(TimeSpan.FromMinutes(2), 99999);
+
+        Assert.True(CredentialManagerHelper.IsStaleOwnedMarker(ownMarker, SweepNow));
+        Assert.True(CredentialManagerHelper.IsStaleOwnedMarker(foreignMarker, SweepNow));
+    }
+
+    [Fact]
+    public void IsStaleOwnedMarker_InsideTheLiveWindow_IsNotStale()
+    {
+        string marker = MarkerAgedBy(CredentialManagerHelper.LiveLaunchMarkerWindow - TimeSpan.FromSeconds(1));
+
+        Assert.False(CredentialManagerHelper.IsStaleOwnedMarker(marker, SweepNow));
+    }
+
+    // The single-field format carries no timestamp, so it cannot be judged and is left alone:
+    // deleting it on its prefix alone would reach into a launch an older build may still be running.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("Heimdall:RDP:legacy-single-field")]
+    [InlineData("Heimdall:RDP:4242:not-a-number:abcd")]
+    [InlineData("Somebody else's comment")]
+    public void IsStaleOwnedMarker_UnjudgeableComment_IsNotStale(string? comment)
+    {
+        Assert.False(CredentialManagerHelper.IsStaleOwnedMarker(comment, SweepNow));
+    }
+
+    [Fact]
+    public void SweepStaleOwnedCredentials_DeletesOnlyStaleHeimdallDomainPasswordEntries()
+    {
+        List<(string Target, uint Type)> deleted = [];
+        IReadOnlyList<CredentialManagerHelper.StoredCredentialSummary> stored =
+        [
+            new("TERMSRV/stale", CredentialManagerHelper.CredTypeDomainPassword, MarkerAgedBy(TimeSpan.FromHours(1))),
+            new("TERMSRV/live", CredentialManagerHelper.CredTypeDomainPassword, MarkerAgedBy(TimeSpan.FromSeconds(5))),
+            new("TERMSRV/foreign", CredentialManagerHelper.CredTypeDomainPassword, "Saved by the user in Credential Manager"),
+            new("TERMSRV/unmarked", CredentialManagerHelper.CredTypeDomainPassword, null),
+            new("TERMSRV/generic", CredentialManagerHelper.CredTypeGeneric, MarkerAgedBy(TimeSpan.FromHours(1))),
+        ];
+
+        int count = CredentialManagerHelper.SweepStaleOwnedCredentials(
+            SweepNow,
+            (string filter, out IReadOnlyList<CredentialManagerHelper.StoredCredentialSummary> credentials, out int errorCode) =>
+            {
+                Assert.Equal(CredentialManagerHelper.RdpCredentialTargetFilter, filter);
+                credentials = stored;
+                errorCode = 0;
+                return true;
+            },
+            (target, type) =>
+            {
+                deleted.Add((target, type));
+                return new CredentialManagerHelper.CredentialDeleteResult(true, 0);
+            },
+            warn: null);
+
+        Assert.Equal(1, count);
+        Assert.Equal([("TERMSRV/stale", CredentialManagerHelper.CredTypeDomainPassword)], deleted);
+    }
+
+    [Fact]
+    public void SweepStaleOwnedCredentials_NothingStored_DeletesNothingAndStaysSilent()
+    {
+        List<string> warnings = [];
+        bool deleteCalled = false;
+
+        int count = CredentialManagerHelper.SweepStaleOwnedCredentials(
+            SweepNow,
+            (string _, out IReadOnlyList<CredentialManagerHelper.StoredCredentialSummary> credentials, out int errorCode) =>
+            {
+                credentials = [];
+                errorCode = CredentialManagerHelper.ErrorNotFound;
+                return false;
+            },
+            (_, _) =>
+            {
+                deleteCalled = true;
+                return new CredentialManagerHelper.CredentialDeleteResult(true, 0);
+            },
+            warnings.Add);
+
+        Assert.Equal(0, count);
+        Assert.False(deleteCalled);
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
+    public void SweepStaleOwnedCredentials_EnumerationFails_WarnsWithTheCodeAndDeletesNothing()
+    {
+        List<string> warnings = [];
+
+        int count = CredentialManagerHelper.SweepStaleOwnedCredentials(
+            SweepNow,
+            (string _, out IReadOnlyList<CredentialManagerHelper.StoredCredentialSummary> credentials, out int errorCode) =>
+            {
+                credentials = [];
+                errorCode = 5;
+                return false;
+            },
+            (_, _) => throw new InvalidOperationException("delete must not be reached"),
+            warnings.Add);
+
+        Assert.Equal(0, count);
+        string warning = Assert.Single(warnings);
+        Assert.Contains("WIN32_ERROR_5", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SweepStaleOwnedCredentials_DeleteFails_WarnsWithTheTargetOnlyAndKeepsGoing()
+    {
+        List<string> warnings = [];
+        string staleMarker = MarkerAgedBy(TimeSpan.FromHours(1));
+        IReadOnlyList<CredentialManagerHelper.StoredCredentialSummary> stored =
+        [
+            new("TERMSRV/first", CredentialManagerHelper.CredTypeDomainPassword, staleMarker),
+            new("TERMSRV/second", CredentialManagerHelper.CredTypeDomainPassword, staleMarker),
+        ];
+
+        int count = CredentialManagerHelper.SweepStaleOwnedCredentials(
+            SweepNow,
+            (string _, out IReadOnlyList<CredentialManagerHelper.StoredCredentialSummary> credentials, out int errorCode) =>
+            {
+                credentials = stored;
+                errorCode = 0;
+                return true;
+            },
+            (target, _) => target.EndsWith("first", StringComparison.Ordinal)
+                ? new CredentialManagerHelper.CredentialDeleteResult(false, 5)
+                : new CredentialManagerHelper.CredentialDeleteResult(true, 0),
+            warnings.Add);
+
+        Assert.Equal(1, count);
+        string warning = Assert.Single(warnings);
+        Assert.Contains("TERMSRV/first", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain(staleMarker, warning, StringComparison.Ordinal);
+    }
 }

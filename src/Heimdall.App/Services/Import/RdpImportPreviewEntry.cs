@@ -15,6 +15,7 @@
  */
 
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Import;
 
 namespace Heimdall.App.Services.Import;
 
@@ -42,4 +43,10 @@ public sealed class RdpImportPreviewEntry
     public int UnknownKeyCount { get; init; }
 
     public IReadOnlyList<string> SkippedMappings { get; init; } = [];
+
+    /// <summary>
+    /// What the file said, kept so a Replace can write onto the existing profile exactly the
+    /// fields the file carries and nothing else.
+    /// </summary>
+    internal RdpFileSchema? Schema { get; init; }
 }

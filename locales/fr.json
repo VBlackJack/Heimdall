@@ -400,6 +400,7 @@
   "RdpErrorCancelReconnectFailed": "Impossible d'annuler la reconnexion.",
   "RdpErrorCancelConnectFailed": "Impossible d'annuler la connexion.",
   "RdpErrorStartEmbeddedSessionFailed": "Impossible de d\u00e9marrer la session Bureau \u00e0 distance int\u00e9gr\u00e9e.",
+  "RdpConnectVaultLocked": "D\u00e9verrouillez le coffre avant de d\u00e9marrer cette session Bureau \u00e0 distance.",
   "CredentialGuardEnabled": "Credential Guard : Activ\u00e9",
   "CredentialGuardDisabled": "Credential Guard : Non disponible",
   "SettingsSectionData": "Gestion des donn\u00e9es",
