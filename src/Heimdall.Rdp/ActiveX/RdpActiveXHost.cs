@@ -66,8 +66,10 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
 
     private static readonly Guid IidMsRdpExtendedSettings = new("302D8188-0052-4807-806A-362B628F9AC5");
     private static readonly Guid IidMsRdpClientNonScriptable5 = new("4F6996D5-D7B1-412C-B0FF-063718566907");
-    // MsTscAx typelib slot: IUnknown(3) + inherited nonscriptable methods(50).
-    private const int NonScriptable5PutUseMultimonSlot = 53;
+    // MsTscAx typelib slot: IUnknown(3) + inherited nonscriptable methods(50). Pinned against
+    // the type library by MsTscAxVtableContractTests: the interface is vtable-only, so a wrong
+    // slot calls whatever member sits there, with no error and no log line.
+    internal const int NonScriptable5PutUseMultimonSlot = 53;
 
     /// <summary>
     /// Default number of auto-reconnect attempts; <see cref="SetResilienceOptions"/>
@@ -425,14 +427,12 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             MinKeepAliveIntervalMs,
             MaxKeepAliveIntervalMs);
 
+        // Remembered, not applied: both values are written by ApplyRedirectionSettings, which
+        // Connect() runs over every pending setting. Applying here as well ran that method a
+        // third time before every connect - two interface queries, twenty late-bound writes
+        // and a gateway attestation with read-back - for values Connect() was about to write.
         Core.Logging.FileLogger.Info(
             $"RdpActiveXHost.SetResilienceOptions: reconnectAttempts={_session.MaxAutoReconnectAttempts} keepAliveMs={_session.KeepAliveIntervalMs} handleCreated={IsHandleCreated}");
-
-        var ocx = GetActiveXInstance();
-        if (ocx is not null)
-        {
-            ApplyRedirectionSettings(ocx);
-        }
     }
 
     public int EffectiveMaxAutoReconnectAttempts => _session.MaxAutoReconnectAttempts;
@@ -684,25 +684,12 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
         }
     }
 
-    /// <summary>
-    /// Best-effort clearing of the COM-side password after the connection handoff.
-    /// Should be called in the OnConnected event handler.
-    /// </summary>
-    public void ClearPassword()
-    {
-        try
-        {
-            var ocx = GetOcx();
-            if (ocx is null) return;
-
-            var nonScriptable = (IMsTscNonScriptable)ocx;
-            nonScriptable.put_ClearTextPassword(string.Empty);
-        }
-        catch (Exception ex)
-        {
-            LastError = ex.Message;
-        }
-    }
+    // The password stays on the control for the life of the session on purpose. The resolution
+    // change falls back to Reconnect(width, height) on clients without
+    // UpdateSessionDisplaySettings, and that reconnect authenticates again from what the control
+    // holds; a control cleared at OnConnected would prompt instead. The secret is reset by
+    // RdpPasswordReset once the control reports itself disconnected, and overwritten before the
+    // control is handed to another session.
 
     #region Internal event raisers (called by MsTscAxEventSink)
 
