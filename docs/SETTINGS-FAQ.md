@@ -139,6 +139,13 @@ credential; this is how long Heimdall waits before deleting them, so `mstsc.exe`
 read them. If Heimdall exits before the delay elapses, both are released at exit; after a
 crash, they are reclaimed at the next startup or the next external launch.
 
+**Idle Remote Desktop controls kept for reuse** and **Idle control expiry** - when an embedded
+RDP tab closes, its control is kept alive so the next connection reuses it instead of paying
+about 66 kernel handles for a new one; each idle control holds about 300 MB. The first setting
+says how many are kept (0 to 8, 0 creates a control per session), the second how many minutes
+an idle one is kept before its memory is released (0 keeps it until Heimdall exits). Both apply
+without a restart. See [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
+
 **Session keep-alive interval** and **Anti-idle interval** are different things. Keep-alive is
 protocol traffic that stops the *server* dropping an idle session. Anti-idle simulates activity
 so the remote *desktop* does not lock.

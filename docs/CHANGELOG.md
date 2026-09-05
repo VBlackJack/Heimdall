@@ -12,6 +12,25 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: idle Remote Desktop controls expire
+
+### An idle Remote Desktop control gives its memory back
+
+The pool that keeps Remote Desktop controls alive between sessions, so the next connection does
+not re-pay a measured 66 kernel handles for a fresh control, kept two of them for the life of the
+process. Each holds about 300 MB, so a Heimdall that had been used sat 600 MB above one just
+started after every tab was closed, and stayed there (measured on 2026-08-24, parked as BL-0110).
+
+The pool now reads its capacity and its idle expiry from two settings on the RDP tab's
+Performance sub-tab: how many idle controls to keep (0 to 8, default 2) and how many minutes an
+idle one is kept (default 5; 0 keeps it until exit, which is what every earlier version did). Both
+are read live, so a change applies at the next release and the next expiry check without a
+restart. A dispatcher timer trims the pool while anything is idle and stops when nothing is; the
+oldest idle control goes first, and a new session takes the most recently released one so the
+oldest keeps ageing towards its expiry. The session manager now disposes the pool before the
+application's first exit await, so the idle controls are torn down in an application that still
+exists.
+
 ## 2026-09-05: the RDP audit closes eleven findings, and the vault tests own their baseline (v2026.090502)
 
 ### An interrupted external launch no longer leaves its password in the Credential Manager

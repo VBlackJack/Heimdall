@@ -151,6 +151,14 @@ sessions embarquées.
 supprimés à la fermeture ; après un plantage, ils sont récupérés au démarrage suivant ou au
 prochain lancement externe.
 
+**Contrôles Bureau à distance inactifs gardés pour réemploi** et **Expiration d'un contrôle
+inactif** - quand un onglet RDP embarqué se ferme, son contrôle est gardé vivant pour que la
+connexion suivante le réemploie au lieu de payer environ 66 handles noyau pour un nouveau ;
+chaque contrôle inactif retient environ 300 Mo. Le premier réglage dit combien en garder (0 à 8,
+0 crée un contrôle par session), le second combien de minutes un contrôle inactif est gardé avant
+que sa mémoire soit rendue (0 le garde jusqu'à la fermeture de Heimdall). Les deux s'appliquent
+sans redémarrage. Voir [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
+
 **Intervalle de maintien de session** et **Intervalle anti-inactivité** sont deux choses
 différentes. Le maintien est du trafic protocolaire qui empêche le *serveur* de couper une
 session inactive. L'anti-inactivité simule une activité pour que le *bureau* distant ne se

@@ -174,6 +174,146 @@ public sealed class ReusableHostPoolTests
         Assert.Equal(0, pool.IdleCount);
     }
 
+    // What gives the memory back. An idle host holds about 300 MB, and two of them kept for
+    // the life of the process left a used Heimdall 600 MB above a fresh one.
+    [Fact]
+    public void Trim_DisposesTheHostsThatOutlivedTheExpiry_OldestFirst()
+    {
+        ManualClock clock = new();
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 2, () => TimeSpan.FromMinutes(5), clock);
+        FakeHost older = pool.Acquire();
+        FakeHost newer = pool.Acquire();
+        pool.Release(older);
+        clock.Advance(TimeSpan.FromMinutes(3));
+        pool.Release(newer);
+        clock.Advance(TimeSpan.FromMinutes(2));
+
+        int disposed = pool.Trim();
+
+        Assert.Equal(1, disposed);
+        Assert.True(older.IsDisposed);
+        Assert.False(newer.IsDisposed);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    [Fact]
+    public void Trim_BeforeTheExpiry_DisposesNothing()
+    {
+        ManualClock clock = new();
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 2, () => TimeSpan.FromMinutes(5), clock);
+        FakeHost host = pool.Acquire();
+        pool.Release(host);
+        clock.Advance(TimeSpan.FromMinutes(5) - TimeSpan.FromSeconds(1));
+
+        Assert.Equal(0, pool.Trim());
+        Assert.False(host.IsDisposed);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    // Zero is "keep until the pool is disposed", which is what the fixed-capacity shape does.
+    [Fact]
+    public void Trim_WithNoExpiry_KeepsIdleHostsForEver()
+    {
+        ManualClock clock = new();
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 2, () => TimeSpan.Zero, clock);
+        FakeHost host = pool.Acquire();
+        pool.Release(host);
+        clock.Advance(TimeSpan.FromDays(30));
+
+        Assert.Equal(0, pool.Trim());
+        Assert.False(host.IsDisposed);
+    }
+
+    // Acquire takes the most recently released host, so the oldest keeps ageing towards its
+    // expiry instead of being revived by every new session.
+    [Fact]
+    public void Acquire_HandsOutTheMostRecentlyReleasedHost()
+    {
+        ManualClock clock = new();
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 2, () => TimeSpan.Zero, clock);
+        FakeHost older = pool.Acquire();
+        FakeHost newer = pool.Acquire();
+        pool.Release(older);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        pool.Release(newer);
+
+        Assert.Same(newer, pool.Acquire());
+    }
+
+    // The capacity is read live: lowering it on the settings screen applies at the next trim
+    // rather than at the next restart, and it is the oldest idle hosts that go.
+    [Fact]
+    public void Trim_DisposesTheOldestHostsBeyondALoweredCapacity()
+    {
+        int capacity = 2;
+        ManualClock clock = new();
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => capacity, () => TimeSpan.Zero, clock);
+        FakeHost older = pool.Acquire();
+        FakeHost newer = pool.Acquire();
+        pool.Release(older);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        pool.Release(newer);
+
+        capacity = 1;
+        int disposed = pool.Trim();
+
+        Assert.Equal(1, disposed);
+        Assert.True(older.IsDisposed);
+        Assert.False(newer.IsDisposed);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    [Fact]
+    public void Release_ReadsTheCapacityLive()
+    {
+        int capacity = 0;
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => capacity, () => TimeSpan.Zero);
+        FakeHost first = pool.Acquire();
+        pool.Release(first);
+        Assert.True(first.IsDisposed);
+
+        capacity = 1;
+        FakeHost second = pool.Acquire();
+        pool.Release(second);
+
+        Assert.False(second.IsDisposed);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ANegativeCapacityReadsAsZero()
+    {
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => -3, () => TimeSpan.Zero);
+
+        Assert.Equal(0, pool.Capacity);
+    }
+
+    [Fact]
+    public void Trim_AfterDispose_DoesNothing()
+    {
+        var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 2, () => TimeSpan.FromMinutes(1));
+        pool.Dispose();
+
+        Assert.Equal(0, pool.Trim());
+    }
+
+    private sealed class ManualClock : TimeProvider
+    {
+        private DateTimeOffset _now = new(2026, 9, 5, 12, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan elapsed) => _now += elapsed;
+    }
+
     private sealed class FakeHost : IReusableHost
     {
         public bool IsReusable { get; set; } = true;

@@ -97,6 +97,35 @@ public sealed class AppSettings
     public int RdpAutoReconnectMaxAttempts { get; set; } = DefaultRdpAutoReconnectMaxAttempts;
     [SettingRange(5000, 300000)]
     public int RdpKeepAliveIntervalMs { get; set; } = 60000;
+
+    /// <summary>Idle RDP controls kept alive by default; the pool's own default, restated here.</summary>
+    public const int DefaultRdpHostPoolCapacity = 2;
+
+    /// <summary>Minutes an idle RDP control is kept by default; the pool's own default, restated here.</summary>
+    public const int DefaultRdpHostPoolIdleExpiryMinutes = 5;
+
+    /// <summary>
+    /// How many Remote Desktop controls stay alive after their tabs close, so the next
+    /// connection reuses one instead of paying a measured 66 kernel handles for a new one.
+    /// </summary>
+    /// <remarks>
+    /// Each idle control holds about 300 MB of private commit. Zero creates a control per
+    /// session, which is what Heimdall did before pooling existed.
+    /// </remarks>
+    [SettingRange(0, 8)]
+    public int RdpHostPoolCapacity { get; set; } = DefaultRdpHostPoolCapacity;
+
+    /// <summary>
+    /// How long an idle Remote Desktop control is kept before it is released, in minutes.
+    /// Zero keeps it until Heimdall exits.
+    /// </summary>
+    /// <remarks>
+    /// Zero sits inside the range rather than being declared as the off sentinel: the loader's
+    /// oracle diagnoses the value one below the minimum, and a minimum of one would put the
+    /// sentinel exactly there. "Never" is a value like any other here, and the pool reads it.
+    /// </remarks>
+    [SettingRange(0, 1440)]
+    public int RdpHostPoolIdleExpiryMinutes { get; set; } = DefaultRdpHostPoolIdleExpiryMinutes;
     public const int DefaultSshKeepAliveIntervalSeconds = 30;
     [SettingRange(5, 600)]
     public int SshKeepAliveIntervalSeconds { get; set; } = DefaultSshKeepAliveIntervalSeconds;

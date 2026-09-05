@@ -865,6 +865,34 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.RdpHostPoolCapacity))]
+    private int _rdpHostPoolCapacity = AppSettings.DefaultRdpHostPoolCapacity;
+
+    /// <summary>Text of the field that edits <see cref="RdpHostPoolCapacity"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpHostPoolCapacityText = string.Empty;
+
+    partial void OnRdpHostPoolCapacityTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpHostPoolCapacity = parsed);
+
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.RdpHostPoolIdleExpiryMinutes))]
+    private int _rdpHostPoolIdleExpiryMinutes = AppSettings.DefaultRdpHostPoolIdleExpiryMinutes;
+
+    /// <summary>Text of the field that edits <see cref="RdpHostPoolIdleExpiryMinutes"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _rdpHostPoolIdleExpiryMinutesText = string.Empty;
+
+    partial void OnRdpHostPoolIdleExpiryMinutesTextChanged(string value)
+        => CommitNumericText(value, parsed => RdpHostPoolIdleExpiryMinutes = parsed);
+
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
     [SettingRangeOf(nameof(AppSettings.RdpKeepAliveIntervalMs))]
     private int _rdpKeepAliveIntervalMs = 60000;
 
@@ -1385,6 +1413,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpCredentialAutofillTimeoutMs = settings.RdpCredentialAutofillTimeoutMs;
         RdpAutoReconnectMaxAttempts = settings.RdpAutoReconnectMaxAttempts;
         RdpKeepAliveIntervalMs = settings.RdpKeepAliveIntervalMs;
+        RdpHostPoolCapacity = settings.RdpHostPoolCapacity;
+        RdpHostPoolIdleExpiryMinutes = settings.RdpHostPoolIdleExpiryMinutes;
 
         UnsubscribeExternalToolTracking();
 
@@ -1465,6 +1495,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpCredentialAutofillTimeoutMsText = RdpCredentialAutofillTimeoutMs.ToString(CultureInfo.InvariantCulture);
         RdpAutoReconnectMaxAttemptsText = RdpAutoReconnectMaxAttempts.ToString(CultureInfo.InvariantCulture);
         RdpKeepAliveIntervalMsText = RdpKeepAliveIntervalMs.ToString(CultureInfo.InvariantCulture);
+        RdpHostPoolCapacityText = RdpHostPoolCapacity.ToString(CultureInfo.InvariantCulture);
+        RdpHostPoolIdleExpiryMinutesText = RdpHostPoolIdleExpiryMinutes.ToString(CultureInfo.InvariantCulture);
         SessionHealthCheckIntervalSecondsText = SessionHealthCheckIntervalSeconds.ToString(CultureInfo.InvariantCulture);
         SessionHealthProbeTimeoutMsText = SessionHealthProbeTimeoutMs.ToString(CultureInfo.InvariantCulture);
         SessionHealthMaxConcurrentText = SessionHealthMaxConcurrent.ToString(CultureInfo.InvariantCulture);
@@ -1715,6 +1747,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.RdpCredentialAutofillTimeoutMs = RdpCredentialAutofillTimeoutMs;
             settings.RdpAutoReconnectMaxAttempts = RdpAutoReconnectMaxAttempts;
             settings.RdpKeepAliveIntervalMs = RdpKeepAliveIntervalMs;
+            settings.RdpHostPoolCapacity = RdpHostPoolCapacity;
+            settings.RdpHostPoolIdleExpiryMinutes = RdpHostPoolIdleExpiryMinutes;
 
             // UI state
             settings.ShowToolsPanel = ShowToolsPanel;
@@ -1914,6 +1948,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpCredentialAutofillTimeoutMs = defaults.RdpCredentialAutofillTimeoutMs;
         RdpAutoReconnectMaxAttempts = defaults.RdpAutoReconnectMaxAttempts;
         RdpKeepAliveIntervalMs = defaults.RdpKeepAliveIntervalMs;
+        RdpHostPoolCapacity = defaults.RdpHostPoolCapacity;
+        RdpHostPoolIdleExpiryMinutes = defaults.RdpHostPoolIdleExpiryMinutes;
         RdpDialogAdvancedDefault = defaults.RdpDialogAdvancedDefault;
         RdpResolutionPresets = defaults.RdpResolutionPresets;
         RdpConnectWatchdogTimeoutMs = defaults.RdpConnectWatchdogTimeoutMs;
@@ -1935,6 +1971,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpCredentialAutofillTimeoutMsText = RdpCredentialAutofillTimeoutMs.ToString(CultureInfo.InvariantCulture);
         RdpAutoReconnectMaxAttemptsText = RdpAutoReconnectMaxAttempts.ToString(CultureInfo.InvariantCulture);
         RdpKeepAliveIntervalMsText = RdpKeepAliveIntervalMs.ToString(CultureInfo.InvariantCulture);
+        RdpHostPoolCapacityText = RdpHostPoolCapacity.ToString(CultureInfo.InvariantCulture);
+        RdpHostPoolIdleExpiryMinutesText = RdpHostPoolIdleExpiryMinutes.ToString(CultureInfo.InvariantCulture);
         RdpConnectWatchdogTimeoutMsText = RdpConnectWatchdogTimeoutMs.ToString(CultureInfo.InvariantCulture);
     }
 
@@ -3400,6 +3438,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.RdpArtifactCleanupDelayMs)] = "ValidationSettingsRdpArtifactCleanupDelay",
         [nameof(AppSettings.RdpCredentialAutofillTimeoutMs)] = "ValidationSettingsRdpCredentialAutofillTimeout",
         [nameof(AppSettings.RdpAutoReconnectMaxAttempts)] = "ValidationSettingsRdpAutoReconnectMaxAttempts",
+        [nameof(AppSettings.RdpHostPoolCapacity)] = "ValidationSettingsRdpHostPoolCapacity",
+        [nameof(AppSettings.RdpHostPoolIdleExpiryMinutes)] = "ValidationSettingsRdpHostPoolIdleExpiry",
         [nameof(AppSettings.DefaultResolutionWidth)] = "ValidationSettingsRdpWidth",
         [nameof(AppSettings.DefaultResolutionHeight)] = "ValidationSettingsRdpHeight",
         [nameof(AppSettings.WindowsHelloGraceMinutes)] = "ValidationSettingsWindowsHelloGrace",
@@ -3471,6 +3511,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(RdpAutoReconnectMaxAttemptsText),
         nameof(RdpKeepAliveIntervalMs),
         nameof(RdpKeepAliveIntervalMsText),
+        nameof(RdpHostPoolCapacity),
+        nameof(RdpHostPoolCapacityText),
+        nameof(RdpHostPoolIdleExpiryMinutes),
+        nameof(RdpHostPoolIdleExpiryMinutesText),
         nameof(DefaultResolutionWidth),
         nameof(DefaultResolutionWidthText),
         nameof(DefaultResolutionHeight),

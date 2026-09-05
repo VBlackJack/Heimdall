@@ -87,7 +87,7 @@ dans les tampons du contrôle.
 **La compression.** C'est un réglage de bande passante. Aucun effet mémoire n'a été mesuré et
 aucun mécanisme n'en produirait.
 
-## La mémoire qui n'est pas rendue quand vous fermez un onglet
+## La mémoire qui n'est pas rendue quand vous fermez un onglet, et pour combien de temps
 
 Heimdall garde jusqu'à deux contrôles RDP vivants après la fermeture de leurs onglets, pour que
 la connexion suivante soit rapide et ne repaie pas une fuite interne à `mstscax.dll` qui coûte
@@ -99,8 +99,16 @@ Mesure : la fermeture des trois sessions ramène le processus à 799 Mo et non �
 un emballement** : un second cycle d'ouverture et de fermeture n'a ajouté que 9,7 Mo, pas 600 de
 plus.
 
-En pratique, un Heimdall qui a servi se tient plus haut qu'un Heimdall fraîchement démarré.
-Donner une expiration à ces contrôles inactifs est un travail prévu.
+Depuis la v2026.090601, un contrôle inactif est rendu après **cinq minutes** par défaut, et le
+pool se règle par deux réglages sur l'onglet **RDP**, sous-onglet **Performance** : **Contrôles
+Bureau à distance inactifs gardés pour réemploi** (0 à 8 ; 0 crée un contrôle par session, comme
+avant l'existence du pool) et **Expiration d'un contrôle inactif** en minutes (0 les garde jusqu'à
+la fermeture de Heimdall, ce que faisaient toutes les versions précédentes). Les deux s'appliquent
+sans redémarrage : le prochain onglet fermé et la prochaine vérification d'expiration lisent les
+nouvelles valeurs. Les contrôles inactifs sont aussi rendus à la fermeture de Heimdall.
+
+Un Heimdall qui a servi se tient donc toujours plus haut qu'un Heimdall fraîchement démarré, mais
+seulement le temps que dit l'expiration, et l'expiration est à vous.
 
 ## Face aux autres clients
 
