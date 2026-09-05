@@ -1199,6 +1199,17 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
         reason is 3335 or 3591 or 3847;
 
     /// <summary>
+    /// The separator between the parts of a formatted disconnect code.
+    /// </summary>
+    /// <remarks>
+    /// The code is shown on the reconnect overlay and copied into the clipboard report that ends
+    /// up in support tickets, mails and consoles. It stays ASCII so it survives a Windows console
+    /// code page, a diff and a ticket system that re-encodes what it is pasted: the middle dot it
+    /// used to carry was the one non-ASCII character in the whole report.
+    /// </remarks>
+    public const string DisconnectCodeSeparator = " | ";
+
+    /// <summary>
     /// Formats a disconnect reason as a symbolic support code plus the raw numeric value.
     /// </summary>
     public static string FormatDisconnectCode(int reason)
@@ -1227,10 +1238,10 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             ? "UNKNOWN"
             : ToUpperSnakeCase(reasonKey);
 
-        string formatted = $"RDP_{symbolicCode} \u00B7 {reason}";
+        string formatted = $"RDP_{symbolicCode}{DisconnectCodeSeparator}{reason}";
         return extendedReason == NoExtendedDisconnectReason
             ? formatted
-            : $"{formatted} \u00B7 EXT {extendedReason}";
+            : $"{formatted}{DisconnectCodeSeparator}EXT {extendedReason}";
     }
 
     private static string ToUpperSnakeCase(string value)

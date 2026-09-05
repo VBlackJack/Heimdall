@@ -189,10 +189,10 @@ public sealed class RdpActiveXHostTests
     }
 
     [Theory]
-    [InlineData(1800, "RDP_CONSOLE_SESSION_IN_PROGRESS · 1800")]
-    [InlineData(2308, "RDP_SOCKET_CLOSED · 2308")]
-    [InlineData(3848, "RDP_CRED_SSP_POLICY_ERROR · 3848")]
-    [InlineData(0, "RDP_NO_INFO · 0")]
+    [InlineData(1800, "RDP_CONSOLE_SESSION_IN_PROGRESS | 1800")]
+    [InlineData(2308, "RDP_SOCKET_CLOSED | 2308")]
+    [InlineData(3848, "RDP_CRED_SSP_POLICY_ERROR | 3848")]
+    [InlineData(0, "RDP_NO_INFO | 0")]
     public void FormatDisconnectCode_KnownCode_ReturnsSymbolicCode(int reason, string expected)
     {
         string actual = RdpActiveXHost.FormatDisconnectCode(reason);
@@ -205,7 +205,7 @@ public sealed class RdpActiveXHostTests
     {
         string actual = RdpActiveXHost.FormatDisconnectCode(9999);
 
-        Assert.Equal("RDP_UNKNOWN · 9999", actual);
+        Assert.Equal("RDP_UNKNOWN | 9999", actual);
     }
 
     [Theory]
@@ -649,10 +649,10 @@ public sealed class RdpActiveXHostTests
     // gateway refusal is the socket close it produced, so a gateway timeout was labelled
     // RDP_SOCKET_CLOSED.
     [Theory]
-    [InlineData(2308, 0x0300_0032, "RDP_RD_GATEWAY_TIMEOUT \u00B7 2308 \u00B7 EXT 50331698")]
-    [InlineData(2308, 0x0300_000C, "RDP_RD_GATEWAY_UNREACHABLE \u00B7 2308 \u00B7 EXT 50331660")]
-    [InlineData(2308, 0x0200_0001, "RDP_REMOTE_APP_ERROR \u00B7 2308 \u00B7 EXT 33554433")]
-    [InlineData(2308, 768, "RDP_BAD_CREDENTIALS \u00B7 2308 \u00B7 EXT 768")]
+    [InlineData(2308, 0x0300_0032, "RDP_RD_GATEWAY_TIMEOUT | 2308 | EXT 50331698")]
+    [InlineData(2308, 0x0300_000C, "RDP_RD_GATEWAY_UNREACHABLE | 2308 | EXT 50331660")]
+    [InlineData(2308, 0x0200_0001, "RDP_REMOTE_APP_ERROR | 2308 | EXT 33554433")]
+    [InlineData(2308, 768, "RDP_BAD_CREDENTIALS | 2308 | EXT 768")]
     public void FormatDisconnectCode_WithExtendedReason_NamesTheResolvedCauseAndBothNumbers(
         int reason,
         int extendedReason,
@@ -667,7 +667,7 @@ public sealed class RdpActiveXHostTests
     public void FormatDisconnectCode_UndecodedExtendedReason_StillPrintsIt()
     {
         Assert.Equal(
-            "RDP_SOCKET_CLOSED \u00B7 2308 \u00B7 EXT 4096",
+            "RDP_SOCKET_CLOSED | 2308 | EXT 4096",
             RdpActiveXHost.FormatDisconnectCode(2308, 4096));
     }
 

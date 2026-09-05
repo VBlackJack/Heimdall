@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: idle Remote Desktop controls expire
+## Unreleased: idle Remote Desktop controls expire, and the disconnect code is ASCII
 
 ### An idle Remote Desktop control gives its memory back
 
@@ -30,6 +30,16 @@ oldest idle control goes first, and a new session takes the most recently releas
 oldest keeps ageing towards its expiry. The session manager now disposes the pool before the
 application's first exit await, so the idle controls are torn down in an application that still
 exists.
+
+### The Remote Desktop disconnect code is plain ASCII
+
+The code beside the reconnect message (`RDP_BAD_CREDENTIALS | 2055`, with `| EXT <n>` when an
+extended reason exists) used a middle dot between its parts. It is the line people copy from the
+clipboard report into a ticket, a mail or a console, and the middle dot was the only non-ASCII
+character in that report: it came out as a question mark or a two-byte sequence in a Windows
+console and in ticket systems that re-encode what is pasted. The separator is now a vertical
+bar. The test that pinned the middle dot now pins the whole code to ASCII, whatever the
+separator.
 
 ## 2026-09-05: the RDP audit closes eleven findings, and the vault tests own their baseline (v2026.090502)
 
