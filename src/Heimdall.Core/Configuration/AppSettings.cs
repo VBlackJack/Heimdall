@@ -331,6 +331,12 @@ public sealed class AppSettings
     public bool ServerDialogAdvancedMode { get; set; }
     public string? LastUsedGatewayId { get; set; }
 
+    /// <summary>
+    /// The session selected in the tree when the application last saved its tree state, so the
+    /// next start opens on it. Null when nothing was selected.
+    /// </summary>
+    public string? LastSelectedServerId { get; set; }
+
     // Collections
     public List<SshGatewayDto> SshGateways { get; set; } = new();
     public List<ProjectDto> Projects { get; set; } = new();

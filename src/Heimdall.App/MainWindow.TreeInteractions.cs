@@ -1123,6 +1123,46 @@ public partial class MainWindow
         => FindAncestor<WpfTextBox>(source) is not null;
 
     /// <summary>
+    /// Puts WPF's own selection on the row of a session the view model selected without a
+    /// gesture, and scrolls it into view.
+    /// </summary>
+    /// <remarks>
+    /// The sync is suppressed because the view model already holds the selection: letting the
+    /// notification answer again would route the restore through whichever modifier keys happen
+    /// to be down at that instant.
+    /// </remarks>
+    private void RestoreTreeSelectionRow(ServerItemViewModel? server)
+    {
+        if (server is null)
+        {
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() =>
+            {
+                TreeViewItem? container = GetOrRealizeSessionTreeItem(server);
+                if (container is null)
+                {
+                    return;
+                }
+
+                _treeState.SuppressSelectedItemSync = true;
+                try
+                {
+                    container.IsSelected = true;
+                }
+                finally
+                {
+                    _treeState.SuppressSelectedItemSync = false;
+                }
+
+                container.BringIntoView();
+            }));
+    }
+
+    /// <summary>
     /// Puts keyboard focus back on a session's row after a rebuild replaced its container.
     /// </summary>
     private void RefocusSessionRow(ServerItemViewModel server)

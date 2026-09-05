@@ -254,6 +254,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 await viewModel.LoadCommand.ExecuteAsync(null);
             }
 
+            // The view model restored the last selection from the settings; WPF's own row
+            // selection has to follow, so Enter, F2 and the keyboard menu have their fallback.
+            RestoreTreeSelectionRow(viewModel.ServerList.SelectedServer);
+
             if (viewModel.CurrentSettings is { } loadedSettings)
             {
                 RestoreWindowBounds(loadedSettings);
