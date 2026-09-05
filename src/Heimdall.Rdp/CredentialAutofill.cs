@@ -154,14 +154,35 @@ public static partial class CredentialAutofill
         + @"|mstsc",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    /// <summary>Regex pattern matching password fields in UI Automation trees.</summary>
-    private static readonly Regex PasswordFieldPattern = new(
-        @"Password|Mot de passe",
+    /// <summary>
+    /// Regex pattern matching password fields in UI Automation trees, in the locales
+    /// <see cref="TitlePattern"/> recognises a dialog in. Consulted after the IsPassword flag,
+    /// which most dialogs set; this is the name fallback for the ones that do not.
+    /// </summary>
+    internal static readonly Regex PasswordFieldPattern = new(
+        @"Password|Mot de passe|Kennwort|Contrase\u00f1a|Senha|Wachtwoord|Has\u0142o",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    /// <summary>Regex pattern matching confirmation buttons in credential dialogs.</summary>
-    private static readonly Regex OkButtonPattern = new(
-        @"^(OK|&OK|Sign in|Connect|Se connecter)$",
+    /// <summary>
+    /// Regex pattern matching confirmation buttons in credential dialogs, in the locales
+    /// <see cref="TitlePattern"/> recognises a dialog in.
+    /// </summary>
+    /// <remarks>
+    /// The title pattern claimed eight locales while this one named the buttons of two, so on the
+    /// other six the UI Automation path fell through to "the first enabled button", which on the
+    /// Windows Security dialog can be the choices link rather than the confirmation. A leading
+    /// ampersand is the classic Win32 mnemonic and is accepted on every label.
+    /// </remarks>
+    internal static readonly Regex OkButtonPattern = new(
+        @"^&?(OK"
+        + @"|Sign in|Connect"
+        + @"|Se connecter|Connexion"
+        + @"|Anmelden|Verbinden"
+        + @"|Iniciar sesi\u00f3n|Conectar|Aceptar"
+        + @"|Accedi|Connetti"
+        + @"|Entrar|Ligar"
+        + @"|Aanmelden|Verbinding maken"
+        + @"|Zaloguj si\u0119|Po\u0142\u0105cz)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     #endregion
@@ -201,6 +222,11 @@ public static partial class CredentialAutofill
         var deadline = DateTime.UtcNow + timeout;
         var scan = 0;
 
+        // One process name per process for the life of this watcher. Every scan enumerates every
+        // visible window and the name of its owner is one process handle each; without the cache
+        // that was a handle per window every half second for up to ninety seconds.
+        var processNames = new Dictionary<int, string>();
+
         FileLogger.Info(
             $"CredentialAutofill started: pid={mstscProcessId} hostHint={targetHost} timeout={timeout.TotalSeconds:0}s interval={DefaultScanInterval.TotalMilliseconds:0}ms surface=0x{sessionSurfaceHandle.ToInt64():X}");
 
@@ -216,7 +242,8 @@ public static partial class CredentialAutofill
                     targetHost,
                     hostHintPattern,
                     scan,
-                    sessionSurfaceHandle);
+                    sessionSurfaceHandle,
+                    processNames);
                 if (target is not null)
                 {
                     FileLogger.Info(
@@ -256,9 +283,10 @@ public static partial class CredentialAutofill
         string targetHost,
         Regex? hostHintPattern,
         int scan,
-        IntPtr sessionSurfaceHandle)
+        IntPtr sessionSurfaceHandle,
+        IDictionary<int, string> processNames)
     {
-        var windows = GetVisibleWindows();
+        var windows = GetVisibleWindows(processNames);
         var candidates = windows.Where(IsCredentialDialogCandidate).ToList();
 
         return SelectCredentialDialogTarget(
@@ -939,10 +967,9 @@ public static partial class CredentialAutofill
     /// Unlike Process.MainWindowTitle which returns only one window per process,
     /// this finds secondary windows such as credential dialogs spawned by ActiveX controls.
     /// </summary>
-    private static List<WindowInfo> GetVisibleWindows()
+    private static List<WindowInfo> GetVisibleWindows(IDictionary<int, string> processNames)
     {
         var result = new List<WindowInfo>();
-        var currentPid = Environment.ProcessId;
 
         // 1. EnumWindows for top-level windows
         EnumWindows((hWnd, _) =>
@@ -955,7 +982,7 @@ public static partial class CredentialAutofill
             GetWindowThreadProcessId(hWnd, out var pid);
             var title = GetWindowText(hWnd);
             var className = GetClassName(hWnd);
-            var processName = GetProcessName(pid);
+            var processName = ResolveProcessName(pid, processNames, GetProcessName);
 
             if (string.IsNullOrWhiteSpace(title)
                 && !CredentialDialogClassNames.Any(classNameHint =>
@@ -994,7 +1021,7 @@ public static partial class CredentialAutofill
                             title,
                             className,
                             pid,
-                            GetProcessName(pid),
+                            ResolveProcessName(pid, processNames, GetProcessName),
                             GetWindow(hWnd, GW_OWNER)));
                         existingHandles.Add(hWnd);
                     }
@@ -1044,6 +1071,34 @@ public static partial class CredentialAutofill
         var buffer = new char[256];
         var len = GetClassNameW(hWnd, buffer, buffer.Length);
         return len > 0 ? new string(buffer, 0, len) : string.Empty;
+    }
+
+    /// <summary>
+    /// The name of a process, resolved once per process identifier for the life of the cache.
+    /// </summary>
+    /// <remarks>
+    /// A process identifier can be reused by a new process during the watcher's lifetime, so
+    /// the cached name can be stale for such a window. That costs nothing here: the target
+    /// process is matched by identifier, not by name, and the name only classifies credential
+    /// brokers, which are not the kind of process that comes and goes inside a ninety-second
+    /// window.
+    /// </remarks>
+    internal static string ResolveProcessName(
+        int processId,
+        IDictionary<int, string> cache,
+        Func<int, string> resolve)
+    {
+        ArgumentNullException.ThrowIfNull(cache);
+        ArgumentNullException.ThrowIfNull(resolve);
+
+        if (cache.TryGetValue(processId, out var cached))
+        {
+            return cached;
+        }
+
+        var name = resolve(processId);
+        cache[processId] = name;
+        return name;
     }
 
     private static string GetProcessName(int processId)

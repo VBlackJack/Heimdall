@@ -506,6 +506,9 @@ public sealed partial class SessionCoordinatorPreMountTests
         /// </summary>
         public ServerProfileDto? LastServer { get; private set; }
 
+        /// <summary>The RDP mode the last connection attempt was asked to run under.</summary>
+        public RdpModeOverride LastRdpModeOverride { get; private set; } = RdpModeOverride.UseProfile;
+
         public Task<ConnectionResult> ConnectAsync(
             ServerProfileDto server,
             AppSettings settings,
@@ -513,6 +516,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
         {
             LastServer = server;
+            LastRdpModeOverride = rdpModeOverride;
             Started.TrySetResult(ct);
             return Result.Task.WaitAsync(ct);
         }

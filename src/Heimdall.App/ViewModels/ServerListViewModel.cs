@@ -812,7 +812,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// Restores a server session by stable inventory ID using the standard connection pipeline.
     /// Returns false when the server no longer exists or the connection fails.
     /// </summary>
-    internal async Task<bool> RestoreServerAsync(string originalServerId, CancellationToken cancellationToken)
+    /// <param name="rdpModeOverride">
+    /// The RDP mode the session being restored ran under. A reconnect keeps the mode the user
+    /// forced on the tab; a restore at startup has no tab and follows the profile.
+    /// </param>
+    internal async Task<bool> RestoreServerAsync(
+        string originalServerId,
+        CancellationToken cancellationToken,
+        RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(originalServerId);
 
@@ -829,7 +836,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         return await ConnectCoreAsync(
             server,
             cancellationToken,
-            RdpModeOverride.UseProfile,
+            rdpModeOverride,
             allowCredentialPrompt: false);
     }
 

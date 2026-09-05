@@ -275,6 +275,10 @@ public partial class ServerDialog : Window
                 MainTabControl.SelectedItem = DlgSrv_TabNetwork;
                 target = DlgSrv_LocalPortBox;
                 break;
+            case nameof(ServerDialogViewModel.RdpGateway):
+                MainTabControl.SelectedItem = DlgSrv_TabNetwork;
+                target = DlgSrv_RdpGatewayBox;
+                break;
             case nameof(ServerDialogViewModel.RdpAudioMode):
                 MainTabControl.SelectedItem = DlgSrv_TabOptions;
                 target = DlgSrv_RdpAudioModeCombo;

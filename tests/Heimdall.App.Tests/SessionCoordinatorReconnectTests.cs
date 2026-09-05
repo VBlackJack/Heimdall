@@ -283,6 +283,33 @@ public sealed partial class SessionCoordinatorPreMountTests
         await WaitUntilAsync(() => harness.EmbeddedSessionManager.AttachSshSessionCalls == 1);
     }
 
+    // A tab opened as "force embedded" over a profile whose mode is External reconnected from
+    // the profile: the overlay's Reconnect launched the external client and closed the embedded
+    // tab, under a title that still carried the forced suffix.
+    [Fact]
+    public async Task ReconnectSession_KeepsTheForcedRdpMode()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler rdpHandler = harness.GetHandler("RDP");
+        ServerProfileDto server = harness.CreateServer("RDP");
+        server.RdpMode = "External";
+        await harness.PersistServerAsync(server);
+        SessionTabViewModel tab = new SessionTabViewModel
+        {
+            ServerId = server.Id,
+            OriginalServerId = server.Id,
+            ConnectionType = "RDP",
+            Title = "forced",
+            RdpModeOverride = RdpModeOverride.ForceEmbedded
+        };
+
+        harness.Main.Session.ReconnectSession(tab);
+
+        await rdpHandler.Started.Task.WaitAsync(TestTimeout);
+        Assert.Equal(RdpModeOverride.ForceEmbedded, rdpHandler.LastRdpModeOverride);
+        rdpHandler.Result.SetResult(new ConnectionResult(false, "stopped by the test", null));
+    }
+
     [Fact]
     public async Task ReconnectSession_ServerMissingFromInventory_SetsServerNotFoundStatus()
     {
