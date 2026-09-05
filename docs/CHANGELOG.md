@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: the .rdp import reads what the client writes, and a session torn down mid-connect no longer holds the machine awake
+## 2026-09-05: the .rdp import reads what the client writes, and a session torn down mid-connect no longer holds the machine awake (v2026.090504)
 
 ### The .rdp import reads the keys the Remote Desktop client itself writes
 
