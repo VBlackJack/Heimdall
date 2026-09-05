@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: every setting bound is declared once, certificate trust has two owners, the palette dials a saved profile as a saved profile, and the out-of-range warning says what the loader does
+## 2026-09-05: certificate trust has two owners, the palette dials a saved profile as a saved profile, and every setting bound is declared once (v2026.090501)
 
 ### The line-endings gate measures the bytes
 
