@@ -59,6 +59,9 @@ C'est gratuit, open source, et cela tourne sur Windows 10 et 11.
   alors jamais.
 - **Des outils que vous iriez chercher ailleurs.** Ping, scanner de ports, inspecteur de
   certificats, générateurs d'empreintes et de mots de passe, et des dizaines d'autres, intégrés.
+- **Des sessions rangées comme vous travaillez.** Des dossiers en couleur, du glisser-déposer
+  pour déplacer un dossier ou ranger les sessions à la main, des filtres par protocole, favori,
+  état de connexion ou passerelle, et une arborescence qui s'ouvre là où vous l'avez laissée.
 - **Rien à installer à côté.** Les deux téléchargements sont autonomes.
 
 Le catalogue complet se trouve dans la [référence des fonctionnalités](docs/fr/FEATURES.md).

@@ -216,6 +216,9 @@ Appuyez sur **F1** à tout moment pour la liste complète. Ceux qui se rentabili
 | `Ctrl+F` | Aller au champ de recherche |
 | `F11` | Plein écran, `Echap` pour en sortir |
 | `Ctrl+Shift+T` | Basculer le panneau gauche entre Sessions et Outils |
+| `Ctrl+A` | Dans l'arborescence, sélectionner toutes les sessions des dossiers ouverts |
+| `Alt+Haut` / `Alt+Bas` | Déplacer la session en surbrillance dans son dossier |
+| `F2` | Renommer la session ou le dossier sélectionné |
 
 ---
 
