@@ -85,6 +85,21 @@ a name already taken under the target is reported the way a rename reports it. T
 gains a "Move to" submenu listing the top level and every folder the drop would accept, so the
 same move is one keystroke sequence away.
 
+### Sessions can be arranged by hand within a folder
+
+A session dropped on another session row lands before or after it, depending on which half of
+the row the pointer is on, and a thin accent edge shows the side while dragging. Dropped on a row
+of another folder, it changes folder and takes that position in the same write. Alt+Up and
+Alt+Down move the focused session one step among its siblings from the keyboard, and the row
+help text says so. Each arrangement renumbers the folder's sessions by tens and saves them at
+once.
+
+The meaning of a sort order of zero changes with this: it used to rank first, so every session
+created after a folder had been arranged landed at its top. Zero now means "no manual order" and
+ranks after every ordered session, alphabetically among the other unordered ones. An inventory
+that mixed hand-typed orders with untouched sessions sees the untouched ones move to the bottom
+of their folder; an inventory that never set an order keeps its alphabetical tree.
+
 ### Smaller corrections
 
 - A session row announces its keyboard gestures to assistive technology: Enter, F2, Ctrl+Space,
