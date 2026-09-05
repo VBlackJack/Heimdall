@@ -78,7 +78,7 @@ public sealed class SettingRangesTests
         (nameof(AppSettings.SshAutoReconnectSecondDelaySeconds), 1, 600, false),
         (nameof(AppSettings.SshAutoReconnectSubsequentDelaySeconds), 1, 600, false),
         (nameof(AppSettings.SshConnectTimeExitWindowSeconds), 0, 600, false),
-        (nameof(AppSettings.RdpDefaultColorDepth), 8, 32, false),
+        (nameof(AppSettings.RdpDefaultColorDepth), 16, 32, false),
         (nameof(AppSettings.MaxEmbeddedSessions), 1, 20, false),
         (nameof(AppSettings.SidebarWidth), 0, 1000, false),
         (nameof(AppSettings.SessionHealthCheckIntervalSeconds), 15, 3600, false),
@@ -92,7 +92,7 @@ public sealed class SettingRangesTests
     private static readonly (string Name, int Min, int Max, bool ZeroMeansOff)[] ExpectedServerRanges =
     [
         (nameof(ServerProfileDto.RdpAudioMode), 0, 2, false),
-        (nameof(ServerProfileDto.RdpColorDepth), 8, 32, false),
+        (nameof(ServerProfileDto.RdpColorDepth), 16, 32, false),
     ];
 
     [Fact]

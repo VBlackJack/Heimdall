@@ -12,6 +12,20 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the colour depth bound says what the session gets
+
+### The colour depth floor is 16 bits
+
+The colour depth of a profile and of the RDP defaults accepted anything from 8 to 32 bits, while
+the connect-time resolver has always rewritten anything at or below 16 to 16: the control and the
+.rdp format know 16, 24 and 32 and nothing lower. A value of 8 was therefore accepted, saved and
+silently not delivered. The bound is now 16 to 32, declared once beside the other display limits
+and read by the settings loader, the profile validator and the server dialog. The two importers
+that could produce a lower depth - the mRemoteNG importer for its 256-colour and 15-bit modes, the
+.rdp importer for a `session bpp` below 16 - bring it onto the floor, which is what the session got
+before. An existing profile carrying 8 still connects at 16; the dialog asks for a valid value the
+next time it is edited.
+
 ## 2026-09-05: the .rdp import reads what the client writes, and a session torn down mid-connect no longer holds the machine awake (v2026.090504)
 
 ### The .rdp import reads the keys the Remote Desktop client itself writes

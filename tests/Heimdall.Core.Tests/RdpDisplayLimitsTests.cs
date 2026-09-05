@@ -21,6 +21,23 @@ namespace Heimdall.Core.Tests;
 
 public sealed class RdpDisplayLimitsTests
 {
+    // The floor is the depth the session gets, so a value below it normalises onto it and never
+    // below; above 24 the only depth left is 32.
+    [Theory]
+    [InlineData(0, 16)]
+    [InlineData(8, 16)]
+    [InlineData(15, 16)]
+    [InlineData(16, 16)]
+    [InlineData(20, 24)]
+    [InlineData(24, 24)]
+    [InlineData(32, 32)]
+    [InlineData(64, 32)]
+    public void NormalizeColorDepth_LandsOnTheThreeDepthsTheControlKnows(int raw, int expected)
+    {
+        Assert.Equal(expected, RdpDisplayLimits.NormalizeColorDepth(raw));
+        Assert.InRange(expected, RdpDisplayLimits.MinimumColorDepth, RdpDisplayLimits.MaximumColorDepth);
+    }
+
     /// <summary>
     /// The range messages are the one place the bounds are spelled out a second
     /// time, because a <c>[Range]</c> attribute needs a constant string and C#
@@ -46,6 +63,13 @@ public sealed class RdpDisplayLimitsTests
             RdpDisplayLimits.MinimumSessionResolution.ToString(CultureInfo.InvariantCulture);
         string maxSession =
             RdpDisplayLimits.MaximumSessionResolution.ToString(CultureInfo.InvariantCulture);
+
+        string minDepth = RdpDisplayLimits.MinimumColorDepth.ToString(CultureInfo.InvariantCulture);
+        string maxDepth = RdpDisplayLimits.MaximumColorDepth.ToString(CultureInfo.InvariantCulture);
+
+        Assert.Equal(
+            RdpDisplayLimits.ColorDepthRangeMessage,
+            $"Color depth must be between {minDepth} and {maxDepth}.");
 
         Assert.Equal(
             RdpDisplayLimits.DefaultResolutionWidthRangeMessage,

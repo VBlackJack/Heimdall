@@ -1091,8 +1091,9 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(8, 32, ErrorMessage = "Color depth must be between 8 and 32.")]
-    private int _rdpColorDepth = 32;
+    [Range(RdpDisplayLimits.MinimumColorDepth, RdpDisplayLimits.MaximumColorDepth,
+        ErrorMessage = RdpDisplayLimits.ColorDepthRangeMessage)]
+    private int _rdpColorDepth = RdpDisplayLimits.MaximumColorDepth;
 
     [ObservableProperty]
     private bool _rdpBitmapCaching = true;
@@ -2733,7 +2734,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         ["SSH port must be between 1 and 65535."] = "ValidationSshPortRange",
         ["WinRM port must be between 1 and 65535."] = "ValidationWinRmPortRange",
         ["Audio mode must be 0 (disabled), 1 (local), or 2 (remote)."] = "ValidationAudioMode",
-        ["Color depth must be between 8 and 32."] = "ValidationColorDepth",
+        [RdpDisplayLimits.ColorDepthRangeMessage] = "ValidationColorDepth",
         [RdpDisplayLimits.FixedWidthRangeMessage] = "ValidationRdpFixedWidthRange",
         [RdpDisplayLimits.FixedHeightRangeMessage] = "ValidationRdpFixedHeightRange",
         ["FTP port must be between 1 and 65535."] = "ValidationFtpPortRange",

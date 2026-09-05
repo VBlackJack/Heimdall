@@ -264,8 +264,12 @@ public class SchemaValidatorTests
         Assert.True(result.IsValid);
     }
 
+    // 8 and 15 sit below the floor: the connect-time resolver rewrote them to 16 in silence, so
+    // the bound now says what the session will actually get.
     [Theory]
     [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(15)]
     [InlineData(33)]
     [InlineData(0)]
     public void ValidateSettings_RdpDefaultColorDepth_OutOfRange_ReturnsError(int value)
@@ -279,8 +283,8 @@ public class SchemaValidatorTests
     }
 
     [Theory]
-    [InlineData(8)]
     [InlineData(16)]
+    [InlineData(24)]
     [InlineData(32)]
     public void ValidateSettings_RdpDefaultColorDepth_ValidValues_IsValid(int value)
     {
@@ -927,6 +931,8 @@ public class SchemaValidatorTests
 
     [Theory]
     [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(15)]
     [InlineData(33)]
     [InlineData(0)]
     [InlineData(-1)]

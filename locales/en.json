@@ -2938,7 +2938,7 @@
   "ValidationSshPortRange": "SSH port must be between 1 and 65535.",
   "ValidationWinRmPortRange": "WinRM port must be between 1 and 65535.",
   "ValidationAudioMode": "Audio mode must be 0 (disabled), 1 (local), or 2 (remote).",
-  "ValidationColorDepth": "Color depth must be between 8 and 32.",
+  "ValidationColorDepth": "Color depth must be between 16 and 32.",
   "ValidationRdpFixedWidthRange": "RDP fixed width must be between 200 and 7680.",
   "ValidationRdpGatewayInvalid": "The RD Gateway must be a valid host name or IP address.",
   "ValidationRdpFixedHeightRange": "RDP fixed height must be between 200 and 4320.",

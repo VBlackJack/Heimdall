@@ -2935,7 +2935,7 @@
   "ValidationSshPortRange": "Le port SSH doit \u00eatre compris entre 1 et 65535.",
   "ValidationWinRmPortRange": "Le port WinRM doit \u00eatre compris entre 1 et 65535.",
   "ValidationAudioMode": "Le mode audio doit \u00eatre 0 (d\u00e9sactiv\u00e9), 1 (local) ou 2 (distant).",
-  "ValidationColorDepth": "La profondeur de couleur doit \u00eatre comprise entre 8 et 32.",
+  "ValidationColorDepth": "La profondeur de couleur doit \u00eatre comprise entre 16 et 32.",
   "ValidationRdpFixedWidthRange": "La largeur RDP fixe doit \u00eatre comprise entre 200 et 7680.",
   "ValidationRdpGatewayInvalid": "La passerelle RD doit \u00eatre un nom d'h\u00f4te ou une adresse IP valide.",
   "ValidationRdpFixedHeightRange": "La hauteur RDP fixe doit \u00eatre comprise entre 200 et 4320.",

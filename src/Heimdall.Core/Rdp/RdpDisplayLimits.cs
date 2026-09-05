@@ -102,6 +102,35 @@ public static class RdpDisplayLimits
     public const string DefaultResolutionHeightRangeMessage =
         "Default resolution height must be between 640 and 7680 pixels.";
 
+    /// <summary>Lowest colour depth a profile or the defaults may carry, in bits per pixel.</summary>
+    /// <remarks>
+    /// Sixteen rather than eight: the connect-time resolver has always rewritten anything at or
+    /// below 16 to 16 (the control and the .rdp format know 16, 24 and 32), so a bound of 8
+    /// accepted a value the session silently did not get. The floor now says what is enforced;
+    /// importers bring lower depths onto it through <see cref="NormalizeColorDepth" />.
+    /// </remarks>
+    public const int MinimumColorDepth = 16;
+
+    /// <summary>Highest colour depth a profile or the defaults may carry, in bits per pixel.</summary>
+    public const int MaximumColorDepth = 32;
+
+    /// <summary>Validation message for an out-of-range colour depth.</summary>
+    /// <remarks>Guarded by the same test as <see cref="FixedWidthRangeMessage" />.</remarks>
+    public const string ColorDepthRangeMessage =
+        "Color depth must be between 16 and 32.";
+
+    /// <summary>
+    /// The depth the session is actually given for a requested one: 16, 24 or 32, the three
+    /// the control and the .rdp format know. Anything at or below 16 is 16, anything above 24
+    /// is 32.
+    /// </summary>
+    public static int NormalizeColorDepth(int colorDepth) => colorDepth switch
+    {
+        <= MinimumColorDepth => MinimumColorDepth,
+        <= 24 => 24,
+        _ => MaximumColorDepth
+    };
+
     /// <summary>
     /// Brings a requested fixed width inside <see cref="MinimumFixedDimension" />
     /// and <see cref="MaximumFixedWidth" />.

@@ -387,8 +387,8 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public bool RdpDynamicResolution { get; set; } = true;
     public bool RdpNla { get; set; } = true;
     public bool RdpStrictServerAuthentication { get; set; }
-    [SettingRange(8, 32)]
-    public int RdpColorDepth { get; set; } = 32;
+    [SettingRange(Rdp.RdpDisplayLimits.MinimumColorDepth, Rdp.RdpDisplayLimits.MaximumColorDepth)]
+    public int RdpColorDepth { get; set; } = Rdp.RdpDisplayLimits.MaximumColorDepth;
     public bool RdpBitmapCaching { get; set; } = true;
     public bool RdpCompression { get; set; } = true;
 

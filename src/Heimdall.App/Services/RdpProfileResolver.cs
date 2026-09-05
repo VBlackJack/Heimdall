@@ -195,12 +195,7 @@ internal static class RdpProfileResolver
             ? settings.RdpDefaultColorDepth
             : server.RdpColorDepth;
 
-        return raw switch
-        {
-            <= 16 => 16,
-            <= 24 => 24,
-            _ => 32
-        };
+        return RdpDisplayLimits.NormalizeColorDepth(raw);
     }
 
     /// <summary>
