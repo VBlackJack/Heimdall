@@ -100,6 +100,14 @@ ranks after every ordered session, alphabetically among the other unordered ones
 that mixed hand-typed orders with untouched sessions sees the untouched ones move to the bottom
 of their folder; an inventory that never set an order keeps its alphabetical tree.
 
+### The tree opens on the session that was selected at the last close
+
+The session selected in the tree is saved with the tree's expand state, at the same debounced
+write and at the close flush, and the next start selects it again, with its detail pane and
+WPF's own row selection in place. A selection cleared before closing is remembered as cleared. A
+reload after a folder operation keeps whatever is selected at that moment rather than jumping
+back to the saved one.
+
 ### Smaller corrections
 
 - A session row announces its keyboard gestures to assistive technology: Enter, F2, Ctrl+Space,
