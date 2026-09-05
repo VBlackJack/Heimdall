@@ -36,9 +36,8 @@ namespace Heimdall.App;
 /// (<see cref="TreeInteractionState"/>) and, for the selection warm-up alone, in
 /// <c>_dnsWarmupGate</c> and <c>_dnsWarmupCancellation</c>; this file only contains the WPF
 /// event handlers that mutate that state and poke the named XAML elements
-/// (<c>SessionTreeView</c>, <c>SessionTreeNoGroupDropZone</c>,
-/// <c>SessionDetailPanel</c>, <c>ToolDetailPanel</c>, <c>Mw_Detail*</c>,
-/// <c>Mw_ToolDetail*</c>).
+/// (<c>SessionTreeView</c>, <c>SessionTreeNoGroupDropZone</c>, <c>Mw_ToolDetail*</c>).
+/// The visibility of the two detail panes is bound to the view model and never written here.
 /// </summary>
 public partial class MainWindow
 {
@@ -186,9 +185,7 @@ public partial class MainWindow
         }
 
         TreeViewItem? hitContainer = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
-        ServerItemViewModel? server = ResolveTreeDoubleClickServer(
-            hitContainer?.DataContext,
-            vm.ServerList.SelectedServer);
+        ServerItemViewModel? server = ResolveTreeDoubleClickServer(hitContainer?.DataContext);
         if (server is null) return;
 
         ApplyTreeActivation(
@@ -200,12 +197,14 @@ public partial class MainWindow
     /// <summary>
     /// Resolves a double-click target only when the hit container is a server.
     /// </summary>
+    /// <remarks>
+    /// The globally selected server is deliberately not an input: a double-click on a folder used
+    /// to connect whichever server was selected elsewhere, and keeping the selection out of the
+    /// signature is what makes that mistake impossible to reintroduce.
+    /// </remarks>
     /// <param name="hitTarget">The data context of the container under the pointer.</param>
-    /// <param name="selectedServer">The globally selected server, which must not affect hit testing.</param>
     /// <returns>The hit server, or <see langword="null"/> for any other target.</returns>
-    internal static ServerItemViewModel? ResolveTreeDoubleClickServer(
-        object? hitTarget,
-        ServerItemViewModel? selectedServer)
+    internal static ServerItemViewModel? ResolveTreeDoubleClickServer(object? hitTarget)
     {
         return hitTarget as ServerItemViewModel;
     }
@@ -1246,30 +1245,35 @@ public partial class MainWindow
         return payload is not null;
     }
 
+    /// <summary>
+    /// Reacts to a session being shown in the tree: warms its DNS entry and fills the tool
+    /// detail pane when the session is a tool.
+    /// </summary>
+    /// <remarks>
+    /// Which detail pane is on screen is not decided here. It used to be: this method wrote
+    /// <c>SessionDetailPanel.Visibility</c>, <c>ToolDetailPanel.Visibility</c> and the Connect
+    /// button's label as local values, and a local value on a bound dependency property replaces
+    /// the binding. The first click on the tree therefore severed the <c>HasSelection</c> binding
+    /// the markup declared, and every later selection change that did not pass through a tree
+    /// handler - a search with no match, the collapse of the folder holding the selection, a UI
+    /// Automation Select - left the pane exactly as the last click had put it, title blank and
+    /// Connect button inert. The panes now bind to
+    /// <see cref="ServerListViewModel.ShowSessionDetail"/> and
+    /// <see cref="ServerListViewModel.ShowToolDetail"/>, and nothing in code-behind writes them.
+    /// </remarks>
     private void ShowTreeSelection(MainViewModel vm, ServerItemViewModel? server)
     {
         if (server is null)
         {
-            SessionDetailPanel.Visibility = Visibility.Collapsed;
-            ToolDetailPanel.Visibility = Visibility.Collapsed;
             return;
         }
 
         WarmDns(server);
 
-        var isTool = ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType);
-        if (isTool)
+        if (ConnectionTypeCatalog.IsToolConnectionType(server.ConnectionType))
         {
-            SessionDetailPanel.Visibility = Visibility.Collapsed;
-            ToolDetailPanel.Visibility = Visibility.Visible;
             UpdateToolDetailPanel(vm, server.ConnectionType!);
-            return;
         }
-
-        SessionDetailPanel.Visibility = Visibility.Visible;
-        ToolDetailPanel.Visibility = Visibility.Collapsed;
-        Mw_DetailConnectBtn.Content = vm.Localize("DetailBtnConnect");
-        Mw_DetailHostPort.Visibility = Visibility.Visible;
     }
 
     private void WarmDns(ServerItemViewModel server)

@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Heimdall.App.Controls;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.ViewModels;
 
@@ -28,6 +29,24 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
     public ObservableCollection<ServerItemViewModel> SelectedItems { get; } = [];
 
     public int SelectionCount => SelectedItems.Count;
+
+    /// <summary>Whether the detail pane of a remote session belongs on screen.</summary>
+    /// <remarks>
+    /// The two panes are driven from here and from nowhere else. The window used to write their
+    /// visibility as local values from its tree handlers, and a local value on a bound dependency
+    /// property replaces the binding: the first click on the tree severed the binding the markup
+    /// declared, and from then on every selection change that did not pass through a tree handler
+    /// - a search with no match, the collapse of the folder holding the selection, a UI Automation
+    /// Select - left the pane in whatever state the last click had put it.
+    /// </remarks>
+    public bool ShowSessionDetail =>
+        SelectedServer is { } selected
+        && !ConnectionTypeCatalog.IsToolConnectionType(selected.ConnectionType);
+
+    /// <summary>Whether the detail pane of a tool belongs on screen.</summary>
+    public bool ShowToolDetail =>
+        SelectedServer is { } selected
+        && ConnectionTypeCatalog.IsToolConnectionType(selected.ConnectionType);
 
     private void InitializeSelectionModel()
     {
@@ -173,6 +192,9 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
 
     partial void OnSelectedServerChanged(ServerItemViewModel? value)
     {
+        OnPropertyChanged(nameof(ShowSessionDetail));
+        OnPropertyChanged(nameof(ShowToolDetail));
+
         if (_suppressSelectedServerSync)
         {
             return;

@@ -1396,7 +1396,7 @@
                           Visibility="{Binding Connection.HasActiveSessions, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
                         <!-- Server detail panel (shown when a non-tool server is selected) -->
                         <Border x:Name="SessionDetailPanel"
-                                Visibility="{Binding ServerList.HasSelection, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Visibility="{Binding ServerList.ShowSessionDetail, Converter={StaticResource BoolToVisibilityConverter}}"
                                 Padding="{StaticResource SpacingXl}">
                             <StackPanel VerticalAlignment="Top">
                                 <TextBlock Text="{Binding ServerList.SelectedServer.DisplayName}"
@@ -1588,7 +1588,7 @@
 
                         <!-- Tool detail panel (shown when a TOOL:* entry is selected) -->
                         <Border x:Name="ToolDetailPanel"
-                                Visibility="Collapsed"
+                                Visibility="{Binding ServerList.ShowToolDetail, Converter={StaticResource BoolToVisibilityConverter}}"
                                 Padding="{StaticResource SpacingXl}">
                             <StackPanel VerticalAlignment="Top">
                                 <TextBlock x:Name="Mw_ToolDetailName"

@@ -21,18 +21,18 @@ namespace Heimdall.App.Tests;
 
 public sealed class MainWindowTreeDoubleClickTests
 {
-    public static TheoryData<object?, ServerItemViewModel?, ServerItemViewModel?> DoubleClickTargets
+    public static TheoryData<object?, ServerItemViewModel?> DoubleClickTargets
     {
         get
         {
             ServerItemViewModel hitServer = CreateServer("hit-server");
             ServerItemViewModel selectedServer = CreateServer("selected-server");
 
-            return new TheoryData<object?, ServerItemViewModel?, ServerItemViewModel?>
+            return new TheoryData<object?, ServerItemViewModel?>
             {
-                { hitServer, selectedServer, hitServer },
-                { new FolderViewModel { Name = "Production", FullPath = "Production" }, selectedServer, null },
-                { null, selectedServer, null }
+                { hitServer, hitServer },
+                { new FolderViewModel { Name = "Production", FullPath = "Production" }, null },
+                { null, null }
             };
         }
     }
@@ -41,10 +41,9 @@ public sealed class MainWindowTreeDoubleClickTests
     [MemberData(nameof(DoubleClickTargets))]
     public void ResolveTreeDoubleClickServer_OnlyAcceptsHitServer(
         object? hitTarget,
-        ServerItemViewModel? selectedServer,
         ServerItemViewModel? expectedServer)
     {
-        ServerItemViewModel? resolved = MainWindow.ResolveTreeDoubleClickServer(hitTarget, selectedServer);
+        ServerItemViewModel? resolved = MainWindow.ResolveTreeDoubleClickServer(hitTarget);
 
         Assert.Same(expectedServer, resolved);
     }
