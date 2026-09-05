@@ -3472,9 +3472,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         // Expand every ancestor folder so the leaf container can be realized.
         ExpandFoldersToServer(vm.ServerList.GroupedServers, server);
 
-        // Defer until WPF has generated the newly expanded containers, then select
-        // and scroll. Selecting the container raises SelectedItemChanged, which runs
-        // the existing SelectSingle + ShowTreeSelection path.
+        // Defer until WPF has generated the newly expanded containers, then select and
+        // scroll. The view model is selected first and the native flag follows with the
+        // sync suppressed, so the outcome does not depend on which modifier keys are still
+        // down from the gesture that asked for the reveal when this action runs.
         _ = Dispatcher.BeginInvoke(
             System.Windows.Threading.DispatcherPriority.Background,
             new Action(() =>
@@ -3482,15 +3483,16 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 var container = GetOrRealizeSessionTreeItem(server);
                 if (container is not null)
                 {
-                    container.IsSelected = true;
+                    SelectRowProgrammatically(_treeState, container, server, vm.ServerList.SelectSingle);
                     container.BringIntoView();
                 }
                 else
                 {
-                    // Container not realized: at least drive the VM selection + detail panel.
+                    // Container not realized: at least drive the view model selection.
                     vm.ServerList.SelectSingle(server);
-                    ShowTreeSelection(vm, server);
                 }
+
+                ShowTreeSelection(vm, server);
             }));
     }
 

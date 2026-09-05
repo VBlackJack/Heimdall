@@ -43,6 +43,8 @@ public class SessionTreeViewItemAutomationPeer : TreeViewItemAutomationPeer, ISe
         : base(owner)
     {
         owner.DataContextChanged += OnOwnerDataContextChanged;
+        owner.Unloaded += OnOwnerUnloaded;
+        owner.Loaded += OnOwnerLoaded;
         Observe(owner.DataContext);
     }
 
@@ -84,6 +86,22 @@ public class SessionTreeViewItemAutomationPeer : TreeViewItemAutomationPeer, ISe
     /// </remarks>
     private void OnOwnerDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         => Observe(e.NewValue);
+
+    /// <summary>
+    /// Drops the subscription when the row leaves the screen, and takes it back when it returns.
+    /// </summary>
+    /// <remarks>
+    /// <c>DataContextChanged</c> is not enough. When the tree discards a row, WPF puts its
+    /// <c>DisconnectedItem</c> sentinel into the row's DataContext without raising that event, so
+    /// the peer went on listening to an item that lives as long as the inventory - and the item
+    /// held the peer, which held the row and its visual subtree, for that long. Measured on
+    /// 2026-09-05: after the discard, the peer was still on the item's invocation list.
+    /// <c>Unloaded</c> is what the discard does raise; <c>Loaded</c> covers a row virtualized away
+    /// and back, and a recycled row still re-points through <c>DataContextChanged</c>.
+    /// </remarks>
+    private void OnOwnerUnloaded(object sender, RoutedEventArgs e) => Observe(null);
+
+    private void OnOwnerLoaded(object sender, RoutedEventArgs e) => Observe((sender as FrameworkElement)?.DataContext);
 
     private void Observe(object? item)
     {
