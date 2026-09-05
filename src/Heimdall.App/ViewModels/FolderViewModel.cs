@@ -305,7 +305,7 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     {
         "SessionTreeFolderAccessibleName" => "{0}, folder",
         "SessionTreeFolderAccessibleHelp" =>
-            "Folder. Use Left and Right Arrow to collapse or expand. Press Shift+F10 for actions.",
+            "Folder. Use Left and Right Arrow or Enter to collapse or expand. Press Shift+F10 for actions.",
         _ => key
     };
 }
