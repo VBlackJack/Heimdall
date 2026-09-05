@@ -52,6 +52,16 @@ folder or a session whose name starts with an accented letter sat at the bottom 
 "Zurich". The tree, the folder pickers, the project list and the bulk-delete summary now sort under
 the current culture, case-insensitively, through one shared comparer.
 
+### The sessions tree filters by gateway, and the gateway badge can be hidden
+
+The filter menu gains a "Via gateway" facet that keeps only the sessions routed through an SSH
+gateway, a missing one included, since a session whose gateway is gone is exactly the one worth
+finding. The same menu gains a view preference, "Show gateway badge", persisted in the settings:
+an inventory that routes every session through one gateway painted the same badge on every row,
+which was noise rather than information. With the badge hidden, the row's hover text names the
+gateway instead, and a missing gateway keeps its badge whatever the preference says, because that
+badge is a warning.
+
 ### Smaller corrections
 
 - A session row announces its keyboard gestures to assistive technology: Enter, F2, Ctrl+Space,
