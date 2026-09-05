@@ -99,7 +99,7 @@ Mesure : la fermeture des trois sessions ramène le processus à 799 Mo et non �
 un emballement** : un second cycle d'ouverture et de fermeture n'a ajouté que 9,7 Mo, pas 600 de
 plus.
 
-Depuis la v2026.090601, un contrôle inactif est rendu après **cinq minutes** par défaut, et le
+Depuis la v2026.090503, un contrôle inactif est rendu après **cinq minutes** par défaut, et le
 pool se règle par deux réglages sur l'onglet **RDP**, sous-onglet **Performance** : **Contrôles
 Bureau à distance inactifs gardés pour réemploi** (0 à 8 ; 0 crée un contrôle par session, comme
 avant l'existence du pool) et **Expiration d'un contrôle inactif** en minutes (0 les garde jusqu'à

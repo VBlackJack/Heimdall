@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased: idle Remote Desktop controls expire, and the disconnect code is ASCII
+## 2026-09-05: idle Remote Desktop controls expire, the disconnect code is ASCII, and the drive key is measured (v2026.090503)
 
 ### An idle Remote Desktop control gives its memory back
 
@@ -40,6 +40,16 @@ character in that report: it came out as a question mark or a two-byte sequence 
 console and in ticket systems that re-encode what is pasted. The separator is now a vertical
 bar. The test that pinned the middle dot now pins the whole code to ASCII, whatever the
 separator.
+
+### The drive key in generated .rdp files, measured
+
+The audit asked whether the generated `.rdp` file, which carries `redirectdrives:i:1` and never
+`drivestoredirect:s:*`, still redirects drives on a current mstsc whose documentation lists only
+the newer key. Measured in the mstsc 10.0.26100 `/edit` dialog: the legacy key alone checks
+Drives, `:i:0` and no key leave it clear, and a Save from the dialog writes `redirectdrives:i:1`
+with no `drivestoredirect` line. The generator is right as it stands. The newer key is read too
+and wins over `redirectdrives:i:0`, so a test now pins that the file never carries it: emitting
+it unconditionally would redirect drives on a profile that said no.
 
 ## 2026-09-05: the RDP audit closes eleven findings, and the vault tests own their baseline (v2026.090502)
 

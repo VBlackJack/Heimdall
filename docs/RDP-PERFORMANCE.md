@@ -90,7 +90,7 @@ Measured: closing all three sessions returned the process to 799 MB rather than 
 baseline, and it stayed there 25 minutes later. **The amount is bounded, not a runaway**: a
 second open-and-close cycle added 9.7 MB, not another 600.
 
-Since v2026.090601 an idle control is released after **five minutes** by default, and the pool
+Since v2026.090503 an idle control is released after **five minutes** by default, and the pool
 is a pair of settings on the **RDP** tab, under the **Performance** sub-tab: **Idle Remote
 Desktop controls kept for reuse** (0 to 8; 0 creates a control per session, as before pooling
 existed) and **Idle control expiry** in minutes (0 keeps them until Heimdall exits, which is
