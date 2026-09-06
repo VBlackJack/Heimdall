@@ -321,8 +321,12 @@ public sealed class PlinkTunnelRunner : IDisposable
         // Continuously drain stderr in the background to prevent buffer saturation.
         // The drain is owned by an internal CTS so Stop() can both cancel and
         // synchronously join it, eliminating "fire and forget" thread-pool
-        // exceptions when the process is killed before the pipe drains.
-        _drainCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        // exceptions when the process is killed before the pipe drains. It is
+        // deliberately NOT linked to the caller's token: that token scopes the
+        // connect, and the tunnel outlives it. A drain that followed it would stop
+        // reading while plink kept running, and plink blocks on its next stderr
+        // line once the pipe buffer is full, which silently ends the forwarding.
+        _drainCts = new CancellationTokenSource();
         var drainToken = _drainCts.Token;
         _drainTask = Task.Run(async () =>
         {
