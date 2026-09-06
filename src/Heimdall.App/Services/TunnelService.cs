@@ -442,13 +442,15 @@ public sealed class TunnelService : ITunnelService
 
         if (result.Success)
         {
-            await WaitForTunnelEstablishmentAsync(
+            int establishedLocalPort = result.Tunnel?.LocalPort ?? localPort;
+            await WaitForTunnelEstablishmentOrReleaseAsync(
+                    _tunnelManager,
+                    establishedLocalPort,
                     settings.TunnelEstablishmentDelayMs,
                     _timeProvider,
                     ct)
                 .ConfigureAwait(false);
 
-            int establishedLocalPort = result.Tunnel?.LocalPort ?? localPort;
             Core.Logging.FileLogger.Info($"Tunnel established for {serverId} on port {establishedLocalPort}");
             _connectionSm.SetTunnelInfo(serverId, establishedLocalPort, 0);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
@@ -770,7 +772,9 @@ public sealed class TunnelService : ITunnelService
                 SshLocalizationKeys.ErrorTunnelPortConcurrent);
         }
 
-        await WaitForTunnelEstablishmentAsync(
+        await WaitForTunnelEstablishmentOrReleaseAsync(
+                _tunnelManager,
+                localPort,
                 settings.TunnelEstablishmentDelayMs,
                 _timeProvider,
                 ct)
@@ -782,6 +786,46 @@ public sealed class TunnelService : ITunnelService
             $"Plink tunnel established for {serverId} on port {localPort} (pid={runner.ProcessId?.ToString() ?? "unknown"})");
 
         return new TunnelResult(true, tunnelInfo, null, null);
+    }
+
+    /// <summary>
+    /// Waits out the establishment delay on a tunnel that is already registered
+    /// and referenced, and releases that reference if the wait is cancelled.
+    /// </summary>
+    /// <remarks>
+    /// Every opening path registers its tunnel, with one reference, before this
+    /// wait, and tells the connection state the port only after it. A
+    /// cancellation in between used to leave a tunnel nobody knew the port of:
+    /// the orphan cleanup on close found nothing to release, and the SSH.NET or
+    /// plink tunnel stayed open until the application exited or the user closed
+    /// it by hand from the tunnels list.
+    /// </remarks>
+    /// <param name="tunnelManager">Registry holding the tunnel's reference.</param>
+    /// <param name="localPort">Local port the tunnel was registered under.</param>
+    /// <param name="delayMs">Establishment delay, in milliseconds; non-positive means none.</param>
+    /// <param name="timeProvider">Clock the delay is measured on.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    internal static async Task WaitForTunnelEstablishmentOrReleaseAsync(
+        TunnelManager tunnelManager,
+        int localPort,
+        int delayMs,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tunnelManager);
+
+        try
+        {
+            await WaitForTunnelEstablishmentAsync(delayMs, timeProvider, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Core.Logging.FileLogger.Info(
+                $"Tunnel establishment on port {localPort} was cancelled; releasing the tunnel reference.");
+            tunnelManager.ReleaseReference(localPort);
+            throw;
+        }
     }
 
     internal static Task WaitForTunnelEstablishmentAsync(
