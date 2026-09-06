@@ -433,10 +433,21 @@ if ($Mode -eq 'Release') {
             & $iscc /DAppVersion="$buildNumber" /DVariant="$($o.Name)" /DSourceDir="$($o.Dir)" /Q $issFile 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    + Heimdall_${buildNumber}_$($o.Name)_Setup.exe" -ForegroundColor DarkGray
+            } elseif ($Mode -eq 'Release') {
+                # Fatal, like a WiX failure below. The Setup.exe is the only asset the
+                # in-app updater can use: a release published without it leaves every
+                # user without in-app updating until the next one.
+                Write-Host "    [!] Inno Setup failed for $($o.Name) - a Release build cannot publish without its installer" -ForegroundColor Red
+                exit 1
             } else {
                 Write-Host "    [!] Inno Setup failed for $($o.Name)" -ForegroundColor DarkYellow
             }
         }
+    } elseif ($Mode -eq 'Release') {
+        Write-Host "  [!] Inno Setup compiler not found - a Release build cannot publish without its installer" -ForegroundColor Red
+        Write-Host "      Install Inno Setup 6, or set `$env:HEIMDALL_ISCC_PATH if ISCC.exe is installed elsewhere." -ForegroundColor Yellow
+        Write-Host "      Checked: $iscc" -ForegroundColor Red
+        exit 1
     } else {
         Write-Host "  [!] Inno Setup compiler not found - skipping .exe installer generation" -ForegroundColor DarkYellow
         Write-Host "      Install Inno Setup 6, or set `$env:HEIMDALL_ISCC_PATH if ISCC.exe is installed elsewhere." -ForegroundColor Yellow

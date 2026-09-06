@@ -69,6 +69,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private readonly ContextMenuFactory _contextMenuFactory;
     private readonly SessionTabContextMenuFactory _sessionTabContextMenuFactory;
     private readonly ISessionWindowService _sessionWindowService;
+
+    /// <summary>Cancels the startup update work when the window closes.</summary>
+    private readonly CancellationTokenSource _startupUpdateCts = new();
     private readonly FileShareService _fileShareService;
     private readonly KeyboardShortcutService _keyboardShortcutService;
     private readonly IForegroundWatchService _foregroundWatchService;
@@ -288,30 +291,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 }
             };
 
-            // Reports a previous update attempt that did not apply. A sibling of the
-            // startup check rather than a step inside it: that check returns early when
-            // updates are disabled and again inside its throttle window, which is exactly
-            // where a relaunch minutes after a failed update lands.
-            try
-            {
-                await viewModel.Update.ReportPreviousAttemptAsync(CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn($"[Updates] previous attempt report: {ex.Message}");
-            }
-
-            // Throttled background update check (usually a no-op). Never blocks the UI.
-            try
-            {
-                await viewModel.Update.CheckOnStartupAsync(CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn($"[Updates] startup check: {ex.Message}");
-            }
-
-            _settingsRuntimeBridgeInitialized = true;
+            await FinishStartupUpdatesAsync(viewModel);
         };
 
         // Re-apply all localized strings when the user switches language at runtime
@@ -370,6 +350,67 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         vm.ServerList.RefreshLocalizedState();
         vm.ToolsTab.RefreshHeaderText();
         vm.ToolsTab.InvalidateSections();
+
+        // The banner status is set imperatively, like its settings twin, which the locale
+        // handler clears; the banner remembers its key and re-formats instead.
+        vm.Update.RefreshLocalization();
+    }
+
+    /// <summary>
+    /// The last steps of the Loaded handler: the runtime settings bridge, then the update
+    /// work. Body-level steps, so the exit-path guard can read their order.
+    /// </summary>
+    /// <remarks>
+    /// The bridge flag comes BEFORE the update calls: the startup check is a network
+    /// round trip with a 30 s ceiling, and while the flag was false a runtime setting
+    /// toggled in that window was silently not applied. Both update calls are cancelled
+    /// when the window closes; the continuation used to write the last-check stamp to
+    /// settings.json during the shutdown sequence.
+    /// </remarks>
+    private async Task FinishStartupUpdatesAsync(MainViewModel viewModel)
+    {
+        _settingsRuntimeBridgeInitialized = true;
+        await ReportPreviousUpdateAttemptAsync(viewModel);
+        await CheckForUpdatesOnStartupAsync(viewModel);
+    }
+
+    /// <summary>
+    /// Reports a previous update attempt that did not apply. A sibling of the startup
+    /// check rather than a step inside it: that check returns early when updates are
+    /// disabled and again inside its throttle window, which is exactly where a relaunch
+    /// minutes after a failed update lands.
+    /// </summary>
+    private async Task ReportPreviousUpdateAttemptAsync(MainViewModel viewModel)
+    {
+        try
+        {
+            await viewModel.Update.ReportPreviousAttemptAsync(_startupUpdateCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // The window closed first; there is nothing to report to.
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"[Updates] previous attempt report: {ex.Message}");
+        }
+    }
+
+    /// <summary>Throttled background update check (usually a no-op). Never blocks the UI.</summary>
+    private async Task CheckForUpdatesOnStartupAsync(MainViewModel viewModel)
+    {
+        try
+        {
+            await viewModel.Update.CheckOnStartupAsync(_startupUpdateCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Same.
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"[Updates] startup check: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -3810,6 +3851,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             app.IsShuttingDown = true;
         }
+
+        // Whatever the startup update check is still doing stops here, before the
+        // shutdown sequence it would otherwise race for settings.json.
+        _startupUpdateCts.Cancel();
+        _startupUpdateCts.Dispose();
 
         StopFullscreenChrome();
         DisposeLowLevelKeyboardHook();

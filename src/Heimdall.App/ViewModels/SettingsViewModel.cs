@@ -230,6 +230,31 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private bool _updateCheckEnabled = true;
 
+    /// <summary>
+    /// The version the banner's "Skip this version" persisted, or null. One click and no
+    /// confirmation wrote it, and until now nothing displayed or undid it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSkippedVersion))]
+    [NotifyPropertyChangedFor(nameof(SkippedVersionText))]
+    [NotifyCanExecuteChangedFor(nameof(ClearSkippedVersionCommand))]
+    private string? _updateSkippedVersion;
+
+    /// <summary>True when a skipped version is on record.</summary>
+    public bool HasSkippedVersion => !string.IsNullOrWhiteSpace(UpdateSkippedVersion);
+
+    /// <summary>The localized "Skipped version: x" line.</summary>
+    public string SkippedVersionText =>
+        HasSkippedVersion ? _localizer.Format("SettingsUpdateSkippedVersion", UpdateSkippedVersion!) : string.Empty;
+
+    /// <summary>Forgets the skipped version, so the next check offers it again.</summary>
+    [RelayCommand(CanExecute = nameof(HasSkippedVersion))]
+    private async Task ClearSkippedVersionAsync()
+    {
+        await _configManager.MergeSettingAsync(s => s.UpdateSkippedVersion = null);
+        UpdateSkippedVersion = null;
+    }
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [SettingRangeOf(nameof(AppSettings.UpdateCheckIntervalHours))]
@@ -1318,6 +1343,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Updates
         UpdateCheckEnabled = settings.UpdateCheckEnabled;
         UpdateCheckIntervalHours = settings.UpdateCheckIntervalHours;
+        UpdateSkippedVersion = settings.UpdateSkippedVersion;
         LegacyMigrationReofferAvailable =
             LegacyMigrationDecisionPolicy.HasDeclineMarker(settings);
 
@@ -3290,6 +3316,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // that neither Save nor Discard can act on.
         if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
             or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
+            or nameof(UpdateSkippedVersion) or nameof(HasSkippedVersion) or nameof(SkippedVersionText)
             or nameof(CredentialGuardStatusText)
             or nameof(IsInstallingUpdate) or nameof(DownloadProgress) or nameof(IsUpdateAvailable)
             or nameof(IsUpdateReleaseAvailable)

@@ -268,7 +268,12 @@
             <Border x:Name="Mw_UpdateBanner" Grid.Row="0"
                     Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
                     Padding="{StaticResource SpacingLg}"
-                    Visibility="{Binding Update.IsBannerVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                    AutomationProperties.Name="{loc:Translate A11yUpdateBanner}"
+                    AutomationProperties.LiveSetting="Polite"
+                    Visibility="{Binding Update.IsBannerShown, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border.InputBindings>
+                    <KeyBinding Key="Escape" Command="{Binding Update.LaterCommand}"/>
+                </Border.InputBindings>
                 <DockPanel LastChildFill="False">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- The offer affordances. Hidden when the banner is reporting what a
@@ -303,9 +308,9 @@
                                    Visibility="{Binding Update.IsUpdateOffer, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Run Text="{loc:Translate UpdateBannerText}"/><Run Text="{Binding Update.BannerVersionText}" FontWeight="SemiBold"/>
                         </TextBlock>
-                        <ProgressBar x:Name="Mw_UpdateBannerProgress" Minimum="0" Maximum="1" Value="{Binding Update.DownloadProgress}"
+                        <ProgressBar x:Name="Mw_UpdateBannerProgress" Minimum="0" Maximum="1" Value="{Binding Update.DownloadProgress, Mode=OneWay}"
                                      Height="6" Width="200" HorizontalAlignment="Left" Margin="0,8,0,0"
-                                     AutomationProperties.Name="{loc:Translate SettingsBtnDownloadInstall}"
+                                     AutomationProperties.Name="{loc:Translate SettingsUpdateStatusDownloading}"
                                      Visibility="{Binding Update.IsInstalling, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <TextBlock x:Name="Mw_UpdateBannerStatus" Text="{Binding Update.BannerStatusText}"
                                    Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
@@ -2412,6 +2417,15 @@
                                                 Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
                                                 AutomationProperties.Name="{loc:Translate SettingsBtnCheckNow}"/>
                                         <TextBlock x:Name="Mw_SettingsUpdateStatus" Text="{Binding Settings.UpdateStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                        <!-- The version the banner's "Skip this version" persisted: one click, no confirmation,
+                                             and until now nothing displayed or undid it. -->
+                                        <StackPanel x:Name="Mw_SettingsSkippedVersionPanel" Orientation="Horizontal" Margin="0,8,0,0"
+                                                    Visibility="{Binding Settings.HasSkippedVersion, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock x:Name="Mw_SettingsSkippedVersion" Text="{Binding Settings.SkippedVersionText}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                            <Button x:Name="Mw_SettingsClearSkippedVersion" Content="{loc:Translate SettingsBtnClearSkippedVersion}" Command="{Binding Settings.ClearSkippedVersionCommand}"
+                                                    Style="{DynamicResource SecondaryButtonStyle}" Margin="12,0,0,0"
+                                                    AutomationProperties.Name="{loc:Translate SettingsBtnClearSkippedVersion}"/>
+                                        </StackPanel>
                                         <Button x:Name="Mw_SettingsViewReleaseButton" Content="{loc:Translate UpdateBannerViewReleaseBtn}" Command="{Binding Settings.OpenUpdateReleaseCommand}"
                                                 Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
                                                 AutomationProperties.Name="{loc:Translate UpdateBannerViewReleaseBtn}"
@@ -2420,7 +2434,7 @@
                                                 Style="{DynamicResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
                                                 AutomationProperties.Name="{loc:Translate SettingsBtnDownloadInstall}"
                                                 Visibility="{Binding Settings.IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                        <ProgressBar x:Name="Mw_SettingsDownloadProgress" Minimum="0" Maximum="1" Value="{Binding Settings.DownloadProgress}"
+                                        <ProgressBar x:Name="Mw_SettingsDownloadProgress" Minimum="0" Maximum="1" Value="{Binding Settings.DownloadProgress, Mode=OneWay}"
                                                      Height="6" Margin="0,8,0,0"
                                                      AutomationProperties.Name="{loc:Translate SettingsUpdateStatusDownloading}"
                                                      Visibility="{Binding Settings.IsInstallingUpdate, Converter={StaticResource BoolToVisibilityConverter}}"/>

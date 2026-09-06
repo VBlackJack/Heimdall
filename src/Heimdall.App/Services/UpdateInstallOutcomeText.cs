@@ -33,6 +33,9 @@ public static class UpdateInstallOutcomeText
         UpdateInstallOutcome.Cancelled => "SettingsUpdateStatusCancelled",
         UpdateInstallOutcome.VerificationFailed => "SettingsUpdateStatusVerificationFailed",
         UpdateInstallOutcome.DownloadFailed => "SettingsUpdateStatusDownloadFailed",
-        _ => "SettingsUpdateStatusDownloadFailed", // total/fail-safe
+
+        // Total, and silent: an unknown outcome must not invent a cause. The default arm
+        // used to say "Download failed." for any member added later, on both surfaces.
+        _ => null,
     };
 }

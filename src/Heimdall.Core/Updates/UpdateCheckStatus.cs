@@ -25,5 +25,4 @@ public enum UpdateCheckStatus
     UpdateAvailable,
     UpdateNotInstallable,
     CheckFailed,
-    Skipped,
 }
