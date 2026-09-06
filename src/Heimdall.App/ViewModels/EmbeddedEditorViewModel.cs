@@ -29,6 +29,12 @@ namespace Heimdall.App.ViewModels;
 public sealed partial class EmbeddedEditorViewModel : ObservableObject
 {
     /// <summary>
+    /// The largest local file the editor opens, the same ceiling as the inline remote editor.
+    /// Without one a multi-gigabyte log was read whole into a string and the window froze.
+    /// </summary>
+    internal const long MaxLocalFileBytes = 16L * 1024 * 1024;
+
+    /// <summary>
     /// The encoder used for a local file when no encoding was captured on load - a load that failed,
     /// or a path the editor never opened. It reproduces what
     /// <see cref="File.WriteAllTextAsync(string, string?, CancellationToken)"/> applied here
@@ -41,9 +47,18 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
         encoderShouldEmitUTF8Identifier: false);
 
     private readonly LocalizationManager? _localizer;
+
+    /// <summary>
+    /// Serializes saves. Deliberately never disposed: a save can still hold it after the view
+    /// that owns this model has been torn down (the pane is closed while an upload unwinds, and
+    /// the typed text must survive that), and a release on a disposed semaphore throws inside
+    /// that save's finally. A SemaphoreSlim that never allocated its wait handle holds no
+    /// operating-system resource, so leaving it to the collector costs nothing.
+    /// </summary>
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private IDialogService? _dialogService;
     private long _contentRevision;
+    private long _modifiedTransitions;
 
     /// <summary>
     /// The encoding and byte order mark observed when the current local file was read, kept so the
@@ -153,12 +168,22 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
 
         try
         {
+            long length = new FileInfo(filePath).Length;
+            if (length > MaxLocalFileBytes)
+            {
+                _localDocument = null;
+                LoadErrorMessage = string.Format(L("EditorFileTooLarge"), Path.GetFileName(filePath));
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"EmbeddedEditor refused to open {filePath}: {length} bytes exceeds the {MaxLocalFileBytes} byte ceiling.");
+                return null;
+            }
+
             // Read through the codec rather than File.ReadAllTextAsync so the encoding and the byte
             // order mark survive until the save. A file that is neither BOM-carrying nor valid UTF-8
-            // now fails here instead of being silently transcoded, and lands in LoadErrorMessage
-            // through the catch below.
+            // is opened as Latin-1 and says so; it used to fail here and land in LoadErrorMessage.
             RemoteTextDocument document = await RemoteTextFileCodec.ReadAsync(filePath);
             _localDocument = document;
+            NoticeText = document.DecodedWithFallback ? L("EditorEncodingFallbackNotice") : string.Empty;
             return document.Text;
         }
         catch (Exception ex)
@@ -290,7 +315,16 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
             }
         }
 
-        CloseRequested?.Invoke();
+        if (CloseRequested is null)
+        {
+            // A close nobody hosts is a button that does nothing; say so in the log rather than
+            // leave the user clicking.
+            Heimdall.Core.Logging.FileLogger.Warn(
+                "EmbeddedEditor close requested with no host attached; the editor stays open.");
+            return;
+        }
+
+        CloseRequested.Invoke();
     }
 
     /// <summary>
@@ -319,8 +353,15 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     partial void OnIsModifiedChanged(bool value)
     {
         _ = value;
+        Interlocked.Increment(ref _modifiedTransitions);
         UpdateDisplayTitle();
     }
+
+    /// <summary>
+    /// A counter that only ever increases, moved on every change of <see cref="IsModified"/>; the
+    /// close guard folds it into its stamp so a consent cannot outlive the edit that followed it.
+    /// </summary>
+    public long ModifiedTransitions => Interlocked.Read(ref _modifiedTransitions);
 
     private void UpdateDisplayTitle()
     {

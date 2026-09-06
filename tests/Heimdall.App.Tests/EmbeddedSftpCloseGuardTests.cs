@@ -30,7 +30,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public void PollClose_NothingInFlight_Allows()
     {
-        SftpCloseGuardSnapshot snapshot = new(false, false, false, 1);
+        SftpCloseGuardSnapshot snapshot = new(false, false, false, false, 1);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
 
         Assert.Equal(CloseVerdict.Allow, guard.PollClose(Request()).Verdict);
@@ -39,7 +39,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public void PollClose_SaveInFlight_DeniesTerminally()
     {
-        SftpCloseGuardSnapshot snapshot = new(false, true, false, 1);
+        SftpCloseGuardSnapshot snapshot = new(false, true, false, false, 1);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
 
         CloseDecision decision = guard.PollClose(Request());
@@ -56,7 +56,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public void PollClose_TransferInFlight_DefersToTheAsyncStage()
     {
-        SftpCloseGuardSnapshot snapshot = new(true, false, false, 7);
+        SftpCloseGuardSnapshot snapshot = new(true, false, false, false, 7);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
 
         CloseDecision decision = guard.PollClose(Request());
@@ -69,7 +69,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public void PollClose_UnsavedEditorChanges_DefersToTheAsyncStage()
     {
-        SftpCloseGuardSnapshot snapshot = new(false, false, true, 1);
+        SftpCloseGuardSnapshot snapshot = new(false, false, true, false, 1);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
 
         CloseDecision decision = guard.PollClose(Request());
@@ -78,10 +78,45 @@ public sealed class EmbeddedSftpCloseGuardTests
         Assert.Equal(SftpCloseGuardLocaleKeys.EditorDirtyMessage, decision.ReasonKey);
     }
 
+    /// <remarks>
+    /// The guard never consulted the external editor, so a pane with a file open outside closed
+    /// without a question and disposed the editor, which deleted the staged file under the editor
+    /// still open on it. A question rather than a refusal: the editor itself survives the close,
+    /// only its next save is lost.
+    /// </remarks>
+    [Fact]
+    public void PollClose_FileOpenInExternalEditor_DefersWithItsOwnQuestion()
+    {
+        SftpCloseGuardSnapshot snapshot = new(false, false, false, true, 1);
+        EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
+
+        CloseDecision decision = guard.PollClose(Request());
+
+        Assert.Equal(CloseVerdict.Defer, decision.Verdict);
+        Assert.Equal(SftpCloseGuardLocaleKeys.ExternalEditMessage, decision.ReasonKey);
+    }
+
+    [Fact]
+    public async Task ResolveCloseAsync_FileOpenInExternalEditor_AsksWithThatQuestion()
+    {
+        SftpCloseGuardSnapshot snapshot = new(false, false, false, true, 1);
+        List<string> asked = [];
+        EmbeddedSftpCloseGuard guard = CreateGuard(
+            () => snapshot,
+            (_, messageKey) =>
+            {
+                asked.Add(messageKey);
+                return Task.FromResult(false);
+            });
+
+        Assert.False(await guard.ResolveCloseAsync(Request(), CancellationToken.None));
+        Assert.Equal([SftpCloseGuardLocaleKeys.ExternalEditMessage], asked);
+    }
+
     [Fact]
     public void PollClose_SaveAndTransferBothInFlight_TheRefusalWins()
     {
-        SftpCloseGuardSnapshot snapshot = new(true, true, false, 1);
+        SftpCloseGuardSnapshot snapshot = new(true, true, false, false, 1);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
 
         // Confirming would be a lie: no answer the user gives can stop an uninterruptible write, so
@@ -92,7 +127,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public void DescribeEditorSaveRefusal_SaveInFlight_NamesTheSameKeyPollCloseDenies()
     {
-        SftpCloseGuardSnapshot snapshot = new(false, true, false, 1);
+        SftpCloseGuardSnapshot snapshot = new(false, true, false, false, 1);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot);
 
         // The point of the shared predicate: the pane surface and the editor overlay cannot name
@@ -114,7 +149,7 @@ public sealed class EmbeddedSftpCloseGuardTests
         bool saveInProgress,
         bool unsavedChanges)
     {
-        SftpCloseGuardSnapshot snapshot = new(transferInProgress, saveInProgress, unsavedChanges, 1);
+        SftpCloseGuardSnapshot snapshot = new(transferInProgress, saveInProgress, unsavedChanges, false, 1);
 
         // A running transfer and unsaved text are losable work the user may abandon knowingly, so
         // each stays a question. Only the save refuses - the editor's Close must not be widened
@@ -125,7 +160,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public async Task ResolveCloseAsync_SaveInFlight_RefusesWithoutAsking()
     {
-        SftpCloseGuardSnapshot snapshot = new(false, true, false, 1);
+        SftpCloseGuardSnapshot snapshot = new(false, true, false, false, 1);
         int prompts = 0;
         EmbeddedSftpCloseGuard guard = CreateGuard(
             () => snapshot,
@@ -144,7 +179,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public async Task ResolveCloseAsync_UserConfirms_Consents()
     {
-        SftpCloseGuardSnapshot snapshot = new(true, false, false, 1);
+        SftpCloseGuardSnapshot snapshot = new(true, false, false, false, 1);
         List<string> asked = [];
         EmbeddedSftpCloseGuard guard = CreateGuard(
             () => snapshot,
@@ -161,7 +196,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public async Task ResolveCloseAsync_UserDeclines_Refuses()
     {
-        SftpCloseGuardSnapshot snapshot = new(true, false, false, 1);
+        SftpCloseGuardSnapshot snapshot = new(true, false, false, false, 1);
         EmbeddedSftpCloseGuard guard = CreateGuard(() => snapshot, (_, _) => Task.FromResult(false));
 
         Assert.False(await guard.ResolveCloseAsync(Request(), CancellationToken.None));
@@ -170,7 +205,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public async Task ResolveCloseAsync_WorkFinishedBeforeItRan_ConsentsWithoutAsking()
     {
-        SftpCloseGuardSnapshot snapshot = new(false, false, false, 2);
+        SftpCloseGuardSnapshot snapshot = new(false, false, false, false, 2);
         int prompts = 0;
         EmbeddedSftpCloseGuard guard = CreateGuard(
             () => snapshot,
@@ -190,7 +225,7 @@ public sealed class EmbeddedSftpCloseGuardTests
     [Fact]
     public async Task ResolveCloseAsync_UnsavedChanges_AsksAboutTheEditorNotTheTransfer()
     {
-        SftpCloseGuardSnapshot snapshot = new(false, false, true, 1);
+        SftpCloseGuardSnapshot snapshot = new(false, false, true, false, 1);
         List<string> asked = [];
         EmbeddedSftpCloseGuard guard = CreateGuard(
             () => snapshot,
@@ -212,7 +247,7 @@ public sealed class EmbeddedSftpCloseGuardTests
         EmbeddedSftpCloseGuard guard = CreateGuard(() =>
         {
             reads++;
-            return new SftpCloseGuardSnapshot(true, false, false, 42);
+            return new SftpCloseGuardSnapshot(true, false, false, false, 42);
         });
 
         CloseGuardState state = guard.SampleCloseGuardState();
@@ -223,15 +258,16 @@ public sealed class EmbeddedSftpCloseGuardTests
     }
 
     [Theory]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, true)]
-    public void Snapshot_AnyProtectedWork_ReadsAsBusy(bool transfer, bool saving, bool dirty)
-        => Assert.True(new SftpCloseGuardSnapshot(transfer, saving, dirty, 1).IsBusy);
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, false, true)]
+    public void Snapshot_AnyProtectedWork_ReadsAsBusy(bool transfer, bool saving, bool dirty, bool external)
+        => Assert.True(new SftpCloseGuardSnapshot(transfer, saving, dirty, external, 1).IsBusy);
 
     [Fact]
     public void Snapshot_NoProtectedWork_ReadsAsIdle()
-        => Assert.False(new SftpCloseGuardSnapshot(false, false, false, 1).IsBusy);
+        => Assert.False(new SftpCloseGuardSnapshot(false, false, false, false, 1).IsBusy);
 
     [Fact]
     public async Task LocaleKeys_AreTranslatedInBothCatalogues()
@@ -253,10 +289,10 @@ public sealed class EmbeddedSftpCloseGuardTests
                 .Select(field => (string)field.GetRawConstantValue()!)
         ];
 
-        // Five from SftpCloseGuardLocaleKeys plus six for the save-escape offer, plus
+        // Six from SftpCloseGuardLocaleKeys plus six for the save-escape offer, plus
         // six from CloseGuardLocaleKeys. Raised inside the change that added them: a
         // count discovered by a red CI is a count nobody chose.
-        Assert.Equal(17, keys.Length);
+        Assert.Equal(18, keys.Length);
         foreach (string key in keys)
         {
             Assert.NotEqual(key, english[key]);

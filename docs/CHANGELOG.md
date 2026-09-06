@@ -295,6 +295,51 @@ Twenty-five em dashes written as `\u2014` escapes reached users through fallback
 placeholders while every literal typography guard stayed green. They are ASCII hyphens now,
 and a guard refuses the escape.
 
+### Closing an SFTP pane no longer deletes a file open in an external editor
+
+"Edit in external editor" stages the remote file under the temporary folder, starts the editor
+and watches the copy so that every save goes back to the server. The pane's close guard never
+consulted the editor, so the pane closed without a question, disposed the editor, and the editor
+deleted the staged copy under the editor still open on it: the user's next Ctrl+S recreated a
+file that nothing watched, and the remote save silently never happened. The close guard now asks
+when a file of the pane is open outside, and a staged copy whose editor is still running is left
+in place for the startup sweeper. An editor that cannot be started no longer leaves a session and
+a watcher orphaned for the life of the pane; the session is unregistered and the message names
+the executable.
+
+### The local editor pane asks before closing on unsaved text
+
+The local file browser swaps in an editor pane. That pane implemented no close guard, and the
+arbiter skips every host that is not one: the tab, the split pane and the floating window closed
+without a question and the unsaved text was gone. Only the pane's own Close button asked. It has
+the same guard the SFTP pane has, in a WPF-free class pinned by tests. The editor also gained
+Ctrl+S and Ctrl+W, an accessible name for its text, a ceiling of 16 MiB on the local file it
+opens, and an atomic local save through the same staged-rename the downloads use.
+
+### A right-click selects the row it lands on
+
+Every command of the two file browsers' context menus applied to the row selected BEFORE the
+right-click, and chmod, duplicate, copy path, download and edit confirm nothing. A right-click
+on a row outside the selection selects that row alone; a right-click on a row already selected
+keeps the multi-selection, so a batch command still applies to the batch.
+
+### External editor setting, shortcuts, encoding and accessibility
+
+The external editor configured in Settings reached the local browser only; a remote file always
+opened in notepad. It reaches the remote editor now, through one policy that also refuses a
+shell as an editor on both sides. The browser's shortcuts no longer fire under the inline editor
+overlay (F2 renamed a hidden row, F5 refreshed, Ctrl+F swallowed the keystroke), nor while a text
+box has focus (Delete in the filter box opened the deletion of the selected file). Keyboard focus
+enters the inline editor when it opens and returns to the list when it closes. A file with no
+byte order mark that is not valid UTF-8, which is every Latin-1 configuration file with an accent
+in it, could not be opened in the editor at all; it opens as Latin-1, the editor says so, and a
+save writes the same bytes back. Both editors' working directories are created by one factory
+that applies the restrictive ACL; the inline editor's directory used to inherit the temporary
+folder's. The rows of both file lists carry the entry name as their accessible name, the Disconnect
+button reads "Disconnect" rather than the same "Close" as the tab button, and the security notice
+badge keeps its bound accessible name. The escape offered for a stalled save is offered again for
+the next stalled save, and the editor's close handler follows the view into a floating window.
+
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 
 ### The Plink port probe runs before the first wait

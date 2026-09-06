@@ -41,7 +41,7 @@
             <DockPanel LastChildFill="True">
                 <Button x:Name="DisconnectButton"
                         DockPanel.Dock="Right"
-                        Content="{loc:Translate SftpBtnClose}"
+                        Content="{loc:Translate SftpBtnDisconnect}"
                         ToolTip="{loc:Translate TooltipDisconnectSession}"
                         Click="OnDisconnectClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
@@ -166,7 +166,7 @@
                              Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="{loc:Translate A11yTxtSearchFiles}"/>
                     <CheckBox x:Name="ToggleHiddenCheckBox"
-                              Content=".*"
+                              Content="{loc:Translate SftpToggleHiddenLabel}"
                               VerticalAlignment="Center"
                               Foreground="{DynamicResource TextSecondaryBrush}"
                               FontSize="{StaticResource FontSizeCaption}"
@@ -406,6 +406,7 @@
                   SelectionMode="Extended"
                   AlternationCount="2"
                   MouseDoubleClick="OnFileDoubleClick"
+                  PreviewMouseRightButtonDown="OnFileListPreviewMouseRightButtonDown"
                   SelectionChanged="OnSelectionChanged"
                   GridViewColumnHeader.Click="OnColumnHeaderClick"
                   SizeChanged="OnFileListSizeChanged"
@@ -482,6 +483,7 @@
                     <Setter Property="BorderBrush" Value="Transparent"/>
                     <Setter Property="BorderThickness" Value="1"/>
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
                     <Setter Property="ToolTip">
                         <Setter.Value>
                             <ToolTip>

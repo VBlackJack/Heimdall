@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
              xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit"
-             Background="{DynamicResource BackgroundBrush}">
+             Background="{DynamicResource BackgroundBrush}"
+             PreviewKeyDown="OnEditorPreviewKeyDown">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -40,6 +41,7 @@
         <!-- AvalonEdit Editor -->
         <avalon:TextEditor x:Name="Editor"
                            Grid.Row="1"
+                           AutomationProperties.Name="{loc:Translate A11yEditorText}"
                            FontFamily="{StaticResource FontFamilyMonospace}"
                            FontSize="{StaticResource FontSizeBodyLarge}"
                            ShowLineNumbers="True"

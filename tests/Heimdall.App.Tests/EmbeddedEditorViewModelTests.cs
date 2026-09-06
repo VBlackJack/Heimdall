@@ -192,11 +192,11 @@ public sealed class EmbeddedEditorViewModelTests
         }
     }
 
-    // The read is strict now, so a legacy single-byte file that is not valid UTF-8 is reported
-    // instead of being transcoded into something else. That is the fail-closed direction for a
-    // finding about silent byte corruption, and the file on disk is left untouched.
+    // A legacy single-byte file that is not valid UTF-8 could not be opened at all: every
+    // Latin-1 configuration file with an accent in it. It opens as Latin-1 now, the editor says
+    // so, and a save writes the same bytes back rather than a transcoding.
     [Fact]
-    public async Task LoadFileAsync_UndecodableLegacyFile_ReportsInsteadOfTranscoding()
+    public async Task LoadFileAsync_UndecodableLegacyFile_OpensAsLatin1AndSaysSo()
     {
         string path = Path.Combine(Path.GetTempPath(), $"heimdall-sftp006-legacy-{Guid.NewGuid():N}.txt");
         byte[] latin1 = [0x63, 0x61, 0x66, 0xE9];
@@ -207,14 +207,54 @@ public sealed class EmbeddedEditorViewModelTests
             EmbeddedEditorViewModel viewModel = new();
             string? loaded = await viewModel.LoadFileAsync(path);
 
-            Assert.Null(loaded);
-            Assert.False(string.IsNullOrEmpty(viewModel.LoadErrorMessage));
+            Assert.Equal("caf\u00e9", loaded);
+            Assert.Null(viewModel.LoadErrorMessage);
+            Assert.True(viewModel.HasNotice, "the fallback decode is said");
+
+            await viewModel.SaveAsync(loaded!);
+
             Assert.Equal(latin1, await File.ReadAllBytesAsync(path));
         }
         finally
         {
             File.Delete(path);
         }
+    }
+
+    /// <remarks>The local editor had no ceiling: a multi-gigabyte log was read whole.</remarks>
+    [Fact]
+    public async Task LoadFileAsync_FileAboveTheCeiling_IsRefusedWithoutBeingRead()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-editor-huge-{Guid.NewGuid():N}.log");
+        using (FileStream stream = new(path, FileMode.CreateNew, FileAccess.Write))
+        {
+            stream.SetLength(EmbeddedEditorViewModel.MaxLocalFileBytes + 1);
+        }
+
+        try
+        {
+            EmbeddedEditorViewModel viewModel = new();
+            string? loaded = await viewModel.LoadFileAsync(path);
+
+            Assert.Null(loaded);
+            Assert.False(string.IsNullOrEmpty(viewModel.LoadErrorMessage));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ModifiedTransitions_MoveOnEveryChangeOfIsModified()
+    {
+        EmbeddedEditorViewModel viewModel = new();
+        long before = viewModel.ModifiedTransitions;
+
+        viewModel.IsModified = true;
+        viewModel.IsModified = false;
+
+        Assert.Equal(before + 2, viewModel.ModifiedTransitions);
     }
 
     [Fact]

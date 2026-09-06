@@ -35,6 +35,9 @@ public static class SftpCloseGuardLocaleKeys
 
     public const string EditorDirtyMessage = "SftpCloseGuardEditorDirtyMessage";
 
+    /// <summary>Asked when a file of this pane is open in an external editor.</summary>
+    public const string ExternalEditMessage = "SftpCloseGuardExternalEditMessage";
+
     /// <summary>Title of the offer the editor overlay makes when a save will not end.</summary>
     public const string EditorSaveEscapeTitle = "SftpCloseGuardEditorSaveEscapeTitle";
 
@@ -147,6 +150,14 @@ public sealed class EmbeddedSftpCloseGuard : ICloseGuard
             return CloseDecision.Defer(SftpCloseGuardLocaleKeys.EditorDirtyMessage, snapshot.Epoch);
         }
 
+        // A file open in an external editor is not lost by the close, but its next save is: the
+        // watcher that would have sent it to the server dies with the pane, and the user finds out
+        // from the server. A question, because the editor itself stays open.
+        if (snapshot.HasExternalEdits)
+        {
+            return CloseDecision.Defer(SftpCloseGuardLocaleKeys.ExternalEditMessage, snapshot.Epoch);
+        }
+
         return CloseDecision.Allow(snapshot.Epoch);
     }
 
@@ -171,7 +182,9 @@ public sealed class EmbeddedSftpCloseGuard : ICloseGuard
 
         string messageKey = snapshot.IsTransferInProgress
             ? SftpCloseGuardLocaleKeys.TransferMessage
-            : SftpCloseGuardLocaleKeys.EditorDirtyMessage;
+            : snapshot.HasUnsavedEditorChanges
+                ? SftpCloseGuardLocaleKeys.EditorDirtyMessage
+                : SftpCloseGuardLocaleKeys.ExternalEditMessage;
 
         return await _confirmAsync(SftpCloseGuardLocaleKeys.Title, messageKey).ConfigureAwait(true);
     }
@@ -186,6 +199,7 @@ public sealed class EmbeddedSftpCloseGuard : ICloseGuard
 /// <param name="IsTransferInProgress">A file transfer is running.</param>
 /// <param name="IsEditorSaveInProgress">The inline editor is writing a file back to the server.</param>
 /// <param name="HasUnsavedEditorChanges">The inline editor holds edits that were never saved.</param>
+/// <param name="HasExternalEdits">A file of this pane is open in an external editor, watched for its next save.</param>
 /// <param name="Epoch">
 /// Change stamp over the three flags above. Never read as a quantity: only equality across the
 /// protocol's two phases matters.
@@ -194,8 +208,9 @@ public readonly record struct SftpCloseGuardSnapshot(
     bool IsTransferInProgress,
     bool IsEditorSaveInProgress,
     bool HasUnsavedEditorChanges,
+    bool HasExternalEdits,
     long Epoch)
 {
     /// <summary>True when tearing the pane down right now would destroy work.</summary>
-    public bool IsBusy => IsTransferInProgress || IsEditorSaveInProgress || HasUnsavedEditorChanges;
+    public bool IsBusy => IsTransferInProgress || IsEditorSaveInProgress || HasUnsavedEditorChanges || HasExternalEdits;
 }

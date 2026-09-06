@@ -345,12 +345,24 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 var editorView = new Views.EmbeddedEditorView();
                 await editorView.OpenFile(path);
 
-                // When editor closes, restore the file browser
+                // When editor closes, restore the file browser. The close handler follows the
+                // view's Loaded and Unloaded, like the browser's own handler above: detached on
+                // Unloaded alone, it never came back after a detachment into a floating window,
+                // and the editor's Close button was inert from then on.
+                bool isCloseHandlerAttached = false;
+                editorView.Loaded += OnEditorLoaded;
                 editorView.Unloaded += OnEditorUnloaded;
-                editorView.CloseRequested += OnEditorCloseRequested;
+                AttachEditorCloseRequestedHandler();
+
+                void OnEditorLoaded(object? sender, RoutedEventArgs e)
+                {
+                    AttachEditorCloseRequestedHandler();
+                }
 
                 void OnEditorCloseRequested()
                 {
+                    editorView.Loaded -= OnEditorLoaded;
+                    editorView.Unloaded -= OnEditorUnloaded;
                     DetachEditorCloseRequestedHandler();
 
                     var browserPane = Heimdall.Core.Models.SplitTreeHelper.FindPaneByHostControl(
@@ -368,11 +380,27 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                     DetachEditorCloseRequestedHandler();
                 }
 
+                void AttachEditorCloseRequestedHandler()
+                {
+                    if (isCloseHandlerAttached)
+                    {
+                        return;
+                    }
+
+                    editorView.CloseRequested += OnEditorCloseRequested;
+                    isCloseHandlerAttached = true;
+                }
+
                 void DetachEditorCloseRequestedHandler()
                 {
-                    editorView.Unloaded -= OnEditorUnloaded;
+                    if (!isCloseHandlerAttached)
+                    {
+                        return;
+                    }
+
                     // Detach to prevent handler leak identified by audit-2026-04-22 (PERF-01).
                     editorView.CloseRequested -= OnEditorCloseRequested;
+                    isCloseHandlerAttached = false;
                 }
 
                 var editorPane = Heimdall.Core.Models.SplitTreeHelper.FindPaneByHostControl(
@@ -939,6 +967,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     {
         var view = new EmbeddedSftpView
         {
+            ExternalEditorPath = settings?.ExternalEditorPath,
             SessionOperationLog = _sessionOperationLog,
             // Read the LIVE global toggle at the seam (mirrors the RDP/VNC/Citrix wiring), so enabling
             // session logging takes effect without a restart.

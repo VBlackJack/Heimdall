@@ -16,13 +16,21 @@
 
 using System.IO;
 using System.Text;
+using Heimdall.Sftp;
 
 namespace Heimdall.App.Services;
 
 internal sealed record RemoteTextDocument(
     string Text,
     Encoding Encoding,
-    ReadOnlyMemory<byte> Preamble);
+    ReadOnlyMemory<byte> Preamble)
+{
+    /// <summary>
+    /// True when the bytes were not valid UTF-8 and were read as Latin-1 instead. The editor says
+    /// so, and the save writes Latin-1 back.
+    /// </summary>
+    public bool DecodedWithFallback { get; init; }
+}
 
 internal static class RemoteTextFileCodec
 {
@@ -69,12 +77,28 @@ internal static class RemoteTextFileCodec
     {
         byte[] bytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
         (Encoding Encoding, int PreambleLength) detected = DetectEncoding(bytes);
-        string text = detected.Encoding.GetString(
-            bytes,
-            detected.PreambleLength,
-            bytes.Length - detected.PreambleLength);
+        string text;
+        bool decodedWithFallback = false;
+        try
+        {
+            text = detected.Encoding.GetString(
+                bytes,
+                detected.PreambleLength,
+                bytes.Length - detected.PreambleLength);
+        }
+        catch (DecoderFallbackException) when (detected.PreambleLength == 0)
+        {
+            // No byte order mark and not valid UTF-8: every Latin-1 configuration file with an
+            // accent in it. Latin-1 maps every byte, so the file opens; it is written back as
+            // Latin-1, and the editor says so. A file WITH a mark that fails its own encoding is
+            // still refused: that is corruption, not a legacy encoding.
+            text = Encoding.Latin1.GetString(bytes);
+            decodedWithFallback = true;
+        }
+
         byte[] preamble = bytes[..detected.PreambleLength];
-        return new RemoteTextDocument(text, detected.Encoding, preamble);
+        Encoding encoding = decodedWithFallback ? Encoding.Latin1 : detected.Encoding;
+        return new RemoteTextDocument(text, encoding, preamble) { DecodedWithFallback = decodedWithFallback };
     }
 
     internal static async Task WriteAsync(
@@ -88,7 +112,20 @@ internal static class RemoteTextFileCodec
             document.Preamble.Length + content.Length);
         document.Preamble.Span.CopyTo(bytes);
         content.CopyTo(bytes, document.Preamble.Length);
-        await File.WriteAllBytesAsync(filePath, bytes, cancellationToken);
+
+        // Staged beside the destination and published by a rename: a direct write that died
+        // part way left the user's file truncated.
+        string tempPath = AtomicLocalFile.CreateTempPath(filePath);
+        try
+        {
+            await File.WriteAllBytesAsync(tempPath, bytes, cancellationToken);
+            AtomicLocalFile.Commit(tempPath, filePath);
+        }
+        catch
+        {
+            AtomicLocalFile.Rollback(tempPath);
+            throw;
+        }
     }
 
     private static (Encoding Encoding, int PreambleLength) DetectEncoding(byte[] bytes)
