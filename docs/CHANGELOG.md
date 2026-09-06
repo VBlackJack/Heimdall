@@ -159,6 +159,71 @@ guard pins the four properties of the Inno script the updater depends on (the Ap
 registration probe reads, `PrivilegesRequired=lowest`, `skipifsilent`, the `WizardSilent` guard)
 against the constant the updater uses. The startup failure exit code is 1 rather than -1.
 
+### A chmod on a listed symbolic link no longer changes its target
+
+The SFTP browser classified the entry it was about to chmod through a stat that follows links,
+so a chmod on a listed symbolic link changed the mode of whatever the link pointed at, a file the
+user had not selected and possibly could not see. The browser now reads the entry without
+following it and refuses a symbolic link outright. The server-side copy classifies its source the
+same way: a link to a directory used to read as a directory, and `cp -a` then duplicated the
+whole target tree under the new name. Only a regular file or a directory is accepted as a copy
+source.
+
+### Server-supplied names are validated where they enter
+
+Both browsers trusted the name the server gave each listed entry and joined it into every path
+that entry was later used for: delete, download, rename, chmod, and the privileged fallbacks. A
+name containing a separator, a `..` segment or a control character is now skipped at the listing
+boundary, with a warning in the log, for SFTP and for FTP alike. The child-name guard that every
+create, rename and upload already went through refuses control characters as well.
+
+### Uploads work again on servers that allow SFTP but refuse exec
+
+The metadata preflight that protects a replaced file's capabilities, ACLs and extended
+attributes ran on every upload, including one to a path that did not exist yet, and let a raw
+transport exception escape when the server refused the exec channel. On a ForceCommand
+internal-sftp account, a chrooted user or a nologin shell, no file could be uploaded at all and
+the user read the generic "transfer failed". The preflight now runs only when the destination
+exists, and an exec channel that fails is reported as the "exec unavailable" refusal the
+vocabulary already had, with its own localized message. A destination that turns out to be a
+directory is refused before staging rather than by the server after the whole file has been
+sent.
+
+### A failed server-side directory copy no longer leaves a partial tree
+
+The directory branch of the server-side copy reserved the destination with `mkdir` and then ran
+`cp -a`; a copy that failed part way, on a permission, a quota or a full disk, left the reserved
+root and a partial tree on the server while the caller reported that nothing had been copied.
+The command now removes the reserved root when the copy fails and returns the copy's own status.
+The same command escapes both paths through the shell escaper the rest of the file uses, and the
+"destination lies inside the source" refusal collapses `.` and `..` segments before comparing, so
+a source spelled `/srv/./data` is still the source. The recursive delete runs under the same
+per-command timeout every other exec in the browser has; a stalled exec channel used to run for
+as long as the connection lived.
+
+### FTP browser: paths, root deletes, rename and disconnect
+
+The FTP browser's path normalizer collapsed repeated slashes but not `..`, so the current
+directory grew a `/..` per step up and every listed path inherited the spelling. It now collapses
+dot segments and never climbs above the root. `DeleteAsync` refuses the protected root the way
+the SFTP browser does; FluentFTP's directory delete is recursive and the FTP one relied on its
+callers. A rename onto an existing name is refused rather than left to the server, which most
+servers answer by overwriting. The synchronous `Disconnect` waited on the operation lock with no
+timeout, pinning a thread for the whole of a stalled transfer, and `Dispose` then disposed that
+lock under any waiter; the wait is now bounded, the client is torn down under the operation that
+holds the lock, and the lock outlives the browser. Reading the current directory takes the
+operation lock asynchronously instead of blocking the calling thread, which on the UI thread was
+the dispatcher, for as long as a transfer held it.
+
+### The local download commit retries while the file is briefly held
+
+The atomic download commits by moving the completed `.part` file over the destination. On
+Windows an antivirus scanner, the search indexer or a preview handler holds a freshly written
+file, or the one about to be replaced, for a moment; a single unretried move turned that moment
+into a discarded download. The move is retried three times over about half a second, on a sharing
+violation and on the access-denied a held replaced file surfaces as, before the failure
+propagates.
+
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 
 ### The Plink port probe runs before the first wait
