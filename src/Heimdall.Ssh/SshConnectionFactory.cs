@@ -635,8 +635,20 @@ public static class SshConnectionFactory
             return false;
         }
 
+        // Only a passphrase GUESSED from the legacy password mapping may be
+        // abandoned in favour of that same password: the guess was never a
+        // statement about the key. A passphrase the profile states explicitly
+        // is one, and a key that refuses it must be reported as such; falling
+        // back would drop the key silently and let the next refusal be
+        // classified as a rejected key that was never offered.
+        if (!connectionParams.UseLegacyPasswordAsKeyPassphrase
+            || !string.IsNullOrEmpty(connectionParams.KeyPassphrase))
+        {
+            return false;
+        }
+
         // SSH.NET raises typed passphrase/key parsing exceptions before it can
-        // attempt later auth methods. When an explicit password fallback exists,
+        // attempt later auth methods. When the legacy password fallback exists,
         // keep building the connection so password auth can still proceed.
         return ex is SshPassPhraseNullOrEmptyException
             or SshException
