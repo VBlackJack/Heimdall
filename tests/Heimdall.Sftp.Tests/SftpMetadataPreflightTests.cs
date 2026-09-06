@@ -124,6 +124,10 @@ public sealed class SftpMetadataPreflightTests
         // needs CAP_CHOWN. Timestamps are deliberately absent from this probe: the owner CAN
         // restore mtime and atime, so they are an implementation gap, not an unreproducible class.
         Assert.Contains("stat -c %u --", command, StringComparison.Ordinal);
+
+        // BSD stat second: the probe used to exit "tooling unavailable" on every non-GNU server
+        // and a replacement there was refused for good.
+        Assert.Contains("|| stat -f %u --", command, StringComparison.Ordinal);
         Assert.Contains("id -u", command, StringComparison.Ordinal);
         Assert.Contains($"exit {SftpMetadataPreflight.OwnershipStatus}", command, StringComparison.Ordinal);
         Assert.DoesNotContain("touch ", command, StringComparison.Ordinal);

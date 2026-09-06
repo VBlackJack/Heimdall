@@ -149,6 +149,41 @@ public sealed class PrivilegedFileCommandsTests
         Assert.Contains("set -eu;", command, StringComparison.Ordinal);
     }
 
+    /// <remarks>
+    /// The scripts are GNU-only (stat -c, cp --attributes-only, sync -f, mv -T) and used to fail on
+    /// the first such flag with a message about the flag. The probe names the missing tool and
+    /// refuses before anything is staged, on both the write and the read path.
+    /// </remarks>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Scripts_ProbeTheToolingFirstAndExitWithTheirOwnStatus(bool write)
+    {
+        string command = write
+            ? PrivilegedFileCommands.BuildAtomicWriteBody("/srv/app/config")
+            : PrivilegedFileCommands.BuildNoFollowBase64ReadBody("/srv/app/config");
+
+        Assert.Contains("command -v \"$t\"", command, StringComparison.Ordinal);
+        Assert.Contains("for t in stat cp sync mv ln mktemp chmod chown rm rmdir base64 cat; do", command, StringComparison.Ordinal);
+        Assert.Contains("*GNU*)", command, StringComparison.Ordinal);
+        Assert.Contains($"exit {PrivilegedFileCommands.ToolingUnavailableExitStatus};", command, StringComparison.Ordinal);
+
+        // Probed before the work directory exists: nothing to clean up when it refuses.
+        int probe = command.IndexOf("for t in stat", StringComparison.Ordinal);
+        int workDirectory = command.IndexOf("mktemp -d", StringComparison.Ordinal);
+        Assert.True(probe >= 0 && workDirectory > probe, "the probe runs before mktemp");
+    }
+
+    [Fact]
+    public void ToolingUnavailableExitStatus_IsItsOwnStatus()
+    {
+        Assert.Equal(77, PrivilegedFileCommands.ToolingUnavailableExitStatus);
+        Assert.NotEqual(73, PrivilegedFileCommands.ToolingUnavailableExitStatus);
+        Assert.NotEqual(74, PrivilegedFileCommands.ToolingUnavailableExitStatus);
+        Assert.NotEqual(PrivilegedFileCommands.MetadataPreservationFailedExitStatus, PrivilegedFileCommands.ToolingUnavailableExitStatus);
+        Assert.NotEqual(PrivilegedFileCommands.FileTooLargeExitStatus, PrivilegedFileCommands.ToolingUnavailableExitStatus);
+    }
+
     [Fact]
     public void MetadataPreservationFailedExitStatus_DoesNotCollideWithTheNoFollowReadRefusal()
     {

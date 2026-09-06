@@ -24,7 +24,7 @@ namespace Heimdall.Sftp;
 /// </summary>
 /// <remarks>
 /// Pure string construction with no I/O, so the shell-escaping contract is unit-testable in isolation.
-/// Every path is single-quoted through <see cref="InputValidator.EscapeShellArg(string)"/> (CWE-78) and
+/// Every path is single-quoted through <see cref="PathEscaper.EscapeForShell(string)"/> (CWE-78) and
 /// guarded by <c>--</c> so a path beginning with <c>-</c> cannot be parsed as a flag.
 /// <para>
 /// Three claims that must not be conflated. The exclusivity of <c>ln</c> and of <c>mkdir</c> without
@@ -85,6 +85,8 @@ internal static class ServerSideNoClobberPublishCommand
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        return $"mkdir -- {InputValidator.EscapeShellArg(destinationPath)}";
+        // The same escaper as the file publish and the copy: two escapers with different
+        // contracts side by side is how one of them ends up handling a character the other refuses.
+        return $"mkdir -- {PathEscaper.EscapeForShell(destinationPath)}";
     }
 }
