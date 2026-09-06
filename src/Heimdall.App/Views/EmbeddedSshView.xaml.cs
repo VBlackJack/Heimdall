@@ -115,6 +115,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgSetConvertEol = "set-convert-eol:";
 
     /// <summary>
+    /// Outbound message: clipboard text the host has confirmed, base64 encoded. The page hands it
+    /// to xterm's own paste path so bracketed paste and newline folding apply.
+    /// </summary>
+    private const string MsgClipboardPaste = "clipboard-paste:";
+
+    /// <summary>
     /// Maps color scheme names to xterm.js theme JSON object literals.
     /// Keys must match the values stored in <see cref="AppSettings.TerminalColorScheme"/>.
     /// </summary>
@@ -1308,7 +1314,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                         }
 
                         string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
-                        PostTerminalMessage("clipboard-paste:" + base64);
+                        PostTerminalMessage(MsgClipboardPaste + base64);
                     }
                 }
             }
