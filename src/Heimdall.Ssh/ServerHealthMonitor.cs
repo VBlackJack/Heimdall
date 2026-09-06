@@ -264,6 +264,14 @@ public sealed class ServerHealthMonitor : IDisposable
             {
                 break;
             }
+            catch (ObjectDisposedException)
+            {
+                // The shell session disposed its client on disconnect. There is
+                // nothing left to poll, and asking a disposed client again every
+                // interval would only log the same throw for ever.
+                FileLogger.Warn("ServerHealthMonitor: SSH client disposed, stopping poll loop");
+                break;
+            }
             catch (Exception ex)
             {
                 FileLogger.Warn($"ServerHealthMonitor poll error: {ex.Message}");
