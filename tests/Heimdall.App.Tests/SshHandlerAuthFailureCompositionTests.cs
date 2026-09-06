@@ -158,7 +158,7 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
                 dialogService: null!,
                 plinkHostKeyProbe: new NeverProbedPlinkHostKeyProbe(),
                 agentRegistryFactory: _ => new SshAgentRegistry(agents),
-                connectShellSession: (_, _, _, _, _) =>
+                connectShellSession: (_, _, _, _, _, _, _) =>
                     throw new SshAuthenticationException(RefusalFromServer));
         }
 

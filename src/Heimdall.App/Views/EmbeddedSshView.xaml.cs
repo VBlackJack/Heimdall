@@ -290,6 +290,18 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// <summary>The interval the keepalive timer runs at, for the tick's idle check.</summary>
     private int _keepAliveIntervalSeconds;
 
+    /// <summary>
+    /// The last size the page reported (<c>ready:</c> or <c>resize:</c>). Written on the UI
+    /// thread; read by the SSH handler from the connect thread just before it creates the PTY.
+    /// </summary>
+    private TerminalSize? _lastKnownTerminalSize;
+
+    /// <summary>
+    /// The last size the terminal page reported, or <see langword="null"/> before it has spoken.
+    /// The SSH handler creates the PTY at this size when it is known before the connect.
+    /// </summary>
+    internal TerminalSize? LastKnownTerminalSize => Volatile.Read(ref _lastKnownTerminalSize);
+
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
     public Core.Localization.LocalizationManager? Localizer
     {
@@ -485,6 +497,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             StartHealthMonitor();
         }
 
+        // The page usually reports its size before the session exists; that resize went to a
+        // null session. Replayed now that there is one to receive it.
+        ReplayLastKnownTerminalSize();
+
         UpdateStatus("Connected");
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
@@ -533,6 +549,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         _terminalSession.DataReceived += _terminalDataHandler;
         _terminalSession.ProcessExited += _terminalExitHandler;
+
+        // Same replay as AttachSession. A no-op on the Plink pipe transport, which cannot
+        // resize after start; that path carries the size into the launch instead.
+        ReplayLastKnownTerminalSize();
 
         // The xterm.js convertEol option is baked at terminal construction time
         // (GetTerminalHtml). For SSH the view is mounted in a "Connecting" state
@@ -1201,6 +1221,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
             if (TryParseSize(message.AsSpan(MsgReady.Length), out int readyCols, out int readyRows))
             {
+                RememberTerminalSize(readyCols, readyRows);
                 ResizeSession(readyCols, readyRows);
             }
 
@@ -1214,6 +1235,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             if (TryParseSize(message.AsSpan(MsgResize.Length), out int cols, out int rows))
             {
+                RememberTerminalSize(cols, rows);
                 ResizeSession(cols, rows);
             }
             return;
@@ -1647,6 +1669,26 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 _autoReconnectOnProcessExit,
                 suppressAutoReconnect);
         OnDisconnected(disconnectInfo);
+    }
+
+    /// <summary>
+    /// Keeps the last size the page reported, for the handler to create the PTY with and for the
+    /// attach to replay. Sizes arrive validated by <see cref="TryParseSize"/>: both positive.
+    /// </summary>
+    private void RememberTerminalSize(int columns, int rows)
+    {
+        Volatile.Write(ref _lastKnownTerminalSize, new TerminalSize(columns, rows));
+    }
+
+    /// <summary>
+    /// Resizes the freshly attached session to the size the page reported before it existed.
+    /// </summary>
+    private void ReplayLastKnownTerminalSize()
+    {
+        if (Volatile.Read(ref _lastKnownTerminalSize) is { } size)
+        {
+            ResizeSession(size.Columns, size.Rows);
+        }
     }
 
     private void ResizeSession(int columns, int rows)

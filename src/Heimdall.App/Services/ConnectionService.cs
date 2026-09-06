@@ -37,6 +37,7 @@ public sealed class ConnectionService : IConnectionService
     private readonly Dictionary<string, IProtocolHandler> _handlers;
     private Action<string>? _setStatusText;
     private Func<ServerProfileDto, Task<bool>>? _confirmExecution;
+    private Func<string, TerminalSize?>? _resolveInitialTerminalSize;
 
     /// <summary>Cached snapshot of the latest application settings.</summary>
     private AppSettings? _currentSettings;
@@ -61,6 +62,23 @@ public sealed class ConnectionService : IConnectionService
             if (_handlers.TryGetValue("SSH", out var handler) && handler is SshHandler sshHandler)
             {
                 sshHandler.SetStatusText = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Relay wired by the shell so the SSH handler can create the PTY at the size the terminal
+    /// page already reported for a session id. Returns <see langword="null"/> when unknown.
+    /// </summary>
+    internal Func<string, TerminalSize?>? ResolveInitialTerminalSize
+    {
+        get => _resolveInitialTerminalSize;
+        set
+        {
+            _resolveInitialTerminalSize = value;
+            if (_handlers.TryGetValue("SSH", out var handler) && handler is SshHandler sshHandler)
+            {
+                sshHandler.ResolveInitialTerminalSize = value;
             }
         }
     }
@@ -92,6 +110,7 @@ public sealed class ConnectionService : IConnectionService
         if (_handlers.TryGetValue("SSH", out var handler) && handler is SshHandler sshHandler)
         {
             sshHandler.SetStatusText = _setStatusText;
+            sshHandler.ResolveInitialTerminalSize = _resolveInitialTerminalSize;
         }
 
         _configManager.SettingsChanged += OnSettingsChanged;
