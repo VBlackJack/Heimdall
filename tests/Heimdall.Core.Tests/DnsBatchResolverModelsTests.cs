@@ -24,7 +24,7 @@ public sealed class DnsBatchResolverModelsTests
     [Fact]
     public void Placeholder_UsesEmDash()
     {
-        Assert.Equal("\u2014", DnsBatchResolveResult.Placeholder);
+        Assert.Equal("-", DnsBatchResolveResult.Placeholder);
     }
 
     [Fact]

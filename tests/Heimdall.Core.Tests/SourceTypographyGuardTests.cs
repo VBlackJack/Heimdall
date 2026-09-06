@@ -123,6 +123,42 @@ public sealed class SourceTypographyGuardTests
             + string.Join("\n", violations.Take(MaxViolationsReported)));
     }
 
+    /// <summary>
+    /// The raw scan above deliberately leaves <c>\uXXXX</c> escapes alone, because a parser
+    /// alphabet may need one. A dash is never a parser alphabet: twenty-five escaped em dashes
+    /// reached users through fallback strings and placeholders while every literal guard stayed
+    /// green.
+    /// </summary>
+    [Fact]
+    public void ProductSourcesUseNoEscapedDashes()
+    {
+        string[] escapes = ["\\u2013", "\\u2014", "\\u2212", "\\u2010", "\\u2011"];
+        List<string> violations = [];
+        int scanned = 0;
+
+        foreach (string path in ProductSources())
+        {
+            scanned++;
+            string[] lines = File.ReadAllLines(path);
+            for (int index = 0; index < lines.Length; index++)
+            {
+                foreach (string escape in escapes)
+                {
+                    if (lines[index].Contains(escape, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        violations.Add($"{Relative(path)}:{index + 1} contains the escape {escape}");
+                    }
+                }
+            }
+        }
+
+        Assert.True(scanned >= MinimumSourceFilesScanned, $"only {scanned} product sources were scanned");
+        Assert.True(
+            violations.Count == 0,
+            $"{violations.Count} escaped dash(es) in product sources:\n"
+            + string.Join("\n", violations.Take(MaxViolationsReported)));
+    }
+
     [Theory]
     [InlineData("en.json")]
     [InlineData("fr.json")]

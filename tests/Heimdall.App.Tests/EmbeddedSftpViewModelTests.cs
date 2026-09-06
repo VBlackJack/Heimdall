@@ -26,6 +26,7 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Ssh;
 using Heimdall.Sftp;
 using Heimdall.Ssh;
+using Renci.SshNet.Common;
 
 namespace Heimdall.App.Tests;
 
@@ -417,7 +418,7 @@ public sealed class EmbeddedSftpViewModelTests
             Path.GetTempPath());
 
         Assert.Equal(0, browser.DownloadCallCount);
-        Assert.Equal("No files downloaded \u2014 folders aren't supported.", viewModel.StatusText);
+        Assert.Equal("No files downloaded - folders aren't supported.", viewModel.StatusText);
         Assert.False(viewModel.IsErrorStatus);
         Assert.False(viewModel.IsTransferInProgress);
     }
@@ -562,8 +563,14 @@ public sealed class EmbeddedSftpViewModelTests
             // SSH.NET reports an existing directory with the generic message "Failure" (not
             // "already exists"); tolerance must not depend on the error text.
             CreateDirectoryException = new IOException("Failure"),
-            // The existence probe lists the directory; a successful listing means it exists -> merge.
-            ListDirectoryHandler = (_, _) => Task.FromResult<IReadOnlyList<SftpFileInfo>>([])
+            // The parent's listing shows the directory, which is what proves it. An empty
+            // listing of the directory itself proves nothing: an FTP LIST on an absent path
+            // often answers empty, and a parent "proved" that way let a real mkdir failure
+            // pass as "already exists".
+            ListDirectoryHandler = (path, _) => Task.FromResult<IReadOnlyList<SftpFileInfo>>(
+                path == "/srv"
+                    ? [CreateRemoteEntry("proj", "/srv/proj", isDirectory: true)]
+                    : []),
         };
         SetBrowser(viewModel, browser);
 
@@ -600,9 +607,10 @@ public sealed class EmbeddedSftpViewModelTests
         FakeRemoteBrowser browser = new()
         {
             // A genuine mkdir failure (e.g. permission), and the probe finds no such directory.
+            // The absence is typed: an untyped listing failure now refuses the batch up front.
             CreateDirectoryException = new IOException("Failure"),
             ListDirectoryHandler = (_, _) =>
-                Task.FromException<IReadOnlyList<SftpFileInfo>>(new IOException("No such file")),
+                Task.FromException<IReadOnlyList<SftpFileInfo>>(new SftpPathNotFoundException("No such file")),
         };
         SetBrowser(viewModel, browser);
 
@@ -885,6 +893,146 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.Equal(0, browser.ListDirectoryCallCount);
         Assert.Equal(localizer["SftpStatusTransferFailed"], viewModel.StatusText);
         Assert.True(viewModel.IsErrorStatus);
+    }
+
+    /// <remarks>
+    /// A failure part way used to abandon the batch without a refresh, so the entries already
+    /// changed were shown with their old mode. Delete got the per-entry treatment; chmod did not.
+    /// </remarks>
+    [Fact]
+    public async Task ChmodEntriesAsync_OneEntryFails_ContinuesRefreshesAndSummarises()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new()
+        {
+            ChmodException = new IOException("chmod failed"),
+            ChmodFailurePath = "/srv/two.txt",
+        };
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService("640"));
+        SftpFileInfo[] entries =
+        [
+            CreateRemoteEntry("one.txt", "/srv/one.txt", isDirectory: false),
+            CreateRemoteEntry("two.txt", "/srv/two.txt", isDirectory: false),
+            CreateRemoteEntry("three.txt", "/srv/three.txt", isDirectory: false),
+        ];
+
+        await viewModel.ChmodEntriesAsync(entries);
+
+        Assert.Equal(3, browser.ChmodCallCount);
+        Assert.Equal(1, browser.ListDirectoryCallCount);
+        Assert.Equal(localizer.Format("SftpChmodPartialSummary", 1, 3), viewModel.StatusText);
+        Assert.False(viewModel.IsErrorStatus);
+    }
+
+    [Fact]
+    public async Task ChmodEntriesAsync_AcceptsAFourDigitModeAndPassesTheSpecialBits()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService("4755"));
+        SftpFileInfo entry = CreateRemoteEntry("bin", "/srv/bin", isDirectory: false);
+
+        await viewModel.ChmodEntriesAsync([entry]);
+
+        Assert.Equal(1, browser.ChmodCallCount);
+        Assert.Equal((short)(SftpPermissionMode.SetUid | 0b111_101_101), browser.LastChmodMode);
+        Assert.True(browser.LastChmodCancellationToken.CanBeCanceled, "chmod runs under the lifecycle token");
+        Assert.False(viewModel.IsErrorStatus);
+    }
+
+    /// <remarks>
+    /// The one-shot operations ran under no token at all, so a batch delete kept issuing
+    /// commands after the pane had been torn down.
+    /// </remarks>
+    [Fact]
+    public async Task DeleteEntriesAsync_RunsUnderTheLifecycleToken()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        viewModel.SetDialogService(new ConfirmingDialogService());
+        SftpFileInfo entry = CreateRemoteEntry("one.txt", "/srv/one.txt", isDirectory: false);
+
+        await viewModel.DeleteEntriesAsync([entry]);
+
+        Assert.Equal(1, browser.DeleteCallCount);
+        Assert.True(browser.LastDeleteCancellationToken.CanBeCanceled);
+        Assert.False(browser.LastDeleteCancellationToken.IsCancellationRequested);
+
+        viewModel.MarkDisposed();
+
+        Assert.True(browser.LastDeleteCancellationToken.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_SeveralEntries_ConfirmsWithTheCountNotAQuotedName()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SetLocalizer(viewModel, localizer);
+        ConfirmingDialogService dialogService = new();
+        viewModel.SetDialogService(dialogService);
+        SftpFileInfo[] entries =
+        [
+            CreateRemoteEntry("one.txt", "/srv/one.txt", isDirectory: false),
+            CreateRemoteEntry("logs", "/srv/logs", isDirectory: true),
+        ];
+
+        await viewModel.DeleteEntriesAsync(entries);
+
+        (string _, string message, string _) = Assert.Single(dialogService.ConfirmCalls);
+        Assert.Equal(localizer.Format("SftpConfirmDeleteMultiple", "2"), message);
+        Assert.DoesNotContain("\"", message, StringComparison.Ordinal);
+        Assert.Contains("cannot be undone", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <remarks>
+    /// Eight localized refusals, each naming the metadata at stake and a remedy, were carried by
+    /// this exception and read by nothing: every one showed "Transfer failed".
+    /// </remarks>
+    [Fact]
+    public async Task DescribeTransferError_MetadataPreservationRefusal_UsesItsOwnMessage()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+        SftpMetadataPreservationException refusal = new(
+            SftpMetadataPreflightVerdict.CapabilitiesPresent,
+            "/srv/app/agent");
+
+        string message = viewModel.DescribeTransferError(refusal);
+
+        Assert.Equal(localizer.Format("ErrorSftpReplaceRefusedCapabilities", "/srv/app/agent"), message);
+        Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
+    }
+
+    [Fact]
+    public async Task DescribeTransferError_InventoryFailure_NamesTheDirectory()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+        RemoteUploadInventoryException refusal = new("/srv/incoming", new IOException("reset"));
+
+        string message = viewModel.DescribeTransferError(refusal);
+
+        Assert.Equal(localizer.Format("SftpErrorUploadInventoryFailed", "/srv/incoming"), message);
     }
 
     [Fact]
@@ -1338,6 +1486,9 @@ public sealed class EmbeddedSftpViewModelTests
         SetBrowser(viewModel, browser);
         SftpFileInfo file = CreateRemoteEntry("report.txt", "/src/report.txt", isDirectory: false);
         viewModel.UnfilteredEntries = [file];
+
+        // Names come from a live listing of the destination, not from the rendered entries.
+        browser.ListDirectoryHandler = (_, _) => Task.FromResult<IReadOnlyList<SftpFileInfo>>([file]);
 
         await viewModel.DuplicateEntriesAsync([file]);
 
@@ -1987,14 +2138,22 @@ public sealed class EmbeddedSftpViewModelTests
                 : DeleteHandler(path, ct);
         }
 
+        /// <summary>When set, only a chmod of this path throws <see cref="ChmodException"/>.</summary>
+        public string? ChmodFailurePath { get; set; }
+
+        public CancellationToken LastChmodCancellationToken { get; private set; }
+
         public Task ChmodAsync(string path, short mode, CancellationToken ct = default)
         {
             LastChmodPath = path;
             LastChmodMode = mode;
+            LastChmodCancellationToken = ct;
             Interlocked.Increment(ref _chmodCallCount);
-            return ChmodException is null
-                ? Task.CompletedTask
-                : Task.FromException(ChmodException);
+            bool fails = ChmodException is not null
+                && (ChmodFailurePath is null || string.Equals(path, ChmodFailurePath, StringComparison.Ordinal));
+            return fails
+                ? Task.FromException(ChmodException!)
+                : Task.CompletedTask;
         }
 
         /// <summary>When set, RenameAsync throws for an entry whose old path equals this value.</summary>

@@ -922,6 +922,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         };
         FakeRemoteBrowser sourceBrowser = new();
         FakeRemoteBrowser targetBrowser = new() { IsConnected = false };
+        targetBrowser.Listings["/dst"] = [];
         SetBrowser(targetPane, targetBrowser);
         SetEndpointKey(targetPane, "host=b;port=22;user=bob");
         clipboard.Set(CreateContent("host=a;port=22;user=alice", sourceBrowser));
@@ -1008,6 +1009,76 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
     // browser: a token that turns out not to be the coordinator's leaves the assertion green under a
     // cancellation mutant, which is exactly how a first draft of these tests passed vacuously.
 
+    /// <remarks>
+    /// A cut publishes by a bare rename, which on FTP (RNFR/RNTO) many servers answer by
+    /// overwriting; the names used to come from the pane's last rendering, and the only thing
+    /// between the user and an overwritten file was how old that snapshot was.
+    /// </remarks>
+    [Fact]
+    public async Task PasteClipboardAsync_CutSameEndpoint_NamesFromTheLiveListingNotTheSnapshot()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel sourcePane = new(new FakeUiDispatcher(), clipboard)
+        {
+            CurrentPath = "/src",
+            IsConnected = true
+        };
+        EmbeddedSftpViewModel targetPane = new(new FakeUiDispatcher(), clipboard)
+        {
+            CurrentPath = "/dst",
+            IsConnected = true,
+            UnfilteredEntries = []
+        };
+        FakeRemoteBrowser targetBrowser = new();
+        targetBrowser.Listings["/dst"] = [CreateEntry("a.txt", "/dst/a.txt", isDirectory: false)];
+        SetBrowser(targetPane, targetBrowser);
+        SftpFileInfo sourceEntry = CreateEntry("a.txt", "/src/a.txt", isDirectory: false);
+
+        SetEndpointKey(sourcePane, "host=server;port=22;user=alice");
+        SetEndpointKey(targetPane, "host=server;port=22;user=alice");
+        sourcePane.SetSelection([sourceEntry], sourceEntry);
+        sourcePane.CutSelectedCommand.Execute(null);
+
+        await targetPane.PasteClipboardAsync();
+
+        Assert.Equal(1, targetBrowser.RenameCallCount);
+        Assert.NotEqual("/dst/a.txt", targetBrowser.LastRenamedNewPath);
+        Assert.StartsWith("/dst/a", targetBrowser.LastRenamedNewPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PasteClipboardAsync_SameEndpointCancelled_ReportsACancellationNotAFailure()
+    {
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel sourcePane = new(new FakeUiDispatcher(), clipboard)
+        {
+            CurrentPath = "/src",
+            IsConnected = true
+        };
+        EmbeddedSftpViewModel targetPane = new(new FakeUiDispatcher(), clipboard)
+        {
+            CurrentPath = "/dst",
+            IsConnected = true,
+            UnfilteredEntries = []
+        };
+        FakeRemoteBrowser targetBrowser = new();
+        targetBrowser.Listings["/dst"] = [];
+        targetBrowser.CopyHandler = (_, _, _, _) => throw new OperationCanceledException();
+        SetBrowser(targetPane, targetBrowser);
+        SftpFileInfo sourceEntry = CreateEntry("a.txt", "/src/a.txt", isDirectory: false);
+
+        SetEndpointKey(sourcePane, "host=server;port=22;user=alice");
+        SetEndpointKey(targetPane, "host=server;port=22;user=alice");
+        sourcePane.SetSelection([sourceEntry], sourceEntry);
+        sourcePane.CopySelectedCommand.Execute(null);
+
+        await targetPane.PasteClipboardAsync();
+
+        Assert.Single(targetBrowser.CopyCalls);
+        Assert.False(targetPane.IsErrorStatus);
+        Assert.Equal("Transfer cancelled", targetPane.StatusText);
+    }
+
     [Fact]
     public async Task PasteClipboardAsync_SameEndpointWhileTransferRuns_RefusesAndLeavesRunningTransferAlive()
     {
@@ -1016,6 +1087,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FakeRemoteBrowser targetBrowser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        targetBrowser.Listings["/dst"] = [];
         SetBrowser(targetPane, targetBrowser);
         SetEndpointKey(targetPane, "host=server;port=22;user=alice");
         clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
@@ -1056,6 +1128,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FakeRemoteBrowser targetBrowser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        targetBrowser.Listings["/dst"] = [];
         SetBrowser(targetPane, targetBrowser);
         SetEndpointKey(targetPane, "host=server;port=22;user=alice");
         clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
@@ -1096,6 +1169,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FakeRemoteBrowser browser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        browser.Listings["/dst"] = [];
         SetBrowser(pane, browser);
         SetEndpointKey(pane, "host=server;port=22;user=alice");
         clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
@@ -1152,6 +1226,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         RemoteClipboardService clipboard = new();
         EmbeddedSftpViewModel pane = CreateReceivingPane(clipboard);
         FakeRemoteBrowser browser = new();
+        browser.Listings["/dst"] = [];
         SetBrowser(pane, browser);
         SftpFileInfo entry = CreateEntry("b.txt", "/dst/b.txt", isDirectory: false);
 
@@ -1177,6 +1252,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
                 await releaseCopy.Task;
             }
         };
+        targetBrowser.Listings["/dst"] = [];
         SetBrowser(targetPane, targetBrowser);
         SetEndpointKey(targetPane, "host=server;port=22;user=alice");
         clipboard.Set(CreateTwoEntryContent("host=server;port=22;user=alice"));
@@ -1209,6 +1285,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         TaskCompletionSource copyStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource releaseCopy = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FakeRemoteBrowser browser = BlockingCopyBrowser(copyStarted, releaseCopy);
+        browser.Listings["/dst"] = [];
         SetBrowser(pane, browser);
 
         try
@@ -1251,6 +1328,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
                 await releaseCopy.Task;
             }
         };
+        targetBrowser.Listings["/dst"] = [];
         SetBrowser(targetPane, targetBrowser);
         SetEndpointKey(targetPane, "host=server;port=22;user=alice");
         clipboard.Set(CreateContent("host=server;port=22;user=alice"));
@@ -1294,6 +1372,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
                 await releaseCopy.Task;
             }
         };
+        browser.Listings["/dst"] = [];
         SetBrowser(pane, browser);
 
         try

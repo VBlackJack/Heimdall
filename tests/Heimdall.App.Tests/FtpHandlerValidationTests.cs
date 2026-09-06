@@ -73,7 +73,6 @@ public sealed class FtpHandlerValidationTests
 
         var warning = FtpHandler.ComputeCleartextWarning(
             useSsl: false,
-            username: "operator",
             host: "ftp.example.com",
             port: 21,
             localizer);
@@ -83,17 +82,30 @@ public sealed class FtpHandlerValidationTests
         Assert.Contains("cleartext", warning, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Theory]
-    [InlineData(true, "operator")]
-    [InlineData(false, null)]
-    [InlineData(false, "")]
-    public void ComputeCleartextWarning_TlsOrEmptyUsername_ReturnsNull(
-        bool useSsl,
-        string? username)
+    /// <remarks>
+    /// The warning used to be suppressed for an anonymous session. The credential risk is
+    /// absent then; the content risk is not, and the warning is about the channel.
+    /// </remarks>
+    [Fact]
+    public async Task ComputeCleartextWarning_NonTls_WarnsWithoutACredential()
+    {
+        var localizer = await CreateLocalizerAsync();
+
+        var warning = FtpHandler.ComputeCleartextWarning(
+            useSsl: false,
+            host: "ftp.example.com",
+            port: 21,
+            localizer);
+
+        Assert.NotNull(warning);
+        Assert.Contains("file contents", warning, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ComputeCleartextWarning_Tls_ReturnsNull()
     {
         var warning = FtpHandler.ComputeCleartextWarning(
-            useSsl,
-            username,
+            useSsl: true,
             "ftp.example.com",
             21,
             new LocalizationManager());

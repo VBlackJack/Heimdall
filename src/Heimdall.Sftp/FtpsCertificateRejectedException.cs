@@ -16,6 +16,26 @@
 
 namespace Heimdall.Sftp;
 
+/// <summary>Why an FTPS server certificate was refused.</summary>
+public enum FtpsCertificateRejectionReason
+{
+    /// <summary>The server presented no certificate at all.</summary>
+    NotPresented,
+
+    /// <summary>A certificate is pinned for this endpoint and the presented one differs.</summary>
+    Mismatch,
+
+    /// <summary>
+    /// The presented certificate is the pinned one, but it no longer passes the checks a pin
+    /// cannot override: expired, revoked, or a chain whose revocation status cannot be
+    /// determined for a pin the system validated.
+    /// </summary>
+    PinnedCertificateInvalid,
+
+    /// <summary>The user answered the first-use prompt with Reject.</summary>
+    RejectedByUser,
+}
+
 public sealed class FtpsCertificateRejectedException : Exception
 {
     public FtpsCertificateRejectedException(
@@ -23,7 +43,7 @@ public sealed class FtpsCertificateRejectedException : Exception
         int port,
         string presentedFingerprint,
         string? storedFingerprint,
-        bool isMismatch,
+        FtpsCertificateRejectionReason reason,
         string message,
         Exception? innerException = null)
         : base(message, innerException)
@@ -32,7 +52,7 @@ public sealed class FtpsCertificateRejectedException : Exception
         Port = port;
         PresentedFingerprint = presentedFingerprint;
         StoredFingerprint = storedFingerprint;
-        IsMismatch = isMismatch;
+        Reason = reason;
     }
 
     public string Host { get; }
@@ -43,5 +63,12 @@ public sealed class FtpsCertificateRejectedException : Exception
 
     public string? StoredFingerprint { get; }
 
-    public bool IsMismatch { get; }
+    /// <summary>
+    /// Why the certificate was refused. A pin that expired or was revoked used to be reported
+    /// with the same words as a Reject click, and the user could not tell a decision of theirs
+    /// from a certificate that had gone bad.
+    /// </summary>
+    public FtpsCertificateRejectionReason Reason { get; }
+
+    public bool IsMismatch => Reason == FtpsCertificateRejectionReason.Mismatch;
 }

@@ -81,7 +81,6 @@ public sealed class DialogFtpsCertificateVerifierTests
             "ftps.example.com",
             21,
             "SHA256:presented",
-            null,
             "CN=ftps.example.com",
             "CN=Test CA",
             DateTimeOffset.UtcNow.AddDays(-1),

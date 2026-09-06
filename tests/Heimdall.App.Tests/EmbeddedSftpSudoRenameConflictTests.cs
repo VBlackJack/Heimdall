@@ -24,6 +24,7 @@ using Heimdall.Core.Import;
 using Heimdall.Core.Ssh;
 using Heimdall.Sftp;
 using Heimdall.Ssh;
+using Renci.SshNet.Common;
 
 namespace Heimdall.App.Tests;
 
@@ -289,7 +290,7 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
             => throw new NotSupportedException();
 
         public Task RenameAsync(string oldPath, string newPath, CancellationToken ct = default)
-            => Task.FromException(new UnauthorizedAccessException("rename denied"));
+            => Task.FromException(new SftpPermissionDeniedException("rename denied"));
 
         public Task CopyAsync(
             string sourcePath,

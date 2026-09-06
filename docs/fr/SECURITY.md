@@ -152,8 +152,10 @@ Sur une clé qui a changé, l'invite met par défaut et en focus **Refuser** : l
 réflexe Entrée appris sur l'invite de première utilisation, où Entrée accepte,
 ne doit pas connecter à un hôte dont la clé ne correspond plus à celle
 stockée. Accepter la nouvelle clé ou ne lui faire confiance que pour une
-session demande un clic explicite. L'invite de certificat FTPS suit la même
-règle. Remplacer une clé ne reporte jamais l'ancien blob de clé publique :
+session demande un clic explicite. L'invite de certificat FTPS n'est qu'une
+invite de première utilisation : un certificat FTPS qui a changé est refusé
+sans invite, et approuver un remplaçant passe par la suppression du
+certificat enregistré. Remplacer une clé ne reporte jamais l'ancien blob de clé publique :
 l'entrée porte la nouvelle empreinte avec le blob de l'appelant ou aucun, si
 bien que l'export known_hosts ne peut jamais réécrire une clé que
 l'utilisateur vient de rejeter. Une discordance résolue contre une entrée
@@ -428,7 +430,9 @@ restauration en échec lève une `InvalidOperationException` portant à la fois
 l'erreur de validation et l'erreur de restauration. Entre les deux
 déplacements, la destination n'existe pas : un lecteur concurrent peut donc
 observer un fichier manquant, et un plantage peut laisser la charge utile sous
-le voisin `.bak`.
+le voisin `.bak`. Heimdall ne reprend pas depuis cet état : un voisin
+`<nom>.<guid>.bak` laissé par une validation interrompue est le fichier
+précédent, à renommer à la main.
 
 Le remplacement FTP ne préserve par ailleurs aucune métadonnée du fichier
 remplacé. Ce qui atterrit à la destination est un fichier fraîchement remonté,
@@ -453,15 +457,22 @@ ces cas rien n'a été remplacé.
 ### Avertissements de transport FTP et FTPS
 
 Le FTP est implémenté au-dessus de l'`AsyncFtpClient` de FluentFTP. `FtpHandler`
-valide l'hôte et le port cibles avant la connexion. Si un utilisateur se
-connecte avec des identifiants alors que TLS est désactivé,
+valide l'hôte et le port cibles avant la connexion. Si TLS est désactivé,
 `ConnectionResult.Warning` porte vers la surface de statut un avertissement
-localisé et non bloquant sur la circulation en clair ; cela ne bloque ni les
-sessions anonymes ni les sessions FTPS explicites. Le FTPS explicite active TLS
+localisé et non bloquant sur la circulation en clair, pour les sessions
+anonymes aussi : aucun identifiant ne circule alors, mais chaque fichier, oui,
+en clair. Les sessions FTPS explicites n'ont pas d'avertissement. Le plancher
+TLS est fixé à 1.2 et 1.3. Le FTPS explicite active TLS
 pour le canal de contrôle ainsi que `DataConnectionEncryption` de FluentFTP, de
 sorte que les transferts de fichiers utilisent un canal de données chiffré.
 
-Le certificat du canal de contrôle FTPS est validé et épinglé par Heimdall. Le
+Le certificat du canal de contrôle FTPS est validé et épinglé par Heimdall. Une
+épingle validée par le système est refusée, sans invite, quand le statut de
+révocation de sa chaîne ne peut plus être déterminé : l'adversaire contre lequel
+une épingle existe détient une clé volée, révoquée depuis, et bloque OCSP et
+CRL. Une épingle auto-signée confirmée par l'utilisateur n'a jamais eu de statut
+vérifiable et garde son comportement. Une épingle refusée est signalée comme
+telle, avec d'autres mots qu'un clic sur Refuser. Le
 canal de données souffre d'une limitation tierce dans FluentFTP 54.2.0 :
 `FtpDataStream` installe un gestionnaire d'acceptation de certificat
 inconditionnel, si bien que Heimdall ne peut pas vérifier l'identité de ce

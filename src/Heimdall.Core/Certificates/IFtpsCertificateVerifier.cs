@@ -27,7 +27,6 @@ public sealed record FtpsCertificatePrompt(
     string Host,
     int Port,
     string PresentedFingerprint,
-    string? StoredFingerprint,
     string Subject,
     string Issuer,
     DateTimeOffset NotBefore,

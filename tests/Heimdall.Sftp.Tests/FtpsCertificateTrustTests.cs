@@ -131,6 +131,7 @@ public sealed class FtpsCertificateTrustTests
                 "self-signed certificate"));
 
         Assert.False(ex.IsMismatch);
+        Assert.Equal(FtpsCertificateRejectionReason.RejectedByUser, ex.Reason);
         Assert.Null(store.GetEntry("rejected.example.com", 21));
         Assert.Equal(1, verifier.CallCount);
     }
@@ -220,6 +221,9 @@ public sealed class FtpsCertificateTrustTests
                 "certificate expired"));
 
         Assert.False(ex.IsMismatch);
+
+        // Its own reason: an expired pin used to be reported in the words of a Reject click.
+        Assert.Equal(FtpsCertificateRejectionReason.PinnedCertificateInvalid, ex.Reason);
         Assert.Equal(original.LastSeen, store.GetEntry("persistent-expired.example.com", 990)!.LastSeen);
         Assert.Equal(0, verifier.CallCount);
     }
@@ -254,9 +258,57 @@ public sealed class FtpsCertificateTrustTests
     [Theory]
     [InlineData("ftp.example.com", 21, "ftp.example.com:21")]
     [InlineData("2001:db8::1", 990, "[2001:db8::1]:990")]
+    // DNS names are case-insensitive; two spellings used to keep two pins, and the second
+    // spelling met a first-use prompt instead of a change detection.
+    [InlineData("FTP.Example.COM", 21, "ftp.example.com:21")]
+    [InlineData("2001:DB8::1", 990, "[2001:db8::1]:990")]
     public void MakeKey_FormatsHostPortForPersistence(string host, int port, string expected)
     {
         Assert.Equal(expected, FtpsCertificateStore.MakeKey(host, port));
+    }
+
+    [Fact]
+    public void LoadEntriesFromConfig_FoldsTheCaseOfKeysWrittenBeforeTheRule()
+    {
+        using var certificate = CreateCertificate("CN=case.example.com");
+        var store = new FtpsCertificateStore();
+        FtpsCertificateEntry entry = CreateEntry(certificate, FtpsCertificateSource.SystemValidated);
+
+        store.LoadEntriesFromConfig([new KeyValuePair<string, FtpsCertificateEntry>("Case.Example.com:21", entry)]);
+
+        Assert.NotNull(store.GetEntry("case.example.com", 21));
+        Assert.NotNull(store.GetEntry("CASE.EXAMPLE.COM", 21));
+    }
+
+    /// <remarks>
+    /// The pin exists against one adversary: the holder of a stolen, since-revoked key who
+    /// blocks OCSP and CRL so the status comes back unknown. A system-validated pin refuses that
+    /// status; a self-signed pin the user confirmed never had a checkable status.
+    /// </remarks>
+    [Theory]
+    [InlineData(X509ChainStatusFlags.RevocationStatusUnknown, FtpsCertificateSource.SystemValidated, true)]
+    [InlineData(X509ChainStatusFlags.OfflineRevocation, FtpsCertificateSource.SystemValidated, true)]
+    [InlineData(X509ChainStatusFlags.RevocationStatusUnknown, FtpsCertificateSource.UserConfirmed, false)]
+    [InlineData(X509ChainStatusFlags.OfflineRevocation, FtpsCertificateSource.UserConfirmed, false)]
+    [InlineData(X509ChainStatusFlags.Revoked, FtpsCertificateSource.UserConfirmed, true)]
+    [InlineData(X509ChainStatusFlags.UntrustedRoot, FtpsCertificateSource.UserConfirmed, false)]
+    [InlineData(X509ChainStatusFlags.NoError, FtpsCertificateSource.SystemValidated, false)]
+    public void IsNonOverridableChainError_RefusesAnUnknownRevocationStatusOnASystemValidatedPin(
+        X509ChainStatusFlags status,
+        FtpsCertificateSource source,
+        bool expected)
+    {
+        Assert.Equal(expected, FtpBrowser.IsNonOverridableChainError(status, source));
+    }
+
+    [Fact]
+    public void CreateConfig_PinsTheTlsFloorToOneTwoAndOneThree()
+    {
+        FluentFTP.FtpConfig config = FtpBrowser.CreateConfig(passiveMode: true, useSsl: true);
+
+        Assert.Equal(
+            System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13,
+            config.SslProtocols);
     }
 
     private static X509Certificate2 CreateCertificate(string subjectName)

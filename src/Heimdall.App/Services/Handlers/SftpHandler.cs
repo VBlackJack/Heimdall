@@ -364,7 +364,7 @@ internal sealed class SftpHandler : IProtocolHandler
         var message = _localizer["ErrorHostKeyMismatch"];
         if (string.Equals(message, "ErrorHostKeyMismatch", StringComparison.Ordinal))
         {
-            message = "SSH host key mismatch \u2014 possible MITM. Stored fingerprint differs from server-presented fingerprint.";
+            message = "SSH host key mismatch - possible MITM. Stored fingerprint differs from server-presented fingerprint.";
         }
 
         var detail = _localizer.Format(

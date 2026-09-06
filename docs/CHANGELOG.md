@@ -224,6 +224,77 @@ into a discarded download. The move is retried three times over about half a sec
 violation and on the access-denied a held replaced file surfaces as, before the failure
 propagates.
 
+### A transient listing failure no longer sends an upload batch as replacements
+
+Before an upload, the browser lists each planned destination directory to find conflicts. Every
+failure of that listing was swallowed as "the directory does not exist yet", so a dropped
+connection, a timeout or a server error during the inventory produced an empty inventory, no
+conflict, no dialog, and every file went out as a replacement of whatever was there. Only a
+typed absence is silence now; any other failure refuses the batch before its first byte, and
+the message names the directory that could not be listed. The inventory compares names
+case-insensitively unless a listing proves the server tells case apart, since on OpenSSH for
+Windows, IIS FTP or macOS `Readme.txt` replaced `README.TXT` without a dialog. A directory is
+proved by a directory entry in its parent's listing, not by an empty listing of itself: an FTP
+LIST on an absent path often answers empty, and a parent "proved" that way let a real mkdir
+failure pass as "already exists".
+
+### Upload failures keep their reason, and their count
+
+The metadata preflight carried eight localized refusals, each naming the metadata at stake and
+a remedy, and nothing read them: every refusal showed "Transfer failed". They are shown now. An
+upload that fails part way says how many of the batch's files had landed before the failure,
+and the failure is the last message written: the automatic refresh that follows an upload used
+to end with "Ready" on top of it. A local access refusal (a read-only folder, an ACL) is no
+longer read as a remote permission denial, which escalated to a privileged remote transfer that
+failed on the same local path with a message blaming the server. A local directory at a
+download's target is a conflict; the probe used to see only files and the download failed at
+the open.
+
+### FTPS trust: revocation, reasons, case and the TLS floor
+
+A pin the system validated is refused, without a prompt, when its chain's revocation status
+can no longer be determined: the one adversary a pin exists against holds a stolen,
+since-revoked key and blocks OCSP and CRL, and that status let them through. A self-signed pin
+the user confirmed never had a checkable status and keeps its behaviour. A pin that expired or
+was revoked is reported as such, in its own words; it used to read like a Reject click. The
+pin store lower-cases the host, so `FTP.example.com` and `ftp.example.com` are one pin rather
+than two with a first-use prompt on the second spelling, and keys stored before the rule are
+folded on load. The TLS floor is pinned to 1.2 and 1.3.
+
+The "certificate changed" prompt with Reject as its default button, added on 2026-09-06, is
+removed: it could not be reached. A changed FTPS certificate is refused by the browser before
+any prompt is asked, and the prompt is a first-use prompt only. `SECURITY.md` says so. The
+cleartext warning is shown for anonymous FTP sessions too: no credential travels then, but
+every file still does, in clear.
+
+### Chmod: the special bits, and one failure does not abandon the batch
+
+A `4755` binary read as `755`, the chmod dialog offered `755` as its current value and refused
+anything above `777`, since it parsed the octal text as a decimal: the set-user-ID, set-group-ID
+and sticky bits could be neither seen, nor written, nor removed. The listing renders them
+(`rwsr-xr-x`, `rwxrwxrwt`), the dialog accepts four octal digits, and the mode is applied
+whole. A chmod over several entries that failed part way abandoned the batch without a
+refresh, so the entries already changed were shown with their old mode; it now continues,
+refreshes, and summarises what could not be changed. Creating a folder, renaming, deleting and
+chmod run under the pane's lifetime token: a batch delete kept issuing commands after the pane
+had been torn down.
+
+### Paste, duplicate and delete
+
+A same-endpoint cut publishes by a bare rename, which on FTP many servers answer by
+overwriting; the destination names came from what the pane last rendered, so the only thing
+between the user and an overwritten file was how old that snapshot was. Names are read live
+now, for a paste and for a duplicate. Cancelling a same-endpoint paste or a duplicate is
+reported as a cancellation, not as "Transfer failed" in red. The delete confirmation says that
+a folder goes with everything it contains and that nothing undoes it, and a multi-selection is
+confirmed by its count rather than by a count between the quotes reserved for a name.
+
+### Escaped em dashes
+
+Twenty-five em dashes written as `\u2014` escapes reached users through fallback strings and
+placeholders while every literal typography guard stayed green. They are ASCII hyphens now,
+and a guard refuses the escape.
+
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 
 ### The Plink port probe runs before the first wait

@@ -366,10 +366,10 @@ public partial class PingToolView : UserControl, IToolView
         }
         else
         {
-            TxtMin.Text = "\u2014";
-            TxtAvg.Text = "\u2014";
-            TxtMax.Text = "\u2014";
-            TxtJitter.Text = "\u2014";
+            TxtMin.Text = "-";
+            TxtAvg.Text = "-";
+            TxtMax.Text = "-";
+            TxtJitter.Text = "-";
         }
 
         TxtLoss.Text = string.Format(L("ToolPingStatsPercent"), $"{stats.LossPercent:F1}");
@@ -516,11 +516,11 @@ public partial class PingToolView : UserControl, IToolView
 
     private void ResetStats()
     {
-        TxtMin.Text = "\u2014";
-        TxtAvg.Text = "\u2014";
-        TxtMax.Text = "\u2014";
-        TxtJitter.Text = "\u2014";
-        TxtLoss.Text = "\u2014";
+        TxtMin.Text = "-";
+        TxtAvg.Text = "-";
+        TxtMax.Text = "-";
+        TxtJitter.Text = "-";
+        TxtLoss.Text = "-";
     }
 
     private Func<string, string> CreateLocalize() => key => _localizer?[key] ?? key;

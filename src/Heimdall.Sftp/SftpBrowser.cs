@@ -1155,15 +1155,9 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
 
                 var attrs = client.GetAttributes(path);
 
-                attrs.OwnerCanRead = (mode & 0x100) != 0;
-                attrs.OwnerCanWrite = (mode & 0x080) != 0;
-                attrs.OwnerCanExecute = (mode & 0x040) != 0;
-                attrs.GroupCanRead = (mode & 0x020) != 0;
-                attrs.GroupCanWrite = (mode & 0x010) != 0;
-                attrs.GroupCanExecute = (mode & 0x008) != 0;
-                attrs.OthersCanRead = (mode & 0x004) != 0;
-                attrs.OthersCanWrite = (mode & 0x002) != 0;
-                attrs.OthersCanExecute = (mode & 0x001) != 0;
+                // The whole mode, special bits included: the nine rwx flags set one by one
+                // could neither set nor clear setuid, setgid or sticky.
+                attrs.SetPermissions(SftpPermissionMode.ToOctalCoded(mode));
 
                 client.SetAttributes(path, attrs);
             }, ct).ConfigureAwait(false);
@@ -1916,26 +1910,7 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
     }
 
     private static string FormatPermissions(ISftpFile entry)
-    {
-        var attrs = entry.Attributes;
-
-        // SSH.NET exposes permission bits via Attributes
-        // Build standard rwxrwxrwx string from the octal permissions
-        int mode = attrs.GetPermissionsOrDefault();
-
-        return string.Create(9, mode, static (span, m) =>
-        {
-            span[0] = (m & 0x100) != 0 ? 'r' : '-';
-            span[1] = (m & 0x080) != 0 ? 'w' : '-';
-            span[2] = (m & 0x040) != 0 ? 'x' : '-';
-            span[3] = (m & 0x020) != 0 ? 'r' : '-';
-            span[4] = (m & 0x010) != 0 ? 'w' : '-';
-            span[5] = (m & 0x008) != 0 ? 'x' : '-';
-            span[6] = (m & 0x004) != 0 ? 'r' : '-';
-            span[7] = (m & 0x002) != 0 ? 'w' : '-';
-            span[8] = (m & 0x001) != 0 ? 'x' : '-';
-        });
-    }
+        => SftpPermissionMode.FormatSymbolic(entry.Attributes.GetPermissionsOrDefault());
 }
 
 /// <summary>
@@ -1973,6 +1948,9 @@ internal static class SftpFileAttributesExtensions
             if (attrs.OthersCanRead) mode |= 0x004;
             if (attrs.OthersCanWrite) mode |= 0x002;
             if (attrs.OthersCanExecute) mode |= 0x001;
+            if (attrs.IsUIDBitSet) mode |= SftpPermissionMode.SetUid;
+            if (attrs.IsGroupIDBitSet) mode |= SftpPermissionMode.SetGid;
+            if (attrs.IsStickyBitSet) mode |= SftpPermissionMode.Sticky;
             return mode;
         }
         catch (Exception ex)
