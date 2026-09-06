@@ -21,6 +21,7 @@ using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Sftp;
+using Renci.SshNet.Common;
 
 namespace Heimdall.App.Tests;
 
@@ -92,6 +93,197 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Equal(["/missing"], browser.ListDirectoryCalls);
         Assert.False(item.HasConflict);
         Assert.Null(item.ExistingTargetKind);
+    }
+
+    /// <remarks>
+    /// A transient failure - a dropped connection, a timeout, a server error - used to be
+    /// swallowed like an absent parent: the inventory came back empty, no conflict was found,
+    /// and every file was sent as a replacement. Nothing about the destination is known, so
+    /// the batch is refused before its first byte.
+    /// </remarks>
+    [Fact]
+    public async Task Inventory_TransientListingFailure_RefusesTheBatch()
+    {
+        RecordingRemoteBrowser browser = new();
+        browser.FailingDirectories.Add("/dst");
+        IReadOnlyList<RemoteUploadOp> ops =
+        [
+            new RemoteUploadOp(RemoteUploadOpKind.UploadFile, "local", "/dst/file.txt"),
+        ];
+
+        RemoteUploadInventoryException refusal = await Assert.ThrowsAsync<RemoteUploadInventoryException>(
+            () => EmbeddedSftpViewModel.BuildRemoteUploadConflictInventoryAsync(
+                browser,
+                ops,
+                CancellationToken.None));
+
+        Assert.Equal("/dst", refusal.RemoteDirectory);
+        Assert.IsType<IOException>(refusal.InnerException);
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_TransientListingFailure_SendsNothingAndSaysSo()
+    {
+        using TempDirectory temp = new();
+        string localFile = Path.Combine(temp.Path, "alpha.txt");
+        await File.WriteAllTextAsync(localFile, "payload");
+        RecordingRemoteBrowser browser = new();
+        browser.FailingDirectories.Add("/srv");
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.UploadEntriesAsync([localFile], "/srv");
+
+        Assert.Empty(browser.UploadCalls);
+        Assert.True(viewModel.IsErrorStatus);
+        Assert.Equal("SftpErrorUploadInventoryFailed", viewModel.StatusText);
+    }
+
+    /// <remarks>
+    /// "Transfer failed" alone left the user to work out which of their files were on the
+    /// server. The count of files that landed is part of the verdict.
+    /// </remarks>
+    [Fact]
+    public async Task UploadEntriesAsync_FailsPartWay_SaysHowManyFilesLanded()
+    {
+        using TempDirectory temp = new();
+        string alpha = Path.Combine(temp.Path, "alpha.txt");
+        string beta = Path.Combine(temp.Path, "beta.txt");
+        await File.WriteAllTextAsync(alpha, "payload");
+        await File.WriteAllTextAsync(beta, "payload");
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/srv"] = [];
+        browser.FailingUploads.Add("/srv/beta.txt");
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.UploadEntriesAsync([alpha, beta], "/srv");
+
+        Assert.Equal(2, browser.UploadCalls.Count);
+        Assert.True(viewModel.IsErrorStatus);
+        Assert.StartsWith("1 of 2 files uploaded before the failure.", viewModel.StatusText, StringComparison.Ordinal);
+    }
+
+    /// <remarks>
+    /// Case-insensitive unless a listing proves otherwise: on OpenSSH for Windows, IIS FTP or
+    /// macOS, Readme.txt replaced README.TXT without a dialog under an ordinal comparer.
+    /// </remarks>
+    [Fact]
+    public async Task Inventory_CaseDifferenceOnly_IsAConflictByDefault()
+    {
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/dst"] = [CreateRemoteEntry("README.TXT", "/dst/README.TXT", isDirectory: false)];
+        IReadOnlyList<RemoteUploadOp> ops =
+        [
+            new RemoteUploadOp(RemoteUploadOpKind.UploadFile, "local", "/dst/Readme.txt"),
+        ];
+
+        EmbeddedSftpViewModel.RemoteUploadConflictInventory inventory =
+            await EmbeddedSftpViewModel.BuildRemoteUploadConflictInventoryAsync(
+                browser,
+                ops,
+                CancellationToken.None);
+        FileConflictAnalysisItem item = Assert.Single(FileConflictPlanner.Analyze(
+            ToPlanItems(ops),
+            inventory.GetTargetKind,
+            inventory.PathComparer));
+
+        Assert.Same(StringComparer.OrdinalIgnoreCase, inventory.PathComparer);
+        Assert.True(item.HasConflict);
+        Assert.Equal(FileConflictItemKind.File, item.ExistingTargetKind);
+    }
+
+    [Fact]
+    public async Task Inventory_ListingThatTellsCaseApart_ComparesOrdinally()
+    {
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/dst"] =
+        [
+            CreateRemoteEntry("a.txt", "/dst/a.txt", isDirectory: false),
+            CreateRemoteEntry("A.txt", "/dst/A.txt", isDirectory: false),
+        ];
+        IReadOnlyList<RemoteUploadOp> ops =
+        [
+            new RemoteUploadOp(RemoteUploadOpKind.UploadFile, "local", "/dst/A.TXT"),
+        ];
+
+        EmbeddedSftpViewModel.RemoteUploadConflictInventory inventory =
+            await EmbeddedSftpViewModel.BuildRemoteUploadConflictInventoryAsync(
+                browser,
+                ops,
+                CancellationToken.None);
+        FileConflictAnalysisItem item = Assert.Single(FileConflictPlanner.Analyze(
+            ToPlanItems(ops),
+            inventory.GetTargetKind,
+            inventory.PathComparer));
+
+        Assert.Same(StringComparer.Ordinal, inventory.PathComparer);
+        Assert.False(item.HasConflict);
+    }
+
+    [Fact]
+    public void ChooseRemoteNameComparer_IsOrdinalOnlyWhenOneListingHoldsTwoSpellings()
+    {
+        SftpFileInfo lower = CreateRemoteEntry("a.txt", "/x/a.txt", isDirectory: false);
+        SftpFileInfo upper = CreateRemoteEntry("A.TXT", "/y/A.TXT", isDirectory: false);
+
+        Assert.Same(
+            StringComparer.OrdinalIgnoreCase,
+            EmbeddedSftpViewModel.ChooseRemoteNameComparer([[lower], [upper]]));
+        Assert.Same(
+            StringComparer.Ordinal,
+            EmbeddedSftpViewModel.ChooseRemoteNameComparer([[lower, upper]]));
+        Assert.Same(
+            StringComparer.OrdinalIgnoreCase,
+            EmbeddedSftpViewModel.ChooseRemoteNameComparer([]));
+    }
+
+    /// <remarks>
+    /// An FTP LIST on an absent path often answers empty. A parent "proved" by an empty listing
+    /// let a real mkdir failure (permission, quota) pass as "already exists".
+    /// </remarks>
+    [Fact]
+    public async Task Inventory_EmptyListing_DoesNotProveTheDirectory()
+    {
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/dst"] = [];
+        browser.Listings["/dst/new"] = [];
+        IReadOnlyList<RemoteUploadOp> ops =
+        [
+            new RemoteUploadOp(RemoteUploadOpKind.MakeDirectory, "local-new", "/dst/new"),
+            new RemoteUploadOp(RemoteUploadOpKind.UploadFile, "local-one", "/dst/new/one.txt"),
+        ];
+
+        EmbeddedSftpViewModel.RemoteUploadConflictInventory inventory =
+            await EmbeddedSftpViewModel.BuildRemoteUploadConflictInventoryAsync(
+                browser,
+                ops,
+                CancellationToken.None);
+
+        Assert.False(inventory.DirectoryExists("/dst/new"));
+    }
+
+    [Fact]
+    public async Task Inventory_ListedDirectoryEntry_ProvesTheDirectory()
+    {
+        RecordingRemoteBrowser browser = new();
+        browser.Listings["/dst"] = [CreateRemoteEntry("new", "/dst/new", isDirectory: true)];
+        browser.Listings["/dst/new"] = [];
+        IReadOnlyList<RemoteUploadOp> ops =
+        [
+            new RemoteUploadOp(RemoteUploadOpKind.MakeDirectory, "local-new", "/dst/new"),
+            new RemoteUploadOp(RemoteUploadOpKind.UploadFile, "local-one", "/dst/new/one.txt"),
+        ];
+
+        EmbeddedSftpViewModel.RemoteUploadConflictInventory inventory =
+            await EmbeddedSftpViewModel.BuildRemoteUploadConflictInventoryAsync(
+                browser,
+                ops,
+                CancellationToken.None);
+
+        Assert.True(inventory.DirectoryExists("/dst/new"));
     }
 
     // Unknown and an out-of-range value are listed separately on purpose: only the second one dies if
@@ -643,11 +835,18 @@ public sealed class EmbeddedSftpUploadConflictTests
         internal Dictionary<string, IReadOnlyList<SftpFileInfo>> Listings { get; } =
             new(StringComparer.Ordinal);
 
+        /// <summary>Parents that do not exist: the listing raises the typed absence.</summary>
         internal HashSet<string> MissingDirectories { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>Parents whose listing fails for a reason that says nothing about them.</summary>
+        internal HashSet<string> FailingDirectories { get; } = new(StringComparer.Ordinal);
 
         internal List<string> ListDirectoryCalls { get; } = [];
 
         internal List<(string LocalPath, string RemotePath)> UploadCalls { get; } = [];
+
+        /// <summary>Remote paths whose upload fails after the call is recorded.</summary>
+        internal HashSet<string> FailingUploads { get; } = new(StringComparer.Ordinal);
 
         internal List<string> CreateDirectoryCalls { get; } = [];
 
@@ -659,7 +858,12 @@ public sealed class EmbeddedSftpUploadConflictTests
             ListDirectoryCalls.Add(targetPath);
             if (MissingDirectories.Contains(targetPath))
             {
-                throw new IOException($"Missing directory: {targetPath}");
+                throw new SftpPathNotFoundException($"Missing directory: {targetPath}");
+            }
+
+            if (FailingDirectories.Contains(targetPath))
+            {
+                throw new IOException($"Connection reset while listing: {targetPath}");
             }
 
             return Task.FromResult(
@@ -686,7 +890,9 @@ public sealed class EmbeddedSftpUploadConflictTests
             CancellationToken ct = default)
         {
             UploadCalls.Add((localPath, remotePath));
-            return Task.CompletedTask;
+            return FailingUploads.Contains(remotePath)
+                ? Task.FromException(new IOException($"Connection reset while writing: {remotePath}"))
+                : Task.CompletedTask;
         }
 
         public Task CreateDirectoryAsync(string path, CancellationToken ct = default)

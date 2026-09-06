@@ -165,6 +165,10 @@ public sealed class EmbeddedSftpViewModelHelpersTests
     [InlineData("---------", "000")]
     [InlineData("", "000")]
     [InlineData("rwx", "000")]
+    [InlineData("rwsr-xr-x", "4755")]
+    [InlineData("rwxr-sr-x", "2755")]
+    [InlineData("rwxrwxrwt", "1777")]
+    [InlineData("rwSr--r--", "4644")]
     public void PermissionsToOctal_ReturnsExpectedOctal(string permissions, string expected)
     {
         string actual = EmbeddedSftpViewModel.PermissionsToOctal(permissions);
@@ -182,12 +186,12 @@ public sealed class EmbeddedSftpViewModelHelpersTests
     }
 
     [Fact]
-    public void IsPermissionDenied_ReturnsTrueForUnauthorizedAccess()
+    public void IsPermissionDenied_ReturnsFalseForLocalUnauthorizedAccess()
     {
         bool actual = EmbeddedSftpViewModel.IsPermissionDenied(
             new UnauthorizedAccessException("permission denied"));
 
-        Assert.True(actual);
+        Assert.False(actual);
     }
 
     [Fact]

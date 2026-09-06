@@ -31,12 +31,17 @@ public sealed class IsPermissionDeniedTests
         Assert.True(EmbeddedSftpViewModel.IsPermissionDenied(ex));
     }
 
+    /// <remarks>
+    /// UnauthorizedAccessException is the local file system refusing (a read-only folder, an
+    /// ACL). Reading it as a remote denial escalated to a privileged remote transfer that
+    /// failed on the same local path, with a message that blamed the server.
+    /// </remarks>
     [Fact]
-    public void Returns_True_For_UnauthorizedAccessException()
+    public void Returns_False_For_UnauthorizedAccessException()
     {
         var ex = new UnauthorizedAccessException("Access denied.");
 
-        Assert.True(EmbeddedSftpViewModel.IsPermissionDenied(ex));
+        Assert.False(EmbeddedSftpViewModel.IsPermissionDenied(ex));
     }
 
     [Fact]

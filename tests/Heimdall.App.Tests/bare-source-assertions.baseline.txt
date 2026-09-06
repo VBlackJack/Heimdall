@@ -169,10 +169,6 @@ tests/Heimdall.Core.Tests/ConfigManagerTransactionTests.cs|CommitMigration_Clear
 tests/Heimdall.Core.Tests/ConfigManagerTransactionTests.cs|CommitMigration_ClearsBothBaselineBuffers|index-of|" finally"
 tests/Heimdall.Core.Tests/ConfigManagerTransactionTests.cs|CommitMigration_ClearsBothBaselineBuffers|index-of|"_writeLock.Release();"
 tests/Heimdall.Core.Tests/RdpDocumentationClaimGuardTests.cs|FeatureListDoesNotAdvertiseATcpOnlyMode|assert-presence|"UDP"
-tests/Heimdall.Sftp.Tests/BrowserChmodTests.cs|SftpBrowser_ChmodSource_PreservesAllNinePermissionBitsAndPersistsAttributes|assert-presence|assignment
-tests/Heimdall.Sftp.Tests/BrowserChmodTests.cs|SftpBrowser_ChmodSource_PreservesAllNinePermissionBitsAndPersistsAttributes|assert-presence|"client.SetAttributes(path, attrs);"
-tests/Heimdall.Sftp.Tests/BrowserChmodTests.cs|SftpBrowser_ChmodSource_PreservesAllNinePermissionBitsAndPersistsAttributes|index-of|"public async Task ChmodAsync"
-tests/Heimdall.Sftp.Tests/BrowserChmodTests.cs|SftpBrowser_ChmodSource_PreservesAllNinePermissionBitsAndPersistsAttributes|index-of|"public async Task RenameAsync"
 tests/Heimdall.Sftp.Tests/FtpBrowserAtomicUploadTests.cs|UploadFileAsync_WiresTheCombinedWarningIntoTheCommitRename|assert-presence|"onExistingTargetReplaced: () => OperationWarningRaised?.Invoke("
 tests/Heimdall.Sftp.Tests/FtpBrowserAtomicUploadTests.cs|UploadFileAsync_WiresTheCombinedWarningIntoTheCommitRename|assert-presence|"RemoteOperationWarning.CreateFtpExistingTargetReplaced("
 tests/Heimdall.Sftp.Tests/SftpBrowserCopyRefusalTests.cs|CopyAsync_RefusesOnAnyNonSuccessOutcome_AndHasNoRoundtripFallback|assert-presence|"ServerSideCopyOutcome outcome = await TryServerSideCopyAsync("

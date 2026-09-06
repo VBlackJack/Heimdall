@@ -94,6 +94,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private readonly object _transferCtsGate = new();
     private CancellationTokenSource? _lifecycleCts = new();
     private CancellationTokenSource? _transferCts;
+
+    /// <summary>Files uploaded so far and planned, for the message of a batch that fails part way.</summary>
+    private (int Uploaded, int Total) _uploadBatchProgress;
     private string _endpointKey = string.Empty;
     private bool _disposed;
 
@@ -840,6 +843,20 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return L10n("SftpErrorRemoteUploadTargetNotRegularFile");
         }
 
+        // Eight localized refusals, each naming the metadata at stake and a remedy, were
+        // carried by this exception and read by nothing: every one showed "Transfer failed".
+        if (ex is SftpMetadataPreservationException preservationRefusal)
+        {
+            return _localizer?.Format(preservationRefusal.MessageKey, preservationRefusal.RemotePath)
+                ?? preservationRefusal.MessageKey;
+        }
+
+        if (ex is RemoteUploadInventoryException inventoryFailure)
+        {
+            return _localizer?.Format("SftpErrorUploadInventoryFailed", inventoryFailure.RemoteDirectory)
+                ?? "SftpErrorUploadInventoryFailed";
+        }
+
         // Two different refusals, two different reasons. FTP has no safe publish at all; SFTP has one
         // but could not reach it. Collapsing them would tell an SFTP user to switch to SFTP.
         if (ex is RemoteCopyUnsupportedException copyRefusal)
@@ -861,6 +878,46 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         return SetErrorStatus(DescribeTransferError(ex));
     }
+
+    /// <summary>
+    /// Reports an upload batch that failed part way, with how many files had landed: "Transfer
+    /// failed" alone left the user to work out which of their files were on the server.
+    /// </summary>
+    private string SetUploadBatchError(Exception ex)
+    {
+        (int uploaded, int total) = _uploadBatchProgress;
+        string reason = DescribeTransferError(ex);
+        if (uploaded == 0)
+        {
+            return SetErrorStatus(reason);
+        }
+
+        return SetErrorStatus(
+            _localizer?.Format("SftpErrorUploadFailedAfter", uploaded, total, reason)
+                ?? $"{uploaded} of {total} files uploaded before the failure. {reason}");
+    }
+
+    /// <summary>
+    /// Reports the outcome of an operation that ended in an exception: a cancellation is the user's
+    /// own act and is not an error.
+    /// </summary>
+    private void ReportOperationOutcome(Exception ex)
+    {
+        if (ex is OperationCanceledException)
+        {
+            UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+            return;
+        }
+
+        SetTransferError(ex);
+    }
+
+    /// <summary>
+    /// The lifecycle token for a one-shot remote operation, or none once the view model is disposed:
+    /// a batch delete used to keep issuing commands after the pane had been torn down.
+    /// </summary>
+    private CancellationToken LifecycleTokenOrNone()
+        => TryCaptureLifecycleToken(out CancellationToken token) ? token : CancellationToken.None;
 
     /// <summary>
     /// Raises the split request event.
@@ -930,6 +987,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         TransferProgressValue = 0;
         bool refreshAfterTransfer = true;
         List<string> pendingOperationWarnings = [];
+        _uploadBatchProgress = default;
+        Action? finalReport = null;
 
         try
         {
@@ -965,18 +1024,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+            finalReport = () => UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn(
                 $"EmbeddedSFTP upload failed [{ex.GetType().Name}]: {ex.Message} (sshParams={(_sshParams is not null ? "present" : "null")})");
-            SetTransferError(ex);
+            finalReport = () => SetUploadBatchError(ex);
         }
         finally
         {
             CompleteTransfer(transferCts);
-            if (refreshAfterTransfer)
+            if (finalReport is not null)
+            {
+                // The refresh ends with "Ready" and used to run after the failure had been
+                // written, unawaited, so the message the user needed was wiped by the listing
+                // of a directory that now held part of their batch. The listing first, then
+                // the verdict, as the last message written.
+                await Refresh();
+                finalReport();
+            }
+            else if (refreshAfterTransfer)
             {
                 if (pendingOperationWarnings.Count > 0)
                 {
@@ -1123,7 +1191,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     : FileConflictItemKind.File))
                 .ToList(),
             inventory.GetTargetKind,
-            StringComparer.Ordinal);
+            inventory.PathComparer);
         IReadOnlyList<FileConflictAnalysisItem> conflicts = conflictAnalysis
             .Where(item => item.HasConflict)
             .ToList();
@@ -1149,12 +1217,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             conflictAnalysis,
             decisions,
             inventory.TargetExists,
-            StringComparer.Ordinal);
+            inventory.PathComparer);
 
         int totalFiles = resolvedOps.Count(item =>
             item.Action != FileConflictEffectiveAction.Skip
             && plannedOps[item.Index].Kind == RemoteUploadOpKind.UploadFile);
         int uploadedFiles = 0;
+        _uploadBatchProgress = (0, totalFiles);
 
         if (resolvedOps.Any(item =>
             item.Action != FileConflictEffectiveAction.Skip
@@ -1214,6 +1283,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
                 await UploadViaSudoAsync(op.LocalPath, resolved.EffectiveTargetPath, ct);
             }
+
+            _uploadBatchProgress = (uploadedFiles, totalFiles);
         }
 
         return new UploadPlanOutcome(
@@ -1233,12 +1304,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(browser);
         ArgumentNullException.ThrowIfNull(ops);
 
-        Dictionary<string, FileConflictItemKind> targetKinds = new(StringComparer.Ordinal);
-        HashSet<string> existingDirectories = new(StringComparer.Ordinal);
-        HashSet<string> unsupportedTargets = new(StringComparer.Ordinal);
         IEnumerable<string> parentDirectories = ops
             .Select(op => GetParentPath(op.RemotePath))
             .Distinct(StringComparer.Ordinal);
+        List<(string Parent, IReadOnlyList<SftpFileInfo> Entries)> listings = [];
 
         foreach (string parentDirectory in parentDirectories)
         {
@@ -1249,43 +1318,92 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 IReadOnlyList<SftpFileInfo> entries = await browser
                     .ListDirectoryAsync(parentDirectory, ct)
                     .ConfigureAwait(false);
-                existingDirectories.Add(parentDirectory);
-
-                foreach (SftpFileInfo entry in entries)
-                {
-                    string targetPath = CombineRemotePath(parentDirectory, entry.Name);
-                    switch (entry.Kind)
-                    {
-                        case RemoteEntryKind.Directory:
-                            targetKinds[targetPath] = FileConflictItemKind.Directory;
-                            break;
-                        case RemoteEntryKind.File:
-                            targetKinds[targetPath] = FileConflictItemKind.File;
-                            break;
-                        // The default arm is the point: a value this switch does not enumerate used to
-                        // land in neither collection, so the destination was neither a known conflict
-                        // nor unsupported and the upload went ahead against it.
-                        case RemoteEntryKind.Unknown:
-                        case RemoteEntryKind.SymbolicLink:
-                        case RemoteEntryKind.Fifo:
-                        case RemoteEntryKind.Socket:
-                        case RemoteEntryKind.Device:
-                        default:
-                            unsupportedTargets.Add(targetPath);
-                            break;
-                    }
-                }
+                listings.Add((parentDirectory, entries));
             }
-            catch (Exception ex) when (ex is IOException or SftpPathNotFoundException)
+            catch (Exception ex) when (RemotePathAbsence.IsPathNotFound(ex))
             {
                 // A missing planned parent has no existing children and therefore no conflicts.
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Anything else says nothing about what the destination holds. It used to be
+                // read as "no conflicts", and every file went out as a replacement.
+                throw new RemoteUploadInventoryException(parentDirectory, ex);
+            }
+        }
+
+        // Case-insensitive unless a listing proves otherwise: a prompt too many costs a click, a
+        // prompt too few costs a file. A server that lists two names differing only by case has
+        // shown it tells them apart.
+        StringComparer pathComparer = ChooseRemoteNameComparer(listings.Select(listing => listing.Entries));
+        Dictionary<string, FileConflictItemKind> targetKinds = new(pathComparer);
+        HashSet<string> existingDirectories = new(pathComparer);
+        HashSet<string> unsupportedTargets = new(pathComparer);
+
+        foreach ((string parentDirectory, IReadOnlyList<SftpFileInfo> entries) in listings)
+        {
+            // A listing that returned entries proves the directory; an empty one does not. An
+            // FTP LIST on an absent path often answers empty, and a parent "proved" that way let
+            // a real mkdir failure pass as "already exists".
+            if (entries.Count > 0)
+            {
+                existingDirectories.Add(parentDirectory);
+            }
+
+            foreach (SftpFileInfo entry in entries)
+            {
+                string targetPath = CombineRemotePath(parentDirectory, entry.Name);
+                switch (entry.Kind)
+                {
+                    case RemoteEntryKind.Directory:
+                        targetKinds[targetPath] = FileConflictItemKind.Directory;
+                        break;
+                    case RemoteEntryKind.File:
+                        targetKinds[targetPath] = FileConflictItemKind.File;
+                        break;
+                    // The default arm is the point: a value this switch does not enumerate used to
+                    // land in neither collection, so the destination was neither a known conflict
+                    // nor unsupported and the upload went ahead against it.
+                    case RemoteEntryKind.Unknown:
+                    case RemoteEntryKind.SymbolicLink:
+                    case RemoteEntryKind.Fifo:
+                    case RemoteEntryKind.Socket:
+                    case RemoteEntryKind.Device:
+                    default:
+                        unsupportedTargets.Add(targetPath);
+                        break;
+                }
             }
         }
 
         return new RemoteUploadConflictInventory(
             targetKinds,
             existingDirectories,
-            unsupportedTargets);
+            unsupportedTargets,
+            pathComparer);
+    }
+
+    /// <summary>
+    /// Ordinal when any single listing holds two names that differ only by case, which proves
+    /// the server distinguishes them; case-insensitive otherwise.
+    /// </summary>
+    internal static StringComparer ChooseRemoteNameComparer(IEnumerable<IReadOnlyList<SftpFileInfo>> listings)
+    {
+        ArgumentNullException.ThrowIfNull(listings);
+
+        foreach (IReadOnlyList<SftpFileInfo> listing in listings)
+        {
+            HashSet<string> folded = new(StringComparer.OrdinalIgnoreCase);
+            foreach (SftpFileInfo entry in listing)
+            {
+                if (!folded.Add(entry.Name))
+                {
+                    return StringComparer.Ordinal;
+                }
+            }
+        }
+
+        return StringComparer.OrdinalIgnoreCase;
     }
 
     /// <summary>In-memory remote inventory used by upload analysis and execution.</summary>
@@ -1294,16 +1412,25 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         private readonly IReadOnlyDictionary<string, FileConflictItemKind> _targetKinds;
         private readonly IReadOnlySet<string> _existingDirectories;
         private readonly IReadOnlySet<string> _unsupportedTargets;
+        private readonly StringComparison _pathComparison;
 
         internal RemoteUploadConflictInventory(
             IReadOnlyDictionary<string, FileConflictItemKind> targetKinds,
             IReadOnlySet<string> existingDirectories,
-            IReadOnlySet<string> unsupportedTargets)
+            IReadOnlySet<string> unsupportedTargets,
+            StringComparer pathComparer)
         {
             _targetKinds = targetKinds;
             _existingDirectories = existingDirectories;
             _unsupportedTargets = unsupportedTargets;
+            PathComparer = pathComparer;
+            _pathComparison = ReferenceEquals(pathComparer, StringComparer.Ordinal)
+                ? StringComparison.Ordinal
+                : StringComparison.OrdinalIgnoreCase;
         }
+
+        /// <summary>The comparer the destination server was shown to use for names.</summary>
+        internal StringComparer PathComparer { get; }
 
         /// <summary>
         /// Gets whether the target path is, or lives under, a remote entry that is neither a
@@ -1319,7 +1446,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             foreach (string unsupported in _unsupportedTargets)
             {
-                if (targetPath.StartsWith(unsupported + "/", StringComparison.Ordinal))
+                if (targetPath.StartsWith(unsupported + "/", _pathComparison))
                 {
                     return true;
                 }
@@ -1607,9 +1734,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             IReadOnlyList<FileConflictAnalysisItem> conflictAnalysis = FileConflictPlanner.Analyze(
                 plannedDownloads
-                    .Select(item => new FileConflictPlanItem(item.File.FullPath, item.TargetPath))
+                    .Select(item => new FileConflictPlanItem(
+                        item.File.FullPath,
+                        item.TargetPath,
+                        FileConflictItemKind.File))
                     .ToList(),
-                File.Exists,
+                LocalTargetKind,
                 StringComparer.OrdinalIgnoreCase);
             IReadOnlyList<FileConflictAnalysisItem> conflicts = conflictAnalysis
                 .Where(item => item.HasConflict)
@@ -1633,7 +1763,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             IReadOnlyList<FileConflictResolvedItem> resolvedDownloads = FileConflictPlanner.Resolve(
                 conflictAnalysis,
                 decisions,
-                File.Exists,
+                LocalTargetExists,
                 StringComparer.OrdinalIgnoreCase);
 
             foreach (FileConflictResolvedItem resolved in resolvedDownloads)
@@ -1674,7 +1804,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     break;
                 case SftpDownloadOutcome.OnlyDirectoriesSkipped:
                     UpdateStatus(_localizer?["SftpStatusDownloadNoFilesFoldersSkipped"]
-                        ?? "No files downloaded \u2014 folders aren't supported.");
+                        ?? "No files downloaded - folders aren't supported.");
                     break;
                 case SftpDownloadOutcome.Completed:
                 case SftpDownloadOutcome.Empty:
@@ -2275,7 +2405,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             string remotePath = CombineRemotePath(CurrentPath, folderName);
             try
             {
-                await _browser.CreateDirectoryAsync(remotePath);
+                await _browser.CreateDirectoryAsync(remotePath, LifecycleTokenOrNone());
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
@@ -2341,7 +2471,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             string newPath = CombineRemotePath(CurrentPath, newName);
             try
             {
-                await _browser.RenameAsync(file.FullPath, newPath);
+                await _browser.RenameAsync(file.FullPath, newPath, LifecycleTokenOrNone());
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
@@ -2549,11 +2679,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
-        string itemName = entries.Count == 1
-            ? entries[0].Name
-            : _localizer?.Format("SftpItemCount", entries.Count.ToString()) ?? $"{entries.Count} items";
-        string message = _localizer?.Format("SftpConfirmDelete", itemName)
-            ?? $"Delete \"{itemName}\"?";
+        // A count is not a name: it does not go between the quotes reserved for one.
+        string message = entries.Count == 1
+            ? _localizer?.Format("SftpConfirmDelete", entries[0].Name)
+                ?? $"Delete \"{entries[0].Name}\"? This cannot be undone."
+            : _localizer?.Format("SftpConfirmDeleteMultiple", entries.Count.ToString(CultureInfo.InvariantCulture))
+                ?? $"Delete {entries.Count} items? This cannot be undone.";
 
         bool confirmed = await _dialogService.ShowConfirmAsync(
             L10n("SftpConfirmDeleteTitle"),
@@ -2647,7 +2778,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
-            await browser.DeleteAsync(file.FullPath).ConfigureAwait(false);
+            await browser.DeleteAsync(file.FullPath, LifecycleTokenOrNone()).ConfigureAwait(false);
             return null;
         }
         catch (OperationCanceledException)
@@ -2776,16 +2907,19 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
-        if (!int.TryParse(newPerms, NumberStyles.None, null, out int octal)
-            || octal < 0
-            || octal > 777
-            || newPerms.Any(c => c < '0' || c > '7'))
+        // Up to four octal digits: the special bits are part of the mode. The value used to be
+        // parsed as a decimal and refused above 777, so setuid, setgid and sticky could not be
+        // set or cleared from here.
+        if (!SftpPermissionMode.TryParseOctal(newPerms, out short mode))
         {
             SetErrorStatus(L10n("ErrorInvalidOctalPermission"));
             return;
         }
 
-        short mode = Convert.ToInt16(newPerms, 8);
+        // Per entry, like delete: a failure part way used to abandon the batch without a
+        // refresh, so the entries already changed were shown with their old mode.
+        List<string> failedNames = [];
+        Exception? firstFailure = null;
 
         try
         {
@@ -2793,18 +2927,34 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 try
                 {
-                    await _browser.ChmodAsync(entry.FullPath, mode);
+                    await ChmodEntryAsync(entry, mode, newPerms).ConfigureAwait(false);
                 }
-                catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
+                catch (Exception ex) when (ex is not (OperationCanceledException or NotSupportedException))
                 {
-                    Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
-                    await RunSudoCommandAsync(
-                        $"chmod {newPerms} {PathEscaper.EscapeForShell(entry.FullPath)}");
+                    Core.Logging.FileLogger.Warn(
+                        $"EmbeddedSFTP chmod failed for '{entry.FullPath}' [{ex.GetType().Name}]: {ex.Message}");
+                    failedNames.Add(entry.Name);
+                    firstFailure ??= ex;
                 }
             }
 
-            await RunOnUiAsync(() => UpdateStatus(L10n("SftpChmodSuccess")));
+            if (failedNames.Count == 0)
+            {
+                await RunOnUiAsync(() => UpdateStatus(L10n("SftpChmodSuccess")));
+                await Refresh().ConfigureAwait(false);
+                return;
+            }
+
+            if (failedNames.Count == entries.Count)
+            {
+                await RunOnUiAsync(() => SetTransferError(firstFailure!));
+                return;
+            }
+
+            string summary = _localizer?.Format("SftpChmodPartialSummary", failedNames.Count, entries.Count)
+                ?? "SftpChmodPartialSummary";
             await Refresh().ConfigureAwait(false);
+            await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);
         }
         catch (NotSupportedException)
         {
@@ -2815,6 +2965,20 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             await RunOnUiAsync(() =>
                 SetTransferError(ex));
+        }
+    }
+
+    private async Task ChmodEntryAsync(SftpFileInfo entry, short mode, string octalText)
+    {
+        try
+        {
+            await _browser!.ChmodAsync(entry.FullPath, mode, LifecycleTokenOrNone()).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
+        {
+            Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
+            await RunSudoCommandAsync(
+                $"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}").ConfigureAwait(false);
         }
     }
 
@@ -2896,21 +3060,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// Converts a rwxrwxrwx permission string to its octal form.
     /// </summary>
     public static string PermissionsToOctal(string perms)
-    {
-        if (string.IsNullOrEmpty(perms) || perms.Length != 9)
-        {
-            return "000";
-        }
-
-        static int TriadToDigit(char r, char w, char x) =>
-            (r != '-' ? 4 : 0) + (w != '-' ? 2 : 0) + (x != '-' ? 1 : 0);
-
-        int owner = TriadToDigit(perms[0], perms[1], perms[2]);
-        int group = TriadToDigit(perms[3], perms[4], perms[5]);
-        int other = TriadToDigit(perms[6], perms[7], perms[8]);
-
-        return $"{owner}{group}{other}";
-    }
+        => SftpPermissionMode.TryParseSymbolic(perms, out int mode)
+            ? SftpPermissionMode.ToOctalString(mode)
+            : "000";
 
     internal static string BuildSudoInvocation(string privilegedBody, bool authenticateViaStdin)
     {
@@ -2978,12 +3130,30 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// <summary>
     /// Determines whether the provided exception represents a permission error.
     /// </summary>
+    /// <summary>
+    /// What occupies a local download target. A probe by File.Exists alone read a directory as
+    /// free, the batch proceeded, and the download failed at the open.
+    /// </summary>
+    internal static FileConflictItemKind? LocalTargetKind(string path)
+    {
+        if (File.Exists(path))
+        {
+            return FileConflictItemKind.File;
+        }
+
+        return Directory.Exists(path) ? FileConflictItemKind.Directory : null;
+    }
+
+    internal static bool LocalTargetExists(string path) => LocalTargetKind(path) is not null;
+
     public static bool IsPermissionDenied(Exception ex)
     {
         ArgumentNullException.ThrowIfNull(ex);
 
+        // Not UnauthorizedAccessException: that is the local file system refusing (a read-only
+        // folder, an ACL), and escalating to a privileged remote transfer for it fails on the
+        // same local path with a message that blames the server.
         return ex is SftpPermissionDeniedException
-            or UnauthorizedAccessException
             or RemoteRecursiveDeleteException
         {
             Reason: RemoteRecursiveDeleteFailureReason.PermissionDenied,

@@ -45,6 +45,25 @@ public sealed class EmbeddedSftpDownloadConflictTests
             call => Assert.Equal(System.IO.Path.Combine(target.Path, "beta.txt"), call.LocalPath));
     }
 
+    /// <remarks>
+    /// The probe used File.Exists alone, so a local DIRECTORY at the target was not a conflict:
+    /// the batch proceeded and the download failed at the open.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadFilesAsync_LocalDirectoryAtTheTarget_IsAConflict()
+    {
+        using TempDirectory target = new();
+        Directory.CreateDirectory(System.IO.Path.Combine(target.Path, "alpha.txt"));
+        var presenter = new RecordingConflictPresenter(_ => null);
+        var browser = new RecordingRemoteBrowser();
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.DownloadFilesAsync([CreateFile("alpha.txt")], target.Path);
+
+        Assert.Equal(1, presenter.CallCount);
+        Assert.Empty(browser.DownloadCalls);
+    }
+
     [Fact]
     public async Task DownloadFilesAsync_CancelledConflict_AbortsEntireBatch()
     {

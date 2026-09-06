@@ -175,21 +175,6 @@ public sealed partial class EmbeddedSftpViewModel
             targetDirectory.TrimEnd('/'),
             StringComparison.Ordinal);
 
-        var existingNames = new HashSet<string>(
-            UnfilteredEntries.Select(entry => entry.Name),
-            StringComparer.Ordinal);
-
-        // A cut back into the same directory must leave the original names "free" so the self-move guard
-        // recognizes an unchanged target; a copy into the same directory keeps them as collisions so a
-        // second copy is created instead of being skipped.
-        if (cut && sameDirectory)
-        {
-            foreach (SftpFileInfo entry in clipboard.Entries)
-            {
-                existingNames.Remove(entry.Name);
-            }
-        }
-
         // Source paths of cut entries that have been fully processed (moved, or skipped as a self-move).
         // On a mid-loop failure these are dropped from the clipboard so a re-paste cannot target sources
         // that have already moved away; the entries not yet processed (including the one that failed,
@@ -199,6 +184,23 @@ public sealed partial class EmbeddedSftpViewModel
 
         try
         {
+            // Read live, not from what the pane last rendered: a cut publishes by a bare rename,
+            // which on FTP (RNFR/RNTO) many servers answer by overwriting, and the only thing
+            // between the user and an overwritten file was how old the snapshot was.
+            HashSet<string> existingNames = await ReadLiveDestinationNamesAsync(targetDirectory, ct)
+                .ConfigureAwait(false);
+
+            // A cut back into the same directory must leave the original names "free" so the self-move guard
+            // recognizes an unchanged target; a copy into the same directory keeps them as collisions so a
+            // second copy is created instead of being skipped.
+            if (cut && sameDirectory)
+            {
+                foreach (SftpFileInfo entry in clipboard.Entries)
+                {
+                    existingNames.Remove(entry.Name);
+                }
+            }
+
             foreach (SftpFileInfo entry in clipboard.Entries)
             {
                 // Entry granularity is all this layer can offer: interrupting the server-side copy of
@@ -293,7 +295,7 @@ public sealed partial class EmbeddedSftpViewModel
                 });
             }
 
-            await RunOnUiAsync(() => SetTransferError(ex));
+            await RunOnUiAsync(() => ReportOperationOutcome(ex));
         }
     }
 
@@ -793,13 +795,13 @@ public sealed partial class EmbeddedSftpViewModel
 
         CancellationToken ct = transferCts.Token;
         string targetDirectory = CurrentPath;
-        var existingNames = new HashSet<string>(
-            UnfilteredEntries.Select(entry => entry.Name),
-            StringComparer.Ordinal);
         var skippedUnsupportedPaths = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
+            HashSet<string> existingNames = await ReadLiveDestinationNamesAsync(targetDirectory, ct)
+                .ConfigureAwait(false);
+
             foreach (SftpFileInfo entry in entries)
             {
                 ct.ThrowIfCancellationRequested();
@@ -838,7 +840,7 @@ public sealed partial class EmbeddedSftpViewModel
         }
         catch (Exception ex)
         {
-            await RunOnUiAsync(() => SetTransferError(ex));
+            await RunOnUiAsync(() => ReportOperationOutcome(ex));
         }
         finally
         {
