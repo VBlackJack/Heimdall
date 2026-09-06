@@ -28,7 +28,7 @@ namespace Heimdall.App.Services;
 /// gathered for a short quiet window and merged in one write, last change per key
 /// winning.
 /// </summary>
-public sealed class HostKeyPersistenceCoalescer : IDisposable
+public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
 {
     /// <summary>Quiet window after the last change before the batch is written.</summary>
     public static readonly TimeSpan DefaultQuietWindow = TimeSpan.FromMilliseconds(250);
@@ -94,13 +94,30 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable
         return batch is null ? LastFlush : WriteAsync(batch);
     }
 
+    /// <summary>
+    /// Stops the quiet-window timer and starts the final write. The write is not
+    /// awaited here: prefer <see cref="DisposeAsync"/>, which the container uses at
+    /// exit, so a change made in the last quiet window is on disk before the process
+    /// ends.
+    /// </summary>
     public void Dispose()
+    {
+        _ = StopAndFlush();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await StopAndFlush().ConfigureAwait(false);
+    }
+
+    private Task StopAndFlush()
     {
         lock (_gate)
         {
             if (_disposed)
             {
-                return;
+                return LastFlush;
             }
 
             _disposed = true;
@@ -108,7 +125,7 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable
             _timer = null;
         }
 
-        _ = FlushAsync();
+        return FlushAsync();
     }
 
     private void Enqueue(string key, PendingChange change)

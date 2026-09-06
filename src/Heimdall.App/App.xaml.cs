@@ -17,6 +17,7 @@
 using System.IO;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Threading;
 using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -81,6 +82,16 @@ public partial class App : System.Windows.Application
     /// <summary>How long exit waits for the session snapshot to reach disk.</summary>
     private static readonly TimeSpan ExitSnapshotSaveBudget = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// Ceiling on the service container's asynchronous disposal at exit. It was the only
+    /// unbounded await on the exit path: a service whose DisposeAsync blocked hung the
+    /// exit, and on the update path that is the relauncher's wait expiring.
+    /// </summary>
+    private static readonly TimeSpan ExitContainerDisposeBudget = TimeSpan.FromSeconds(5);
+
+    /// <summary>Ceiling on the trusted host key flush at exit.</summary>
+    private static readonly TimeSpan ExitHostKeyFlushBudget = TimeSpan.FromSeconds(5);
+
     // WPF's startup hook is event-like. Keeping async void here lets the splash
     // stay visible while awaited initialization completes on the dispatcher.
     protected override async void OnStartup(StartupEventArgs e)
@@ -101,17 +112,12 @@ public partial class App : System.Windows.Application
         // Temporarily switch to explicit shutdown so closing the splash doesn't kill the app
         // (WPF treats the first Window shown as MainWindow when ShutdownMode is OnMainWindowClose).
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        var splash = CreateSplashWindow();
 
         // Register global exception handlers BEFORE any awaits - async void
         // resumes on the dispatcher, so unhandled exceptions from awaited calls
         // must already be caught at this point.
-        DispatcherUnhandledException += (_, args) =>
-        {
-            Heimdall.Core.Logging.FileLogger.Error("Unhandled exception", args.Exception);
-            ShowUnhandledException(args.Exception);
-            args.Handled = true;
-        };
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        SessionEnding += OnSessionEnding;
 
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
@@ -158,6 +164,10 @@ public partial class App : System.Windows.Application
                 // Already logged by the guard. Starting is the lesser failure.
                 break;
         }
+
+        // After the single-instance decision, deliberately: a second launch used to
+        // flash the full splash before handing over to the running instance.
+        var splash = CreateSplashWindow();
 
         LogMsTscAxRegistration();
 
@@ -1300,6 +1310,43 @@ public partial class App : System.Windows.Application
         }
     }
 
+    /// <summary>
+    /// The dispatcher's unhandled-exception hook. Logged and flushed only while shutting
+    /// down: a modal box on the way out stops the process from ending - the update
+    /// relauncher's wait expires, and a logoff shows the "this app is preventing
+    /// shutdown" screen.
+    /// </summary>
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)
+    {
+        Heimdall.Core.Logging.FileLogger.Error("Unhandled exception", args.Exception);
+        if (ShutdownDecisions.ShouldShowUnhandledExceptionDialog(IsShuttingDown))
+        {
+            ShowUnhandledException(args.Exception);
+        }
+        else
+        {
+            Heimdall.Core.Logging.FileLogger.Flush();
+        }
+
+        args.Handled = true;
+    }
+
+    /// <summary>
+    /// Windows logoff or shutdown. WPF closes every window with the cancellation ignored
+    /// and then shuts down; without this the main window took its full interactive close
+    /// pass - prompts during a logoff - and a refused or thrown confirmation returned
+    /// before the expand state and window bounds were saved.
+    /// </summary>
+    private void OnSessionEnding(object sender, SessionEndingCancelEventArgs args)
+    {
+        IsShuttingDown = true;
+        Heimdall.Core.Logging.FileLogger.Info("Session ending: persisting state before shutdown");
+        if (MainWindow is MainWindow window)
+        {
+            _ = window.PersistStateForShutdownAsync();
+        }
+    }
+
     private void ShowUnhandledException(Exception exception)
     {
         // Written here rather than at the three call sites: this is the chokepoint every
@@ -1371,102 +1418,148 @@ public partial class App : System.Windows.Application
         Task hostKeyPersistenceFlush = _serviceProvider?.GetService<HostKeyPersistenceCoalescer>()?.FlushAsync()
             ?? Task.CompletedTask;
 
-        if (_serviceProvider is not null)
-        {
-            // The sessions are closed BEFORE this method first yields, and the sequence records
-            // why: WPF clears Application.Current the moment an asynchronous OnExit returns to
-            // DoShutdown, which is its first incomplete await. The snapshot save is that await.
-            // Closing after it tore every host down inside an application that no longer existed.
-            ISessionSnapshotService? snapshotService = _mainViewModel is null
-                ? null
-                : _serviceProvider.GetService<ISessionSnapshotService>();
-            if (snapshotService is not null)
-            {
-                _mainViewModel!.StatusText = _mainViewModel.Localize("StatusSnapshotSaving");
-            }
+        // Everything that releases a resource outside this process runs here, BEFORE the
+        // first await: WPF clears Application.Current the moment an asynchronous OnExit
+        // returns to DoShutdown, which is its first incomplete await, and the continuation
+        // then runs inside an application that no longer exists. The session close was
+        // moved above that line for this reason; these steps were left behind it. Each is
+        // a step of this body, where the exit-path guard reads their order.
+        ReleaseRdpArtifacts();
+        ReleaseTunnels();
+        StopScheduler();
+        StopX11Server();
+        ReleaseSleepPrevention();
 
-            await ApplicationExitSequence.SaveSnapshotAndCloseSessionsAsync(
-                () => _mainViewModel!.GetSessionSnapshotEntries(),
-                () =>
-                {
-                    _mainViewModel?.Connection.CloseAllSessionsSilently();
+        // The log so far, while the process is still whole. The final flush below sits
+        // behind two awaits, and the tail of a shutdown is the part hardest to reproduce.
+        Core.Logging.FileLogger.Flush();
 
-                    // The closed sessions hand their RDP controls back to the pool; release
-                    // the pool here, on the UI thread and before the first await, so the idle
-                    // controls are torn down inside an application that still exists.
-                    _serviceProvider.GetService<EmbeddedSessionManager>()?.Dispose();
-                },
-                snapshotService,
-                ExitSnapshotSaveBudget,
-                Core.Logging.FileLogger.Warn);
-
-            // Release the .rdp files and Credential Manager entries whose deferred cleanup has
-            // not fired yet. The cleanup task is unobserved and dies with the process; without
-            // this an exit inside the window leaves the password readable until logoff.
-            try
-            {
-                foreach (RdpHandler rdpHandler in
-                    _serviceProvider.GetServices<IProtocolHandler>().OfType<RdpHandler>())
-                {
-                    rdpHandler.FlushPendingCleanups();
-                }
-            }
-            catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] RDP artifact cleanup: {ex.Message}"); }
-
-            // Close all active tunnels (Plink tunnel processes)
-            try
-            {
-                var tunnelManager = _serviceProvider.GetService<TunnelManager>();
-                tunnelManager?.Dispose();
-            }
-            catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] tunnel cleanup: {ex.Message}"); }
-
-            // Stop scheduled task engine
-            try
-            {
-                _mainViewModel?.StopScheduler();
-            }
-            catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] scheduler cleanup: {ex.Message}"); }
-
-            // Stop managed X11 server
-            try
-            {
-                var x11Manager = _serviceProvider.GetService<X11ServerManager>();
-                x11Manager?.Stop();
-            }
-            catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] X11 cleanup: {ex.Message}"); }
-
-            // Release sleep prevention
-            try
-            {
-                SleepPrevention.ForceRelease();
-            }
-            catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] sleep prevention cleanup: {ex.Message}"); }
-        }
-
-        // ServiceProvider must be disposed asynchronously because some registered services
-        // (e.g. FileShareService) only implement IAsyncDisposable. A sync Dispose() on the
-        // container would throw "type only implements IAsyncDisposable. Use DisposeAsync".
-        if (_serviceProvider is IAsyncDisposable asyncProvider)
-        {
-            await asyncProvider.DisposeAsync();
-        }
-        else
-        {
-            _serviceProvider?.Dispose();
-        }
-
-        try
-        {
-            await hostKeyPersistenceFlush.WaitAsync(TimeSpan.FromSeconds(5));
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Warn($"Trusted host key flush at exit did not complete: {ex.Message}");
-        }
+        await SaveSnapshotAndCloseSessionsAsync();
+        await DisposeContainerBoundedAsync();
+        await ExitStep.RunBoundedAsync(
+            "trusted host key flush",
+            () => hostKeyPersistenceFlush,
+            ExitHostKeyFlushBudget,
+            Core.Logging.FileLogger.Warn);
 
         Core.Logging.FileLogger.Info("Heimdall shutdown complete");
         Core.Logging.FileLogger.Flush();
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// Releases the .rdp files and Credential Manager entries whose deferred cleanup has
+    /// not fired yet. The cleanup task is unobserved and dies with the process; without
+    /// this an exit inside the window leaves the password readable until logoff.
+    /// </summary>
+    private void ReleaseRdpArtifacts()
+    {
+        if (_serviceProvider is null)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (RdpHandler rdpHandler in
+                _serviceProvider.GetServices<IProtocolHandler>().OfType<RdpHandler>())
+            {
+                rdpHandler.FlushPendingCleanups();
+            }
+        }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] RDP artifact cleanup: {ex.Message}"); }
+    }
+
+    /// <summary>Closes every active tunnel (Plink tunnel processes).</summary>
+    private void ReleaseTunnels()
+    {
+        try
+        {
+            _serviceProvider?.GetService<TunnelManager>()?.Dispose();
+        }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] tunnel cleanup: {ex.Message}"); }
+    }
+
+    /// <summary>Stops the scheduled task engine.</summary>
+    private void StopScheduler()
+    {
+        try
+        {
+            _mainViewModel?.StopScheduler();
+        }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] scheduler cleanup: {ex.Message}"); }
+    }
+
+    /// <summary>Stops the managed X11 server.</summary>
+    private void StopX11Server()
+    {
+        try
+        {
+            _serviceProvider?.GetService<X11ServerManager>()?.Stop();
+        }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] X11 cleanup: {ex.Message}"); }
+    }
+
+    /// <summary>Releases sleep prevention.</summary>
+    private static void ReleaseSleepPrevention()
+    {
+        try
+        {
+            SleepPrevention.ForceRelease();
+        }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] sleep prevention cleanup: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// The sessions are closed BEFORE this method first yields, and the sequence records
+    /// why: WPF clears Application.Current the moment an asynchronous OnExit returns to
+    /// DoShutdown, which is its first incomplete await. The snapshot save is that await.
+    /// Closing after it tore every host down inside an application that no longer existed.
+    /// </summary>
+    private async Task SaveSnapshotAndCloseSessionsAsync()
+    {
+        if (_serviceProvider is null)
+        {
+            return;
+        }
+
+        ISessionSnapshotService? snapshotService = _mainViewModel is null
+            ? null
+            : _serviceProvider.GetService<ISessionSnapshotService>();
+
+        await ApplicationExitSequence.SaveSnapshotAndCloseSessionsAsync(
+            () => _mainViewModel!.GetSessionSnapshotEntries(),
+            () =>
+            {
+                _mainViewModel?.Connection.CloseAllSessionsSilently();
+
+                // The closed sessions hand their RDP controls back to the pool; release
+                // the pool here, on the UI thread and before the first await, so the idle
+                // controls are torn down inside an application that still exists.
+                _serviceProvider.GetService<EmbeddedSessionManager>()?.Dispose();
+            },
+            snapshotService,
+            ExitSnapshotSaveBudget,
+            Core.Logging.FileLogger.Warn);
+    }
+
+    /// <summary>
+    /// The container must be disposed asynchronously because some registered services
+    /// (e.g. FileShareService) only implement IAsyncDisposable; a sync Dispose() on it
+    /// would throw. Bounded: it was the only unbounded await on the exit path.
+    /// </summary>
+    private async Task DisposeContainerBoundedAsync()
+    {
+        if (_serviceProvider is not IAsyncDisposable asyncProvider)
+        {
+            _serviceProvider?.Dispose();
+            return;
+        }
+
+        await ExitStep.RunBoundedAsync(
+            "service container disposal",
+            () => asyncProvider.DisposeAsync().AsTask(),
+            ExitContainerDisposeBudget,
+            Core.Logging.FileLogger.Warn);
     }
 }

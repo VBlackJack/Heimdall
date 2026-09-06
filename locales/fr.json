@@ -2073,7 +2073,6 @@
   "LevelDiagnosticWarning": "Avertissement",
   "WarningSnapshotRestorePartial": "{0} session(s) restaur\u00e9e(s) sur {1}.",
   "ErrorSnapshotRestoreFailed": "\u00c9chec de la restauration des sessions sauvegard\u00e9es : {0}",
-  "StatusSnapshotSaving": "Sauvegarde de l'instantan\u00e9 de session...",
   "A11yWorkspaceSave": "Sauvegarder l'espace de travail actuel",
   "A11yWorkspaceRestore": "Restaurer l'espace de travail sauvegard\u00e9",
   "LogWorkspaceSaved": "Espace de travail sauvegard\u00e9 avec {0} sessions",

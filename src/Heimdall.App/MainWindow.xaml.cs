@@ -3646,6 +3646,31 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
+    /// <summary>The sessions the close confirmation counts: attached and detached alike.</summary>
+    private int CountConnectedSessionsForClose(MainViewModel vm)
+    {
+        return ShutdownDecisions.CountConnectedSessions(vm.Connection.ActiveSessions, _sessionWindowService.DetachedSessions);
+    }
+
+    /// <summary>
+    /// Persists what the close gesture persists, without its prompts. For a shutdown
+    /// requested elsewhere - an update install - whose shutting-down flag makes
+    /// <see cref="OnClosing"/> return before it saves anything.
+    /// </summary>
+    internal Task PersistStateForShutdownAsync()
+    {
+        if (DataContext is not MainViewModel vm)
+        {
+            return Task.CompletedTask;
+        }
+
+        return WindowClosingFlow.PersistBeforeShutdownAsync(
+            vm.Settings.IsDirty,
+            () => vm.Settings.TrySaveAsync(),
+            () => vm.ServerList.FlushExpandStateForCloseAsync(),
+            () => SaveWindowBoundsAsync(vm));
+    }
+
     private Task SaveWindowBoundsAsync(MainViewModel vm)
     {
         // Save Normal-state bounds even when maximized
@@ -3708,17 +3733,15 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
+        // Detached sessions too: detaching removes a session from the main collection,
+        // and three detached sessions used to produce a count of zero and no question.
+        int connectedSessionCount = CountConnectedSessionsForClose(vm);
+
         _closeInProgress = true;
         try
         {
             string warningTitle = vm.Localize("SettingsCloseSaveFailedTitle");
             string warningMessage = vm.Localize("SettingsCloseSaveFailedMessage");
-            int connectedSessionCount = vm.Connection.ActiveSessions.Count(session =>
-                Heimdall.Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
-                    .Any(pane => string.Equals(
-                        pane.Status,
-                        "Connected",
-                        StringComparison.Ordinal)));
             bool prepared = await WindowClosingFlow.TryPrepareCloseAsync(
                 vm.Settings.IsDirty,
                 connectedSessionCount,

@@ -22,6 +22,24 @@ namespace Heimdall.App.Services;
 /// </summary>
 internal sealed class ApplicationLifecycle : IApplicationLifecycle
 {
+    /// <inheritdoc />
+    /// <remarks>
+    /// The update install used to skip straight to <see cref="RequestShutdown"/>, whose
+    /// shutting-down flag makes the main window's close pass return before it saves
+    /// anything: a user who edited settings and installed from the same screen came
+    /// back to their edits gone, the tree collapsed and the window moved.
+    /// </remarks>
+    public async Task PersistStateAsync()
+    {
+        System.Windows.Application? application = System.Windows.Application.Current;
+        if (application?.MainWindow is not Heimdall.App.MainWindow window)
+        {
+            return;
+        }
+
+        await application.Dispatcher.InvokeAsync(() => window.PersistStateForShutdownAsync()).Task.Unwrap();
+    }
+
     public void RequestShutdown()
     {
         System.Windows.Application? application = System.Windows.Application.Current;
