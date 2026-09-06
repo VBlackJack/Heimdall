@@ -67,7 +67,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly HostKeyStore _hostKeyStore;
     private readonly IHostKeyTrustService _hostKeyTrustService;
     private readonly IHostKeyVerifier _hostKeyVerifier;
-    private readonly X11ServerManager _x11ServerManager;
+    private readonly IX11ServerManager _x11ServerManager;
     private readonly IDialogService _dialogService;
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
@@ -95,7 +95,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         HostKeyStore hostKeyStore,
         IHostKeyTrustService hostKeyTrustService,
         IHostKeyVerifier hostKeyVerifier,
-        X11ServerManager x11ServerManager,
+        IX11ServerManager x11ServerManager,
         IDialogService dialogService,
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
@@ -217,10 +217,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             Core.Logging.FileLogger.Info(
                 $"SSH using Plink fallback for {server.DisplayName}");
-            if (server.SshX11Forwarding)
-            {
-                await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
-            }
 
             return await ConnectSshViaPlinkAsync(
                     server,
@@ -366,10 +362,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 Core.Logging.FileLogger.Info(
                     $"SSH.NET auth failed ({failure.Code}), falling back to Plink: {failure.Message}");
                 SetStatusText?.Invoke(_localizer[SshLocalizationKeys.StatusSshRetryingViaPlink]);
-                if (server.SshX11Forwarding)
-                {
-                    await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
-                }
 
                 return await ConnectSshViaPlinkAsync(
                         server,
@@ -468,6 +460,48 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
 
         return TerminalSize.Default;
+    }
+
+    /// <summary>
+    /// Whether this session gets X11 forwarding: the profile asked for it and an X server is
+    /// available. When the profile asks and no server can be found or started, the localized
+    /// notice goes to the status text, the same path the direct-transport capability notice
+    /// uses, and the answer is <see langword="false"/> so the launcher is not handed <c>-X</c>
+    /// for a display that does not exist.
+    /// </summary>
+    /// <remarks>
+    /// The three launch paths used to ignore the manager's answer: Plink and PuTTY were still
+    /// given <c>-X</c>, every X client on the remote side failed with "cannot open display", and
+    /// the user saw nothing here explaining why. The notice existed and went to the log only.
+    /// </remarks>
+    private async Task<bool> ResolveX11ForwardingAsync(ServerProfileDto server)
+    {
+        if (!server.SshX11Forwarding)
+        {
+            return false;
+        }
+
+        bool available;
+        try
+        {
+            available = await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"X11 server check failed for {server.DisplayName}: {ex.Message}");
+            available = false;
+        }
+
+        if (available)
+        {
+            return true;
+        }
+
+        Core.Logging.FileLogger.Warn(
+            $"X11 forwarding requested for {server.DisplayName} but no X11 server is available; launching without it.");
+        SetStatusText?.Invoke(_localizer[SshLocalizationKeys.X11ServerNotFound]);
+        return false;
     }
 
     private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
@@ -577,21 +611,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 ? $"{server.SshUsername}@{targetHost}"
                 : targetHost;
 
+            bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
             System.Diagnostics.ProcessStartInfo psi = BuildPuttyStartInfo(
                 puttyPath,
                 server.SshKeyPath,
                 server.SshCompression,
                 server.SshAgentForwarding,
-                server.SshX11Forwarding,
+                x11Forwarding,
                 targetPort,
                 target,
                 hostKeyArg);
             Core.Logging.FileLogger.Info($"Launching PuTTY: {puttyPath} for {targetHost}:{targetPort}");
-
-            if (server.SshX11Forwarding)
-            {
-                await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
-            }
 
             System.Diagnostics.Process? process = System.Diagnostics.Process.Start(psi);
 
@@ -820,6 +850,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             // The dialog is over, so the gap between identifying the image and launching it is now
             // bounded by this block alone. The lease pins that exact image; the block closes as soon
             // as the launch has been issued, so a later update is not held off for the whole session.
+            // Resolved before the attestation so a slow X server start does not widen the gap
+            // between identifying the launcher image and launching it.
+            bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
+
             using (PlinkAttestationLease attestation = _plinkAttestation(plinkPath))
             {
                 string? passwordFilePath = CreatePlinkPasswordFile(password);
@@ -828,7 +862,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     server.SshKeyPath,
                     server.SshCompression,
                     server.SshAgentForwarding,
-                    server.SshX11Forwarding,
+                    x11Forwarding,
                     targetPort,
                     target,
                     hostKeyArg,
