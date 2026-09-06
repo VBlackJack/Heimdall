@@ -38,8 +38,11 @@ public static class SftpAtomicUpload
         {
             case null:
             case RemoteEntryKind.File:
-            case RemoteEntryKind.Directory:
                 return;
+
+            // A directory used to be accepted here and refused only by the server, at the
+            // rename, after the whole file had been staged. It is decidable up front.
+            case RemoteEntryKind.Directory:
             case RemoteEntryKind.Unknown:
             case RemoteEntryKind.SymbolicLink:
             case RemoteEntryKind.Fifo:

@@ -34,21 +34,23 @@ public sealed class SftpAtomicUploadTargetTests
         Assert.Null(exception);
     }
 
-    [Theory]
-    [InlineData(RemoteEntryKind.File)]
-    [InlineData(RemoteEntryKind.Directory)]
-    public void EnsureUploadTargetSupported_AllowsSupportedExistingDestination(
-        RemoteEntryKind existingDestinationKind)
+    [Fact]
+    public void EnsureUploadTargetSupported_AllowsAnExistingRegularFile()
     {
         Exception? exception = Record.Exception(() =>
             SftpAtomicUpload.EnsureUploadTargetSupported(
                 FinalRemotePath,
-                existingDestinationKind));
+                RemoteEntryKind.File));
 
         Assert.Null(exception);
     }
 
+    /// <remarks>
+    /// A directory used to be accepted here and refused only by the server, at the rename,
+    /// after the whole file had been staged. It is decidable up front.
+    /// </remarks>
     [Theory]
+    [InlineData(RemoteEntryKind.Directory)]
     [InlineData(RemoteEntryKind.Unknown)]
     [InlineData(RemoteEntryKind.SymbolicLink)]
     [InlineData(RemoteEntryKind.Fifo)]

@@ -22,6 +22,55 @@ public sealed class SftpBrowserMetadataPreflightWiringTests
 {
     private const string Target = "/srv/app/agent";
 
+    /// <remarks>
+    /// A server that allows SFTP but refuses exec - ForceCommand internal-sftp, a chrooted
+    /// account, a nologin shell - raised a raw SshException out of the preflight, so no file
+    /// could be uploaded at all and the user read the generic "transfer failed". It is the
+    /// verdict the vocabulary already names, with its own localized refusal.
+    /// </remarks>
+    [Theory]
+    [InlineData(TransportFailureKind.Ssh)]
+    [InlineData(TransportFailureKind.Socket)]
+    [InlineData(TransportFailureKind.Io)]
+    [InlineData(TransportFailureKind.Timeout)]
+    public async Task Replacement_IsRefusedAsExecUnavailable_WhenTheExecChannelFails(TransportFailureKind kind)
+    {
+        Exception failure = kind switch
+        {
+            TransportFailureKind.Ssh => new Renci.SshNet.Common.SshException("exec refused"),
+            TransportFailureKind.Socket => new System.Net.Sockets.SocketException(),
+            TransportFailureKind.Io => new IOException("pipe closed"),
+            _ => new TimeoutException("exec timed out"),
+        };
+        ThrowingExecRunner runner = new(failure);
+        using SftpBrowser browser = new(runner);
+
+        SftpMetadataPreservationException exception =
+            await Assert.ThrowsAsync<SftpMetadataPreservationException>(
+                () => browser.EnsureReplacementPreservesMetadataAsync(Target, CancellationToken.None));
+
+        Assert.Equal(SftpMetadataPreflightVerdict.ExecUnavailable, exception.Verdict);
+        Assert.Equal("ErrorSftpReplaceRefusedExecUnavailable", exception.MessageKey);
+        Assert.Equal(Target, exception.RemotePath);
+    }
+
+    public enum TransportFailureKind
+    {
+        Ssh,
+        Socket,
+        Io,
+        Timeout,
+    }
+
+    private sealed class ThrowingExecRunner : ISftpExecCommandRunner
+    {
+        private readonly Exception _failure;
+
+        public ThrowingExecRunner(Exception failure) => _failure = failure;
+
+        public Task<SftpExecResult> ExecuteAsync(string command, CancellationToken ct) => throw _failure;
+    }
+
     [Fact]
     public async Task Replacement_IsRefused_WhenNoTrustedExecChannelIsAvailable()
     {

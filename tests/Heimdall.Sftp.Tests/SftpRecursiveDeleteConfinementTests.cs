@@ -44,6 +44,28 @@ public sealed class SftpRecursiveDeleteConfinementTests
         Assert.Equal("LC_ALL=C rm -r -- '/srv/tree'", runner.LastCommand);
     }
 
+    /// <remarks>
+    /// Every other exec in the browser carries its own ceiling; the recursive delete ran with
+    /// the caller's token alone, and a stalled exec channel ran for as long as the connection
+    /// lived. A caller passing CancellationToken.None must still hand the runner a token
+    /// that can fire.
+    /// </remarks>
+    [Fact]
+    public async Task DeleteDirectoryViaExecAsync_BoundsTheExecWithItsOwnToken()
+    {
+        CancellationToken observed = default;
+        FakeExecCommandRunner runner = new((_, ct) =>
+        {
+            observed = ct;
+            return Task.FromResult(new SftpExecResult(0, string.Empty));
+        });
+        using SftpBrowser browser = new(runner);
+
+        await browser.DeleteDirectoryViaExecAsync("/srv/tree", CancellationToken.None);
+
+        Assert.True(observed.CanBeCanceled, "the exec must run under a token that a timeout can cancel");
+    }
+
     [Fact]
     public async Task DeleteDirectoryViaExecAsync_MapsExit127ToShellOrRmUnavailable()
     {
