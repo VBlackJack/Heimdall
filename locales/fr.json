@@ -2036,6 +2036,7 @@
   "WarnProxyJumpUnsupportedProxyCommand": "ProxyCommand n'est pas pris en charge ; Heimdall prend uniquement en charge les sauts TCP natifs via ProxyJump : {0}",
   "WarnProxyJumpMixedWithProxyCommand": "ProxyJump et ProxyCommand sont combin\u00e9s ; utilisez uniquement ProxyJump pour l'import Heimdall : {0}",
   "WarnProxyJumpTokenSubstitution": "ProxyJump avec substitutions OpenSSH (%h/%p/%r) n'est pas pris en charge : {0}",
+  "WarnHostNameTokenSubstitution": "HostName utilise une substitution OpenSSH que Heimdall ne peut pas d\u00e9velopper (seul %h est pris en charge) ; h\u00f4te ignor\u00e9 : {0}",
   "WarnProxyJumpCycle": "Cycle ProxyJump d\u00e9tect\u00e9 dans la cha\u00eene pour Host {0}",
   "WarnProxyJumpUnrecognisedSyntax": "Syntaxe ProxyJump non reconnue : {0}",
   "InfoProxyJumpReusingGateway": "r\u00e9utilise la passerelle existante \"{0}\"",

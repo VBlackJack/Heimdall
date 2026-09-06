@@ -2036,6 +2036,7 @@
   "WarnProxyJumpUnsupportedProxyCommand": "ProxyCommand is not supported; Heimdall only supports native TCP jumps via ProxyJump: {0}",
   "WarnProxyJumpMixedWithProxyCommand": "ProxyJump and ProxyCommand combined; use only ProxyJump for Heimdall import: {0}",
   "WarnProxyJumpTokenSubstitution": "ProxyJump with OpenSSH tokens (%h/%p/%r) is not supported: {0}",
+  "WarnHostNameTokenSubstitution": "HostName uses an OpenSSH token Heimdall cannot expand (only %h is supported); host skipped: {0}",
   "WarnProxyJumpCycle": "ProxyJump cycle detected in chain for Host {0}",
   "WarnProxyJumpUnrecognisedSyntax": "Unrecognised ProxyJump syntax: {0}",
   "InfoProxyJumpReusingGateway": "reusing existing gateway '{0}'",
