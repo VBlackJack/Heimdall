@@ -129,6 +129,24 @@ public sealed class SshConnectionProbeTests
         Assert.Empty(result.MessageArguments);
     }
 
+    // A-07: a reset during the banner read surfaces as an IOException wrapping the
+    // SocketException. Only the bare SocketException was caught, so the caller
+    // displayed the raw .NET message instead of the classified network failure.
+    [Fact]
+    public async Task ProbeAsync_ConnectionResetDuringBannerRead_ReturnsNetworkResetFailure()
+    {
+        (int port, Task serverTask) = StartResettingServer();
+
+        SshConnectionProbe.ProbeResult result =
+            await SshConnectionProbe.ProbeAsync("127.0.0.1", port, LocalServerProbeTimeoutMs);
+        await serverTask;
+
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.NetworkReset, result.FailureCode);
+        Assert.Equal(SshConnectionProbe.MessageKeyConnectionReset, result.MessageKey);
+        Assert.Null(result.Banner);
+    }
+
     [Fact]
     public async Task ProbeAsync_SshBanner_ReturnsSuccess()
     {
@@ -181,6 +199,29 @@ public sealed class SshConnectionProbeTests
     private static (int Port, Task ServerTask) StartSingleResponseServer(string response)
     {
         return StartSingleResponseServer(Encoding.UTF8.GetBytes(response));
+    }
+
+    /// <summary>
+    /// Accepts one connection and closes it with a zero linger, which sends a TCP reset
+    /// instead of a FIN, so the probe's pending banner read fails with a connection reset.
+    /// </summary>
+    private static (int Port, Task ServerTask) StartResettingServer()
+    {
+        TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+
+        Task serverTask = Task.Run(async () =>
+        {
+            using (listener)
+            {
+                using Socket accepted = await listener.AcceptSocketAsync();
+                accepted.LingerState = new LingerOption(enable: true, seconds: 0);
+                accepted.Close();
+            }
+        });
+
+        return (port, serverTask);
     }
 
     private static (int Port, Task ServerTask) StartSingleResponseServer(byte[] response)
