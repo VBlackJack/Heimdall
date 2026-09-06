@@ -458,6 +458,84 @@ public class PlinkTunnelRunnerTests : IDisposable
         Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
     }
 
+    /// <summary>
+    /// The forwarded port is probed before the first wait: plink binds within milliseconds,
+    /// and sleeping first charged every fallback connect a whole interval during which the
+    /// password file, already consumed, still sat on disk.
+    /// </summary>
+    [Fact]
+    public async Task StartAsync_ProbesTheForwardedPortBeforeWaitingTheFirstInterval()
+    {
+        const int intervalMs = 1000;
+        FakeOwnershipProbe probe = new(TcpListenerOwnership.OwnedByExpectedProcess);
+        FakePlinkProcess process = new() { WaitForExitResult = true };
+        using PlinkTunnelRunner runner = new(
+            new PlinkTunnelRunnerOptions(intervalMs, 100),
+            probe,
+            _ => process);
+
+        System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        PlinkTunnelResult result = await runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gw.test", 22, "user", null, null,
+            "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+        stopwatch.Stop();
+
+        Assert.True(result.Success, result.ErrorMessage);
+        Assert.True(
+            stopwatch.ElapsedMilliseconds < intervalMs / 2,
+            $"StartAsync took {stopwatch.ElapsedMilliseconds} ms although the port was owned at once: the first probe waited a whole interval");
+    }
+
+    [Fact]
+    public async Task StartAsync_ProcessStartFails_RemovesThePasswordFile()
+    {
+        using PasswordFileDirectory passwordFiles = new();
+        FakePlinkProcess process = new()
+        {
+            WaitForExitResult = true,
+            StartException = new InvalidOperationException("simulated start failure")
+        };
+        using PlinkTunnelRunner runner = CreateRunner(
+            new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess),
+            _ => process,
+            passwordFiles);
+
+        PlinkTunnelResult result = await runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gw.test", 22, "user", null, "s3cret",
+            "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+        Assert.False(result.Success);
+        Assert.True(process.Started.Task.IsCompleted, "the password file was written before Start was attempted");
+        Assert.Empty(passwordFiles.EnumeratePasswordFiles());
+    }
+
+    [Fact]
+    public async Task StartAsync_CancelledDuringOwnershipWait_RemovesThePasswordFile()
+    {
+        using PasswordFileDirectory passwordFiles = new();
+        FakePlinkProcess process = new() { WaitForExitResult = true };
+        using PlinkTunnelRunner runner = CreateRunner(
+            new FakeOwnershipProbe(TcpListenerOwnership.NothingListening),
+            _ => process,
+            passwordFiles);
+        using CancellationTokenSource cancellation = new();
+
+        Task<PlinkTunnelResult> startTask = runner.StartAsync(
+            GetCommandProcessorPath(),
+            "gw.test", 22, "user", null, "s3cret",
+            "remote", 22, GetAvailableLoopbackPort(), "SHA256:test",
+            cancellation.Token);
+        await process.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        cancellation.Cancel();
+
+        PlinkTunnelResult result = await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
+        Assert.Empty(passwordFiles.EnumeratePasswordFiles());
+    }
+
     [Fact]
     public void BuildArguments_RejectsKeyPathWithQuoteInjection()
     {
@@ -1094,10 +1172,21 @@ public class PlinkTunnelRunnerTests : IDisposable
         /// </summary>
         public TaskCompletionSource? StartGate { get; init; }
 
+        /// <summary>
+        /// Optional failure raised from <see cref="Start"/>, after the runner has written the
+        /// password file, the way a Win32 launch failure surfaces from <c>Process.Start</c>.
+        /// </summary>
+        public Exception? StartException { get; init; }
+
         public bool Start()
         {
             Started.TrySetResult();
             StartGate?.Task.GetAwaiter().GetResult();
+            if (StartException is not null)
+            {
+                throw StartException;
+            }
+
             return true;
         }
 
