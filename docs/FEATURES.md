@@ -89,7 +89,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - **Cross-pane paste** between two file browsers, same server or across servers
 - **Paste from Explorer**: upload files/folders from the Windows clipboard (CF_HDROP) into the current directory
 - SFTP/FTP file operations journaled (download / upload / mkdir / delete / rename / copy / chmod)
-- Chmod dialog with the set-user-ID, set-group-ID and sticky bits (four octal digits), path bookmarks, filename filter
+- Chmod dialog with the setuid, setgid and sticky bits (four octal digits), path bookmarks, filename filter
 - Upload conflicts are inventoried before the first byte: a destination that cannot be listed refuses the batch, and names compare case-insensitively unless the server lists two names that differ only by case
 - A right-click selects the row under the pointer before its menu opens; the browser shortcuts stay quiet while a text box has focus or the inline editor is open
 

@@ -89,7 +89,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - **Collage inter-volets** entre deux navigateurs de fichiers, sur le même serveur ou entre serveurs
 - **Coller depuis l'Explorateur** : téléverse les fichiers/dossiers présents dans le presse-papiers Windows (CF_HDROP) vers le répertoire courant
 - Opérations de fichiers SFTP/FTP journalisées (download / upload / mkdir / delete / rename / copy / chmod)
-- Boîte de dialogue chmod avec les bits set-user-ID, set-group-ID et sticky (quatre chiffres octaux), marque-pages de chemins, filtre sur le nom de fichier
+- Boîte de dialogue chmod avec les bits setuid, setgid et sticky (quatre chiffres octaux), marque-pages de chemins, filtre sur le nom de fichier
 - Les conflits de téléversement sont inventoriés avant le premier octet : une destination qui ne peut pas être listée refuse le lot, et les noms se comparent sans tenir compte de la casse sauf si le serveur liste deux noms qui n'en diffèrent que par elle
 - Un clic droit sélectionne la ligne sous le pointeur avant l'ouverture de son menu ; les raccourcis du navigateur restent muets quand une zone de texte a le focus ou que l'éditeur intégré est ouvert
 
