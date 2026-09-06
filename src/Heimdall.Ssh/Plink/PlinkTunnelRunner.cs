@@ -863,7 +863,11 @@ public sealed class PlinkTunnelRunner : IDisposable
 
     /// <summary>
     /// Waits for the local forwarded port to be owned by the process Heimdall started.
-    /// Uses a retry loop with configurable attempts and interval.
+    /// Uses a retry loop with configurable attempts and interval. The port is probed
+    /// before the first wait, not after it: plink binds its listener within a few
+    /// milliseconds of starting, and a loop that slept first charged every fallback
+    /// connect a full interval (two seconds by default) during which the plaintext
+    /// password file, already consumed by plink, still sat on disk.
     /// </summary>
     private async Task<TcpListenerOwnership> WaitForPortBindAsync(
         int localPort,
@@ -876,7 +880,10 @@ public sealed class PlinkTunnelRunner : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            await Task.Delay(_portCheckInterval, cancellationToken).ConfigureAwait(false);
+            if (attempt > 0)
+            {
+                await Task.Delay(_portCheckInterval, cancellationToken).ConfigureAwait(false);
+            }
 
             ownership = _listenerOwnershipProbe.Probe(
                 localBindHost,
