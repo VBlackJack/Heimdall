@@ -17,6 +17,7 @@
 using System.IO;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 
@@ -25,9 +26,15 @@ namespace Heimdall.App.Services.Import;
 /// <summary>
 /// Computes import statuses and persists selected OpenSSH config candidates.
 /// </summary>
-public sealed class OpenSshConfigImporter(IConfigManager configManager)
+public sealed class OpenSshConfigImporter(IConfigManager configManager, LocalizationManager? localizer = null)
 {
+    /// <summary>Locale key of the name given to a gateway created without a usable host or user.</summary>
+    internal const string DefaultGatewayNameKey = "LabelImportOpenSshDefaultGatewayName";
+
     private readonly IConfigManager _configManager = configManager;
+    private readonly LocalizationManager? _localizer = localizer;
+
+    private string DefaultGatewayName => _localizer?[DefaultGatewayNameKey] ?? DefaultGatewayNameKey;
 
     /// <summary>
     /// Computes candidate import statuses against the current server inventory.
@@ -85,7 +92,8 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
                     existingGatewayList,
                     batchGateways,
                     usedGatewayNames,
-                    createMissingGateways: false);
+                    createMissingGateways: false,
+                    DefaultGatewayName);
 
                 return new OpenSshImportCandidateAssessment(
                     candidate,
@@ -147,7 +155,8 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
                 existingGatewayList,
                 batchGateways,
                 usedGatewayNames,
-                createMissingGateways: true);
+                createMissingGateways: true,
+                DefaultGatewayName);
             foreach (var gateway in gatewayPlan.CreatedGateways)
             {
                 existingGatewayList.Add(gateway);
@@ -218,7 +227,8 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
         IReadOnlyList<SshGatewayDto> existingGateways,
         IDictionary<GatewayBatchKey, SshGatewayDto> batchGateways,
         ISet<string> usedGatewayNames,
-        bool createMissingGateways)
+        bool createMissingGateways,
+        string defaultGatewayName)
     {
         if (candidate.ProxyJumpChain.Count == 0)
         {
@@ -251,7 +261,7 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
 
             if (gateway is null)
             {
-                gateway = CreateGateway(hop, parentGatewayId, usedGatewayNames);
+                gateway = CreateGateway(hop, parentGatewayId, usedGatewayNames, defaultGatewayName);
                 batchGateways[batchKey] = gateway;
 
                 if (createMissingGateways)
@@ -286,12 +296,13 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
     private static SshGatewayDto CreateGateway(
         OpenSshProxyJumpHop hop,
         string? parentGatewayId,
-        ISet<string> usedGatewayNames)
+        ISet<string> usedGatewayNames,
+        string defaultGatewayName)
     {
         var baseName = string.IsNullOrWhiteSpace(hop.User)
             ? hop.HostName
             : $"{hop.User}@{hop.HostName}";
-        var name = MakeUniqueName(baseName, usedGatewayNames);
+        var name = MakeUniqueName(baseName, usedGatewayNames, defaultGatewayName);
         return new SshGatewayDto
         {
             Id = Guid.NewGuid().ToString(),
@@ -311,9 +322,9 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager)
     /// </summary>
     private const int MaxUniqueNameSuffix = 1000;
 
-    private static string MakeUniqueName(string baseName, ISet<string> usedGatewayNames)
+    private static string MakeUniqueName(string baseName, ISet<string> usedGatewayNames, string defaultGatewayName)
     {
-        var candidate = string.IsNullOrWhiteSpace(baseName) ? "SSH Gateway" : baseName;
+        var candidate = string.IsNullOrWhiteSpace(baseName) ? defaultGatewayName : baseName;
         if (usedGatewayNames.Add(candidate))
         {
             return candidate;

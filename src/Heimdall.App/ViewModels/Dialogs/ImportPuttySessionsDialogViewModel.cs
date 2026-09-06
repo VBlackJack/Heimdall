@@ -41,7 +41,7 @@ public sealed class ImportPuttySessionsDialogViewModel(
             assessments.Select(assessment => new ImportSessionItemViewModel(
                 assessment.Candidate,
                 assessment.Candidate.DisplayName,
-                assessment.Candidate.HostName ?? "∅",
+                assessment.Candidate.HostName ?? Localizer["LabelImportPuttyHostNameMissing"],
                 assessment.Candidate.Port,
                 assessment.Candidate.UserName,
                 assessment.Candidate.PublicKeyFile,

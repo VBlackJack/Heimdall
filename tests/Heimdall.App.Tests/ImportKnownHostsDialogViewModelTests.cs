@@ -69,6 +69,43 @@ public sealed class ImportKnownHostsDialogViewModelTests
         Assert.Equal(0, viewModel.Result!.SkippedExisting);
     }
 
+    // B-08: FileTooLarge and FileReadError had no locale key, so the dialog showed the
+    // raw enum name; they are file-level diagnostics carrying line 0, which must not be
+    // rendered as a line number either.
+    [Theory]
+    [InlineData(KnownHostsDiagnosticCode.FileTooLarge, "1234567 bytes")]
+    [InlineData(KnownHostsDiagnosticCode.FileReadError, "access denied")]
+    public async Task Initialize_FileLevelDiagnosticWithLineZero_IsLocalizedWithoutALineNumber(
+        KnownHostsDiagnosticCode code,
+        string context)
+    {
+        ImportKnownHostsDialogViewModel viewModel = await CreateViewModelAsync();
+
+        await viewModel.InitializeAsync(new KnownHostsImportPreview(
+            [],
+            [new KnownHostsImportDiagnostic(KnownHostsDiagnosticLevel.Warning, 0, code, context)]));
+
+        KnownHostDiagnosticViewModel diagnostic = Assert.Single(viewModel.Diagnostics);
+        Assert.NotEqual(code.ToString(), diagnostic.Message);
+        Assert.Contains(context, diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("0", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Initialize_LegacyKeyTypeDiagnostic_IsLocalizedWithLineAndKeyType()
+    {
+        ImportKnownHostsDialogViewModel viewModel = await CreateViewModelAsync();
+
+        await viewModel.InitializeAsync(new KnownHostsImportPreview(
+            [],
+            [new KnownHostsImportDiagnostic(KnownHostsDiagnosticLevel.Info, 7, KnownHostsDiagnosticCode.LegacyKeyType, "ssh-dss")]));
+
+        KnownHostDiagnosticViewModel diagnostic = Assert.Single(viewModel.Diagnostics);
+        Assert.NotEqual(KnownHostsDiagnosticCode.LegacyKeyType.ToString(), diagnostic.Message);
+        Assert.Contains("7", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("ssh-dss", diagnostic.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void FingerprintDisplay_TruncatesCorrectly_AndTooltipCarriesFull()
     {

@@ -195,15 +195,24 @@ public partial class ImportKnownHostsDialogViewModel(
             KnownHostsDiagnosticCode.MalformedLine => "DiagKnownHostsMalformedLine",
             KnownHostsDiagnosticCode.DuplicateFingerprintInSourceMerged => "DiagKnownHostsDuplicateFingerprintInSourceMerged",
             KnownHostsDiagnosticCode.IntraFileFingerprintConflict => "DiagKnownHostsIntraFileFingerprintConflict",
+            KnownHostsDiagnosticCode.LegacyKeyType => "DiagKnownHostsLegacyKeyType",
+            KnownHostsDiagnosticCode.FileTooLarge => "DiagKnownHostsFileTooLarge",
+            KnownHostsDiagnosticCode.FileReadError => "DiagKnownHostsFileReadError",
             _ => null
         };
 
+        // File-level diagnostics describe the whole file and carry no source line;
+        // their templates take the context only, so "line 0" is never rendered.
         var message = key switch
         {
+            "DiagKnownHostsFileTooLarge" or
+            "DiagKnownHostsFileReadError" =>
+                _localizer.Format(key, diagnostic.Context ?? string.Empty),
             "DiagKnownHostsUnsupportedHostPattern" or
             "DiagKnownHostsUnsupportedKeyType" or
             "DiagKnownHostsMalformedLine" or
-            "DiagKnownHostsIntraFileFingerprintConflict" =>
+            "DiagKnownHostsIntraFileFingerprintConflict" or
+            "DiagKnownHostsLegacyKeyType" =>
                 _localizer.Format(key, diagnostic.SourceLineNumber, diagnostic.Context ?? string.Empty),
             not null => _localizer.Format(key, diagnostic.SourceLineNumber),
             _ => diagnostic.Code.ToString()
