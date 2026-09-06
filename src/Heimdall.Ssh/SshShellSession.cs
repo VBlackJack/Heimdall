@@ -218,11 +218,16 @@ public sealed class SshShellSession : IDisposable
             _stream = shellStream;
         }
 
-        // Link the read-loop CTS to the external cancellation token so
-        // a cancel signal from the caller propagates all the way down to
-        // the pipe read, instead of being swallowed once Connect completes.
-        _readCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _readLoopTask = Task.Run(() => ReadLoopAsync(_readCts.Token), _readCts.Token);
+        // The connect token governs the connect, and nothing after it. Once the
+        // shell is up the session is owned through Disconnect/Dispose, which
+        // every owner in the application calls; a read loop that also listened
+        // to the connect token exited silently when that token was cancelled
+        // after a successful connect, with no cleanup and no Disconnected
+        // event, leaving a connected client and its key file alive with
+        // nothing watching them.
+        CancellationTokenSource readCts = new CancellationTokenSource();
+        _readCts = readCts;
+        _readLoopTask = Task.Run(() => ReadLoopAsync(readCts.Token), readCts.Token);
     }
 
     /// <summary>Writes raw bytes to the shell's standard input.</summary>
