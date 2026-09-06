@@ -32,7 +32,18 @@ namespace Heimdall.Ssh.Plink;
 /// <param name="Success">Whether the tunnel was established and is forwarding traffic.</param>
 /// <param name="ErrorMessage">Error description on failure; null on success.</param>
 /// <param name="FailureCode">Structured failure code on failure; null on success.</param>
-public sealed record PlinkTunnelResult(bool Success, string? ErrorMessage, SshFailureCode? FailureCode);
+public sealed record PlinkTunnelResult(bool Success, string? ErrorMessage, SshFailureCode? FailureCode)
+{
+    /// <summary>
+    /// Locale key of the failure sentence when the runner composed it; the application
+    /// formats it with <see cref="MessageArguments"/>. <see cref="ErrorMessage"/> keeps
+    /// the English detail for the log.
+    /// </summary>
+    public string? MessageKey { get; init; }
+
+    /// <summary>Format arguments for <see cref="MessageKey"/>.</summary>
+    public IReadOnlyList<object?> MessageArguments { get; init; } = [];
+}
 
 internal interface IPlinkProcess : IDisposable
 {
@@ -259,7 +270,11 @@ public sealed class PlinkTunnelRunner : IDisposable
 
         if (!File.Exists(plinkPath))
         {
-            return new PlinkTunnelResult(false, $"Plink executable not found: {plinkPath}", SshFailureCode.Unknown);
+            return new PlinkTunnelResult(false, $"Plink executable not found: {plinkPath}", SshFailureCode.Unknown)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyPlinkExecutableNotFound,
+                MessageArguments = [plinkPath]
+            };
         }
 
         List<string> args;
@@ -296,7 +311,11 @@ public sealed class PlinkTunnelRunner : IDisposable
             process?.Dispose();
             _process = null;
             CleanupPasswordFile();
-            return new PlinkTunnelResult(false, $"Failed to start plink process: {ex.Message}", SshFailureCode.Unknown);
+            return new PlinkTunnelResult(false, $"Failed to start plink process: {ex.Message}", SshFailureCode.Unknown)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyPlinkProcessStartFailed,
+                MessageArguments = [ex.Message]
+            };
         }
 
         // Continuously drain stderr in the background to prevent buffer saturation.
@@ -364,12 +383,19 @@ public sealed class PlinkTunnelRunner : IDisposable
         catch (OperationCanceledException)
         {
             Stop();
-            return new PlinkTunnelResult(false, "Tunnel establishment was cancelled.", SshFailureCode.Cancelled);
+            return new PlinkTunnelResult(false, "Tunnel establishment was cancelled.", SshFailureCode.Cancelled)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyEstablishmentCancelled
+            };
         }
         catch (Exception ex)
         {
             Stop();
-            return new PlinkTunnelResult(false, $"Failed to start plink process: {ex.Message}", SshFailureCode.Unknown);
+            return new PlinkTunnelResult(false, $"Failed to start plink process: {ex.Message}", SshFailureCode.Unknown)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyPlinkProcessStartFailed,
+                MessageArguments = [ex.Message]
+            };
         }
     }
 

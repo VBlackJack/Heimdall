@@ -62,6 +62,10 @@ internal static class SshLocalizationKeys
     public const string ErrorTunnelFailed = "ErrorTunnelFailed";
     public const string ErrorTunnelNoLoopbackAlias = "ErrorTunnelNoLoopbackAlias";
     public const string ErrorTunnelPortConcurrent = "ErrorTunnelPortConcurrent";
+
+    /// <summary>Route annotation of a tunnelled session; {0} is the gateway name or chain.</summary>
+    public const string LabelTunnelRouteVia = "SessionGatewayBadgeVia";
+
     /// <summary>Disconnect detail of a process-backed terminal whose process exited; {0} is the exit code.</summary>
     public const string SshDisconnectProcessExited = "SshDisconnectProcessExited";
 

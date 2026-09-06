@@ -3006,6 +3006,13 @@
   "ErrorInvalidTargetHost": "Invalid target host (rejected by input validation).",
   "ErrorInvalidTargetPort": "Invalid SSH target port.",
   "ErrorTunnelPortConcurrent": "The tunnel local port was claimed concurrently.",
+  "ErrorTunnelLocalPortInUse": "Local port {0} is already in use by an existing tunnel.",
+  "ErrorTunnelManagerDisposed": "The tunnel manager was disposed before the tunnel could be registered.",
+  "ErrorTunnelEstablishmentCancelled": "Tunnel establishment was cancelled.",
+  "ErrorTunnelChainedEstablishmentCancelled": "Chained tunnel establishment was cancelled.",
+  "ErrorTunnelGatewayChainEmpty": "The gateway chain must contain at least one gateway.",
+  "ErrorPlinkProcessStartFailed": "Failed to start the plink process: {0}",
+  "ErrorPlinkExecutableNotFound": "Plink executable not found: {0}",
   "ErrorUnhandledTitle": "Heimdall Error",
 
   "EditorBtnSave": "Save",

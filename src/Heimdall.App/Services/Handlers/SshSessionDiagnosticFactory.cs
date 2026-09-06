@@ -37,7 +37,12 @@ internal static class SshSessionDiagnosticFactory
             failure.Message);
     }
 
-    internal static SessionDiagnostic FromPreflight(PreflightResult preflight)
+    /// <param name="preflight">The failed preflight.</param>
+    /// <param name="detail">
+    /// The sentence already resolved for the user; the raw preflight message (which may
+    /// be a locale key) is used when none is supplied.
+    /// </param>
+    internal static SessionDiagnostic FromPreflight(PreflightResult preflight, string? detail = null)
     {
         ArgumentNullException.ThrowIfNull(preflight);
 
@@ -45,7 +50,7 @@ internal static class SshSessionDiagnosticFactory
             SessionFailureStage.SshPreflight,
             GetMessageKey(preflight.FailureCode, "ErrorPreflightFailed"),
             preflight.FailureCode is null ? null : (int)preflight.FailureCode.Value,
-            preflight.Message);
+            detail ?? preflight.Message);
     }
 
     internal static SessionDiagnostic CreateGatewayFailure(

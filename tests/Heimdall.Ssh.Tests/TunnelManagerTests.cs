@@ -1514,7 +1514,8 @@ public class TunnelManagerTests : IDisposable
         Assert.False(result.Success);
         Assert.Null(result.Tunnel);
         Assert.Equal(SshFailureCode.PortInUse, result.FailureCode);
-        Assert.Contains("already in use", result.ErrorMessage);
+        Assert.Equal(TunnelMessageKeys.MessageKeyLocalPortInUse, result.MessageKey);
+        Assert.Equal(10001, Assert.Single(result.MessageArguments));
         Assert.Equal(0, openedCount);
         Assert.Equal(0, closedCount);
     }
@@ -1541,7 +1542,8 @@ public class TunnelManagerTests : IDisposable
         Assert.False(result.Success);
         Assert.Null(result.Tunnel);
         Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
-        Assert.Equal("Tunnel establishment was cancelled.", result.ErrorMessage);
+        Assert.Equal(TunnelMessageKeys.MessageKeyEstablishmentCancelled, result.MessageKey);
+        Assert.Empty(result.MessageArguments);
         Assert.Equal(0, openedCount);
         Assert.Equal(0, closedCount);
         Assert.False(_manager.HasTunnel(10001));
@@ -1565,7 +1567,7 @@ public class TunnelManagerTests : IDisposable
         Assert.False(result.Success);
         Assert.Null(result.Tunnel);
         Assert.Equal(SshFailureCode.Unknown, result.FailureCode);
-        Assert.Equal("Gateway chain must contain at least one gateway.", result.ErrorMessage);
+        Assert.Equal(TunnelMessageKeys.MessageKeyGatewayChainEmpty, result.MessageKey);
     }
 
     [Fact]
@@ -1589,7 +1591,8 @@ public class TunnelManagerTests : IDisposable
         Assert.False(result.Success);
         Assert.Null(result.Tunnel);
         Assert.Equal(SshFailureCode.PortInUse, result.FailureCode);
-        Assert.Contains("already in use", result.ErrorMessage);
+        Assert.Equal(TunnelMessageKeys.MessageKeyLocalPortInUse, result.MessageKey);
+        Assert.Equal(10001, Assert.Single(result.MessageArguments));
         Assert.Equal(0, openedCount);
         Assert.Equal(0, closedCount);
     }
@@ -1616,7 +1619,7 @@ public class TunnelManagerTests : IDisposable
         Assert.False(result.Success);
         Assert.Null(result.Tunnel);
         Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
-        Assert.Equal("Chained tunnel establishment was cancelled.", result.ErrorMessage);
+        Assert.Equal(TunnelMessageKeys.MessageKeyChainedEstablishmentCancelled, result.MessageKey);
         Assert.Equal(0, openedCount);
         Assert.Equal(0, closedCount);
         Assert.False(_manager.HasTunnel(10001));
@@ -1639,7 +1642,7 @@ public class TunnelManagerTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
-        Assert.Equal("Tunnel establishment was cancelled.", result.ErrorMessage);
+        Assert.Equal(TunnelMessageKeys.MessageKeyEstablishmentCancelled, result.MessageKey);
     }
 
     [Fact]

@@ -23,14 +23,25 @@ namespace Heimdall.Ssh;
 /// </summary>
 /// <param name="Success">Whether all pre-flight checks passed.</param>
 /// <param name="FailureCode">Failure code if checks failed.</param>
-/// <param name="Message">Human-readable failure description.</param>
+/// <param name="Message">
+/// Failure description: a locale key when the checker composed the sentence, which the
+/// application formats with <see cref="MessageArguments"/>; a message the catalogue
+/// does not know is shown as is.
+/// </param>
 public sealed record PreflightResult(bool Success, SshFailureCode? FailureCode, string? Message)
 {
+    /// <summary>Format arguments for a <see cref="Message"/> that is a locale key.</summary>
+    public IReadOnlyList<object?> MessageArguments { get; init; } = [];
+
     /// <summary>Create a passing result.</summary>
     public static PreflightResult Ok() => new(true, null, null);
 
     /// <summary>Create a failing result with a specific code and message.</summary>
     public static PreflightResult Fail(SshFailureCode code, string message) => new(false, code, message);
+
+    /// <summary>Create a failing result whose message is a locale key with format arguments.</summary>
+    public static PreflightResult Fail(SshFailureCode code, string messageKey, params object?[] arguments)
+        => new(false, code, messageKey) { MessageArguments = arguments };
 }
 
 /// <summary>
@@ -50,6 +61,15 @@ public sealed record ChainPreflightResult(PreflightResult Result, int FailedHopI
 /// </summary>
 public static class AuthPreflightChecker
 {
+    /// <summary>Locale key: the configured key file does not exist; {0} is its path.</summary>
+    public const string MessageKeyKeyFileNotFound = "ErrorSshKeyFileNotFound";
+
+    /// <summary>Locale key: no SSH agent is running to supply an identity.</summary>
+    public const string MessageKeyNoAgentRunning = "ErrorNoSshAgentRunning";
+
+    /// <summary>Locale key: the running agents hold no identity.</summary>
+    public const string MessageKeyAgentHasNoIdentities = "ErrorSshAgentHasNoIdentities";
+
     /// <summary>
     /// Runs <see cref="Check"/> against every hop of a gateway chain and returns
     /// the first failure, so a doomed hop is reported at the door rather than
@@ -99,7 +119,8 @@ public static class AuthPreflightChecker
         {
             return PreflightResult.Fail(
                 SshFailureCode.KeyFileNotFound,
-                $"Key file not found: {connectionParams.KeyPath}");
+                MessageKeyKeyFileNotFound,
+                connectionParams.KeyPath);
         }
 
         // Tunnel mode: no key and no password - needs an agent as sole auth source.
@@ -129,7 +150,7 @@ public static class AuthPreflightChecker
         {
             return PreflightResult.Fail(
                 SshFailureCode.PageantKeyUnavailable,
-                "ErrorNoSshAgentRunning");
+                MessageKeyNoAgentRunning);
         }
 
         var failedAgents = 0;
@@ -160,6 +181,6 @@ public static class AuthPreflightChecker
 
         return PreflightResult.Fail(
             SshFailureCode.PageantNoIdentities,
-            "ErrorSshAgentHasNoIdentities");
+            MessageKeyAgentHasNoIdentities);
     }
 }

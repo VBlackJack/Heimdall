@@ -45,7 +45,10 @@ public class AuthPreflightCheckerTests
 
         Assert.False(result.Success);
         Assert.Equal(SshFailureCode.KeyFileNotFound, result.FailureCode);
-        Assert.Contains("key.pem", result.Message);
+        // A-10: the message is the locale key the application already owns, with the path
+        // as its argument, instead of an English sentence composed here.
+        Assert.Equal("ErrorSshKeyFileNotFound", result.Message);
+        Assert.Equal(@"C:\nonexistent\key.pem", Assert.Single(result.MessageArguments));
     }
 
     [Fact]

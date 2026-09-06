@@ -193,7 +193,11 @@ public sealed partial class TunnelManager : IDisposable
         if (localPort > 0 && IsPortTracked(localPort))
         {
             ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
-            return new TunnelResult(false, null, $"Local port {localPort} is already in use by an existing tunnel.", SshFailureCode.PortInUse);
+            return new TunnelResult(false, null, $"Local port {localPort} is already in use by an existing tunnel.", SshFailureCode.PortInUse)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyLocalPortInUse,
+                MessageArguments = [localPort]
+            };
         }
 
         var context = new TunnelBuildContext();
@@ -300,7 +304,10 @@ public sealed partial class TunnelManager : IDisposable
 
         if (gatewayChain.Count == 0)
         {
-            return new TunnelResult(false, null, "Gateway chain must contain at least one gateway.", SshFailureCode.Unknown);
+            return new TunnelResult(false, null, "Gateway chain must contain at least one gateway.", SshFailureCode.Unknown)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyGatewayChainEmpty
+            };
         }
 
         // Single gateway: delegate to simple tunnel
@@ -324,7 +331,11 @@ public sealed partial class TunnelManager : IDisposable
         if (localPort > 0 && IsPortTracked(localPort))
         {
             ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
-            return new TunnelResult(false, null, $"Local port {localPort} is already in use by an existing tunnel.", SshFailureCode.PortInUse);
+            return new TunnelResult(false, null, $"Local port {localPort} is already in use by an existing tunnel.", SshFailureCode.PortInUse)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyLocalPortInUse,
+                MessageArguments = [localPort]
+            };
         }
 
         var context = new TunnelBuildContext();

@@ -80,7 +80,8 @@ public sealed class AuthPreflightCheckerChainTests
 
         Assert.False(result.Result.Success);
         Assert.Equal(0, result.FailedHopIndex);
-        Assert.Contains("root.pem", result.Result.Message);
+        Assert.Equal(AuthPreflightChecker.MessageKeyKeyFileNotFound, result.Result.Message);
+        Assert.Contains("root.pem", Assert.IsType<string>(Assert.Single(result.Result.MessageArguments)));
     }
 
     [Fact]

@@ -3003,6 +3003,13 @@
   "ErrorInvalidTargetHost": "H\u00f4te cible invalide (rejet\u00e9 par la validation des entr\u00e9es).",
   "ErrorInvalidTargetPort": "Port SSH cible invalide.",
   "ErrorTunnelPortConcurrent": "Le port local du tunnel a \u00e9t\u00e9 r\u00e9clam\u00e9 de mani\u00e8re concurrente.",
+  "ErrorTunnelLocalPortInUse": "Le port local {0} est d\u00e9j\u00e0 utilis\u00e9 par un tunnel existant.",
+  "ErrorTunnelManagerDisposed": "Le gestionnaire de tunnels a \u00e9t\u00e9 lib\u00e9r\u00e9 avant l'enregistrement du tunnel.",
+  "ErrorTunnelEstablishmentCancelled": "L'\u00e9tablissement du tunnel a \u00e9t\u00e9 annul\u00e9.",
+  "ErrorTunnelChainedEstablishmentCancelled": "L'\u00e9tablissement du tunnel en cha\u00eene a \u00e9t\u00e9 annul\u00e9.",
+  "ErrorTunnelGatewayChainEmpty": "La cha\u00eene de passerelles doit contenir au moins une passerelle.",
+  "ErrorPlinkProcessStartFailed": "Impossible de d\u00e9marrer le processus plink : {0}",
+  "ErrorPlinkExecutableNotFound": "Ex\u00e9cutable plink introuvable : {0}",
   "ErrorUnhandledTitle": "Erreur Heimdall",
 
   "EditorBtnSave": "Enregistrer",

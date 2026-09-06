@@ -45,4 +45,15 @@ public sealed record TunnelResult(
     /// three opening paths and the two that were missed were missed exactly that way.</para>
     /// </remarks>
     public bool ReusedExistingTunnel { get; init; }
+
+    /// <summary>
+    /// Locale key of the failure sentence when this layer composed it, so the application
+    /// can show it in the user's language. <see cref="ErrorMessage"/> then holds the
+    /// English detail for the log only. Null when the message was relayed from the server
+    /// or from an exception.
+    /// </summary>
+    public string? MessageKey { get; init; }
+
+    /// <summary>Format arguments for <see cref="MessageKey"/>.</summary>
+    public IReadOnlyList<object?> MessageArguments { get; init; } = [];
 }

@@ -70,16 +70,17 @@ internal static class ToolGatewayConnector
             ConnectTimeout = TimeSpan.FromSeconds(15)
         };
 
+        var (trustService, localizer) = ResolveHostKeyDependencies();
+
         // Validate authentication prerequisites before attempting connection
         var preflight = AuthPreflightChecker.Check(connParams, isTunnelMode: true);
         if (!preflight.Success)
         {
             throw new InvalidOperationException(
-                preflight.Message ?? $"Authentication preflight failed for {gateway.Host}.");
+                TunnelFailureMessageResolver.ResolvePreflightMessage(preflight, localizer));
         }
 
         var client = SshConnectionFactory.CreateSshClient(connParams);
-        var (trustService, localizer) = ResolveHostKeyDependencies();
         var fingerprint = trustService.GetEffectiveEntry(gateway.Host, gateway.Port)?.Fingerprint
             ?? throw new InvalidOperationException(
                 localizer.Format("ErrorGatewayHostKeyNotTrusted", gateway.Host, gateway.Port));

@@ -352,6 +352,10 @@ public sealed class TunnelService : ITunnelService
                 .ConfigureAwait(false);
         }
 
+        // Sentences the manager composed itself travel as locale keys; formatted here,
+        // once, before anything below reads or appends to the message.
+        result = TunnelFailureMessageResolver.Localize(result, _localizer);
+
         // A refused sign-in on a single gateway. Both routes out of here used
         // to compose a message of their own and return, so on the one machine
         // state where they fire - an SSH agent actually running - the gateway's
@@ -589,7 +593,7 @@ public sealed class TunnelService : ITunnelService
         ChainPreflightResult preflight,
         IReadOnlyList<SshGatewayDto> chainDtos)
     {
-        string message = ResolvePreflightMessage(preflight.Result.Message);
+        string message = TunnelFailureMessageResolver.ResolvePreflightMessage(preflight.Result, _localizer);
         if (chainDtos.Count <= 1
             || preflight.FailedHopIndex < 0
             || preflight.FailedHopIndex >= chainDtos.Count)
@@ -731,6 +735,7 @@ public sealed class TunnelService : ITunnelService
                 _localizer[SshLocalizationKeys.ErrorPlinkPassphraseUnsupported],
                 localBindHost)
             .ConfigureAwait(false);
+        result = TunnelFailureMessageResolver.Localize(result, _localizer);
 
         if (!result.Success)
         {
@@ -930,16 +935,4 @@ public sealed class TunnelService : ITunnelService
             : _localizer[decision.FailureMessageKey];
     }
 
-    private string ResolvePreflightMessage(string? messageOrKey)
-    {
-        if (string.IsNullOrWhiteSpace(messageOrKey))
-        {
-            return _localizer[SshLocalizationKeys.ErrorPreflightFailed];
-        }
-
-        string localized = _localizer[messageOrKey];
-        return string.Equals(localized, messageOrKey, StringComparison.Ordinal)
-            ? messageOrKey
-            : localized;
-    }
 }
