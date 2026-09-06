@@ -12,6 +12,75 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-09-06: the SSH layer audited, 34 findings fixed, two of them security fixes (v2026.090601)
+
+### Replacing a host key no longer exports the rejected key
+
+The trust service, when a stored entry was replaced by a new fingerprint without a public key
+blob, carried the blob of the entry being replaced over to the new one. Two paths pass no blob:
+the Plink accept path and the "Replace" choice of the import conflict dialog. The store then held
+the new fingerprint over the old key material, and the known_hosts export wrote the rejected key
+back into `~/.ssh/known_hosts` under the host the user had just re-trusted. The blob is now carried
+over only while the fingerprint is unchanged; a replaced key gets the caller's blob or none, and an
+import conflict carries the imported blob so "Replace" stores the key it refers to. The same
+reconciliation now runs through the hashed-aware lookup: a mismatch resolved against a hashed
+known_hosts entry used to add a plain entry beside it and leave the old fingerprint effective
+again as soon as the plain row was removed; the hashed twin is removed and its removal persisted.
+
+### Reject is the default answer on a changed host key or certificate
+
+The SSH host key prompt and the FTPS certificate prompt made "Trust this session" both the
+default and the focused button on a mismatch, so the Enter reflex trained by the first-use prompt,
+where Enter accepts, connected and authenticated to a server whose key no longer matched. OpenSSH
+refuses outright in that situation. Both dialogs now default to and focus Reject on a mismatch;
+only Accept answers Enter on first use.
+
+### The managed VcXsrv keeps its host access control
+
+The X server Heimdall starts for X11 forwarding was launched with `-ac`, which disables host
+access control on a display that listens on TCP 6000: any host on the network could open the
+forwarded windows, inject input and read the clipboard. The only client Heimdall points at the
+display is `localhost:0.0`, which the default host list already admits. The flag is gone.
+
+### known_hosts import, export and generated key files
+
+The import dialog classified a line by an exact `host:port` lookup in the settings dictionary, so
+a host already trusted through a hashed entry showed as New, and a plain line with a different key
+was written next to it and won every lookup from then on. The importer now also asks the trust
+service, which matches hashed entries, before deciding Existing, Conflict or New. The export wrote
+a UTF-8 byte order mark that OpenSSH does not strip, so the first line never matched its host and
+`ssh` re-prompted on every call; a multi-host line was replaced by a single-host line and its other
+alias lost. The key generator saved both files with the same byte order mark and the folder's
+inherited permissions, which OpenSSH and PuTTYgen refused to read and Win32-OpenSSH refused as
+"permissions too open". All three now write UTF-8 without BOM, and the private key is created
+with an owner-only ACL through the writer the Plink password file already used.
+
+### Connecting, cancelling, and the Plink fallback
+
+Cancelling a connect stuck in the key exchange did nothing: the client's session is assigned only
+after the handshake returns, so the disconnect registered on the token had nothing to act on, and
+the attempt ran on to the connect timeout, which was then shown as an error. The handshake now
+runs through the asynchronous connect that observes the token, and a cancelled attempt is always
+reported as cancelled. An explicit key passphrase the key refused was swallowed whenever a password
+was also stored, the key dropped silently and the next refusal classified as a rejected key; the
+password fallback now applies only to a passphrase guessed from the legacy password mapping. The
+Plink fallback opened a plain local forward and reported success for a profile that needed a SOCKS
+proxy or a reverse forward; it now refuses with a message naming the missing forward. Cancelling
+during the establishment delay left a registered tunnel with one reference and no owner; the
+reference is released before the cancellation propagates.
+
+### The embedded terminal
+
+A confirmed paste was posted back as raw keystrokes, so bracketed paste never applied and a Windows
+`\r\n` submitted an extra empty line; confirmed pastes go through xterm's paste path, and
+Shift+Insert reaches the paste guard like Ctrl+V. The TMOUT reset wrote a bare Enter every interval
+into whatever was half-typed, into local and WinRM terminals too, and into macro recordings; it now
+waits for an idle SSH shell and is never recorded. The size the page reported before the session
+was attached was dropped, leaving the PTY at 80x24 until a window resize; it is replayed on attach
+and used to create the PTY. When no X server is available the session says so and launches
+without forwarding. Disconnect details, tunnel failures composed in the SSH layer and import
+diagnostics are translated instead of shown in English.
+
 ## 2026-09-05: the sessions tree, audited and reworked, and the colour depth floor is 16 bits (v2026.090505)
 
 ### The colour depth floor is 16 bits
