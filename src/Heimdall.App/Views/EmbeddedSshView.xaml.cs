@@ -281,6 +281,15 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private int _autoReconnectMaxAttempts;
     private int _autoReconnectSecondsRemaining;
 
+    /// <summary>
+    /// Monotonic clock (<see cref="Environment.TickCount64"/>) of the last real terminal input,
+    /// read by the keepalive tick on the timer thread. Written on the UI thread.
+    /// </summary>
+    private long _lastTerminalInputMilliseconds = TerminalKeepAlivePolicy.NoInputRecorded;
+
+    /// <summary>The interval the keepalive timer runs at, for the tick's idle check.</summary>
+    private int _keepAliveIntervalSeconds;
+
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
     public Core.Localization.LocalizationManager? Localizer
     {
@@ -535,7 +544,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             + (terminalSession is Heimdall.Terminal.PipeModeSession ? "true" : "false"));
 
         UpdateStatus(connectedStatus);
-        StartKeepAliveTimer(keepAliveIntervalSeconds);
+        // Only an SSH shell has a remote TMOUT to reset. The local shell and WinRM sessions share
+        // this view, and for them the reset is nothing but a stray Enter.
+        StartKeepAliveTimer(TerminalKeepAlivePolicy.ResolveIntervalSeconds(_sessionTab?.ConnectionType, keepAliveIntervalSeconds));
         AcquireSleepPrevention();
         // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
@@ -1737,9 +1748,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
-        if (_isRecording)
+        if (marksTerminalInput)
         {
-            var delayMs = (int)_macroStopwatch.ElapsedMilliseconds;
+            NoteTerminalInput();
+        }
+
+        // A macro records what the user typed. The keepalive reset is not input, and recording it
+        // would replay a phantom Enter.
+        if (_isRecording && marksTerminalInput)
+        {
+            int delayMs = (int)_macroStopwatch.ElapsedMilliseconds;
             _macroStopwatch.Restart();
 
             _macroEntries.Add(new MacroEntry
@@ -1950,6 +1968,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (marksTerminalInput)
+        {
+            NoteTerminalInput();
+        }
+
         if (_session is not null)
         {
             SshShellSession session = _session;
@@ -1971,6 +1994,15 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _terminalSessionHasInput = true;
         _winRmEarlyOutputDiagnostic?.MarkUserInput();
         _winRmEarlyOutputDiagnostic = null;
+    }
+
+    /// <summary>
+    /// Stamps the clock the keepalive tick reads, so a reset is not written into a shell the user
+    /// is typing into.
+    /// </summary>
+    private void NoteTerminalInput()
+    {
+        Volatile.Write(ref _lastTerminalInputMilliseconds, Environment.TickCount64);
     }
 
     /// <summary>Whether a macro recording is currently in progress.</summary>
@@ -2435,6 +2467,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        _keepAliveIntervalSeconds = intervalSeconds;
         _keepAliveTimer = new System.Threading.Timer(
             _ => SendKeepAlive(),
             null,
@@ -2473,6 +2506,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             Core.Logging.FileLogger.Warn("SSH keepalive skipped: session not connected");
             StopKeepAliveTimer();
+            return;
+        }
+
+        // A bare CR is a keystroke. Into a shell the user is typing into it submits a half-typed
+        // line; the user's own input has already reset TMOUT, so the tick has nothing to do.
+        if (!TerminalKeepAlivePolicy.ShouldSendTick(
+            Environment.TickCount64,
+            Volatile.Read(ref _lastTerminalInputMilliseconds),
+            _keepAliveIntervalSeconds))
+        {
             return;
         }
 
