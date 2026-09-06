@@ -46,13 +46,43 @@ public static class AtomicLocalFile
     /// <summary>
     /// Atomically replaces the final file with the completed temporary file.
     /// </summary>
+    /// <remarks>
+    /// Retried on a sharing violation. On Windows an antivirus scanner, the search indexer
+    /// or a preview handler holds a freshly written file, or the one about to be replaced,
+    /// for a moment; a single unretried move turned that moment into a discarded download.
+    /// A replaced file held open surfaces as access denied rather than as a sharing
+    /// violation, so both are retried; a real permission failure still propagates after the
+    /// last attempt.
+    /// </remarks>
     public static void Commit(string tempPath, string finalPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(finalPath);
 
-        File.Move(tempPath, finalPath, overwrite: true);
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Move(tempPath, finalPath, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (IsTransientMoveFailure(ex) && attempt < CommitRetryDelays.Length)
+            {
+                Thread.Sleep(CommitRetryDelays[attempt]);
+            }
+        }
     }
+
+    private static bool IsTransientMoveFailure(Exception exception) =>
+        exception is IOException or UnauthorizedAccessException;
+
+    /// <summary>Waits between commit attempts; the last failure propagates.</summary>
+    private static readonly TimeSpan[] CommitRetryDelays =
+    [
+        TimeSpan.FromMilliseconds(50),
+        TimeSpan.FromMilliseconds(150),
+        TimeSpan.FromMilliseconds(450),
+    ];
 
     /// <summary>
     /// Removes an abandoned temporary file without touching the final path.

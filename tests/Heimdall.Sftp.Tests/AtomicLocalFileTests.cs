@@ -32,6 +32,31 @@ public sealed class AtomicLocalFileTests : IDisposable
         Directory.CreateDirectory(_testDirectory);
     }
 
+    /// <remarks>
+    /// On Windows an antivirus scanner, the search indexer or a preview handler holds a
+    /// freshly written file, or the one about to be replaced, for a moment; a single
+    /// unretried move turned that moment into a discarded download.
+    /// </remarks>
+    [Fact]
+    public async Task Commit_RetriesWhileTheDestinationIsBrieflyHeld()
+    {
+        string finalPath = Path.Combine(_testDirectory, "held.txt");
+        string tempPath = AtomicLocalFile.CreateTempPath(finalPath);
+        File.WriteAllText(finalPath, "original");
+        File.WriteAllText(tempPath, "downloaded");
+
+        using (FileStream hold = new(finalPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Task commit = Task.Run(() => AtomicLocalFile.Commit(tempPath, finalPath));
+            await Task.Delay(TimeSpan.FromMilliseconds(120));
+            hold.Dispose();
+            await commit;
+        }
+
+        Assert.Equal("downloaded", File.ReadAllText(finalPath));
+        Assert.False(File.Exists(tempPath));
+    }
+
     [Fact]
     public void Commit_ReplacesExistingFinalFile_WithTempContent()
     {
