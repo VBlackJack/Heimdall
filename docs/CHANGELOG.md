@@ -56,6 +56,41 @@ record before writing a new attempt, so a failed delete cannot pair a new attemp
 cause, and takes the pending attempt by rename so two instances starting together cannot both
 report it.
 
+### The update source is pinned and asset downloads are confined to GitHub origins
+
+The repository the updater checked was a pair of strings in `settings.json`, unvalidated and shown
+in no interface. Anyone able to write that file could point the updater at a repository of their
+own; the SHA-256 check passed, because it is computed against that repository's own checksum file,
+the installer is not signed, and on a Program Files install the relauncher started the payload
+under an elevation prompt carrying this application's name. The two settings are gone and the
+source is a compile-time constant. Asset and checksum URLs taken from the release JSON are now
+refused unless they are https on `github.com`, `githubusercontent.com` or a subdomain of either;
+only the API origin used to be pinned.
+
+### A portable or MSI copy is no longer offered an installer that cannot replace it
+
+The variant detector only told the standard build from the self-contained one; a portable archive,
+an MSI deployment or a build run from its output directory looked like an installed copy, was
+offered the Inno Setup installer, got a second copy installed elsewhere, was relaunched unchanged
+and read "the update did not apply" on every launch from then on. The updater now checks the
+installer's own uninstall registration for the running directory and reports such a copy as not
+installable in place, with the release page. The installer is also passed the running copy's
+directory explicitly, so its destination no longer depends on a registry lookup that could
+disagree with the elevation decision.
+
+### Other update check and download fixes
+
+A download that stalls is cut off after sixty seconds without data and reported as a failed
+download: `HttpClient.Timeout` governs the headers only when the body is streamed, and a stalled
+body used to block for ever behind a frozen progress bar. The "Check now" button catches the same
+faults the startup check already caught instead of crashing the application. A failure to prepare
+the relauncher (a full disk, a locked data directory) clears the attempt record instead of leaving
+the next startup to announce a failure that never started. Staging directories older than a day
+and relauncher transcripts older than thirty days are swept at startup; nothing removed them
+before. The relauncher host and the outcome store resolve the same data root. A skipped version is
+compared as a version rather than as text. Update staging in tests no longer touches the
+operator's profile.
+
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 
 ### The Plink port probe runs before the first wait
