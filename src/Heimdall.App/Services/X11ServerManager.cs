@@ -213,8 +213,17 @@ public sealed class X11ServerManager : IDisposable
     }
 
     /// <summary>
+    /// Command line handed to VcXsrv: display :0, one native window per X client,
+    /// clipboard integration without primary-selection sync. Host access control is
+    /// deliberately left on: the only client Heimdall points at this display is the
+    /// local one (<c>localhost:0.0</c>), and <c>-ac</c> would let any host that can
+    /// reach TCP 6000 read the forwarded windows and the clipboard.
+    /// </summary>
+    internal const string VcXsrvArguments = ":0 -multiwindow -clipboard -noprimary";
+
+    /// <summary>
     /// Starts the X server process at the given path.
-    /// VcXsrv is launched with common defaults (multi-window, clipboard, no access control).
+    /// VcXsrv is launched with <see cref="VcXsrvArguments"/>.
     /// </summary>
     private bool StartServer(string serverPath)
     {
@@ -234,10 +243,9 @@ public sealed class X11ServerManager : IDisposable
                     CreateNoWindow = true
                 };
 
-                // VcXsrv: multi-window mode, clipboard enabled, no access control
                 if (fileName == "vcxsrv")
                 {
-                    psi.Arguments = ":0 -multiwindow -clipboard -noprimary -ac";
+                    psi.Arguments = VcXsrvArguments;
                 }
 
                 _managedProcess = Process.Start(psi);
