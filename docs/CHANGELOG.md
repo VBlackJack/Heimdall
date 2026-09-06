@@ -12,6 +12,37 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-09-06: tunnels released once, distinct loopback honoured, plink drain outlives the connect (v2026.090602)
+
+### A pane close cannot release a tunnel twice
+
+Two paths release a pane's tunnel: the WinRM process exit handler, which runs on the process's
+exit thread, and the pane close, which runs on the UI thread. Each read the port from the
+connection state, released it, and only then tore the state down, so a close landing between
+the exit handler's read and its teardown released one acquisition twice and closed a tunnel a
+third holder still used. Reproduced with the real handler and the real split service parked at
+that interleaving. The state machine now hands the port out through `TryTakeTunnelLocalPort`,
+which clears it under the lock, and every release site takes it instead of reading it.
+
+### Reuse honours the distinct-loopback preference
+
+An external launch asks for a distinct loopback alias because its CredMan entry is keyed on the
+tunnel host, and two launches sharing 127.0.0.1 collide on the same entry. The reuse path never
+looked at the bind host, so such a launch was handed an embedded session's default-loopback
+tunnel. Reuse now skips default-loopback candidates when the preference is set; an aliased tunnel
+is still reused, and otherwise a fresh aliased tunnel is opened as the open path already did.
+
+### The plink stderr drain owns its cancellation
+
+The drain that keeps plink's stderr pipe from filling was linked to the token handed to the
+tunnel start, which scopes the connect and not the tunnel. Cancelling that token after the tunnel
+was up made the drain exit on its next line while plink kept forwarding, and plink blocks on its
+next diagnostic line once the pipe buffer is full, which silently ends the forwarding. Reproduced
+against a real child process driven through stdin. No caller cancels that token after
+establishment today, so this closes a latent path: the drain now has its own source, cancelled
+by Stop as before. The companion suspicion, a Stop paying the whole drain join timeout, was
+refuted on the same child: Stop takes about 50 ms, the pipe read observes cancellation.
+
 ## 2026-09-06: the SSH layer audited, 34 findings fixed, two of them security fixes (v2026.090601)
 
 ### Replacing a host key no longer exports the rejected key
