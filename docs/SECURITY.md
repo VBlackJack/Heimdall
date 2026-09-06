@@ -140,7 +140,9 @@ On a changed key the prompt defaults to and focuses **Reject**: the Enter
 reflex trained by the first-use prompt, where Enter accepts, must not connect
 to a host whose key no longer matches the stored one. Accepting the new key or
 trusting it for one session takes an explicit click. The FTPS certificate
-prompt follows the same rule. Replacing a key never carries the previous
+prompt is a first-use prompt only: a changed FTPS certificate is refused
+without a prompt, and trusting a replacement means removing the stored
+certificate first. Replacing a key never carries the previous
 public key blob over: the entry holds the new fingerprint with the caller's
 blob or none, so the known_hosts export can never write back a key the user
 just decided against. A mismatch resolved against a hashed entry replaces that
@@ -382,7 +384,9 @@ then deletes the backup. A failed commit restores the backup, and a failed
 restore raises an `InvalidOperationException` carrying both the commit and the
 restore error. Between the two moves the destination does not exist, so a
 concurrent reader can observe a missing file and a crash can leave the payload
-under the `.bak` sibling.
+under the `.bak` sibling. Heimdall does not resume from that state: a
+`<name>.<guid>.bak` sibling left by an interrupted commit is the previous
+file, to be renamed back by hand.
 
 FTP replacement also preserves none of the replaced file's metadata. What lands
 at the destination is a freshly uploaded file, carrying whatever owner, mode and
@@ -404,15 +408,21 @@ nothing was replaced.
 ### FTP and FTPS transport notices
 
 FTP is implemented on top of FluentFTP `AsyncFtpClient`. `FtpHandler`
-validates the target host and port before connect. If a user connects with
-credentials and TLS is disabled, `ConnectionResult.Warning` carries a
-localized non-blocking cleartext warning to the status surface; it does not
-block anonymous or explicit FTPS sessions. Explicit FTPS enables TLS for the
+validates the target host and port before connect. If TLS is disabled,
+`ConnectionResult.Warning` carries a localized non-blocking cleartext warning
+to the status surface, for anonymous sessions too: no credential travels then,
+but every file still does, in clear. Explicit FTPS sessions get no warning.
+The TLS floor is pinned to 1.2 and 1.3. Explicit FTPS enables TLS for the
 control channel and FluentFTP `DataConnectionEncryption`, so file transfers
 use an encrypted data channel.
 
 The FTPS control-channel certificate is validated and pinned by Heimdall.
-The data channel has a third-party limitation in FluentFTP 54.2.0:
+A pin the system validated is refused, without a prompt, when its chain's
+revocation status can no longer be determined: the one adversary a pin exists
+against holds a stolen, since-revoked key and blocks OCSP and CRL. A
+self-signed pin the user confirmed never had a checkable status and keeps its
+behaviour. A refused pin is reported as such, in different words from a Reject
+click. The data channel has a third-party limitation in FluentFTP 54.2.0:
 `FtpDataStream` installs an unconditional certificate-acceptance handler, so
 Heimdall cannot verify that channel's identity. This behavior is also present
 in the current upstream source. No `FtpConfig` option exposes data-channel
