@@ -67,8 +67,12 @@ public sealed class RemoteTextFileCodecTests
         }
     }
 
+    /// <remarks>
+    /// A file with no byte order mark that is not valid UTF-8 could not be opened at all. It is
+    /// read as Latin-1, flagged, and written back as Latin-1: the bytes survive a no-op save.
+    /// </remarks>
     [Fact]
-    public async Task ReadAsync_BomlessInvalidUtf8_ThrowsDecoderFallbackException()
+    public async Task ReadAsync_BomlessInvalidUtf8_FallsBackToLatin1AndSaysSo()
     {
         string testDirectory = Path.Combine(
             Path.GetTempPath(),
@@ -79,10 +83,70 @@ public sealed class RemoteTextFileCodecTests
 
         try
         {
-            await File.WriteAllBytesAsync(testFile, [0xE9]);
+            byte[] latin1 = [0x63, 0x61, 0x66, 0xE9];
+            await File.WriteAllBytesAsync(testFile, latin1);
+
+            RemoteTextDocument document = await RemoteTextFileCodec.ReadAsync(testFile);
+
+            Assert.True(document.DecodedWithFallback);
+            Assert.Equal("caf\u00e9", document.Text);
+            Assert.Same(Encoding.Latin1, document.Encoding);
+
+            await RemoteTextFileCodec.WriteAsync(testFile, document.Text, document);
+
+            Assert.Equal(latin1, await File.ReadAllBytesAsync(testFile));
+        }
+        finally
+        {
+            Directory.Delete(testDirectory, recursive: true);
+        }
+    }
+
+    /// <remarks>
+    /// A file WITH a byte order mark that fails its own encoding is corruption, not a legacy
+    /// encoding, and stays refused.
+    /// </remarks>
+    [Fact]
+    public async Task ReadAsync_InvalidUtf16WithMark_StillThrows()
+    {
+        string testDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "HeimdallTests",
+            Guid.NewGuid().ToString("N"));
+        string testFile = Path.Combine(testDirectory, "corrupt.txt");
+        Directory.CreateDirectory(testDirectory);
+
+        try
+        {
+            // UTF-16 LE mark followed by a lone high surrogate.
+            await File.WriteAllBytesAsync(testFile, [0xFF, 0xFE, 0x00, 0xD8]);
 
             await Assert.ThrowsAsync<DecoderFallbackException>(
                 () => RemoteTextFileCodec.ReadAsync(testFile));
+        }
+        finally
+        {
+            Directory.Delete(testDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WriteAsync_LeavesNoStagingFileBehind()
+    {
+        string testDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "HeimdallTests",
+            Guid.NewGuid().ToString("N"));
+        string testFile = Path.Combine(testDirectory, "notes.txt");
+        Directory.CreateDirectory(testDirectory);
+
+        try
+        {
+            RemoteTextDocument document = new("v1", new UTF8Encoding(false), ReadOnlyMemory<byte>.Empty);
+            await RemoteTextFileCodec.WriteAsync(testFile, "v2", document);
+
+            Assert.Equal("v2", await File.ReadAllTextAsync(testFile));
+            Assert.Equal([testFile], Directory.GetFiles(testDirectory));
         }
         finally
         {

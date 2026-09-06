@@ -17,6 +17,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Heimdall.App.Services;
 using Heimdall.App.Themes;
@@ -31,10 +32,11 @@ namespace Heimdall.App.Views;
 /// Embedded text editor with syntax highlighting powered by AvalonEdit.
 /// Used for editing local and remote (SFTP) files with theme-aware colors.
 /// </summary>
-public partial class EmbeddedEditorView : UserControl
+public partial class EmbeddedEditorView : UserControl, ICloseGuard
 {
     private readonly EmbeddedEditorViewModel _viewModel;
     private readonly LocalizationManager? _localizer;
+    private readonly EmbeddedEditorCloseGuard _closeGuard;
     private HeimdallThemeService? _themeService;
     private bool _suppressTextChangeNotifications;
 
@@ -70,6 +72,7 @@ public partial class EmbeddedEditorView : UserControl
     {
         _localizer = localizer;
         _viewModel = new EmbeddedEditorViewModel(localizer);
+        _closeGuard = new EmbeddedEditorCloseGuard(SampleCloseGuardSnapshot, ConfirmCloseAsync);
         InitializeComponent();
         DataContext = _viewModel;
         ApplyTheme();
@@ -142,6 +145,65 @@ public partial class EmbeddedEditorView : UserControl
         SetEditorText(content);
         ApplySyntaxHighlighting();
         _viewModel.UpdateCursorPosition(Editor.TextArea.Caret.Line, Editor.TextArea.Caret.Column);
+    }
+
+    /// <summary>Moves keyboard focus into the text, so typing starts without a click.</summary>
+    public void FocusEditor()
+    {
+        Dispatcher.BeginInvoke(() => Editor.Focus());
+    }
+
+    /// <summary>Shows a notice in the editor's own status bar.</summary>
+    public void ShowNotice(string message)
+    {
+        _viewModel.NoticeText = message;
+    }
+
+    private void OnEditorPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (EditorShortcut.Classify(e.Key, Keyboard.Modifiers))
+        {
+            case EditorShortcutAction.Save:
+                OnSaveClick(sender, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+
+            case EditorShortcutAction.Close:
+                OnCloseClick(sender, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+
+            case EditorShortcutAction.None:
+            default:
+                break;
+        }
+    }
+
+    public CloseGuardState SampleCloseGuardState() => _closeGuard.SampleCloseGuardState();
+
+    public CloseDecision PollClose(CloseRequest request) => _closeGuard.PollClose(request);
+
+    public Task<bool> ResolveCloseAsync(CloseRequest request, CancellationToken cancellationToken)
+        => _closeGuard.ResolveCloseAsync(request, cancellationToken);
+
+    private EditorCloseGuardSnapshot SampleCloseGuardSnapshot()
+        => new(_viewModel.IsModified, _viewModel.ModifiedTransitions);
+
+    private async Task<bool> ConfirmCloseAsync(string titleKey, string messageKey)
+    {
+        IDialogService? dialogService = (Application.Current as App)?.Services?.GetService<IDialogService>();
+        if (dialogService is null)
+        {
+            // Nothing to ask with: the text is kept rather than lost on an unanswerable question.
+            Heimdall.Core.Logging.FileLogger.Warn(
+                "EmbeddedEditor close guard could not ask about unsaved changes; the pane stays open.");
+            return false;
+        }
+
+        return await dialogService.ShowConfirmAsync(
+            _localizer?[titleKey] ?? titleKey,
+            _localizer?[messageKey] ?? messageKey,
+            "warning").ConfigureAwait(true);
     }
 
     private async void OnSaveClick(object sender, RoutedEventArgs e)
