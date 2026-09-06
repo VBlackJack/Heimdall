@@ -171,6 +171,10 @@ public static class OpenSshConfigParser
             : new HostBlockState(lineNumber, aliases);
     }
 
+    /// <summary>
+    /// Applies one directive to the current Host block. OpenSSH keeps the first value
+    /// obtained for a directive, so a repeated directive inside one block is ignored.
+    /// </summary>
     private static void ApplyDirective(
         HostBlockState block,
         string directive,
@@ -182,16 +186,25 @@ public static class OpenSshConfigParser
     {
         if (directive.Equals("hostname", StringComparison.OrdinalIgnoreCase))
         {
-            block.HostName = value;
-            block.HostNameLineNumber = lineNumber;
+            if (block.HostName is null)
+            {
+                block.HostName = value;
+                block.HostNameLineNumber = lineNumber;
+            }
+
             return;
         }
 
         if (directive.Equals("port", StringComparison.OrdinalIgnoreCase))
         {
+            if (block.ObtainedPort is not null)
+            {
+                return;
+            }
+
             if (int.TryParse(value, out var port) && port is >= 1 and <= 65535)
             {
-                block.Port = port;
+                block.ObtainedPort = port;
                 return;
             }
 
@@ -200,34 +213,46 @@ public static class OpenSshConfigParser
                 lineNumber,
                 OpenSshDiagnosticCode.InvalidPort,
                 value));
-            block.Port = 22;
+            block.ObtainedPort = HostBlockState.DefaultPort;
             return;
         }
 
         if (directive.Equals("user", StringComparison.OrdinalIgnoreCase))
         {
-            block.User = value;
+            block.User ??= value;
             return;
         }
 
         if (directive.Equals("identityfile", StringComparison.OrdinalIgnoreCase))
         {
-            block.IdentityFile = ExpandIdentityFile(value, userProfile, lineNumber, diagnostics);
+            if (block.IdentityFile is null)
+            {
+                block.IdentityFile = ExpandIdentityFile(value, userProfile, lineNumber, diagnostics);
+            }
+
             return;
         }
 
         if (directive.Equals("proxyjump", StringComparison.OrdinalIgnoreCase))
         {
-            block.ProxyJumpValue = value;
-            block.ProxyJumpLineNumber = lineNumber;
-            block.ProxyJumpWasQuoted = valueWasQuoted;
+            if (block.ProxyJumpValue is null)
+            {
+                block.ProxyJumpValue = value;
+                block.ProxyJumpLineNumber = lineNumber;
+                block.ProxyJumpWasQuoted = valueWasQuoted;
+            }
+
             return;
         }
 
         if (directive.Equals("proxycommand", StringComparison.OrdinalIgnoreCase))
         {
-            block.ProxyCommandValue = value;
-            block.ProxyCommandLineNumber = lineNumber;
+            if (block.ProxyCommandValue is null)
+            {
+                block.ProxyCommandValue = value;
+                block.ProxyCommandLineNumber = lineNumber;
+            }
+
             return;
         }
 
@@ -776,7 +801,13 @@ public static class OpenSshConfigParser
 
         public int? HostNameLineNumber { get; set; }
 
-        public int Port { get; set; } = 22;
+        /// <summary>Port used when the block carries no valid Port directive.</summary>
+        public const int DefaultPort = 22;
+
+        /// <summary>The first Port value obtained in the block, or null when none was seen.</summary>
+        public int? ObtainedPort { get; set; }
+
+        public int Port => ObtainedPort ?? DefaultPort;
 
         public string? User { get; set; }
 
