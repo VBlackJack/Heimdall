@@ -2444,15 +2444,21 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             $"SSH keepalive timer started ({intervalSeconds}s interval)");
     }
 
+    /// <remarks>
+    /// Reached from the timer's own pool thread (a tick that finds the session gone) and from the
+    /// UI thread (dispose, disconnect). The field is taken once, atomically, so two callers racing
+    /// past a null check cannot both dereference it; the same shape as
+    /// <see cref="StopAutoReconnectTimer(AutoReconnectTickScheduler, ref System.Threading.Timer?)"/>.
+    /// </remarks>
     private void StopKeepAliveTimer()
     {
-        if (_keepAliveTimer is null)
+        System.Threading.Timer? stoppedTimer = Interlocked.Exchange(ref _keepAliveTimer, null);
+        if (stoppedTimer is null)
         {
             return;
         }
 
-        _keepAliveTimer.Dispose();
-        _keepAliveTimer = null;
+        stoppedTimer.Dispose();
         Core.Logging.FileLogger.Info("SSH keepalive timer stopped");
     }
 
