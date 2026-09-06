@@ -20,13 +20,19 @@ using Heimdall.Core.Ssh;
 
 namespace Heimdall.Ssh;
 
+/// <summary>
+/// A known_hosts line whose key differs from the stored one. The imported public
+/// key blob travels with the conflict so a "replace" decision can store the key
+/// it actually refers to instead of inheriting the rejected blob.
+/// </summary>
 public sealed record KnownHostsImportConflict(
     string Host,
     int Port,
     string ExistingFingerprint,
     string ImportedFingerprint,
     string Algorithm,
-    int SourceLineNumber);
+    int SourceLineNumber,
+    string? ImportedPublicKeyBase64 = null);
 
 public sealed record KnownHostsImportReport(
     int Imported,
@@ -128,7 +134,8 @@ public sealed class KnownHostsImporter(IHostKeyTrustService trustService)
                 existing.Fingerprint,
                 fingerprint,
                 entry.KeyType,
-                entry.SourceLineNumber));
+                entry.SourceLineNumber,
+                Convert.ToBase64String(entry.Base64Key)));
             FileLogger.Warn(
                 $"known_hosts import conflict for {entry.Host}:{entry.Port}: existing={existing.Fingerprint} imported={fingerprint}");
         }
@@ -163,7 +170,11 @@ public sealed class KnownHostsExporter(
     Action<string, string>? writeAllText = null)
 {
     private readonly IHostKeyTrustService _trustService = trustService;
-    private readonly Action<string, string> _writeAllText = writeAllText ?? ((path, content) => File.WriteAllText(path, content, Encoding.UTF8));
+    // OpenSSH reads known_hosts byte for byte and does not strip a UTF-8 BOM, so a
+    // preamble would make the first line fail to match its host on every ssh call.
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
+    private readonly Action<string, string> _writeAllText = writeAllText ?? ((path, content) => File.WriteAllText(path, content, Utf8NoBom));
 
     public KnownHostsExportReport ExportFile(string? path = null)
     {

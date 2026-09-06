@@ -331,6 +331,43 @@ public sealed class KnownHostsImportExportTests : IDisposable
         Assert.NotNull(service.GetEntry("alsogood.example.com", 22));
     }
 
+    [Fact]
+    public void Import_ConflictingEntry_CarriesImportedPublicKeyOnConflict()
+    {
+        byte[] importedKey = [0x21, 0x22, 0x23];
+        string path = WriteKnownHosts($"conflict.example.com ssh-ed25519 {ToKey(importedKey)}");
+        (_, HostKeyTrustService service) = CreateService();
+        service.Trust("conflict.example.com", 22, "SHA256:existing", "ssh-ed25519", HostKeySource.UserConfirmed, "AAAAexisting");
+        KnownHostsImporter importer = new(service);
+
+        KnownHostsImportReport report = importer.ImportFile(path, DateTimeOffset.Parse("2026-04-24T10:15:00Z"));
+
+        KnownHostsImportConflict conflict = Assert.Single(report.Conflicts);
+        Assert.Equal(ToKey(importedKey), conflict.ImportedPublicKeyBase64);
+    }
+
+    [Fact]
+    public void ExportFile_WritesUtf8WithoutByteOrderMark()
+    {
+        Directory.CreateDirectory(_rootPath);
+        string path = Path.Combine(_rootPath, "known_hosts");
+        (_, HostKeyTrustService service) = CreateService();
+        service.Import(
+            "host.example.com",
+            22,
+            HostKeyFormats.ComputeSha256Fingerprint([0x31, 0x32]),
+            "ssh-ed25519",
+            DateTimeOffset.Parse("2026-04-24T10:15:00Z"),
+            ToKey([0x31, 0x32]));
+
+        new KnownHostsExporter(service).ExportFile(path);
+
+        byte[] bytes = File.ReadAllBytes(path);
+        Assert.True(bytes.Length > 3);
+        Assert.NotEqual(new byte[] { 0xEF, 0xBB, 0xBF }, bytes[..3]);
+        Assert.Equal((byte)'h', bytes[0]);
+    }
+
     private string WriteKnownHosts(string content)
     {
         Directory.CreateDirectory(_rootPath);

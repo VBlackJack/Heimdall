@@ -166,4 +166,85 @@ public class HostKeyTrustServiceTests
         Assert.Equal($"{Host}:{Port}", removed);
         Assert.Null(_service.GetEntry(Host, Port));
     }
+
+    [Fact]
+    public void Trust_ReplacingDifferentFingerprintWithoutPublicKey_DropsStalePublicKey()
+    {
+        const string oldPublicKey = "AAAAold";
+        _service.Trust(Host, Port, "SHA256:old", "ssh-ed25519", HostKeySource.UserConfirmed, oldPublicKey);
+
+        _service.Trust(Host, Port, "SHA256:new", "ssh-ed25519", HostKeySource.UserConfirmed);
+
+        HostKeyEntry? entry = _service.GetEntry(Host, Port);
+        Assert.NotNull(entry);
+        Assert.Equal("SHA256:new", entry.Fingerprint);
+        Assert.Null(entry.PublicKeyBase64);
+    }
+
+    [Fact]
+    public void Trust_SameFingerprintWithoutPublicKey_KeepsKnownPublicKey()
+    {
+        const string publicKey = "AAAAsame";
+        _service.Trust(Host, Port, "SHA256:same", "ssh-ed25519", HostKeySource.UserConfirmed, publicKey);
+
+        _service.Trust(Host, Port, "SHA256:same", "ssh-ed25519", HostKeySource.UserConfirmed);
+
+        Assert.Equal(publicKey, _service.GetEntry(Host, Port)?.PublicKeyBase64);
+    }
+
+    [Fact]
+    public void Import_ReplacingDifferentFingerprintWithoutPublicKey_DropsStalePublicKey()
+    {
+        const string oldPublicKey = "AAAAold";
+        DateTimeOffset importedAt = DateTimeOffset.Parse("2026-04-24T10:15:00Z");
+        _service.Import(Host, Port, "SHA256:old", "ssh-ed25519", importedAt, oldPublicKey);
+
+        _service.Import(Host, Port, "SHA256:new", "ssh-ed25519", importedAt.AddDays(1));
+
+        HostKeyEntry? entry = _service.GetEntry(Host, Port);
+        Assert.NotNull(entry);
+        Assert.Equal("SHA256:new", entry.Fingerprint);
+        Assert.Null(entry.PublicKeyBase64);
+    }
+
+    [Fact]
+    public void Trust_AfterMismatchAgainstHashedEntry_ReplacesHashedEntry()
+    {
+        string hashedHost = CreateHashedHost(Host, [0x01, 0x02, 0x03, 0x04]);
+        _store.TrustEntry(
+            hashedHost,
+            Port,
+            new HostKeyEntry(
+                "SHA256:old",
+                DateTimeOffset.UtcNow.AddDays(-2),
+                DateTimeOffset.UtcNow.AddDays(-1),
+                "ssh-ed25519",
+                HostKeySource.ImportedKnownHosts));
+        Assert.Equal("SHA256:old", _service.GetEntry(Host, Port)?.Fingerprint);
+        (string HostPort, HostKeyEntry OldEntry, HostKeyEntry NewEntry)? replaced = null;
+        string? removed = null;
+        _service.EntryReplaced += (hostPort, oldEntry, newEntry) => replaced = (hostPort, oldEntry, newEntry);
+        _service.EntryRemoved += hostPort => removed = hostPort;
+
+        _service.Trust(Host, Port, "SHA256:new", "ssh-ed25519", HostKeySource.UserConfirmed);
+
+        Assert.Equal("SHA256:new", _service.GetEntry(Host, Port)?.Fingerprint);
+        Assert.DoesNotContain(
+            _service.GetAllEntries(),
+            item => item.HostPort.StartsWith("|1|", StringComparison.Ordinal));
+        Assert.NotNull(replaced);
+        Assert.Equal("SHA256:old", replaced.Value.OldEntry.Fingerprint);
+        Assert.Equal($"{hashedHost}:{Port}", removed);
+
+        _service.Remove(Host, Port);
+
+        Assert.Null(_service.GetEntry(Host, Port));
+    }
+
+    private static string CreateHashedHost(string host, byte[] salt)
+    {
+        using System.Security.Cryptography.HMACSHA1 hmac = new(salt);
+        byte[] hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(host));
+        return $"|1|{Convert.ToBase64String(salt)}|{Convert.ToBase64String(hash)}";
+    }
 }
