@@ -12,6 +12,50 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens
+
+### The Plink port probe runs before the first wait
+
+The port bind wait slept a full interval (two seconds by default) before its first probe, so every
+Plink fallback connect paid that interval on top of the establishment delay, and the plaintext
+password file, already consumed by plink at startup, sat on disk for those two seconds. The loop
+now probes first and waits only between attempts; the attempt budget is unchanged. A test with the
+port owned at once took 1083 ms before and under 100 ms after. The password-file cleanup on a
+failed process start and on a cancelled ownership wait, correct but unpinned, is now asserted by
+tests that each fail against the mutant removing their cleanup call.
+
+### A connect whose session was disposed while it awaited is abandoned
+
+`ConnectAsync` checked the disposed flag only at entry. A Dispose issued while the host key prompt
+was open, or while the key exchange ran, found nothing to tear down and only marked the session;
+the connect then ran on and left a connected client nothing owned. Every await of the connect is
+now followed by a check that releases what the teardown could not see and throws. The shell read
+loop, never executed by a test until now, is driven through the transport seam by a scripted
+stream: data then remote end of stream, transport failure, remote end of stream racing a local
+Disconnect, and Dispose while blocked in a read.
+
+### Keyboard-interactive answers only the password prompt
+
+The handler answered every prompt with the stored password, so a server asking for a verification
+code after the password got the password twice and the refusal was reported as a rejected
+password. Only a password prompt receives the password now (a single prompt whatever its wording,
+a localised password prompt by marker); any other prompt is left empty and recorded, and the
+refusal that follows is classified `KeyboardInteractiveUnsupportedPrompt` with the question in the
+message and a localized key in both locales. Second-factor entry is not supported; the failure is
+honest.
+
+### The known_hosts sync no longer hashes hashed tokens, and trust changes are written in batches
+
+Measured first: 2000 hashed store entries against a 2000-line hashed known_hosts took 19055 ms at
+startup and raised 2000 persistence events, each a full settings write and settings-changed
+broadcast. A lookup whose host is itself a hashed token was hashed under every stored salt, a
+comparison that can never match since a hashed token only matches the identical token. The scan is
+skipped for hashed candidates, the store is enumerated without copying and the HMAC is one-shot:
+the same sync takes 23 ms. Trust store changes now reach the settings through a coalescer that
+gathers them for a 250 ms quiet window and merges them in one write, last change per key winning,
+flushed at exit. A plain-host miss still costs one HMAC per stored hashed entry, about 2.7 us
+each, which is the crypto floor.
+
 ## 2026-09-06: tunnels released once, distinct loopback honoured, plink drain outlives the connect (v2026.090602)
 
 ### A pane close cannot release a tunnel twice

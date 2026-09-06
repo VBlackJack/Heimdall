@@ -62,6 +62,10 @@ C'est gratuit, open source, et cela tourne sur Windows 10 et 11.
 - **Des sessions rangées comme vous travaillez.** Des dossiers en couleur, du glisser-déposer
   pour déplacer un dossier ou ranger les sessions à la main, des filtres par protocole, favori,
   état de connexion ou passerelle, et une arborescence qui s'ouvre là où vous l'avez laissée.
+- **Une confiance que vous pouvez auditer.** Les clés d'hôte SSH sont épinglées à la première
+  connexion et affichées pour que vous les compariez ; une clé qui change est refusée par défaut,
+  et votre `~/.ssh/known_hosts` s'importe et s'exporte pour que OpenSSH et Heimdall soient
+  d'accord sur qui est qui.
 - **Rien à installer à côté.** Les deux téléchargements sont autonomes.
 
 Le catalogue complet se trouve dans la [référence des fonctionnalités](docs/fr/FEATURES.md).

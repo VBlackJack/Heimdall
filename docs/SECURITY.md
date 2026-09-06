@@ -136,12 +136,42 @@ Trust entries carry metadata (`FirstSeen`, `LastSeen`, `Algorithm`, `Source`,
 legacy `trustedHostKeys` string dictionary remains readable for downgrade
 safety and is never rewritten from the V2 path.
 
+On a changed key the prompt defaults to and focuses **Reject**: the Enter
+reflex trained by the first-use prompt, where Enter accepts, must not connect
+to a host whose key no longer matches the stored one. Accepting the new key or
+trusting it for one session takes an explicit click. The FTPS certificate
+prompt follows the same rule. Replacing a key never carries the previous
+public key blob over: the entry holds the new fingerprint with the caller's
+blob or none, so the known_hosts export can never write back a key the user
+just decided against. A mismatch resolved against a hashed entry replaces that
+entry instead of leaving the old fingerprint effective beside the new one.
+
 `~/.ssh/known_hosts` import and export are explicit user actions surfaced in
 `Settings > SSH & SFTP > Trusted host keys`. Import preserves conflicting
 existing entries unless the user explicitly opts into replacement in a
-dedicated modal. Export preserves every line Heimdall did not originate
-(including `@cert-authority`, `@revoked`, and hashed entries that Heimdall
-cannot fully consume) verbatim.
+dedicated modal; conflicts are detected through the trust service, which also
+matches hashed entries, so a plain line cannot silently shadow a host already
+trusted through a hashed one. A hashed token can only match the identical
+token: its plain host is unknown, so it is never hashed under the stored
+salts. Export writes UTF-8 without a byte order mark, which OpenSSH does not
+strip, and preserves every line Heimdall did not originate (including
+`@cert-authority`, `@revoked`, hashed entries, and any multi-host line whose
+aliases are not all managed) verbatim.
+
+Password authentication registers both `password` and `keyboard-interactive`.
+The keyboard-interactive handler answers only a password prompt with the stored
+password; any other prompt (a verification code, a challenge) is left empty and
+recorded, and the refusal that follows is reported as an unanswered question
+(`KeyboardInteractiveUnsupportedPrompt`) rather than as a rejected password.
+Second-factor entry is not supported.
+
+The key generator writes both files as UTF-8 without a byte order mark with LF
+line endings, and creates the private key through the same restrictive-ACL
+writer as the Plink password file, so Win32-OpenSSH does not refuse it as
+"permissions too open". The managed VcXsrv keeps host access control on: the
+only client Heimdall points at the display is the local one, and `-ac` would
+let any host that can reach TCP 6000 read the forwarded windows and the
+clipboard.
 
 Plink fallback paths are also fail-closed. `PlinkHostKeyDecider` accepts a
 stored fingerprint immediately, otherwise asks an injectable

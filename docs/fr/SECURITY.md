@@ -148,13 +148,46 @@ enrichies ; l'ancien dictionnaire de chaînes `trustedHostKeys` reste lisible
 pour la sûreté en cas de retour arrière et n'est jamais réécrit depuis le
 chemin V2.
 
+Sur une clé qui a changé, l'invite met par défaut et en focus **Refuser** : le
+réflexe Entrée appris sur l'invite de première utilisation, où Entrée accepte,
+ne doit pas connecter à un hôte dont la clé ne correspond plus à celle
+stockée. Accepter la nouvelle clé ou ne lui faire confiance que pour une
+session demande un clic explicite. L'invite de certificat FTPS suit la même
+règle. Remplacer une clé ne reporte jamais l'ancien blob de clé publique :
+l'entrée porte la nouvelle empreinte avec le blob de l'appelant ou aucun, si
+bien que l'export known_hosts ne peut jamais réécrire une clé que
+l'utilisateur vient de rejeter. Une discordance résolue contre une entrée
+hachée remplace cette entrée au lieu de laisser l'ancienne empreinte effective
+à côté de la nouvelle.
+
 L'import et l'export de `~/.ssh/known_hosts` sont des actions utilisateur
 explicites exposées dans `Settings > SSH & SFTP > Trusted host keys`. L'import
 préserve les entrées existantes en conflit, sauf si l'utilisateur choisit
-explicitement le remplacement dans une fenêtre modale dédiée. L'export préserve
-mot pour mot chaque ligne dont Heimdall n'est pas à l'origine (y compris
-`@cert-authority`, `@revoked` et les entrées hachées que Heimdall ne sait pas
-consommer entièrement).
+explicitement le remplacement dans une fenêtre modale dédiée ; les conflits
+sont détectés par le service de confiance, qui apparie aussi les entrées
+hachées, donc une ligne en clair ne peut pas masquer en silence un hôte déjà
+approuvé par une entrée hachée. Un jeton haché ne peut apparier que le jeton
+identique : son hôte en clair est inconnu, il n'est donc jamais haché sous les
+sels stockés. L'export écrit de l'UTF-8 sans marque d'ordre des octets, que
+OpenSSH ne retire pas, et préserve mot pour mot chaque ligne dont Heimdall
+n'est pas à l'origine (y compris `@cert-authority`, `@revoked`, les entrées
+hachées et toute ligne multi-hôtes dont les alias ne sont pas tous gérés).
+
+L'authentification par mot de passe enregistre à la fois `password` et
+`keyboard-interactive`. Le handler keyboard-interactive ne répond qu'à une
+demande de mot de passe avec le mot de passe stocké ; toute autre demande (un
+code de vérification, un défi) est laissée vide et enregistrée, et le refus qui
+suit est signalé comme une question sans réponse
+(`KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un mot de passe
+rejeté. La saisie d'un second facteur n'est pas prise en charge.
+
+Le générateur de clés écrit les deux fichiers en UTF-8 sans marque d'ordre des
+octets avec des fins de ligne LF, et crée la clé privée par le même écrivain à
+ACL restrictive que le fichier de mot de passe Plink, afin que Win32-OpenSSH ne
+la refuse pas pour "permissions too open". Le VcXsrv géré conserve son
+contrôle d'accès par hôte : le seul client que Heimdall pointe vers l'affichage
+est local, et `-ac` laisserait tout hôte joignant le port TCP 6000 lire les
+fenêtres redirigées et le presse-papiers.
 
 Les chemins de repli Plink sont eux aussi fail-closed. `PlinkHostKeyDecider`
 accepte immédiatement une empreinte stockée ; sinon il demande la clé présentée

@@ -585,8 +585,9 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 2. Heimdall auto-detects and auto-starts the X server when X11 forwarding is enabled
 3. If auto-start fails, set the X server path manually in Settings > X11 Server Path
 4. Verify the `DISPLAY` environment variable is set (Heimdall sets `localhost:0.0` automatically)
+5. When no X server is available at connect time, the session's status text says so and the session is launched without forwarding; fix the server, then reconnect
 
-**Files**: `Services/X11ServerManager.cs`, `Services/ConnectionService.Ssh.cs`
+**Files**: `Services/X11ServerManager.cs`, `Services/Handlers/SshHandler.cs`
 
 ---
 
@@ -928,3 +929,35 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Solution**: Edit the task and point it at the profile you mean. A task saved from the current version records that profile's identifier and no longer depends on its name.
 
 **Files**: `src/Heimdall.App/ViewModels/Scheduled/ScheduledTaskServerResolver.cs`, `src/Heimdall.App/ViewModels/Scheduled/ScheduledTasksViewModel.cs`
+
+---
+
+## 51. SSH - Server Asks an Interactive Question This Client Cannot Answer {#ssh-keyboard-interactive-unsupported-prompt}
+
+**Symptom**: Connecting with a password fails with a message saying the server asked an interactive question this client cannot answer, naming the question (for example `Verification code:`).
+
+**Root cause**: The server authenticates through keyboard-interactive and asks for a second factor after the password. Heimdall answers only a password prompt with the stored password; any other prompt is left empty and recorded, and the refusal that follows is reported as that unanswered question (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) rather than as a rejected password. Before this classification existed the same refusal was blamed on the password.
+
+**Solution**:
+
+1. Use a client that supports the server's second factor for that host, or authenticate with a key the server accepts without a challenge.
+2. If the server is yours, exempt the client's source or account from the second factor, or enable public key authentication.
+
+**Key lesson**: A password refusal reported after a keyboard-interactive round must be read together with what the round asked; the classifier does that from `SshConnectionParams.KeyboardInteractive`.
+
+**Files**: `Heimdall.Ssh/SshConnectionFactory.cs` (`AnswerKeyboardInteractivePrompts`), `Heimdall.Ssh/FailureClassifier.cs`, `Heimdall.Ssh/KeyboardInteractiveObservation.cs`
+
+---
+
+## 52. Tunnel - Plink Fallback Refused for a SOCKS Proxy or Reverse Forward {#tunnel-plink-fallback-forwarding-unsupported}
+
+**Symptom**: A tunneled session whose gateway sign-in was refused by the built-in SSH client fails with a message saying the Plink fallback cannot provide the SOCKS proxy or remote port forward the profile needs.
+
+**Root cause**: The Plink fallback only opens a plain local forward (`-L`). A profile with `SocksProxyPort` or `RemoteBindPort` set used to get that plain forward and a reported success while the forward it needed did not exist; the fallback now refuses such a profile before launching plink.
+
+**Solution**:
+
+1. Fix the gateway sign-in for the built-in client (usually the agent or key the gateway expects), which serves every forwarding mode.
+2. Or remove the SOCKS proxy / reverse forward from the profile if the session does not need it.
+
+**Files**: `Services/TunnelService.cs` (`EstablishPlinkTunnelAsync`), `Heimdall.Ssh/Plink/PlinkTunnelRunner.cs`

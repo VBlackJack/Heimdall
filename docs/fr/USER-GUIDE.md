@@ -88,7 +88,9 @@ machine que vous vous attendez à joindre ; Heimdall s'en souvient ensuite.
 
 Si cette même demande réapparaît plus tard pour une machine déjà acceptée, **arrêtez-vous et
 demandez conseil.** Cela peut signifier que la machine a été réinstallée, ou que quelque chose se
-fait passer pour elle.
+fait passer pour elle. Sur cette demande, le bouton mis en avant est **Refuser** : appuyer sur
+Entrée refuse la connexion. Accepter la nouvelle clé, ou ne lui faire confiance que pour cette
+session, demande un clic délibéré.
 
 ### Connexion rapide
 
@@ -154,6 +156,7 @@ Heimdall affiche la raison en clair partout où il le peut. Les cas courants :
 | Le mot de passe est refusé | Mauvais mot de passe, ou compte verrouillé sur la machine distante. |
 | La connexion expire | La machine est éteinte, ou un pare-feu bloque. Vérifiez l'adresse. |
 | La clé d'hôte a changé | Voir l'avertissement plus haut. N'acceptez pas sans demander. |
+| Le serveur pose une question à laquelle ce client ne peut pas répondre | Le serveur veut un code de vérification ou un autre second facteur. Heimdall ne répond qu'aux demandes de mot de passe ; utilisez un autre client pour ce serveur. |
 | Un message parlant de WebView2 | La machine n'a pas Microsoft Edge. Voir [Installation](#installation). |
 | "Passerelle SSH introuvable" | La session pointe vers une passerelle qui n'existe plus. Modifiez la session pour en choisir une, ou recréez-la dans les réglages. |
 

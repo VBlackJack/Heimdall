@@ -83,7 +83,9 @@ This is normal on a first connection. Accept it if you are connecting to a machi
 reach; Heimdall remembers it afterwards.
 
 If that same prompt appears again later for a machine you have already accepted, **stop and ask
-someone.** It can mean the machine was rebuilt, or that something is impersonating it.
+someone.** It can mean the machine was rebuilt, or that something is impersonating it. On that
+prompt the highlighted button is **Reject**: pressing Enter refuses the connection. Accepting the
+new key, or trusting it for this session only, takes a deliberate click.
 
 ### Quick connect
 
@@ -145,6 +147,7 @@ Heimdall shows the reason in plain language wherever it can. The common ones:
 | The password is refused | Wrong password, or the account is locked on the remote machine. |
 | The connection times out | The machine is off, or a firewall is in the way. Check the address. |
 | The host key changed | See the warning above. Do not accept it without asking. |
+| The server asks a question this client cannot answer | The server wants a verification code or another second factor. Heimdall only answers password prompts; use another client for that server. |
 | A message about WebView2 | The machine has no Microsoft Edge. See [Installing](#installing). |
 | "SSH gateway not found" | The session points at a gateway that no longer exists. Edit the session and choose one, or recreate it in Settings. |
 
