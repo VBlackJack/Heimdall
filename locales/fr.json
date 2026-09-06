@@ -4296,6 +4296,9 @@
   "ToolSshAuditBtnCopy": "Copier l'empreinte",
   "ToolSshAuditEmptyState": "Collez une cl\u00e9 SSH ou parcourez un fichier de cl\u00e9 pour auditer sa s\u00e9curit\u00e9",
   "ToolSshAuditParseError": "Impossible d'analyser la cl\u00e9 fournie. V\u00e9rifiez qu'il s'agit d'une cl\u00e9 SSH publique ou priv\u00e9e valide.",
+  "ToolSshAuditKeyFileFilter": "Fichiers de cl\u00e9s SSH (*.pem;*.pub;*.key)|*.pem;*.pub;*.key|Tous les fichiers (*.*)|*.*",
+  "ToolSshAuditFileTooLarge": "Le fichier d\u00e9passe {0} octets et ne peut pas \u00eatre analys\u00e9.",
+  "ToolSshAuditFileReadError": "Le fichier de cl\u00e9 n'a pas pu \u00eatre lu : {0}",
   "ToolSshAuditBitsLabel": "{0} bits",
   "ToolHelpSSHAUDIT": "Auditeur de Cl\u00e9 SSH\n\nAnalyse la s\u00e9curit\u00e9 des cl\u00e9s SSH et fournit des recommandations.\n\nUtilisation :\n1. Collez une cl\u00e9 SSH (publique ou priv\u00e9e) dans la zone de texte, OU\n2. Cliquez sur Parcourir pour charger un fichier de cl\u00e9\n\nFormats support\u00e9s :\n- Cl\u00e9s publiques OpenSSH (ssh-rsa, ssh-ed25519, ecdsa-sha2-*)\n- Cl\u00e9s priv\u00e9es OpenSSH\n- Format PEM (PKCS#1, PKCS#8)\n\nV\u00e9rifications de s\u00e9curit\u00e9 :\n- Force de l'algorithme (Ed25519 > ECDSA > RSA > DSA)\n- Ad\u00e9quation de la taille de cl\u00e9 (RSA : min 2048, recommand\u00e9 4096)\n- Statut de chiffrement (cl\u00e9s priv\u00e9es non chiffr\u00e9es signal\u00e9es)\n- S\u00e9curit\u00e9 du format (ancien chiffrement PEM vs OpenSSH moderne)",
 

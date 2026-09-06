@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Localization;
@@ -45,9 +46,68 @@ public sealed partial class SshKeyAuditViewModel : ObservableObject
     [ObservableProperty] private bool _showParseError;
     [ObservableProperty] private bool _showResults;
 
+    /// <summary>Locale key shown when a chosen key file exceeds the audit size cap; {0} is the cap in bytes.</summary>
+    public const string FileTooLargeKey = "ToolSshAuditFileTooLarge";
+
+    /// <summary>Locale key shown when a chosen key file cannot be read; {0} is the platform reason.</summary>
+    public const string FileReadErrorKey = "ToolSshAuditFileReadError";
+
+    [ObservableProperty] private string _fileErrorMessage = string.Empty;
+    [ObservableProperty] private bool _showFileError;
+
     public void Initialize(LocalizationManager? localizer)
     {
         _localizer = localizer;
+    }
+
+    /// <summary>
+    /// Loads a key file chosen by the user into <see cref="KeyText"/>. A file above the
+    /// audit size cap, an I/O failure or an access refusal is reported through
+    /// <see cref="FileErrorMessage"/> instead of being dropped silently.
+    /// </summary>
+    /// <param name="path">Path of the file to load.</param>
+    public void LoadKeyFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        try
+        {
+            FileInfo fileInfo = new FileInfo(path);
+            if (fileInfo.Length > SshKeyAuditEngine.MaxKeyFileSize)
+            {
+                ShowFileErrorMessage(Localize(FileTooLargeKey, SshKeyAuditEngine.MaxKeyFileSize));
+                return;
+            }
+
+            string text = File.ReadAllText(path);
+            ClearFileError();
+            KeyText = text;
+        }
+        catch (IOException ex)
+        {
+            ShowFileErrorMessage(Localize(FileReadErrorKey, ex.Message));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ShowFileErrorMessage(Localize(FileReadErrorKey, ex.Message));
+        }
+    }
+
+    private void ShowFileErrorMessage(string message)
+    {
+        FileErrorMessage = message;
+        ShowFileError = true;
+    }
+
+    private void ClearFileError()
+    {
+        FileErrorMessage = string.Empty;
+        ShowFileError = false;
+    }
+
+    private string Localize(string key, params object[] arguments)
+    {
+        return _localizer?.Format(key, arguments) ?? key;
     }
 
     /// <summary>

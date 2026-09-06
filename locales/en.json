@@ -4297,6 +4297,9 @@
   "ToolSshAuditBtnCopy": "Copy fingerprint",
   "ToolSshAuditEmptyState": "Paste an SSH key or browse for a key file to audit its security",
   "ToolSshAuditParseError": "Could not parse the provided key. Ensure it is a valid SSH public or private key.",
+  "ToolSshAuditKeyFileFilter": "SSH key files (*.pem;*.pub;*.key)|*.pem;*.pub;*.key|All files (*.*)|*.*",
+  "ToolSshAuditFileTooLarge": "The file is larger than {0} bytes and cannot be audited.",
+  "ToolSshAuditFileReadError": "The key file could not be read: {0}",
   "ToolSshAuditBitsLabel": "{0} bits",
   "ToolHelpSSHAUDIT": "SSH Key Auditor\n\nAnalyzes SSH key security and provides recommendations.\n\nUsage:\n1. Paste an SSH key (public or private) into the text area, OR\n2. Click Browse to load a key file\n\nSupported formats:\n- OpenSSH public keys (ssh-rsa, ssh-ed25519, ecdsa-sha2-*)\n- OpenSSH private keys\n- PEM format (PKCS#1, PKCS#8)\n\nSecurity checks:\n- Algorithm strength (Ed25519 > ECDSA > RSA > DSA)\n- Key size adequacy (RSA: min 2048, recommended 4096)\n- Encryption status (unencrypted private keys flagged)\n- Format security (old PEM encryption vs modern OpenSSH)",
 
