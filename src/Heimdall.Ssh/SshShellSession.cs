@@ -203,8 +203,19 @@ public sealed class SshShellSession : IDisposable
                 cancellationToken)
             .ConfigureAwait(false);
 
+        // The host key prompt can stay open for a long time, and the owner may dispose the
+        // session while it is: Dispose found nothing to tear down at that point and only
+        // marked the session, so the connect used to run on and leave a connected client
+        // that nothing owned. Every await of the connect is followed by the same check.
+        AbandonConnectIfDisposed(client: null);
+
         SshClient client = _transport.CreateClient(connectionParams);
-        _client = client;
+        lock (_teardownGate)
+        {
+            _client = client;
+        }
+
+        AbandonConnectIfDisposed(client);
 
         SshConnectionFactory.AttachPinnedHostKeyVerification(
             client,
@@ -214,12 +225,15 @@ public sealed class SshShellSession : IDisposable
         await _transport.ConnectAsync(client, cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
+        AbandonConnectIfDisposed(client);
 
         ISshShellStream shellStream = _transport.CreateShellStream(client, terminalColumns, terminalRows);
         lock (_streamGate)
         {
             _stream = shellStream;
         }
+
+        AbandonConnectIfDisposed(client);
 
         // The connect token governs the connect, and nothing after it. Once the
         // shell is up the session is owned through Disconnect/Dispose, which
@@ -307,6 +321,48 @@ public sealed class SshShellSession : IDisposable
     public void Dispose()
     {
         BeginTeardown(notifyDisconnected: false, markDisposed: true, operationName: nameof(Dispose));
+    }
+
+    /// <summary>
+    /// Ends a connect whose session was disposed while it was awaiting. Releases the
+    /// client and stream the teardown could not see when it ran, then throws so the
+    /// caller never treats the session as connected.
+    /// </summary>
+    /// <param name="client">The client created by this connect, if one exists yet.</param>
+    private void AbandonConnectIfDisposed(SshClient? client)
+    {
+        lock (_teardownGate)
+        {
+            if (!_disposed && !_teardownStarted)
+            {
+                return;
+            }
+        }
+
+        CleanupStream();
+        SshClient? owned = Interlocked.Exchange(ref _client, null) ?? client;
+        if (owned is not null)
+        {
+            try
+            {
+                if (owned.IsConnected)
+                {
+                    owned.Disconnect();
+                }
+
+                owned.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The teardown got to it first.
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Debug("SSH shell client cleanup after a disposed connect suppressed", ex);
+            }
+        }
+
+        throw new ObjectDisposedException(nameof(SshShellSession));
     }
 
     /// <summary>
