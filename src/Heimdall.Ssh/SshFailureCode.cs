@@ -65,6 +65,12 @@ public enum SshFailureCode
     /// <summary>Keyboard-interactive auth required but no password provided.</summary>
     KeyboardInteractiveNoPassword,
 
+    /// <summary>
+    /// The keyboard-interactive exchange asked something other than a password (a
+    /// verification code, a challenge) that this client cannot answer.
+    /// </summary>
+    KeyboardInteractiveUnsupportedPrompt,
+
     // ── Network failures ───────────────────────────────────────────────
 
     /// <summary>TCP connection refused (server down or port blocked).</summary>

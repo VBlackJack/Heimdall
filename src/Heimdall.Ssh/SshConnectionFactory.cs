@@ -579,7 +579,7 @@ public static class SshConnectionFactory
         //      hardened Linux). SSH.NET tries the next method automatically on rejection.
         if (!string.IsNullOrEmpty(connectionParams.Password))
         {
-            AddPasswordMethods(methods, connectionParams.Username, connectionParams.Password);
+            AddPasswordMethods(methods, connectionParams);
         }
 
         // SSH agent key authentication. Always add agent keys as supplementary
@@ -691,21 +691,77 @@ public static class SshConnectionFactory
 
     private static void AddPasswordMethods(
         ICollection<AuthenticationMethod> methods,
-        string username,
-        string password)
+        SshConnectionParams connectionParams)
     {
+        string username = connectionParams.Username;
+        string password = connectionParams.Password!;
         methods.Add(new PasswordAuthenticationMethod(username, password));
 
         var capturedPassword = password; // Captured in closure - avoid re-reading mutable param.
+        KeyboardInteractiveObservation observation = connectionParams.KeyboardInteractive;
+        observation.Reset();
         var kbdInteractive = new KeyboardInteractiveAuthenticationMethod(username);
         kbdInteractive.AuthenticationPrompt += (_, e) =>
-        {
-            foreach (var prompt in e.Prompts)
-            {
-                prompt.Response = capturedPassword;
-            }
-        };
+            AnswerKeyboardInteractivePrompts(e.Prompts, capturedPassword, observation);
         methods.Add(kbdInteractive);
+    }
+
+    /// <summary>
+    /// Answers a keyboard-interactive round. Only a prompt that asks for a password gets
+    /// the stored password; anything else (a verification code, a challenge) is left
+    /// empty and recorded, so the refusal that follows names the question instead of
+    /// blaming a password that may have been right. A round with a single prompt is
+    /// taken to be the password prompt whatever its wording, since servers phrase it
+    /// freely and the password is the only answer this client has.
+    /// </summary>
+    internal static void AnswerKeyboardInteractivePrompts(
+        IReadOnlyList<AuthenticationPrompt> prompts,
+        string password,
+        KeyboardInteractiveObservation observation)
+    {
+        ArgumentNullException.ThrowIfNull(prompts);
+        ArgumentNullException.ThrowIfNull(observation);
+
+        bool single = prompts.Count == 1;
+        foreach (AuthenticationPrompt prompt in prompts)
+        {
+            if (single || LooksLikePasswordPrompt(prompt.Request))
+            {
+                prompt.Response = password;
+            }
+            else
+            {
+                prompt.Response = string.Empty;
+                observation.RecordUnanswered(prompt.Request);
+            }
+        }
+    }
+
+    private static readonly string[] PasswordPromptMarkers =
+    [
+        "password",
+        "passphrase",
+        "mot de passe",
+        "passwort",
+        "contrase"
+    ];
+
+    private static bool LooksLikePasswordPrompt(string? request)
+    {
+        if (string.IsNullOrWhiteSpace(request))
+        {
+            return true;
+        }
+
+        foreach (string marker in PasswordPromptMarkers)
+        {
+            if (request.Contains(marker, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

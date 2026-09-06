@@ -238,6 +238,14 @@ public sealed class HostKeyStore
             StringComparer.Ordinal);
 
     /// <summary>
+    /// Enumerates the trusted entries without copying them. The dictionary's own
+    /// enumeration is safe under concurrent mutation; a lookup that scans the
+    /// hashed entries runs once per known_hosts line during a sync and must not
+    /// pay a full copy each time.
+    /// </summary>
+    internal IEnumerable<KeyValuePair<string, HostKeyEntry>> EnumerateEntries() => _trustedKeys;
+
+    /// <summary>
     /// Get all trusted metadata entries.
     /// </summary>
     public IReadOnlyDictionary<string, HostKeyEntry> GetAllEntries()

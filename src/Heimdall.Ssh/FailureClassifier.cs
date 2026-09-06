@@ -157,6 +157,21 @@ public static class FailureClassifier
         // "keyboard-interactive" contains the substring "key". The no-password case
         // already returned above, so reaching here means a password was configured and
         // it is that password, supplied through keyboard-interactive, that was refused.
+        // The exchange itself said what it could not answer: a second prompt after the
+        // password (a verification code, a challenge). The password may well have been
+        // right; blaming it would send the user to re-type a correct secret.
+        if (msg.Contains("keyboard-interactive", StringComparison.OrdinalIgnoreCase)
+            && connectionParams?.KeyboardInteractive.UnansweredPrompt is string unanswered)
+        {
+            return new SshFailureInfo(
+                SshFailureCode.KeyboardInteractiveUnsupportedPrompt,
+                unanswered.Length == 0
+                    ? "Server asked an interactive question this client cannot answer."
+                    : $"Server asked an interactive question this client cannot answer: {unanswered}",
+                true,
+                ex);
+        }
+
         if (msg.Contains("keyboard-interactive", StringComparison.OrdinalIgnoreCase))
             return new SshFailureInfo(SshFailureCode.PasswordRejected, "SSH password was rejected.", true, ex);
 

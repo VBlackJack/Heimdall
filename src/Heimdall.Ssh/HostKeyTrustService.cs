@@ -50,19 +50,30 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
             return true;
         }
 
-        string hashedHostCandidate = port == 22 ? host : $"[{host}]:{port}";
-        foreach (var (storedHostPort, storedEntry) in _store.GetAllEntries())
+        // A hashed known_hosts token can only ever match the very same token, which the
+        // direct lookup above already tried: its plain host is unknown, so hashing it under
+        // every stored salt compares two unrelated digests. A startup sync of a hashed
+        // known_hosts against a store of hashed entries used to run that comparison for
+        // every line, one HMAC per stored entry, for nothing.
+        if (KnownHostsHash.IsHashedToken(host))
         {
-            if (!HostKeyFormats.TryParseKey(storedHostPort, out var storedHost, out _)
-                || !storedHost.StartsWith("|1|", StringComparison.Ordinal))
+            entry = null!;
+            return false;
+        }
+
+        string hashedHostCandidate = port == 22 ? host : $"[{host}]:{port}";
+        foreach (KeyValuePair<string, HostKeyEntry> stored in _store.EnumerateEntries())
+        {
+            if (!HostKeyFormats.TryParseKey(stored.Key, out var storedHost, out _)
+                || !KnownHostsHash.IsHashedToken(storedHost))
             {
                 continue;
             }
 
             if (KnownHostsHash.TryMatches(storedHost, hashedHostCandidate))
             {
-                hostPort = storedHostPort;
-                entry = storedEntry;
+                hostPort = stored.Key;
+                entry = stored.Value;
                 return true;
             }
         }

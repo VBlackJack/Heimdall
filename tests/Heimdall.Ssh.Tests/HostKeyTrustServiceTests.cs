@@ -241,6 +241,28 @@ public class HostKeyTrustServiceTests
         Assert.Null(_service.GetEntry(Host, Port));
     }
 
+    /// <summary>
+    /// A hashed token as the looked-up host can only match itself: its plain host is
+    /// unknown, so it is never hashed under the stored salts. A sync of a hashed
+    /// known_hosts against a store of hashed entries used to run that hopeless
+    /// comparison for every line.
+    /// </summary>
+    [Fact]
+    public void GetEntry_WithAHashedTokenAsHost_MatchesOnlyTheIdenticalToken()
+    {
+        byte[] salt = [0x01, 0x02, 0x03, 0x04];
+        string storedToken = CreateHashedHost(Host, salt);
+        _store.TrustEntry(
+            storedToken,
+            Port,
+            new HostKeyEntry("SHA256:hashed", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "ssh-ed25519", HostKeySource.ImportedKnownHosts));
+        string sameHostOtherSalt = CreateHashedHost(Host, [0x09, 0x09, 0x09, 0x09]);
+
+        Assert.Equal("SHA256:hashed", _service.GetEntry(storedToken, Port)?.Fingerprint);
+        Assert.Null(_service.GetEntry(sameHostOtherSalt, Port));
+        Assert.Equal("SHA256:hashed", _service.GetEntry(Host, Port)?.Fingerprint);
+    }
+
     private static string CreateHashedHost(string host, byte[] salt)
     {
         using System.Security.Cryptography.HMACSHA1 hmac = new(salt);
