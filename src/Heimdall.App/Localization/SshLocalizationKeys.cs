@@ -33,6 +33,12 @@ internal static class SshLocalizationKeys
     public const string ErrorPlinkNotConfigured = "ErrorPlinkNotConfigured";
     public const string ErrorPlinkNotConfiguredWithReason = "ErrorPlinkNotConfiguredWithReason";
     public const string ErrorPlinkOpenSshAgentUnsupported = "ErrorPlinkOpenSshAgentUnsupported";
+
+    /// <summary>
+    /// The Plink fallback only opens a local forward; a profile that needs a
+    /// SOCKS proxy or a remote forward cannot be served by it.
+    /// </summary>
+    public const string ErrorPlinkForwardingModeUnsupported = "ErrorPlinkForwardingModeUnsupported";
     public const string ErrorPlinkPassphraseUnsupported = "ErrorPlinkPassphraseUnsupported";
     public const string ErrorSshTunnelPortOwnershipUnattested = "ErrorSshTunnelPortOwnershipUnattested";
     public const string ErrorSshUsernameRequiredForPassword = "ErrorSshUsernameRequiredForPassword";

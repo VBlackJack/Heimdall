@@ -2991,6 +2991,7 @@
   "ErrorPlinkNotConfiguredWithReason": "SSH.NET a \u00e9chou\u00e9 ({0}), mais Plink est introuvable. Configurez le chemin dans les param\u00e8tres.",
   "ErrorPlinkPassphraseUnsupported": "Le repli Plink ne peut pas d\u00e9verrouiller un fichier de cl\u00e9 prot\u00e9g\u00e9 par passphrase. Chargez la cl\u00e9 dans Pageant \u00e0 la place.",
   "ErrorPlinkOpenSshAgentUnsupported": "Le repli Plink ne peut pas utiliser Windows OpenSSH Agent. Chargez la cl\u00e9 dans Pageant ou configurez-la directement dans Heimdall.",
+  "ErrorPlinkForwardingModeUnsupported": "Le repli Plink ne peut pas fournir le proxy SOCKS ou la redirection de port distante dont ce profil a besoin. Corrigez l'authentification de la passerelle pour le client SSH int\u00e9gr\u00e9, ou retirez ces redirections du profil.",
   "ErrorPuttyNotConfigured": "PuTTY introuvable. Configurez le chemin dans les param\u00e8tres ou installez PuTTY \u00e0 c\u00f4t\u00e9 de Plink.",
   "ErrorInvalidSshUsername": "Nom d'utilisateur SSH invalide (rejet\u00e9 par la validation des entr\u00e9es).",
   "ErrorInvalidTargetHost": "H\u00f4te cible invalide (rejet\u00e9 par la validation des entr\u00e9es).",

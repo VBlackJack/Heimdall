@@ -2994,6 +2994,7 @@
   "ErrorPlinkNotConfiguredWithReason": "SSH.NET failed ({0}), but Plink is not found. Set the path in Settings.",
   "ErrorPlinkPassphraseUnsupported": "Plink fallback cannot unlock a passphrase-protected key file. Load the key in Pageant instead.",
   "ErrorPlinkOpenSshAgentUnsupported": "Plink fallback cannot use the Windows OpenSSH Agent. Load the key in Pageant or configure it directly in Heimdall.",
+  "ErrorPlinkForwardingModeUnsupported": "Plink fallback cannot provide the SOCKS proxy or remote port forward this profile needs. Fix the gateway sign-in for the built-in SSH client, or remove those forwards from the profile.",
   "ErrorPuttyNotConfigured": "PuTTY not found. Set the path in Settings or install PuTTY alongside Plink.",
   "ErrorInvalidSshUsername": "Invalid SSH username (rejected by input validation).",
   "ErrorInvalidTargetHost": "Invalid target host (rejected by input validation).",

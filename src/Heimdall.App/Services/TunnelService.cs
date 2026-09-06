@@ -398,7 +398,9 @@ public sealed class TunnelService : ITunnelService
                         ct,
                         resolvedRoute,
                         preferDistinctLoopback,
-                        refusalMessage)
+                        refusalMessage,
+                        socksProxyPort,
+                        remoteBindPort)
                     .ConfigureAwait(false);
 
                 if (fallback.Success)
@@ -610,6 +612,15 @@ public sealed class TunnelService : ITunnelService
     /// text is what reaches the connection state, so the sentence the server
     /// sent stays at the head of the message whatever the fallback runs into.
     /// </param>
+    /// <param name="socksProxyPort">
+    /// SOCKS proxy port the profile needs, or <c>0</c>. Plink is launched with
+    /// a local forward only, so a profile that needs one is refused here rather
+    /// than handed a tunnel that silently lacks it.
+    /// </param>
+    /// <param name="remoteBindPort">
+    /// Remote reverse-forward bind port the profile needs, or <c>0</c>. Refused
+    /// for the same reason as <paramref name="socksProxyPort"/>.
+    /// </param>
     internal async Task<TunnelResult> EstablishPlinkTunnelAsync(
         string serverId,
         SshConnectionParams gatewayParams,
@@ -621,7 +632,9 @@ public sealed class TunnelService : ITunnelService
         CancellationToken ct,
         string? gatewayRoute,
         bool preferDistinctLoopback = false,
-        string? precedingRefusal = null)
+        string? precedingRefusal = null,
+        int socksProxyPort = 0,
+        int remoteBindPort = 0)
     {
         TunnelResult Refuse(string message, SshFailureCode? code, string? messageKey = null)
         {
@@ -632,6 +645,22 @@ public sealed class TunnelService : ITunnelService
                 ?? string.Empty;
             _connectionSm.SetError(serverId, composed);
             return new TunnelResult(false, null, composed, code);
+        }
+
+        // Before anything is looked up or launched: the fallback builds a
+        // plink command line with a single -L, so it cannot serve a profile
+        // that needs a SOCKS proxy or a reverse forward. Returning a tunnel
+        // without them reported success for a proxy that did not exist, and
+        // registered it under a reuse identity (0, 0) that no later attempt
+        // for the same profile could match.
+        if (socksProxyPort > 0 || remoteBindPort > 0)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"Plink fallback refused for {serverId}: the profile needs socks={socksProxyPort} remoteBind={remoteBindPort}, which plink is not launched with.");
+            return Refuse(
+                _localizer[SshLocalizationKeys.ErrorPlinkForwardingModeUnsupported],
+                SshFailureCode.ForwardingFailed,
+                SshLocalizationKeys.ErrorPlinkForwardingModeUnsupported);
         }
 
         string? plinkPath = ConnectionHelpers.ResolvePlinkPath(settings.PlinkPath);
