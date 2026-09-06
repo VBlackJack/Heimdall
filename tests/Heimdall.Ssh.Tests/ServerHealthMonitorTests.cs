@@ -184,9 +184,9 @@ public sealed class ServerHealthMonitorTests
     [Fact]
     public async Task PollLoop_ClientDisposed_StopsWithoutPolling()
     {
-        using var client = new DisposedTestSshClient();
-        var runner = new BlockingHealthCommandRunner();
-        using var monitor = new ServerHealthMonitor(_ => runner);
+        using DisposedTestSshClient client = new DisposedTestSshClient();
+        BlockingHealthCommandRunner runner = new BlockingHealthCommandRunner();
+        using ServerHealthMonitor monitor = new ServerHealthMonitor(_ => runner);
 
         await monitor.StartAsync(client);
         Task pollLoop = GetPollTask(monitor);

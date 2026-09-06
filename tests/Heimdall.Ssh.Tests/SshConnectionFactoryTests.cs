@@ -417,7 +417,7 @@ public sealed class SshConnectionFactoryTests
         }
     }
 
-    // ── BuildAuthMethods — wrong passphrase ──────────────────────────
+    // ── BuildAuthMethods - wrong passphrase ──────────────────────────
 
     /// <summary>
     /// An explicit passphrase the key refuses is a fact about the key, not a

@@ -392,7 +392,7 @@ public class TunnelManagerTests : IDisposable
     public void GetActiveTunnels_ClientDisposedBetweenSnapshotAndRead_ReportsNotAlive()
     {
         TunnelInfo info = MakeInfo(10001);
-        var client = new RecordingSshClient
+        RecordingSshClient client = new RecordingSshClient
         {
             ConnectionProbe = static () => throw new ObjectDisposedException(nameof(SshClient))
         };
@@ -413,7 +413,7 @@ public class TunnelManagerTests : IDisposable
     public void GetTunnel_ClientDisposedBetweenSnapshotAndRead_ReportsNotAlive()
     {
         TunnelInfo info = MakeInfo(10001);
-        var client = new RecordingSshClient
+        RecordingSshClient client = new RecordingSshClient
         {
             ConnectionProbe = static () => throw new ObjectDisposedException(nameof(SshClient))
         };
