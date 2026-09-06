@@ -837,7 +837,10 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.NotEqual(localizer["SftpChmodSuccess"], viewModel.StatusText);
         Assert.True(viewModel.IsErrorStatus);
         Assert.Equal([localizer["SftpChmodNotSupported"]], statusUpdates);
-        Assert.Empty(operationLog.Records);
+        // The refusal is an operation the user asked for; it is recorded as such, not as a success.
+        SessionOperationRecord refusalRecord = Assert.Single(operationLog.Records);
+        Assert.Equal(SessionOperationKind.Chmod, refusalRecord.Op);
+        Assert.Equal(SessionOperationResult.Error, refusalRecord.Result);
     }
 
     [Fact]
@@ -1033,6 +1036,173 @@ public sealed class EmbeddedSftpViewModelTests
         string message = viewModel.DescribeTransferError(refusal);
 
         Assert.Equal(localizer.Format("SftpErrorUploadInventoryFailed", "/srv/incoming"), message);
+    }
+
+    /// <remarks>
+    /// The notice was shown by value at connect and stayed in that language for the session.
+    /// </remarks>
+    [Fact]
+    public async Task ShowSecurityNoticeKey_FollowsALocaleSwitch()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+        string english = localizer["WarnFtpCleartextBadge"];
+
+        viewModel.ShowSecurityNoticeKey("WarnFtpCleartextBadge");
+        Assert.Equal(english, viewModel.SecurityNoticeText);
+
+        await localizer.SwitchLocaleAsync("fr");
+
+        Assert.NotEqual(english, viewModel.SecurityNoticeText);
+        Assert.Equal(localizer["WarnFtpCleartextBadge"], viewModel.SecurityNoticeText);
+    }
+
+    /// <remarks>
+    /// The shared clipboard held the pane's browser for the life of the process. The entries
+    /// stay, so a same-endpoint paste elsewhere still works; the browser goes.
+    /// </remarks>
+    [Fact]
+    public void MarkDisposed_DropsTheBrowserFromTheSharedClipboardAndKeepsTheEntries()
+    {
+        FakeUiDispatcher dispatcher = new();
+        RemoteClipboardService clipboard = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher, clipboard) { CurrentPath = "/src", IsConnected = true };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        SftpFileInfo entry = CreateRemoteEntry("a.txt", "/src/a.txt", isDirectory: false);
+        viewModel.SetSelection([entry], entry);
+        viewModel.CopySelectedCommand.Execute(null);
+        Assert.Same(browser, clipboard.Current!.SourceBrowser);
+
+        viewModel.MarkDisposed();
+
+        Assert.NotNull(clipboard.Current);
+        Assert.Null(clipboard.Current!.SourceBrowser);
+        Assert.Single(clipboard.Current.Entries);
+    }
+
+    /// <remarks>
+    /// Two loads started in the gap between reading IsLoading and setting it both listed and both
+    /// applied. The gate is atomic now: the second load returns without listing.
+    /// </remarks>
+    [Fact]
+    public async Task LoadDirectoryAsync_Concurrent_OnlyOneListingRuns()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { IsConnected = true };
+        TaskCompletionSource<IReadOnlyList<SftpFileInfo>> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser browser = new() { ListDirectoryHandler = (_, _) => release.Task };
+        SetBrowser(viewModel, browser);
+
+        Task first = viewModel.LoadDirectoryAsync("/a");
+        Task second = viewModel.LoadDirectoryAsync("/b");
+        release.SetResult([]);
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, browser.ListDirectoryCallCount);
+    }
+
+    /// <remarks>
+    /// The history entry was popped BEFORE the load, which can return without listing; the place
+    /// the user wanted back was then gone.
+    /// </remarks>
+    [Fact]
+    public async Task NavigateBack_LoadCannotRun_KeepsTheHistoryEntry()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/", IsConnected = true };
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        await viewModel.LoadDirectoryAsync("/a");
+        Assert.True(viewModel.CanGoBack);
+
+        // Hold the gate with a load that never completes, then ask to go back.
+        TaskCompletionSource<IReadOnlyList<SftpFileInfo>> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        browser.ListDirectoryHandler = (_, _) => release.Task;
+        Task blocked = viewModel.LoadDirectoryAsync("/b");
+
+        await viewModel.NavigateBack();
+
+        Assert.True(viewModel.CanGoBack, "the entry survives a load that could not run");
+        Assert.Equal("/a", viewModel.CurrentPath);
+        release.SetResult([]);
+        await blocked.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    /// <remarks>A link to a directory read as "not a directory", so a double-click did nothing.</remarks>
+    [Fact]
+    public async Task HandleFileDoubleClick_LinkToADirectory_Navigates()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv", IsConnected = true };
+        FakeRemoteBrowser browser = new()
+        {
+            ListDirectoryHandler = (path, _) => path == "/srv/link"
+                ? Task.FromResult<IReadOnlyList<SftpFileInfo>>([CreateRemoteEntry("inside.txt", "/srv/link/inside.txt", isDirectory: false)])
+                : Task.FromException<IReadOnlyList<SftpFileInfo>>(new IOException("not a directory")),
+        };
+        SetBrowser(viewModel, browser);
+        SftpFileInfo link = new("link", "/srv/link", RemoteEntryKind.SymbolicLink, 0, DateTime.UnixEpoch, "rwxrwxrwx", "1000", "1000");
+
+        Assert.True(viewModel.HandleFileDoubleClick(link));
+        await viewModel.PendingNavigation.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("/srv/link", viewModel.CurrentPath);
+    }
+
+    [Fact]
+    public async Task HandleFileDoubleClick_LinkToAFile_SaysSoAndStays()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv", IsConnected = true };
+        SetLocalizer(viewModel, localizer);
+        FakeRemoteBrowser browser = new()
+        {
+            ListDirectoryHandler = (_, _) => Task.FromException<IReadOnlyList<SftpFileInfo>>(new IOException("not a directory")),
+        };
+        SetBrowser(viewModel, browser);
+        SftpFileInfo link = new("link", "/srv/link", RemoteEntryKind.SymbolicLink, 0, DateTime.UnixEpoch, "rwxrwxrwx", "1000", "1000");
+
+        Assert.True(viewModel.HandleFileDoubleClick(link));
+        await viewModel.PendingNavigation.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("/srv", viewModel.CurrentPath);
+        Assert.Equal(localizer.Format("SftpStatusLinkNotADirectory", "link"), viewModel.StatusText);
+    }
+
+    /// <remarks>
+    /// The privileged script's tooling refusal used to surface as "sudo atomic write failed
+    /// (exit 75)": a raw exit status where a sentence about the missing tool belongs.
+    /// </remarks>
+    [Fact]
+    public void EnsureSudoSucceeded_ToolingRefusal_HasItsOwnType()
+    {
+        SudoToolingUnavailableException refusal = Assert.Throws<SudoToolingUnavailableException>(
+            () => EmbeddedSftpViewModel.EnsureSudoSucceeded(
+                PrivilegedFileCommands.ToolingUnavailableExitStatus,
+                "Refusing: stat is not available on the server.",
+                "atomic write"));
+
+        Assert.Contains("stat", refusal.RemoteDiagnostic, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(
+            () => EmbeddedSftpViewModel.EnsureSudoSucceeded(1, "boom", "atomic write"));
+    }
+
+    [Fact]
+    public async Task DescribeTransferError_ToolingRefusal_NamesTheMissingTooling()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+
+        string message = viewModel.DescribeTransferError(new SudoToolingUnavailableException("Refusing: cp"));
+
+        Assert.Equal(localizer["SftpErrorSudoToolingUnavailable"], message);
+        Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
     }
 
     [Fact]

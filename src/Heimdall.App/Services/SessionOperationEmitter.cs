@@ -96,6 +96,14 @@ public sealed class SessionOperationEmitter
             ms => SessionOperationRecord.Delete.Cancelled(_protocol, _host, path, ms, privileged),
             (ms, category) => SessionOperationRecord.Delete.Error(_protocol, _host, path, ms, category, privileged));
 
+    /// <summary>Runs a privileged chmod, recording one record on completion.</summary>
+    public Task RunChmodAsync(string path, Func<Task> operation, bool privileged = false)
+        => RunCoreAsync(
+            operation,
+            ms => SessionOperationRecord.Chmod.Success(_protocol, _host, path, ms, privileged),
+            ms => SessionOperationRecord.Chmod.Cancelled(_protocol, _host, path, ms, privileged),
+            (ms, category) => SessionOperationRecord.Chmod.Error(_protocol, _host, path, ms, category, privileged));
+
     /// <summary>Runs a privileged rename, recording one record on completion.</summary>
     public Task RunRenameAsync(string oldPath, string newPath, Func<Task> operation, bool privileged = false)
         => RunCoreAsync(

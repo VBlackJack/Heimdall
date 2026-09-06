@@ -133,6 +133,24 @@ public sealed class LoggingRemoteBrowserTests : IDisposable
         record.LocalPath.Should().BeNull();
     }
 
+    /// <remarks>A chmod left no record at all while every other mutation of the server did.</remarks>
+    [Fact]
+    public async Task ChmodAsync_Success_LogsChmodWithoutBytes()
+    {
+        CapturingOperationLog sink = new();
+        FakeRemoteBrowser inner = new();
+        LoggingRemoteBrowser decorator = Create(inner, sink);
+
+        await decorator.ChmodAsync("/srv/data/script.sh", 0x1ED);
+
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(SessionOperationKind.Chmod);
+        record.Result.Should().Be(SessionOperationResult.Success);
+        record.RemotePath.Should().Be("/srv/data/script.sh");
+        record.Bytes.Should().BeNull();
+        record.LocalPath.Should().BeNull();
+    }
+
     [Fact]
     public async Task RenameAsync_Success_LogsRenameWithRemotePathTo()
     {

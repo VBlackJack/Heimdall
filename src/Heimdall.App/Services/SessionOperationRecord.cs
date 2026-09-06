@@ -38,7 +38,10 @@ public enum SessionOperationKind
     Mkdir,
 
     /// <summary>A same-server remote copy (source to destination).</summary>
-    Copy
+    Copy,
+
+    /// <summary>A remote permission change.</summary>
+    Chmod
 }
 
 /// <summary>
@@ -242,6 +245,34 @@ public sealed record SessionOperationRecord
             string protocol, string host, string remotePath, long durationMs, bool privileged = false)
             => CreatePathOnly(
                 SessionOperationKind.Mkdir, protocol, host, remotePath,
+                durationMs, SessionOperationResult.Cancelled, errorCategory: null, privileged);
+    }
+
+    /// <summary>Factories for chmod operations (remote path only).</summary>
+    /// <remarks>
+    /// A chmod left no record at all, privileged or not, while every other mutation of the
+    /// server did; an operations log that says what was deleted but not what was made
+    /// world-writable is not the log its reader expects.
+    /// </remarks>
+    public static class Chmod
+    {
+        public static SessionOperationRecord Success(
+            string protocol, string host, string remotePath, long durationMs, bool privileged = false)
+            => CreatePathOnly(
+                SessionOperationKind.Chmod, protocol, host, remotePath,
+                durationMs, SessionOperationResult.Success, errorCategory: null, privileged);
+
+        public static SessionOperationRecord Error(
+            string protocol, string host, string remotePath, long durationMs, string errorCategory,
+            bool privileged = false)
+            => CreatePathOnly(
+                SessionOperationKind.Chmod, protocol, host, remotePath,
+                durationMs, SessionOperationResult.Error, RequireCategory(errorCategory), privileged);
+
+        public static SessionOperationRecord Cancelled(
+            string protocol, string host, string remotePath, long durationMs, bool privileged = false)
+            => CreatePathOnly(
+                SessionOperationKind.Chmod, protocol, host, remotePath,
                 durationMs, SessionOperationResult.Cancelled, errorCategory: null, privileged);
     }
 

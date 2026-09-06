@@ -418,9 +418,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         }
         else if (_browser is FtpBrowser ftpBrowser)
         {
-            string securityNotice = localizer[
-                GetFtpSecurityNoticeLocalizationKey(ftpBrowser.IsTlsEnabled)];
-            _viewModel.ShowSecurityNotice(securityNotice);
+            _viewModel.ShowSecurityNoticeKey(
+                GetFtpSecurityNoticeLocalizationKey(ftpBrowser.IsTlsEnabled));
         }
 
         UpdateStatus(_localizer["SftpStatusConnected"]);

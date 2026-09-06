@@ -198,7 +198,11 @@ public sealed class LoggingRemoteBrowser
 
     /// <inheritdoc />
     public Task ChmodAsync(string path, short mode, CancellationToken ct = default)
-        => _inner.ChmodAsync(path, mode, ct);
+        => RunLoggedAsync(
+            () => _inner.ChmodAsync(path, mode, ct),
+            ms => SessionOperationRecord.Chmod.Success(_protocol, _host, path, ms),
+            ms => SessionOperationRecord.Chmod.Cancelled(_protocol, _host, path, ms),
+            (ms, category) => SessionOperationRecord.Chmod.Error(_protocol, _host, path, ms, category));
 
     /// <inheritdoc />
     public Task RenameAsync(string oldPath, string newPath, CancellationToken ct = default)

@@ -95,6 +95,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private CancellationTokenSource? _lifecycleCts = new();
     private CancellationTokenSource? _transferCts;
 
+    /// <summary>The locale key of the security notice, re-rendered when the locale changes.</summary>
+    private string? _securityNoticeKey;
+    private bool _localeChangeObserved;
+
+    /// <summary>Serialises directory loads: an atomic gate, where two reads of IsLoading raced.</summary>
+    private int _loadGate;
+
+    /// <summary>The navigation a double-click started, observable by tests.</summary>
+    internal Task PendingNavigation { get; private set; } = Task.CompletedTask;
+
     /// <summary>Files uploaded so far and planned, for the message of a batch that fails part way.</summary>
     private (int Uploaded, int Total) _uploadBatchProgress;
     private string _endpointKey = string.Empty;
@@ -382,6 +392,20 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         IsConnected = false;
         _remoteClipboard.Changed -= OnRemoteClipboardChanged;
+        if (_localizer is not null && _localeChangeObserved)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+            _localeChangeObserved = false;
+        }
+
+        // The shared clipboard is a process-wide singleton and held this pane's browser for the
+        // life of the process. The entries stay, so a same-endpoint paste in another pane still
+        // works; the browser goes, so a cross-endpoint paste reports the source session gone
+        // instead of calling into a disposed client.
+        if (_remoteClipboard.Current is { } content && ReferenceEquals(content.SourceBrowser, _browser))
+        {
+            _remoteClipboard.Set(content with { SourceBrowser = null });
+        }
     }
 
     private bool TryCaptureLifecycleToken(out CancellationToken token)
@@ -539,11 +563,30 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// Navigates to the previous directory in history.
     /// </summary>
     [RelayCommand]
-    public Task NavigateBack()
+    public async Task NavigateBack()
     {
-        return _navigationHistory.TryPop(out var previousPath)
-            ? LoadDirectoryCoreAsync(previousPath, pushToHistory: false)
-            : Task.CompletedTask;
+        // Peek, load, then pop: the entry was popped BEFORE the load, which can return without
+        // listing (busy, disconnected, refused), and the place the user wanted back was gone.
+        if (!_navigationHistory.TryPeek(out string? previousPath))
+        {
+            return;
+        }
+
+        bool listed = await LoadDirectoryCoreAsync(previousPath, pushToHistory: false).ConfigureAwait(false);
+        if (!listed)
+        {
+            return;
+        }
+
+        await RunOnUiAsync(() =>
+        {
+            if (_navigationHistory.TryPeek(out string? top) && string.Equals(top, previousPath, StringComparison.Ordinal))
+            {
+                _navigationHistory.Pop();
+            }
+
+            CanGoBack = _navigationHistory.Count > 0;
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -638,13 +681,33 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// </summary>
     public bool HandleFileDoubleClick(SftpFileInfo file)
     {
+        if (file.Kind == RemoteEntryKind.SymbolicLink)
+        {
+            // The listing does not say what a link points at. Listing it tells: a link to a
+            // directory navigates, a link to anything else says so. It used to do nothing at all.
+            PendingNavigation = NavigateIntoLinkAsync(file);
+            return true;
+        }
+
         if (!file.IsDirectory)
         {
             return false;
         }
 
-        _ = LoadDirectoryAsync(file.FullPath);
+        PendingNavigation = LoadDirectoryAsync(file.FullPath);
         return true;
+    }
+
+    private async Task NavigateIntoLinkAsync(SftpFileInfo link)
+    {
+        bool listed = await LoadDirectoryCoreAsync(link.FullPath, pushToHistory: true, suppressErrorStatus: true)
+            .ConfigureAwait(false);
+        if (!listed)
+        {
+            await RunOnUiAsync(() => UpdateStatus(
+                _localizer?.Format("SftpStatusLinkNotADirectory", link.Name)
+                    ?? $"{link.Name} does not point at a directory.")).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -768,7 +831,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (SessionTab is not null)
         {
-            SessionTab.Status = IsConnected ? "Connected" : "Disconnected";
+            SessionTab.Status = IsConnected ? SessionStatusTokens.Connected : SessionStatusTokens.Disconnected;
         }
     }
 
@@ -783,6 +846,33 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// <summary>
     /// Shows a persistent security notice for the active browser session.
     /// </summary>
+    /// <summary>
+    /// Shows a security notice by its locale key and keeps it in the current language: shown by
+    /// value, the notice stayed in the language of the connect for the whole session.
+    /// </summary>
+    public void ShowSecurityNoticeKey(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        _securityNoticeKey = key;
+        if (_localizer is not null && !_localeChangeObserved)
+        {
+            _localizer.LocaleChanged += OnLocaleChanged;
+            _localeChangeObserved = true;
+        }
+
+        ShowSecurityNotice(_localizer?[key] ?? key);
+    }
+
+    private void OnLocaleChanged(string locale)
+    {
+        _ = locale;
+        if (_securityNoticeKey is { } key && _localizer is not null)
+        {
+            _ = RunOnUiAsync(() => ShowSecurityNotice(_localizer[key]));
+        }
+    }
+
     public void ShowSecurityNotice(string message)
     {
         SecurityNoticeText = message;
@@ -800,7 +890,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (SessionTab is not null)
         {
-            SessionTab.Status = IsConnected ? "Connected" : "Disconnected";
+            SessionTab.Status = IsConnected ? SessionStatusTokens.Connected : SessionStatusTokens.Disconnected;
         }
 
         return message;
@@ -816,6 +906,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         if (ex is SudoAuthenticationException sudoException)
         {
             return GetSudoAuthenticationErrorMessage(sudoException.Kind);
+        }
+
+        if (ex is SudoToolingUnavailableException)
+        {
+            return L10n("SftpErrorSudoToolingUnavailable");
         }
 
         if (ex is SudoEditFileTooLargeException tooLargeException)
@@ -2337,7 +2432,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         EnsureSudoSucceeded(cmd.ExitStatus ?? -1, cmd.Error, operationLabel);
     }
 
-    private static void EnsureSudoSucceeded(
+    internal static void EnsureSudoSucceeded(
         int exitStatus,
         string? stderr,
         string operationLabel)
@@ -2354,6 +2449,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         if (failureKind is SudoFailureKind.PasswordUnavailable or SudoFailureKind.PasswordRejected)
         {
             throw new SudoAuthenticationException(failureKind, error);
+        }
+
+        // The script refused before staging anything because a tool it needs is missing, or the
+        // coreutils are not GNU. Its own message, not "transfer failed".
+        if (exitStatus == PrivilegedFileCommands.ToolingUnavailableExitStatus)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused by the tooling probe: {error}");
+            throw new SudoToolingUnavailableException(error);
         }
 
         throw new InvalidOperationException(
@@ -2977,8 +3080,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
         {
             Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
-            await RunSudoCommandAsync(
-                $"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}").ConfigureAwait(false);
+            await _sudoEmitter.RunChmodAsync(
+                entry.FullPath,
+                () => RunSudoCommandAsync($"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}"),
+                privileged: true).ConfigureAwait(false);
         }
     }
 
@@ -3167,7 +3272,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     public static string ResolveDropTargetDirectory(SftpFileInfo? hoveredEntry, string currentDirectory)
         => hoveredEntry is { IsDirectory: true } ? hoveredEntry.FullPath : currentDirectory;
 
-    private async Task LoadDirectoryCoreAsync(
+    /// <returns>True when the directory was listed and applied; false when nothing changed.</returns>
+    private async Task<bool> LoadDirectoryCoreAsync(
         string path,
         bool pushToHistory,
         bool suppressErrorStatus = false,
@@ -3175,12 +3281,19 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         if (!TryCaptureLifecycleToken(out CancellationToken ct)
             || _browser is null
-            || !_browser.IsConnected
-            || IsLoading)
+            || !_browser.IsConnected)
         {
-            return;
+            return false;
         }
 
+        // One atomic gate. IsLoading was read here and set through a second dispatch, and two
+        // loads started in that gap both listed and both applied.
+        if (Interlocked.CompareExchange(ref _loadGate, 1, 0) != 0)
+        {
+            return false;
+        }
+
+        bool listed = false;
         await RunOnUiAsync(() => IsLoading = true);
 
         try
@@ -3221,6 +3334,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 CanGoBack = _navigationHistory.Count > 0;
                 UpdateStatus(_localizer?["SftpStatusReady"] ?? "Ready");
             });
+            listed = true;
         }
         catch (OperationCanceledException)
         {
@@ -3244,8 +3358,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
         finally
         {
+            Interlocked.Exchange(ref _loadGate, 0);
             await RunOnUiAsync(() => IsLoading = false);
         }
+
+        return listed;
     }
 
     private async Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoAsync(

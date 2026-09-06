@@ -59,6 +59,21 @@ public sealed class SessionOperationEmitterTests
     }
 
     [Fact]
+    public async Task RunChmodAsync_Success_EmitsPrivilegedChmodRecord()
+    {
+        CapturingOperationLog sink = new();
+        SessionOperationEmitter emitter = Create(sink);
+
+        await emitter.RunChmodAsync("/srv/data/script.sh", () => Task.CompletedTask, privileged: true);
+
+        SessionOperationRecord record = sink.Records.Should().ContainSingle().Subject;
+        record.Op.Should().Be(SessionOperationKind.Chmod);
+        record.Result.Should().Be(SessionOperationResult.Success);
+        record.Privileged.Should().BeTrue();
+        record.RemotePath.Should().Be("/srv/data/script.sh");
+    }
+
+    [Fact]
     public async Task RunRenameAsync_Success_EmitsRemotePathTo()
     {
         CapturingOperationLog sink = new();
