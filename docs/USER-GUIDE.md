@@ -131,7 +131,14 @@ remote machine on the other.
 - **Drag and drop** between the panels to copy, in either direction, including whole folders.
 - **Double-click a remote text file** to edit it. Heimdall downloads it, opens it, and uploads it
   again each time you save. Close the editor when you are done.
-- **F2** renames, **F5** refreshes the listing.
+- **F2** renames, **F5** refreshes the listing. Neither fires while you are typing in the filter
+  box.
+- **Right-click** a row to act on it: the row under the pointer is selected before the menu opens.
+- **Edit in external editor** uses the editor chosen in Settings, for remote files too. Heimdall
+  keeps a local copy while that editor is open and uploads each save; closing the pane while a
+  file is still open there asks you first.
+- In the built-in editor, **Ctrl+S** saves and **Ctrl+W** closes. A file that is not UTF-8 opens
+  as Latin-1 and says so in the editor's status bar.
 
 > Deleting in the local file browser is **permanent**. It does not use the Recycle Bin, and a
 > folder goes with everything inside it. The confirmation says so; read it before clicking yes.

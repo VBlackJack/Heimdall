@@ -694,7 +694,7 @@ The parser used `Split(null, 9)` and checked `parts.Length < 9`, which skipped A
 
 **Root cause**: Heimdall intentionally no longer treats generic `Failure` strings as permission denied. That heuristic could trigger privileged sudo operations on non-permission failures such as channel errors, network drops, or server-side policy failures.
 
-**Solution**: `EmbeddedSftpViewModel.IsPermissionDenied()` accepts typed permission-denied signals only: `SftpPermissionDeniedException` and local `UnauthorizedAccessException`. If a server returns an ambiguous generic failure for a real permission issue, retry manually with "Browse as root" or inspect the server logs; do not reintroduce substring matching.
+**Solution**: `EmbeddedSftpViewModel.IsPermissionDenied()` accepts typed REMOTE permission-denied signals only: `SftpPermissionDeniedException`, and the recursive delete's own permission refusal. A local `UnauthorizedAccessException` is no longer one of them: it is the local file system refusing (a read-only folder, an ACL), and escalating on it ran a privileged remote transfer that failed on the same local path with a message blaming the server. If a server returns an ambiguous generic failure for a real permission issue, retry manually with "Browse as root" or inspect the server logs; do not reintroduce substring matching.
 
 **Key lesson**: False negatives are safer than privileged false positives. Sudo escalation must be based on typed errors, not message text.
 

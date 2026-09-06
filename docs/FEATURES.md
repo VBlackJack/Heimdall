@@ -78,7 +78,8 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Embedded file browser panel with directory tree and file list
 - **Auto-open companion**: opens automatically alongside an SSH session as a vertical split (gated by a setting). Reconnecting the SFTP pane is pane-scoped, so the sibling SSH terminal and its scrollback are preserved; an SSH keepalive keeps idle SFTP sessions alive
 - **Follow the SSH directory** (opt-in): the companion can track the SSH terminal's current working directory via the OSC 7 escape sequence, with a per-pane toggle (best-effort; inert on shells that do not emit OSC 7)
-- Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save (transient upload failures are retried)
+- Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save (transient upload failures are retried). The external editor set in Settings is used for remote files too, and a shell interpreter is refused as an editor. Closing a pane while a file is open in an external editor asks first, and the staged copy is kept as long as that editor runs
+- The inline editor opens a file that is not valid UTF-8 as Latin-1 and says so; Ctrl+S saves, Ctrl+W closes; the local editor pane asks before closing on unsaved text
 - **"Browse as root" sudo mode**: toggle in toolbar enables `sudo ls -la` directory listing via SSH exec channel - browse any directory regardless of SFTP user permissions
 - **Full sudo fallback** on all operations: upload (`sudo tee`), download (`sudo cat`), edit, chmod, rename, delete, mkdir - triggered only on typed permission-denied exceptions
 - Sudo edit sessions cache the pinned host-key verifier, detect mid-edit host-key rotation, track upload tasks, and clean temporary files even when the privileged write fails
@@ -87,14 +88,17 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - **Recursive folder upload** and drop-into-folder targeting
 - **Cross-pane paste** between two file browsers, same server or across servers
 - **Paste from Explorer**: upload files/folders from the Windows clipboard (CF_HDROP) into the current directory
-- SFTP/FTP file operations journaled (download / upload / mkdir / delete / rename / copy)
-- Chmod dialog, path bookmarks, filename filter
+- SFTP/FTP file operations journaled (download / upload / mkdir / delete / rename / copy / chmod)
+- Chmod dialog with the setuid, setgid and sticky bits (four octal digits), path bookmarks, filename filter
+- Upload conflicts are inventoried before the first byte: a destination that cannot be listed refuses the batch, and names compare case-insensitively unless the server lists two names that differ only by case
+- A right-click selects the row under the pointer before its menu opens; the browser shortcuts stay quiet while a text box has focus or the inline editor is open
 
 ### FTP Browser
 - FTP/FTPS client backed by FluentFTP async APIs
 - Reuses the full SFTP browser UI via `IRemoteBrowser` interface
 - Configurable passive mode and SSL/TLS (FTPS) support
-- Cleartext FTP connections with credentials surface a non-blocking warning in the session status area
+- Cleartext FTP connections, anonymous ones included, surface a non-blocking warning in the session status area; FTPS negotiates TLS 1.2 or 1.3 only
+- The FTPS certificate is prompted for on first use and pinned; a changed certificate is refused without a prompt until the stored one is removed, and a pin the system validated is refused when its revocation status can no longer be checked
 - Host and port validation matches SSH/SFTP handlers
 - Directory listing parsing is delegated to FluentFTP across server variants
 

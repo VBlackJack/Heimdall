@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-09-06: the updater and the application exit audited, then the SFTP, FTP and FTPS layer (v2026.090604)
 
 ### The update relauncher brings the application back even when its script never starts
 
@@ -339,6 +339,32 @@ folder's. The rows of both file lists carry the entry name as their accessible n
 button reads "Disconnect" rather than the same "Close" as the tab button, and the security notice
 badge keeps its bound accessible name. The escape offered for a stalled save is offered again for
 the next stalled save, and the editor's close handler follows the view into a floating window.
+
+### The file browsers, view-model and local side
+
+Navigating back popped the history entry BEFORE the load, which can return without listing
+(busy, disconnected, refused), so the place the user wanted back was gone; the entry is popped
+only after the listing applied. Two loads started in the gap between reading the loading flag
+and setting it both listed and both applied; one atomic gate serialises them. A double-click on
+a link to a directory did nothing, since a link is not a directory; it lists the link and
+navigates when that succeeds, and says so when it does not. The shared clipboard held a closed
+pane's browser for the life of the process; the entries stay, the browser goes. The FTP cleartext
+notice stayed in the language of the connect for the whole session; it follows a locale switch.
+A chmod left no entry in the operations log, privileged or not; it is journaled like every other
+mutation of the server. The local paste walked and probed the whole source tree on the UI thread,
+freezing the window on a big tree or a slow share; the walk runs off the UI thread, a root that is
+a junction or a link is refused by name rather than copied through, and a file link inside the
+tree is skipped rather than copied by value.
+
+### Privileged transfers name the missing tool, and the ownership probe is portable
+
+The privileged read and write scripts are written for GNU coreutils and used to fail on the
+first GNU-only flag with a message about the flag. They probe the tooling first and refuse with
+their own status and a sentence naming the tool. The metadata preflight's ownership probe tries
+BSD stat after GNU stat, so a macOS or FreeBSD server is no longer refused for good on that
+step alone; the extended-attribute and ACL tools stay required, since without them the
+destination cannot be characterised. The directory reservation of the no-clobber publish uses
+the same shell escaper as the file publish and the copy.
 
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 

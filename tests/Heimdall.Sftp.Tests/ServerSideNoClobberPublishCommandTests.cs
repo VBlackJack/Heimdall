@@ -83,6 +83,17 @@ public sealed class ServerSideNoClobberPublishCommandTests
         Assert.Equal("mkdir -- '/srv/data/proj'", command);
     }
 
+    /// <remarks>
+    /// The reservation used a second escaper with a different contract from the one the file
+    /// publish and the copy use. One escaper: a control character is refused here as it is there.
+    /// </remarks>
+    [Fact]
+    public void BuildDirectoryReservation_RefusesAControlCharacter()
+    {
+        Assert.ThrowsAny<ArgumentException>(
+            () => ServerSideNoClobberPublishCommand.BuildDirectoryReservation("/srv/data/pro\nj"));
+    }
+
     // Both paths are shell-escaped and guarded by --, so a path that begins with a dash or embeds a
     // quote cannot become a flag or break out of its argument. Asserted as exact equality: checking
     // only that the escaped destination appears would pass while the staging path went through raw,

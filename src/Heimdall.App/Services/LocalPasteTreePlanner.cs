@@ -111,9 +111,10 @@ public static class LocalPasteTreePlanner
         bool isRoot,
         List<LocalPasteOp> operations)
     {
-        // Root reparse points intentionally remain traversable to preserve current behavior.
-        // SFTP-015 owns root-level containment and must resolve this known asymmetry.
-        if (!isRoot && entry.IsDirectory && entry.IsReparsePoint)
+        // A child reparse point is skipped whatever it is: a junction would be traversed and
+        // copied by value, and a file link was copied by value too. The root is classified by the
+        // caller before planning, which refuses a link there rather than copying through it.
+        if (!isRoot && entry.IsReparsePoint)
         {
             return;
         }

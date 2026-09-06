@@ -43,8 +43,29 @@ public static class PrivilegedFileCommands
     /// </remarks>
     public const int MetadataPreservationFailedExitStatus = 76;
 
+    /// <summary>
+    /// Exit status of a privileged script that found one of the tools it needs missing, or a cp
+    /// that is not GNU coreutils. Distinct from 73 (non-regular target), 74 (non-regular source)
+    /// 75 (file too large) and 76 (metadata not preserved): the caller names the missing tool rather than reporting
+    /// a failed transfer. Kept in step with the literal the probe exits with; a test pins the two.
+    /// </summary>
+    public const int ToolingUnavailableExitStatus = 77;
+
+    /// <summary>
+    /// The scripts below are written for GNU coreutils (<c>stat -c</c>, <c>cp --attributes-only</c>,
+    /// <c>sync -f</c>, <c>mv -T</c>). On a BSD or busybox server they used to fail on the first
+    /// such flag with a message about that flag; the probe names the missing tool instead, and
+    /// refuses before anything is staged.
+    /// </summary>
+    private const string ToolingProbe =
+        "for t in stat cp sync mv ln mktemp chmod chown rm rmdir base64 cat; do "
+        + "command -v \"$t\" >/dev/null 2>&1 || { printf '%s\\n' \"Refusing: $t is not available on the server.\" >&2; exit 77; }; done; "
+        + "case \"$(stat --version 2>/dev/null)\" in *GNU*) ;; *) "
+        + "printf '%s\\n' 'Refusing: GNU coreutils are required for a privileged transfer.' >&2; exit 77;; esac; ";
+
     private const string AtomicWriteScript =
         "set -eu; umask 077; target=$1; "
+        + ToolingProbe
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
         + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
         + "work=$(mktemp -d -- \"$dir/.heimdall-write.XXXXXXXXXX\"); "
@@ -91,6 +112,7 @@ public static class PrivilegedFileCommands
 
     private const string NoFollowReadPrefix =
         "set -eu; umask 077; target=$1; "
+        + ToolingProbe
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
         + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
         + "work=$(mktemp -d -- \"$dir/.heimdall-read.XXXXXXXXXX\"); "

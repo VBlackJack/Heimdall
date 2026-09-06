@@ -158,7 +158,12 @@ public static class SftpMetadataPreflight
                 // here: the owner can restore mtime and atime, so they are an implementation gap
                 // rather than something this session is unable to reproduce.
                 + "if command -v stat >/dev/null 2>&1 && command -v id >/dev/null 2>&1; then "
-                + $"owner_uid=$(stat -c %u -- {path} 2>/dev/null) "
+                // GNU stat first, BSD stat (macOS, FreeBSD) second: the probe used to exit as
+                // "tooling unavailable" on every non-GNU server, and a replacement there was refused
+                // for good. The extended-attribute and ACL tools stay required: without them the
+                // destination cannot be characterised, and an uncharacterised destination is not
+                // replaced.
+                + $"owner_uid=$(stat -c %u -- {path} 2>/dev/null || stat -f %u -- {path} 2>/dev/null) "
                 + $"|| {{ IFS=$oldifs; set +f; exit {UnreadableStatus}; }}; "
                 + $"self_uid=$(id -u 2>/dev/null) || {{ IFS=$oldifs; set +f; exit {UnreadableStatus}; }}; "
                 + "if [ -z \"$owner_uid\" ] || [ -z \"$self_uid\" ]; then "
