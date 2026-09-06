@@ -112,38 +112,57 @@ internal static class PlinkHostKeyProbe
             Core.Logging.FileLogger.Info(
                 $"Host key probe stderr ({stderr.Length} chars): {stderr.Trim().Replace('\n', ' ')}");
 
-            if (string.IsNullOrWhiteSpace(stderr))
-            {
-                return null;
-            }
-
-            var fullMatch = Regex.Match(
-                stderr,
-                @"(ssh-\S+)\s+\d+\s+(SHA256:\S+)",
-                RegexOptions.Multiline);
-
-            if (fullMatch.Success)
-            {
-                var algorithm = fullMatch.Groups[1].Value;
-                var fingerprint = fullMatch.Groups[2].Value;
-                Core.Logging.FileLogger.Info(
-                    $"Extracted host key presentation: algorithm={algorithm} fingerprint={fingerprint}");
-                return new PlinkHostKeyPresentation(algorithm, fingerprint);
-            }
-
-            var sha256Match = Regex.Match(stderr, @"SHA256:(\S+)");
-
-            if (sha256Match.Success)
-            {
-                var fingerprint = $"SHA256:{sha256Match.Groups[1].Value}";
-                Core.Logging.FileLogger.Info(
-                    $"Extracted host key fingerprint (fallback): {fingerprint}");
-                return new PlinkHostKeyPresentation("ssh-unknown", fingerprint);
-            }
+            return TryParsePresentation(stderr);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"[PlinkHostKeyProbe] probe failed: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Algorithm reported when plink printed a fingerprint but no recognisable key type.
+    /// </summary>
+    internal const string UnknownAlgorithm = "ssh-unknown";
+
+    /// <summary>
+    /// Extracts the presented host key algorithm and SHA256 fingerprint from the
+    /// verbose stderr of a plink probe. Returns null when no fingerprint is present.
+    /// </summary>
+    internal static PlinkHostKeyPresentation? TryParsePresentation(string? stderr)
+    {
+        if (string.IsNullOrWhiteSpace(stderr))
+        {
+            return null;
+        }
+
+        // Key type names plink prints: ssh-ed25519, ssh-rsa, ecdsa-sha2-nistpNNN and the
+        // security-key variants sk-ssh-ed25519@openssh.com / sk-ecdsa-sha2-nistp256@openssh.com.
+        // Anchored on a word boundary so "sk-ssh-..." is not read from its "ssh-" suffix.
+        Match fullMatch = Regex.Match(
+            stderr,
+            @"(?<![\w@.-])((?:ssh|ecdsa|sk)-[\w@.-]+)\s+\d+\s+(SHA256:\S+)",
+            RegexOptions.Multiline);
+
+        if (fullMatch.Success)
+        {
+            string algorithm = fullMatch.Groups[1].Value;
+            string fingerprint = fullMatch.Groups[2].Value;
+            Core.Logging.FileLogger.Info(
+                $"Extracted host key presentation: algorithm={algorithm} fingerprint={fingerprint}");
+            return new PlinkHostKeyPresentation(algorithm, fingerprint);
+        }
+
+        Match sha256Match = Regex.Match(stderr, @"SHA256:(\S+)");
+
+        if (sha256Match.Success)
+        {
+            string fingerprint = $"SHA256:{sha256Match.Groups[1].Value}";
+            Core.Logging.FileLogger.Info(
+                $"Extracted host key fingerprint (fallback): {fingerprint}");
+            return new PlinkHostKeyPresentation(UnknownAlgorithm, fingerprint);
         }
 
         return null;
