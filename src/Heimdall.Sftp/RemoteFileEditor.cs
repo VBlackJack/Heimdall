@@ -48,6 +48,7 @@ public sealed class RemoteFileEditor : IDisposable
     private readonly HostKeyStore _hostKeyStore;
     private readonly IHostKeyVerifier _hostKeyVerifier;
     private readonly ConcurrentDictionary<string, EditSession> _activeSessions = new();
+    private long _sessionTransitions;
     private bool _disposed;
 
     /// <summary>
@@ -136,8 +137,9 @@ public sealed class RemoteFileEditor : IDisposable
             return;
         }
 
+        Interlocked.Increment(ref _sessionTransitions);
         StartWatcher(session);
-        LaunchEditor(_editorPath, localPath);
+        AttachEditor(session);
     }
 
     /// <summary>
@@ -244,8 +246,9 @@ public sealed class RemoteFileEditor : IDisposable
             return;
         }
 
+        Interlocked.Increment(ref _sessionTransitions);
         StartWatcher(session);
-        LaunchEditor(_editorPath, localPath);
+        AttachEditor(session);
     }
 
     /// <summary>
@@ -259,8 +262,7 @@ public sealed class RemoteFileEditor : IDisposable
 
         if (_activeSessions.TryRemove(remotePath, out var session))
         {
-            DrainSession(session);
-            CleanupTempFile(session.LocalPath);
+            ReleaseSession(session);
         }
     }
 
@@ -269,6 +271,16 @@ public sealed class RemoteFileEditor : IDisposable
     {
         return _activeSessions.Keys.ToList();
     }
+
+    /// <summary>
+    /// A counter that only ever increases, moved every time an edit session opens or closes.
+    /// The pane's close guard folds it into its change stamp, so a consent given while no file
+    /// was open outside cannot be spent on a close that happens after one was opened.
+    /// </summary>
+    public long EditSessionTransitions => Interlocked.Read(ref _sessionTransitions);
+
+    /// <summary>The editor executable this instance launches, as configured.</summary>
+    internal string EditorPath => _editorPath;
 
     internal IReadOnlyDictionary<string, EditSession> ActiveSessionsForTesting => _activeSessions;
 
@@ -298,8 +310,7 @@ public sealed class RemoteFileEditor : IDisposable
         {
             if (_activeSessions.TryRemove(kvp.Key, out var session))
             {
-                DrainSession(session);
-                CleanupTempFile(session.LocalPath);
+                ReleaseSession(session);
             }
         }
 
@@ -313,27 +324,62 @@ public sealed class RemoteFileEditor : IDisposable
     private static string CreateTempFilePath(string remotePath)
     {
         string fileName = Path.GetFileName(remotePath);
-        string tempDir = Path.Combine(
-            Path.GetTempPath(),
-            "Heimdall",
-            "edit",
-            Guid.NewGuid().ToString("N"));
 
-        Directory.CreateDirectory(tempDir);
+        // The one factory both editors use: the root is defined once, and the restrictive ACL is
+        // applied there, so a root-owned file read through sudo is never staged in a directory
+        // every account can read.
+        string tempDir = Heimdall.Core.Utilities.EditorTempPaths.CreateWorkingDirectory();
+        return Path.Combine(tempDir, fileName);
+    }
 
-        // Restrict temp directory ACL - edited files may contain sensitive
-        // server configs (root-owned files downloaded via sudo)
-        if (OperatingSystem.IsWindows())
+    /// <summary>
+    /// Unregisters a session: stops its watcher and drains its upload, then removes the staged
+    /// copy unless the external editor still has it open.
+    /// </summary>
+    /// <remarks>
+    /// Deleting the file under a running editor turned the user's next Ctrl+S into a file that
+    /// nothing watched: the save landed on disk and never reached the server. A copy left behind
+    /// is removed by the startup sweeper once it is old enough.
+    /// </remarks>
+    private void ReleaseSession(EditSession session)
+    {
+        Interlocked.Increment(ref _sessionTransitions);
+        bool editorRunning = session.IsEditorRunning;
+        DrainSession(session);
+
+        if (editorRunning)
         {
-            try { Heimdall.Core.Security.AclEnforcer.SetDirectoryAcl(tempDir); }
-            catch (Exception ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Error(
-                    $"Failed to restrict temp directory ACL for SFTP editor - edited files may be readable by other users: {ex.Message}");
-            }
+            Heimdall.Core.Logging.FileLogger.Info(
+                $"RemoteFileEditor left the staged copy of {session.RemotePath} in place: the external editor is still running.");
+            return;
         }
 
-        return Path.Combine(tempDir, fileName);
+        CleanupTempFile(session.LocalPath);
+    }
+
+    /// <summary>
+    /// Starts the external editor on a registered session, and unregisters the session when the
+    /// editor cannot be started.
+    /// </summary>
+    private void AttachEditor(EditSession session)
+    {
+        try
+        {
+            session.EditorProcess = LaunchEditor(_editorPath, session.LocalPath);
+        }
+        catch (ExternalEditorLaunchException)
+        {
+            // Registered and watching before the editor failed to start: a session with no editor
+            // would otherwise watch, for the life of the pane, a file nobody edits.
+            if (_activeSessions.TryRemove(session.RemotePath, out EditSession? orphan))
+            {
+                Interlocked.Increment(ref _sessionTransitions);
+                DrainSession(orphan);
+                CleanupTempFile(orphan.LocalPath);
+            }
+
+            throw;
+        }
     }
 
     private static void CleanupTempFile(string localPath)
@@ -716,27 +762,35 @@ public sealed class RemoteFileEditor : IDisposable
         return string.IsNullOrEmpty(trimmed) ? "notepad.exe" : trimmed;
     }
 
-    private static void LaunchEditor(string editorPath, string localPath)
+    /// <summary>
+    /// Starts the editor and returns its process, kept so the session knows whether the editor
+    /// still has the staged copy open when the session closes.
+    /// </summary>
+    /// <exception cref="ExternalEditorLaunchException">The editor could not be started.</exception>
+    private static Process? LaunchEditor(string editorPath, string localPath)
     {
-        Process? proc = null;
+        var resolvedEditorPath = ResolveEditorPath(editorPath);
+        var psi = new ProcessStartInfo
+        {
+            FileName = resolvedEditorPath,
+            UseShellExecute = false
+        };
+
+        // ArgumentList performs proper Win32-aware quoting per arg, so a
+        // local path containing quotes, spaces, or shell metacharacters
+        // cannot break out of the editor argument.
+        psi.ArgumentList.Add(localPath);
+
         try
         {
-            var resolvedEditorPath = ResolveEditorPath(editorPath);
-            var psi = new ProcessStartInfo
-            {
-                FileName = resolvedEditorPath,
-                UseShellExecute = false
-            };
-
-            // ArgumentList performs proper Win32-aware quoting per arg, so a
-            // local path containing quotes, spaces, or shell metacharacters
-            // cannot break out of the editor argument.
-            psi.ArgumentList.Add(localPath);
-            proc = Process.Start(psi);
+            return Process.Start(psi);
         }
-        finally
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception
+            or InvalidOperationException
+            or FileNotFoundException
+            or PlatformNotSupportedException)
         {
-            proc?.Dispose();
+            throw new ExternalEditorLaunchException(resolvedEditorPath, ex);
         }
     }
 }
@@ -816,6 +870,25 @@ internal sealed class EditSession : IDisposable
     /// <summary>File system watcher for auto-upload on save.</summary>
     public FileSystemWatcher? Watcher { get; set; }
 
+    /// <summary>The external editor started on the staged copy, when one was.</summary>
+    public Process? EditorProcess { get; set; }
+
+    /// <summary>Whether the external editor still runs, and so may still hold the staged copy.</summary>
+    public bool IsEditorRunning
+    {
+        get
+        {
+            try
+            {
+                return EditorProcess is { HasExited: false };
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+            {
+                return false;
+            }
+        }
+    }
+
     /// <summary>
     /// One-shot timer that re-checks for a pending upload after the debounce
     /// interval elapses (trailing-edge debounce).
@@ -874,6 +947,7 @@ internal sealed class EditSession : IDisposable
         DebounceTimer?.Dispose();
         UploadSemaphore.Dispose();
         UploadCts.Dispose();
+        EditorProcess?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -36,7 +36,6 @@ public partial class LocalFileBrowserView : UserControl
 {
     private const double FileListWidthPadding = 10;
     private const double MinimumNameColumnWidth = 200;
-    private const string DefaultEditorPath = @"%windir%\system32\notepad.exe";
 
     /// <summary>Host of the shell "Open with" dialog.</summary>
     internal const string RunDllExecutableName = "rundll32.exe";
@@ -168,7 +167,9 @@ public partial class LocalFileBrowserView : UserControl
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (PathTextBox.IsFocused)
+        if (!FileBrowserShortcutPolicy.ShouldHandleShortcut(
+            inlineEditorOpen: false,
+            Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
         {
             return;
         }
@@ -454,48 +455,23 @@ public partial class LocalFileBrowserView : UserControl
         };
     }
 
+    // The policy is shared with the remote browser; these stay as the names the callers use.
     internal static bool TryCreateEditorStartInfo(
         string? configuredEditorPath,
         string filePath,
         out ProcessStartInfo? processStartInfo,
         out string? rejectionKey)
-    {
-        ArgumentNullException.ThrowIfNull(filePath);
-
-        var editorPath = ResolveEditorPath(configuredEditorPath);
-        if (InputValidator.IsShellTarget(editorPath))
-        {
-            processStartInfo = null;
-            rejectionKey = "EditorRejectedShellTarget";
-            return false;
-        }
-
-        processStartInfo = CreateEditorStartInfo(editorPath, filePath);
-        rejectionKey = null;
-        return true;
-    }
+        => EditorLaunchPolicy.TryCreateEditorStartInfo(
+            configuredEditorPath,
+            filePath,
+            out processStartInfo,
+            out rejectionKey);
 
     internal static string ResolveEditorPath(string? configuredEditorPath)
-    {
-        string editorPath = string.IsNullOrWhiteSpace(configuredEditorPath)
-            ? DefaultEditorPath
-            : configuredEditorPath;
-        return Environment.ExpandEnvironmentVariables(editorPath);
-    }
+        => EditorLaunchPolicy.ResolveEditorPath(configuredEditorPath);
 
     internal static ProcessStartInfo CreateEditorStartInfo(string editorPath, string filePath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(editorPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-
-        var processStartInfo = new ProcessStartInfo
-        {
-            FileName = editorPath,
-            UseShellExecute = false
-        };
-        processStartInfo.ArgumentList.Add(filePath);
-        return processStartInfo;
-    }
+        => EditorLaunchPolicy.CreateEditorStartInfo(editorPath, filePath);
 
     private void ShowEditorLaunchWarning(string message)
     {
@@ -516,6 +492,9 @@ public partial class LocalFileBrowserView : UserControl
             Clipboard.SetText(entry.FullPath);
         }
     }
+
+    private void OnFileListPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        => ListViewContextMenuHelper.SelectRowOnRightClick(sender, e);
 
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {

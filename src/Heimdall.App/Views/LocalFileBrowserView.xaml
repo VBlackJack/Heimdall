@@ -90,6 +90,7 @@
                   SelectionMode="Extended"
                   AlternationCount="2"
                   MouseDoubleClick="OnFileDoubleClick"
+                  PreviewMouseRightButtonDown="OnFileListPreviewMouseRightButtonDown"
                   SizeChanged="OnFileListSizeChanged"
                   AutomationProperties.Name="{loc:Translate A11yLstFiles}"
                   VirtualizingPanel.IsVirtualizing="True">
@@ -137,6 +138,7 @@
                     <Setter Property="BorderBrush" Value="Transparent"/>
                     <Setter Property="BorderThickness" Value="1"/>
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
                     <Style.Triggers>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>

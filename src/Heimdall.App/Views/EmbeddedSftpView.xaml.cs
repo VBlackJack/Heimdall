@@ -100,6 +100,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     private bool _disposed;
     private bool _inlineEditorSaveInProgress;
 
+    /// <summary>Set when the configured external editor was refused as a shell target.</summary>
+    private string? _externalEditorRejectionKey;
+
+    /// <summary>
+    /// The external editor configured in settings. Read at <see cref="InitializeSession"/>: the
+    /// setting was wired to the local browser only, and a remote file always opened in notepad.
+    /// </summary>
+    public string? ExternalEditorPath { get; set; }
+
     /// <summary>Whether the connection was already dropped to escape a stuck save.</summary>
     private bool _inlineEditorEscapeAttempted;
 
@@ -252,6 +261,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         InlineEditorHost.Content = editorView;
         InlineEditorHost.Visibility = Visibility.Visible;
         AllowDrop = false;
+        editorView.FocusEditor();
         return true;
     }
 
@@ -289,6 +299,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         _activeInlineEditor = null;
         _activeInlineEditorTempPath = null;
         RefreshCloseGuardEditorDirty();
+
+        if (!_disposed)
+        {
+            FileListView.Focus();
+        }
     }
 
     private static T ResolveRequiredService<T>()
@@ -377,10 +392,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             operationHost: operationHost,
             sessionLoggingOverride: SessionLoggingOverride);
 
-        _editor = new RemoteFileEditor(
-            operationsBrowser,
-            hostKeyStore: hostKeyStore,
-            hostKeyVerifier: _hostKeyVerifier);
+        string editorPath = EditorLaunchPolicy.ResolveExternalEditor(ExternalEditorPath, out string? editorRejectionKey);
+        _externalEditorRejectionKey = editorRejectionKey;
+        _editor = new RemoteFileEditor(operationsBrowser, hostKeyStore: hostKeyStore, hostKeyVerifier: _hostKeyVerifier, editorPath: editorPath);
         _editor.FileUploaded += OnEditorFileUploaded;
         _editor.HostKeyRotatedDuringUpload += OnHostKeyRotatedDuringUpload;
         _editor.SudoSaveCompleted += OnEditorSudoSaveCompleted;
@@ -407,9 +421,6 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             string securityNotice = localizer[
                 GetFtpSecurityNoticeLocalizationKey(ftpBrowser.IsTlsEnabled)];
             _viewModel.ShowSecurityNotice(securityNotice);
-            System.Windows.Automation.AutomationProperties.SetName(
-                SecurityNoticeBadge,
-                securityNotice);
         }
 
         UpdateStatus(_localizer["SftpStatusConnected"]);
@@ -566,8 +577,16 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             isTransferInProgress,
             _inlineEditorSaveInProgress,
             HasUnsavedInlineEditorChanges(),
-            transferEpoch + _closeGuardEpoch);
+            HasExternalEdits(),
+            transferEpoch + _closeGuardEpoch + (_editor?.EditSessionTransitions ?? 0));
     }
+
+    /// <summary>
+    /// Whether a file of this pane is open in an external editor. The guard never consulted the
+    /// editor, so the pane closed without a question and disposed the editor, which deleted the
+    /// staged file under the editor still open on it.
+    /// </summary>
+    private bool HasExternalEdits() => _editor is not null && _editor.GetActiveEdits().Count > 0;
 
     /// <summary>
     /// Raises the guard's confirmation, filling the message template with the pane label so the
@@ -769,6 +788,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         _inlineEditorSaveInProgress = inProgress;
         _closeGuardEpoch++;
+
+        // The escape is offered once per save. The flag was never reset, so the second save
+        // that stalled in a pane's life read as "already escaped" and got the stuck report
+        // instead of the offer.
+        if (inProgress)
+        {
+            _inlineEditorEscapeAttempted = false;
+        }
     }
 
     /// <summary>
@@ -814,6 +841,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     private void OnViewKeyDown(object sender, KeyEventArgs e)
     {
         if (_disposed || _browser is null || !_browser.IsConnected)
+        {
+            return;
+        }
+
+        if (!FileBrowserShortcutPolicy.ShouldHandleShortcut(
+            _activeInlineEditor is not null,
+            Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
         {
             return;
         }
@@ -1157,6 +1191,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     // Context menu actions
     // ------------------------------------------------------------------
 
+    private void OnFileListPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        => ListViewContextMenuHelper.SelectRowOnRightClick(sender, e);
+
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {
         bool hasSelection = FileListView.SelectedItem is not null;
@@ -1300,6 +1337,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
+        // The same refusal the local browser applies: a shell is not an editor, and a file path
+        // handed to one as an argument is a command line.
+        if (_externalEditorRejectionKey is { } rejectionKey)
+        {
+            ShowError(_localizer?[rejectionKey] ?? rejectionKey);
+            return;
+        }
+
         try
         {
             UpdateStatus(_localizer?.Format("SftpStatusEditing", file.Name)
@@ -1315,6 +1360,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                     $"EmbeddedSFTP external edit permission denied, falling back to sudo for {file.Name}");
                 await _editor.EditFileSudoAsync(file.FullPath, _sshParams);
             }
+        }
+        catch (ExternalEditorLaunchException ex)
+        {
+            ShowError(_localizer?.Format("SftpErrorExternalEditorLaunchFailed", ex.EditorPath)
+                ?? $"The external editor could not be started: {ex.EditorPath}");
         }
         catch (Exception ex)
         {
@@ -1361,10 +1411,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 ?? $"Editing: {file.Name}");
 
             // Download file content for embedded editing
-            tempPath = Path.Combine(
-                EditorTempPaths.Root,
-                Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempPath);
+            tempPath = EditorTempPaths.CreateWorkingDirectory();
             _activeEditTempDirs.Add(tempPath);
             string localPath = Path.Combine(tempPath, Path.GetFileName(file.Name));
 
@@ -1372,10 +1419,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             int downloadExceededSizeLimit = 0;
             using CancellationTokenSource downloadCancellation = new();
 
+            // The browser reports the file name it derives from the remote path; compare against
+            // the same derivation rather than the entry's listed name.
+            string progressFileName = Path.GetFileName(file.FullPath);
+
             void EnforceInlineEditDownloadLimit(SftpTransferProgress progress)
             {
                 if (!progress.IsUpload
-                    && string.Equals(progress.FileName, file.Name, StringComparison.Ordinal)
+                    && string.Equals(progress.FileName, progressFileName, StringComparison.Ordinal)
                     && (progress.BytesTransferred > MaxInlineEditFileBytes
                         || progress.TotalBytes > MaxInlineEditFileBytes))
                 {
@@ -1433,6 +1484,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 RemoteTextDocument document = await RemoteTextFileCodec.ReadAsync(localPath);
                 string content = document.Text;
                 string remotePath = file.FullPath;
+                string? encodingNotice = document.DecodedWithFallback
+                    ? _localizer?["EditorEncodingFallbackNotice"] ?? "EditorEncodingFallbackNotice"
+                    : null;
 
                 // Open in embedded AvalonEdit editor
                 EmbeddedEditorView editorView = new(_localizer);
@@ -1442,6 +1496,10 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 // pane's own close guard sat inert for weeks after it shipped.
                 editorView.CloseRefusedByHost = RefuseInlineEditorCloseWhileSaving;
                 editorView.OpenContent(file.Name, content);
+                if (encodingNotice is not null)
+                {
+                    editorView.ShowNotice(encodingNotice);
+                }
 
                 SessionPaneModel? inlineEditorPane = _ownerPane;
                 if (inlineEditorPane is null && _sessionTab is not null)
