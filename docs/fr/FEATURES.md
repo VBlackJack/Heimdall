@@ -78,7 +78,8 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Panneau de navigation de fichiers embarqué avec arborescence de répertoires et liste de fichiers
 - **Ouverture automatique en compagnon** : s'ouvre automatiquement à côté d'une session SSH sous forme de split vertical (conditionné par un réglage). La reconnexion du volet SFTP reste circonscrite au volet, si bien que le terminal SSH voisin et son historique sont préservés ; un keepalive SSH maintient en vie les sessions SFTP inactives
 - **Suivre le répertoire SSH** (optionnel) : le compagnon peut suivre le répertoire courant du terminal SSH via la séquence d'échappement OSC 7, avec une bascule par volet (au mieux ; inerte sur les shells qui n'émettent pas OSC 7)
-- Deux modes d'édition : éditeur AvalonEdit intégré OU éditeur externe avec téléversement automatique à l'enregistrement (les échecs de téléversement transitoires sont réessayés)
+- Deux modes d'édition : éditeur AvalonEdit intégré OU éditeur externe avec téléversement automatique à l'enregistrement (les échecs de téléversement transitoires sont réessayés). L'éditeur externe choisi dans les réglages sert aussi aux fichiers distants, et un interpréteur de commandes est refusé comme éditeur. Fermer un volet pendant qu'un fichier est ouvert dans un éditeur externe demande d'abord, et la copie locale est conservée tant que cet éditeur tourne
+- L'éditeur intégré ouvre un fichier qui n'est pas de l'UTF-8 valide en Latin-1 et le dit ; Ctrl+S enregistre, Ctrl+W ferme ; le volet d'éditeur local demande avant de se fermer sur du texte non enregistré
 - **Mode sudo "Parcourir en root"** : une bascule dans la barre d'outils active le listage de répertoires par `sudo ls -la` via un canal exec SSH - parcourez n'importe quel répertoire indépendamment des permissions de l'utilisateur SFTP
 - **Repli sudo complet** sur toutes les opérations : téléversement (`sudo tee`), téléchargement (`sudo cat`), édition, chmod, renommage, suppression, mkdir - déclenché uniquement sur des exceptions typées de permission refusée
 - Les sessions d'édition sudo mettent en cache le vérificateur de clé d'hôte épinglée, détectent une rotation de clé en cours d'édition, suivent les tâches de téléversement et nettoient les fichiers temporaires même lorsque l'écriture privilégiée échoue
@@ -87,14 +88,17 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - **Téléversement récursif de dossiers** et dépôt directement sur une ligne de dossier
 - **Collage inter-volets** entre deux navigateurs de fichiers, sur le même serveur ou entre serveurs
 - **Coller depuis l'Explorateur** : téléverse les fichiers/dossiers présents dans le presse-papiers Windows (CF_HDROP) vers le répertoire courant
-- Opérations de fichiers SFTP/FTP journalisées (download / upload / mkdir / delete / rename / copy)
-- Boîte de dialogue chmod, marque-pages de chemins, filtre sur le nom de fichier
+- Opérations de fichiers SFTP/FTP journalisées (download / upload / mkdir / delete / rename / copy / chmod)
+- Boîte de dialogue chmod avec les bits set-user-ID, set-group-ID et sticky (quatre chiffres octaux), marque-pages de chemins, filtre sur le nom de fichier
+- Les conflits de téléversement sont inventoriés avant le premier octet : une destination qui ne peut pas être listée refuse le lot, et les noms se comparent sans tenir compte de la casse sauf si le serveur liste deux noms qui n'en diffèrent que par elle
+- Un clic droit sélectionne la ligne sous le pointeur avant l'ouverture de son menu ; les raccourcis du navigateur restent muets quand une zone de texte a le focus ou que l'éditeur intégré est ouvert
 
 ### Navigateur FTP
 - Client FTP/FTPS appuyé sur les API asynchrones de FluentFTP
 - Réutilise l'intégralité de l'interface du navigateur SFTP via l'interface `IRemoteBrowser`
 - Mode passif configurable et prise en charge SSL/TLS (FTPS)
-- Les connexions FTP en clair avec identifiants font remonter un avertissement non bloquant dans la zone d'état de la session
+- Les connexions FTP en clair, anonymes comprises, font remonter un avertissement non bloquant dans la zone d'état de la session ; le FTPS ne négocie que TLS 1.2 ou 1.3
+- Le certificat FTPS est demandé à la première utilisation puis épinglé ; un certificat qui a changé est refusé sans invite tant que celui enregistré n'est pas supprimé, et une épingle validée par le système est refusée quand son statut de révocation ne peut plus être vérifié
 - La validation de l'hôte et du port est identique à celle des gestionnaires SSH/SFTP
 - L'analyse des listages de répertoires est déléguée à FluentFTP pour couvrir les variantes de serveurs
 

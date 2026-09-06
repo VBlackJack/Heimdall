@@ -139,7 +139,15 @@ machine d'un côté, la machine distante de l'autre.
 - **Glissez-déposez** entre les panneaux pour copier, dans les deux sens, dossiers entiers compris.
 - **Double-cliquez sur un fichier texte distant** pour l'éditer. Heimdall le télécharge, l'ouvre,
   et le renvoie à chaque enregistrement. Fermez l'éditeur quand vous avez fini.
-- **F2** renomme, **F5** rafraîchit la liste.
+- **F2** renomme, **F5** rafraîchit la liste. Ni l'un ni l'autre ne se déclenche pendant que vous
+  tapez dans la zone de filtre.
+- **Clic droit** sur une ligne pour agir dessus : la ligne sous le pointeur est sélectionnée avant
+  l'ouverture du menu.
+- **Modifier dans l'éditeur externe** utilise l'éditeur choisi dans les réglages, pour les fichiers
+  distants aussi. Heimdall garde une copie locale tant que cet éditeur est ouvert et renvoie chaque
+  enregistrement ; fermer le volet pendant qu'un fichier y est encore ouvert vous demande d'abord.
+- Dans l'éditeur intégré, **Ctrl+S** enregistre et **Ctrl+W** ferme. Un fichier qui n'est pas en
+  UTF-8 s'ouvre en Latin-1 et le dit dans la barre d'état de l'éditeur.
 
 > La suppression dans l'explorateur de fichiers local est **définitive**. Elle n'utilise pas la
 > Corbeille, et un dossier part avec tout ce qu'il contient. La confirmation le dit ; lisez-la

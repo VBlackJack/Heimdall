@@ -694,7 +694,7 @@ Le parseur utilisait `Split(null, 9)` et testait `parts.Length < 9`, ce qui éca
 
 **Cause racine** : Heimdall ne considère volontairement plus les chaînes génériques `Failure` comme un refus de permission. Cette heuristique pouvait déclencher des opérations sudo privilégiées sur des échecs sans rapport avec les permissions, comme des erreurs de canal, des coupures réseau ou des refus de stratégie côté serveur.
 
-**Solution** : `EmbeddedSftpViewModel.IsPermissionDenied()` n'accepte que des signaux typés de permission refusée : `SftpPermissionDeniedException` et l'`UnauthorizedAccessException` locale. Si un serveur renvoie un échec générique ambigu pour un vrai problème de permission, réessayez manuellement avec "Browse as root" ou consultez les journaux serveur ; ne réintroduisez pas de correspondance par sous-chaîne.
+**Solution** : `EmbeddedSftpViewModel.IsPermissionDenied()` n'accepte que des signaux typés de permission refusée DISTANTS : `SftpPermissionDeniedException`, et le refus de permission propre à la suppression récursive. L'`UnauthorizedAccessException` locale n'en fait plus partie : c'est le système de fichiers local qui refuse (un dossier en lecture seule, une ACL), et escalader dessus lançait un transfert distant privilégié qui échouait sur le même chemin local avec un message accusant le serveur. Si un serveur renvoie un échec générique ambigu pour un vrai problème de permission, réessayez manuellement avec "Browse as root" ou consultez les journaux serveur ; ne réintroduisez pas de correspondance par sous-chaîne.
 
 **Leçon clé** : les faux négatifs sont plus sûrs que les faux positifs privilégiés. L'escalade sudo doit reposer sur des erreurs typées, pas sur le texte des messages.
 
