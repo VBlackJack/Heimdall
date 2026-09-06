@@ -37,7 +37,13 @@ namespace Heimdall.Ssh.Tests;
 /// </remarks>
 public sealed class PlinkTunnelRunnerDrainReproTests
 {
-    private static readonly TimeSpan ExitVerdictWindow = TimeSpan.FromSeconds(4);
+    /// <summary>
+    /// Failure bound for the child to process its exit command, not a measure of how
+    /// fast it does: a child blocked on a full stderr pipe never exits, so the bound is
+    /// only paid when the drain is gone. Under a full parallel test run a 4 s window
+    /// was exceeded by a healthy child.
+    /// </summary>
+    private static readonly TimeSpan ExitVerdictWindow = TimeSpan.FromSeconds(30);
     private const int BurstLines = 200;
 
     [Fact]
