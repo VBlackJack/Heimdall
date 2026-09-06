@@ -29,7 +29,7 @@ public sealed record DnsBatchResolveResult(
     string Status,
     bool Success)
 {
-    public const string Placeholder = "\u2014";
+    public const string Placeholder = "-";
 
     public static DnsBatchResolveResult Ok(string hostname, IEnumerable<IPAddress>? addresses, int resolveTimeMs)
     {

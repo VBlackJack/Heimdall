@@ -50,7 +50,7 @@ public static class ToolContextMenuHelper
         items.Add(copyIp);
 
         // Copy hostname if available
-        if (!string.IsNullOrWhiteSpace(hostname) && hostname != "\u2014")
+        if (!string.IsNullOrWhiteSpace(hostname) && hostname != "-")
         {
             var copyHost = new MenuItem { Header = L(localizer, "ToolCtxCopyHostname") };
             copyHost.Click += (_, _) => { try { Clipboard.SetText(hostname); } catch (System.Runtime.InteropServices.ExternalException) { /* clipboard locked */ } };

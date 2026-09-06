@@ -379,7 +379,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
                 tlsStatus = $"{tlsCert.TlsVersion} ({L("ToolNetMapCertValid")} {tlsCert.NotAfter:yyyy-MM-dd})";
         }
 
-        var osGuess = host.OsFingerprint?.OsGuess ?? "\u2014";
+        var osGuess = host.OsFingerprint?.OsGuess ?? "-";
 
         var detailParts = new List<string>();
         if (!string.IsNullOrEmpty(host.NetBiosName))
@@ -400,7 +400,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
             detailParts.Add($"HTTP:{host.HttpFingerprint.ProductName}");
         if (host.SmbInfo is not null)
             detailParts.Add($"SMB:{host.SmbInfo.DialectRevision:X4}");
-        var detailsSummary = detailParts.Count > 0 ? string.Join(" | ", detailParts) : "\u2014";
+        var detailsSummary = detailParts.Count > 0 ? string.Join(" | ", detailParts) : "-";
 
         var tooltipParts = new List<string>
         {
@@ -500,7 +500,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         return new CartographyRowViewModel
         {
             IpAddress = host.IpAddress,
-            Hostname = host.Hostname ?? "\u2014",
+            Hostname = host.Hostname ?? "-",
             OsGuess = osGuess,
             PortSummary = string.Join(", ", openPorts),
             ServiceSummary = string.Join(", ", services),
@@ -513,17 +513,17 @@ public partial class NetworkCartographyView : UserControl, IToolView
                 : tlsCert.ExpiresSoon ? L("ToolNetMapCertExpiring")
                 : L("ToolNetMapCertValid"),
             PrimaryRoleName = host.PrimaryRole?.Role
-                ?? (host.Manufacturer is not null ? host.Manufacturer : "\u2014"),
+                ?? (host.Manufacturer is not null ? host.Manufacturer : "-"),
             Confidence = host.PrimaryRole is not null ? $"{host.PrimaryRole.Confidence}%"
-                : (host.Manufacturer is not null ? "MAC" : "\u2014"),
+                : (host.Manufacturer is not null ? "MAC" : "-"),
             DetailsSummary = detailsSummary,
             DetailTooltip = detailTooltip,
             VlanSegment = _vm.LastSnapshot?.DetectedVlans?
                 .FirstOrDefault(v => v.MemberIps.Contains(host.IpAddress))
-                is { } vlan ? $"VLAN {vlan.VlanId} ({vlan.Subnet})" : "\u2014",
-            Manufacturer = host.Manufacturer ?? "\u2014",
-            MacAddress = host.MacAddress ?? "\u2014",
-            Latency = host.PingLatencyMs > 0 ? $"{host.PingLatencyMs}ms" : "\u2014",
+                is { } vlan ? $"VLAN {vlan.VlanId} ({vlan.Subnet})" : "-",
+            Manufacturer = host.Manufacturer ?? "-",
+            MacAddress = host.MacAddress ?? "-",
+            Latency = host.PingLatencyMs > 0 ? $"{host.PingLatencyMs}ms" : "-",
             NetBiosName = host.NetBiosName,
             NetBiosDomain = host.NetBiosDomain,
             SnmpSysName = host.SnmpInfo?.SysName,
@@ -733,7 +733,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
             };
             menu.Items.Add(copyIp);
 
-            if (!string.IsNullOrWhiteSpace(row.Hostname) && row.Hostname != "\u2014")
+            if (!string.IsNullOrWhiteSpace(row.Hostname) && row.Hostname != "-")
             {
                 var copyHost = new MenuItem { Header = L("ToolCtxCopyHostname") };
                 copyHost.Click += (_, _) =>

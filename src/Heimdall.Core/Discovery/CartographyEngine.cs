@@ -1082,9 +1082,9 @@ public sealed class CartographyEngine
 
             var confidence = host.PrimaryRole is not null
                 ? $"{host.PrimaryRole.Confidence}%"
-                : host.Manufacturer is not null ? "MAC" : "\u2014";
+                : host.Manufacturer is not null ? "MAC" : "-";
             var role = host.PrimaryRole?.Role
-                ?? (host.Manufacturer is not null ? host.Manufacturer : "\u2014");
+                ?? (host.Manufacturer is not null ? host.Manufacturer : "-");
             var mdnsServices = host.MdnsServices is { Count: > 0 }
                 ? string.Join("; ", host.MdnsServices)
                 : string.Empty;
