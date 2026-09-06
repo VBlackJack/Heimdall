@@ -96,9 +96,9 @@
                 </Style.Triggers>
             </Style>
 
-            <Style x:Key="TrustOnceButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Style x:Key="RejectButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
                 <Style.Triggers>
-                    <DataTrigger Binding="{Binding TrustOnceIsDefault}" Value="True">
+                    <DataTrigger Binding="{Binding RejectIsDefault}" Value="True">
                         <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
                         <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
@@ -225,9 +225,10 @@
                     Margin="0,0,8,0"
                     MinWidth="104"
                     IsCancel="True"
+                    IsDefault="{Binding RejectIsDefault}"
                     Content="{Binding RejectButtonText}"
                     Command="{Binding RejectCommand}"
-                    Style="{StaticResource SecondaryButtonStyle}"
+                    Style="{StaticResource RejectButtonStyle}"
                     AutomationProperties.Name="{Binding RejectButtonText}"/>
             <Button x:Name="TrustOnceButton"
                     Margin="0,0,8,0"
@@ -235,7 +236,7 @@
                     MaxWidth="260"
                     IsDefault="{Binding TrustOnceIsDefault}"
                     Command="{Binding TrustOnceCommand}"
-                    Style="{StaticResource TrustOnceButtonStyle}"
+                    Style="{StaticResource SecondaryButtonStyle}"
                     AutomationProperties.Name="{Binding TrustOnceButtonText}">
                 <TextBlock Text="{Binding TrustOnceButtonText}"
                            TextAlignment="Center"
