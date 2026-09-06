@@ -125,6 +125,40 @@ log is flushed there too. The trusted host key coalescer's asynchronous disposal
 write. A second launch no longer flashes a splash window before handing over to the running
 instance.
 
+### The update banner offers again after a failed attempt, and stays out of fullscreen
+
+The banner's outcome notice, shown when a previous update did not apply, was never reset: an
+update found right after that notice showed the failure text and a Dismiss button with every
+offer affordance collapsed, so the offer for the very version that failed was swallowed. An
+offer now clears the notice, and dismissing a notice returns the banner to a neutral state. The
+banner is suppressed while the window is fullscreen: it lives in its own layout row, and one
+arriving after the user went fullscreen inserted a bar into a session meant to fill the screen
+and resized the live surface under it. The startup update work no longer delays the runtime
+settings bridge (a toggle flipped during the check was silently not applied), is cancelled when
+the window closes instead of writing settings during the shutdown sequence, and the banner's
+status is re-localized on a language switch like its settings twin.
+
+### Accessibility and wording of the update banner
+
+The banner's progress bar announced itself with the label of the button beside it; it now names
+the download status. The banner carries an accessible name and a polite live setting so a
+screen reader is told it appeared, and Escape dismisses it. Both progress bars bind one way. A
+skipped version, persisted by one click with no confirmation and undone by nothing, is now shown
+in the Updates section of Settings with a button that offers it again. The View release command
+on the banner shares its settings twin's predicate. Two French messages named the About panel
+without its accent while the tab is accented, and one lacked the accent on its preposition; a
+guard now holds the whole catalogue to the tab's spelling. An outcome the install mapper does
+not know no longer reads as "Download failed": it says nothing, like its relaunch sibling, and
+the relaunch mapper gained the test file it never had. The dead `Skipped` check status is gone.
+
+### Tooling guards around the installer
+
+A Release build now fails when Inno Setup is missing or fails, as it already did for WiX: the
+`Setup.exe` is the only asset the in-app updater can use, and a publish could ship without it. A
+guard pins the four properties of the Inno script the updater depends on (the AppId the install
+registration probe reads, `PrivilegesRequired=lowest`, `skipifsilent`, the `WizardSilent` guard)
+against the constant the updater uses. The startup failure exit code is 1 rather than -1.
+
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 
 ### The Plink port probe runs before the first wait
