@@ -249,7 +249,8 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
                     selection.Port,
                     selection.ImportedFingerprint,
                     selection.Algorithm,
-                    DateTimeOffset.UtcNow);
+                    DateTimeOffset.UtcNow,
+                    selection.ImportedPublicKeyBase64);
                 replaced++;
             }
         }

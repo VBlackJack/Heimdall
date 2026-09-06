@@ -154,8 +154,8 @@ public sealed class KnownHostsImporter
                         KnownHostsDiagnosticCode.DuplicateFingerprintInSourceMerged));
                 }
 
-                var hostPortKey = HostKeyFormats.MakeKey(primary.Host, primary.Port);
-                if (settings.TrustedHostKeys.TryGetValue(hostPortKey, out var storedFingerprint))
+                var storedFingerprint = ResolveStoredFingerprint(settings, primary.Host, primary.Port);
+                if (storedFingerprint is not null)
                 {
                     rows.Add(new KnownHostsPreviewRow(
                         primary,
@@ -221,7 +221,8 @@ public sealed class KnownHostsImporter
             }
 
             var candidate = candidates[0];
-            if (settings.TrustedHostKeys.TryGetValue(group.Key, out var storedFingerprint))
+            var storedFingerprint = ResolveStoredFingerprint(settings, candidate.Host, candidate.Port);
+            if (storedFingerprint is not null)
             {
                 if (string.Equals(storedFingerprint, candidate.Fingerprint, StringComparison.Ordinal))
                 {
@@ -292,6 +293,22 @@ public sealed class KnownHostsImporter
         }
 
         return new KnownHostsImportOutcome(imported, skippedExisting, skippedConflict);
+    }
+
+    /// <summary>
+    /// Resolves the fingerprint currently trusted for a host. The settings dictionary
+    /// only answers an exact <c>host:port</c> lookup; the trust service also matches
+    /// hashed known_hosts entries, which would otherwise let a plain import shadow a
+    /// hashed one without a conflict.
+    /// </summary>
+    private string? ResolveStoredFingerprint(AppSettings settings, string host, int port)
+    {
+        if (settings.TrustedHostKeys.TryGetValue(HostKeyFormats.MakeKey(host, port), out var storedFingerprint))
+        {
+            return storedFingerprint;
+        }
+
+        return _hostKeyTrustService.GetEntry(host, port)?.Fingerprint;
     }
 
     private sealed record IndexedCandidate(int Index, KnownHostsImportCandidate Candidate);

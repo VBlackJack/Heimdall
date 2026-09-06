@@ -171,27 +171,18 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(fingerprint);
 
-        var hostPort = HostKeyFormats.MakeKey(host, port);
-        var existing = _store.GetEntry(host, port);
         var now = DateTimeOffset.UtcNow;
-        var entry = new HostKeyEntry(
+        Store(
+            host,
+            port,
             fingerprint,
-            existing?.FirstSeen > DateTimeOffset.MinValue ? existing.FirstSeen : now,
-            now,
-            NormalizeAlgorithm(algorithm, existing?.Algorithm),
-            source)
-        { PublicKeyBase64 = publicKeyBase64 ?? existing?.PublicKeyBase64 };
-
-        _store.SetEntry(host, port, entry, raiseEvent: true);
-
-        if (existing is not null && !HostKeyStore.ConstantTimeEquals(existing.Fingerprint, fingerprint))
-        {
-            EntryReplaced?.Invoke(hostPort, existing, entry);
-        }
-        else
-        {
-            EntryTrusted?.Invoke(hostPort, entry);
-        }
+            publicKeyBase64,
+            existing => new HostKeyEntry(
+                fingerprint,
+                existing?.FirstSeen > DateTimeOffset.MinValue ? existing.FirstSeen : now,
+                now,
+                NormalizeAlgorithm(algorithm, existing?.Algorithm),
+                source));
     }
 
     public void Import(
@@ -205,21 +196,62 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(fingerprint);
 
-        var hostPort = HostKeyFormats.MakeKey(host, port);
-        var existing = _store.GetEntry(host, port);
-        var entry = new HostKeyEntry(
+        Store(
+            host,
+            port,
             fingerprint,
-            importedAt,
-            importedAt,
-            NormalizeAlgorithm(algorithm, existing?.Algorithm),
-            HostKeySource.ImportedKnownHosts)
-        { PublicKeyBase64 = publicKeyBase64 ?? existing?.PublicKeyBase64 };
+            publicKeyBase64,
+            existing => new HostKeyEntry(
+                fingerprint,
+                importedAt,
+                importedAt,
+                NormalizeAlgorithm(algorithm, existing?.Algorithm),
+                HostKeySource.ImportedKnownHosts));
+    }
+
+    /// <summary>
+    /// Writes a durable entry under the plain <c>host:port</c> key and reconciles it
+    /// with whatever the store already held for that host, hashed entries included.
+    /// The previous public key blob is carried over only while the fingerprint is
+    /// unchanged: a replaced key gets the caller's blob or none, never the blob of
+    /// the key the user just decided against, which the known_hosts export would
+    /// otherwise write back out under the new fingerprint.
+    /// </summary>
+    private void Store(
+        string host,
+        int port,
+        string fingerprint,
+        string? publicKeyBase64,
+        Func<HostKeyEntry?, HostKeyEntry> build)
+    {
+        var hostPort = HostKeyFormats.MakeKey(host, port);
+        HostKeyEntry? existing = TryFindStoredEntry(host, port, out var existingHostPort, out var found)
+            ? found
+            : null;
+        bool fingerprintChanged = existing is not null
+            && !HostKeyStore.ConstantTimeEquals(existing.Fingerprint, fingerprint);
+
+        var entry = build(existing) with
+        {
+            PublicKeyBase64 = fingerprintChanged
+                ? publicKeyBase64
+                : publicKeyBase64 ?? existing?.PublicKeyBase64
+        };
 
         _store.SetEntry(host, port, entry, raiseEvent: true);
 
-        if (existing is not null && !HostKeyStore.ConstantTimeEquals(existing.Fingerprint, fingerprint))
+        bool matchedHashedEntry = existing is not null
+            && !string.Equals(existingHostPort, hostPort, StringComparison.Ordinal);
+        if (matchedHashedEntry && _store.RemoveKey(existingHostPort))
         {
-            EntryReplaced?.Invoke(hostPort, existing, entry);
+            // The plain entry now carries the trust; leaving the hashed one behind
+            // would resurrect the old fingerprint as soon as the plain row is removed.
+            EntryRemoved?.Invoke(existingHostPort);
+        }
+
+        if (fingerprintChanged)
+        {
+            EntryReplaced?.Invoke(hostPort, existing!, entry);
         }
         else
         {

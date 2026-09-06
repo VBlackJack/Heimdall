@@ -229,7 +229,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
 
         if (dialog.ShowDialog() == true)
         {
-            System.IO.File.WriteAllText(dialog.FileName, _publicKeyOpenSsh + Environment.NewLine, Encoding.UTF8);
+            Heimdall.Core.Security.SshKeyFileWriter.WritePublicKey(dialog.FileName, _publicKeyOpenSsh);
         }
     }
 
@@ -250,7 +250,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
 
         if (dialog.ShowDialog() == true)
         {
-            System.IO.File.WriteAllText(dialog.FileName, _privateKeyPem, Encoding.UTF8);
+            Heimdall.Core.Security.SshKeyFileWriter.WritePrivateKey(dialog.FileName, _privateKeyPem);
         }
     }
 

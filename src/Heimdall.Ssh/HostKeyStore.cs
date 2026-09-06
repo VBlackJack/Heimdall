@@ -217,6 +217,18 @@ public sealed class HostKeyStore
     }
 
     /// <summary>
+    /// Remove a trusted entry by its stored key, which for a hashed known_hosts
+    /// entry is the <c>|1|salt|hash:port</c> form that cannot be rebuilt from a
+    /// plain host name.
+    /// </summary>
+    internal bool RemoveKey(string hostPortKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hostPortKey);
+        _sessionTrustedKeys.TryRemove(hostPortKey, out _);
+        return _trustedKeys.TryRemove(hostPortKey, out _);
+    }
+
+    /// <summary>
     /// Get all trusted entries for persistence to config.
     /// </summary>
     public IReadOnlyDictionary<string, string> GetAllTrusted()

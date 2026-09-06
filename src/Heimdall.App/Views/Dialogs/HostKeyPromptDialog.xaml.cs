@@ -47,9 +47,9 @@ public partial class HostKeyPromptDialog : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         ApplyAutomationNames();
-        if (_viewModel?.TrustOnceIsDefault == true)
+        if (_viewModel?.RejectIsDefault == true)
         {
-            TrustOnceButton.Focus();
+            RejectButton.Focus();
         }
         else
         {

@@ -28,7 +28,8 @@ public sealed record ImportKnownHostsConflictSelection(
     int Port,
     string ImportedFingerprint,
     string Algorithm,
-    bool ReplaceWithImported);
+    bool ReplaceWithImported,
+    string? ImportedPublicKeyBase64 = null);
 
 public sealed record ImportKnownHostsConflictResolution(
     IReadOnlyList<ImportKnownHostsConflictSelection> Selections);
@@ -85,7 +86,8 @@ public sealed partial class ImportKnownHostsConflictDialogViewModel : Observable
                 row.Port,
                 row.ImportedFingerprint,
                 row.Algorithm,
-                row.ReplaceWithImported))
+                row.ReplaceWithImported,
+                row.ImportedPublicKeyBase64))
                 .ToList());
         CloseRequested?.Invoke(true);
     }
@@ -112,8 +114,14 @@ public sealed partial class ImportKnownHostsConflictRowViewModel : ObservableObj
         ExistingFingerprintDisplay = TruncateFingerprint(conflict.ExistingFingerprint);
         ImportedFingerprintDisplay = TruncateFingerprint(conflict.ImportedFingerprint);
         Algorithm = conflict.Algorithm;
+        ImportedPublicKeyBase64 = conflict.ImportedPublicKeyBase64;
         AccessibleName = accessibleName;
     }
+
+    /// <summary>
+    /// Base64 blob of the imported key, forwarded to the trust store on replace.
+    /// </summary>
+    public string? ImportedPublicKeyBase64 { get; }
 
     public string Host { get; }
 

@@ -192,7 +192,7 @@ public sealed class TrustedHostKeysSettingsViewModelTests
         fixture.ImportHandler = () => new KnownHostsImportReport(
             0,
             0,
-            [new KnownHostsImportConflict("conflict.example.com", 22, "SHA256:existing", "SHA256:imported", "ssh-rsa", 4)]);
+            [new KnownHostsImportConflict("conflict.example.com", 22, "SHA256:existing", "SHA256:imported", "ssh-rsa", 4, "AAAAimported")]);
 
         fixture.Dialog.ConflictHandler = vm =>
         {
@@ -224,7 +224,8 @@ public sealed class TrustedHostKeysSettingsViewModelTests
                     row.Port,
                     row.ImportedFingerprint,
                     row.Algorithm,
-                    row.ReplaceWithImported)
+                    row.ReplaceWithImported,
+                    row.ImportedPublicKeyBase64)
             ]);
         };
 
@@ -234,6 +235,7 @@ public sealed class TrustedHostKeysSettingsViewModelTests
         Assert.NotNull(entry);
         Assert.Equal("SHA256:imported", entry.Fingerprint);
         Assert.Equal(HostKeySource.ImportedKnownHosts, entry.Source);
+        Assert.Equal("AAAAimported", entry.PublicKeyBase64);
     }
 
     [Fact]
