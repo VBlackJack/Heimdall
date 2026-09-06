@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-using Heimdall.Core.Security;
-
 namespace Heimdall.Sftp;
 
 /// <summary>
@@ -23,7 +21,7 @@ namespace Heimdall.Sftp;
 /// Pure string construction with no I/O, so the shell-escaping contract is unit-testable in isolation.
 /// </summary>
 /// <remarks>
-/// Both paths are single-quoted through <see cref="InputValidator.EscapeShellArg(string)"/> (CWE-78),
+/// Both paths are single-quoted through <see cref="PathEscaper.EscapeForShell(string)"/> (CWE-78),
 /// and a <c>--</c> end-of-options guard prevents a path that begins with <c>-</c> from being parsed as
 /// a flag. File copies use a sibling temp followed by <c>ln</c>, so the final path appears complete and
 /// link creation fails atomically on collision. Directory copies reserve the root with <c>mkdir</c> before
@@ -43,12 +41,16 @@ internal static class ServerSideCopyCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        string source = InputValidator.EscapeShellArg(sourcePath);
-        string destination = InputValidator.EscapeShellArg(destinationPath);
+        string source = PathEscaper.EscapeForShell(sourcePath);
+        string destination = PathEscaper.EscapeForShell(destinationPath);
 
         if (recursive)
         {
-            return $"mkdir -- {destination} && cp -a -- {source}/. {destination}";
+            // The reserved root and whatever cp managed to copy are removed when cp fails
+            // part way: the caller reports that the copy was not performed, and a partial
+            // tree left on the server made that statement false.
+            return $"mkdir -- {destination} && cp -a -- {source}/. {destination}; "
+                + $"status=$?; if [ $status -ne 0 ]; then rm -rf -- {destination}; fi; exit $status";
         }
 
         string tempDestination = $"{destination}.$$.part";
