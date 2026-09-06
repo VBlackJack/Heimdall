@@ -74,9 +74,20 @@ public partial class FtpsCertificatePromptDialogViewModel(
 
     public string RejectButtonText => _localizer["FtpsCertificateRejectButton"];
 
-    public bool TrustOnceIsDefault => IsMismatch;
+    /// <summary>
+    /// "Trust this session" never answers Enter: on a first-use prompt Accept does,
+    /// and on a changed certificate nothing that connects may be one keystroke away.
+    /// </summary>
+    public bool TrustOnceIsDefault => false;
 
-    public bool AcceptIsDefault => !TrustOnceIsDefault;
+    public bool AcceptIsDefault => !IsMismatch;
+
+    /// <summary>
+    /// On a changed certificate the default button is Reject, the same rule as the
+    /// SSH host key prompt: the Enter reflex trained by the first-use prompt must
+    /// not connect to a server whose certificate no longer matches the stored one.
+    /// </summary>
+    public bool RejectIsDefault => IsMismatch;
 
     public FtpsCertificateDecision? Decision { get; private set; }
 
