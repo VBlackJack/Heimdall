@@ -140,6 +140,23 @@ public sealed class LocalPasteTreePlannerTests
         Assert.DoesNotContain(operations, operation => operation.SourcePath == linkedFile.FullPath);
     }
 
+    /// <remarks>A file link inside a pasted tree was copied by value, as its target's bytes.</remarks>
+    [Fact]
+    public void Plan_ChildReparsePointFile_IsSkipped()
+    {
+        LocalPasteEntry root = new(@"C:\Source\Root", "Root", IsDirectory: true, IsReparsePoint: false);
+        LocalPasteEntry link = new(@"C:\Source\Root\link.txt", "link.txt", IsDirectory: false, IsReparsePoint: true);
+        LocalPasteEntry file = new(@"C:\Source\Root\real.txt", "real.txt", IsDirectory: false, IsReparsePoint: false);
+
+        IReadOnlyList<LocalPasteOp> operations = LocalPasteTreePlanner.Plan(
+            [root],
+            @"C:\Target",
+            _ => [link, file]);
+
+        Assert.DoesNotContain(operations, op => op.SourcePath.EndsWith("link.txt", StringComparison.Ordinal));
+        Assert.Contains(operations, op => op.SourcePath.EndsWith("real.txt", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Plan_RootReparsePointDirectory_IsPlanned()
     {

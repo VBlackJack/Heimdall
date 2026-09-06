@@ -527,77 +527,31 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         }
 
         string title = L10n("FileBrowserPasteOverwriteTitle");
-        List<(string SourcePath, IReadOnlyList<LocalPasteOp> Operations)> plannedRoots = [];
-        List<LocalPasteOp> operations = [];
-        List<string> refusedRootNames = [];
+        string targetDirectory = CurrentPath;
 
-        foreach (string sourcePath in sourcePaths)
+        // Planned off the UI thread: the walk probes every entry of the source tree, and on a big
+        // tree or a slow share it froze the window for its whole duration.
+        LocalPastePlan plan = await Task.Run(() => PlanPasteRoots(sourcePaths, targetDirectory, File.GetAttributes));
+        List<(string SourcePath, IReadOnlyList<LocalPasteOp> Operations)> plannedRoots = plan.Roots;
+        List<LocalPasteOp> operations = [.. plannedRoots.SelectMany(root => root.Operations)];
+
+        foreach ((string sourceName, string message) in plan.Errors)
         {
-            if (string.IsNullOrWhiteSpace(sourcePath))
-            {
-                continue;
-            }
-
-            try
-            {
-                bool isDirectory;
-                if (File.Exists(sourcePath))
-                {
-                    isDirectory = false;
-                }
-                else if (Directory.Exists(sourcePath))
-                {
-                    isDirectory = true;
-                }
-                else
-                {
-                    continue;
-                }
-
-                if (isDirectory && LocalPasteTreePlanner.IsSameOrDescendantPath(sourcePath, CurrentPath))
-                {
-                    refusedRootNames.Add(Path.GetFileName(sourcePath));
-                    continue;
-                }
-
-                FileAttributes attributes = File.GetAttributes(sourcePath);
-                LocalPasteEntry root = new(
-                    sourcePath,
-                    Path.GetFileName(sourcePath),
-                    isDirectory,
-                    (attributes & FileAttributes.ReparsePoint) != 0);
-                IReadOnlyList<LocalPasteOp> rootOperations = LocalPasteTreePlanner.Plan(
-                    [root],
-                    CurrentPath,
-                    directoryPath => Directory
-                        .EnumerateFileSystemEntries(directoryPath)
-                        .Select(childPath =>
-                        {
-                            FileAttributes childAttributes = File.GetAttributes(childPath);
-                            return new LocalPasteEntry(
-                                childPath,
-                                Path.GetFileName(childPath),
-                                (childAttributes & FileAttributes.Directory) != 0,
-                                (childAttributes & FileAttributes.ReparsePoint) != 0);
-                        })
-                        .ToList());
-                plannedRoots.Add((sourcePath, rootOperations));
-                operations.AddRange(rootOperations);
-            }
-            catch (Exception ex)
-            {
-                string errorMessage = string.Format(
-                    L10n("FileBrowserPasteError"),
-                    Path.GetFileName(sourcePath),
-                    ex.Message);
-                dialogService.ShowError(title, errorMessage);
-            }
+            string errorMessage = string.Format(L10n("FileBrowserPasteError"), sourceName, message);
+            dialogService.ShowError(title, errorMessage);
         }
 
-        if (refusedRootNames.Count > 0)
+        if (plan.RefusedSelfTargets.Count > 0)
         {
-            string refusedNames = string.Join(", ", refusedRootNames);
+            string refusedNames = string.Join(", ", plan.RefusedSelfTargets);
             string errorMessage = string.Format(L10n("FileBrowserPasteRefusedSelfTarget"), refusedNames);
+            dialogService.ShowError(title, errorMessage);
+        }
+
+        if (plan.RefusedLinks.Count > 0)
+        {
+            string refusedNames = string.Join(", ", plan.RefusedLinks);
+            string errorMessage = string.Format(L10n("FileBrowserPasteRefusedLinks"), refusedNames);
             dialogService.ShowError(title, errorMessage);
         }
 
@@ -690,6 +644,96 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         }
 
         await Refresh();
+    }
+
+    /// <summary>
+    /// Plans every root of a paste. Pure apart from the file system it is handed, so the walk can
+    /// run off the UI thread and be tested with attributes of the test's choosing.
+    /// </summary>
+    /// <remarks>
+    /// A root that is a reparse point (a junction, a symbolic link) is refused rather than copied
+    /// through: the planner would otherwise traverse a junction to wherever it points, and copy a
+    /// file link by value.
+    /// </remarks>
+    internal static LocalPastePlan PlanPasteRoots(
+        IReadOnlyList<string> sourcePaths,
+        string targetDirectory,
+        Func<string, FileAttributes> getAttributes)
+    {
+        ArgumentNullException.ThrowIfNull(sourcePaths);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetDirectory);
+        ArgumentNullException.ThrowIfNull(getAttributes);
+
+        List<(string SourcePath, IReadOnlyList<LocalPasteOp> Operations)> roots = [];
+        List<string> refusedSelfTargets = [];
+        List<string> refusedLinks = [];
+        List<(string SourceName, string Message)> errors = [];
+
+        foreach (string sourcePath in sourcePaths)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath))
+            {
+                continue;
+            }
+
+            try
+            {
+                bool isDirectory;
+                if (File.Exists(sourcePath))
+                {
+                    isDirectory = false;
+                }
+                else if (Directory.Exists(sourcePath))
+                {
+                    isDirectory = true;
+                }
+                else
+                {
+                    continue;
+                }
+
+                if (isDirectory && LocalPasteTreePlanner.IsSameOrDescendantPath(sourcePath, targetDirectory))
+                {
+                    refusedSelfTargets.Add(Path.GetFileName(sourcePath));
+                    continue;
+                }
+
+                FileAttributes attributes = getAttributes(sourcePath);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    refusedLinks.Add(Path.GetFileName(sourcePath));
+                    continue;
+                }
+
+                LocalPasteEntry root = new(
+                    sourcePath,
+                    Path.GetFileName(sourcePath),
+                    isDirectory,
+                    IsReparsePoint: false);
+                IReadOnlyList<LocalPasteOp> rootOperations = LocalPasteTreePlanner.Plan(
+                    [root],
+                    targetDirectory,
+                    directoryPath => Directory
+                        .EnumerateFileSystemEntries(directoryPath)
+                        .Select(childPath =>
+                        {
+                            FileAttributes childAttributes = getAttributes(childPath);
+                            return new LocalPasteEntry(
+                                childPath,
+                                Path.GetFileName(childPath),
+                                (childAttributes & FileAttributes.Directory) != 0,
+                                (childAttributes & FileAttributes.ReparsePoint) != 0);
+                        })
+                        .ToList());
+                roots.Add((sourcePath, rootOperations));
+            }
+            catch (Exception ex)
+            {
+                errors.Add((Path.GetFileName(sourcePath), ex.Message));
+            }
+        }
+
+        return new LocalPastePlan(roots, refusedSelfTargets, refusedLinks, errors);
     }
 
     /// <summary>
