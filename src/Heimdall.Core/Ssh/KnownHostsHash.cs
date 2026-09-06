@@ -21,6 +21,18 @@ namespace Heimdall.Core.Ssh;
 
 public static class KnownHostsHash
 {
+    private const string HashedTokenPrefix = "|1|";
+
+    /// <summary>
+    /// Whether a host token is a hashed known_hosts entry (<c>|1|salt|hash</c>)
+    /// rather than a plain host name.
+    /// </summary>
+    public static bool IsHashedToken(string host)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        return host.StartsWith(HashedTokenPrefix, StringComparison.Ordinal);
+    }
+
     public static bool TryMatches(string hashedHost, string plainHost)
     {
         ArgumentNullException.ThrowIfNull(hashedHost);
@@ -58,8 +70,5 @@ public static class KnownHostsHash
     }
 
     private static byte[] ComputeHash(byte[] salt, string plainHost)
-    {
-        using var hmac = new HMACSHA1(salt);
-        return hmac.ComputeHash(Encoding.UTF8.GetBytes(plainHost));
-    }
+        => HMACSHA1.HashData(salt, Encoding.UTF8.GetBytes(plainHost));
 }

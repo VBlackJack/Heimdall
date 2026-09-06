@@ -262,19 +262,13 @@ public partial class App : System.Windows.Application
 
             // Persist newly trusted host keys back to settings via transactional merge.
             // Fire-and-forget on purpose: TOFU acceptance must not block the caller path.
+            // Batched: a known_hosts sync raises one event per line, and each write is a
+            // full settings load, serialize, atomic write and settings-changed broadcast.
             var hostKeyTrustService = _serviceProvider.GetRequiredService<IHostKeyTrustService>();
-            hostKeyTrustService.EntryTrusted += (key, entry) =>
-            {
-                _ = PersistTrustedHostKeyEntryAsync(configManager, key, entry);
-            };
-            hostKeyTrustService.EntryReplaced += (key, oldEntry, entry) =>
-            {
-                _ = PersistTrustedHostKeyEntryAsync(configManager, key, entry);
-            };
-            hostKeyTrustService.EntryRemoved += key =>
-            {
-                _ = PersistRemovedHostKeyAsync(configManager, key);
-            };
+            var hostKeyPersistence = _serviceProvider.GetRequiredService<HostKeyPersistenceCoalescer>();
+            hostKeyTrustService.EntryTrusted += (key, entry) => hostKeyPersistence.Upsert(key, entry);
+            hostKeyTrustService.EntryReplaced += (key, oldEntry, entry) => hostKeyPersistence.Upsert(key, entry);
+            hostKeyTrustService.EntryRemoved += key => hostKeyPersistence.Remove(key);
 
             hostKeyStore.HostKeyEvent += (key, fingerprint, trusted) =>
             {
@@ -285,11 +279,11 @@ public partial class App : System.Windows.Application
 
                 if (hostKeyStore.GetAllEntries().TryGetValue(key, out var entry))
                 {
-                    _ = PersistTrustedHostKeyEntryAsync(configManager, key, entry);
+                    hostKeyPersistence.Upsert(key, entry);
                 }
                 else
                 {
-                    _ = PersistTrustedHostKeyAsync(configManager, key, fingerprint);
+                    hostKeyPersistence.UpsertFingerprint(key, fingerprint);
                 }
             };
 
@@ -563,6 +557,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<HostKeyStore>();
         services.AddSingleton<IHostKeyTrustService, HostKeyTrustService>();
         services.AddSingleton<KnownHostsStartupSync>();
+        services.AddSingleton(provider => new HostKeyPersistenceCoalescer(provider.GetRequiredService<IConfigManager>()));
         services.AddSingleton<TrustPromptCoordinator>();
         services.AddSingleton<IHostKeyVerifier, DialogHostKeyVerifier>();
         services.AddSingleton<FtpsCertificateStore>();
@@ -1347,6 +1342,11 @@ public partial class App : System.Windows.Application
         _singleInstanceGuard?.Dispose();
         _singleInstanceGuard = null;
 
+        // Started before the first await, awaited at the end: a trust change made in the last
+        // quiet window would otherwise be lost with the process.
+        Task hostKeyPersistenceFlush = _serviceProvider?.GetService<HostKeyPersistenceCoalescer>()?.FlushAsync()
+            ?? Task.CompletedTask;
+
         if (_serviceProvider is not null)
         {
             // The sessions are closed BEFORE this method first yields, and the sequence records
@@ -1430,6 +1430,15 @@ public partial class App : System.Windows.Application
         else
         {
             _serviceProvider?.Dispose();
+        }
+
+        try
+        {
+            await hostKeyPersistenceFlush.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Trusted host key flush at exit did not complete: {ex.Message}");
         }
 
         Core.Logging.FileLogger.Info("Heimdall shutdown complete");
