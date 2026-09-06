@@ -229,6 +229,58 @@ public sealed class KnownHostsImportExportTests : IDisposable
         Assert.DoesNotContain($"managed.example.com ssh-rsa {ToKey(oldManagedKey)}", lines);
     }
 
+    // B-05: a known_hosts line can name several hosts. Rewriting the whole line for the one
+    // host Heimdall manages silently dropped every other token from the user's file.
+    [Fact]
+    public void ExportFile_MultiHostLineWithUnmanagedToken_KeepsOriginalLineAndAppendsManagedLine()
+    {
+        byte[] oldKey = [0x30, 0x31, 0x32];
+        byte[] newKey = [0x33, 0x34, 0x35];
+        string multiHostLine = $"web1.example.com,10.0.0.5 ssh-ed25519 {ToKey(oldKey)}";
+        string path = WriteKnownHosts(multiHostLine);
+        (_, HostKeyTrustService service) = CreateService();
+        service.Import(
+            "web1.example.com",
+            22,
+            HostKeyFormats.ComputeSha256Fingerprint(newKey),
+            "ssh-ed25519",
+            DateTimeOffset.Parse("2026-04-24T10:15:00Z"),
+            ToKey(newKey));
+        KnownHostsExporter exporter = new KnownHostsExporter(service);
+
+        KnownHostsExportReport report = exporter.ExportFile(path);
+
+        string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+        Assert.Contains(multiHostLine, lines);
+        Assert.Contains($"web1.example.com ssh-ed25519 {ToKey(newKey)}", lines);
+        Assert.Equal(1, report.Written);
+        Assert.Equal(1, report.Preserved);
+    }
+
+    [Fact]
+    public void ExportFile_MultiHostLineWithEveryTokenManaged_RewritesEachHostOnItsOwnLine()
+    {
+        byte[] oldKey = [0x36, 0x37];
+        byte[] firstKey = [0x38, 0x39];
+        byte[] secondKey = [0x3A, 0x3B];
+        string multiHostLine = $"web1.example.com,web2.example.com ssh-ed25519 {ToKey(oldKey)}";
+        string path = WriteKnownHosts(multiHostLine);
+        (_, HostKeyTrustService service) = CreateService();
+        DateTimeOffset importedAt = DateTimeOffset.Parse("2026-04-24T10:15:00Z");
+        service.Import("web1.example.com", 22, HostKeyFormats.ComputeSha256Fingerprint(firstKey), "ssh-ed25519", importedAt, ToKey(firstKey));
+        service.Import("web2.example.com", 22, HostKeyFormats.ComputeSha256Fingerprint(secondKey), "ssh-ed25519", importedAt, ToKey(secondKey));
+        KnownHostsExporter exporter = new KnownHostsExporter(service);
+
+        KnownHostsExportReport report = exporter.ExportFile(path);
+
+        string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+        Assert.DoesNotContain(multiHostLine, lines);
+        Assert.Contains($"web1.example.com ssh-ed25519 {ToKey(firstKey)}", lines);
+        Assert.Contains($"web2.example.com ssh-ed25519 {ToKey(secondKey)}", lines);
+        Assert.Equal(2, report.Written);
+        Assert.Equal(0, report.Preserved);
+    }
+
     [Fact]
     public void ExportFile_WriteFailure_LeavesExistingFileIntact()
     {

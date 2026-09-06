@@ -197,17 +197,24 @@ public sealed class KnownHostsExporter(
 
         foreach (var line in existingLines)
         {
-            if (!TryFindWritableKnownHostKey(line, writableEntries, out var matchedKey))
+            // A line is rewritten only when every host token on it is a managed host.
+            // A line that also names hosts Heimdall does not manage is kept verbatim so
+            // those hosts survive the export; the managed entries are appended below.
+            IReadOnlyList<string> managedKeys = FindFullyManagedHostKeys(line, writableEntries);
+            if (managedKeys.Count == 0)
             {
                 output.Add(line);
                 preserved++;
                 continue;
             }
 
-            if (written.Add(matchedKey)
-                && TryExportLine(matchedKey, writableEntries[matchedKey], out var replacement))
+            foreach (string matchedKey in managedKeys)
             {
-                output.Add(replacement);
+                if (written.Add(matchedKey)
+                    && TryExportLine(matchedKey, writableEntries[matchedKey], out var replacement))
+                {
+                    output.Add(replacement);
+                }
             }
         }
 
@@ -245,29 +252,40 @@ public sealed class KnownHostsExporter(
         }
     }
 
-    private static bool TryFindWritableKnownHostKey(
+    /// <summary>
+    /// Returns the managed <c>host:port</c> keys of a known_hosts line when every host token
+    /// on the line maps to a managed entry, and an empty list otherwise. The parser emits one
+    /// entry per clear or hashed token and a diagnostic per token it cannot represent, so a
+    /// line with any diagnostic, any hashed token or any unmanaged host is not fully managed.
+    /// </summary>
+    private static IReadOnlyList<string> FindFullyManagedHostKeys(
         string line,
-        IReadOnlyDictionary<string, HostKeyEntry> entries,
-        out string matchedKey)
+        IReadOnlyDictionary<string, HostKeyEntry> entries)
     {
-        matchedKey = string.Empty;
-        var parsed = KnownHostsParser.Parse(line);
-        foreach (var entry in parsed.Entries)
+        KnownHostsParseResult parsed = KnownHostsParser.Parse(line);
+        if (parsed.Diagnostics.Count > 0 || parsed.Entries.Count == 0)
+        {
+            return [];
+        }
+
+        List<string> keys = new List<string>(parsed.Entries.Count);
+        foreach (KnownHostsRawEntry entry in parsed.Entries)
         {
             if (entry.IsHashedHost)
             {
-                continue;
+                return [];
             }
 
-            var key = HostKeyFormats.MakeKey(entry.Host, entry.Port);
-            if (entries.ContainsKey(key))
+            string key = HostKeyFormats.MakeKey(entry.Host, entry.Port);
+            if (!entries.ContainsKey(key))
             {
-                matchedKey = key;
-                return true;
+                return [];
             }
+
+            keys.Add(key);
         }
 
-        return false;
+        return keys;
     }
 
     private static bool TryExportLine(string hostPort, HostKeyEntry entry, out string line)
