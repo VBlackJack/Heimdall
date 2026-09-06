@@ -302,6 +302,11 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Updates** section in Settings with a manual **Check now** button and the current installed version
 - Every release publishes a `SHA256SUMS.txt` asset so installer integrity can be verified before running
 - The downloaded installer is staged under a restrictive-ACL directory and held under a deny-write handle from verification through launch; its SHA-256 (plus Authenticode when the installer is signed) is re-checked immediately before the elevated launch, so a swap between verification and execution is refused
+- The update source is pinned to the project's GitHub repository at compile time, and asset downloads are confined to GitHub origins; nothing in the user's settings can redirect the updater
+- A copy the installer did not put in place (a portable zip, an MSI deployment, a build run from its output folder) is told a release exists and pointed at the release page instead of being offered an installer that would install a second copy elsewhere
+- The relauncher refuses to run the installer while the application is still running, records why it stopped at every stage (including a declined elevation prompt), and brings the application back even when its own bootstrap fails before the script starts
+- A download that stalls is cut off after sixty seconds without data and reported as a failed download; **Skip this version** is shown in the Updates section of Settings with a button to offer that version again
+- Installing an update saves unsaved settings, the session tree's expand state and the window bounds before the application exits, as a normal close would
 
 ---
 

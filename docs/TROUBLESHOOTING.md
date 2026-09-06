@@ -961,3 +961,19 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 2. Or remove the SOCKS proxy / reverse forward from the profile if the session does not need it.
 
 **Files**: `Services/TunnelService.cs` (`EstablishPlinkTunnelAsync`), `Heimdall.Ssh/Plink/PlinkTunnelRunner.cs`
+
+---
+
+## 53. Update - The Banner Says the Update Did Not Apply {#update-did-not-apply}
+
+**Symptom**: After accepting an update, Heimdall comes back on the previous version and the banner reports that the update was not applied, was cancelled, or could not start because Heimdall was still running.
+
+**Root cause**: The relauncher records the stage it reached before it stopped, and the next start reports it. The three most frequent causes, each with its own wording: the elevation prompt was declined (reported as a cancellation, not a failure); Heimdall had not exited within two minutes, so the relauncher refused to run the installer over a live process; or the installer itself reported an error. A copy the installer did not put in place (portable zip, MSI) is never offered an installer any more and is shown the release page instead.
+
+**Solution**:
+
+1. Read the relauncher transcript: `Heimdall_relaunch_<date>.log` in the log folder shown in the About panel. It names the stage and, for an installer error, the exit code.
+2. If Heimdall was still running, close every window (detached session windows included) and try again; a session close prompt that stayed open is the usual reason.
+3. If the copy is a portable zip or an MSI deployment, download the new archive or package from the release page.
+
+**Files**: `Heimdall.Core/Updates/UpdateRelaunchScript.cs`, `Heimdall.Core/Updates/UpdateOutcomeClassifier.cs`, `Services/UpdateRelaunchOutcomeText.cs`

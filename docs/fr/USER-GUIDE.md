@@ -202,7 +202,16 @@ renvoie vers la page de publication pour le faire à la main.
 
 Si vous avez installé depuis le zip plutôt qu'avec l'installeur, remplacez le contenu du dossier
 par la nouvelle version. Vos sessions et vos réglages vivent en dehors du dossier du programme et
-ne sont pas touchés.
+ne sont pas touchés. Heimdall reconnaît une telle copie et ne propose pas de l'écraser ; il affiche
+la page de publication à la place.
+
+Si vous avez choisi **Ignorer cette version** sur la bannière et changez d'avis, la version ignorée
+est listée dans **Réglages** -> **Mises à jour** avec un bouton qui la propose à nouveau.
+
+Installer une mise à jour enregistre vos réglages non sauvegardés, l'état de dépliage de l'arbre et
+la position de la fenêtre avant la sortie de Heimdall, exactement comme la fermeture de la fenêtre.
+Si une mise à jour ne s'est pas appliquée, la bannière le dit au démarrage suivant et le journal du
+relanceur se trouve dans le dossier de journaux indiqué dans le panneau À propos.
 
 ---
 

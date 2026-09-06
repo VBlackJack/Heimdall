@@ -563,6 +563,39 @@ assignments, token / bearer assignments to end-of-line, and `-pw` / `-pwfile`
 flags so an unexpected stderr echo from plink cannot leak credentials into
 the application log.
 
+### In-app update source and relaunch
+
+The repository the updater checks is a compile-time constant (`UpdateSource`),
+not a setting. It used to be a pair of strings in the user's `settings.json`,
+unvalidated and shown in no interface: anyone able to write that file could
+point the updater at a repository of their own, and the SHA-256 check passed
+because it is computed against that repository's own checksum file. SHA-256 is
+an integrity control against a corrupt transfer, not an authenticity control;
+until the installer is signed, the source is the only authenticity control, so
+it is pinned. Asset and checksum URLs taken from the release JSON are refused
+unless they are `https` on `github.com`, `githubusercontent.com` or a subdomain
+of either.
+
+The detached relauncher runs under Windows PowerShell through an in-memory
+bootstrap that re-reads the script under a deny-write handle and verifies its
+pinned SHA-256 before executing it. The bootstrap has its own failure path: a
+tampered or unparseable script is refused, recorded as a preparation failure,
+and the application is relaunched. The script refuses to run the installer
+while the application is still running (an installer started over a live
+process force-closes it mid-session), passes the installer the directory of
+the running copy, and records a declined elevation prompt as a cancellation
+rather than a failure. An installer is only offered to a copy the installer
+registered in place; a portable archive or an MSI deployment is shown the
+release page instead.
+
+Known residual risk, recorded rather than fixed: on the elevated path the
+installer runs as administrator from a staging directory the unprivileged
+user can write. The installer file itself is held under a deny-write lease
+from verification through launch, so it cannot be swapped; a sibling file
+planted beside it could still be resolved by the installer's own loader.
+Under Microsoft's stated model UAC is not a security boundary, so this is a
+hardening item, not a break.
+
 ### Remote entries whose type cannot be determined
 
 A listing classifies each remote entry: regular file, directory, symbolic link, pipe, socket, device.
