@@ -24,6 +24,10 @@ public sealed class GitHubReleaseClientTests
 {
     private const string AppVersion = "2026.061501";
 
+    private const string ChecksumUrl = "https://github.com/VBlackJack/Heimdall/releases/download/v2026.061502/SHA256SUMS.txt";
+
+    private const string InstallerUrl = "https://github.com/VBlackJack/Heimdall/releases/download/v2026.061502/standard.exe";
+
     private const string LatestReleaseJson = """
     {
         "tag_name": "v2026.061502",
@@ -123,7 +127,7 @@ public sealed class GitHubReleaseClientTests
             Content = new StringContent(body, Encoding.UTF8),
         });
 
-        var text = await client.GetAssetTextAsync("https://example.test/SHA256SUMS.txt", CancellationToken.None);
+        var text = await client.GetAssetTextAsync(ChecksumUrl, CancellationToken.None);
 
         Assert.Equal(body, text);
     }
@@ -133,7 +137,7 @@ public sealed class GitHubReleaseClientTests
     {
         var client = CreateClient((_, _) => new HttpResponseMessage(HttpStatusCode.InternalServerError));
 
-        var text = await client.GetAssetTextAsync("https://example.test/SHA256SUMS.txt", CancellationToken.None);
+        var text = await client.GetAssetTextAsync(ChecksumUrl, CancellationToken.None);
 
         Assert.Null(text);
     }
@@ -143,7 +147,7 @@ public sealed class GitHubReleaseClientTests
     {
         var client = CreateClient((_, _) => throw new TaskCanceledException("timed out"));
 
-        var text = await client.GetAssetTextAsync("https://example.test/SHA256SUMS.txt", CancellationToken.None);
+        var text = await client.GetAssetTextAsync(ChecksumUrl, CancellationToken.None);
 
         Assert.Null(text);
     }
@@ -156,7 +160,7 @@ public sealed class GitHubReleaseClientTests
         var client = CreateClient((_, ct) => throw new TaskCanceledException("canceled", innerException: null, ct));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => client.GetAssetTextAsync("https://example.test/SHA256SUMS.txt", cts.Token));
+            () => client.GetAssetTextAsync(ChecksumUrl, cts.Token));
     }
 
     [Fact]
@@ -168,7 +172,7 @@ public sealed class GitHubReleaseClientTests
             Content = new ByteArrayContent(payload),
         });
 
-        await using var stream = await client.OpenAssetStreamAsync("https://example.test/standard.exe", CancellationToken.None);
+        await using var stream = await client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None);
         using var buffer = new MemoryStream();
         await stream.CopyToAsync(buffer);
 
@@ -181,7 +185,91 @@ public sealed class GitHubReleaseClientTests
         var client = CreateClient((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound));
 
         await Assert.ThrowsAsync<HttpRequestException>(
-            () => client.OpenAssetStreamAsync("https://example.test/missing.exe", CancellationToken.None));
+            () => client.OpenAssetStreamAsync("https://github.com/VBlackJack/Heimdall/releases/download/v1/missing.exe", CancellationToken.None));
+    }
+
+    /// <remarks>
+    /// Only the API origin was pinned; every asset URL came out of the JSON and was
+    /// dispatched as found, checksum file and installer alike. A refused URL must not
+    /// reach the network at all.
+    /// </remarks>
+    [Theory]
+    [InlineData("https://evil.example/Heimdall_Setup.exe")]
+    [InlineData("http://github.com/VBlackJack/Heimdall/releases/download/v1/setup.exe")]
+    [InlineData("https://github.com.evil.example/setup.exe")]
+    [InlineData("file:///C:/setup.exe")]
+    [InlineData("not a url")]
+    public async Task OpenAssetStreamAsync_UnexpectedOrigin_RefusesWithoutSending(string url)
+    {
+        int sent = 0;
+        var client = CreateClient((_, _) =>
+        {
+            sent++;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1]) };
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.OpenAssetStreamAsync(url, CancellationToken.None));
+
+        Assert.Equal(0, sent);
+    }
+
+    [Fact]
+    public async Task GetAssetTextAsync_UnexpectedOrigin_ReturnsNullWithoutSending()
+    {
+        int sent = 0;
+        var client = CreateClient((_, _) =>
+        {
+            sent++;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("abc  x.exe") };
+        });
+
+        string? text = await client.GetAssetTextAsync("https://evil.example/SHA256SUMS.txt", CancellationToken.None);
+
+        Assert.Null(text);
+        Assert.Equal(0, sent);
+    }
+
+    [Theory]
+    [InlineData("https://github.com/VBlackJack/Heimdall/releases/download/v1/setup.exe", true)]
+    [InlineData("https://objects.githubusercontent.com/github-production-release-asset/x", true)]
+    [InlineData("https://api.github.com/repos/x/y/releases/assets/1", true)]
+    [InlineData("https://GITHUB.COM/x", true)]
+    [InlineData("https://githubusercontent.com/x", true)]
+    [InlineData("https://notgithub.com/x", false)]
+    [InlineData("https://github.com.evil.example/x", false)]
+    [InlineData("http://github.com/x", false)]
+    [InlineData("/relative/path", false)]
+    public void IsAllowedAssetUrl_AcceptsOnlyHttpsOnGitHubOrigins(string url, bool expected)
+    {
+        Assert.Equal(expected, GitHubReleaseClient.IsAllowedAssetUrl(url));
+    }
+
+    /// <remarks>
+    /// The response was neither returned nor disposed when the status check threw,
+    /// so its connection stayed with the garbage collector.
+    /// </remarks>
+    [Fact]
+    public async Task OpenAssetStreamAsync_NonSuccess_DisposesTheResponse()
+    {
+        var content = new DisposeTrackingContent();
+        var client = CreateClient((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = content });
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.OpenAssetStreamAsync("https://github.com/x/missing.exe", CancellationToken.None));
+
+        Assert.True(content.Disposed, "the response content must be disposed when it is not returned");
+    }
+
+    private sealed class DisposeTrackingContent() : ByteArrayContent([0])
+    {
+        public bool Disposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;
+            base.Dispose(disposing);
+        }
     }
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, string json) =>

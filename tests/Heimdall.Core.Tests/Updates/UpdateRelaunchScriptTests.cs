@@ -305,6 +305,20 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Contains($"-ArgumentList '{UpdateRelaunchScript.DefaultInstallerArguments}'", script);
     }
 
+    /// <remarks>
+    /// Without /DIR the destination came from Inno's previous-install lookup in the
+    /// hive matching the current elevation, decided separately by the writability
+    /// probe; when the two disagreed the update went to the default directory and
+    /// the old copy was relaunched.
+    /// </remarks>
+    [Theory]
+    [InlineData(@"C:\Program Files\Heimdall", @"/SILENT /NORESTART /DIR=""C:\Program Files\Heimdall""")]
+    [InlineData(@"C:\Program Files\Heimdall\", @"/SILENT /NORESTART /DIR=""C:\Program Files\Heimdall""")]
+    public void InstallerArgumentsFor_AppendsTheQuotedInstallDirectory(string directory, string expected)
+    {
+        Assert.Equal(expected, UpdateRelaunchScript.InstallerArgumentsFor(directory));
+    }
+
     [Fact]
     public void Build_EmitsSelfDeleteOfScriptPath()
     {

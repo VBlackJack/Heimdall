@@ -183,10 +183,11 @@ public partial class UpdateBannerViewModel : ObservableObject
             return;
         }
 
+        // The source is pinned, never read from settings: see UpdateSource.
         var result = await _updateService.CheckForUpdatesAsync(
             current.Value,
-            settings.UpdateRepositoryOwner,
-            settings.UpdateRepositoryName,
+            UpdateSource.RepositoryOwner,
+            UpdateSource.RepositoryName,
             cancellationToken);
 
         if (result.Status == UpdateCheckStatus.CheckFailed)
@@ -203,7 +204,7 @@ public partial class UpdateBannerViewModel : ObservableObject
         }
 
         var version = result.Update.Version;
-        if (string.Equals(version.ToString(), settings.UpdateSkippedVersion, StringComparison.Ordinal))
+        if (IsSkipped(version, settings.UpdateSkippedVersion))
         {
             return;
         }
@@ -218,6 +219,16 @@ public partial class UpdateBannerViewModel : ObservableObject
     }
 
     private bool CanDownloadAndInstall() => !IsInstalling && _availableUpdate is not null;
+
+    /// <summary>
+    /// Whether the user asked to skip this version. Compared as versions, because the
+    /// type's equality is numeric and a comparison of spellings would offer a skipped
+    /// version again the day either side gains a leading 'v'.
+    /// </summary>
+    internal static bool IsSkipped(HeimdallVersion version, string? skippedVersion) =>
+        HeimdallVersion.TryParse(skippedVersion, out HeimdallVersion skipped)
+            ? skipped == version
+            : string.Equals(version.ToString(), skippedVersion, StringComparison.Ordinal);
 
     /// <summary>
     /// Downloads the verified installer for the banner's update and launches the relauncher via

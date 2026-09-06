@@ -16,6 +16,7 @@
 
 using System.ComponentModel;
 using System.IO;
+using System.Security;
 using System.Text;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Updates;
@@ -57,27 +58,37 @@ internal sealed class UpdateInstaller : IUpdateInstaller
             return false;
         }
 
-        string scriptPath = _host.CreateScriptPath(package.StagingDirectory);
-        var logPath = _host.CreateLogPath();
-        var failureRecordPath = _host.CreateFailureRecordPath();
-
-        var installDir = Path.GetDirectoryName(exe);
-        var requiresElevation = installDir is not null && !_host.IsDirectoryWritable(installDir);
-
-        var spec = new UpdateRelaunchSpec(
-            InstallerPath: package.InstallerPath,
-            ExpectedInstallerSha256: package.ExpectedSha256,
-            TargetExecutablePath: exe,
-            ProcessId: _host.ProcessId,
-            ScriptPath: scriptPath,
-            StagingDirectory: package.StagingDirectory,
-            RequiresElevation: requiresElevation,
-            LogPath: logPath,
-            FailureRecordPath: failureRecordPath);
+        string? installDir = Path.GetDirectoryName(exe);
+        if (string.IsNullOrWhiteSpace(installDir))
+        {
+            FileLogger.Warn("Update install aborted: cannot determine the install directory.");
+            return false;
+        }
 
         bool launched;
         try
         {
+            // Inside the try, all three: two of them create directories, and on a full
+            // disk or a locked data directory they threw out of this method with the
+            // attempt record already written, so the next startup announced a failure
+            // for an update that never started.
+            string scriptPath = _host.CreateScriptPath(package.StagingDirectory);
+            string logPath = _host.CreateLogPath();
+            string failureRecordPath = _host.CreateFailureRecordPath();
+            bool requiresElevation = !_host.IsDirectoryWritable(installDir);
+
+            var spec = new UpdateRelaunchSpec(
+                InstallerPath: package.InstallerPath,
+                ExpectedInstallerSha256: package.ExpectedSha256,
+                TargetExecutablePath: exe,
+                ProcessId: _host.ProcessId,
+                ScriptPath: scriptPath,
+                StagingDirectory: package.StagingDirectory,
+                RequiresElevation: requiresElevation,
+                InstallerArguments: UpdateRelaunchScript.InstallerArgumentsFor(installDir),
+                LogPath: logPath,
+                FailureRecordPath: failureRecordPath);
+
             string script = UpdateRelaunchScript.Build(spec);
             string expectedScriptSha256 = ComputeTextSha256(script);
             _host.WriteProtectedText(scriptPath, script);
@@ -94,17 +105,23 @@ internal sealed class UpdateInstaller : IUpdateInstaller
                 exe,
                 failureRecordPath);
             launched = _host.StartDetached(psHost, args);
+
+            // The transcript path is recorded here because it is the only account of what
+            // happens after this process exits, and until now its name appeared nowhere.
+            FileLogger.Info(
+                $"Update relauncher launched={launched} elevation={requiresElevation} transcript={logPath}");
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or Win32Exception
+            or SecurityException
+            or NotSupportedException
+            or ArgumentException)
         {
-            FileLogger.Warn($"Update install failed to launch relauncher: {ex.Message}");
+            FileLogger.WarnDetailed("Update install failed to launch the relauncher", ex);
             return false;
         }
 
-        // The transcript path is recorded here because it is the only account of what
-        // happens after this process exits, and until now its name appeared nowhere.
-        FileLogger.Info(
-            $"Update relauncher launched={launched} elevation={requiresElevation} transcript={logPath}");
         return launched;
     }
 

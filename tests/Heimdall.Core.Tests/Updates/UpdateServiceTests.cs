@@ -20,10 +20,157 @@ using Heimdall.Core.Updates;
 
 namespace Heimdall.Core.Tests;
 
-public sealed class UpdateServiceTests
+public sealed class UpdateServiceTests : IDisposable
 {
     private const string CurrentTag = "v2026.061501";
+    private const string OlderTag = "v2026.061500";
     private const string NewerTag = "v2026.061502";
+
+    /// <summary>
+    /// A data root of this test's own. Staging used to land in the operator's real
+    /// profile (the BL-0063 shape), and the snapshot-based assertions had to work
+    /// around whatever other tests had left there.
+    /// </summary>
+    private readonly string _dataRoot = Path.Combine(
+        Path.GetTempPath(),
+        "heimdall-update-service",
+        Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(_dataRoot))
+            {
+                Directory.Delete(_dataRoot, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // A lease still open on a verified installer; the root is disposable.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Same.
+        }
+    }
+
+    /// <remarks>
+    /// The only test of the "not newer" branch used an EQUAL version, so the
+    /// comparison could have been == and stayed green. A server that went backwards
+    /// must read as up to date too, never as an update.
+    /// </remarks>
+    [Fact]
+    public async Task CheckForUpdatesAsync_LatestOlderThanCurrent_UpToDate()
+    {
+        var client = new StubReleaseClient { Release = ReleaseFor(OlderTag, includeChecksum: true) };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
+
+        Assert.Equal(UpdateCheckStatus.UpToDate, result.Status);
+        Assert.Null(result.Update);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesAsync_CancelledToken_Propagates()
+    {
+        var client = new StubReleaseClient { Release = ReleaseFor(NewerTag, includeChecksum: true) };
+        var service = CreateService(client, BuildVariant.Standard);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", cancellation.Token));
+    }
+
+    /// <remarks>
+    /// A portable archive, an MSI deployment or a build run from its output directory
+    /// detects a variant exactly like an installed copy. Offering it the installer
+    /// installed a second copy elsewhere, relaunched the old one, and reported "did
+    /// not apply" on every launch from then on. The release page is the honest answer.
+    /// </remarks>
+    [Fact]
+    public async Task CheckForUpdatesAsync_CopyNotInstalledInPlace_UpdateNotInstallable()
+    {
+        var client = new StubReleaseClient
+        {
+            Release = ReleaseFor(NewerTag, includeChecksum: true),
+            ChecksumText = ChecksumsFor(NewerTag),
+        };
+        var service = new UpdateService(
+            client,
+            new StubVariantDetector(BuildVariant.Standard, installedInPlace: false),
+            _dataRoot);
+
+        var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
+
+        Assert.Equal(UpdateCheckStatus.UpdateNotInstallable, result.Status);
+        Assert.Null(result.Update);
+        AssertReleaseRef(result);
+    }
+
+    [Theory]
+    [InlineData(BuildVariant.Standard, "Heimdall_2026.061502_Standard_Setup.exe")]
+    [InlineData(BuildVariant.SelfContained, "Heimdall_2026.061502_SelfContained_Setup.exe")]
+    public void BuildInstallerName_MatchesThePublishedPattern(BuildVariant variant, string expected)
+    {
+        Assert.Equal(expected, UpdateService.BuildInstallerName(HeimdallVersion.Parse(NewerTag), variant));
+    }
+
+    [Theory]
+    [InlineData("abc  Heimdall_x.exe\n", "Heimdall_x.exe", "abc")]
+    [InlineData("ABC  Heimdall_x.exe\r\n", "heimdall_x.exe", "abc")]
+    [InlineData("abc  Heimdall_x.exe\ndef  Other.exe\n", "Other.exe", "def")]
+    [InlineData("abc Heimdall_x.exe\n", "Heimdall_x.exe", null)]
+    [InlineData("  abc  Heimdall_x.exe  \n", "Heimdall_x.exe", "abc")]
+    [InlineData("", "Heimdall_x.exe", null)]
+    public void ParseChecksumLine_ReadsTheTwoSpaceFormat(string text, string fileName, string? expected)
+    {
+        Assert.Equal(expected, UpdateService.ParseChecksumLine(text, fileName));
+    }
+
+    /// <remarks>
+    /// Measured under .NET 10: HttpClient.Timeout governs the headers only when the
+    /// body is streamed, so a body that stalls stayed blocked in ReadAsync for ever
+    /// with the progress bar frozen. The inactivity budget is the only bound, and a
+    /// stall must read as a failed download, not as a cancellation the user did not
+    /// make.
+    /// </remarks>
+    [Fact(Timeout = 10000)]
+    public async Task DownloadVerifiedAsync_SourceStreamStalls_ThrowsIOExceptionAndDeletesStaging()
+    {
+        var client = new StubReleaseClient { StreamFactory = () => new StalledStream() };
+        var service = new UpdateService(
+            client,
+            new StubVariantDetector(BuildVariant.Standard),
+            _dataRoot,
+            downloadIdleTimeout: TimeSpan.FromMilliseconds(200));
+        const string tag = "v2026.061596";
+        var update = UpdateWithSha(new string('0', 64), 10, tag);
+
+        IOException thrown = await Assert.ThrowsAsync<IOException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Contains("stalled", thrown.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(StagingSnapshot(tag));
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task DownloadVerifiedAsync_CallerCancelsDuringAStall_ReportsCancellationNotAStall()
+    {
+        var client = new StubReleaseClient { StreamFactory = () => new StalledStream() };
+        var service = new UpdateService(
+            client,
+            new StubVariantDetector(BuildVariant.Standard),
+            _dataRoot,
+            downloadIdleTimeout: TimeSpan.FromSeconds(30));
+        var update = UpdateWithSha(new string('0', 64), 10, "v2026.061595");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.DownloadVerifiedAsync(update, null, cancellation.Token));
+    }
     private const long StandardSize = 100;
     private const long SelfContainedSize = 200;
 
@@ -311,8 +458,8 @@ public sealed class UpdateServiceTests
         Assert.Empty(StagingSnapshot(tag).Except(before));
     }
 
-    private static UpdateService CreateService(StubReleaseClient client, BuildVariant variant)
-        => new(client, new StubVariantDetector(variant));
+    private UpdateService CreateService(StubReleaseClient client, BuildVariant variant)
+        => new(client, new StubVariantDetector(variant), _dataRoot);
 
     private static void AssertReleaseRef(UpdateCheckResult result, string tag = NewerTag)
     {
@@ -354,11 +501,10 @@ public sealed class UpdateServiceTests
         return new UpdateInfo(version, versionTag, "https://example.test", "notes", asset, sha256);
     }
 
-    private static HashSet<string> StagingSnapshot(string versionTag)
+    private HashSet<string> StagingSnapshot(string versionTag)
     {
         var version = HeimdallVersion.Parse(versionTag);
-        string updatesRoot = ApplicationDataPathResolver.GetUpdatesDirectory(
-            ApplicationDataPathResolver.Resolve());
+        string updatesRoot = ApplicationDataPathResolver.GetUpdatesDirectory(_dataRoot);
         return Directory.Exists(updatesRoot)
             ? new(
                 Directory.EnumerateDirectories(
@@ -377,7 +523,10 @@ public sealed class UpdateServiceTests
         public Func<Stream>? StreamFactory { get; set; }
 
         public Task<GitHubRelease?> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
-            => Task.FromResult(Release);
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(Release);
+        }
 
         public Task<string?> GetAssetTextAsync(string url, CancellationToken cancellationToken)
             => Task.FromResult(ChecksumText);
@@ -386,9 +535,47 @@ public sealed class UpdateServiceTests
             => Task.FromResult(StreamFactory?.Invoke() ?? Stream.Null);
     }
 
-    private sealed class StubVariantDetector(BuildVariant variant) : IVariantDetector
+    private sealed class StubVariantDetector(BuildVariant variant, bool installedInPlace = true) : IVariantDetector
     {
         public BuildVariant Detect() => variant;
+
+        public bool IsInstalledInPlace() => installedInPlace;
+    }
+
+    /// <summary>A body that never delivers a byte and never ends, until cancelled.</summary>
+    private sealed class StalledStream : Stream
+    {
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class RecordingProgress : IProgress<double>

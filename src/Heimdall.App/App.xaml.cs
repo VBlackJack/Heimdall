@@ -222,6 +222,22 @@ public partial class App : System.Windows.Application
                 // that dies with the process. Before this ran only ahead of the next external
                 // launch, so a stranded password waited for one.
                 RdpHandler.SweepStaleArtifactsAtStartup();
+
+                // And for update attempts: a staging directory survives every ending but
+                // three, with the installer inside it, and the relauncher transcripts
+                // accumulate one per attempt.
+                string dataRoot = _dataRoot ?? ApplicationDataPathResolver.Resolve();
+                int staging = UpdateStagingSweeper.SweepStaging(
+                    ApplicationDataPathResolver.GetUpdatesDirectory(dataRoot),
+                    DateTimeOffset.UtcNow);
+                int logs = UpdateStagingSweeper.SweepRelaunchLogs(
+                    ApplicationDataPathResolver.GetLogsDirectory(dataRoot),
+                    DateTimeOffset.UtcNow);
+                if (staging > 0 || logs > 0)
+                {
+                    Heimdall.Core.Logging.FileLogger.Info(
+                        $"Swept {staging} stale update staging director{(staging == 1 ? "y" : "ies")} and {logs} relauncher transcript{(logs == 1 ? "" : "s")}");
+                }
             });
 
             // Respect Windows "Show animations" accessibility setting (WCAG 2.1 § 2.3.3).
@@ -601,8 +617,16 @@ public partial class App : System.Windows.Application
             sp.GetRequiredService<HttpClient>(),
             sp.GetRequiredService<IAppVersionProvider>().Current?.ToString() ?? "unknown"));
         services.AddSingleton<IVariantDetector>(_ => new VariantDetector());
-        services.AddSingleton<IUpdateService, UpdateService>();
-        services.AddSingleton<IUpdateInstallerHost, SystemUpdateInstallerHost>();
+        services.AddSingleton<IUpdateService>(sp => new UpdateService(
+            sp.GetRequiredService<IGitHubReleaseClient>(),
+            sp.GetRequiredService<IVariantDetector>(),
+            _dataRoot ?? ApplicationDataPathResolver.Resolve()));
+
+        // The same root as the outcome store below: the relauncher writes its failure
+        // record where the host says, and the store reads where it was told. Two
+        // resolutions of the root were only ever equal by coincidence of production.
+        services.AddSingleton<IUpdateInstallerHost>(_ => new SystemUpdateInstallerHost(
+            _dataRoot ?? ApplicationDataPathResolver.Resolve()));
         services.AddSingleton<IUpdateInstaller, UpdateInstaller>();
         services.AddSingleton<IApplicationLifecycle, ApplicationLifecycle>();
 

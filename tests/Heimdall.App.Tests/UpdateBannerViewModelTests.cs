@@ -101,6 +101,40 @@ public sealed class UpdateBannerViewModelTests
         Assert.Equal(Newer, vm.BannerVersionText);
     }
 
+    /// <remarks>
+    /// The repository used to be read from settings.json, unvalidated and shown in no
+    /// interface: whoever could write that file could point the updater at their own
+    /// repository, whose checksum file would vouch for their own installer.
+    /// </remarks>
+    [Fact]
+    public async Task CheckOnStartup_UsesThePinnedRepository()
+    {
+        var update = new StubUpdateService { Result = UpToDate() };
+        var vm = CreateViewModel(BaseSettings(), update, Current);
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        Assert.Equal(UpdateSource.RepositoryOwner, update.Owner);
+        Assert.Equal(UpdateSource.RepositoryName, update.Repo);
+    }
+
+    /// <remarks>
+    /// Compared as text, a skipped "v2026.061502" was offered again as "2026.061502":
+    /// the type's equality is numeric and the comparison was not.
+    /// </remarks>
+    [Fact]
+    public async Task CheckOnStartup_SkippedVersionSpelledWithALeadingV_StillSkipped()
+    {
+        var settings = BaseSettings();
+        settings.UpdateSkippedVersion = "v" + Newer;
+        var update = new StubUpdateService { Result = Available(Newer) };
+        var vm = CreateViewModel(settings, update, Current);
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        Assert.False(vm.IsBannerVisible);
+    }
+
     [Fact]
     public async Task CheckOnStartup_SkippedVersion_DoesNotShowBanner()
     {
@@ -443,8 +477,6 @@ public sealed class UpdateBannerViewModelTests
         UpdateCheckIntervalHours = 24,
         UpdateLastCheckUtc = null,
         UpdateSkippedVersion = null,
-        UpdateRepositoryOwner = "VBlackJack",
-        UpdateRepositoryName = "Heimdall"
     };
 
     private static UpdateCheckResult UpToDate()
@@ -477,9 +509,15 @@ public sealed class UpdateBannerViewModelTests
 
         public bool WasCalled { get; private set; }
 
+        public string? Owner { get; private set; }
+
+        public string? Repo { get; private set; }
+
         public Task<UpdateCheckResult> CheckForUpdatesAsync(HeimdallVersion current, string owner, string repo, CancellationToken cancellationToken)
         {
             WasCalled = true;
+            Owner = owner;
+            Repo = repo;
             return Task.FromResult(Result);
         }
 

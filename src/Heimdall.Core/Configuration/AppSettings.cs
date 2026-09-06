@@ -60,8 +60,6 @@ public sealed class AppSettings
     public int UpdateCheckIntervalHours { get; set; } = 24;
     public string? UpdateLastCheckUtc { get; set; } = null;   // ISO 8601 round-trip (UTC)
     public string? UpdateSkippedVersion { get; set; } = null;
-    public string UpdateRepositoryOwner { get; set; } = "VBlackJack";
-    public string UpdateRepositoryName { get; set; } = "Heimdall";
 
     // Legacy migration offer
     public int LegacyMigrationDeclinedOfferVersion { get; set; }

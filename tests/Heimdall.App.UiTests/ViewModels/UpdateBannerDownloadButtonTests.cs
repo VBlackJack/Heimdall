@@ -137,8 +137,6 @@ public sealed class UpdateBannerDownloadButtonTests
         UpdateCheckIntervalHours = 24,
         UpdateLastCheckUtc = null,
         UpdateSkippedVersion = null,
-        UpdateRepositoryOwner = "VBlackJack",
-        UpdateRepositoryName = "Heimdall"
     };
 
     private static UpdateCheckResult Available(string version)

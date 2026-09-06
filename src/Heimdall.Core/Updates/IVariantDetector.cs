@@ -23,4 +23,11 @@ namespace Heimdall.Core.Updates;
 public interface IVariantDetector
 {
     BuildVariant Detect();
+
+    /// <summary>
+    /// Whether the running copy is the one the installer registered, so that the
+    /// installer can replace it in place. False for a portable archive, an MSI
+    /// deployment or a build run from its output directory.
+    /// </summary>
+    bool IsInstalledInPlace();
 }
