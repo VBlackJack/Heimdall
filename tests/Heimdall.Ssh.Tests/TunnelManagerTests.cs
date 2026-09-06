@@ -381,6 +381,54 @@ public class TunnelManagerTests : IDisposable
         Assert.Empty(_manager.GetActiveTunnels());
     }
 
+    /// <summary>
+    /// The registry is snapshotted, then each session's client is read outside
+    /// the lock. A concurrent release disposes the client between the two, and
+    /// SSH.NET reports IsConnected on a disposed client by throwing. The
+    /// snapshot is read by the tunnels view on the UI thread, where that throw
+    /// is a crash; a tunnel whose client is gone is simply not alive.
+    /// </summary>
+    [Fact]
+    public void GetActiveTunnels_ClientDisposedBetweenSnapshotAndRead_ReportsNotAlive()
+    {
+        TunnelInfo info = MakeInfo(10001);
+        var client = new RecordingSshClient
+        {
+            ConnectionProbe = static () => throw new ObjectDisposedException(nameof(SshClient))
+        };
+        TunnelResult registered = _manager.RegisterTunnelSession(
+            new TunnelSession(client, new RecordingForwardedPortLocal(), info),
+            info.LocalPort,
+            info);
+        Assert.True(registered.Success);
+
+        IReadOnlyList<TunnelInfo> tunnels = _manager.GetActiveTunnels();
+
+        TunnelInfo snapshot = Assert.Single(tunnels);
+        Assert.Equal(10001, snapshot.LocalPort);
+        Assert.False(snapshot.IsAlive);
+    }
+
+    [Fact]
+    public void GetTunnel_ClientDisposedBetweenSnapshotAndRead_ReportsNotAlive()
+    {
+        TunnelInfo info = MakeInfo(10001);
+        var client = new RecordingSshClient
+        {
+            ConnectionProbe = static () => throw new ObjectDisposedException(nameof(SshClient))
+        };
+        TunnelResult registered = _manager.RegisterTunnelSession(
+            new TunnelSession(client, new RecordingForwardedPortLocal(), info),
+            info.LocalPort,
+            info);
+        Assert.True(registered.Success);
+
+        TunnelInfo? snapshot = _manager.GetTunnel(10001);
+
+        Assert.NotNull(snapshot);
+        Assert.False(snapshot.IsAlive);
+    }
+
     // ── GetTunnel ─────────────────────────────────────────────────────
 
     [Fact]
