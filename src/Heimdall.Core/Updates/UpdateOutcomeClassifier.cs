@@ -61,9 +61,7 @@ public static class UpdateOutcomeClassifier
         // independent things to go wrong: an installer that reports an error after the
         // files were in fact replaced is a documented possibility, and the user looking
         // at the new version must not be told it failed.
-        string? running = runningVersion?.ToString();
-        if (!string.IsNullOrWhiteSpace(running)
-            && string.Equals(running, attempt.AttemptedVersion, StringComparison.OrdinalIgnoreCase))
+        if (IsRunningTheAttemptedVersion(attempt.AttemptedVersion, runningVersion))
         {
             return UpdateRelaunchOutcome.Succeeded;
         }
@@ -78,6 +76,16 @@ public static class UpdateOutcomeClassifier
             return UpdateRelaunchOutcome.IntegrityRejected;
         }
 
+        if (string.Equals(failure.Stage, UpdateOutcomeStage.ElevationDeclined, StringComparison.Ordinal))
+        {
+            return UpdateRelaunchOutcome.CancelledByUser;
+        }
+
+        if (string.Equals(failure.Stage, UpdateOutcomeStage.ApplicationStillRunning, StringComparison.Ordinal))
+        {
+            return UpdateRelaunchOutcome.ApplicationStillRunning;
+        }
+
         if (failure.HasExitCode)
         {
             return InnoSetupExitCode.IsUserCancellation(failure.InstallerExitCode)
@@ -89,5 +97,33 @@ public static class UpdateOutcomeClassifier
         // read, falls back to the statement that is still true. An unknown token must
         // never throw and must never invent a cause.
         return UpdateRelaunchOutcome.NotApplied;
+    }
+
+    /// <summary>
+    /// Whether the version now running is the one that was attempted.
+    /// </summary>
+    /// <remarks>
+    /// Compared as versions when both sides parse, and only as text when they do not.
+    /// Both sides originate from <see cref="HeimdallVersion"/>, whose equality is
+    /// numeric; a comparison of their spellings would turn a successful update into a
+    /// false "did not apply" the day one side gains a leading 'v' or a trailing
+    /// component - which is the outcome the type remarks name as the one that must
+    /// never occur.
+    /// </remarks>
+    private static bool IsRunningTheAttemptedVersion(string attemptedVersion, HeimdallVersion? runningVersion)
+    {
+        if (runningVersion is null)
+        {
+            return false;
+        }
+
+        if (HeimdallVersion.TryParse(attemptedVersion, out HeimdallVersion attempted))
+        {
+            return runningVersion.Value == attempted;
+        }
+
+        string running = runningVersion.Value.ToString();
+        return !string.IsNullOrWhiteSpace(running)
+            && string.Equals(running, attemptedVersion, StringComparison.OrdinalIgnoreCase);
     }
 }

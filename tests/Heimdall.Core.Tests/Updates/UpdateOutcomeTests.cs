@@ -149,6 +149,124 @@ public sealed class UpdateOutcomeTests : IDisposable
             UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082201")));
     }
 
+    /// <remarks>
+    /// Both sides originate from <see cref="HeimdallVersion"/>, whose equality is
+    /// numeric. Comparing their spellings turned a successful update into a false
+    /// "did not apply" the day one side gained a leading 'v' - the outcome the
+    /// classifier's own remarks name as the one that must never occur.
+    /// </remarks>
+    [Fact]
+    public void Classify_SameVersionSpelledDifferently_ReportsSucceeded()
+    {
+        UpdateAttemptRecord attempt = Attempt("v2026.090601", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure(UpdateOutcomeStage.InstallerExit, 3, known: 1);
+
+        Assert.Equal(
+            UpdateRelaunchOutcome.Succeeded,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.090601")));
+    }
+
+    [Fact]
+    public void Classify_AttemptedVersionThatDoesNotParse_FallsBackToText()
+    {
+        UpdateAttemptRecord attempt = Attempt("not-a-version", DateTimeOffset.UtcNow);
+
+        Assert.Equal(
+            UpdateRelaunchOutcome.NotApplied,
+            UpdateOutcomeClassifier.Classify(attempt, null, HeimdallVersion.Parse("2026.090601")));
+    }
+
+    /// <remarks>
+    /// A declined consent prompt never starts the installer, so no Inno exit code can
+    /// describe it. The relauncher records the launch failure's ERROR_CANCELLED as its
+    /// own stage, and the user who said "No" must not read that the update failed.
+    /// </remarks>
+    [Fact]
+    public void Classify_ElevationDeclined_IsReportedAsCancellation()
+    {
+        UpdateAttemptRecord attempt = Attempt("2026.082202", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure(UpdateOutcomeStage.ElevationDeclined, 0, known: 0);
+
+        Assert.Equal(
+            UpdateRelaunchOutcome.CancelledByUser,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082201")));
+    }
+
+    [Fact]
+    public void Classify_ApplicationStillRunning_IsReportedAsItsOwnCause()
+    {
+        UpdateAttemptRecord attempt = Attempt("2026.082202", DateTimeOffset.UtcNow);
+        UpdateFailureRecord failure = Failure(UpdateOutcomeStage.ApplicationStillRunning, 0, known: 0);
+
+        Assert.Equal(
+            UpdateRelaunchOutcome.ApplicationStillRunning,
+            UpdateOutcomeClassifier.Classify(attempt, failure, HeimdallVersion.Parse("2026.082201")));
+    }
+
+    /// <remarks>
+    /// The write used to come first and the delete second, so a delete that failed
+    /// left a fresh attempt paired with a stale cause at the next startup.
+    /// </remarks>
+    [Fact]
+    public void Store_WriteAttempt_WhenTheOldFailureRecordCannotBeDeleted_WritesNoAttempt()
+    {
+        Directory.CreateDirectory(_directory);
+        var store = new UpdateOutcomeStore(_directory);
+        string failurePath = Path.Combine(_directory, "update-failure.json");
+        File.WriteAllText(failurePath, @"{""schemaVersion"":1,""stage"":""IntegrityRejected"",""installerExitCode"":0,""installerExitCodeKnown"":0}");
+
+        using (new FileStream(failurePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            store.WriteAttempt("2026.082202");
+        }
+
+        // No attempt, so nothing to pair the stale cause with; the stale cause is then
+        // discarded by the next successful write.
+        Assert.Null(store.TryTakePending());
+        Assert.False(File.Exists(Path.Combine(_directory, "update-attempt.json")));
+    }
+
+    [Fact]
+    public void Store_TakeSurvivesALeftoverFromAnInterruptedTake()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(Path.Combine(_directory, "update-attempt.json.taken"), "{ leftover");
+        var store = new UpdateOutcomeStore(_directory);
+        store.WriteAttempt("2026.082202");
+
+        PendingUpdateOutcome? taken = store.TryTakePending();
+
+        Assert.NotNull(taken);
+        Assert.Equal("2026.082202", taken!.Attempt.AttemptedVersion);
+        Assert.False(File.Exists(Path.Combine(_directory, "update-attempt.json.taken")));
+    }
+
+    [Fact]
+    public void Store_AttemptWithAForeignSchema_IsDiscarded()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(
+            Path.Combine(_directory, "update-attempt.json"),
+            $@"{{""schemaVersion"":{UpdateAttemptRecord.CurrentSchemaVersion + 1},""attemptedVersion"":""2026.082202"",""startedUtc"":""{DateTimeOffset.UtcNow:O}""}}");
+        var store = new UpdateOutcomeStore(_directory);
+
+        Assert.Null(store.TryTakePending());
+    }
+
+    [Fact]
+    public void Store_FailureWithAForeignSchema_CostsTheCauseNotTheReport()
+    {
+        Directory.CreateDirectory(_directory);
+        var store = new UpdateOutcomeStore(_directory);
+        store.WriteAttempt("2026.082202");
+        WriteFailure($@"{{""schemaVersion"":{UpdateFailureRecord.CurrentSchemaVersion + 1},""stage"":""InstallerExit"",""installerExitCode"":3,""installerExitCodeKnown"":1}}");
+
+        PendingUpdateOutcome? taken = store.TryTakePending();
+
+        Assert.NotNull(taken);
+        Assert.Null(taken!.Failure);
+    }
+
     [Fact]
     public void Store_RoundTripsTheFailureRecordAlongsideTheAttempt()
     {

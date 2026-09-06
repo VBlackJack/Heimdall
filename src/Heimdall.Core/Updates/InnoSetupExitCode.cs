@@ -63,8 +63,10 @@ public static class InnoSetupExitCode
     /// True when the code means the user stopped it rather than something breaking.
     /// </summary>
     /// <remarks>
-    /// A declined elevation prompt surfaces here too, and is very probably the most
-    /// frequent reason a real update does not apply.
+    /// Only a cancellation inside the wizard reaches this table. A declined elevation
+    /// prompt never starts the installer at all, so it has no exit code: the relauncher
+    /// records it as <see cref="UpdateOutcomeStage.ElevationDeclined"/> from the launch
+    /// failure instead, and the classifier maps that stage to the same cancellation.
     /// </remarks>
     public static bool IsUserCancellation(int exitCode) =>
         exitCode is CancelledBeforeInstall or CancelledDuringInstall;
