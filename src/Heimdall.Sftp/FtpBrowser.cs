@@ -57,6 +57,9 @@ public sealed class FtpBrowser : IRemoteBrowser
         | X509ChainStatusFlags.HasNotSupportedCriticalExtension;
 
     private readonly SemaphoreSlim _opLock = new SemaphoreSlim(1, 1);
+
+    /// <summary>How long a synchronous disconnect waits for the operation lock before forcing the teardown.</summary>
+    private static readonly TimeSpan DisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
     private readonly FtpsCertificateStore _certificateStore;
     private readonly IFtpsCertificateVerifier _certificateVerifier;
     private AsyncFtpClient? _client;
@@ -209,7 +212,11 @@ public sealed class FtpBrowser : IRemoteBrowser
                     continue;
                 }
 
-                result.Add(MapFtpItemToFileInfo(item, targetPath));
+                SftpFileInfo? mapped = MapFtpItemToFileInfo(item, targetPath);
+                if (mapped is not null)
+                {
+                    result.Add(mapped);
+                }
             }
 
             return result;
@@ -221,14 +228,14 @@ public sealed class FtpBrowser : IRemoteBrowser
     }
 
     /// <inheritdoc/>
-    public Task<string> GetCurrentDirectoryAsync(CancellationToken ct = default)
+    public async Task<string> GetCurrentDirectoryAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        _opLock.Wait(ct);
+        await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             EnsureConnected();
-            return Task.FromResult(CurrentDirectory);
+            return CurrentDirectory;
         }
         finally
         {
@@ -388,6 +395,10 @@ public sealed class FtpBrowser : IRemoteBrowser
     public async Task DeleteAsync(string path, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        // FluentFTP's DeleteDirectory is recursive; the SFTP browser refuses the root here
+        // and this one relied on its callers to.
+        SftpPathGuard.ThrowIfProtectedRoot(path, "delete");
         string normalizedPath = NormalizePath(path);
 
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
@@ -426,7 +437,17 @@ public sealed class FtpBrowser : IRemoteBrowser
         try
         {
             AsyncFtpClient client = GetConnectedClient();
-            await client.Rename(oldPath, newPath, ct).ConfigureAwait(false);
+
+            // MoveFile with Skip rather than the low-level Rename: RNFR/RNTO is free to
+            // replace the destination on many servers, and a plain rename onto a name
+            // taken from a stale listing silently lost the file that was there. The
+            // existence check is the client's and the window between it and the rename
+            // remains; it is the strongest guarantee FTP can give.
+            bool moved = await client.MoveFile(oldPath, newPath, FtpRemoteExists.Skip, ct).ConfigureAwait(false);
+            if (!moved)
+            {
+                throw new IOException($"Refused to rename: destination already exists: {newPath}");
+            }
         }
         finally
         {
@@ -466,55 +487,6 @@ public sealed class FtpBrowser : IRemoteBrowser
         throw new RemoteCopyUnsupportedException(sourcePath, destinationPath, "FTP");
     }
 
-    private async Task<bool> RemoteExistsAsync(string path, CancellationToken ct)
-    {
-        string normalized = NormalizePath(path);
-
-        await _opLock.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            AsyncFtpClient client = GetConnectedClient();
-            if (await client.DirectoryExists(normalized, ct).ConfigureAwait(false))
-            {
-                return true;
-            }
-
-            return await client.FileExists(normalized, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            _opLock.Release();
-        }
-    }
-
-    private async Task<bool> RemoteIsDirectoryAsync(string path, CancellationToken ct)
-    {
-        string normalized = NormalizePath(path);
-
-        await _opLock.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            AsyncFtpClient client = GetConnectedClient();
-            return await client.DirectoryExists(normalized, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            _opLock.Release();
-        }
-    }
-
-    private async Task<IReadOnlyList<string>> ListChildNamesAsync(string path, CancellationToken ct)
-    {
-        IReadOnlyList<SftpFileInfo> entries = await ListDirectoryAsync(path, ct).ConfigureAwait(false);
-        List<string> names = new List<string>(entries.Count);
-        foreach (SftpFileInfo entry in entries)
-        {
-            names.Add(entry.Name);
-        }
-
-        return names;
-    }
-
     /// <inheritdoc/>
     public void Disconnect()
     {
@@ -523,15 +495,22 @@ public sealed class FtpBrowser : IRemoteBrowser
             return;
         }
 
+        // Bounded, the way the SFTP browser decided it: an unbounded wait pinned a thread
+        // for the whole of a stalled transfer. When the lock is not obtained the client is
+        // torn down under the operation that holds it, which is what unblocks that
+        // operation.
+        bool lockTaken = _opLock.Wait(DisconnectLockTimeout);
         bool disconnected;
-        _opLock.Wait();
         try
         {
             disconnected = DisconnectCore();
         }
         finally
         {
-            _opLock.Release();
+            if (lockTaken)
+            {
+                _opLock.Release();
+            }
         }
 
         if (disconnected)
@@ -575,7 +554,10 @@ public sealed class FtpBrowser : IRemoteBrowser
 
         _disposed = true;
         Disconnect();
-        _opLock.Dispose();
+
+        // The lock is deliberately not disposed: an operation still awaiting it would meet
+        // an ObjectDisposedException instead of the client teardown it is about to observe.
+        // Same decision as the SFTP browser, which pins it by test.
     }
 
     private bool DisconnectCore()
@@ -607,13 +589,9 @@ public sealed class FtpBrowser : IRemoteBrowser
             path = "/" + path;
         }
 
-        // Remove trailing slash unless it is the root
-        if (path.Length > 1 && path.EndsWith('/'))
-        {
-            path = path.TrimEnd('/');
-        }
-
-        return path;
+        // Collapse . and .. so the current directory cannot accumulate segments that every
+        // listed path would then inherit; the collapse also removes a trailing slash.
+        return RemotePathNormalizer.Collapse(path);
     }
 
     internal static string ResolvePath(string path, string currentDirectory)
@@ -847,8 +825,17 @@ public sealed class FtpBrowser : IRemoteBrowser
         return type == FtpObjectType.File ? RemoteEntryKind.File : RemoteEntryKind.Unknown;
     }
 
-    internal static SftpFileInfo MapFtpItemToFileInfo(FtpListItem item, string parentPath)
+    internal static SftpFileInfo? MapFtpItemToFileInfo(FtpListItem item, string parentPath)
     {
+        // The server names the entry, and that name becomes a path every operation trusts.
+        // A name that is not a single clean segment is refused here, at the boundary.
+        if (!SftpPathGuard.IsValidChildName(item.Name))
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[FtpBrowser] listing of {parentPath} skipped an entry with an unsafe name");
+            return null;
+        }
+
         RemoteEntryKind kind = item.Type switch
         {
             FtpObjectType.Link => RemoteEntryKind.SymbolicLink,
