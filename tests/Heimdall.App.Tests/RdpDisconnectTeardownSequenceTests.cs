@@ -67,6 +67,53 @@ public sealed class RdpDisconnectTeardownSequenceTests
         Assert.Contains("step=Disconnect", warnings[0], StringComparison.Ordinal);
     }
 
+    /// <remarks>
+    /// This catch wraps the five COM teardown steps, the deepest part of the RDP dispose
+    /// tail, and it was the last place on that path still logging the message alone.
+    /// The exit NullReferenceException of 2026-09-03 was never located because every
+    /// catch it could have crossed threw the stack away.
+    /// </remarks>
+    [Fact]
+    public void Execute_StepThrows_LogsTheStackNotOnlyTheMessage()
+    {
+        var target = new NullReferenceTarget();
+        var warnings = new List<string>();
+
+        RdpDisconnectTeardownSequence.Execute(target, DisconnectReason.UserAction, _ => { }, warnings.Add);
+
+        string warning = Assert.Single(warnings);
+        Assert.Contains(nameof(NullReferenceException), warning, StringComparison.Ordinal);
+        Assert.Contains("   at ", warning, StringComparison.Ordinal);
+        Assert.Contains(nameof(NullReferenceTarget), warning, StringComparison.Ordinal);
+    }
+
+    private sealed class NullReferenceTarget : IRdpDisconnectTeardownTarget
+    {
+        public string TeardownTargetName => nameof(NullReferenceTarget);
+
+        public void CollapseHost()
+        {
+        }
+
+        public void ClearHostChild()
+        {
+        }
+
+        public void Disconnect()
+        {
+            object? nothing = null;
+            _ = nothing!.ToString();
+        }
+
+        public void DetachEventSink()
+        {
+        }
+
+        public void DisposeHost()
+        {
+        }
+    }
+
     private sealed class RecordingTarget(bool throwOnDisconnect = false) : IRdpDisconnectTeardownTarget
     {
         public List<string> Steps { get; } = [];

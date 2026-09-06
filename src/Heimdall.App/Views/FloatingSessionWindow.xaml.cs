@@ -128,7 +128,12 @@ public partial class FloatingSessionWindow : Window
     {
         base.OnClosing(e);
 
-        if (_closeGranted || _reattached || e.Cancel || _session.HostControl is not ICloseGuard)
+        // The same early return the main window takes on a shutting-down application.
+        // Exit closes every window with the cancellation ignored, so a guard poll here
+        // could only prompt the user during shutdown - and hold the process, and the
+        // update relauncher waiting on it.
+        bool isShuttingDown = Application.Current is Heimdall.App.App { IsShuttingDown: true };
+        if (e.Cancel || !ShutdownDecisions.FloatingWindowShouldPollGuards(isShuttingDown, _closeGranted, _reattached, _session.HostControl is ICloseGuard))
         {
             return;
         }
@@ -190,33 +195,52 @@ public partial class FloatingSessionWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        bool isShuttingDown = Application.Current is Heimdall.App.App { IsShuttingDown: true };
         if (!_reattached)
         {
-            // The session was not reattached; dispose it properly via ConnectionViewModel
-            if (MainViewModelLocator.FindCurrent() is MainViewModel vm)
-            {
-                // Detach host control from this window before ConnectionViewModel disposes it
-                SessionHost.Content = null;
-
-                // Restore the session before CloseSession prompts so a declined close keeps it visible.
-                RestoreSession(vm);
-                vm.Connection.CloseSessionCommand.Execute(_session);
-            }
-            else
-            {
-                // Fallback: dispose host control directly if main window is unavailable
-                SessionHost.Content = null;
-                if (_session.HostControl is IDisposable disposable)
-                {
-                    try { disposable.Dispose(); }
-                    catch (ObjectDisposedException) { /* Expected */ }
-                }
-            }
+            ReleaseSessionOnClose(isShuttingDown);
         }
 
         _session.PropertyChanged -= OnSessionPropertyChanged;
         _localizer.LocaleChanged -= OnLocaleChanged;
         base.OnClosed(e);
+    }
+
+    /// <summary>
+    /// What a closing window does with a session it did not hand back: restore it to the
+    /// main collection, then close it interactively - unless the application is shutting
+    /// down, when the restore is all it does.
+    /// </summary>
+    /// <remarks>
+    /// During shutdown the session goes back to the main collection so the exit snapshot
+    /// records it and the silent close in <c>App.OnExit</c> tears it down. Running the
+    /// interactive close here disposed it without the restore, and a detached session was
+    /// missing from the restore-on-launch list.
+    /// </remarks>
+    private void ReleaseSessionOnClose(bool isShuttingDown)
+    {
+        if (MainViewModelLocator.FindCurrent() is not MainViewModel vm)
+        {
+            // Fallback: dispose host control directly if main window is unavailable
+            SessionHost.Content = null;
+            if (_session.HostControl is IDisposable disposable)
+            {
+                try { disposable.Dispose(); }
+                catch (ObjectDisposedException) { /* Expected */ }
+            }
+
+            return;
+        }
+
+        // Detach host control from this window before ConnectionViewModel disposes it
+        SessionHost.Content = null;
+
+        // Restore the session before CloseSession prompts so a declined close keeps it visible.
+        RestoreSession(vm);
+        if (ShutdownDecisions.FloatingWindowShouldCloseSessionInteractively(isShuttingDown, _reattached))
+        {
+            vm.Connection.CloseSessionCommand.Execute(_session);
+        }
     }
 
     private void RestoreSession(MainViewModel vm)

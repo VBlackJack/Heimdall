@@ -127,6 +127,53 @@ internal static class WindowClosingFlow
             }
         }
 
+        await PersistCloseStateAsync(flushExpandStateAsync, persistWindowStateAsync);
+        return true;
+    }
+
+    /// <summary>
+    /// What the close gesture persists, without any of its prompts: for a shutdown the
+    /// user already asked for elsewhere, such as an update install.
+    /// </summary>
+    /// <remarks>
+    /// Dirty settings are saved as if the user had chosen Save: they asked to install,
+    /// and the alternative was losing the edits without a word. A save that fails is
+    /// logged and the shutdown goes on; refusing the update over it would trade one
+    /// surprise for another.
+    /// </remarks>
+    internal static async Task PersistBeforeShutdownAsync(
+        bool settingsDirty,
+        Func<Task<bool>> trySaveSettingsAsync,
+        Func<Task> flushExpandStateAsync,
+        Func<Task> persistWindowStateAsync)
+    {
+        ArgumentNullException.ThrowIfNull(trySaveSettingsAsync);
+        ArgumentNullException.ThrowIfNull(flushExpandStateAsync);
+        ArgumentNullException.ThrowIfNull(persistWindowStateAsync);
+
+        if (settingsDirty)
+        {
+            try
+            {
+                if (!await trySaveSettingsAsync())
+                {
+                    FileLogger.Warn("Unsaved settings could not be saved before the requested shutdown.");
+                }
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Error("Settings save before the requested shutdown failed", ex);
+            }
+        }
+
+        await PersistCloseStateAsync(flushExpandStateAsync, persistWindowStateAsync);
+    }
+
+    /// <summary>The two persistence steps every close ends with, each on its own.</summary>
+    private static async Task PersistCloseStateAsync(
+        Func<Task> flushExpandStateAsync,
+        Func<Task> persistWindowStateAsync)
+    {
         try
         {
             await flushExpandStateAsync();
@@ -144,7 +191,5 @@ internal static class WindowClosingFlow
         {
             FileLogger.Warn($"Window state persistence failed during close: {ex.Message}");
         }
-
-        return true;
     }
 }

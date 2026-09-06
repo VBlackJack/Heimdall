@@ -164,6 +164,82 @@ public sealed class WindowClosingFlowTests
         Assert.Equal(["settings", "sessions", "window-state"], steps);
     }
 
+    /// <remarks>
+    /// The update install used to skip straight to the shutdown, whose flag makes the
+    /// main window's close pass return before it saves anything: settings edited on the
+    /// very screen that holds the install button were lost, the tree came back
+    /// collapsed and the window jumped to its last saved bounds.
+    /// </remarks>
+    [Fact]
+    public async Task PersistBeforeShutdown_DirtySettings_SavesThenFlushesThenPersistsBounds()
+    {
+        List<string> calls = [];
+
+        await WindowClosingFlow.PersistBeforeShutdownAsync(
+            settingsDirty: true,
+            () =>
+            {
+                calls.Add("save");
+                return Task.FromResult(true);
+            },
+            () =>
+            {
+                calls.Add("flush");
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                calls.Add("bounds");
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(["save", "flush", "bounds"], calls);
+    }
+
+    [Fact]
+    public async Task PersistBeforeShutdown_CleanSettings_DoesNotSave()
+    {
+        List<string> calls = [];
+
+        await WindowClosingFlow.PersistBeforeShutdownAsync(
+            settingsDirty: false,
+            () => throw new InvalidOperationException("Settings save must not run."),
+            () =>
+            {
+                calls.Add("flush");
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                calls.Add("bounds");
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(["flush", "bounds"], calls);
+    }
+
+    [Fact]
+    public async Task PersistBeforeShutdown_SaveThrows_StillFlushesAndPersistsBounds()
+    {
+        List<string> calls = [];
+
+        await WindowClosingFlow.PersistBeforeShutdownAsync(
+            settingsDirty: true,
+            () => throw new IOException("disk full"),
+            () =>
+            {
+                calls.Add("flush");
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                calls.Add("bounds");
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(["flush", "bounds"], calls);
+    }
+
     [Fact]
     public void UpdateShutdown_MarksConfirmedBeforeRequest_ExactlyOnce()
     {

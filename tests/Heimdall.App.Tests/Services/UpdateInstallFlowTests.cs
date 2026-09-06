@@ -146,7 +146,46 @@ public sealed class UpdateInstallFlowTests
 
     private sealed class ThrowingApplicationLifecycle : IApplicationLifecycle
     {
+        public Task PersistStateAsync() => Task.CompletedTask;
+
         public void RequestShutdown() => throw new InvalidOperationException("dispatcher gone");
+    }
+
+    /// <remarks>
+    /// The shutdown flag makes the main window's close pass return before it saves
+    /// anything, so what the close would have saved is persisted here first, silently.
+    /// </remarks>
+    [Fact]
+    public async Task RunAsync_PersistsStateBeforeRequestingShutdown()
+    {
+        var lifecycle = new FakeApplicationLifecycle();
+        var flow = new UpdateInstallFlow(
+            new FakeUpdateService(),
+            new FakeUpdateInstaller { BeginInstallResult = true },
+            lifecycle,
+            new FakeUpdateOutcomeStore());
+
+        var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
+
+        outcome.Should().Be(UpdateInstallOutcome.Started);
+        lifecycle.Calls.Should().Equal(
+            FakeApplicationLifecycle.PersistCall,
+            FakeApplicationLifecycle.ShutdownCall);
+    }
+
+    [Fact]
+    public async Task RunAsync_LaunchFailed_DoesNotPersistOrShutDown()
+    {
+        var lifecycle = new FakeApplicationLifecycle();
+        var flow = new UpdateInstallFlow(
+            new FakeUpdateService(),
+            new FakeUpdateInstaller { BeginInstallResult = false },
+            lifecycle,
+            new FakeUpdateOutcomeStore());
+
+        await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
+
+        lifecycle.Calls.Should().BeEmpty();
     }
 
     /// <summary>An installer that records itself into the same sequence as the store.</summary>
@@ -294,8 +333,24 @@ public sealed class UpdateInstallFlowTests
 
     private sealed class FakeApplicationLifecycle : IApplicationLifecycle
     {
+        public const string PersistCall = "Persist";
+
+        public const string ShutdownCall = "Shutdown";
+
         public int RequestShutdownCallCount { get; private set; }
 
-        public void RequestShutdown() => RequestShutdownCallCount++;
+        public List<string> Calls { get; } = [];
+
+        public Task PersistStateAsync()
+        {
+            Calls.Add(PersistCall);
+            return Task.CompletedTask;
+        }
+
+        public void RequestShutdown()
+        {
+            RequestShutdownCallCount++;
+            Calls.Add(ShutdownCall);
+        }
     }
 }

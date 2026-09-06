@@ -91,6 +91,11 @@ internal sealed class UpdateInstallFlow : IUpdateInstallFlow
             try
             {
                 package.TransferCleanupToRelauncher();
+
+                // What the ordinary close would have saved, without its prompts: the
+                // shutdown requested below makes the main window's close pass return
+                // before it saves anything.
+                await _lifecycle.PersistStateAsync();
                 _lifecycle.RequestShutdown();
             }
             catch (Exception ex)

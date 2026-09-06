@@ -21,6 +21,14 @@ namespace Heimdall.App.Services;
 /// </summary>
 public interface IApplicationLifecycle
 {
+    /// <summary>
+    /// Persists what the ordinary close gesture persists - unsaved settings, the tree's
+    /// expand state, the window bounds - without any prompt. For a shutdown the user
+    /// already asked for, such as an update install, where the close pass that would
+    /// have saved them is skipped.
+    /// </summary>
+    Task PersistStateAsync();
+
     /// <summary>Requests an orderly shutdown of the running application.</summary>
     void RequestShutdown();
 }

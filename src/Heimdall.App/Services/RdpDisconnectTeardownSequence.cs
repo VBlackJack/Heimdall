@@ -87,8 +87,13 @@ public static class RdpDisconnectTeardownSequence
         }
         catch (Exception ex)
         {
+            // The whole exception, stack included. This catch wraps the five COM
+            // teardown steps, the deepest part of the RDP dispose tail, and it was the
+            // last place on that path still logging the message alone: the exit
+            // NullReferenceException of 2026-09-03 was never located because every
+            // catch it could have crossed threw the stack away.
             logWarn(
-                $"RdpDisconnectTeardownSequence step={step} failed reason={reason} target={target.TeardownTargetName}: {ex.Message}");
+                $"RdpDisconnectTeardownSequence step={step} failed reason={reason} target={target.TeardownTargetName}: {ex}");
         }
     }
 }

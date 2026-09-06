@@ -2073,7 +2073,6 @@
   "LevelDiagnosticWarning": "Warning",
   "WarningSnapshotRestorePartial": "Restored {0} of {1} saved sessions.",
   "ErrorSnapshotRestoreFailed": "Failed to restore saved sessions: {0}",
-  "StatusSnapshotSaving": "Saving session snapshot...",
   "A11yWorkspaceSave": "Save current workspace",
   "A11yWorkspaceRestore": "Restore saved workspace",
   "LogWorkspaceSaved": "Workspace saved with {0} sessions",

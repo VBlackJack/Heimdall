@@ -120,6 +120,33 @@ public sealed class HostKeyPersistenceCoalescerTests
         Assert.Equal("SHA256:kept", (await config.LoadSettingsAsync()).TrustedHostKeys["kept:22"]);
     }
 
+    /// <remarks>
+    /// Dispose ended with a fire-and-forget flush, and the container disposed the
+    /// coalescer during the exit's container disposal: a trust change enqueued in the
+    /// last quiet window was written by a task nobody awaited, and could be lost with
+    /// the process. The asynchronous disposal owns the write.
+    /// </remarks>
+    [Fact]
+    public async Task DisposeAsync_DoesNotReturnBeforeThePendingChangeIsWritten()
+    {
+        CountingConfigManager config = new();
+        TaskCompletionSource gate = new();
+        config.BeforeMerge = () => gate.Task;
+        FakeTimeProvider clock = new();
+        HostKeyPersistenceCoalescer coalescer = new(config, clock, QuietWindow);
+        coalescer.Upsert("late:22", Entry("SHA256:late"));
+
+        ValueTask disposal = coalescer.DisposeAsync();
+
+        // The write is held at the gate, so a disposal that awaited it cannot be done yet.
+        Assert.False(disposal.IsCompleted, "DisposeAsync returned before the pending write finished");
+        gate.SetResult();
+        await disposal;
+
+        Assert.Equal(1, config.MergeCount);
+        Assert.Equal("SHA256:late", (await config.LoadSettingsAsync()).TrustedHostKeys["late:22"]);
+    }
+
     private static HostKeyEntry Entry(string fingerprint) =>
         new(fingerprint, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "ssh-ed25519", HostKeySource.ImportedKnownHosts);
 
@@ -130,6 +157,9 @@ public sealed class HostKeyPersistenceCoalescerTests
         private int _mergeCount;
 
         public int MergeCount => Volatile.Read(ref _mergeCount);
+
+        /// <summary>Awaited before every merge, so a test can hold a write open.</summary>
+        public Func<Task>? BeforeMerge { get; set; }
 
         public string ConfigPath => _inner.ConfigPath;
 
@@ -155,10 +185,15 @@ public sealed class HostKeyPersistenceCoalescerTests
 
         public Task<int> MergeTrustedHostKeysAsync(IEnumerable<KeyValuePair<string, string>> entries) => _inner.MergeTrustedHostKeysAsync(entries);
 
-        public Task MergeSettingAsync(Action<AppSettings> mutate)
+        public async Task MergeSettingAsync(Action<AppSettings> mutate)
         {
+            if (BeforeMerge is not null)
+            {
+                await BeforeMerge();
+            }
+
             Interlocked.Increment(ref _mergeCount);
-            return _inner.MergeSettingAsync(mutate);
+            await _inner.MergeSettingAsync(mutate);
         }
 
         public Task<List<ServerProfileDto>> LoadServersAsync() => _inner.LoadServersAsync();
