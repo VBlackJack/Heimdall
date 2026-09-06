@@ -606,7 +606,8 @@ public sealed partial class TunnelManager : IDisposable
         int remotePort,
         int socksProxyPort,
         int remoteBindPort,
-        int remoteLocalPort)
+        int remoteLocalPort,
+        bool preferDistinctLoopback = false)
     {
         ArgumentNullException.ThrowIfNull(gatewayChainKey);
         ArgumentNullException.ThrowIfNull(remoteHost);
@@ -627,7 +628,8 @@ public sealed partial class TunnelManager : IDisposable
                         remotePort,
                         socksProxyPort,
                         remoteBindPort,
-                        effectiveRemoteLocalPort))
+                        effectiveRemoteLocalPort)
+                    && SatisfiesLoopbackPreference(session.Info, preferDistinctLoopback))
                 {
                     candidates.Add(new ReusableTunnelCandidate(
                         session.Info,
@@ -646,7 +648,8 @@ public sealed partial class TunnelManager : IDisposable
                         remotePort,
                         socksProxyPort,
                         remoteBindPort,
-                        effectiveRemoteLocalPort))
+                        effectiveRemoteLocalPort)
+                    && SatisfiesLoopbackPreference(session.Info, preferDistinctLoopback))
                 {
                     candidates.Add(new ReusableTunnelCandidate(
                         session.Info,
@@ -843,6 +846,21 @@ public sealed partial class TunnelManager : IDisposable
             && tunnel.SocksProxyPort == socksProxyPort
             && tunnel.RemoteBindPort == remoteBindPort
             && tunnel.EffectiveRemoteLocalPort == effectiveRemoteLocalPort;
+    }
+
+    /// <summary>
+    /// A caller that asked for a distinct loopback alias (an external launch whose
+    /// credential entry is keyed on the tunnel host) must not be handed a tunnel bound
+    /// on the default loopback address: two such launches would collide on the same
+    /// entry. Without the preference every bind host is acceptable.
+    /// </summary>
+    private static bool SatisfiesLoopbackPreference(TunnelInfo tunnel, bool preferDistinctLoopback)
+    {
+        return !preferDistinctLoopback
+            || !string.Equals(
+                LoopbackBinding.NormalizeHost(tunnel.LocalBindHost),
+                LoopbackBinding.DefaultHost,
+                StringComparison.Ordinal);
     }
 
     private static bool IsAliveOutsideRegistryLock(ReusableTunnelCandidate candidate)
