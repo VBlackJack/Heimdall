@@ -42,6 +42,7 @@ public static class UpdateRelaunchOutcomeText
         UpdateRelaunchOutcome.CancelledByUser => "UpdateBannerOutcomeCancelled",
         UpdateRelaunchOutcome.InstallerFailed => "UpdateBannerOutcomeInstallerFailed",
         UpdateRelaunchOutcome.IntegrityRejected => "UpdateBannerOutcomeIntegrityRejected",
+        UpdateRelaunchOutcome.ApplicationStillRunning => "UpdateBannerOutcomeAppStillRunning",
         _ => null, // total, and silent: an unknown outcome must not invent a message.
     };
 }

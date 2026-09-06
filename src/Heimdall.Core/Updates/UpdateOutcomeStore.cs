@@ -80,6 +80,9 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
 
     private const string FailureFileName = "update-failure.json";
 
+    /// <summary>Appended to the attempt file's name while it is being taken.</summary>
+    private const string TakenSuffix = ".taken";
+
     private readonly string _directory;
     private readonly TimeProvider _timeProvider;
 
@@ -110,11 +113,15 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
         try
         {
             Directory.CreateDirectory(_directory);
-            File.WriteAllText(AttemptPath, JsonSerializer.Serialize(record));
 
             // A previous run's failure record must never be read against this
-            // attempt. It describes something else entirely.
+            // attempt: it describes something else entirely. Deleted FIRST, so that a
+            // delete that fails - the file held open by a relauncher from an earlier
+            // attempt, or by an indexer - leaves no attempt for it to be paired with.
+            // The other order wrote the attempt and then failed to delete, and the next
+            // startup reported the new attempt with the old cause.
             File.Delete(FailurePath);
+            File.WriteAllText(AttemptPath, JsonSerializer.Serialize(record));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -140,7 +147,12 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
 
     public PendingUpdateOutcome? TryTakePending()
     {
-        string? attemptContent = ReadOrNull(AttemptPath);
+        // Taken by rename, not read-then-delete. A rename is atomic on the same volume,
+        // so of two instances starting together exactly one gets the file and the other
+        // finds nothing; a read followed by a delete let both read before either
+        // deleted, and both reported. It also removes the file before parsing, so a
+        // record that cannot be parsed is not read again on every launch forever.
+        string? attemptContent = TakeOrNull(AttemptPath);
         if (attemptContent is null)
         {
             return null;
@@ -150,10 +162,6 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
         // On its own it means nothing: it describes how a relauncher ended, not which
         // update it belonged to.
         string? failureContent = ReadOrNull(FailurePath);
-
-        // Deleted BEFORE parsing, deliberately. A record that cannot be parsed would
-        // otherwise be read again on every launch forever, and two instances starting
-        // together would both report the same attempt.
         Clear();
 
         UpdateAttemptRecord? attempt = Parse<UpdateAttemptRecord>(attemptContent);
@@ -178,6 +186,35 @@ public sealed class UpdateOutcomeStore : IUpdateOutcomeStore
         }
 
         return new PendingUpdateOutcome(attempt, failure);
+    }
+
+    /// <summary>
+    /// Moves the file aside under a private name, reads it, and deletes it. The move is
+    /// the claim: whoever completes it owns the record.
+    /// </summary>
+    /// <remarks>
+    /// The private name is overwritten rather than refused, so a leftover from a run
+    /// that died between the move and the delete cannot block every later take.
+    /// </remarks>
+    private static string? TakeOrNull(string path)
+    {
+        string taken = path + TakenSuffix;
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            File.Move(path, taken, overwrite: true);
+            string content = File.ReadAllText(taken);
+            File.Delete(taken);
+            return content;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static string? ReadOrNull(string path)

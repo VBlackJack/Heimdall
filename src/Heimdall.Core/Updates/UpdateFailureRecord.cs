@@ -35,6 +35,18 @@ public static class UpdateOutcomeStage
 
     /// <summary>The installer ran and reported a non-zero exit code.</summary>
     public const string InstallerExit = "InstallerExit";
+
+    /// <summary>
+    /// The application never exited within the wait, so the installer was not run: it
+    /// would have force-closed a live session instead of updating it.
+    /// </summary>
+    public const string ApplicationStillRunning = "ApplicationStillRunning";
+
+    /// <summary>
+    /// The user declined the elevation prompt. The installer never started, so no
+    /// exit code exists to say so; the launch itself reported the refusal.
+    /// </summary>
+    public const string ElevationDeclined = "ElevationDeclined";
 }
 
 /// <summary>

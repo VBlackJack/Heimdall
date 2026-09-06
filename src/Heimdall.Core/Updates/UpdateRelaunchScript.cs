@@ -59,6 +59,28 @@ public static class UpdateRelaunchScript
         "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden";
 
     /// <summary>
+    /// Win32 <c>ERROR_CANCELLED</c>: what ShellExecute reports when the user declines
+    /// the elevation consent prompt. It surfaces from <c>Start-Process -Verb RunAs</c>
+    /// as a <c>Win32Exception</c>, usually wrapped in an <c>InvalidOperationException</c>.
+    /// </summary>
+    public const int Win32ErrorCancelled = 1223;
+
+    /// <summary>
+    /// The variable through which the script tells the bootstrap that the relaunch is
+    /// now its responsibility. The bootstrap initialises it to <c>$false</c> and the
+    /// script's very first statement sets it to <c>$true</c>; both run in one scope
+    /// because the bootstrap executes the script with <c>Invoke-Expression</c>.
+    /// </summary>
+    /// <remarks>
+    /// This is what lets the two guarantees compose. A script that never starts - the
+    /// file was tampered with, or it does not parse, so no statement of it runs - leaves
+    /// the flag false and the bootstrap brings the application back. A script that
+    /// starts and then fails has its own <c>finally</c> for that, and the flag stops the
+    /// bootstrap from starting a second instance on top of it.
+    /// </remarks>
+    public const string RelaunchOwnedVariable = "relaunchOwnedByScript";
+
+    /// <summary>
     /// Escapes a value for embedding inside a PowerShell single-quoted literal:
     /// a single quote is escaped by doubling it.
     /// </summary>
@@ -73,14 +95,32 @@ public static class UpdateRelaunchScript
     /// bootstrap reads the script once under a deny-write handle, verifies its pinned
     /// SHA-256, and executes those verified bytes without reopening the script path.
     /// </summary>
+    /// <param name="scriptPath">The script the bootstrap reads and verifies.</param>
+    /// <param name="expectedScriptSha256">The digest the script bytes must match.</param>
+    /// <param name="targetExecutablePath">
+    /// The application to bring back if the script never gets to run. The script has
+    /// its own relaunch for every failure after it starts; this one covers the failures
+    /// before that, which used to leave the user with no application at all.
+    /// </param>
+    /// <param name="failureRecordPath">
+    /// Where to record a failure that happened before the script started, so the next
+    /// startup can say so. Null records nothing.
+    /// </param>
     public static string BuildPowerShellArguments(
         string scriptPath,
-        string expectedScriptSha256)
+        string expectedScriptSha256,
+        string targetExecutablePath,
+        string? failureRecordPath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scriptPath);
         ValidateSha256(expectedScriptSha256, nameof(expectedScriptSha256));
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetExecutablePath);
 
-        string bootstrap = BuildScriptBootstrap(scriptPath, expectedScriptSha256);
+        string bootstrap = BuildScriptBootstrap(
+            scriptPath,
+            expectedScriptSha256,
+            targetExecutablePath,
+            failureRecordPath);
         string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(bootstrap));
         return $"{PowerShellFlags} -EncodedCommand {encoded}";
     }
@@ -93,14 +133,25 @@ public static class UpdateRelaunchScript
     {
         ArgumentNullException.ThrowIfNull(spec);
         ValidateSha256(spec.ExpectedInstallerSha256, nameof(spec.ExpectedInstallerSha256));
+        ValidateLiteral(spec.InstallerPath, nameof(spec.InstallerPath));
+        ValidateLiteral(spec.TargetExecutablePath, nameof(spec.TargetExecutablePath));
+        ValidateLiteral(spec.ScriptPath, nameof(spec.ScriptPath));
+        ValidateLiteral(spec.StagingDirectory, nameof(spec.StagingDirectory));
+        ValidateLiteral(spec.InstallerArguments, nameof(spec.InstallerArguments));
+        ValidateOptionalLiteral(spec.LogPath, nameof(spec.LogPath));
+        ValidateOptionalLiteral(spec.FailureRecordPath, nameof(spec.FailureRecordPath));
 
-        var hasLog = !string.IsNullOrEmpty(spec.LogPath);
-        var hasFailureRecord = !string.IsNullOrEmpty(spec.FailureRecordPath);
-        var elevation = spec.RequiresElevation ? " -Verb RunAs" : string.Empty;
+        bool hasLog = !string.IsNullOrEmpty(spec.LogPath);
+        bool hasFailureRecord = !string.IsNullOrEmpty(spec.FailureRecordPath);
+        string elevation = spec.RequiresElevation ? " -Verb RunAs" : string.Empty;
         string installerPath = EscapeSingleQuoted(spec.InstallerPath);
         string expectedInstallerSha256 = EscapeSingleQuoted(spec.ExpectedInstallerSha256);
 
-        var sb = new StringBuilder();
+        StringBuilder sb = new();
+
+        // The first statement, before anything that can fail: from here on the script
+        // owns the relaunch, and the bootstrap must not start a second instance.
+        sb.AppendLine($"${RelaunchOwnedVariable} = $true");
         sb.AppendLine("$ErrorActionPreference = 'Stop'");
         sb.AppendLine("$transcriptStarted = $false");
         sb.AppendLine("$installerStream = $null");
@@ -113,12 +164,32 @@ public static class UpdateRelaunchScript
 
         if (hasLog)
         {
-            sb.AppendLine($"    Start-Transcript -Path '{EscapeSingleQuoted(spec.LogPath!)}' -Append");
-            sb.AppendLine("    $transcriptStarted = $true");
+            // Losing the transcript must not lose the update: a log path held open by
+            // an earlier relauncher, or transcription disabled by policy, is not a
+            // reason to leave the user on the old version.
+            sb.AppendLine("    try {");
+            sb.AppendLine($"        Start-Transcript -Path '{EscapeSingleQuoted(spec.LogPath!)}' -Append");
+            sb.AppendLine("        $transcriptStarted = $true");
+            sb.AppendLine("    } catch {");
+            sb.AppendLine("        Write-Warning ('Transcript unavailable: ' + $_)");
+            sb.AppendLine("    }");
         }
 
         sb.AppendLine(
             $"    Wait-Process -Id {spec.ProcessId} -Timeout {spec.WaitTimeoutSeconds} -ErrorAction SilentlyContinue");
+
+        // Wait-Process reports a timeout as an error, which the line above suppresses
+        // on purpose because a process that had already exited reports one too. So the
+        // two outcomes are told apart here, by asking. An installer started over a
+        // live application does not update it: Inno Setup force-closes the process it
+        // finds holding the files, mid-session, which is the one thing this script
+        // exists to avoid.
+        sb.AppendLine(
+            $"    if ($null -ne (Get-Process -Id {spec.ProcessId} -ErrorAction SilentlyContinue)) {{");
+        sb.AppendLine($"        $updateStage = '{UpdateOutcomeStage.ApplicationStillRunning}'");
+        sb.AppendLine("        throw 'The application is still running after the wait timeout.'");
+        sb.AppendLine("    }");
+
         // Obtaining a verdict and judging one are separate things, and only the second
         // is a reason to refuse. Measured on a GitHub runner: Windows PowerShell 5.1 can
         // fail to import Microsoft.PowerShell.Security, so the command does not exist at
@@ -186,6 +257,22 @@ public static class UpdateRelaunchScript
         sb.AppendLine("    }");
         sb.AppendLine("} catch {");
 
+        // A declined consent prompt never reaches the installer, so no Inno exit code
+        // can describe it: it arrives as ERROR_CANCELLED from ShellExecute, somewhere in
+        // the exception chain of the launch. Only the launch stage is inspected; the
+        // same code raised anywhere else would be a coincidence, not a decision.
+        sb.AppendLine($"    if ($updateStage -eq '{UpdateOutcomeStage.InstallerLaunch}') {{");
+        sb.AppendLine("        $inspected = $_.Exception");
+        sb.AppendLine("        while ($null -ne $inspected) {");
+        sb.AppendLine(
+            "            if ($inspected -is [System.ComponentModel.Win32Exception] "
+            + $"-and $inspected.NativeErrorCode -eq {Win32ErrorCancelled.ToString(CultureInfo.InvariantCulture)}) {{");
+        sb.AppendLine($"                $updateStage = '{UpdateOutcomeStage.ElevationDeclined}'");
+        sb.AppendLine("            }");
+        sb.AppendLine("            $inspected = $inspected.InnerException");
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
+
         // STRICTLY BEFORE Write-Error, and that ordering is the whole point. Under
         // $ErrorActionPreference = 'Stop' a Write-Error inside a catch is a TERMINATING
         // error: it abandons the rest of the block. Anything appended after it is dead
@@ -196,17 +283,7 @@ public static class UpdateRelaunchScript
         // application back.
         if (hasFailureRecord)
         {
-            sb.AppendLine("    try {");
-            sb.AppendLine(
-                "        [System.IO.File]::WriteAllText('"
-                + EscapeSingleQuoted(spec.FailureRecordPath!)
-                + "', '{\"schemaVersion\":"
-                + UpdateFailureRecord.CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture)
-                + ",\"stage\":\"' + $updateStage + '\",\"installerExitCode\":' "
-                + "+ $installerExitCode + ',\"installerExitCodeKnown\":' "
-                + "+ $installerExitKnown + '}')");
-            sb.AppendLine("    } catch {");
-            sb.AppendLine("    }");
+            AppendFailureRecordWrite(sb, "    ", spec.FailureRecordPath!, stageExpression: "$updateStage");
         }
 
         sb.AppendLine("    Write-Error $_");
@@ -214,11 +291,16 @@ public static class UpdateRelaunchScript
         sb.AppendLine("    if ($null -ne $installerStream) {");
         sb.AppendLine("        $installerStream.Dispose()");
         sb.AppendLine("    }");
-        sb.AppendLine("    try {");
+
+        // The one case in which the application must NOT be started: it never exited,
+        // so it is still there. A second instance would only hand over to it.
+        sb.AppendLine($"    if ($updateStage -ne '{UpdateOutcomeStage.ApplicationStillRunning}') {{");
+        sb.AppendLine("        try {");
         sb.AppendLine(
-            $"        Start-Process -FilePath '{EscapeSingleQuoted(spec.TargetExecutablePath)}'");
-        sb.AppendLine("    } catch {");
-        sb.AppendLine("        Write-Warning $_");
+            $"            Start-Process -FilePath '{EscapeSingleQuoted(spec.TargetExecutablePath)}'");
+        sb.AppendLine("        } catch {");
+        sb.AppendLine("            Write-Warning $_");
+        sb.AppendLine("        }");
         sb.AppendLine("    }");
 
         if (hasLog)
@@ -232,58 +314,150 @@ public static class UpdateRelaunchScript
             $"    Remove-Item -LiteralPath '{installerPath}' -Force -ErrorAction SilentlyContinue");
         sb.AppendLine(
             $"    Remove-Item -LiteralPath '{EscapeSingleQuoted(spec.ScriptPath)}' -Force -ErrorAction SilentlyContinue");
+
+        // -Recurse, because without it a non-empty directory asks for confirmation, and
+        // under -NonInteractive that request is an invalid-operation error from the host
+        // that -ErrorAction SilentlyContinue does not cover. Measured: it truncated the
+        // rest of the finally and left the directory, with the installer inside it.
         sb.AppendLine(
             $"    Remove-Item -LiteralPath '{EscapeSingleQuoted(spec.StagingDirectory)}' "
-            + "-Force -ErrorAction SilentlyContinue");
+            + "-Recurse -Force -ErrorAction SilentlyContinue");
         sb.AppendLine("}");
 
         return sb.ToString();
     }
 
+    /// <summary>
+    /// The bootstrap that <c>-EncodedCommand</c> runs. It has its own failure path,
+    /// because the script's guarantees only start once the script starts.
+    /// </summary>
+    /// <remarks>
+    /// Everything before <c>Invoke-Expression</c> can fail - a script file that was
+    /// deleted, locked or tampered with, a script that does not parse - and every one
+    /// of those failures used to end the host silently, with the application already
+    /// gone. The <c>finally</c> here brings it back whenever the script did not get far
+    /// enough to do so itself, and the <c>catch</c> records a preparation failure so the
+    /// next startup can say what happened.
+    /// </remarks>
     internal static string BuildScriptBootstrap(
         string scriptPath,
-        string expectedScriptSha256)
+        string expectedScriptSha256,
+        string targetExecutablePath,
+        string? failureRecordPath)
     {
-        var sb = new StringBuilder();
+        StringBuilder sb = new();
         sb.AppendLine("$ErrorActionPreference = 'Stop'");
+        sb.AppendLine($"${RelaunchOwnedVariable} = $false");
+        sb.AppendLine($"$relaunchTarget = '{EscapeSingleQuoted(targetExecutablePath)}'");
+        sb.AppendLine("try {");
+
+        // Advisory, matching the policy the script itself states: the Authenticode
+        // verdict is optional and the SHA-256 comparison is the gate. This import is the
+        // exact module whose failure to load under Windows PowerShell 5.1 is documented
+        // (BL-0091), and the host started here is always Windows PowerShell.
         sb.AppendLine(
-            "$securityModulePath = Join-Path $PSHOME "
+            "    $securityModulePath = Join-Path $PSHOME "
             + "'Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1'");
-        sb.AppendLine("Import-Module -Name $securityModulePath -ErrorAction Stop");
-        sb.AppendLine($"$scriptPath = '{EscapeSingleQuoted(scriptPath)}'");
+        sb.AppendLine("    try {");
+        sb.AppendLine("        Import-Module -Name $securityModulePath -ErrorAction Stop");
+        sb.AppendLine("    } catch {");
+        sb.AppendLine("        Write-Warning ('Security module unavailable: ' + $_)");
+        sb.AppendLine("    }");
+        sb.AppendLine($"    $scriptPath = '{EscapeSingleQuoted(scriptPath)}'");
         sb.AppendLine(
-            $"$expectedScriptSha256 = '{EscapeSingleQuoted(expectedScriptSha256)}'");
+            $"    $expectedScriptSha256 = '{EscapeSingleQuoted(expectedScriptSha256)}'");
         sb.AppendLine(
-            "$scriptStream = [System.IO.File]::Open($scriptPath, "
+            "    $scriptStream = [System.IO.File]::Open($scriptPath, "
             + "[System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, "
             + "[System.IO.FileShare]::Read)");
-        sb.AppendLine("try {");
-        sb.AppendLine("    $memory = New-Object System.IO.MemoryStream");
         sb.AppendLine("    try {");
-        sb.AppendLine("        $scriptStream.CopyTo($memory)");
-        sb.AppendLine("        $scriptBytes = $memory.ToArray()");
+        sb.AppendLine("        $memory = New-Object System.IO.MemoryStream");
+        sb.AppendLine("        try {");
+        sb.AppendLine("            $scriptStream.CopyTo($memory)");
+        sb.AppendLine("            $scriptBytes = $memory.ToArray()");
+        sb.AppendLine("        } finally {");
+        sb.AppendLine("            $memory.Dispose()");
+        sb.AppendLine("        }");
         sb.AppendLine("    } finally {");
-        sb.AppendLine("        $memory.Dispose()");
+        sb.AppendLine("        $scriptStream.Dispose()");
         sb.AppendLine("    }");
-        sb.AppendLine("} finally {");
-        sb.AppendLine("    $scriptStream.Dispose()");
-        sb.AppendLine("}");
-        sb.AppendLine("$sha256 = [System.Security.Cryptography.SHA256]::Create()");
-        sb.AppendLine("try {");
+        sb.AppendLine("    $sha256 = [System.Security.Cryptography.SHA256]::Create()");
+        sb.AppendLine("    try {");
         sb.AppendLine(
-            "    $actualScriptSha256 = "
+            "        $actualScriptSha256 = "
             + "([System.BitConverter]::ToString($sha256.ComputeHash($scriptBytes))).Replace('-', '')");
-        sb.AppendLine("} finally {");
-        sb.AppendLine("    $sha256.Dispose()");
-        sb.AppendLine("}");
+        sb.AppendLine("    } finally {");
+        sb.AppendLine("        $sha256.Dispose()");
+        sb.AppendLine("    }");
         sb.AppendLine(
-            "if (-not [System.String]::Equals($actualScriptSha256, "
+            "    if (-not [System.String]::Equals($actualScriptSha256, "
             + "$expectedScriptSha256, [System.StringComparison]::OrdinalIgnoreCase)) {");
-        sb.AppendLine("    throw 'Relauncher script SHA-256 verification failed.'");
+        sb.AppendLine("        throw 'Relauncher script SHA-256 verification failed.'");
+        sb.AppendLine("    }");
+        sb.AppendLine("    $scriptText = [System.Text.Encoding]::UTF8.GetString($scriptBytes)");
+        sb.AppendLine("    Invoke-Expression $scriptText");
+        sb.AppendLine("} catch {");
+
+        // Only when the script never started: once it has, its own record is the
+        // account of what happened, and this one would overwrite it with less.
+        if (!string.IsNullOrEmpty(failureRecordPath))
+        {
+            sb.AppendLine($"    if (-not ${RelaunchOwnedVariable}) {{");
+            AppendFailureRecordWrite(
+                sb,
+                "        ",
+                failureRecordPath,
+                stageExpression: $"'{UpdateOutcomeStage.Preparation}'",
+                scriptVariablesDefined: false);
+            sb.AppendLine("    }");
+        }
+
+        sb.AppendLine("    Write-Error $_");
+        sb.AppendLine("} finally {");
+        sb.AppendLine($"    if (-not ${RelaunchOwnedVariable}) {{");
+        sb.AppendLine("        try {");
+        sb.AppendLine("            Start-Process -FilePath $relaunchTarget");
+        sb.AppendLine("        } catch {");
+        sb.AppendLine("            Write-Warning $_");
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
         sb.AppendLine("}");
-        sb.AppendLine("$scriptText = [System.Text.Encoding]::UTF8.GetString($scriptBytes)");
-        sb.AppendLine("Invoke-Expression $scriptText");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Emits the guarded write of a failure record. One emitter for both the script and
+    /// the bootstrap, so the two cannot drift into writing different JSON.
+    /// </summary>
+    /// <remarks>
+    /// The stage is an expression rather than a value because the script reports the
+    /// stage it reached, held in a variable, while the bootstrap always reports
+    /// preparation. The exit-code fields come from the script's variables only when
+    /// the script defined them: the bootstrap writes before the script ran, and an
+    /// undefined variable concatenates as empty text, which would leave a hole in the
+    /// JSON on the one run that matters.
+    /// </remarks>
+    private static void AppendFailureRecordWrite(
+        StringBuilder sb,
+        string indent,
+        string failureRecordPath,
+        string stageExpression,
+        bool scriptVariablesDefined = true)
+    {
+        string exitCodeExpression = scriptVariablesDefined ? "$installerExitCode" : "'0'";
+        string exitKnownExpression = scriptVariablesDefined ? "$installerExitKnown" : "'0'";
+
+        sb.AppendLine($"{indent}try {{");
+        sb.AppendLine(
+            $"{indent}    [System.IO.File]::WriteAllText('"
+            + EscapeSingleQuoted(failureRecordPath)
+            + "', '{\"schemaVersion\":"
+            + UpdateFailureRecord.CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture)
+            + ",\"stage\":\"' + " + stageExpression + " + '\",\"installerExitCode\":' "
+            + "+ " + exitCodeExpression + " + ',\"installerExitCodeKnown\":' "
+            + "+ " + exitKnownExpression + " + '}')");
+        sb.AppendLine($"{indent}}} catch {{");
+        sb.AppendLine($"{indent}}}");
     }
 
     private static void ValidateSha256(string value, string parameterName)
@@ -294,6 +468,35 @@ public static class UpdateRelaunchScript
             throw new ArgumentException(
                 "Expected SHA-256 must contain exactly 64 hexadecimal characters.",
                 parameterName);
+        }
+    }
+
+    /// <summary>
+    /// Refuses a value that could not survive a single-quoted literal intact. Quotes are
+    /// escaped; control characters are not representable and are refused instead.
+    /// </summary>
+    /// <remarks>
+    /// A single-quoted PowerShell literal spans lines, so a newline cannot break out of
+    /// it. It can, however, make the emitted text mean something other than a path, and
+    /// no Windows path legitimately contains one. Refusing at the boundary keeps the
+    /// invariant "every interpolated value is a quoted literal" checkable in one place.
+    /// </remarks>
+    private static void ValidateLiteral(string value, string parameterName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        if (value.Any(char.IsControl))
+        {
+            throw new ArgumentException(
+                "Values embedded in the relauncher script must not contain control characters.",
+                parameterName);
+        }
+    }
+
+    private static void ValidateOptionalLiteral(string? value, string parameterName)
+    {
+        if (value is not null)
+        {
+            ValidateLiteral(value, parameterName);
         }
     }
 }

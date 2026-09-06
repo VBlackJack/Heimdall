@@ -726,6 +726,7 @@
   "UpdateBannerViewReleaseBtn": "Voir la release",
   "UpdateBannerLaterBtn": "Plus tard",
   "UpdateBannerDismissBtn": "Fermer",
+  "UpdateBannerOutcomeAppStillRunning": "La mise à jour vers {0} n'a pas pu démarrer : Heimdall était encore en cours d'exécution au moment de lancer l'installeur, rien n'a été modifié. Fermez complètement Heimdall et réessayez.",
   "UpdateBannerOutcomeCancelled": "La mise à jour vers {0} n'a pas été menée a son terme. Elle semble avoir été annulée, ou l'invite d'élévation a été refusée. Heimdall fonctionne toujours sur la version précédente.",
   "UpdateBannerOutcomeInstallerFailed": "La mise à jour vers {0} n'a pas été appliquée : l'installeur a signalé une erreur. Heimdall fonctionne toujours sur la version précédente. Le journal du relanceur se trouve dans le dossier de journaux indiqué dans le panneau A propos.",
   "UpdateBannerOutcomeIntegrityRejected": "La mise à jour vers {0} a été refusée avant son exécution : le contrôle d'intégrité de l'installeur téléchargé a échoué. Heimdall fonctionne toujours sur la version précédente.",

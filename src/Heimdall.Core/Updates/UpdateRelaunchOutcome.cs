@@ -45,4 +45,10 @@ public enum UpdateRelaunchOutcome
     /// check at the execution boundary.
     /// </summary>
     IntegrityRejected,
+
+    /// <summary>
+    /// The application was still running when the installer was due, so the
+    /// relauncher refused to run it. Nothing was changed.
+    /// </summary>
+    ApplicationStillRunning,
 }

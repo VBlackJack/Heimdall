@@ -12,6 +12,50 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### The update relauncher brings the application back even when its script never starts
+
+The in-app updater hands over to a detached PowerShell host through a small bootstrap that reads
+the relauncher script, verifies its SHA-256 and runs it. The bootstrap had no failure path of its
+own: a Security module that would not import (the exact failure documented for Windows PowerShell
+5.1, and Windows PowerShell is the only host the updater starts), a script file that had been
+tampered with, or a script that did not parse, each ended the host with the application already
+exited, nothing relaunched, nothing recorded. The bootstrap now wraps everything in its own
+try/catch/finally: the module import is advisory, a failure before the script starts is recorded as
+a preparation failure for the next startup to report, and the application is relaunched whenever
+the script did not get far enough to do so itself. The script's first statement claims that
+responsibility, so a script that starts and then fails is relaunched exactly once. The execution
+harness now runs the production `-EncodedCommand` arguments end to end, against a tampered script
+and against one that does not parse; until now every execution test used `-File` and the bootstrap
+had never been run by a test.
+
+### The relauncher no longer installs over a running application
+
+`Wait-Process` reports a timeout as an error the script had to suppress, because an already-exited
+process reports one too, so the two were indistinguishable: after two minutes the installer was
+started over the live application, which Inno Setup then force-closed in the middle of a session.
+The script now probes the process after the wait and refuses with a new `ApplicationStillRunning`
+stage, reported at the next startup in its own words, and does not start a second instance of an
+application that is still there. The harness used to wait on the test host itself, which never
+exits, so every execution test took the timeout branch and asserted that the installer ran anyway;
+it now waits on a stand-in that has already exited.
+
+### Other relauncher fixes
+
+A declined elevation prompt is recorded as its own stage and reported as a cancellation rather
+than as a failed update; the Inno Setup exit-code table never sees it, and its documentation
+claimed otherwise. A transcript that cannot be started (log path held open, transcription disabled
+by policy) no longer aborts the update. The staging directory is removed recursively: without
+`-Recurse` a non-empty directory asked for confirmation, which under `-NonInteractive` is a host
+error that truncated the rest of the cleanup and left the installer on disk. Paths containing
+control characters are refused at the spec boundary. The outcome classifier compares the attempted
+and running versions as versions rather than as text, so a spelling difference cannot turn a
+successful update into a false "did not apply". The outcome store deletes the previous failure
+record before writing a new attempt, so a failed delete cannot pair a new attempt with an old
+cause, and takes the pending attempt by rename so two instances starting together cannot both
+report it.
+
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 
 ### The Plink port probe runs before the first wait
