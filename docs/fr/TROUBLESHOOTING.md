@@ -585,8 +585,9 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 2. Heimdall détecte et démarre automatiquement le serveur X lorsque la redirection X11 est activée
 3. Si le démarrage automatique échoue, définir manuellement le chemin du serveur X dans Settings > X11 Server Path
 4. Vérifier que la variable d'environnement `DISPLAY` est définie (Heimdall positionne `localhost:0.0` automatiquement)
+5. Quand aucun serveur X n'est disponible au moment de la connexion, le texte d'état de la session le dit et la session est lancée sans redirection ; corriger le serveur, puis se reconnecter
 
-**Fichiers** : `Services/X11ServerManager.cs`, `Services/ConnectionService.Ssh.cs`
+**Fichiers** : `Services/X11ServerManager.cs`, `Services/Handlers/SshHandler.cs`
 
 ---
 
@@ -928,3 +929,35 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Solution** : modifiez la tâche et pointez-la sur le profil voulu. Une tâche enregistrée depuis la version courante mémorise l'identifiant de ce profil et ne dépend plus de son nom.
 
 **Fichiers** : `src/Heimdall.App/ViewModels/Scheduled/ScheduledTaskServerResolver.cs`, `src/Heimdall.App/ViewModels/Scheduled/ScheduledTasksViewModel.cs`
+
+---
+
+## 51. SSH - le serveur pose une question interactive à laquelle ce client ne peut pas répondre {#ssh-keyboard-interactive-unsupported-prompt}
+
+**Symptôme** : une connexion par mot de passe échoue avec un message disant que le serveur a posé une question interactive à laquelle ce client ne peut pas répondre, en nommant la question (par exemple `Verification code:`).
+
+**Cause racine** : le serveur authentifie par keyboard-interactive et demande un second facteur après le mot de passe. Heimdall ne répond qu'à une demande de mot de passe avec le mot de passe stocké ; toute autre demande est laissée vide et enregistrée, et le refus qui suit est signalé comme cette question sans réponse (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un mot de passe rejeté. Avant cette classification, le même refus était imputé au mot de passe.
+
+**Solution** :
+
+1. Utiliser pour cet hôte un client qui prend en charge le second facteur du serveur, ou s'authentifier avec une clé que le serveur accepte sans défi.
+2. Si le serveur vous appartient, exempter la source ou le compte du client du second facteur, ou activer l'authentification par clé publique.
+
+**Leçon clé** : un refus de mot de passe signalé après un tour keyboard-interactive doit se lire avec ce que le tour a demandé ; le classifieur le fait à partir de `SshConnectionParams.KeyboardInteractive`.
+
+**Fichiers** : `Heimdall.Ssh/SshConnectionFactory.cs` (`AnswerKeyboardInteractivePrompts`), `Heimdall.Ssh/FailureClassifier.cs`, `Heimdall.Ssh/KeyboardInteractiveObservation.cs`
+
+---
+
+## 52. Tunnel - repli Plink refusé pour un proxy SOCKS ou une redirection distante {#tunnel-plink-fallback-forwarding-unsupported}
+
+**Symptôme** : une session tunnelisée dont l'authentification à la passerelle a été refusée par le client SSH intégré échoue avec un message disant que le repli Plink ne peut pas fournir le proxy SOCKS ou la redirection de port distante dont le profil a besoin.
+
+**Cause racine** : le repli Plink n'ouvre qu'une simple redirection locale (`-L`). Un profil avec `SocksProxyPort` ou `RemoteBindPort` obtenait cette redirection simple et un succès annoncé alors que la redirection nécessaire n'existait pas ; le repli refuse désormais un tel profil avant de lancer plink.
+
+**Solution** :
+
+1. Corriger l'authentification à la passerelle pour le client intégré (en général l'agent ou la clé que la passerelle attend), qui sert tous les modes de redirection.
+2. Ou retirer le proxy SOCKS / la redirection distante du profil si la session n'en a pas besoin.
+
+**Fichiers** : `Services/TunnelService.cs` (`EstablishPlinkTunnelAsync`), `Heimdall.Ssh/Plink/PlinkTunnelRunner.cs`

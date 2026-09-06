@@ -44,8 +44,8 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Transport en mode pipe pour des flèches, des couleurs et des séquences d'échappement correctes
 - **Prise en charge multi-agents** : Pageant (PuTTY) et l'agent OpenSSH de Windows (canal nommé `\\.\pipe\openssh-ssh-agent`) derrière une abstraction commune `ISshAgent`. Priorité configurable par l'utilisateur dans `Settings > SSH & SFTP > Connexion > SSH agent preference` (par défaut : OpenSSH d'abord, Pageant ensuite). Les clés RSA négocient SHA-2 automatiquement, si bien que les serveurs modernes ayant désactivé `ssh-rsa` acceptent toujours les clés mises en cache par l'agent.
 - **Champ de phrase secrète de clé distinct** : séparé du mot de passe de connexion, les deux étant persistés chiffrés. Cela permet les scénarios clé-avec-repli-mot-de-passe sans l'ambiguïté de champ des configurations historiques.
-- **Import de configuration OpenSSH avec ProxyJump** : les chaînes à un ou plusieurs sauts sont mappées automatiquement sur le modèle de passerelle de Heimdall avec des liens `ParentGatewayId`. Les formes non prises en charge (ProxyCommand, jetons `%h`/`%p`, cycles) sont rejetées avec un diagnostic explicite plutôt qu'importées de travers en silence.
-- Heartbeat keepalive SSH (évite les déconnexions dues à TMOUT)
+- **Import de configuration OpenSSH avec ProxyJump** : les chaînes à un ou plusieurs sauts sont mappées automatiquement sur le modèle de passerelle de Heimdall avec des liens `ParentGatewayId`. `HostName %h.domaine` développe `%h` en l'alias comme le fait OpenSSH ; les formes non prises en charge (ProxyCommand, autres jetons `%`, cycles) sont rejetées avec un diagnostic explicite plutôt qu'importées de travers en silence, et une directive répétée dans un même bloc `Host` garde sa première valeur.
+- Heartbeat keepalive SSH (évite les déconnexions dues à TMOUT) ; la remise à zéro côté shell ne part que vers un shell SSH inactif, jamais dans une ligne à moitié tapée, un terminal local ou WinRM, ni un enregistrement de macro
 - Vérification TOFU de la clé d'hôte confirmée par l'utilisateur avec épinglage persistant de l'empreinte ; les décisions de confiance sont tranchées *avant* `Connect()` via une sonde de pré-authentification dédiée - le callback `HostKeyReceived` de SSH.NET n'effectue jamais de travail asynchrone ni de dispatch UI
 - Application fail-closed de la clé d'hôte pour SSH.NET comme pour le repli Plink, avec `HostKeyUnavailable` lorsqu'une clé de passerelle épinglée ne peut pas être résolue sans retomber sur le cache de PuTTY/Plink
 - L'identité de réutilisation des tunnels tient compte de la passerelle (identifiants de passerelle stables + hachage de chaîne normalisé), ce qui évite tout partage accidentel entre réseaux privés qui se recouvrent
@@ -53,8 +53,12 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Allocation dynamique du port de tunnel avec nouvelles tentatives bornées en cas de course sur le bind (`AddressAlreadyInUse`)
 - Comptage de références des tunnels (les tunnels partagés survivent à la fermeture d'une session isolée)
 - Redimensionnement du terminal via la requête SSH window-change (API publique `ShellStream.ChangeWindowSize`, sans réflexion)
-- Redirection X11 avec détection automatique du serveur X et démarrage automatique
-- 29 codes d'échec structurés avec des messages d'erreur localisés
+- Redirection X11 avec détection automatique du serveur X et démarrage automatique ; quand aucun serveur X n'est disponible, la session le dit dans son texte d'état et se lance sans redirection. Le VcXsrv géré conserve son contrôle d'accès par hôte
+- Les collages dans le terminal passent par le chemin de collage propre à xterm (collage encadré quand le shell l'a activé, CR+LF repliés), et Shift+Insert passe par la même garde de collage que Ctrl+V
+- Le PTY s'ouvre à la taille que le terminal a déjà signalée, sur le transport SSH.NET comme sur plink, au lieu de 80x24 jusqu'au premier redimensionnement
+- Le repli Plink refuse, avec un message localisé, un profil qui a besoin d'un proxy SOCKS ou d'une redirection distante qu'il ne sait pas fournir, au lieu d'ouvrir une simple redirection locale et d'annoncer un succès
+- Un serveur keyboard-interactive qui demande un second facteur après le mot de passe obtient un échec honnête qui nomme la question sans réponse, pas un mot de passe rejeté
+- Des codes d'échec structurés, un par cause, chacun avec un message d'erreur localisé
 - Des événements de sécurité typés en cours de session distinguent les attaques sur la clé d'hôte des déconnexions ordinaires et suppriment la reconnexion automatique SSH en cas de signal MITM
 - Surcouche de reconnexion automatique en cas de déconnexion inattendue (SSH et RDP)
 
@@ -269,7 +273,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - IPC Pageant durcie : DACL réservée à soi-même sur le mappage de fichier partagé, suffixe aléatoire cryptographique dans le nom du mappage (64 bits d'entropie), liste blanche des processus Pageant de confiance avant tout trafic d'agent, et vérification préalable d'agent vide
 - Comparaison des empreintes de clé d'hôte en temps constant via `CryptographicOperations.FixedTimeEquals`
 - Import de `known_hosts` borné par ligne (64 Ko) et par fichier (50 Mo) avec un `StreamReader` en flux ; une entrée malformée dégrade vers un diagnostic plutôt qu'une exception dans l'interface
-- La purge de stderr de Plink caviarde les affectations de password / passphrase / token / bearer ainsi que les options `-pw` / `-pwfile` ; la tâche de purge est jointe avant `Process.Kill()` afin qu'aucun lecteur d'arrière-plan ne survive à son tube
+- La purge de stderr de Plink caviarde les affectations de password / passphrase / token / bearer ainsi que les options `-pw` / `-pwfile` ; la tâche de purge possède sa propre annulation, survit au jeton de connexion de l'appelant et est jointe avant `Process.Kill()` afin qu'aucun lecteur d'arrière-plan ne survive à son tube
 - Protection XXE : DtdProcessing.Prohibit sur tous les importeurs XML (mRemoteNG, RDCMan, cache Citrix)
 - Fichier de mot de passe Plink : création atomique avec ACL sous Windows, mode 0600 sous Unix (sans repli)
 - Wake-on-LAN par paquet magique UDP (menu contextuel du clic droit)
@@ -278,7 +282,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Dépendances de clé d'hôte non-nullables à la compilation sur les points d'entrée SSH/SFTP/tunnel/sudo ; `RejectingHostKeyVerifier` est le vérificateur fail-closed sûr et `AutoAcceptHostKeyVerifier` est réservé aux tests
 - Les événements de discordance de clé d'hôte en cours de session se propagent par `SshSessionSecurityEvent` / `HostKeyRotatedDuringUpload` au lieu d'être réduits à un texte de déconnexion générique
 - Sous-onglet `Settings > SSH & SFTP > Clés d'hôtes` : grille dense et auditable de chaque clé d'hôte de confiance avec provenance de la source, import depuis `~/.ssh/known_hosts`, export vers ce même fichier, résolution de conflit explicite ligne par ligne ("Keep existing" par défaut) et actions de copie/suppression de ligne
-- Synchronisation optionnelle de `known_hosts` au démarrage, afin que Heimdall, la CLI OpenSSH et Plink partagent une vue unique de la confiance
+- Synchronisation optionnelle de `known_hosts` au démarrage, afin que Heimdall, la CLI OpenSSH et Plink partagent une vue unique de la confiance ; un jeton haché n'est apparié que par son jeton identique, donc la synchronisation ne hache plus chaque ligne sous chaque sel stocké, et les changements de confiance sont persistés en une écriture par fenêtre calme au lieu d'une par ligne
+- Sur une clé d'hôte ou un certificat FTPS qui a changé, l'invite met Refuser par défaut ; les conflits d'import sont détectés aussi contre les entrées hachées ; remplacer une clé abandonne l'ancien blob de clé publique ; l'export écrit de l'UTF-8 sans BOM et conserve mot pour mot les lignes multi-hôtes qu'il ne gère pas entièrement
+- Les fichiers de clés SSH générés sont écrits sans marque d'ordre des octets, avec des fins de ligne LF, la clé privée sous une ACL réservée au propriétaire
 - Les sessions de repli Plink imposent des empreintes `-hostkey` épinglées issues du magasin de confiance partagé et refusent de se lancer quand Heimdall ne peut pas résoudre une empreinte épinglée ou sondée en toute sécurité
 - Le remplissage automatique via le broker d'identifiants exige une correspondance du titre de l'hôte RDP avant d'injecter un mot de passe dans l'invite d'un client externe ; dans Heimdall, l'invite d'une session embarquée est reconnue par la fenêtre qui la possède, donc deux sessions qui invitent en même temps remplissent chacune la leur
 - Les limitations de sécurité connues et les notes de modèle de menace sont suivies dans [docs/fr/SECURITY.md](SECURITY.md)

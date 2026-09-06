@@ -58,6 +58,9 @@ It is free, open source, and runs on Windows 10 and 11.
 - **Sessions organised the way you work.** Folders with colours, drag and drop to move a folder
   or to arrange sessions by hand, filters by protocol, favourite, connected state or gateway, and
   a tree that opens where you left it.
+- **Trust you can audit.** SSH host keys are pinned the first time you connect and shown for you
+  to compare; a key that changes is refused by default, and your `~/.ssh/known_hosts` can be
+  imported and exported so OpenSSH and Heimdall agree on who is who.
 - **Nothing to install alongside it.** Both downloads are self-contained.
 
 The full catalogue is in the [feature reference](docs/FEATURES.md).

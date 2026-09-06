@@ -44,8 +44,8 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Pipe mode transport for correct arrow keys, colors, and escape sequences
 - **Multi-agent support**: Pageant (PuTTY) and Windows OpenSSH Agent (named pipe `\\.\pipe\openssh-ssh-agent`) behind a common `ISshAgent` abstraction. User-configurable priority in `Settings > SSH & SFTP > Connection > SSH agent preference` (default: OpenSSH first, Pageant second). RSA keys negotiate SHA-2 automatically so modern servers with `ssh-rsa` disabled still accept cached agent keys.
 - **Separate key passphrase field**: distinct from the login password, both persisted encrypted. Enables key-with-fallback-password workflows without the field ambiguity of legacy setups.
-- **OpenSSH config import with ProxyJump**: single-hop and multi-hop chains auto-mapped to Heimdall's gateway model with `ParentGatewayId` links. Unsupported forms (ProxyCommand, `%h`/`%p` tokens, cycles) rejected with explicit diagnostics rather than silently mis-imported.
-- SSH keepalive heartbeat (prevents TMOUT disconnects)
+- **OpenSSH config import with ProxyJump**: single-hop and multi-hop chains auto-mapped to Heimdall's gateway model with `ParentGatewayId` links. `HostName %h.domain` expands `%h` to the alias as OpenSSH does; unsupported forms (ProxyCommand, other `%` tokens, cycles) are rejected with explicit diagnostics rather than silently mis-imported, and a directive repeated inside one `Host` block keeps its first value.
+- SSH keepalive heartbeat (prevents TMOUT disconnects); the shell-level reset fires only into an idle SSH shell, never into a half-typed line, a local or WinRM terminal, or a macro recording
 - User-confirmed TOFU host key verification with persistent fingerprint pinning; trust decisions resolved *before* `Connect()` via a dedicated pre-authentication probe - SSH.NET's `HostKeyReceived` callback never performs async work or UI dispatch
 - Fail-closed host-key enforcement for SSH.NET and Plink fallback paths, including `HostKeyUnavailable` when a pinned gateway key cannot be resolved without falling back to PuTTY/Plink's cache
 - Gateway-aware tunnel reuse identity (stable gateway IDs + normalized chain hash) prevents accidental sharing across overlapping private networks
@@ -53,8 +53,12 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Dynamic tunnel port allocation with bounded retry on bind-race (`AddressAlreadyInUse`)
 - Tunnel ref-counting (shared tunnels survive individual session close)
 - Terminal resize via SSH window-change request (public `ShellStream.ChangeWindowSize` API, no reflection)
-- X11 forwarding with automatic X server detection and auto-start
-- 29 structured failure codes with localized error messages
+- X11 forwarding with automatic X server detection and auto-start; when no X server is available the session says so in its status text and launches without forwarding. The managed VcXsrv keeps host access control on
+- Clipboard pastes into the terminal go through xterm's own paste path (bracketed paste when the shell enabled it, CR+LF folded), and Shift+Insert reaches the same paste guard as Ctrl+V
+- The PTY opens at the size the terminal already reported, on both the SSH.NET and the plink transport, instead of 80x24 until the first resize
+- The Plink fallback refuses, with a localized message, a profile that needs a SOCKS proxy or a reverse forward it cannot provide, instead of opening a plain local forward and reporting success
+- A keyboard-interactive server that asks for a second factor after the password gets an honest failure naming the unanswered question, not a rejected password
+- Structured failure codes, one per cause, each with a localized error message
 - Typed mid-session security events distinguish host-key attacks from ordinary disconnects and suppress SSH auto-reconnect on MITM signals
 - Auto-reconnect overlay on unexpected disconnect (SSH and RDP)
 
@@ -269,7 +273,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Pageant IPC hardened with self-only DACL on the shared file mapping, cryptographic random suffix in the mapping name (64 bits of entropy), trusted Pageant process whitelist before any agent traffic, and empty-agent preflight check
 - Constant-time host-key fingerprint comparison via `CryptographicOperations.FixedTimeEquals`
 - `known_hosts` import bounded by per-line (64 KB) and per-file (50 MB) caps with streaming `StreamReader`; malformed input degrades to diagnostics rather than UI exceptions
-- Plink stderr drain redacts password / passphrase / token / bearer assignments and `-pw` / `-pwfile` flags; the drain task is joined before `Process.Kill()` so background readers cannot outlive their pipe
+- Plink stderr drain redacts password / passphrase / token / bearer assignments and `-pw` / `-pwfile` flags; the drain task owns its own cancellation, outlives the caller's connect token, and is joined before `Process.Kill()` so background readers cannot outlive their pipe
 - XXE protection: DtdProcessing.Prohibit on all XML importers (mRemoteNG, RDCMan, Citrix cache)
 - Plink password file: atomic ACL creation on Windows, mode 0600 on Unix (no fallback)
 - Wake-on-LAN via UDP magic packet (right-click context menu)
@@ -278,7 +282,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Compile-time non-null host-key dependencies on SSH/SFTP/tunnel/sudo entry points; `RejectingHostKeyVerifier` is the safe fail-closed verifier and `AutoAcceptHostKeyVerifier` is test-only
 - Mid-session host-key mismatch events propagate through `SshSessionSecurityEvent` / `HostKeyRotatedDuringUpload` instead of being collapsed into generic disconnect text
 - `Settings > SSH & SFTP > Host keys` sub-tab: dense auditable grid of every trusted host key with source provenance, import from `~/.ssh/known_hosts`, export to it, explicit per-row conflict resolution ("Keep existing" default), and copy/remove row actions
-- Opt-in `known_hosts` synchronization at startup so Heimdall, OpenSSH CLI, and Plink share one view of trust
+- Opt-in `known_hosts` synchronization at startup so Heimdall, OpenSSH CLI, and Plink share one view of trust; a hashed token is matched only by its identical token, so the sync no longer hashes every line under every stored salt, and trust changes are persisted in one write per quiet window instead of one per line
+- On a changed host key or FTPS certificate the prompt defaults to Reject; import conflicts are detected against hashed entries too; replacing a key drops the previous public key blob; export writes UTF-8 without BOM and keeps multi-host lines it does not fully manage verbatim
+- Generated SSH key files are written without a byte order mark, with LF endings, the private key under an owner-only ACL
 - Plink fallback sessions enforce pinned `-hostkey` fingerprints from the shared trust store and refuse to launch when Heimdall cannot resolve a pinned/probed fingerprint safely
 - Credential broker autofill requires an RDP host-title match before injecting a password into an external client's prompt; inside Heimdall, the prompt of an embedded session is matched by the window that owns it, so two sessions prompting at once each fill their own
 - Known security limitations and threat model notes are tracked in [docs/SECURITY.md](SECURITY.md)
