@@ -88,9 +88,11 @@ internal sealed class UpdateInstaller : IUpdateInstaller
             }
 
             var psHost = _host.ResolvePowerShellExecutable();
-            var args = UpdateRelaunchScript.BuildPowerShellArguments(
+            string args = UpdateRelaunchScript.BuildPowerShellArguments(
                 scriptPath,
-                expectedScriptSha256);
+                expectedScriptSha256,
+                exe,
+                failureRecordPath);
             launched = _host.StartDetached(psHost, args);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)

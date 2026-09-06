@@ -64,13 +64,23 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Equal(string.Empty, UpdateRelaunchScript.EscapeSingleQuoted(string.Empty));
     }
 
+    private const string RelaunchTarget = @"C:\Program Files\Heimdall\Heimdall.exe";
+
+    private static string DecodeBootstrap(string args)
+    {
+        string encoded = args[(args.IndexOf("-EncodedCommand ", StringComparison.Ordinal)
+            + "-EncodedCommand ".Length)..];
+        return Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+    }
+
     [Fact]
     public void BuildPowerShellArguments_ContainsHostFlagsAndVerifiedBootstrap()
     {
         const string scriptPath = @"C:\Temp\heimdall_relaunch.ps1";
-        var args = UpdateRelaunchScript.BuildPowerShellArguments(
+        string args = UpdateRelaunchScript.BuildPowerShellArguments(
             scriptPath,
-            ScriptSha256);
+            ScriptSha256,
+            RelaunchTarget);
 
         Assert.Contains("-NoProfile", args);
         Assert.Contains("-NonInteractive", args);
@@ -78,20 +88,206 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Contains("-WindowStyle Hidden", args);
         Assert.Contains("-EncodedCommand ", args);
 
-        string encoded = args[(args.IndexOf("-EncodedCommand ", StringComparison.Ordinal)
-            + "-EncodedCommand ".Length)..];
-        string bootstrap = Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+        string bootstrap = DecodeBootstrap(args);
         Assert.Contains(
             "Join-Path $PSHOME 'Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1'",
             bootstrap);
-        Assert.Contains("Import-Module -Name $securityModulePath -ErrorAction Stop", bootstrap);
+        Assert.Contains("Import-Module -Name $securityModulePath", bootstrap);
         Assert.Contains($"$scriptPath = '{scriptPath}'", bootstrap);
         Assert.Contains($"$expectedScriptSha256 = '{ScriptSha256}'", bootstrap);
         Assert.Contains("[System.IO.FileShare]::Read", bootstrap);
         Assert.Contains("$scriptStream.CopyTo($memory)", bootstrap);
         Assert.Contains("$sha256.ComputeHash($scriptBytes)", bootstrap);
         Assert.Contains("Invoke-Expression $scriptText", bootstrap);
-        Assert.DoesNotContain("-File", bootstrap);
+
+        // The host argument, with its delimiters: the bootstrap's own relaunch uses
+        // -FilePath, which is a different token.
+        Assert.DoesNotContain(" -File ", bootstrap);
+        Assert.DoesNotContain(" -File ", args);
+    }
+
+    /// <summary>
+    /// The bootstrap's own failure path. Everything before Invoke-Expression can fail,
+    /// and every one of those failures used to end the host with the application
+    /// already gone: no relaunch, no record, nothing in any log.
+    /// </summary>
+    /// <remarks>
+    /// Text can prove what was emitted, never that it is reached; the execution
+    /// harness runs the real -EncodedCommand arguments against a tampered script and a
+    /// script that does not parse. This pins the shape so a refactor cannot quietly
+    /// move the relaunch back inside the try.
+    /// </remarks>
+    [Fact]
+    public void BuildPowerShellArguments_BootstrapRelaunchesAndRecordsWhenTheScriptNeverStarts()
+    {
+        string bootstrap = DecodeBootstrap(UpdateRelaunchScript.BuildPowerShellArguments(
+            @"C:\Temp\heimdall_relaunch.ps1",
+            ScriptSha256,
+            RelaunchTarget,
+            FailureRecordPath));
+
+        string owned = $"${UpdateRelaunchScript.RelaunchOwnedVariable}";
+        int flagIndex = bootstrap.IndexOf($"{owned} = $false", StringComparison.Ordinal);
+        int tryIndex = bootstrap.IndexOf("try {", StringComparison.Ordinal);
+        int invokeIndex = bootstrap.IndexOf("Invoke-Expression $scriptText", StringComparison.Ordinal);
+        int catchIndex = bootstrap.IndexOf(Environment.NewLine + "} catch {", StringComparison.Ordinal);
+        int recordIndex = bootstrap.IndexOf("[System.IO.File]::WriteAllText", StringComparison.Ordinal);
+        int errorIndex = bootstrap.IndexOf("Write-Error $_", StringComparison.Ordinal);
+        int finallyIndex = bootstrap.IndexOf(Environment.NewLine + "} finally {", StringComparison.Ordinal);
+        int relaunchIndex = bootstrap.IndexOf("Start-Process -FilePath $relaunchTarget", StringComparison.Ordinal);
+
+        Assert.True(flagIndex >= 0 && flagIndex < tryIndex, "the ownership flag is initialised before the try");
+        Assert.True(tryIndex < invokeIndex && invokeIndex < catchIndex, "Invoke-Expression sits inside the try");
+
+        // The record names the preparation stage and is written before the terminating
+        // Write-Error, guarded by the flag so a script that started keeps its own account.
+        Assert.True(catchIndex < recordIndex && recordIndex < errorIndex, "the record is written in the catch, before Write-Error");
+        Assert.Contains($"if (-not {owned}) {{", bootstrap[catchIndex..recordIndex]);
+        Assert.Contains($"'{UpdateOutcomeStage.Preparation}'", bootstrap[catchIndex..errorIndex]);
+        Assert.Contains($"'{FailureRecordPath}'", bootstrap);
+
+        // And the relaunch is in the finally, guarded by the same flag.
+        Assert.True(finallyIndex > errorIndex && relaunchIndex > finallyIndex, "the relaunch sits in the finally");
+        Assert.Contains($"if (-not {owned}) {{", bootstrap[finallyIndex..relaunchIndex]);
+        Assert.Contains($"$relaunchTarget = '{RelaunchTarget}'", bootstrap);
+    }
+
+    /// <remarks>
+    /// The import is the exact module whose failure to load under Windows PowerShell
+    /// 5.1 is documented (BL-0091). PR #247 made the Authenticode call itself
+    /// non-fatal inside the script; the bootstrap had kept a fatal import of the same
+    /// module one level up, outside any try, where no finally could bring the
+    /// application back.
+    /// </remarks>
+    [Fact]
+    public void BuildPowerShellArguments_SecurityModuleImportIsAdvisory()
+    {
+        string bootstrap = DecodeBootstrap(UpdateRelaunchScript.BuildPowerShellArguments(
+            @"C:\Temp\heimdall_relaunch.ps1",
+            ScriptSha256,
+            RelaunchTarget));
+
+        int importIndex = bootstrap.IndexOf("Import-Module -Name $securityModulePath", StringComparison.Ordinal);
+        int tryIndex = bootstrap.LastIndexOf("try {", importIndex, StringComparison.Ordinal);
+        int catchIndex = bootstrap.IndexOf("} catch {", importIndex, StringComparison.Ordinal);
+        int firstStatementAfterCatch = bootstrap.IndexOf("$scriptPath = ", StringComparison.Ordinal);
+
+        Assert.True(tryIndex >= 0 && tryIndex < importIndex, "the import is not inside a try");
+        Assert.True(
+            catchIndex > importIndex && catchIndex < firstStatementAfterCatch,
+            "the import's try is not closed by a catch before the next statement");
+        Assert.Contains("Write-Warning", bootstrap[catchIndex..firstStatementAfterCatch]);
+    }
+
+    /// <summary>The script's first statement claims the relaunch from the bootstrap.</summary>
+    [Fact]
+    public void Build_FirstStatementClaimsTheRelaunch()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec());
+
+        Assert.StartsWith(
+            $"${UpdateRelaunchScript.RelaunchOwnedVariable} = $true",
+            script,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A Wait-Process timeout is reported as an error that the script suppresses, so it
+    /// used to be indistinguishable from the process having exited: the installer was
+    /// started over a live application, which Inno Setup then force-closed mid-session.
+    /// </summary>
+    [Fact]
+    public void Build_ApplicationStillRunning_IsRefusedBeforeTheInstaller()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec());
+
+        int waitIndex = script.IndexOf("Wait-Process -Id 4242", StringComparison.Ordinal);
+        int probeIndex = script.IndexOf("Get-Process -Id 4242 -ErrorAction SilentlyContinue", StringComparison.Ordinal);
+        int stageIndex = script.IndexOf(
+            $"$updateStage = '{UpdateOutcomeStage.ApplicationStillRunning}'", StringComparison.Ordinal);
+        int signatureIndex = script.IndexOf("Get-AuthenticodeSignature", StringComparison.Ordinal);
+
+        Assert.True(waitIndex >= 0 && probeIndex > waitIndex, "the probe follows the wait");
+        Assert.True(stageIndex > probeIndex && stageIndex < signatureIndex, "the refusal precedes every verification");
+        Assert.True(
+            script.IndexOf("throw", stageIndex, StringComparison.Ordinal) < signatureIndex,
+            "the refusal throws");
+
+        // The application never exited, so it must not be started a second time.
+        int finallyIndex = script.IndexOf(Environment.NewLine + "} finally {", StringComparison.Ordinal);
+        int relaunchIndex = script.IndexOf($"Start-Process -FilePath '{RelaunchTarget}'", StringComparison.Ordinal);
+        Assert.True(relaunchIndex > finallyIndex, "the relaunch sits in the finally");
+        Assert.Contains(
+            $"if ($updateStage -ne '{UpdateOutcomeStage.ApplicationStillRunning}') {{",
+            script[finallyIndex..relaunchIndex]);
+    }
+
+    /// <summary>
+    /// A declined consent prompt never starts the installer, so no Inno exit code can
+    /// describe it. It arrives as ERROR_CANCELLED in the launch exception's chain.
+    /// </summary>
+    [Fact]
+    public void Build_DeclinedElevation_IsRecordedAsItsOwnStage()
+    {
+        string script = UpdateRelaunchScript.Build(
+            SampleSpec(requiresElevation: true, failureRecordPath: FailureRecordPath));
+
+        int catchIndex = OuterCatchIndex(script);
+        int inspectIndex = script.IndexOf(
+            $"$inspected.NativeErrorCode -eq {UpdateRelaunchScript.Win32ErrorCancelled}", StringComparison.Ordinal);
+        int stageIndex = script.IndexOf(
+            $"$updateStage = '{UpdateOutcomeStage.ElevationDeclined}'", StringComparison.Ordinal);
+        int recordIndex = script.IndexOf("[System.IO.File]::WriteAllText", StringComparison.Ordinal);
+
+        Assert.True(inspectIndex > catchIndex, "the exception chain is inspected in the catch");
+        Assert.True(stageIndex > inspectIndex && stageIndex < recordIndex, "the stage is set before the record is written");
+        Assert.Contains("$inspected = $inspected.InnerException", script);
+        Assert.Contains(
+            $"if ($updateStage -eq '{UpdateOutcomeStage.InstallerLaunch}') {{",
+            script[catchIndex..inspectIndex]);
+    }
+
+    /// <summary>Losing the transcript must not lose the update.</summary>
+    [Fact]
+    public void Build_TranscriptFailure_DoesNotAbortTheUpdate()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec(logPath: @"C:\Temp\heimdall_update.log"));
+
+        int transcriptIndex = script.IndexOf("Start-Transcript", StringComparison.Ordinal);
+        int tryIndex = script.LastIndexOf("try {", transcriptIndex, StringComparison.Ordinal);
+        int catchIndex = script.IndexOf("} catch {", transcriptIndex, StringComparison.Ordinal);
+        int waitIndex = script.IndexOf("Wait-Process", StringComparison.Ordinal);
+
+        Assert.True(tryIndex >= 0 && tryIndex < transcriptIndex, "Start-Transcript is not inside a try");
+        Assert.True(
+            catchIndex > transcriptIndex && catchIndex < waitIndex,
+            "the transcript's try is not closed by a catch before the wait");
+        Assert.Contains("Write-Warning", script[catchIndex..waitIndex]);
+    }
+
+    [Theory]
+    [InlineData("C:\\Temp\\bad\nname\\setup.exe")]
+    [InlineData("C:\\Temp\\bad\rname\\setup.exe")]
+    [InlineData("C:\\Temp\\bad\0name\\setup.exe")]
+    public void Build_PathWithControlCharacter_Throws(string installerPath)
+    {
+        Assert.Throws<ArgumentException>(
+            () => UpdateRelaunchScript.Build(SampleSpec(installerPath: installerPath)));
+    }
+
+    /// <summary>
+    /// Everything PowerShell would expand in a double-quoted or bare context stays
+    /// inert inside the single-quoted literal the value is emitted into.
+    /// </summary>
+    [Fact]
+    public void Build_HostileCharactersStayInsideTheSingleQuotedLiteral()
+    {
+        const string hostile = @"C:\Temp\$(Get-Date)`n""quoted""\o'brien\setup.exe";
+        string script = UpdateRelaunchScript.Build(SampleSpec(installerPath: hostile));
+
+        Assert.Contains(
+            @"$installerPath = 'C:\Temp\$(Get-Date)`n""quoted""\o''brien\setup.exe'",
+            script);
     }
 
     [Fact]
@@ -121,8 +317,11 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Contains(
             $"Remove-Item -LiteralPath '{spec.InstallerPath}' -Force -ErrorAction SilentlyContinue",
             script);
+        // -Recurse on the staging directory: without it a non-empty directory asks for
+        // confirmation, which under -NonInteractive is a host error that truncates the
+        // rest of the finally and leaves the installer on disk. Measured.
         Assert.Contains(
-            $"Remove-Item -LiteralPath '{spec.StagingDirectory}' -Force -ErrorAction SilentlyContinue",
+            $"Remove-Item -LiteralPath '{spec.StagingDirectory}' -Recurse -Force -ErrorAction SilentlyContinue",
             script);
     }
 
@@ -394,6 +593,7 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Throws<ArgumentException>(
             () => UpdateRelaunchScript.BuildPowerShellArguments(
                 @"C:\Temp\relaunch.ps1",
-                "not-a-hash"));
+                "not-a-hash",
+                RelaunchTarget));
     }
 }

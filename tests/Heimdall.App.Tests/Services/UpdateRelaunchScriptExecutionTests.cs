@@ -21,6 +21,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Heimdall.Core.Security;
 using Heimdall.Core.Updates;
 
 namespace Heimdall.App.Tests.Services;
@@ -72,6 +73,14 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// rather than stall it.
     /// </summary>
     private const int TestWaitTimeoutSeconds = 5;
+
+    /// <summary>
+    /// How long to let a relaunch that should NOT happen land before asserting it did
+    /// not. The relaunch is started without -Wait, so its marker can trail the host's
+    /// exit; a negative assertion needs that window closed, and there is nothing to
+    /// poll for.
+    /// </summary>
+    private static readonly TimeSpan SettleAfterHostExit = TimeSpan.FromSeconds(2);
 
     private const string InstallerRole = "installer";
 
@@ -260,16 +269,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
         Assert.False(File.Exists(sandbox.InstallerPath), "the installer should be removed");
         Assert.False(File.Exists(sandbox.ScriptPath), "the script should delete itself");
 
-        // The host's exit code is deliberately NOT asserted to be zero here, and the
-        // reason is a measured property of the emission rather than a concession. The
-        // staging Remove-Item carries no -Recurse, so against a non-empty directory it
-        // asks for confirmation; under -NonInteractive that request raises
-        // PSInvalidOperationException, which -ErrorAction SilentlyContinue does not
-        // cover, and $ErrorActionPreference = 'Stop' then abandons the rest of the
-        // finally. This fixture makes staging non-empty by construction - the stand-in
-        // is an apphost and needs companions a real installer does not - so the exit
-        // code here measures the fixture, not the script. See the dedicated staging
-        // test, which pins the behaviour itself.
+        // The exit code is pinned by the staging test beside this one, which is the
+        // place where a non-zero code has a named cause.
         _ = run;
     }
 
@@ -302,80 +303,200 @@ public sealed class UpdateRelaunchScriptExecutionTests
     }
 
     /// <remarks>
-    /// Informational rather than blocking, and the reason is a named limitation rather
-    /// than a flake - but NOT the limitation this remark used to name. The reading below
-    /// replaces one that the runner's own transcript falsified once #243 started
-    /// uploading it.
+    /// Measured before the fix: the staging Remove-Item carried no -Recurse, so against
+    /// a non-empty directory it asked for confirmation. Under -NonInteractive that
+    /// request raises PSInvalidOperationException - "PowerShell is in NonInteractive
+    /// mode. Read and Prompt functionality is not available." - and -ErrorAction
+    /// SilentlyContinue does NOT suppress it, because it is an InvalidOperation from the
+    /// host rather than an error from the cmdlet. With $ErrorActionPreference = 'Stop'
+    /// at the top of the script, that terminated the rest of the finally, left the
+    /// directory with the installer inside it, and exited the host non-zero.
     /// <para>
-    /// The failure is confined to Windows PowerShell 5.1. The same test, on the same
-    /// runner, in the same run, PASSES under PowerShell 7 - same Start-Process, same
-    /// window station - so neither of those can be the cause. What the transcript shows
-    /// instead: Microsoft.PowerShell.Security fails to import, its extended type data
-    /// declaring members of System.Security.AccessControl.ObjectSecurity that are
-    /// already present, so Get-AuthenticodeSignature does not exist and the script
-    /// terminates at the signature line under $ErrorActionPreference = 'Stop'.
-    /// Start-Process is never reached at all. The installer file being gone afterwards
-    /// proves only that the outer finally ran.
-    /// </para>
-    /// <para>
-    /// That was a product defect rather than a harness one, and it is recorded as
-    /// BL-0091: the application falls back to powershell.exe wherever PowerShell 7 is
-    /// absent, so on such a machine no update could install. Left running rather than
-    /// silenced: it still executes, its failure is still reported, and it is a real
-    /// oracle under PowerShell 7 and on a developer machine, where the ordering mutant
-    /// is also measured.
-    /// </para>
-    /// <para>
-    /// <b>THAT REASON IS FIXED AND NO LONGER APPLIES.</b> PR #247 made obtaining the
-    /// Authenticode verdict non-fatal, and four independent post-fix CI runs pass 8 of 8
-    /// cases under BOTH hosts, 6 to 7 seconds apiece. The label is kept for a DIFFERENT
-    /// and weaker reason, stated here so nobody mistakes one for the other: on
-    /// 2026-08-23 this class failed once, 1 case of 16, on a 16-core developer machine,
-    /// and the identity of that case was destroyed by re-running before the output was
-    /// captured. Four captured runs afterwards were clean.
-    /// </para>
-    /// <para>
-    /// So removal is blocked on CHARACTERISING that observation, not on its absence -
-    /// see BL-0067, which exists for this family of process-spawning timeouts. Promoting
-    /// these to the blocking lane on the strength of "the old reason is gone" would
-    /// replace one unmeasured claim with another.
+    /// This fixture makes staging non-empty by construction - the stand-in is an apphost
+    /// and needs companions a real installer does not - so it is the natural place to
+    /// pin the cleanup. Informational for the same reason as its neighbours: one
+    /// uncharacterised local failure of this family, see BL-0067.
     /// </para>
     /// </remarks>
     [Trait("Category", "CIUnstable")]
     [Theory]
     [MemberData(nameof(PowerShellHosts))]
-    public async Task Execute_StagingDirectoryNotEmpty_SurvivesAndTheRelaunchStillHappens(string powerShellHost)
+    public async Task Execute_StagingDirectoryNotEmpty_IsRemovedAndTheHostExitsCleanly(string powerShellHost)
     {
         using var sandbox = new UpdateScriptSandbox();
         sandbox.PlaceInstaller(exitCode: 0);
 
         ScriptRun run = await sandbox.RunAsync(powerShellHost);
 
-        // Measured, and the reason this test exists: the staging Remove-Item carries no
-        // -Recurse, so against a non-empty directory it asks for confirmation. Under
-        // -NonInteractive that request raises PSInvalidOperationException - "PowerShell
-        // is in NonInteractive mode. Read and Prompt functionality is not available." -
-        // and -ErrorAction SilentlyContinue does NOT suppress it, because it is an
-        // InvalidOperation from the host rather than an error from the cmdlet. With
-        // $ErrorActionPreference = 'Stop' at the top of the script, that terminates the
-        // rest of the finally and the host exits non-zero.
-        //
-        // Two consequences worth freezing. The directory survives, so a failed cleanup
-        // is silent to the user. And NOTHING may ever be appended after the staging
-        // Remove-Item: any statement placed there would be skipped exactly when cleanup
-        // had already gone wrong.
-        // Tightened with the BL-0091 fix, and this line is the point of it: an abort
-        // before the installer used to satisfy the two assertions below, so on a host
-        // where Get-AuthenticodeSignature was unavailable this passed without ever
-        // reaching the cleanup it describes.
         await sandbox.WaitForRoleAsync(InstallerRole);
-
-        Assert.True(Directory.Exists(sandbox.StageDirectory), "a non-empty staging directory survives");
-        Assert.True(run.ExitCode != 0, "the truncated finally leaves the host with a failing exit code");
-
-        // The relaunch precedes the cleanup, so the user still gets their application
-        // back. That ordering is the whole reason this failure is survivable today.
         await sandbox.WaitForRoleAsync(RelaunchRole);
+
+        Assert.False(
+            Directory.Exists(sandbox.StageDirectory),
+            $"the staging directory must be removed with everything in it.{Environment.NewLine}{run.StandardError}");
+        Assert.True(
+            run.ExitCode == 0,
+            $"a successful update must leave the host with a clean exit code.{Environment.NewLine}{run.StandardError}");
+    }
+
+    /// <summary>
+    /// A Wait-Process timeout is an error the script suppresses on purpose, because an
+    /// already-exited process reports one too. Before the probe that follows it, the
+    /// two were indistinguishable: the installer ran over the live application, which
+    /// Inno Setup then force-closed mid-session.
+    /// </summary>
+    /// <remarks>
+    /// The waited process is this test host, which does not exit, and the wait is one
+    /// second so the refusal is reached quickly. Nothing may run afterwards: not the
+    /// installer, and not a second instance of an application that is still there.
+    /// </remarks>
+    [Trait("Category", "CIUnstable")]
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Execute_ApplicationStillRunning_RefusesToInstallAndRecordsTheStage(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+        sandbox.WaitedProcessIdOverride = Environment.ProcessId;
+        sandbox.WaitTimeoutSecondsOverride = 1;
+
+        ScriptRun run = await sandbox.RunAsync(powerShellHost);
+
+        Assert.True(run.ExitCode != 0, "a refused update must not report success");
+        Assert.False(
+            sandbox.SequenceContainsRole(InstallerRole),
+            "the installer must never run over a live application");
+
+        UpdateFailureRecord? record = await sandbox.ReadFailureRecordAsync();
+        Assert.NotNull(record);
+        Assert.Equal(UpdateOutcomeStage.ApplicationStillRunning, record!.Stage);
+        Assert.False(record.HasExitCode);
+
+        // The application is still running, so it must not be started again. The host
+        // has exited by now, and the relaunch is started without -Wait, so a short
+        // settle covers the only window in which a wrong launch could still land.
+        await Task.Delay(SettleAfterHostExit);
+        Assert.False(
+            sandbox.SequenceContainsRole(RelaunchRole),
+            "an application that never exited must not be relaunched");
+    }
+
+    /// <summary>
+    /// The production launch, end to end: the real -EncodedCommand arguments from
+    /// <see cref="UpdateRelaunchScript.BuildPowerShellArguments"/>, under the host
+    /// production resolves, against the emitted script. Until this test existed the
+    /// bootstrap had zero execution coverage; every other case here runs -File.
+    /// </summary>
+    [Trait("Category", "CIUnstable")]
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Bootstrap_RunsTheEmittedScript_ThroughTheProductionArguments(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+
+        ScriptRun run = await sandbox.RunViaBootstrapAsync(powerShellHost);
+
+        await sandbox.WaitForRoleAsync(InstallerRole);
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+        Assert.False(File.Exists(sandbox.FailureRecordPath), "a successful update leaves no failure record");
+
+        // Exactly one relaunch: the script owns it, and the bootstrap must not add a
+        // second instance on top.
+        await Task.Delay(SettleAfterHostExit);
+        Assert.Equal(1, sandbox.CountRole(RelaunchRole));
+        Assert.True(run.ExitCode == 0, $"clean run expected.{Environment.NewLine}{run.StandardError}");
+    }
+
+    /// <summary>
+    /// The bootstrap's SHA-256 refusal is correct and must stay; what it used to cost
+    /// was the application. A script changed on disk after the application pinned its
+    /// digest is refused, recorded as a preparation failure, and the application comes
+    /// back.
+    /// </summary>
+    [Trait("Category", "CIUnstable")]
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Bootstrap_ScriptChangedAfterHashing_RefusesAndStillRelaunches(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+
+        ScriptRun run = await sandbox.RunViaBootstrapAsync(
+            powerShellHost,
+            tamperAfterHashing: path => File.AppendAllText(path, "Write-Output 'tampered'"));
+
+        Assert.True(run.ExitCode != 0, "a tampered script must not report success");
+        Assert.False(sandbox.SequenceContainsRole(InstallerRole), "a tampered script must never reach the installer");
+
+        UpdateFailureRecord? record = await sandbox.ReadFailureRecordAsync();
+        Assert.NotNull(record);
+        Assert.Equal(UpdateOutcomeStage.Preparation, record!.Stage);
+
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+    }
+
+    /// <summary>
+    /// A script that does not parse never runs a single statement, so its own finally
+    /// is never installed. The bootstrap is the only thing that can bring the
+    /// application back in that case.
+    /// </summary>
+    [Trait("Category", "CIUnstable")]
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Bootstrap_ScriptThatDoesNotParse_StillRelaunches(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+
+        ScriptRun run = await sandbox.RunViaBootstrapAsync(
+            powerShellHost,
+            scriptTextOverride: "if ($true) {" + Environment.NewLine);
+
+        Assert.True(run.ExitCode != 0, "a script that does not parse must not report success");
+        Assert.False(sandbox.SequenceContainsRole(InstallerRole), "nothing of the script may have run");
+
+        UpdateFailureRecord? record = await sandbox.ReadFailureRecordAsync();
+        Assert.NotNull(record);
+        Assert.Equal(UpdateOutcomeStage.Preparation, record!.Stage);
+
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+    }
+
+    /// <summary>
+    /// Every value the spec contributes lands inside a single-quoted literal, where
+    /// subexpressions, backticks and double quotes are inert. Parsed rather than run:
+    /// these paths do not exist, and parsing is the property under test.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task GeneratedScript_WithHostilePaths_StillParses(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+
+        string hostileDirectory = Path.Combine(sandbox.Root, "$(Get-Date)`n\"quoted\" o'brien");
+        UpdateRelaunchSpec spec = sandbox.CreateSpec() with
+        {
+            InstallerPath = Path.Combine(hostileDirectory, "setup.exe"),
+            TargetExecutablePath = Path.Combine(hostileDirectory, "app.exe"),
+            ScriptPath = Path.Combine(hostileDirectory, "relaunch.ps1"),
+            StagingDirectory = hostileDirectory,
+            LogPath = Path.Combine(hostileDirectory, "log.txt"),
+            FailureRecordPath = Path.Combine(hostileDirectory, "failure.json"),
+        };
+        UpdateScriptSandbox.AssertFenced(spec, sandbox.Root);
+
+        string path = Path.Combine(sandbox.Root, "hostile.ps1");
+        await File.WriteAllTextAsync(path, UpdateRelaunchScript.Build(spec));
+        string parserPath = Path.Combine(sandbox.Root, "parse-hostile.ps1");
+        await File.WriteAllTextAsync(parserPath, ParserScript(new[] { path }));
+
+        ScriptRun run = await RunHostAsync(powerShellHost, parserPath, markerPath: null);
+
+        Assert.True(
+            run.ExitCode == 0,
+            $"the generated script does not parse with hostile paths.{Environment.NewLine}{run.StandardOutput}{Environment.NewLine}{run.StandardError}");
     }
 
     /// <remarks>
@@ -556,7 +677,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
         return sb.ToString();
     }
 
-    private static async Task<ScriptRun> RunHostAsync(
+    private static Task<ScriptRun> RunHostAsync(
         string powerShellHost,
         string scriptPath,
         string? markerPath,
@@ -573,7 +694,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
         // The production flags, read from the production constant, so a change there
         // reaches this harness instead of quietly diverging from it. -File rather than
         // -EncodedCommand: both hosts wrap stderr in CLIXML even on a clean run, which
-        // would make stderr useless as an oracle.
+        // would make stderr useless as an oracle. The bootstrap tests take the other
+        // route, through RunBootstrapHostAsync.
         foreach (string flag in UpdateRelaunchScript.PowerShellFlags.Split(
             ' ',
             StringSplitOptions.RemoveEmptyEntries))
@@ -583,6 +705,39 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         psi.ArgumentList.Add("-File");
         psi.ArgumentList.Add(scriptPath);
+
+        return RunHostAsync(psi, powerShellHost, markerPath, installerExitCode);
+    }
+
+    /// <summary>
+    /// Runs the host exactly as production does: one argument string from
+    /// <see cref="UpdateRelaunchScript.BuildPowerShellArguments"/>, so the bootstrap
+    /// that -EncodedCommand carries is the thing under test.
+    /// </summary>
+    private static Task<ScriptRun> RunBootstrapHostAsync(
+        string powerShellHost,
+        string productionArguments,
+        string? markerPath,
+        int installerExitCode)
+    {
+        var psi = new ProcessStartInfo(powerShellHost)
+        {
+            Arguments = productionArguments,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+
+        return RunHostAsync(psi, powerShellHost, markerPath, installerExitCode);
+    }
+
+    private static async Task<ScriptRun> RunHostAsync(
+        ProcessStartInfo psi,
+        string powerShellHost,
+        string? markerPath,
+        int installerExitCode)
+    {
 
         if (markerPath is not null)
         {
@@ -711,6 +866,18 @@ public sealed class UpdateRelaunchScriptExecutionTests
         internal int InstallerExitCode { get; private set; }
 
         /// <summary>
+        /// The process the script waits on. By default a stand-in that has already
+        /// exited, so the wait returns at once and the probe that follows it finds
+        /// nothing - which is what production sees when the application has quit.
+        /// It used to be this test host, which never exits: every run took the timeout
+        /// branch and then asserted that the installer ran anyway, freezing exactly
+        /// the behaviour the probe now refuses.
+        /// </summary>
+        internal int? WaitedProcessIdOverride { get; set; }
+
+        internal int? WaitTimeoutSecondsOverride { get; set; }
+
+        /// <summary>
         /// Refuses to run anything whose spec points outside the sandbox. This is what
         /// makes "it cannot touch the real update path" a check rather than a claim.
         /// </summary>
@@ -793,7 +960,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 ExpectedInstallerSha256:
                     ExpectedSha256Override ?? Sha256OfFileOrPlaceholder(InstallerPath),
                 TargetExecutablePath: TargetExecutablePath,
-                ProcessId: Environment.ProcessId,
+                ProcessId: WaitedProcessIdOverride ?? ExitedStandInProcessId(),
                 ScriptPath: ScriptPath,
                 StagingDirectory: StageDirectory,
                 RequiresElevation: requiresElevation,
@@ -806,9 +973,104 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 // child identically - and which the relaunch already had to use, because
                 // the script starts the target with no arguments at all.
                 InstallerArguments: $"--role {InstallerRole} --exit-code {InstallerExitCode}",
-                WaitTimeoutSeconds: TestWaitTimeoutSeconds,
+                WaitTimeoutSeconds: WaitTimeoutSecondsOverride ?? TestWaitTimeoutSeconds,
                 LogPath: withLog ? LogPath : null,
                 FailureRecordPath: FailureRecordPath);
+        }
+
+        /// <summary>
+        /// Starts the stand-in with no marker and lets it exit, returning the id the
+        /// script will wait on. No marker is set on this process, so it records nothing.
+        /// </summary>
+        private int ExitedStandInProcessId()
+        {
+            var psi = new ProcessStartInfo(TargetExecutablePath)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.Environment.Remove(MarkerEnvironmentVariable);
+
+            using Process process = Process.Start(psi)
+                ?? throw new InvalidOperationException("failed to start the waited stand-in");
+            process.WaitForExit();
+            return process.Id;
+        }
+
+        /// <summary>
+        /// Writes the emitted script, pins its digest the way <c>UpdateInstaller</c>
+        /// does, optionally tampers with the file afterwards, and runs the host with the
+        /// production arguments.
+        /// </summary>
+        /// <param name="scriptTextOverride">
+        /// Replaces the emitted script entirely, for a case about the bootstrap alone.
+        /// The digest is computed over this text, so the bootstrap accepts it.
+        /// </param>
+        /// <param name="tamperAfterHashing">
+        /// Applied to the script file after the digest was pinned, so the bootstrap
+        /// refuses it.
+        /// </param>
+        internal async Task<ScriptRun> RunViaBootstrapAsync(
+            string powerShellHost,
+            string? scriptTextOverride = null,
+            Action<string>? tamperAfterHashing = null)
+        {
+            UpdateRelaunchSpec spec = CreateSpec();
+            AssertFenced(spec, Root);
+            string scriptText = scriptTextOverride ?? UpdateRelaunchScript.Build(spec);
+
+            // UTF-8 without a byte-order mark, as SecureFileWriter writes it: the digest
+            // is over the file bytes, and a mark would be bytes the text does not have.
+            byte[] bytes = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(scriptText);
+            await File.WriteAllBytesAsync(ScriptPath, bytes);
+            string digest = Convert.ToHexString(SHA256.HashData(bytes));
+            tamperAfterHashing?.Invoke(ScriptPath);
+
+            string arguments = UpdateRelaunchScript.BuildPowerShellArguments(
+                ScriptPath,
+                digest,
+                TargetExecutablePath,
+                FailureRecordPath);
+
+            _lastRun = await RunBootstrapHostAsync(
+                powerShellHost,
+                arguments,
+                SequencePath,
+                InstallerExitCode);
+            return _lastRun;
+        }
+
+        internal async Task<UpdateFailureRecord?> ReadFailureRecordAsync()
+        {
+            if (!File.Exists(FailureRecordPath))
+            {
+                return null;
+            }
+
+            string recorded = await File.ReadAllTextAsync(FailureRecordPath);
+            return JsonSerializer.Deserialize<UpdateFailureRecord>(
+                recorded,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+
+        internal int CountRole(string role)
+        {
+            if (!File.Exists(SequencePath))
+            {
+                return 0;
+            }
+
+            string marker = $"{role}|";
+            string text = ReadSharedText(SequencePath);
+            int count = 0;
+            int index = 0;
+            while ((index = text.IndexOf(marker, index, StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                index += marker.Length;
+            }
+
+            return count;
         }
 
         internal async Task<ScriptRun> RunAsync(string powerShellHost)
