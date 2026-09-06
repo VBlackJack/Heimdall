@@ -116,6 +116,21 @@ public sealed class SshConnectionFactoryTests
         return path;
     }
 
+    /// <summary>
+    /// Writes an RSA key that needs <paramref name="passphrase"/> to load, and
+    /// proves it by loading it once with that passphrase: a fixture SSH.NET
+    /// cannot read would make a wrong-passphrase test pass for the wrong reason.
+    /// </summary>
+    private static string CreateTempEncryptedRsaPrivateKeyFile(string passphrase)
+    {
+        string path = PuttyPrivateKeyFileWriter.WriteTemporaryFile(passphrase);
+        using PrivateKeyFile loaded = new PrivateKeyFile(path, passphrase);
+        return path;
+    }
+
+    private static Exception UnwrapReflectionFailure(Exception ex) =>
+        ex is TargetInvocationException { InnerException: { } inner } ? inner : ex;
+
     // ── BuildAuthMethods — password-only ──────────────────────────────
 
     [Fact]
@@ -395,6 +410,78 @@ public sealed class SshConnectionFactoryTests
             var logFile = Directory.GetFiles(logDir, "heimdall_*.log").Single();
             var log = File.ReadAllText(logFile);
             Assert.Contains("Legacy credential mapping for server legacy-profile", log);
+        }
+        finally
+        {
+            File.Delete(keyPath);
+        }
+    }
+
+    // ── BuildAuthMethods - wrong passphrase ──────────────────────────
+
+    /// <summary>
+    /// An explicit passphrase the key refuses is a fact about the key, not a
+    /// reason to try the stored password instead. Swallowing the load failure
+    /// dropped the key without a word and let the next refusal be reported as a
+    /// key the server rejected, for a key that was never offered.
+    /// </summary>
+    [Fact]
+    public void BuildAuthMethods_ExplicitWrongPassphraseWithPasswordFallback_PropagatesKeyLoadFailure()
+    {
+        string keyPath = CreateTempEncryptedRsaPrivateKeyFile("right-passphrase");
+        SshConnectionParams connParams = new SshConnectionParams
+        {
+            Host = "example.com",
+            Port = 22,
+            Username = "user",
+            Password = "login-password",
+            KeyPassphrase = "wrong-passphrase",
+            KeyPath = keyPath,
+            UseLegacyPasswordAsKeyPassphrase = false
+        };
+
+        try
+        {
+            Exception failure = UnwrapReflectionFailure(
+                Assert.ThrowsAny<Exception>(() => InvokeBuildAuthMethods(connParams)));
+
+            SshFailureInfo classified = FailureClassifier.Classify(failure, connParams);
+            Assert.Equal(SshFailureCode.PassphraseRejected, classified.Code);
+        }
+        finally
+        {
+            File.Delete(keyPath);
+        }
+    }
+
+    /// <summary>
+    /// The legacy mapping is a guess that the stored password doubles as the
+    /// key passphrase. A guess that the key refuses is still allowed to fall
+    /// back to that password as a password.
+    /// </summary>
+    [Fact]
+    public void BuildAuthMethods_LegacyPasswordRefusedAsPassphrase_StillFallsBackToPassword()
+    {
+        string keyPath = CreateTempEncryptedRsaPrivateKeyFile("right-passphrase");
+        SshConnectionParams connParams = new SshConnectionParams
+        {
+            Host = "example.com",
+            Port = 22,
+            Username = "user",
+            Password = "not-the-passphrase",
+            KeyPassphrase = null,
+            KeyPath = keyPath,
+            UseLegacyPasswordAsKeyPassphrase = true
+        };
+
+        try
+        {
+            List<AuthenticationMethod> methods = InvokeBuildAuthMethods(connParams);
+            List<string> names = MethodTypeNames(methods).ToList();
+
+            Assert.DoesNotContain("PrivateKeyAuthenticationMethod", names);
+            Assert.Contains("PasswordAuthenticationMethod", names);
+            Assert.Contains("KeyboardInteractiveAuthenticationMethod", names);
         }
         finally
         {

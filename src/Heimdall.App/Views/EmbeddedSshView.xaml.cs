@@ -463,6 +463,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _session.Disconnected += OnDisconnected;
         _session.SecurityEventOccurred += OnSessionSecurityEvent;
 
+        // A panel left open across a reconnect is watching a monitor the
+        // disconnect stopped; point it at the new session's client.
+        if (_healthPanelVisible)
+        {
+            StartHealthMonitor();
+        }
+
         UpdateStatus("Connected");
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
@@ -716,7 +723,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         HealthPanel.Visibility = Visibility.Visible;
         HealthColumnDef.Width = new GridLength(180);
         LocalizeHealthLabels();
+        StartHealthMonitor();
+    }
 
+    private void StartHealthMonitor()
+    {
         var client = _session?.Client;
         if (client is null || !client.IsConnected)
         {
@@ -1518,6 +1529,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             {
                 return;
             }
+
+            // The session disposes its SSH client on disconnect; a monitor
+            // left running would poll that disposed client until the tab
+            // closes. Whatever branch below is taken, there is nothing to poll.
+            StopHealthMonitor();
 
             string? errorMessage = disconnectInfo.Message;
             if (!string.IsNullOrWhiteSpace(errorMessage))

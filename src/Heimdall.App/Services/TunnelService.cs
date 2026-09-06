@@ -398,7 +398,9 @@ public sealed class TunnelService : ITunnelService
                         ct,
                         resolvedRoute,
                         preferDistinctLoopback,
-                        refusalMessage)
+                        refusalMessage,
+                        socksProxyPort,
+                        remoteBindPort)
                     .ConfigureAwait(false);
 
                 if (fallback.Success)
@@ -440,13 +442,15 @@ public sealed class TunnelService : ITunnelService
 
         if (result.Success)
         {
-            await WaitForTunnelEstablishmentAsync(
+            int establishedLocalPort = result.Tunnel?.LocalPort ?? localPort;
+            await WaitForTunnelEstablishmentOrReleaseAsync(
+                    _tunnelManager,
+                    establishedLocalPort,
                     settings.TunnelEstablishmentDelayMs,
                     _timeProvider,
                     ct)
                 .ConfigureAwait(false);
 
-            int establishedLocalPort = result.Tunnel?.LocalPort ?? localPort;
             Core.Logging.FileLogger.Info($"Tunnel established for {serverId} on port {establishedLocalPort}");
             _connectionSm.SetTunnelInfo(serverId, establishedLocalPort, 0);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
@@ -610,6 +614,15 @@ public sealed class TunnelService : ITunnelService
     /// text is what reaches the connection state, so the sentence the server
     /// sent stays at the head of the message whatever the fallback runs into.
     /// </param>
+    /// <param name="socksProxyPort">
+    /// SOCKS proxy port the profile needs, or <c>0</c>. Plink is launched with
+    /// a local forward only, so a profile that needs one is refused here rather
+    /// than handed a tunnel that silently lacks it.
+    /// </param>
+    /// <param name="remoteBindPort">
+    /// Remote reverse-forward bind port the profile needs, or <c>0</c>. Refused
+    /// for the same reason as <paramref name="socksProxyPort"/>.
+    /// </param>
     internal async Task<TunnelResult> EstablishPlinkTunnelAsync(
         string serverId,
         SshConnectionParams gatewayParams,
@@ -621,7 +634,9 @@ public sealed class TunnelService : ITunnelService
         CancellationToken ct,
         string? gatewayRoute,
         bool preferDistinctLoopback = false,
-        string? precedingRefusal = null)
+        string? precedingRefusal = null,
+        int socksProxyPort = 0,
+        int remoteBindPort = 0)
     {
         TunnelResult Refuse(string message, SshFailureCode? code, string? messageKey = null)
         {
@@ -632,6 +647,22 @@ public sealed class TunnelService : ITunnelService
                 ?? string.Empty;
             _connectionSm.SetError(serverId, composed);
             return new TunnelResult(false, null, composed, code);
+        }
+
+        // Before anything is looked up or launched: the fallback builds a
+        // plink command line with a single -L, so it cannot serve a profile
+        // that needs a SOCKS proxy or a reverse forward. Returning a tunnel
+        // without them reported success for a proxy that did not exist, and
+        // registered it under a reuse identity (0, 0) that no later attempt
+        // for the same profile could match.
+        if (socksProxyPort > 0 || remoteBindPort > 0)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"Plink fallback refused for {serverId}: the profile needs socks={socksProxyPort} remoteBind={remoteBindPort}, which plink is not launched with.");
+            return Refuse(
+                _localizer[SshLocalizationKeys.ErrorPlinkForwardingModeUnsupported],
+                SshFailureCode.ForwardingFailed,
+                SshLocalizationKeys.ErrorPlinkForwardingModeUnsupported);
         }
 
         string? plinkPath = ConnectionHelpers.ResolvePlinkPath(settings.PlinkPath);
@@ -741,7 +772,9 @@ public sealed class TunnelService : ITunnelService
                 SshLocalizationKeys.ErrorTunnelPortConcurrent);
         }
 
-        await WaitForTunnelEstablishmentAsync(
+        await WaitForTunnelEstablishmentOrReleaseAsync(
+                _tunnelManager,
+                localPort,
                 settings.TunnelEstablishmentDelayMs,
                 _timeProvider,
                 ct)
@@ -753,6 +786,46 @@ public sealed class TunnelService : ITunnelService
             $"Plink tunnel established for {serverId} on port {localPort} (pid={runner.ProcessId?.ToString() ?? "unknown"})");
 
         return new TunnelResult(true, tunnelInfo, null, null);
+    }
+
+    /// <summary>
+    /// Waits out the establishment delay on a tunnel that is already registered
+    /// and referenced, and releases that reference if the wait is cancelled.
+    /// </summary>
+    /// <remarks>
+    /// Every opening path registers its tunnel, with one reference, before this
+    /// wait, and tells the connection state the port only after it. A
+    /// cancellation in between used to leave a tunnel nobody knew the port of:
+    /// the orphan cleanup on close found nothing to release, and the SSH.NET or
+    /// plink tunnel stayed open until the application exited or the user closed
+    /// it by hand from the tunnels list.
+    /// </remarks>
+    /// <param name="tunnelManager">Registry holding the tunnel's reference.</param>
+    /// <param name="localPort">Local port the tunnel was registered under.</param>
+    /// <param name="delayMs">Establishment delay, in milliseconds; non-positive means none.</param>
+    /// <param name="timeProvider">Clock the delay is measured on.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    internal static async Task WaitForTunnelEstablishmentOrReleaseAsync(
+        TunnelManager tunnelManager,
+        int localPort,
+        int delayMs,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tunnelManager);
+
+        try
+        {
+            await WaitForTunnelEstablishmentAsync(delayMs, timeProvider, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Core.Logging.FileLogger.Info(
+                $"Tunnel establishment on port {localPort} was cancelled; releasing the tunnel reference.");
+            tunnelManager.ReleaseReference(localPort);
+            throw;
+        }
     }
 
     internal static Task WaitForTunnelEstablishmentAsync(

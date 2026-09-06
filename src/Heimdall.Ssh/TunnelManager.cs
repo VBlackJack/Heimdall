@@ -516,7 +516,7 @@ public sealed partial class TunnelManager : IDisposable
         if (_activeTunnels.TryGetValue(localPort, out var session))
         {
             // Return a fresh snapshot with current alive status
-            return session.Info with { IsAlive = session.Client.IsConnected };
+            return session.Info with { IsAlive = IsSessionAlive(session) };
         }
 
         if (_externalTunnels.TryGetValue(localPort, out var externalSession))
@@ -531,11 +531,36 @@ public sealed partial class TunnelManager : IDisposable
     public IReadOnlyList<TunnelInfo> GetActiveTunnels()
     {
         return _activeTunnels.Values
-            .Select(s => s.Info with { IsAlive = s.Client.IsConnected })
+            .Select(s => s.Info with { IsAlive = IsSessionAlive(s) })
             .Concat(_externalTunnels.Values.Select(
                 s => s.Info with { IsAlive = s.IsAlive }))
             .ToList()
             .AsReadOnly();
+    }
+
+    /// <summary>
+    /// Reads a registered session's liveness outside the registry lock.
+    /// </summary>
+    /// <remarks>
+    /// The snapshot these readers take is not held under the lock, so a
+    /// concurrent release can dispose the session's client between the
+    /// snapshot and this read. SSH.NET reports <c>IsConnected</c> on a disposed
+    /// client by throwing, and the readers run on the UI thread; a client that
+    /// is gone is simply not alive, the same answer
+    /// <see cref="ExternalTunnelSession.IsAlive"/> gives.
+    /// </remarks>
+    private static bool IsSessionAlive(TunnelSession session)
+    {
+        try
+        {
+            return session.Client.IsConnected;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"[TunnelManager] Tunnel liveness read failed for port {session.Info.LocalPort}: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>

@@ -31,6 +31,12 @@ namespace Heimdall.Ssh;
 public static class SshConnectionFactory
 {
     /// <summary>
+    /// Message of the <see cref="OperationCanceledException"/> raised when a
+    /// transport failure surfaces after the connect token was cancelled.
+    /// </summary>
+    private const string ConnectCancelledMessage = "SSH connect was cancelled before the handshake completed.";
+
+    /// <summary>
     /// Presented SSH host key captured during a pre-authentication probe.
     /// </summary>
     /// <param name="Host">Host used for trust lookup.</param>
@@ -338,26 +344,9 @@ public static class SshConnectionFactory
             e.CanTrust = false;
         };
 
-        // Intentional cancellation path: SshClient.Connect() is synchronous
-        // and blocking. The CancellationToken passed to Task.Run can cancel
-        // queueing, but not an in-flight Connect(), so Disconnect() is the only
-        // way to interrupt a stuck probe. The brief Connect/Disconnect overlap
-        // is expected; exceptions are swallowed and cleanup still disposes the
-        // client through using/finally.
-        await using var connectReg = cancellationToken.Register(
-            () =>
-            {
-                try { client.Disconnect(); }
-                catch (Exception ex) { Core.Logging.FileLogger.Debug("SSH host key probe disconnect suppressed", ex); }
-            });
-
         try
         {
-            await Task.Run(() =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                client.Connect();
-            }, cancellationToken).ConfigureAwait(false);
+            await ConnectWithCancellationAsync(client, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -390,6 +379,44 @@ public static class SshConnectionFactory
 
         throw new InvalidOperationException(
             $"SSH host key probe completed without receiving a host key for {verificationHost}:{verificationPort}.");
+    }
+
+    /// <summary>
+    /// Runs the SSH handshake on <paramref name="client"/> so that cancelling
+    /// <paramref name="cancellationToken"/> interrupts it, and so that a
+    /// cancelled attempt is always reported as <see cref="OperationCanceledException"/>.
+    /// </summary>
+    /// <remarks>
+    /// SSH.NET assigns the client's session only once the whole handshake has
+    /// run, so a Disconnect issued while Connect is in flight does nothing: it
+    /// cannot interrupt a key exchange the server never finishes, and the attempt
+    /// runs on to the connect timeout. SSH.NET's own asynchronous connect
+    /// observes the token through the handshake instead. A failure that surfaces
+    /// after the token was cancelled is that cancellation as the transport saw
+    /// it, and is reported as such so a caller never shows a timed-out connection
+    /// for one the user abandoned.
+    /// </remarks>
+    /// <param name="client">The client to connect.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    internal static async Task ConnectWithCancellationAsync(
+        BaseClient client,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            await client.ConnectAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(ConnectCancelledMessage, ex, cancellationToken);
+        }
     }
 
     internal static async Task<PinnedFingerprintVerifier> ResolvePresentedHostKeyAsync(
@@ -635,8 +662,20 @@ public static class SshConnectionFactory
             return false;
         }
 
+        // Only a passphrase GUESSED from the legacy password mapping may be
+        // abandoned in favour of that same password: the guess was never a
+        // statement about the key. A passphrase the profile states explicitly
+        // is one, and a key that refuses it must be reported as such; falling
+        // back would drop the key silently and let the next refusal be
+        // classified as a rejected key that was never offered.
+        if (!connectionParams.UseLegacyPasswordAsKeyPassphrase
+            || !string.IsNullOrEmpty(connectionParams.KeyPassphrase))
+        {
+            return false;
+        }
+
         // SSH.NET raises typed passphrase/key parsing exceptions before it can
-        // attempt later auth methods. When an explicit password fallback exists,
+        // attempt later auth methods. When the legacy password fallback exists,
         // keep building the connection so password auth can still proceed.
         return ex is SshPassPhraseNullOrEmptyException
             or SshException

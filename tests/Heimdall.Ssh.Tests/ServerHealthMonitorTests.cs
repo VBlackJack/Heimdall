@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Reflection;
 using System.Threading;
 using Renci.SshNet;
 
@@ -174,6 +175,44 @@ public sealed class ServerHealthMonitorTests
         }
     }
 
+    /// <summary>
+    /// The shell session disposes its client on disconnect while the monitor
+    /// keeps polling it. SSH.NET reports IsConnected on a disposed client by
+    /// throwing, and the loop used to log that throw and sleep for another
+    /// interval, for ever. A client that is gone ends the loop.
+    /// </summary>
+    [Fact]
+    public async Task PollLoop_ClientDisposed_StopsWithoutPolling()
+    {
+        using DisposedTestSshClient client = new DisposedTestSshClient();
+        BlockingHealthCommandRunner runner = new BlockingHealthCommandRunner();
+        using ServerHealthMonitor monitor = new ServerHealthMonitor(_ => runner);
+
+        await monitor.StartAsync(client);
+        Task pollLoop = GetPollTask(monitor);
+
+        await pollLoop.WaitAsync(PollLoopExitBackstop);
+
+        Assert.Equal(0, runner.CallCount);
+    }
+
+    /// <summary>
+    /// Bound for a poll loop that has nothing left to poll to exit on its own,
+    /// with no cancellation. A loop that instead sleeps for its next interval
+    /// is still asleep when this expires, which is the failure.
+    /// </summary>
+    private static readonly TimeSpan PollLoopExitBackstop = TimeSpan.FromSeconds(5);
+
+    private static Task GetPollTask(ServerHealthMonitor monitor)
+    {
+        FieldInfo? field = typeof(ServerHealthMonitor).GetField(
+            "_pollTask",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        Task? task = Assert.IsAssignableFrom<Task>(field.GetValue(monitor));
+        return task;
+    }
+
     private sealed class BlockingHealthCommandRunner : IHealthCommandRunner
     {
         private readonly TaskCompletionSource<object?> _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -231,5 +270,15 @@ public sealed class ServerHealthMonitorTests
         }
 
         public override bool IsConnected => true;
+    }
+
+    private sealed class DisposedTestSshClient : SshClient
+    {
+        public DisposedTestSshClient()
+            : base(new ConnectionInfo("example.com", 22, "tester", new NoneAuthenticationMethod("tester")))
+        {
+        }
+
+        public override bool IsConnected => throw new ObjectDisposedException(nameof(SshClient));
     }
 }

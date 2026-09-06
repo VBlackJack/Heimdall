@@ -61,18 +61,16 @@ public sealed partial class TunnelManager
             verificationPort,
             pinnedVerifier);
 
-        await using var connectReg = cancellationToken.Register(
-            () =>
-            {
-                try { client.Disconnect(); }
-                catch (Exception ex) { Core.Logging.FileLogger.Debug(cancelLogMessage, ex); }
-            });
-
-        await Task.Run(() =>
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            client.Connect();
-        }, cancellationToken).ConfigureAwait(false);
+            await SshConnectionFactory.ConnectWithCancellationAsync(client, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            Core.Logging.FileLogger.Debug(cancelLogMessage, ex);
+            throw;
+        }
     }
 
     private int WireFinalForwardedPorts(
