@@ -55,6 +55,7 @@ public sealed class SshShellSession : IDisposable
     private static readonly TimeSpan StopReadLoopFinal = TimeSpan.FromSeconds(2);
 
     private readonly TimeProvider _timeProvider;
+    private readonly Transport _transport;
     private SshClient? _client;
     private ISshShellStream? _stream;
     private CancellationTokenSource? _readCts;
@@ -75,8 +76,57 @@ public sealed class SshShellSession : IDisposable
     /// depending on wall-clock time.
     /// </param>
     public SshShellSession(TimeProvider? timeProvider = null)
+        : this(timeProvider, null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a shell session whose network-facing steps are replaceable.
+    /// </summary>
+    /// <param name="timeProvider">Clock backing the background teardown wait.</param>
+    /// <param name="transport">
+    /// The steps of <see cref="ConnectAsync"/> that reach the network or SSH.NET.
+    /// Defaults to <see cref="Transport.Default"/>, which is the production wiring.
+    /// </param>
+    internal SshShellSession(TimeProvider? timeProvider, Transport? transport)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _transport = transport ?? Transport.Default;
+    }
+
+    /// <summary>
+    /// The four steps of <see cref="ConnectAsync"/> that reach the network or
+    /// SSH.NET, so a test can stand in for any one of them and drive the session
+    /// past a step it cannot perform against a real server.
+    /// </summary>
+    /// <param name="ResolveHostKeyAsync">Probes and pins the server host key.</param>
+    /// <param name="CreateClient">Builds the SSH.NET client for the connection parameters.</param>
+    /// <param name="ConnectAsync">Runs the SSH handshake on a built client.</param>
+    /// <param name="CreateShellStream">Opens the PTY shell stream on a connected client.</param>
+    internal sealed record Transport(
+        Func<SshConnectionParams, HostKeyStore, IHostKeyVerifier, CancellationToken, Task<PinnedFingerprintVerifier>> ResolveHostKeyAsync,
+        Func<SshConnectionParams, SshClient> CreateClient,
+        Func<SshClient, CancellationToken, Task> ConnectAsync,
+        Func<SshClient, int, int, ISshShellStream> CreateShellStream)
+    {
+        /// <summary>The production wiring.</summary>
+        public static Transport Default { get; } = new(
+            SshConnectionFactory.ResolveHostKeyAsync,
+            SshConnectionFactory.CreateSshClient,
+            SshConnectionFactory.ConnectWithCancellationAsync,
+            CreateDefaultShellStream);
+    }
+
+    private static ISshShellStream CreateDefaultShellStream(SshClient client, int terminalColumns, int terminalRows)
+    {
+        ShellStream shellStream = client.CreateShellStream(
+            terminalName: "xterm-256color",
+            columns: (uint)terminalColumns,
+            rows: (uint)terminalRows,
+            width: 0,
+            height: 0,
+            bufferSize: ReadBufferSize);
+        return new SshNetShellStream(shellStream);
     }
 
     /// <summary>Raised when data is received from the remote shell.</summary>
@@ -143,40 +193,29 @@ public sealed class SshShellSession : IDisposable
             _disconnectNotified = 0;
         }
 
-        var pinnedVerifier = await SshConnectionFactory.ResolveHostKeyAsync(
+        PinnedFingerprintVerifier pinnedVerifier = await _transport.ResolveHostKeyAsync(
                 connectionParams,
                 hostKeyStore,
                 hostKeyVerifier,
                 cancellationToken)
             .ConfigureAwait(false);
 
-        _client = SshConnectionFactory.CreateSshClient(connectionParams);
+        SshClient client = _transport.CreateClient(connectionParams);
+        _client = client;
 
         SshConnectionFactory.AttachPinnedHostKeyVerification(
-            _client,
+            client,
             connectionParams,
             pinnedVerifier);
 
-        await using var connectReg = cancellationToken.Register(
-            () => { try { _client.Disconnect(); } catch (Exception ex) { Core.Logging.FileLogger.Debug("SSH disconnect cleanup suppressed", ex); } });
-        await Task.Run(() =>
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            _client.Connect();
-        }, cancellationToken).ConfigureAwait(false);
+        await _transport.ConnectAsync(client, cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        ShellStream shellStream = _client.CreateShellStream(
-            terminalName: "xterm-256color",
-            columns: (uint)terminalColumns,
-            rows: (uint)terminalRows,
-            width: 0,
-            height: 0,
-            bufferSize: ReadBufferSize);
+        ISshShellStream shellStream = _transport.CreateShellStream(client, terminalColumns, terminalRows);
         lock (_streamGate)
         {
-            _stream = new SshNetShellStream(shellStream);
+            _stream = shellStream;
         }
 
         // Link the read-loop CTS to the external cancellation token so
