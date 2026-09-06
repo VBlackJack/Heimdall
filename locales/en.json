@@ -34,6 +34,7 @@
   "ErrorSshKeyFileInvalid": "SSH key file is invalid, missing, or in an unsupported format.",
   "ErrorSshKeyRejected": "Server rejected the SSH key. Check that the correct key is configured or loaded in an SSH agent.",
   "ErrorSshKeyboardInteractiveNoPassword": "Server requires interactive authentication but no password is configured.",
+  "ErrorSshKeyboardInteractiveUnsupportedPrompt": "The server asked an interactive question this client cannot answer. Only a password prompt is supported; a verification code or other second factor is not.",
   "ErrorSshNetworkRefused": "Connection refused by {0}.",
   "ErrorSshNetworkReset": "Connection reset by {0}.",
   "ErrorSshNetworkTimedOut": "Connection timed out to {0}. Check that the host is reachable.",

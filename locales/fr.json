@@ -34,6 +34,7 @@
   "ErrorSshKeyFileInvalid": "Le fichier de cl\u00e9 SSH est invalide, manquant ou dans un format non support\u00e9.",
   "ErrorSshKeyRejected": "Le serveur a rejet\u00e9 la cl\u00e9 SSH. V\u00e9rifiez que la bonne cl\u00e9 est configur\u00e9e ou charg\u00e9e dans un agent SSH.",
   "ErrorSshKeyboardInteractiveNoPassword": "Le serveur requiert une authentification interactive mais aucun mot de passe n'est configur\u00e9.",
+  "ErrorSshKeyboardInteractiveUnsupportedPrompt": "Le serveur a posé une question interactive à laquelle ce client ne peut pas répondre. Seule une demande de mot de passe est prise en charge, pas un code de vérification ni un autre second facteur.",
   "ErrorSshNetworkRefused": "Connexion refus\u00e9e par {0}.",
   "ErrorSshNetworkReset": "Connexion r\u00e9initialis\u00e9e par {0}.",
   "ErrorSshNetworkTimedOut": "Connexion expir\u00e9e vers {0}. V\u00e9rifiez que l'h\u00f4te est accessible.",

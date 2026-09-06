@@ -87,6 +87,16 @@ public sealed class SshConnectionParams
     /// <summary>SSH transport keepalive interval in seconds.</summary>
     public int? KeepAliveIntervalSeconds { get; init; } = AppSettings.DefaultSshKeepAliveIntervalSeconds;
 
+    /// <summary>
+    /// What the keyboard-interactive exchange of the attempt could not answer, filled
+    /// in by the authentication method and read by the failure classifier so a
+    /// second-factor prompt is not reported as a rejected password. One mutable
+    /// record per parameter set: the copies a handler makes with <c>with</c>-style
+    /// initialisers share it, which is what a classifier looking at the same attempt
+    /// needs.
+    /// </summary>
+    public KeyboardInteractiveObservation KeyboardInteractive { get; init; } = new();
+
     /// <summary>Host identity used for host-key verification and storage.</summary>
     public string HostKeyVerificationHost =>
         string.IsNullOrWhiteSpace(LogicalHost) ? Host : LogicalHost;
