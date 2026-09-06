@@ -602,6 +602,66 @@ public partial class EmbeddedRdpView
 
         _disposed = true;
         Core.Logging.FileLogger.Info($"EmbeddedRDP Dispose started reason={reason}");
+
+        // The verification token is cancelled BEFORE the question is closed, and the pane is
+        // unregistered before it refuses what it was holding. Closing the pane is not an
+        // answer - it is something the user did to the pane, not something they said about
+        // the certificate - so the session settles it as NotAsked. NotAsked does not stop a
+        // connection on its own; a pane sharing its question is handed the answer given
+        // elsewhere. This path stops for a reason of its own, and it is this ordering: the
+        // coalescer takes no shared answer for a pane whose own connection was given up.
+        // Moving the cancellation below the close would put a session behind a pane that no
+        // longer exists. Both stay steps of this body, where the wiring guard reads them.
+        _certificateVerificationCts?.Cancel();
+        _certificateVerificationCts?.Dispose();
+        _certificateVerificationCts = null;
+        _trustPromptRegistration?.Dispose();
+        _trustPromptRegistration = null;
+        _trustPrompt.Close();
+        _trustPrompt.QuestionChanged -= OnTrustPromptQuestionChanged;
+
+        // Every other release is contained, and the COM teardown runs whatever they do.
+        // Roughly forty statements ran ahead of it with no try at all, so any one of them
+        // throwing skipped the whole teardown: the ActiveX control was never disconnected,
+        // its sink never detached, and it never went back to the pool - and _disposed was
+        // already set, so nothing would retry.
+        DisposeSequence.Run(
+            DisposePrologue,
+            () => CompleteDispose(reason),
+            ex => Core.Logging.FileLogger.WarnDetailed($"EmbeddedRDP Dispose prologue failed reason={reason}", ex));
+    }
+
+    /// <summary>The teardown that must run: the COM host, then the last handles.</summary>
+    private void CompleteDispose(DisconnectReason reason)
+    {
+        TearDownRdpHost(reason);
+        _autofillCts?.Dispose();
+        _autofillCts = null;
+        Core.Logging.FileLogger.Info($"EmbeddedRDP Dispose completed reason={reason}");
+    }
+
+    /// <summary>Detaches from the host and runs the canonical COM teardown order.</summary>
+    private void TearDownRdpHost(DisconnectReason reason)
+    {
+        if (_rdpHost is null)
+        {
+            return;
+        }
+
+        _rdpHost.Connected -= OnRdpConnected;
+        _rdpHost.Disconnected -= OnRdpDisconnected;
+        _rdpHost.FatalError -= OnRdpFatalError;
+        _rdpHost.LoginComplete -= OnRdpLoginComplete;
+        _rdpHost.AutoReconnecting -= OnRdpAutoReconnecting;
+        _rdpHost.AutoReconnected -= OnRdpAutoReconnected;
+
+        _rdpHost.CancelAutoReconnect = true;
+        RdpDisconnectTeardownSequence.Execute(this, reason);
+    }
+
+    /// <summary>Every release that precedes the COM teardown, none of which may prevent it.</summary>
+    private void DisposePrologue()
+    {
         UnregisterEscapeHook();
         UnregisterDpiChangedHandler();
 
@@ -630,26 +690,6 @@ public partial class EmbeddedRdpView
         _stabilizationCts?.Cancel();
         _stabilizationCts?.Dispose();
         _stabilizationCts = null;
-        _certificateVerificationCts?.Cancel();
-        _certificateVerificationCts?.Dispose();
-        _certificateVerificationCts = null;
-
-        // Unregistered first so no new question can be routed here, then closed so the one
-        // already on screen stops waiting. Closing the pane is not an answer - it is something
-        // the user did to the pane, not something they said about the certificate - so the
-        // session settles it as NotAsked. Reporting it as a refusal is what told a user they had
-        // declined a certificate they were never shown.
-        //
-        // NotAsked does not stop a connection on its own; a pane sharing its question is handed
-        // the answer given elsewhere. This path stops for a reason of its own, and it is the
-        // ordering a few lines above: the verification token is cancelled BEFORE the question is
-        // closed, and the coalescer takes no shared answer for a pane whose own connection was
-        // given up. Moving that cancellation below this block would put a session behind a pane
-        // that no longer exists.
-        _trustPromptRegistration?.Dispose();
-        _trustPromptRegistration = null;
-        _trustPrompt.Close();
-        _trustPrompt.QuestionChanged -= OnTrustPromptQuestionChanged;
 
         StopReconnectElapsedTracking();
         StopAntiIdleTimer();
@@ -661,23 +701,6 @@ public partial class EmbeddedRdpView
         _allowResolutionUpdates = false;
         _sessionStatus = RdpSessionStatus.Disconnecting;
         UpdateHealthDot();
-
-        if (_rdpHost is not null)
-        {
-            _rdpHost.Connected -= OnRdpConnected;
-            _rdpHost.Disconnected -= OnRdpDisconnected;
-            _rdpHost.FatalError -= OnRdpFatalError;
-            _rdpHost.LoginComplete -= OnRdpLoginComplete;
-            _rdpHost.AutoReconnecting -= OnRdpAutoReconnecting;
-            _rdpHost.AutoReconnected -= OnRdpAutoReconnected;
-
-            _rdpHost.CancelAutoReconnect = true;
-            RdpDisconnectTeardownSequence.Execute(this, reason);
-        }
-
-        _autofillCts?.Dispose();
-        _autofillCts = null;
-        Core.Logging.FileLogger.Info($"EmbeddedRDP Dispose completed reason={reason}");
     }
 
     string IRdpDisconnectTeardownTarget.TeardownTargetName =>
