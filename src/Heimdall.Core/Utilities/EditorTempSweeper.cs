@@ -39,8 +39,14 @@ public static class EditorTempSweeper
     /// <remarks>
     /// A margin rather than a guess at process lifetime. Sweeping runs at startup, so a
     /// directory younger than this belongs either to a session that has only just ended
-    /// or to another instance running right now - there is no single-instance lock in
-    /// this application, so a second window is an ordinary situation, not an edge case.
+    /// or to another instance running right now: the single-instance guard is scoped to
+    /// one data root, and a second instance on another root shares this temporary root.
+    /// <para>
+    /// The retained text is not offered back to the user at the next launch; it is kept
+    /// so a teardown mid-save cannot delete a file an upload is still reading, and it is
+    /// swept once that session is demonstrably over. Recovering it by hand from this
+    /// root within the margin is the only way it comes back.
+    /// </para>
     /// </remarks>
     public static readonly TimeSpan MinimumAge = TimeSpan.FromHours(24);
 

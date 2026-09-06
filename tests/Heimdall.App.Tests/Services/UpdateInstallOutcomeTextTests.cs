@@ -27,6 +27,31 @@ public sealed class UpdateInstallOutcomeTextTests
         UpdateInstallOutcomeText.StatusKey(UpdateInstallOutcome.Started).Should().BeNull();
     }
 
+    /// <remarks>
+    /// The default arm used to say "Download failed." for any member the mapper did not
+    /// know, so a member added later shipped a specific, wrong cause on both surfaces.
+    /// Its sibling for relaunch outcomes returns null there, and now so does this one.
+    /// </remarks>
+    [Fact]
+    public void StatusKey_UnknownOutcome_InventsNoMessage()
+    {
+        UpdateInstallOutcomeText.StatusKey((UpdateInstallOutcome)999).Should().BeNull();
+    }
+
+    [Fact]
+    public void StatusKey_EveryDeclaredNonSuccessOutcome_HasAKey()
+    {
+        foreach (UpdateInstallOutcome outcome in Enum.GetValues<UpdateInstallOutcome>())
+        {
+            if (outcome == UpdateInstallOutcome.Started)
+            {
+                continue;
+            }
+
+            UpdateInstallOutcomeText.StatusKey(outcome).Should().NotBeNull(because: $"{outcome} is a declared outcome");
+        }
+    }
+
     [Theory]
     [InlineData(UpdateInstallOutcome.InstallLaunchFailed, "SettingsUpdateStatusInstallFailed")]
     [InlineData(UpdateInstallOutcome.Cancelled, "SettingsUpdateStatusCancelled")]

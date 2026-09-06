@@ -2994,6 +2994,29 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.False(viewModel.IsCheckingUpdate);
     }
 
+    /// <remarks>
+    /// "Skip this version" persisted on one click with no confirmation, and nothing
+    /// displayed or undid it short of editing settings.json by hand.
+    /// </remarks>
+    [Fact]
+    public async Task ClearSkippedVersion_WritesNullThroughMergeAndClearsTheField()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(new AppSettings { UpdateSkippedVersion = "2026.061502" });
+        Assert.True(viewModel.HasSkippedVersion);
+        Assert.True(viewModel.ClearSkippedVersionCommand.CanExecute(null));
+        Assert.False(viewModel.IsDirty, "the skipped version is not a pending edit");
+
+        await viewModel.ClearSkippedVersionCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, config.MergeSettingCallCount);
+        Assert.Null(config.Settings.UpdateSkippedVersion);
+        Assert.False(viewModel.HasSkippedVersion);
+        Assert.False(viewModel.ClearSkippedVersionCommand.CanExecute(null));
+        Assert.False(viewModel.IsDirty);
+    }
+
     [Fact]
     public async Task CheckNowAsync_UpdateAvailable_IncludesVersionWithoutMarkingDirty()
     {

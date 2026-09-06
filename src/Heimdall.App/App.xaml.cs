@@ -92,6 +92,13 @@ public partial class App : System.Windows.Application
     /// <summary>Ceiling on the trusted host key flush at exit.</summary>
     private static readonly TimeSpan ExitHostKeyFlushBudget = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// Exit code of a launch that failed before the main window. Nothing in the
+    /// application consumes it - the relauncher waits on the process id, by design - but
+    /// a shell reads it, and -1 showed there as 4294967295.
+    /// </summary>
+    private const int StartupFailureExitCode = 1;
+
     // WPF's startup hook is event-like. Keeping async void here lets the splash
     // stay visible while awaited initialization completes on the dispatcher.
     protected override async void OnStartup(StartupEventArgs e)
@@ -486,7 +493,7 @@ public partial class App : System.Windows.Application
             }
 
             ShowUnhandledException(ex);
-            Shutdown(-1);
+            Shutdown(StartupFailureExitCode);
         }
     }
 
