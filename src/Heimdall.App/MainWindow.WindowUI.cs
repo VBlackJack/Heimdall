@@ -86,7 +86,7 @@ public partial class MainWindow
 
     private void ToggleFullscreen()
     {
-        if (DataContext is not MainViewModel)
+        if (DataContext is not MainViewModel vm)
         {
             return;
         }
@@ -133,6 +133,11 @@ public partial class MainWindow
             // Hide the session header bar inside embedded views
             NotifyEmbeddedViewsFullscreen(true);
         }
+
+        // Either way, the banner follows the new state. It lives in its own layout row,
+        // and one arriving late inserted a bar into a fullscreen session and resized the
+        // live surface under it.
+        vm.Update.IsSuppressedByFullscreen = _uiState.IsFullscreen;
     }
 
     private void NotifyEmbeddedViewsFullscreen(bool isFullscreen)

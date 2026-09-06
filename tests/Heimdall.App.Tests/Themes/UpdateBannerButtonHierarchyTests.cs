@@ -78,6 +78,77 @@ public sealed class UpdateBannerButtonHierarchyTests
     /// relative order is checked: any other element added to the banner, such as the
     /// install-only cancel button, is ignored rather than shifting an index.
     /// </summary>
+    /// <remarks>
+    /// The progress bar announced itself to a screen reader with the label of the button
+    /// beside it; two adjacent controls with one accessible name.
+    /// </remarks>
+    [Fact]
+    public void UpdateBanner_ProgressBarDoesNotBorrowTheDownloadButtonsName()
+    {
+        XDocument mainWindow = LoadXaml("src", "Heimdall.App", "MainWindow.xaml");
+        XElement progress = Named(mainWindow, "Mw_UpdateBannerProgress");
+        XElement download = Named(mainWindow, "Mw_UpdateBannerDownloadInstall");
+
+        string? progressName = (string?)progress.Attribute("AutomationProperties.Name");
+        string? downloadName = (string?)download.Attribute("AutomationProperties.Name");
+
+        Assert.False(string.IsNullOrWhiteSpace(progressName), "the progress bar has no accessible name");
+        Assert.NotEqual(downloadName, progressName);
+        Assert.Contains("SettingsUpdateStatusDownloading", progressName, StringComparison.Ordinal);
+    }
+
+    /// <remarks>
+    /// An unprompted asynchronous appearance with no accessibility affordance beyond
+    /// per-button names: a screen-reader user was never told it appeared, and a keyboard
+    /// user had to tab through the window to reach Dismiss.
+    /// </remarks>
+    [Fact]
+    public void UpdateBanner_IsAnnouncedAndDismissableFromTheKeyboard()
+    {
+        XDocument mainWindow = LoadXaml("src", "Heimdall.App", "MainWindow.xaml");
+        XElement banner = Named(mainWindow, "Mw_UpdateBanner");
+
+        Assert.Contains("A11yUpdateBanner", (string?)banner.Attribute("AutomationProperties.Name") ?? string.Empty, StringComparison.Ordinal);
+        Assert.Equal("Polite", (string?)banner.Attribute("AutomationProperties.LiveSetting"));
+
+        XElement? escape = banner.Descendants(PresentationNamespace + "KeyBinding")
+            .FirstOrDefault(binding => string.Equals((string?)binding.Attribute("Key"), "Escape", StringComparison.Ordinal));
+        Assert.True(escape is not null, "the banner has no Escape binding");
+        Assert.Contains("LaterCommand", (string?)escape!.Attribute("Command") ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    /// <remarks>
+    /// RangeBase.Value binds two-way by default, so both progress bars were write doors
+    /// from a view control back into the view model's progress.
+    /// </remarks>
+    [Theory]
+    [InlineData("Mw_UpdateBannerProgress")]
+    [InlineData("Mw_SettingsDownloadProgress")]
+    public void ProgressBars_BindTheirValueOneWay(string name)
+    {
+        XDocument mainWindow = LoadXaml("src", "Heimdall.App", "MainWindow.xaml");
+        string? value = (string?)Named(mainWindow, name).Attribute("Value");
+
+        Assert.Contains("Mode=OneWay", value ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UpdateBanner_BindsTheFullscreenAwareVisibility()
+    {
+        XDocument mainWindow = LoadXaml("src", "Heimdall.App", "MainWindow.xaml");
+        string? visibility = (string?)Named(mainWindow, "Mw_UpdateBanner").Attribute("Visibility");
+
+        Assert.Contains("Update.IsBannerShown", visibility ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    private static XElement Named(XDocument document, string name)
+    {
+        XElement? element = document.Descendants()
+            .FirstOrDefault(candidate => string.Equals((string?)candidate.Attribute(XamlNamespace + "Name"), name, StringComparison.Ordinal));
+        Assert.True(element is not null, $"'{name}' was not found in MainWindow.xaml.");
+        return element!;
+    }
+
     private static void AssertNominalRowOrder(XDocument document)
     {
         string[] actualOrder = document.Descendants(PresentationNamespace + "Button")

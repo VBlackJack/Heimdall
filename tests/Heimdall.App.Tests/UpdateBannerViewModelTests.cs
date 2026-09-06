@@ -317,8 +317,11 @@ public sealed class UpdateBannerViewModelTests
         await vm.DownloadAndInstallCommand.ExecuteAsync(null);
 
         Assert.Equal(1, flow.RunCallCount);
-        Assert.Equal(string.Empty, vm.BannerStatusText);
-        Assert.False(vm.HasBannerStatus);
+
+        // The same meaning the settings screen gives the mapper's null: nothing to say,
+        // leave the "downloading" status alone. The application is shutting down.
+        Assert.Equal(localizer.Format("SettingsUpdateStatusDownloading"), vm.BannerStatusText);
+        Assert.True(vm.HasBannerStatus);
         Assert.False(vm.IsInstalling);
     }
 
@@ -338,6 +341,140 @@ public sealed class UpdateBannerViewModelTests
         Assert.Equal(localizer.Format("SettingsUpdateStatusInstallFailed"), vm.BannerStatusText);
         Assert.True(vm.HasBannerStatus);
         Assert.False(vm.IsInstalling);
+    }
+
+    /// <remarks>
+    /// The notice flag was never reset, so an update found right after a failed attempt
+    /// showed the failure text and a Dismiss button with every offer affordance collapsed:
+    /// the offer for the very version that failed was swallowed. Reachable, because a
+    /// manual check does not stamp the throttle and the next launch checks again.
+    /// </remarks>
+    [Fact]
+    public async Task ReportPreviousAttempt_ThenStartupCheckFindsUpdate_ShowsTheOfferNotTheNotice()
+    {
+        var store = new FakeUpdateOutcomeStore
+        {
+            Pending = new UpdateAttemptRecord(UpdateAttemptRecord.CurrentSchemaVersion, Newer, DateTimeOffset.UtcNow),
+        };
+        var localizer = await CreateLocalizerAsync();
+        var vm = CreateViewModel(
+            BaseSettings(),
+            new StubUpdateService { Result = Available(Newer) },
+            Current,
+            localizer: localizer,
+            outcomeStore: store);
+
+        await vm.ReportPreviousAttemptAsync(CancellationToken.None);
+        Assert.True(vm.IsOutcomeNotice);
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        Assert.True(vm.IsBannerVisible);
+        Assert.True(vm.IsUpdateOffer);
+        Assert.False(vm.IsOutcomeNotice);
+        Assert.Equal(Newer, vm.BannerVersionText);
+        Assert.False(vm.HasBannerStatus);
+    }
+
+    [Fact]
+    public async Task Later_AfterAnOutcomeNotice_ReturnsTheBannerToANeutralState()
+    {
+        var store = new FakeUpdateOutcomeStore
+        {
+            Pending = new UpdateAttemptRecord(UpdateAttemptRecord.CurrentSchemaVersion, Newer, DateTimeOffset.UtcNow),
+        };
+        var vm = CreateViewModel(BaseSettings(), new StubUpdateService(), Current, localizer: await CreateLocalizerAsync(), outcomeStore: store);
+        await vm.ReportPreviousAttemptAsync(CancellationToken.None);
+
+        vm.LaterCommand.Execute(null);
+
+        Assert.False(vm.IsBannerVisible);
+        Assert.False(vm.IsOutcomeNotice);
+        Assert.False(vm.HasBannerStatus);
+    }
+
+    /// <remarks>The settings twin guards on a non-empty URL; the banner's command did not.</remarks>
+    [Fact]
+    public void ViewRelease_BeforeAnyCheck_CommandCannotExecute()
+    {
+        var vm = CreateViewModel(BaseSettings(), new StubUpdateService(), Current);
+
+        Assert.False(vm.ViewReleaseCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ViewRelease_AfterAnOffer_CommandCanExecute()
+    {
+        var vm = CreateViewModel(BaseSettings(), new StubUpdateService { Result = Available(Newer) }, Current);
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        Assert.True(vm.ViewReleaseCommand.CanExecute(null));
+    }
+
+    /// <remarks>
+    /// Both startup entry points were handed CancellationToken.None: closing the window
+    /// during the check let the continuation write the last-check stamp to settings.json
+    /// during the shutdown sequence.
+    /// </remarks>
+    [Fact]
+    public async Task CheckOnStartup_CancelledToken_PropagatesAndPersistsNothing()
+    {
+        var settings = BaseSettings();
+        var vm = CreateViewModel(settings, new StubUpdateService { Result = Available(Newer) }, Current);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => vm.CheckOnStartupAsync(cancellation.Token));
+
+        Assert.Null(settings.UpdateLastCheckUtc);
+        Assert.False(vm.IsBannerVisible);
+    }
+
+    /// <remarks>
+    /// The banner lives in its own layout row: one arriving after the user went fullscreen
+    /// inserted a bar into a session meant to fill the screen and resized the live surface.
+    /// </remarks>
+    [Fact]
+    public async Task IsBannerShown_IsFalseWhileSuppressedByFullscreen()
+    {
+        var vm = CreateViewModel(BaseSettings(), new StubUpdateService { Result = Available(Newer) }, Current);
+        List<string> changes = [];
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName ?? string.Empty);
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+        Assert.True(vm.IsBannerShown);
+
+        vm.IsSuppressedByFullscreen = true;
+        Assert.True(vm.IsBannerVisible, "suppression hides the banner without dismissing it");
+        Assert.False(vm.IsBannerShown);
+
+        vm.IsSuppressedByFullscreen = false;
+        Assert.True(vm.IsBannerShown);
+        Assert.Contains(nameof(UpdateBannerViewModel.IsBannerShown), changes);
+    }
+
+    /// <remarks>
+    /// The locale handler cleared the settings screen's update status and left the
+    /// banner's in the old language: instance fixed, sibling left open.
+    /// </remarks>
+    [Fact]
+    public async Task RefreshLocalization_ReformatsTheStatusInTheNewLanguage()
+    {
+        var store = new FakeUpdateOutcomeStore
+        {
+            Pending = new UpdateAttemptRecord(UpdateAttemptRecord.CurrentSchemaVersion, Newer, DateTimeOffset.UtcNow),
+        };
+        var localizer = await CreateLocalizerAsync();
+        var vm = CreateViewModel(BaseSettings(), new StubUpdateService(), Current, localizer: localizer, outcomeStore: store);
+        await vm.ReportPreviousAttemptAsync(CancellationToken.None);
+        string english = vm.BannerStatusText;
+
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+        vm.RefreshLocalization();
+
+        Assert.Equal(localizer.Format("UpdateBannerOutcomeNotApplied", Newer), vm.BannerStatusText);
+        Assert.NotEqual(english, vm.BannerStatusText);
     }
 
     [Fact]
@@ -515,6 +652,7 @@ public sealed class UpdateBannerViewModelTests
 
         public Task<UpdateCheckResult> CheckForUpdatesAsync(HeimdallVersion current, string owner, string repo, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             WasCalled = true;
             Owner = owner;
             Repo = repo;

@@ -64,11 +64,45 @@ public partial class UpdateBannerViewModel : ObservableObject
     [ObservableProperty]
     private string _bannerStatusText = string.Empty;
 
+    // The key and argument behind BannerStatusText, so a language switch can re-format
+    // it. Set imperatively, the text did not re-localize live: the settings screen's
+    // twin was cleared on a locale change and this one was left in the old language.
+    private string? _bannerStatusKey;
+    private string? _bannerStatusArgument;
+
     /// <summary>True when a status message should be shown under the banner text.</summary>
     public bool HasBannerStatus => !string.IsNullOrEmpty(BannerStatusText);
 
     partial void OnBannerStatusTextChanged(string value) =>
         OnPropertyChanged(nameof(HasBannerStatus));
+
+    /// <summary>
+    /// True while the main window is fullscreen. The banner lives in its own layout row,
+    /// so one that arrived after the user went fullscreen inserted a bar into a session
+    /// that was meant to fill the screen and resized the live surface under it.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSuppressedByFullscreen;
+
+    /// <summary>What the view binds: visible, and not suppressed by fullscreen.</summary>
+    public bool IsBannerShown => IsBannerVisible && !IsSuppressedByFullscreen;
+
+    partial void OnIsBannerVisibleChanged(bool value) => OnPropertyChanged(nameof(IsBannerShown));
+
+    partial void OnIsSuppressedByFullscreenChanged(bool value) => OnPropertyChanged(nameof(IsBannerShown));
+
+    /// <summary>Sets the status from its key, remembering both so it can be re-localized.</summary>
+    private void SetBannerStatus(string? key, string? argument = null)
+    {
+        _bannerStatusKey = key;
+        _bannerStatusArgument = argument;
+        BannerStatusText = key is null
+            ? string.Empty
+            : argument is null ? _localizer.Format(key) : _localizer.Format(key, argument);
+    }
+
+    /// <summary>Re-formats the status in the current language.</summary>
+    internal void RefreshLocalization() => SetBannerStatus(_bannerStatusKey, _bannerStatusArgument);
 
     /// <summary>
     /// True when the banner is reporting what a previous update attempt did, rather than
@@ -152,9 +186,7 @@ public partial class UpdateBannerViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
-        BannerStatusText = _localizer.Format(
-            key,
-            pending?.Attempt.AttemptedVersion ?? string.Empty);
+        SetBannerStatus(key, pending?.Attempt.AttemptedVersion ?? string.Empty);
         IsOutcomeNotice = true;
         IsBannerVisible = true;
         return Task.CompletedTask;
@@ -212,9 +244,17 @@ public partial class UpdateBannerViewModel : ObservableObject
         _candidateVersion = version;
         _releaseUrl = result.Update.ReleaseUrl;
         _availableUpdate = result.Update;
-        // Plain field: no generated notification, so bound controls must be told explicitly.
+        // Plain fields: no generated notification, so bound controls must be told explicitly.
         DownloadAndInstallCommand.NotifyCanExecuteChanged();
+        ViewReleaseCommand.NotifyCanExecuteChanged();
         BannerVersionText = version.ToString();
+
+        // An offer, whatever the banner was showing before. The outcome notice set by
+        // ReportPreviousAttemptAsync was never reset, so an update found right after a
+        // failed attempt showed the failure text and a Dismiss button, with every offer
+        // affordance collapsed: the offer for the very version that failed was swallowed.
+        IsOutcomeNotice = false;
+        SetBannerStatus(null);
         IsBannerVisible = true;
     }
 
@@ -253,13 +293,20 @@ public partial class UpdateBannerViewModel : ObservableObject
 
         IsInstalling = true;
         DownloadProgress = 0;
-        BannerStatusText = _localizer.Format("SettingsUpdateStatusDownloading");
+        SetBannerStatus("SettingsUpdateStatusDownloading");
         try
         {
             var progress = new Progress<double>(p => DownloadProgress = p);
             var outcome = await _installFlow.RunAsync(update, progress, cancellationToken);
+
+            // The same meaning as the settings screen gives a null key: nothing to say,
+            // leave the status alone. The two surfaces used to read the shared mapper's
+            // null differently.
             var key = UpdateInstallOutcomeText.StatusKey(outcome);
-            BannerStatusText = key is null ? string.Empty : _localizer.Format(key);
+            if (key is not null)
+            {
+                SetBannerStatus(key);
+            }
         }
         finally
         {
@@ -267,13 +314,26 @@ public partial class UpdateBannerViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    /// <summary>The same predicate as the settings screen's View release button.</summary>
+    private bool CanViewRelease() => !string.IsNullOrWhiteSpace(_releaseUrl);
+
+    [RelayCommand(CanExecute = nameof(CanViewRelease))]
     private void ViewRelease() => _browserLauncher.Open(_releaseUrl);
 
     private bool CanDismissBanner() => !IsInstalling;
 
     [RelayCommand(CanExecute = nameof(CanDismissBanner))]
-    private void Later() => IsBannerVisible = false;
+    private void Later()
+    {
+        IsBannerVisible = false;
+
+        // Back to a neutral state, so a later offer is an offer.
+        if (IsOutcomeNotice)
+        {
+            IsOutcomeNotice = false;
+            SetBannerStatus(null);
+        }
+    }
 
     [RelayCommand(CanExecute = nameof(CanDismissBanner))]
     private async Task SkipVersionAsync()
