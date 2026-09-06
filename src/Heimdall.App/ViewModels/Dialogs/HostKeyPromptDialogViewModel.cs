@@ -70,9 +70,20 @@ public partial class HostKeyPromptDialogViewModel(
 
     public string RejectButtonText => _localizer["HostKeyRejectButton"];
 
-    public bool TrustOnceIsDefault => IsMismatch;
+    /// <summary>
+    /// "Trust this session" never answers Enter: on a first-use prompt Accept does,
+    /// and on a changed key nothing that connects may be one keystroke away.
+    /// </summary>
+    public bool TrustOnceIsDefault => false;
 
-    public bool AcceptIsDefault => !TrustOnceIsDefault;
+    public bool AcceptIsDefault => !IsMismatch;
+
+    /// <summary>
+    /// On a changed key the default button is Reject, as OpenSSH refuses outright:
+    /// the Enter reflex trained by the first-use prompt must not connect to a host
+    /// whose key no longer matches the stored one.
+    /// </summary>
+    public bool RejectIsDefault => IsMismatch;
 
     public HostKeyDecision? Decision { get; private set; }
 
