@@ -143,6 +143,70 @@ public sealed class KnownHostsImporterTests
         Assert.Equal(Convert.ToBase64String(keyBytes), persisted.PublicKeyBase64);
     }
 
+    [Fact]
+    public async Task BuildPreview_ConflictVsHashedStoreEntry_WhenDifferentFingerprint()
+    {
+        KnownHostsImporter importer = CreateImporter(out _, out HostKeyStore store);
+        string storedFingerprint = HostKeyFormats.ComputeSha256Fingerprint([0x09, 0x09, 0x09]);
+        store.TrustEntry(
+            CreateHashedHost("host", [0x01, 0x02, 0x03, 0x04]),
+            22,
+            new HostKeyEntry(
+                storedFingerprint,
+                DateTimeOffset.UtcNow.AddDays(-2),
+                DateTimeOffset.UtcNow.AddDays(-1),
+                "ssh-ed25519",
+                HostKeySource.ImportedKnownHosts));
+
+        KnownHostsImportPreview preview = await importer.BuildPreviewAsync(new KnownHostsParseResult(
+            [CreateRawEntry("host", 22, [0x01, 0x02, 0x03])],
+            []));
+
+        KnownHostsPreviewRow row = Assert.Single(preview.Rows);
+        Assert.Equal(KnownHostsCandidateStatus.Conflict, row.Status);
+        Assert.Equal(storedFingerprint, row.ExistingFingerprint);
+    }
+
+    [Fact]
+    public async Task ImportSelectedAsync_SkipsCandidateConflictingWithHashedStoreEntry()
+    {
+        KnownHostsImporter importer = CreateImporter(out InMemoryConfigManager config, out HostKeyStore store);
+        string storedFingerprint = HostKeyFormats.ComputeSha256Fingerprint([0x09, 0x09, 0x09]);
+        store.TrustEntry(
+            CreateHashedHost("host", [0x01, 0x02, 0x03, 0x04]),
+            22,
+            new HostKeyEntry(
+                storedFingerprint,
+                DateTimeOffset.UtcNow.AddDays(-2),
+                DateTimeOffset.UtcNow.AddDays(-1),
+                "ssh-ed25519",
+                HostKeySource.ImportedKnownHosts));
+        byte[] importedKey = [0x01, 0x02, 0x03];
+        KnownHostsImportCandidate candidate = new()
+        {
+            Host = "host",
+            Port = 22,
+            Fingerprint = HostKeyFormats.ComputeSha256Fingerprint(importedKey),
+            Algorithm = "ssh-ed25519",
+            PublicKeyBase64 = Convert.ToBase64String(importedKey),
+            SourceLineNumber = 1
+        };
+
+        KnownHostsImportOutcome outcome = await importer.ImportSelectedAsync([candidate]);
+
+        Assert.Equal(0, outcome.Imported);
+        Assert.Equal(1, outcome.SkippedConflict);
+        Assert.Equal(storedFingerprint, new HostKeyTrustService(store).GetEntry("host", 22)?.Fingerprint);
+        Assert.False((await config.LoadSettingsAsync()).TrustedHostKeys.ContainsKey("host:22"));
+    }
+
+    private static string CreateHashedHost(string host, byte[] salt)
+    {
+        using System.Security.Cryptography.HMACSHA1 hmac = new(salt);
+        byte[] hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(host));
+        return $"|1|{Convert.ToBase64String(salt)}|{Convert.ToBase64String(hash)}";
+    }
+
     private static KnownHostsImporter CreateImporter(out InMemoryConfigManager config, out HostKeyStore store)
     {
         config = new InMemoryConfigManager();
