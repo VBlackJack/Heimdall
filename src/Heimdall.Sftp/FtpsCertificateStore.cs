@@ -57,7 +57,10 @@ public sealed class FtpsCertificateStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
 
-        var normalizedHost = host.Trim();
+        // DNS names are case-insensitive; a key that kept the case the user typed gave
+        // FTP.example.com and ftp.example.com two pins, and the second spelling met a
+        // first-use prompt instead of a change detection.
+        var normalizedHost = host.Trim().ToLowerInvariant();
         if (normalizedHost.Contains(':', StringComparison.Ordinal)
             && !normalizedHost.StartsWith("[", StringComparison.Ordinal))
         {
@@ -75,7 +78,9 @@ public sealed class FtpsCertificateStore
         {
             if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(entry.Fingerprint))
             {
-                _trustedCertificates[key] = NormalizeEntry(entry);
+                // Keys written before the host was lower-cased are folded on load, so a stored
+                // pin is found by whichever spelling the next connection uses.
+                _trustedCertificates[key.ToLowerInvariant()] = NormalizeEntry(entry);
             }
         }
     }

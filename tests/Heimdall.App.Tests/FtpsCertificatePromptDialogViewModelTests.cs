@@ -21,47 +21,42 @@ using Heimdall.Core.Localization;
 namespace Heimdall.App.Tests;
 
 /// <summary>
-/// Pins which button answers Enter on the FTPS certificate prompt. A changed
-/// certificate is the one case where the reflex "Enter accepts" must not
-/// connect the session, the same rule the SSH host key prompt follows.
+/// The FTPS certificate prompt is a first-use prompt only: a changed certificate is refused by
+/// the browser before any prompt can be asked. Accept answers Enter; "Trust this session" and
+/// Reject never do.
 /// </summary>
 public sealed class FtpsCertificatePromptDialogViewModelTests
 {
     [Fact]
     public void FirstUse_AcceptIsTheOnlyDefaultButton()
     {
-        FtpsCertificatePromptDialogViewModel vm = CreateViewModel(storedFingerprint: null);
+        FtpsCertificatePromptDialogViewModel vm = CreateViewModel();
 
-        Assert.False(vm.IsMismatch);
         Assert.True(vm.AcceptIsDefault);
         Assert.False(vm.TrustOnceIsDefault);
-        Assert.False(vm.RejectIsDefault);
     }
 
     [Fact]
-    public void Mismatch_RejectIsTheOnlyDefaultButton()
-    {
-        FtpsCertificatePromptDialogViewModel vm = CreateViewModel(storedFingerprint: "SHA256:stored");
-
-        Assert.True(vm.IsMismatch);
-        Assert.True(vm.RejectIsDefault);
-        Assert.False(vm.TrustOnceIsDefault);
-        Assert.False(vm.AcceptIsDefault);
-    }
-
-    private static FtpsCertificatePromptDialogViewModel CreateViewModel(string? storedFingerprint)
+    public void FirstUse_SpeaksOfAnUnknownCertificateNotAChangedOne()
     {
         LocalizationManager localizer = new();
+        FtpsCertificatePromptDialogViewModel vm = CreateViewModel(localizer);
+
+        Assert.Equal(localizer["FtpsCertificateFirstUseTitle"], vm.HeaderText);
+        Assert.Equal(localizer["FtpsCertificateAcceptButton"], vm.AcceptButtonText);
+    }
+
+    private static FtpsCertificatePromptDialogViewModel CreateViewModel(LocalizationManager? localizer = null)
+    {
         FtpsCertificatePrompt prompt = new(
             "ftps.example.com",
             21,
             "SHA256:presented",
-            storedFingerprint,
             "CN=ftps.example.com",
             "CN=Example CA",
             DateTimeOffset.UtcNow.AddDays(-1),
             DateTimeOffset.UtcNow.AddDays(30),
             string.Empty);
-        return new FtpsCertificatePromptDialogViewModel(localizer, prompt);
+        return new FtpsCertificatePromptDialogViewModel(localizer ?? new LocalizationManager(), prompt);
     }
 }

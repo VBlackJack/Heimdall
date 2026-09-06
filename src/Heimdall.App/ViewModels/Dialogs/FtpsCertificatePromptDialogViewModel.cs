@@ -35,8 +35,6 @@ public partial class FtpsCertificatePromptDialogViewModel(
 
     public string PresentedFingerprint { get; } = prompt.PresentedFingerprint;
 
-    public string? StoredFingerprint { get; } = prompt.StoredFingerprint;
-
     public string Subject { get; } = prompt.Subject;
 
     public string Issuer { get; } = prompt.Issuer;
@@ -47,14 +45,15 @@ public partial class FtpsCertificatePromptDialogViewModel(
 
     public DateTimeOffset NotAfter { get; } = prompt.NotAfter;
 
-    public bool IsMismatch => !string.IsNullOrWhiteSpace(StoredFingerprint);
-
-    public string HeaderText => _localizer[IsMismatch
-        ? "FtpsCertificateMismatchTitle"
-        : "FtpsCertificateFirstUseTitle"];
+    /// <remarks>
+    /// This prompt is a first-use prompt only. A changed certificate is refused by the browser
+    /// before any prompt can be asked, so the "certificate changed" wording this view model once
+    /// carried described a screen that could not be shown.
+    /// </remarks>
+    public string HeaderText => _localizer["FtpsCertificateFirstUseTitle"];
 
     public string WarningText => _localizer.Format(
-        IsMismatch ? "FtpsCertificateMismatchWarning" : "FtpsCertificateFirstUseWarning",
+        "FtpsCertificateFirstUseWarning",
         Host,
         Port);
 
@@ -66,28 +65,16 @@ public partial class FtpsCertificatePromptDialogViewModel(
         NotBefore.ToLocalTime(),
         NotAfter.ToLocalTime());
 
-    public string AcceptButtonText => _localizer[IsMismatch
-        ? "FtpsCertificateAcceptDestructiveButton"
-        : "FtpsCertificateAcceptButton"];
+    public string AcceptButtonText => _localizer["FtpsCertificateAcceptButton"];
 
     public string TrustOnceButtonText => _localizer["FtpsCertificateTrustOnceButton"];
 
     public string RejectButtonText => _localizer["FtpsCertificateRejectButton"];
 
-    /// <summary>
-    /// "Trust this session" never answers Enter: on a first-use prompt Accept does,
-    /// and on a changed certificate nothing that connects may be one keystroke away.
-    /// </summary>
+    /// <summary>"Trust this session" never answers Enter; on a first-use prompt Accept does.</summary>
     public bool TrustOnceIsDefault => false;
 
-    public bool AcceptIsDefault => !IsMismatch;
-
-    /// <summary>
-    /// On a changed certificate the default button is Reject, the same rule as the
-    /// SSH host key prompt: the Enter reflex trained by the first-use prompt must
-    /// not connect to a server whose certificate no longer matches the stored one.
-    /// </summary>
-    public bool RejectIsDefault => IsMismatch;
+    public bool AcceptIsDefault => true;
 
     public FtpsCertificateDecision? Decision { get; private set; }
 

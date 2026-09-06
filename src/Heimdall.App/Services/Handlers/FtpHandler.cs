@@ -126,7 +126,6 @@ internal sealed class FtpHandler : IProtocolHandler
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
         var warning = ComputeCleartextWarning(
             server.FtpUseSsl,
-            username,
             host,
             port,
             _localizer);
@@ -138,9 +137,12 @@ internal sealed class FtpHandler : IProtocolHandler
             Warning: warning);
     }
 
+    /// <remarks>
+    /// Anonymous sessions warn too. The credential risk is absent when no username is sent; the
+    /// content risk is not, and every file still crosses the wire in clear.
+    /// </remarks>
     internal static string? ComputeCleartextWarning(
         bool useSsl,
-        string? username,
         string host,
         int port,
         LocalizationManager localizer)
@@ -148,7 +150,7 @@ internal sealed class FtpHandler : IProtocolHandler
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         ArgumentNullException.ThrowIfNull(localizer);
 
-        if (useSsl || string.IsNullOrEmpty(username))
+        if (useSsl)
         {
             return null;
         }
@@ -179,6 +181,16 @@ internal sealed class FtpHandler : IProtocolHandler
             }
 
             return $"{message} {detail}";
+        }
+
+        // A pin that expired or was revoked is not a decision of the user's, and must not read
+        // like one.
+        if (ex.Reason == FtpsCertificateRejectionReason.PinnedCertificateInvalid)
+        {
+            return _localizer.Format(
+                "ErrorFtpsPinnedCertificateInvalid",
+                ex.Host,
+                ex.Port.ToString(CultureInfo.InvariantCulture));
         }
 
         var rejected = _localizer["ErrorFtpsCertificateRejected"];

@@ -44,14 +44,7 @@ public partial class FtpsCertificatePromptDialog : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         ApplyAutomationNames();
-        if (_viewModel?.RejectIsDefault == true)
-        {
-            RejectButton.Focus();
-        }
-        else
-        {
-            AcceptButton.Focus();
-        }
+        AcceptButton.Focus();
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

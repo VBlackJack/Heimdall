@@ -45,20 +45,10 @@
             <Style x:Key="WarningCardStyle" TargetType="Border" BasedOn="{StaticResource DialogSectionCardStyle}">
                 <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
-                    </DataTrigger>
-                </Style.Triggers>
             </Style>
 
             <Style x:Key="WarningTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DialogSectionDescriptionStyle}">
                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
-                    </DataTrigger>
-                </Style.Triggers>
             </Style>
 
             <Style x:Key="HeaderIconStyle" TargetType="Path">
@@ -67,11 +57,6 @@
                 <Setter Property="Data" Value="{DynamicResource Geo.Status.Error}"/>
                 <Setter Property="Stretch" Value="Uniform"/>
                 <Setter Property="Fill" Value="{DynamicResource WarningBrush}"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                        <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
-                    </DataTrigger>
-                </Style.Triggers>
             </Style>
 
             <Style x:Key="HeaderTitleStyle" TargetType="TextBlock">
@@ -79,31 +64,12 @@
                 <Setter Property="FontWeight" Value="SemiBold"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                 <Setter Property="TextWrapping" Value="Wrap"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
-                    </DataTrigger>
-                </Style.Triggers>
             </Style>
 
             <Style x:Key="AcceptButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
-                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
-                    </DataTrigger>
-                </Style.Triggers>
             </Style>
 
             <Style x:Key="RejectButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding RejectIsDefault}" Value="True">
-                        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
-                    </DataTrigger>
-                </Style.Triggers>
             </Style>
         </ResourceDictionary>
     </Window.Resources>
@@ -225,7 +191,6 @@
                     Margin="0,0,8,0"
                     MinWidth="104"
                     IsCancel="True"
-                    IsDefault="{Binding RejectIsDefault}"
                     Content="{Binding RejectButtonText}"
                     Command="{Binding RejectCommand}"
                     Style="{StaticResource RejectButtonStyle}"

@@ -17,6 +17,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Security;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using FluentFTP;
 using Heimdall.Core.Certificates;
@@ -33,6 +34,9 @@ namespace Heimdall.Sftp;
 public sealed class FtpBrowser : IRemoteBrowser
 {
     private const int DefaultTimeoutMilliseconds = 30_000;
+
+    /// <summary>Length of a permission string that carries the entry type as its first character.</summary>
+    private const int TypedPermissionsLength = 10;
     private const X509ChainStatusFlags NonOverridableChainErrors =
         X509ChainStatusFlags.NotTimeValid
         | X509ChainStatusFlags.NotTimeNested
@@ -57,6 +61,9 @@ public sealed class FtpBrowser : IRemoteBrowser
         | X509ChainStatusFlags.HasNotSupportedCriticalExtension;
 
     private readonly SemaphoreSlim _opLock = new SemaphoreSlim(1, 1);
+
+    /// <summary>Token the certificate callback honours while a connect is in flight; none afterwards.</summary>
+    private CancellationToken _certificateValidationToken = CancellationToken.None;
 
     /// <summary>How long a synchronous disconnect waits for the operation lock before forcing the teardown.</summary>
     private static readonly TimeSpan DisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
@@ -136,7 +143,8 @@ public sealed class FtpBrowser : IRemoteBrowser
         _port = port > 0 ? port : DefaultPorts.Ftp;
         _useSsl = useSsl;
 
-        if (!useSsl && !string.IsNullOrEmpty(username))
+        // Anonymous too: no credential travels, the file contents still do.
+        if (!useSsl)
         {
             FileLogger.Warn(
                 "FtpBrowser: FTP session is using a cleartext channel. Prefer SFTP or FTPS when available.");
@@ -158,7 +166,7 @@ public sealed class FtpBrowser : IRemoteBrowser
                     e.Chain,
                     e.PolicyErrors,
                     e.PolicyErrorMessage,
-                    ct);
+                    _certificateValidationToken);
             }
             catch (FtpsCertificateRejectedException ex)
             {
@@ -167,12 +175,17 @@ public sealed class FtpBrowser : IRemoteBrowser
             }
         };
 
+        // The callback stays registered for the life of the client, so it must not keep the
+        // connect token: a later validation, on a reconnect, would see a token that is long
+        // cancelled or belongs to a call that has returned.
+        _certificateValidationToken = ct;
         try
         {
             await client.Connect(ct).ConfigureAwait(false);
         }
         catch
         {
+            _certificateValidationToken = CancellationToken.None;
             client.Dispose();
             _host = null;
             _username = null;
@@ -186,6 +199,7 @@ public sealed class FtpBrowser : IRemoteBrowser
             throw;
         }
 
+        _certificateValidationToken = CancellationToken.None;
         _client = client;
         _connected = true;
         CurrentDirectory = "/";
@@ -631,7 +645,7 @@ public sealed class FtpBrowser : IRemoteBrowser
                 port,
                 "(missing)",
                 null,
-                isMismatch: false,
+                FtpsCertificateRejectionReason.NotPresented,
                 "FTPS server did not present a certificate.");
         }
 
@@ -652,7 +666,8 @@ public sealed class FtpBrowser : IRemoteBrowser
                 chain,
                 policyErrors,
                 validationErrors,
-                fingerprint);
+                fingerprint,
+                sessionEntry.Source);
             return true;
         }
 
@@ -663,7 +678,7 @@ public sealed class FtpBrowser : IRemoteBrowser
                 port,
                 fingerprint,
                 sessionEntry.Fingerprint,
-                isMismatch: true,
+                FtpsCertificateRejectionReason.Mismatch,
                 "FTPS certificate fingerprint mismatch.");
         }
 
@@ -677,7 +692,7 @@ public sealed class FtpBrowser : IRemoteBrowser
                     port,
                     fingerprint,
                     storedEntry.Fingerprint,
-                    isMismatch: true,
+                    FtpsCertificateRejectionReason.Mismatch,
                     "FTPS certificate fingerprint mismatch.");
             }
 
@@ -688,7 +703,8 @@ public sealed class FtpBrowser : IRemoteBrowser
                 chain,
                 policyErrors,
                 validationErrors,
-                fingerprint);
+                fingerprint,
+                storedEntry.Source);
             _certificateStore.RefreshLastSeen(host, port);
             return true;
         }
@@ -711,7 +727,6 @@ public sealed class FtpBrowser : IRemoteBrowser
             host,
             port,
             fingerprint,
-            storedEntry?.Fingerprint,
             entry.Subject,
             entry.Issuer,
             entry.NotBefore,
@@ -739,7 +754,7 @@ public sealed class FtpBrowser : IRemoteBrowser
             port,
             fingerprint,
             null,
-            isMismatch: false,
+            FtpsCertificateRejectionReason.RejectedByUser,
             "FTPS certificate was rejected.");
     }
 
@@ -750,7 +765,8 @@ public sealed class FtpBrowser : IRemoteBrowser
         X509Chain? chain,
         SslPolicyErrors policyErrors,
         string validationErrors,
-        string fingerprint)
+        string fingerprint,
+        FtpsCertificateSource source)
     {
         if (policyErrors == SslPolicyErrors.None)
         {
@@ -762,7 +778,7 @@ public sealed class FtpBrowser : IRemoteBrowser
             now < certificate.NotBefore.ToUniversalTime()
             || now > certificate.NotAfter.ToUniversalTime();
         bool hasNonOverridableChainError = chain?.ChainStatus.Any(
-            static status => (status.Status & NonOverridableChainErrors) != 0) == true;
+            status => IsNonOverridableChainError(status.Status, source)) == true;
 
         if (!outsideValidityPeriod && !hasNonOverridableChainError)
         {
@@ -774,8 +790,30 @@ public sealed class FtpBrowser : IRemoteBrowser
             port,
             fingerprint,
             fingerprint,
-            isMismatch: false,
+            FtpsCertificateRejectionReason.PinnedCertificateInvalid,
             $"FTPS pinned certificate failed non-overridable validity checks: {validationErrors}");
+    }
+
+    /// <summary>
+    /// Whether a chain status on a pinned certificate refuses the connection regardless of the pin.
+    /// </summary>
+    /// <remarks>
+    /// A pin the system validated was trusted on the strength of a chain the system could check.
+    /// When the revocation status of that chain can no longer be determined, the one adversary a
+    /// pin exists against - a stolen, since-revoked key whose holder blocks OCSP and CRL - is
+    /// precisely who passes. A self-signed pin the user confirmed never had a checkable status
+    /// and keeps its behaviour.
+    /// </remarks>
+    internal static bool IsNonOverridableChainError(X509ChainStatusFlags status, FtpsCertificateSource source)
+    {
+        X509ChainStatusFlags nonOverridable = NonOverridableChainErrors;
+        if (source == FtpsCertificateSource.SystemValidated)
+        {
+            nonOverridable |= X509ChainStatusFlags.RevocationStatusUnknown
+                | X509ChainStatusFlags.OfflineRevocation;
+        }
+
+        return (status & nonOverridable) != 0;
     }
 
     /// <summary>
@@ -803,8 +841,6 @@ public sealed class FtpBrowser : IRemoteBrowser
     /// </remarks>
     private static RemoteEntryKind ClassifyFtpEntry(FtpObjectType type, string? rawPermissions)
     {
-        const int TypedPermissionsLength = 10;
-
         if (rawPermissions is { Length: >= TypedPermissionsLength })
         {
             return rawPermissions[0] switch
@@ -849,7 +885,9 @@ public sealed class FtpBrowser : IRemoteBrowser
             : DateTime.SpecifyKind(item.Modified, DateTimeKind.Utc);
         string permissions = string.IsNullOrEmpty(item.RawPermissions)
             ? isDirectory ? "rwxr-xr-x" : "rw-r--r--"
-            : item.RawPermissions;
+            : item.RawPermissions.Length >= TypedPermissionsLength
+                ? item.RawPermissions[1..TypedPermissionsLength]
+                : item.RawPermissions;
         string owner = string.IsNullOrEmpty(item.RawOwner) ? "-" : item.RawOwner;
         string group = string.IsNullOrEmpty(item.RawGroup) ? "-" : item.RawGroup;
         string fullPath = parentPath.TrimEnd('/') + "/" + item.Name;
@@ -881,6 +919,7 @@ public sealed class FtpBrowser : IRemoteBrowser
         {
             EncryptionMode = useSsl ? FtpEncryptionMode.Explicit : FtpEncryptionMode.None,
             DataConnectionEncryption = useSsl,
+            SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
             ValidateCertificateRevocation = useSsl,
             DataConnectionType = passiveMode
                 ? FtpDataConnectionType.AutoPassive

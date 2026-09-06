@@ -107,6 +107,28 @@ public sealed class FtpBrowserParsingTests
         Assert.Null(FtpBrowser.MapFtpItemToFileInfo(item, "/srv"));
     }
 
+    /// <remarks>
+    /// A ten-character permission string carries the entry type first; the display and the
+    /// octal conversion expect the nine mode characters. The special bits travel with them.
+    /// </remarks>
+    [Fact]
+    public void MapFtpItemToFileInfo_TypedPermissions_KeepTheModeOnly()
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = "sudo",
+            Type = FtpObjectType.File,
+            Size = 1,
+            Modified = new DateTime(2026, 1, 15, 12, 34, 0, DateTimeKind.Local),
+            RawPermissions = "-rwsr-xr-x",
+        };
+
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/usr/bin")!;
+
+        Assert.Equal("rwsr-xr-x", entry.Permissions);
+        Assert.Equal(RemoteEntryKind.File, entry.Kind);
+    }
+
     [Fact]
     public void MapFtpItemToFileInfo_Directory_ForcesSizeToZero()
     {
