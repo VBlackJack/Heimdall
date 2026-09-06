@@ -43,6 +43,9 @@ public sealed class SshShellSession : IDisposable
 {
     private const int ReadBufferSize = 8192;
 
+    /// <summary>Terminal type requested for the PTY; matches the xterm.js front end.</summary>
+    internal const string TerminalType = "xterm-256color";
+
     /// <summary>
     /// Best-effort wait for the read loop to honour cancellation before
     /// stream/client disposal begins.
@@ -120,7 +123,7 @@ public sealed class SshShellSession : IDisposable
     private static ISshShellStream CreateDefaultShellStream(SshClient client, int terminalColumns, int terminalRows)
     {
         ShellStream shellStream = client.CreateShellStream(
-            terminalName: "xterm-256color",
+            terminalName: TerminalType,
             columns: (uint)terminalColumns,
             rows: (uint)terminalRows,
             width: 0,
@@ -400,7 +403,8 @@ public sealed class SshShellSession : IDisposable
     {
         if (transportConnected)
         {
-            return SshSessionDisconnectInfo.Clean("Remote shell exited.");
+            return SshSessionDisconnectInfo.Clean()
+                .WithMessageKey(SshDisconnectMessageKeys.MessageKeyRemoteShellExited);
         }
 
         var failure = new SshFailureInfo(

@@ -43,7 +43,8 @@ public enum OpenSshDiagnosticCode
     ProxyJumpCycle,
     ProxyJumpUnrecognizedSyntax,
     IdentityFileTildeExpanded,
-    HostNameFallbackToAlias
+    HostNameFallbackToAlias,
+    HostNameTokenSubstitution
 }
 
 /// <summary>

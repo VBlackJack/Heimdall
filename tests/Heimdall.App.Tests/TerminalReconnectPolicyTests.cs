@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
@@ -32,7 +33,7 @@ public sealed class TerminalReconnectPolicyTests
 
         Assert.True(disconnect.IsClean);
         Assert.False(disconnect.SuppressAutoReconnect);
-        Assert.Equal("Process exited with code 0", disconnect.Message);
+        AssertCarriesExitCode(disconnect, 0);
     }
 
     [Fact]
@@ -44,7 +45,7 @@ public sealed class TerminalReconnectPolicyTests
 
         Assert.False(disconnect.IsClean);
         Assert.False(disconnect.SuppressAutoReconnect);
-        Assert.Equal("Process exited with code 1", disconnect.Message);
+        AssertCarriesExitCode(disconnect, 1);
     }
 
     [Fact]
@@ -56,7 +57,7 @@ public sealed class TerminalReconnectPolicyTests
 
         Assert.False(disconnect.IsClean);
         Assert.True(disconnect.SuppressAutoReconnect);
-        Assert.Equal("Process exited with code 1", disconnect.Message);
+        AssertCarriesExitCode(disconnect, 1);
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public sealed class TerminalReconnectPolicyTests
 
         Assert.False(disconnect.IsClean);
         Assert.True(disconnect.SuppressAutoReconnect);
-        Assert.Equal("Process exited with code 1", disconnect.Message);
+        AssertCarriesExitCode(disconnect, 1);
     }
 
     [Theory]
@@ -323,5 +324,16 @@ public sealed class TerminalReconnectPolicyTests
             processRuntime: TimeSpan.FromSeconds(1));
 
         Assert.False(suppresses);
+    }
+
+    // D-08: the exit sentence was English composed in the policy and printed into the
+    // terminal in every locale. The policy now carries the exit code under a locale key
+    // and the view formats it.
+    private static void AssertCarriesExitCode(SshSessionDisconnectInfo disconnect, int exitCode)
+    {
+        Assert.Equal(SshLocalizationKeys.SshDisconnectProcessExited, disconnect.MessageKey);
+        object? argument = Assert.Single(disconnect.MessageArguments);
+        Assert.Equal(exitCode, argument);
+        Assert.Null(disconnect.Message);
     }
 }

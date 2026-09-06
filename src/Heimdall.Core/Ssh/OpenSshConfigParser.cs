@@ -171,6 +171,10 @@ public static class OpenSshConfigParser
             : new HostBlockState(lineNumber, aliases);
     }
 
+    /// <summary>
+    /// Applies one directive to the current Host block. OpenSSH keeps the first value
+    /// obtained for a directive, so a repeated directive inside one block is ignored.
+    /// </summary>
     private static void ApplyDirective(
         HostBlockState block,
         string directive,
@@ -182,15 +186,25 @@ public static class OpenSshConfigParser
     {
         if (directive.Equals("hostname", StringComparison.OrdinalIgnoreCase))
         {
-            block.HostName = value;
+            if (block.HostName is null)
+            {
+                block.HostName = value;
+                block.HostNameLineNumber = lineNumber;
+            }
+
             return;
         }
 
         if (directive.Equals("port", StringComparison.OrdinalIgnoreCase))
         {
+            if (block.ObtainedPort is not null)
+            {
+                return;
+            }
+
             if (int.TryParse(value, out var port) && port is >= 1 and <= 65535)
             {
-                block.Port = port;
+                block.ObtainedPort = port;
                 return;
             }
 
@@ -199,34 +213,46 @@ public static class OpenSshConfigParser
                 lineNumber,
                 OpenSshDiagnosticCode.InvalidPort,
                 value));
-            block.Port = 22;
+            block.ObtainedPort = HostBlockState.DefaultPort;
             return;
         }
 
         if (directive.Equals("user", StringComparison.OrdinalIgnoreCase))
         {
-            block.User = value;
+            block.User ??= value;
             return;
         }
 
         if (directive.Equals("identityfile", StringComparison.OrdinalIgnoreCase))
         {
-            block.IdentityFile = ExpandIdentityFile(value, userProfile, lineNumber, diagnostics);
+            if (block.IdentityFile is null)
+            {
+                block.IdentityFile = ExpandIdentityFile(value, userProfile, lineNumber, diagnostics);
+            }
+
             return;
         }
 
         if (directive.Equals("proxyjump", StringComparison.OrdinalIgnoreCase))
         {
-            block.ProxyJumpValue = value;
-            block.ProxyJumpLineNumber = lineNumber;
-            block.ProxyJumpWasQuoted = valueWasQuoted;
+            if (block.ProxyJumpValue is null)
+            {
+                block.ProxyJumpValue = value;
+                block.ProxyJumpLineNumber = lineNumber;
+                block.ProxyJumpWasQuoted = valueWasQuoted;
+            }
+
             return;
         }
 
         if (directive.Equals("proxycommand", StringComparison.OrdinalIgnoreCase))
         {
-            block.ProxyCommandValue = value;
-            block.ProxyCommandLineNumber = lineNumber;
+            if (block.ProxyCommandValue is null)
+            {
+                block.ProxyCommandValue = value;
+                block.ProxyCommandLineNumber = lineNumber;
+            }
+
             return;
         }
 
@@ -283,7 +309,11 @@ public static class OpenSshConfigParser
         {
             foreach (var alias in block.Aliases)
             {
-                var hostName = ResolveHostName(alias, block, diagnostics);
+                if (!TryResolveHostName(alias, block, diagnostics, out string hostName))
+                {
+                    continue;
+                }
+
                 candidates.Add(new OpenSshImportCandidate
                 {
                     Alias = alias,
@@ -300,23 +330,90 @@ public static class OpenSshConfigParser
         return candidates;
     }
 
-    private static string ResolveHostName(
+    /// <summary>
+    /// Resolves the host name of a candidate. OpenSSH expands <c>%h</c> in
+    /// <c>HostName</c> to the host alias and <c>%%</c> to a literal percent sign; any
+    /// other token depends on runtime state Heimdall does not have, so the candidate
+    /// is reported and skipped rather than imported with a host that cannot resolve.
+    /// </summary>
+    private static bool TryResolveHostName(
         string alias,
         HostBlockState block,
-        ICollection<OpenSshImportDiagnostic> diagnostics)
+        ICollection<OpenSshImportDiagnostic> diagnostics,
+        out string hostName)
     {
-        if (!string.IsNullOrWhiteSpace(block.HostName))
+        if (string.IsNullOrWhiteSpace(block.HostName))
         {
-            return block.HostName;
+            diagnostics.Add(new OpenSshImportDiagnostic(
+                OpenSshDiagnosticLevel.Info,
+                block.SourceLineNumber,
+                OpenSshDiagnosticCode.HostNameFallbackToAlias,
+                alias));
+
+            hostName = alias;
+            return true;
+        }
+
+        if (TryExpandHostNameTokens(block.HostName, alias, out string expanded))
+        {
+            hostName = expanded;
+            return true;
         }
 
         diagnostics.Add(new OpenSshImportDiagnostic(
-            OpenSshDiagnosticLevel.Info,
-            block.SourceLineNumber,
-            OpenSshDiagnosticCode.HostNameFallbackToAlias,
-            alias));
+            OpenSshDiagnosticLevel.Warning,
+            block.HostNameLineNumber ?? block.SourceLineNumber,
+            OpenSshDiagnosticCode.HostNameTokenSubstitution,
+            block.HostName));
 
-        return alias;
+        hostName = string.Empty;
+        return false;
+    }
+
+    private const char TokenIntroducer = '%';
+    private const char HostAliasToken = 'h';
+
+    /// <summary>
+    /// Expands the OpenSSH <c>HostName</c> tokens Heimdall can honour statically.
+    /// Returns false when the value carries a token that needs runtime state.
+    /// </summary>
+    private static bool TryExpandHostNameTokens(string value, string alias, out string expanded)
+    {
+        StringBuilder builder = new StringBuilder(value.Length + alias.Length);
+        for (int index = 0; index < value.Length; index++)
+        {
+            char current = value[index];
+            if (current != TokenIntroducer)
+            {
+                builder.Append(current);
+                continue;
+            }
+
+            if (index + 1 >= value.Length)
+            {
+                expanded = string.Empty;
+                return false;
+            }
+
+            char token = value[index + 1];
+            index++;
+            if (token == TokenIntroducer)
+            {
+                builder.Append(TokenIntroducer);
+            }
+            else if (token == HostAliasToken)
+            {
+                builder.Append(alias);
+            }
+            else
+            {
+                expanded = string.Empty;
+                return false;
+            }
+        }
+
+        expanded = builder.ToString();
+        return true;
     }
 
     private static IReadOnlyList<OpenSshProxyJumpHop> BuildProxyJumpChain(
@@ -407,10 +504,18 @@ public static class OpenSshConfigParser
             };
         }
 
+        string hopHostName = raw.Host;
+        if (!string.IsNullOrWhiteSpace(hopBlock.HostName))
+        {
+            hopHostName = TryExpandHostNameTokens(hopBlock.HostName, raw.Host, out string expandedHopHostName)
+                ? expandedHopHostName
+                : hopBlock.HostName;
+        }
+
         return new OpenSshProxyJumpHop
         {
             Host = raw.Host,
-            HostName = string.IsNullOrWhiteSpace(hopBlock.HostName) ? raw.Host : hopBlock.HostName,
+            HostName = hopHostName,
             Port = raw.Port ?? hopBlock.Port,
             User = string.IsNullOrWhiteSpace(raw.User) ? hopBlock.User : raw.User,
             IdentityFile = hopBlock.IdentityFile,
@@ -694,7 +799,15 @@ public static class OpenSshConfigParser
 
         public string? HostName { get; set; }
 
-        public int Port { get; set; } = 22;
+        public int? HostNameLineNumber { get; set; }
+
+        /// <summary>Port used when the block carries no valid Port directive.</summary>
+        public const int DefaultPort = 22;
+
+        /// <summary>The first Port value obtained in the block, or null when none was seen.</summary>
+        public int? ObtainedPort { get; set; }
+
+        public int Port => ObtainedPort ?? DefaultPort;
 
         public string? User { get; set; }
 

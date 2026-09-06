@@ -23,6 +23,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Macros;
 using Heimdall.App.Services.WinRm;
@@ -1574,7 +1575,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             // closes. Whatever branch below is taken, there is nothing to poll.
             StopHealthMonitor();
 
-            string? errorMessage = disconnectInfo.Message;
+            string? errorMessage = SshDisconnectMessageResolver.Resolve(
+                disconnectInfo,
+                _localizer,
+                _sessionTab?.Title ?? string.Empty);
             if (!string.IsNullOrWhiteSpace(errorMessage))
             {
                 string template = L("SshTerminalDisconnectMarker");
@@ -2149,7 +2153,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
             UpdateStatus(
                 "MacroExpectTimeout",
-                displayTextOverride: $"Macro expect timed out after {result.TimeoutMs} ms",
+                displayTextOverride: _localizer?.Format(SshLocalizationKeys.StatusMacroExpectTimedOut, result.TimeoutMs)
+                    ?? SshLocalizationKeys.StatusMacroExpectTimedOut,
                 forceErrorBrush: true);
         });
     }

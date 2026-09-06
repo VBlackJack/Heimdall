@@ -15,7 +15,6 @@
  */
 
 using System.ComponentModel;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -36,8 +35,7 @@ namespace Heimdall.App.Views.Tools;
 public partial class SshKeyAuditView : UserControl, IToolView
 {
     private const int DebounceDelayMs = 200;
-    private const string KeyFileFilter =
-        "SSH Key Files (*.pem;*.pub;*.key)|*.pem;*.pub;*.key|All Files (*.*)|*.*";
+    private const string KeyFileFilterKey = "ToolSshAuditKeyFileFilter";
 
     private LocalizationManager? _localizer;
     private readonly SshKeyAuditViewModel _vm;
@@ -182,7 +180,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
     {
         var dialog = new OpenFileDialog
         {
-            Filter = KeyFileFilter
+            Filter = L(KeyFileFilterKey)
         };
 
         if (dialog.ShowDialog(Window.GetWindow(this)) != true)
@@ -190,24 +188,9 @@ public partial class SshKeyAuditView : UserControl, IToolView
             return;
         }
 
-        try
-        {
-            var fileInfo = new FileInfo(dialog.FileName);
-            if (fileInfo.Length > SshKeyAuditEngine.MaxKeyFileSize)
-            {
-                return;
-            }
-
-            _vm.KeyText = File.ReadAllText(dialog.FileName);
-        }
-        catch (IOException)
-        {
-            // Silently ignore read failures.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Silently ignore permission failures.
-        }
+        // The view model reports an oversized or unreadable file through
+        // FileErrorMessage; the view used to drop those cases without a word.
+        _vm.LoadKeyFile(dialog.FileName);
     }
 
     private void OnHelpClick(object sender, RoutedEventArgs e)

@@ -105,6 +105,12 @@ public static class SshConnectionProbe
         {
             return ClassifySocketException(ex);
         }
+        catch (IOException ex) when (ex.InnerException is SocketException socketException)
+        {
+            // A reset or abort during the banner read reaches the caller wrapped by
+            // NetworkStream; it is the same network failure as a bare SocketException.
+            return ClassifySocketException(socketException);
+        }
     }
 
     private static async Task<string?> ReadBannerAsync(

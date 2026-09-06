@@ -1067,11 +1067,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         if (!preflight.Success)
         {
             server.ConnectionState = "Error";
+            string preflightMessage = TunnelFailureMessageResolver.ResolvePreflightMessage(preflight, _localizer);
             return new BulkConnectOutcome(
                 BulkConnectOutcomeStatus.PreflightFailed,
-                preflight.Message ?? _localizer["ErrorPreflightFailed"],
+                preflightMessage,
                 string.Equals(serverDto.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
-                    ? SshSessionDiagnosticFactory.FromPreflight(preflight)
+                    ? SshSessionDiagnosticFactory.FromPreflight(preflight, preflightMessage)
                     : null);
         }
 

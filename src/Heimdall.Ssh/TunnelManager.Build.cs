@@ -260,10 +260,16 @@ public sealed partial class TunnelManager
                     false,
                     null,
                     "Tunnel manager was disposed before registration.",
-                    SshFailureCode.Cancelled);
+                    SshFailureCode.Cancelled)
+                {
+                    MessageKey = TunnelMessageKeys.MessageKeyManagerDisposed
+                };
             }
 
-            return new TunnelResult(false, null, $"Local port {localPort} was claimed concurrently.", SshFailureCode.PortInUse);
+            return new TunnelResult(false, null, $"Local port {localPort} was claimed concurrently.", SshFailureCode.PortInUse)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyLocalPortClaimedConcurrently
+            };
         }
 
         RaiseTunnelOpened(info);
@@ -292,7 +298,12 @@ public sealed partial class TunnelManager
                 false,
                 null,
                 isChained ? "Chained tunnel establishment was cancelled." : "Tunnel establishment was cancelled.",
-                SshFailureCode.Cancelled),
+                SshFailureCode.Cancelled)
+            {
+                MessageKey = isChained
+                    ? TunnelMessageKeys.MessageKeyChainedEstablishmentCancelled
+                    : TunnelMessageKeys.MessageKeyEstablishmentCancelled
+            },
             HostKeyRejectedException directHostKeyRejected => new TunnelResult(
                 false,
                 null,

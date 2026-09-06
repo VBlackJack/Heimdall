@@ -93,6 +93,18 @@ public sealed class SshShellSessionTeardownTests
         Assert.False(SshReconnectPolicy.AllowsAutoReconnect(disconnect));
     }
 
+    // A-06: the clean EOF detail was raw English printed into the terminal marker in every
+    // locale. The SSH layer names the message by locale key and leaves the text to the view.
+    [Fact]
+    public void CreateShellEofDisconnectInfo_ConnectedTransport_CarriesALocaleKeyInsteadOfEnglishText()
+    {
+        SshSessionDisconnectInfo disconnect = SshShellSession.CreateShellEofDisconnectInfo(transportConnected: true);
+
+        Assert.Equal(SshDisconnectMessageKeys.MessageKeyRemoteShellExited, disconnect.MessageKey);
+        Assert.Empty(disconnect.MessageArguments);
+        Assert.Null(disconnect.Message);
+    }
+
     [Fact]
     public void CreateShellEofDisconnectInfo_DisconnectedTransport_ReturnsTransientDisconnect()
     {

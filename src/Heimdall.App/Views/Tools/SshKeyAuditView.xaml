@@ -109,6 +109,14 @@
                                  Padding="{StaticResource PaddingInput}"
                                  TextChanged="OnKeyInputTextChanged"
                                  TabIndex="0"/>
+                        <!-- File load error (oversized, unreadable or access refused) -->
+                        <TextBlock x:Name="FileError"
+                                   Text="{Binding FileErrorMessage, Mode=OneWay}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource ErrorTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding ShowFileError, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Margin="{StaticResource MarginLabelBottom}"/>
                     </StackPanel>
                 </Border>
 

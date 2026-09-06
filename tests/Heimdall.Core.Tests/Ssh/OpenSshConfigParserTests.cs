@@ -66,6 +66,88 @@ public sealed class OpenSshConfigParserTests
         Assert.Equal("prod", diagnostic.Context);
     }
 
+    // B-06: OpenSSH expands %h in HostName to the host alias. Importing the token literally
+    // produced a profile whose host fails validation on the first connection attempt.
+    [Fact]
+    public void Parse_HostNameWithHostToken_ExpandsTokenToAlias()
+    {
+        OpenSshParseResult result = OpenSshConfigParser.Parse(
+            """
+            Host db
+                HostName %h.internal.example
+            """);
+
+        OpenSshImportCandidate candidate = Assert.Single(result.Candidates);
+        Assert.Equal("db.internal.example", candidate.HostName);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == OpenSshDiagnosticCode.HostNameTokenSubstitution);
+    }
+
+    [Fact]
+    public void Parse_HostNameWithEscapedPercent_ExpandsToLiteralPercent()
+    {
+        OpenSshParseResult result = OpenSshConfigParser.Parse(
+            """
+            Host odd
+                HostName host%%name.example
+            """);
+
+        OpenSshImportCandidate candidate = Assert.Single(result.Candidates);
+        Assert.Equal("host%name.example", candidate.HostName);
+    }
+
+    [Theory]
+    [InlineData("%r.internal.example")]
+    [InlineData("%p-host.example")]
+    [InlineData("%n.example")]
+    public void Parse_HostNameWithUnsupportedToken_SkipsCandidateWithDiagnostic(string hostName)
+    {
+        OpenSshParseResult result = OpenSshConfigParser.Parse(
+            $"""
+            Host app
+                HostName {hostName}
+            """);
+
+        Assert.Empty(result.Candidates);
+        OpenSshImportDiagnostic diagnostic = Assert.Single(
+            result.Diagnostics,
+            d => d.Code == OpenSshDiagnosticCode.HostNameTokenSubstitution);
+        Assert.Equal(OpenSshDiagnosticLevel.Warning, diagnostic.Level);
+        Assert.Equal(hostName, diagnostic.Context);
+    }
+
+    // B-11: OpenSSH keeps the first value obtained for a directive; the parser applied the
+    // last one, so a block listing two IdentityFile lines imported the wrong key.
+    [Fact]
+    public void Parse_RepeatedDirectivesInOneBlock_FirstObtainedWins()
+    {
+        OpenSshParseResult result = OpenSshConfigParser.Parse(
+            """
+            Host repeated
+                HostName first.example.com
+                HostName second.example.com
+                Port 2201
+                Port 2202
+                User first-user
+                User second-user
+                IdentityFile C:\keys\first_ed25519
+                IdentityFile C:\keys\second_ed25519
+                ProxyJump first-jump
+                ProxyJump second-jump
+            Host first-jump
+                HostName jump1.example.com
+            Host second-jump
+                HostName jump2.example.com
+            """);
+
+        OpenSshImportCandidate candidate = Assert.Single(result.Candidates, c => c.Alias == "repeated");
+        Assert.Equal("first.example.com", candidate.HostName);
+        Assert.Equal(2201, candidate.Port);
+        Assert.Equal("first-user", candidate.User);
+        Assert.Equal(@"C:\keys\first_ed25519", candidate.IdentityFile);
+        OpenSshProxyJumpHop hop = Assert.Single(candidate.ProxyJumpChain);
+        Assert.Equal("jump1.example.com", hop.HostName);
+    }
+
     [Fact]
     public void Parse_MultiAliasHostLine_ProducesMultipleCandidates()
     {

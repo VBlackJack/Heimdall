@@ -78,6 +78,7 @@ public sealed class ImportOpenSshConfigDialogViewModel(
             OpenSshDiagnosticCode.ProxyJumpUnrecognizedSyntax => "WarnProxyJumpUnrecognisedSyntax",
             OpenSshDiagnosticCode.IdentityFileTildeExpanded => "DiagIdentityFileTildeExpanded",
             OpenSshDiagnosticCode.HostNameFallbackToAlias => "DiagHostNameFallbackToAlias",
+            OpenSshDiagnosticCode.HostNameTokenSubstitution => "WarnHostNameTokenSubstitution",
             _ => null
         };
 

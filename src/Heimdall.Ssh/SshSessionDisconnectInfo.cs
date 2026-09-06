@@ -33,6 +33,23 @@ public sealed record SshSessionDisconnectInfo(
     /// </summary>
     public bool SuppressAutoReconnect { get; init; }
 
+    /// <summary>
+    /// Locale key of the user-visible disconnect detail, when the detail was composed by
+    /// Heimdall rather than relayed from the server. The view formats it with
+    /// <see cref="MessageArguments"/>; <see cref="Message"/> is then only a log fallback.
+    /// </summary>
+    public string? MessageKey { get; init; }
+
+    /// <summary>Format arguments for <see cref="MessageKey"/>.</summary>
+    public IReadOnlyList<object?> MessageArguments { get; init; } = [];
+
+    /// <summary>Returns a copy carrying a locale key and its format arguments.</summary>
+    public SshSessionDisconnectInfo WithMessageKey(string messageKey, params object?[] arguments)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(messageKey);
+        return this with { MessageKey = messageKey, MessageArguments = arguments };
+    }
+
     /// <summary>Creates a normal session-end disconnect.</summary>
     public static SshSessionDisconnectInfo Clean(string? message = null)
         => new(message, Failure: null, IsClean: true);

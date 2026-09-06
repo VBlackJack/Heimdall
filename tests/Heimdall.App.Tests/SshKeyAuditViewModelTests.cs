@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.Core.Security;
 
@@ -50,6 +51,88 @@ public class SshKeyAuditViewModelTests
         Assert.False(sut.ShowEmptyState);
         Assert.True(sut.ShowParseError);
         Assert.False(sut.ShowResults);
+    }
+
+    // D-10: the view swallowed an oversized file, an I/O error and an access refusal
+    // without a word. Loading now goes through the view model and reports a localized
+    // error the view shows next to the input.
+    [Fact]
+    public async Task LoadKeyFile_OversizedFile_ShowsFileErrorAndLeavesKeyTextAlone()
+    {
+        var localizer = await CommandLibraryTestHelpers.CreateAppLocalizerAsync();
+        var sut = new SshKeyAuditViewModel();
+        sut.Initialize(localizer);
+        sut.KeyText = TestEd25519PublicKey;
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-oversized-key-{Guid.NewGuid():N}.pem");
+        using (FileStream stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+        {
+            stream.SetLength(SshKeyAuditEngine.MaxKeyFileSize + 1);
+        }
+
+        try
+        {
+            sut.LoadKeyFile(path);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        Assert.True(sut.ShowFileError);
+        Assert.Equal(
+            localizer.Format(SshKeyAuditViewModel.FileTooLargeKey, SshKeyAuditEngine.MaxKeyFileSize),
+            sut.FileErrorMessage);
+        Assert.Equal(TestEd25519PublicKey, sut.KeyText);
+    }
+
+    [Fact]
+    public async Task LoadKeyFile_PathThatCannotBeRead_ShowsFileErrorWithTheReason()
+    {
+        var localizer = await CommandLibraryTestHelpers.CreateAppLocalizerAsync();
+        var sut = new SshKeyAuditViewModel();
+        sut.Initialize(localizer);
+        // A directory: opening it as a file is refused by the platform.
+        string directory = Path.Combine(Path.GetTempPath(), $"heimdall-key-dir-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            sut.LoadKeyFile(directory);
+        }
+        finally
+        {
+            Directory.Delete(directory);
+        }
+
+        Assert.True(sut.ShowFileError);
+        Assert.NotEqual(SshKeyAuditViewModel.FileReadErrorKey, sut.FileErrorMessage);
+        Assert.StartsWith(
+            localizer.Format(SshKeyAuditViewModel.FileReadErrorKey, string.Empty),
+            sut.FileErrorMessage,
+            StringComparison.Ordinal);
+        Assert.True(sut.FileErrorMessage.Length > localizer.Format(SshKeyAuditViewModel.FileReadErrorKey, string.Empty).Length);
+    }
+
+    [Fact]
+    public void LoadKeyFile_ReadableFile_SetsKeyTextAndClearsFileError()
+    {
+        var sut = new SshKeyAuditViewModel();
+        sut.Initialize(null);
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-key-{Guid.NewGuid():N}.pub");
+        File.WriteAllText(path, TestEd25519PublicKey);
+
+        try
+        {
+            sut.LoadKeyFile(path);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        Assert.False(sut.ShowFileError);
+        Assert.Equal(string.Empty, sut.FileErrorMessage);
+        Assert.Equal(TestEd25519PublicKey, sut.KeyText);
     }
 
     [Fact]

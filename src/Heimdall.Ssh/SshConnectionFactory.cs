@@ -37,6 +37,12 @@ public static class SshConnectionFactory
     private const string ConnectCancelledMessage = "SSH connect was cancelled before the handshake completed.";
 
     /// <summary>
+    /// User name offered by the host key probe when the profile has none. The probe
+    /// stops before authentication, so the name only has to be a valid SSH user name.
+    /// </summary>
+    internal const string ProbeUsername = "heimdall-probe";
+
+    /// <summary>
     /// Presented SSH host key captured during a pre-authentication probe.
     /// </summary>
     /// <param name="Host">Host used for trust lookup.</param>
@@ -317,7 +323,7 @@ public static class SshConnectionFactory
         ArgumentNullException.ThrowIfNull(verificationHost);
 
         var username = string.IsNullOrWhiteSpace(connectionParams.Username)
-            ? "heimdall-probe"
+            ? ProbeUsername
             : connectionParams.Username;
         var connectionInfo = new ConnectionInfo(
             connectionParams.Host,

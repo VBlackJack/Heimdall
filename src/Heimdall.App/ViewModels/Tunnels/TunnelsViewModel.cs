@@ -474,7 +474,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return new TunnelResult(
                 false,
                 null,
-                ResolvePreflightMessage(preflight.Result.Message),
+                TunnelFailureMessageResolver.ResolvePreflightMessage(preflight.Result, _localizer),
                 preflight.Result.FailureCode);
         }
 
@@ -529,6 +529,10 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 .ConfigureAwait(false);
         }
 
+        // Sentences the manager composed itself travel as locale keys and are
+        // formatted here, before the status bar reads the message.
+        result = TunnelFailureMessageResolver.Localize(result, _localizer);
+
         // A manual tunnel used to hand the gateway's bare sentence to the status
         // bar and stop there, so the same refused sign-in told the owner less
         // here than it did from a server profile. It is the same composition,
@@ -547,19 +551,6 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         }
 
         return result;
-    }
-
-    private string ResolvePreflightMessage(string? message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            return _localizer[SshLocalizationKeys.ErrorPreflightFailed];
-        }
-
-        var resolved = _localizer[message];
-        return string.Equals(resolved, message, StringComparison.Ordinal)
-            ? message
-            : resolved;
     }
 
     // ── Public helpers ───────────────────────────────────────────────
@@ -600,7 +591,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             .FirstOrDefault(g => string.Equals(g.Host, tunnel.ServerName, StringComparison.OrdinalIgnoreCase))?.Id;
 
         if (string.IsNullOrEmpty(gatewayId))
-            return $"via {tunnel.ServerName}";
+            return _localizer.Format(SshLocalizationKeys.LabelTunnelRouteVia, tunnel.ServerName);
 
         // Walk the gateway chain to build the full route
         var names = new List<string>();
@@ -617,7 +608,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         if (names.Count == 0) return string.Empty;
         names.Reverse();
-        return "via " + string.Join(" \u2192 ", names);
+        return _localizer.Format(SshLocalizationKeys.LabelTunnelRouteVia, string.Join(" \u2192 ", names));
     }
 
     // ── Event handlers ───────────────────────────────────────────────
