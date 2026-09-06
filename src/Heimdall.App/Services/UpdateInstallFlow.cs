@@ -65,19 +65,43 @@ internal sealed class UpdateInstallFlow : IUpdateInstallFlow
             // written at all, in exactly the case that most needs explaining.
             _outcomeStore.WriteAttempt(update.Version.ToString());
 
-            bool launched = _updateInstaller.BeginInstall(package);
-            if (launched)
+            bool launched;
+            try
+            {
+                launched = _updateInstaller.BeginInstall(package);
+            }
+            catch (Exception ex)
+            {
+                // A throw is a launch that did not happen, and it must be treated as one:
+                // the record is cleared below, or the next startup explains a failure
+                // that never started and the user reads "download failed" now.
+                FileLogger.WarnDetailed("Update install could not start the relauncher", ex);
+                launched = false;
+            }
+
+            if (!launched)
+            {
+                // Nothing left this process, so there is nothing to explain later. Leaving
+                // the record would make the next ordinary startup announce a failure that
+                // never happened.
+                _outcomeStore.Clear();
+                return UpdateInstallOutcome.InstallLaunchFailed;
+            }
+
+            try
             {
                 package.TransferCleanupToRelauncher();
                 _lifecycle.RequestShutdown();
-                return UpdateInstallOutcome.Started;
+            }
+            catch (Exception ex)
+            {
+                // The relauncher is already out there. It waits for this process, refuses
+                // to install over it if it never exits, and records that; the attempt
+                // record must stay so the next startup can say so.
+                FileLogger.WarnDetailed("Update install: shutdown request failed after the relauncher launched", ex);
             }
 
-            // Nothing left this process, so there is nothing to explain later. Leaving the
-            // record would make the next ordinary startup announce a failure that never
-            // happened.
-            _outcomeStore.Clear();
-            return UpdateInstallOutcome.InstallLaunchFailed;
+            return UpdateInstallOutcome.Started;
         }
         catch (OperationCanceledException)
         {

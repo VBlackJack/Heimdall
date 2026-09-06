@@ -48,6 +48,24 @@ public static class UpdateRelaunchScript
     /// <summary>Default silent installer arguments (Inno Setup compatible).</summary>
     public const string DefaultInstallerArguments = "/SILENT /NORESTART";
 
+    /// <summary>
+    /// The silent arguments plus the destination, so the installer replaces the copy
+    /// that is running rather than the one its own registry lookup names.
+    /// </summary>
+    /// <remarks>
+    /// Without <c>/DIR</c> the destination came from Inno's previous-install lookup in
+    /// the hive matching the current elevation, which is decided separately by the
+    /// writability probe. Whenever the two disagreed - a per-user install whose
+    /// directory was later made read-only, a cleaned registry, an MSI deployment -
+    /// the update went to the default directory and the old copy was relaunched.
+    /// </remarks>
+    public static string InstallerArgumentsFor(string installDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(installDirectory);
+        string trimmed = installDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return DefaultInstallerArguments + " /DIR=\"" + trimmed + "\"";
+    }
+
     /// <summary>Default number of seconds to wait for the app process to exit.</summary>
     public const int DefaultWaitTimeoutSeconds = 120;
 

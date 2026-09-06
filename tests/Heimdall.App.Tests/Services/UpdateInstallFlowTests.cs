@@ -96,6 +96,59 @@ public sealed class UpdateInstallFlowTests
         store.Calls.Should().Contain(FakeUpdateOutcomeStore.ClearCall);
     }
 
+    /// <remarks>
+    /// A throw out of BeginInstall used to fall through to the generic catch: the
+    /// record stayed, the user read "download failed", and the next startup announced
+    /// a failure for an update that never started.
+    /// </remarks>
+    [Fact]
+    public async Task RunAsync_BeginInstallThrows_ClearsTheRecordAndReportsLaunchFailed()
+    {
+        var store = new FakeUpdateOutcomeStore();
+        var lifecycle = new FakeApplicationLifecycle();
+        var flow = new UpdateInstallFlow(
+            new FakeUpdateService(),
+            new ThrowingUpdateInstaller(new IOException("disk full")),
+            lifecycle,
+            store);
+
+        var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
+
+        outcome.Should().Be(UpdateInstallOutcome.InstallLaunchFailed);
+        store.Calls.Should().Contain(FakeUpdateOutcomeStore.ClearCall);
+        lifecycle.RequestShutdownCallCount.Should().Be(0);
+    }
+
+    /// <remarks>
+    /// Once the relauncher is out there the record must stay: it will wait for this
+    /// process, refuse to install over it if it never exits, and explain itself.
+    /// </remarks>
+    [Fact]
+    public async Task RunAsync_ShutdownRequestThrows_StillReportsStartedAndKeepsTheRecord()
+    {
+        var store = new FakeUpdateOutcomeStore();
+        var flow = new UpdateInstallFlow(
+            new FakeUpdateService(),
+            new FakeUpdateInstaller { BeginInstallResult = true },
+            new ThrowingApplicationLifecycle(),
+            store);
+
+        var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
+
+        outcome.Should().Be(UpdateInstallOutcome.Started);
+        store.Calls.Should().NotContain(FakeUpdateOutcomeStore.ClearCall);
+    }
+
+    private sealed class ThrowingUpdateInstaller(Exception exception) : IUpdateInstaller
+    {
+        public bool BeginInstall(IVerifiedUpdatePackage package) => throw exception;
+    }
+
+    private sealed class ThrowingApplicationLifecycle : IApplicationLifecycle
+    {
+        public void RequestShutdown() => throw new InvalidOperationException("dispatcher gone");
+    }
+
     /// <summary>An installer that records itself into the same sequence as the store.</summary>
     private sealed class RecordingUpdateInstaller(FakeUpdateOutcomeStore store) : IUpdateInstaller
     {

@@ -48,8 +48,52 @@ public sealed class VariantDetectorTests
 
         detector.Detect();
 
-        Assert.NotNull(probed);
-        Assert.StartsWith(@"C:\App", probed);
-        Assert.EndsWith(@"msedgewebview2.exe", probed);
+        // The exact path, not its ends: a marker moved to another folder under the
+        // base directory used to satisfy StartsWith and EndsWith both.
+        Assert.Equal(@"C:\App\runtimes\webview2\msedgewebview2.exe", probed);
+    }
+
+    [Theory]
+    [InlineData(@"C:\Program Files\Heimdall\")]
+    [InlineData(@"C:\Program Files\Heimdall")]
+    [InlineData(@"c:\program files\heimdall\")]
+    public void IsInstalledInPlace_RegisteredLocationNamesTheBaseDirectory_True(string registered)
+    {
+        var detector = new VariantDetector(
+            @"C:\Program Files\Heimdall\",
+            _ => false,
+            () => [registered]);
+
+        Assert.True(detector.IsInstalledInPlace());
+    }
+
+    [Fact]
+    public void IsInstalledInPlace_NoRegistration_False()
+    {
+        var detector = new VariantDetector(@"C:\Users\me\Downloads\Heimdall", _ => false, () => []);
+
+        Assert.False(detector.IsInstalledInPlace());
+    }
+
+    [Fact]
+    public void IsInstalledInPlace_RegistrationElsewhere_False()
+    {
+        var detector = new VariantDetector(
+            @"C:\Users\me\Downloads\Heimdall",
+            _ => false,
+            () => [@"C:\Users\me\AppData\Local\Programs\Heimdall\"]);
+
+        Assert.False(detector.IsInstalledInPlace());
+    }
+
+    [Fact]
+    public void IsInstalledInPlace_AnyHiveMayMatch()
+    {
+        var detector = new VariantDetector(
+            @"C:\Program Files\Heimdall",
+            _ => false,
+            () => [@"C:\Users\me\AppData\Local\Programs\Heimdall\", @"C:\Program Files\Heimdall\"]);
+
+        Assert.True(detector.IsInstalledInPlace());
     }
 }

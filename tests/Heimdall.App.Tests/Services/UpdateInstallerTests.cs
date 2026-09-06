@@ -67,7 +67,9 @@ public sealed class UpdateInstallerTests
             return ScriptPathValue;
         }
 
-        public string CreateLogPath() => LogPathValue;
+        public Exception? CreateLogPathThrows { get; set; }
+
+        public string CreateLogPath() => CreateLogPathThrows is null ? LogPathValue : throw CreateLogPathThrows;
 
         public string CreateFailureRecordPath() => FailureRecordPathValue;
 
@@ -118,6 +120,28 @@ public sealed class UpdateInstallerTests
         host.StartDetachedCallCount.Should().Be(1);
         host.StartedFileName.Should().Be("pwsh.exe");
         host.StartedArguments.Should().Contain("-EncodedCommand");
+
+        // The installer is told where the running copy lives, so it replaces that one
+        // rather than whatever its own registry lookup names.
+        host.WrittenContent.Should().Contain(@"/DIR=""C:\Program Files\Heimdall""");
+    }
+
+    /// <remarks>
+    /// The three path-creating calls sat before the try, and two of them create
+    /// directories. On a full disk they threw out of this method with the attempt
+    /// record already written by the caller, which then reported a download failure
+    /// and left the record for the next startup to explain.
+    /// </remarks>
+    [Fact]
+    public void BeginInstall_CreateLogPathThrows_ReturnsFalseWithoutLaunching()
+    {
+        var host = new FakeHost { CreateLogPathThrows = new IOException("disk full") };
+        var installer = new UpdateInstaller(host);
+
+        var result = installer.BeginInstall(CreatePackage());
+
+        result.Should().BeFalse();
+        host.StartDetachedCallCount.Should().Be(0);
     }
 
     [Theory]
