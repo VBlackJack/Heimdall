@@ -66,8 +66,8 @@ internal static class ServerSideNoClobberPublishCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(stagingPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        string staging = InputValidator.EscapeShellArg(stagingPath);
-        string destination = InputValidator.EscapeShellArg(destinationPath);
+        string staging = PathEscaper.EscapeForShell(stagingPath);
+        string destination = PathEscaper.EscapeForShell(destinationPath);
 
         return $"ln -- {staging} {destination}; status=$?; rm -f -- {staging}; exit $status";
     }

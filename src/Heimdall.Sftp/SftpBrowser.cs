@@ -549,6 +549,17 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                     continue;
                 }
 
+                // The server names the entry, and that name becomes a path every operation
+                // trusts: delete, download, rename, copy, and the privileged fallbacks. A
+                // name that is not a single clean segment is refused here, where the
+                // untrusted value enters, rather than by each consumer separately.
+                if (!IsListableEntryName(entry.Name))
+                {
+                    Heimdall.Core.Logging.FileLogger.Warn(
+                        $"[SftpBrowser] listing of {targetPath} skipped an entry with an unsafe name");
+                    continue;
+                }
+
                 result.Add(ToSftpFileInfo(entry));
             }
 
@@ -745,10 +756,19 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
 
         // Before the temporary path is even chosen, let alone created. A replacement that cannot
         // put back what it removes must not begin: refusing after the upload would make the
-        // operator pay for a transfer that was never allowed to land.
+        // operator pay for a transfer that was never allowed to land. The same invariant now
+        // covers the destination's kind - a symlink, FIFO, socket or device used to be refused
+        // only after every byte had been staged - and it is also what tells a creation from a
+        // replacement: a destination that is absent needs no metadata preflight, which used to
+        // cost every new file two exec channels it had no use for.
         if (commitMode == UploadCommitMode.ReplaceExisting)
         {
-            await EnsureReplacementPreservesMetadataAsync(remotePath, ct).ConfigureAwait(false);
+            RemoteEntryKind? destinationKind = await TryGetEntryKindWithoutFollowingAsync(remotePath, ct).ConfigureAwait(false);
+            SftpAtomicUpload.EnsureUploadTargetSupported(remotePath, destinationKind);
+            if (destinationKind is not null)
+            {
+                await EnsureReplacementPreservesMetadataAsync(remotePath, ct).ConfigureAwait(false);
+            }
         }
 
         string tempRemotePath = SftpAtomicUpload.CreateRemoteTempPath(remotePath);
@@ -973,9 +993,34 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
         }
 
-        SftpExecResult result = await runner
-            .ExecuteAsync(SftpMetadataPreflight.Build(remotePath), ct)
-            .ConfigureAwait(false);
+        SftpExecResult result;
+        try
+        {
+            result = await runner
+                .ExecuteAsync(SftpMetadataPreflight.Build(remotePath), ct)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is Renci.SshNet.Common.SshException
+            or System.Net.Sockets.SocketException
+            or IOException
+            or TimeoutException
+            or ObjectDisposedException
+            or OperationCanceledException)
+        {
+            // The runner cancels by tearing the client down, which surfaces here rather than
+            // as a cancellation. Reconcile before classifying.
+            ct.ThrowIfCancellationRequested();
+
+            // A server that allows SFTP but refuses exec - ForceCommand internal-sftp, a
+            // chrooted account, a nologin shell - used to let the raw SshException escape,
+            // and no file could be uploaded at all. It is the verdict the vocabulary already
+            // names, with its own localized refusal.
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[SftpBrowser] metadata preflight exec channel unavailable ({ex.GetType().Name}); refusing the replacement.");
+            throw new SftpMetadataPreservationException(
+                SftpMetadataPreflightVerdict.ExecUnavailable,
+                remotePath);
+        }
 
         SftpMetadataPreflightVerdict verdict = SftpMetadataPreflight.Classify(result.ExitStatus);
         if (!SftpMetadataPreflight.AllowsReplacement(verdict))
@@ -1097,6 +1142,17 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
+
+                // GetAttributes and SetAttributes canonicalize through REALPATH and follow
+                // a symbolic link, so a chmod on a listed link changed its target's mode,
+                // anywhere on the server, while reporting success on the link. Rename got
+                // this guard; chmod did not.
+                ISftpFile? entry = TryGetEntryWithoutFollowingTarget(client, path);
+                if (entry is not null)
+                {
+                    EnsureChmodTargetSupported(path, GetRemoteEntryKind(entry));
+                }
+
                 var attrs = client.GetAttributes(path);
 
                 attrs.OwnerCanRead = (mode & 0x100) != 0;
@@ -1198,7 +1254,12 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             throw new IOException($"Refused to copy: destination already exists: {destinationPath}");
         }
 
-        bool sourceIsDirectory = await RemoteIsDirectoryAsync(sourcePath, ct).ConfigureAwait(false);
+        // Classified without following: client.Get canonicalizes through REALPATH, so a
+        // symbolic link to a directory read as a directory and "cp -a -- 'LINK'/." then
+        // duplicated the whole target tree, possibly outside the browsed subtree.
+        RemoteEntryKind sourceKind = await GetEntryKindWithoutFollowingAsync(sourcePath, ct).ConfigureAwait(false);
+        EnsureCopySourceSupported(sourcePath, sourceKind);
+        bool sourceIsDirectory = sourceKind == RemoteEntryKind.Directory;
         if (sourceIsDirectory && !recursive)
         {
             throw new IOException("Source is a directory; set recursive=true.");
@@ -1603,6 +1664,63 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
         return Convert.ToString(SftpModePreservation.GetMode(permissions), 8).PadLeft(4, '0');
     }
 
+    /// <summary>
+    /// Whether a server-supplied entry name may enter the model. One clean path segment,
+    /// no separators, no control characters; the same rule the transfer planners apply.
+    /// </summary>
+    internal static bool IsListableEntryName(string name) => SftpPathGuard.IsValidChildName(name);
+
+    /// <summary>The kinds a copy source may have; a link would be dereferenced by cp.</summary>
+    internal static void EnsureCopySourceSupported(string sourcePath, RemoteEntryKind kind)
+    {
+        if (kind is RemoteEntryKind.File or RemoteEntryKind.Directory)
+        {
+            return;
+        }
+
+        throw new IOException(
+            $"Refused to copy: the source is a {kind}, which the server-side copy would dereference: {sourcePath}");
+    }
+
+    /// <summary>A chmod on a symbolic link would change its target; it is refused.</summary>
+    internal static void EnsureChmodTargetSupported(string path, RemoteEntryKind kind)
+    {
+        if (kind != RemoteEntryKind.SymbolicLink)
+        {
+            return;
+        }
+
+        throw new IOException(
+            $"Refused to change the permissions of a symbolic link, which would change its target instead: {path}");
+    }
+
+    /// <summary>The entry's own kind, never its target's; throws when the path is absent.</summary>
+    private async Task<RemoteEntryKind> GetEntryKindWithoutFollowingAsync(string path, CancellationToken ct)
+    {
+        RemoteEntryKind? kind = await TryGetEntryKindWithoutFollowingAsync(path, ct).ConfigureAwait(false);
+        return kind ?? throw new Renci.SshNet.Common.SftpPathNotFoundException($"Remote path not found: {path}");
+    }
+
+    /// <summary>The entry's own kind, never its target's; null when the path is absent.</summary>
+    private async Task<RemoteEntryKind?> TryGetEntryKindWithoutFollowingAsync(string path, CancellationToken ct)
+    {
+        await _clientLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var client = GetConnectedClient();
+            return await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                ISftpFile? entry = TryGetEntryWithoutFollowingTarget(client, path);
+                return entry is null ? (RemoteEntryKind?)null : GetRemoteEntryKind(entry);
+            }, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
+    }
+
     private static ISftpFile? TryGetEntryWithoutFollowingTarget(SftpClient client, string path)
     {
         try
@@ -1679,10 +1797,16 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
         }
 
         string command = RemoteDeleteCommand.Build(path);
+
+        // The same ceiling every other exec in this file has: without it a recursive
+        // delete whose exec channel stalls ran for as long as the connection lived.
+        using CancellationTokenSource commandCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        commandCts.CancelAfter(ServerSideCopyCommandTimeout);
+
         SftpExecResult result;
         try
         {
-            result = await runner.ExecuteAsync(command, ct).ConfigureAwait(false);
+            result = await runner.ExecuteAsync(command, commandCts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

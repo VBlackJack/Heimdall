@@ -224,6 +224,10 @@ public static class SftpModePreservation
             return;
         }
 
+        // From here the staging file carries the destination's mode, which may be wider than
+        // the private one it was written under. It holds the final content already; the
+        // window between this write and the rename is the price of publishing the mode and
+        // the timestamps in one round trip, and it is the last step before the rename.
         SftpPublicationAttributes desired = existing with { Mode = GetMode(existing.Mode) };
         operations.ApplyPublicationAttributes(desired);
 

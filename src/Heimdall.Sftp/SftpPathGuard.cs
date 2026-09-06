@@ -51,9 +51,23 @@ public static class SftpPathGuard
         }
 
         string trimmed = name.Trim();
-        return trimmed is not "." and not ".."
-            && trimmed.IndexOf('/') < 0
-            && trimmed.IndexOf('\\') < 0
-            && trimmed.IndexOf('\0') < 0;
+        if (trimmed is "." or "..")
+        {
+            return false;
+        }
+
+        // Control characters too, not only NUL: a newline is a legal POSIX filename
+        // character and every shell command this client builds refuses it downstream,
+        // with an unlocalized exception. Refusing at the boundary keeps such an entry
+        // out of the model entirely.
+        foreach (char c in trimmed)
+        {
+            if (c is '/' or '\\' || char.IsControl(c))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

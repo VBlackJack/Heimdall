@@ -41,7 +41,32 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive: true);
 
-        Assert.Equal("mkdir -- '/srv/copy' && cp -a -- '/srv/data'/. '/srv/copy'", command);
+        Assert.Equal(
+            "mkdir -- '/srv/copy' && cp -a -- '/srv/data'/. '/srv/copy'; "
+            + "status=$?; if [ $status -ne 0 ]; then rm -rf -- '/srv/copy'; fi; exit $status",
+            command);
+    }
+
+    /// <remarks>
+    /// A cp -a that fails part way (permission denied on one subtree, quota, disk full) used
+    /// to leave the reserved root and a partial tree on the server while the caller reported
+    /// that the copy was not performed. The file branch cleaned up; the directory branch did
+    /// not.
+    /// </remarks>
+    [Fact]
+    public void Build_Directory_RemovesTheReservedRootWhenTheArchiveCopyFails()
+    {
+        string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive: true);
+
+        int copyIndex = command.IndexOf("cp -a -- ", StringComparison.Ordinal);
+        int statusIndex = command.IndexOf("status=$?", StringComparison.Ordinal);
+        int cleanupIndex = command.IndexOf("rm -rf -- '/srv/copy'", StringComparison.Ordinal);
+        int exitIndex = command.IndexOf("exit $status", StringComparison.Ordinal);
+
+        Assert.True(copyIndex > 0 && statusIndex > copyIndex, "the status is captured after cp");
+        Assert.True(cleanupIndex > statusIndex, "the reserved root is removed on failure");
+        Assert.Contains("if [ $status -ne 0 ]", command, StringComparison.Ordinal);
+        Assert.True(exitIndex > cleanupIndex, "cp's own status is what the command returns");
     }
 
     [Fact]
@@ -65,7 +90,8 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/my data", "/srv/my copy", recursive: true);
 
-        Assert.Equal("mkdir -- '/srv/my copy' && cp -a -- '/srv/my data'/. '/srv/my copy'", command);
+        Assert.StartsWith("mkdir -- '/srv/my copy' && cp -a -- '/srv/my data'/. '/srv/my copy'; ", command, StringComparison.Ordinal);
+        Assert.Contains("rm -rf -- '/srv/my copy'", command, StringComparison.Ordinal);
     }
 
     [Fact]

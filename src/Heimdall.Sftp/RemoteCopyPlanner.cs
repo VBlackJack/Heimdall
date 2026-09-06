@@ -55,10 +55,13 @@ internal static class RemoteCopyPathGuard
     /// <param name="destinationPath">Remote copy destination.</param>
     internal static bool IsSameOrDescendantPath(string sourcePath, string destinationPath)
     {
-        string normalizedSource = sourcePath.TrimEnd('/');
-        string normalizedDestination = destinationPath.TrimEnd('/');
+        // Collapsed first, so a spelling cannot decide what a location cannot: a raw
+        // comparison refused "/srv/data" to "/srv/data/../elsewhere" and accepted
+        // "/srv/./data" to "/srv/data/sub".
+        string normalizedSource = RemotePathNormalizer.Collapse(sourcePath).TrimEnd('/');
+        string normalizedDestination = RemotePathNormalizer.Collapse(destinationPath).TrimEnd('/');
 
-        // Trimming the remote root produces an empty string. Reject it explicitly because every
+        // Collapsing the remote root produces an empty string. Reject it explicitly because every
         // remote destination is within the server root.
         if (normalizedSource.Length == 0)
         {

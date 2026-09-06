@@ -68,6 +68,58 @@ public sealed class FtpBrowserDisconnectTests
         }
     }
 
+    /// <remarks>
+    /// The synchronous Disconnect waited on the operation lock with no timeout, pinning a
+    /// thread for the whole of a stalled transfer, and Dispose then disposed the semaphore
+    /// under any waiter - the opposite of the decision the SFTP browser pins by test.
+    /// </remarks>
+    [Fact]
+    public async Task Disconnect_WhenOperationIsActive_ReturnsWithinItsBound()
+    {
+        using FtpBrowser browser = new();
+        SemaphoreSlim operationLock = GetOperationLock(browser);
+        await operationLock.WaitAsync();
+
+        try
+        {
+            Task disconnect = Task.Run(browser.Disconnect);
+            Task finished = await Task.WhenAny(disconnect, Task.Delay(TimeSpan.FromSeconds(5)));
+
+            Assert.Same(disconnect, finished);
+            await disconnect;
+        }
+        finally
+        {
+            operationLock.Release();
+        }
+    }
+
+    [Fact]
+    public async Task Dispose_DoesNotDisposeTheOperationLock()
+    {
+        FtpBrowser browser = new();
+        SemaphoreSlim operationLock = GetOperationLock(browser);
+
+        browser.Dispose();
+
+        // A waiter arriving after the teardown meets the lock, not an ObjectDisposedException.
+        await operationLock.WaitAsync();
+        operationLock.Release();
+    }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("///")]
+    public async Task DeleteAsync_RejectsProtectedRootBeforeConnectionCheck(string path)
+    {
+        using FtpBrowser browser = new();
+
+        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => browser.DeleteAsync(path));
+
+        Assert.Contains("protected remote root", refusal.Message, StringComparison.Ordinal);
+    }
+
     private static SemaphoreSlim GetOperationLock(FtpBrowser browser)
     {
         FieldInfo field = typeof(FtpBrowser).GetField(

@@ -30,6 +30,10 @@ public sealed class FtpBrowserParsingTests
     [InlineData("var/log", "/var/log")]
     [InlineData("/var/log/", "/var/log")]
     [InlineData("/var/log///", "/var/log")]
+    [InlineData("/var/log/../etc", "/var/etc")]
+    [InlineData("/var/./log", "/var/log")]
+    [InlineData("/../etc", "/etc")]
+    [InlineData("/var/log/..", "/var")]
     public void NormalizePath_ProducesCanonicalForm(string? input, string expected)
     {
         Assert.Equal(expected, FtpBrowser.NormalizePath(input!));
@@ -39,7 +43,11 @@ public sealed class FtpBrowserParsingTests
     [InlineData("/etc/passwd", "/var/log", "/etc/passwd")]
     [InlineData("logs", "/var", "/var/logs")]
     [InlineData("logs", "/", "/logs")]
-    [InlineData("../etc", "/var/log", "/var/log/../etc")]
+    // Collapsed, not accumulated: the current directory used to grow a "/.." per step and
+    // every listed path inherited the spelling.
+    [InlineData("../etc", "/var/log", "/var/etc")]
+    [InlineData("..", "/", "/")]
+    [InlineData("./logs", "/var", "/var/logs")]
     public void ResolvePath_HandlesAbsoluteAndRelative(
         string input,
         string currentDirectory,
@@ -63,7 +71,7 @@ public sealed class FtpBrowserParsingTests
             RawGroup = "wheel",
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/etc");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/etc")!;
 
         Assert.Equal("hosts", entry.Name);
         Assert.Equal("/etc/hosts", entry.FullPath);
@@ -74,6 +82,29 @@ public sealed class FtpBrowserParsingTests
         Assert.Equal("rw-r--r--", entry.Permissions);
         Assert.Equal("root", entry.Owner);
         Assert.Equal("wheel", entry.Group);
+    }
+
+    /// <remarks>
+    /// The server names the entry, and the name became a path every operation trusted:
+    /// delete, download, rename, and the privileged fallbacks. A name that is not one clean
+    /// segment is refused at the boundary, where the untrusted value enters.
+    /// </remarks>
+    [Theory]
+    [InlineData("../x")]
+    [InlineData("a/b")]
+    [InlineData("x\ny")]
+    [InlineData("..")]
+    public void MapFtpItemToFileInfo_UnsafeName_IsRefused(string name)
+    {
+        FtpListItem item = new FtpListItem
+        {
+            Name = name,
+            Type = FtpObjectType.File,
+            Size = 1,
+            Modified = new DateTime(2026, 1, 15, 12, 34, 0, DateTimeKind.Local),
+        };
+
+        Assert.Null(FtpBrowser.MapFtpItemToFileInfo(item, "/srv"));
     }
 
     [Fact]
@@ -87,7 +118,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = "rwxr-xr-x",
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!;
 
         Assert.True(entry.IsDirectory);
         Assert.Equal(0, entry.Size);
@@ -108,7 +139,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = "rwxrwxrwx",
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!;
 
         Assert.False(entry.IsDirectory);
         Assert.Equal("link", entry.Name);
@@ -127,7 +158,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = "drwxr-xr-x",
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!;
 
         Assert.Equal(RemoteEntryKind.SymbolicLink, entry.Kind);
     }
@@ -149,7 +180,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = rawPermissions,
         };
 
-        Assert.Equal(expectedKind, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+        Assert.Equal(expectedKind, FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!.Kind);
     }
 
     // A nine-character value is mode-only and carries no type character at all. Reading its first
@@ -165,7 +196,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = "rw-r--r--",
         };
 
-        Assert.Equal(RemoteEntryKind.File, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+        Assert.Equal(RemoteEntryKind.File, FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!.Kind);
     }
 
     // A type value this build cannot interpret, with nothing in the listing to rescue it. Answering
@@ -180,7 +211,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = string.Empty,
         };
 
-        Assert.Equal(RemoteEntryKind.Unknown, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+        Assert.Equal(RemoteEntryKind.Unknown, FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!.Kind);
     }
 
     // The server did state a type character and this build does not recognise it. That is a positive
@@ -195,7 +226,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = "?rw-r--r--",
         };
 
-        Assert.Equal(RemoteEntryKind.Unknown, FtpBrowser.MapFtpItemToFileInfo(item, "/srv").Kind);
+        Assert.Equal(RemoteEntryKind.Unknown, FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!.Kind);
     }
 
     [Theory]
@@ -214,7 +245,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = rawPermissions,
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/dev");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/dev")!;
 
         Assert.Equal(expectedKind, entry.Kind);
     }
@@ -229,7 +260,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = string.Empty,
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!;
 
         Assert.Equal(RemoteEntryKind.File, entry.Kind);
     }
@@ -245,7 +276,7 @@ public sealed class FtpBrowserParsingTests
             RawPermissions = "-rw-r--r--",
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/srv")!;
 
         Assert.Equal(RemoteEntryKind.Directory, entry.Kind);
         Assert.Equal(0, entry.Size);
@@ -261,7 +292,7 @@ public sealed class FtpBrowserParsingTests
             Size = -1,
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/tmp");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/tmp")!;
 
         Assert.Equal(0, entry.Size);
     }
@@ -275,7 +306,7 @@ public sealed class FtpBrowserParsingTests
             Type = FtpObjectType.File,
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/")!;
 
         Assert.Equal("rw-r--r--", entry.Permissions);
         Assert.Equal("-", entry.Owner);
@@ -293,7 +324,7 @@ public sealed class FtpBrowserParsingTests
             Type = FtpObjectType.Directory,
         };
 
-        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/");
+        SftpFileInfo entry = FtpBrowser.MapFtpItemToFileInfo(item, "/")!;
 
         Assert.Equal("rwxr-xr-x", entry.Permissions);
         Assert.Equal("-", entry.Owner);

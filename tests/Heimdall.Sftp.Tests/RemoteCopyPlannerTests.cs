@@ -40,6 +40,10 @@ public sealed class RemoteCopyPathGuardTests
     [InlineData("/srv/data/", "/srv/data/sub")]
     // The remote root contains every destination.
     [InlineData("/", "/srv/data")]
+    // Collapsed before comparing: a non-canonical spelling of the source is still the source.
+    [InlineData("/srv/./data", "/srv/data/sub")]
+    [InlineData("/srv//data", "/srv/data/sub/x")]
+    [InlineData("/srv/data", "/srv/data/sub/../other")]
     public void IsSameOrDescendantPath_SameOrInside_IsRefused(string source, string destination)
     {
         Assert.True(RemoteCopyPathGuard.IsSameOrDescendantPath(source, destination));
@@ -56,6 +60,9 @@ public sealed class RemoteCopyPathGuardTests
     [InlineData("/srv/data", "/srv/other")]
     [InlineData("/srv/data/sub", "/srv/data")]
     [InlineData("/srv/data/sub", "/srv/data/other")]
+    // A destination that merely spells a way out of the source is outside it.
+    [InlineData("/srv/data", "/srv/data/../elsewhere")]
+    [InlineData("/srv/data", "/srv/data/./../data2")]
     public void IsSameOrDescendantPath_OutsideTheSource_IsAllowed(string source, string destination)
     {
         Assert.False(RemoteCopyPathGuard.IsSameOrDescendantPath(source, destination));
