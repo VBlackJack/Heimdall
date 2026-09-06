@@ -677,6 +677,44 @@ public sealed class SshHandlerConnectTests : IDisposable
         Assert.Equal(0, tunnelService.ReleaseCount);
     }
 
+    // D-11: the plink path refused a relative or missing key path through
+    // TryValidateKeyPath; the SSH.NET path handed the same profile to the client
+    // factory, which resolved a relative path against the working directory and
+    // reported an unrelated failure. Both paths must fail the same way, before dialling.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConnectAsync_SshNetPathWithRelativeKeyPath_FailsWithTheKeyPathErrorBeforeDialling(
+        bool usesTunnel)
+    {
+        int freePort = ReserveAndReleaseLoopbackPort();
+        FakeTunnelService tunnelService = new FakeTunnelService
+        {
+            UsesTunnel = usesTunnel,
+            TargetHost = "127.0.0.1",
+            TargetPort = freePort
+        };
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+        using SshHandler handler = CreateHandler(tunnelService, localizer: localizer);
+        ServerProfileDto server = usesTunnel ? CreateGatewayServer() : CreateDirectServer(freePort);
+        server.SshKeyPath = @"keys\relative_id_ed25519";
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        string expectedMessage = localizer.Format(
+            SshLocalizationKeys.ErrorSshKeyPathNotAbsolute,
+            server.SshKeyPath);
+        Assert.False(result.Success);
+        Assert.Equal(expectedMessage, result.ErrorMessage);
+        Assert.NotNull(result.Failure);
+        Assert.Equal(expectedMessage, result.Failure.Detail);
+        Assert.Equal(usesTunnel ? 1 : 0, tunnelService.ReleaseCount);
+    }
+
     [Theory]
     [InlineData(false, SessionFailureStage.GenericFailure)]
     [InlineData(true, SessionFailureStage.SshGateway)]

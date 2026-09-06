@@ -178,6 +178,21 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 .ConfigureAwait(false);
         }
 
+        // Same refusal as the plink path: a relative or missing key path is a profile
+        // error, not a dial failure. Without this the SSH.NET client factory resolved a
+        // relative path against the working directory and the user saw an unrelated error.
+        if (!TryValidateKeyPath(server.SshKeyPath, out SshKeyPathValidationError sshNetKeyPathError))
+        {
+            string keyPathMessage = LocalizeKeyPathError(sshNetKeyPathError, server.SshKeyPath);
+            _connectionSm.SetError(server.Id, keyPathMessage);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            return new ConnectionResult(
+                false,
+                keyPathMessage,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorConnectionFailed, keyPathMessage));
+        }
+
         var sshParams = new SshConnectionParams
         {
             Host = targetHost,
