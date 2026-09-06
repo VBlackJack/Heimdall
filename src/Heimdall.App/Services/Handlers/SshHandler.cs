@@ -45,6 +45,20 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         SshConnectionParams connectionParams,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
+        int terminalColumns,
+        int terminalRows,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Starts the Plink pipe-mode process. Replaced in tests so the launch, its arguments and
+    /// the terminal size it carries can be observed without starting a process.
+    /// </summary>
+    internal delegate Task StartPipeModeSession(
+        Heimdall.Terminal.PipeModeSession session,
+        string executable,
+        string arguments,
+        int columns,
+        int rows,
         CancellationToken cancellationToken);
 
     private readonly ITunnelService _tunnelService;
@@ -53,7 +67,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly HostKeyStore _hostKeyStore;
     private readonly IHostKeyTrustService _hostKeyTrustService;
     private readonly IHostKeyVerifier _hostKeyVerifier;
-    private readonly X11ServerManager _x11ServerManager;
+    private readonly IX11ServerManager _x11ServerManager;
     private readonly IDialogService _dialogService;
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
@@ -62,8 +76,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly Func<string?, PlinkAttestationLease> _plinkAttestation;
     private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
     private readonly ConnectShellSession _connectShellSession;
+    private readonly StartPipeModeSession _startPipeModeSession;
 
     internal Action<string>? SetStatusText { get; set; }
+
+    /// <summary>
+    /// Resolves the terminal size the view already knows for a session id, or
+    /// <see langword="null"/> when the terminal has not reported one yet. Wired by the shell.
+    /// Consulted just before the PTY is created, because the page's <c>ready:</c> size usually
+    /// arrives while the connection is still being negotiated.
+    /// </summary>
+    internal Func<string, TerminalSize?>? ResolveInitialTerminalSize { get; set; }
 
     public SshHandler(
         ITunnelService tunnelService,
@@ -72,14 +95,15 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         HostKeyStore hostKeyStore,
         IHostKeyTrustService hostKeyTrustService,
         IHostKeyVerifier hostKeyVerifier,
-        X11ServerManager x11ServerManager,
+        IX11ServerManager x11ServerManager,
         IDialogService dialogService,
         IPlinkHostKeyProbe? plinkHostKeyProbe = null,
         PlinkPasswordFileJanitor? plinkPasswordFileJanitor = null,
         Action<string?>? deletePlinkPasswordFile = null,
         Func<string?, PlinkAttestationLease>? plinkAttestation = null,
         Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
-        ConnectShellSession? connectShellSession = null)
+        ConnectShellSession? connectShellSession = null,
+        StartPipeModeSession? startPipeModeSession = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -95,6 +119,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         _plinkAttestation = plinkAttestation ?? PlinkCompatibilityAttestation.Acquire;
         _agentRegistryFactory = agentRegistryFactory ?? SshAgentRegistry.CreateDefault;
         _connectShellSession = connectShellSession ?? ConnectShellSessionAsync;
+        _startPipeModeSession = startPipeModeSession ?? StartPipeModeSessionAsync;
         _plinkPasswordFileJanitorScheduler = new SensitiveFileJanitorScheduler(
             nameof(PlinkPasswordFileJanitor),
             _plinkPasswordFileJanitor.SweepStale);
@@ -192,10 +217,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             Core.Logging.FileLogger.Info(
                 $"SSH using Plink fallback for {server.DisplayName}");
-            if (server.SshX11Forwarding)
-            {
-                await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
-            }
 
             return await ConnectSshViaPlinkAsync(
                     server,
@@ -242,7 +263,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         var session = new SshShellSession();
         try
         {
-            await _connectShellSession(session, sshParams, _hostKeyStore, _hostKeyVerifier, ct)
+            // Resolved here, not at entry: the page's ready: size usually lands while the
+            // tunnel and the transport were being negotiated above.
+            TerminalSize initialSize = ResolveInitialTerminalSizeFor(server);
+            await _connectShellSession(
+                    session,
+                    sshParams,
+                    _hostKeyStore,
+                    _hostKeyVerifier,
+                    initialSize.Columns,
+                    initialSize.Rows,
+                    ct)
                 .ConfigureAwait(false);
             if (session.Client is { } connectedClient)
             {
@@ -331,10 +362,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 Core.Logging.FileLogger.Info(
                     $"SSH.NET auth failed ({failure.Code}), falling back to Plink: {failure.Message}");
                 SetStatusText?.Invoke(_localizer[SshLocalizationKeys.StatusSshRetryingViaPlink]);
-                if (server.SshX11Forwarding)
-                {
-                    await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
-                }
 
                 return await ConnectSshViaPlinkAsync(
                         server,
@@ -374,12 +401,108 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         SshConnectionParams connectionParams,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
+        int terminalColumns,
+        int terminalRows,
         CancellationToken cancellationToken) =>
         session.ConnectAsync(
             connectionParams,
             hostKeyStore: hostKeyStore,
             hostKeyVerifier: hostKeyVerifier,
+            terminalColumns: terminalColumns,
+            terminalRows: terminalRows,
             cancellationToken: cancellationToken);
+
+    private static Task StartPipeModeSessionAsync(
+        Heimdall.Terminal.PipeModeSession session,
+        string executable,
+        string arguments,
+        int columns,
+        int rows,
+        CancellationToken cancellationToken) =>
+        session.StartAsync(
+            executable,
+            arguments,
+            columns,
+            rows,
+            cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// The size to create the PTY at: the one the terminal page already reported for this
+    /// session when the shell wired a resolver and the page has spoken, the default otherwise.
+    /// </summary>
+    /// <remarks>
+    /// The page's <c>ready:</c> size used to arrive before the session was attached and was
+    /// dropped, so the remote PTY stayed at 80x24 until the first window resize. On the Plink
+    /// pipe path that was permanent, because that transport cannot resize after start.
+    /// </remarks>
+    private TerminalSize ResolveInitialTerminalSizeFor(ServerProfileDto server)
+    {
+        Func<string, TerminalSize?>? resolve = ResolveInitialTerminalSize;
+        if (resolve is null)
+        {
+            return TerminalSize.Default;
+        }
+
+        try
+        {
+            TerminalSize? known = resolve(server.Id);
+            if (known is not null)
+            {
+                Core.Logging.FileLogger.Info(
+                    $"SSH opening the PTY for {server.DisplayName} at the reported {known.Columns}x{known.Rows}");
+                return known;
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"SSH initial terminal size lookup failed for {server.DisplayName}, using the default: {ex.Message}");
+        }
+
+        return TerminalSize.Default;
+    }
+
+    /// <summary>
+    /// Whether this session gets X11 forwarding: the profile asked for it and an X server is
+    /// available. When the profile asks and no server can be found or started, the localized
+    /// notice goes to the status text, the same path the direct-transport capability notice
+    /// uses, and the answer is <see langword="false"/> so the launcher is not handed <c>-X</c>
+    /// for a display that does not exist.
+    /// </summary>
+    /// <remarks>
+    /// The three launch paths used to ignore the manager's answer: Plink and PuTTY were still
+    /// given <c>-X</c>, every X client on the remote side failed with "cannot open display", and
+    /// the user saw nothing here explaining why. The notice existed and went to the log only.
+    /// </remarks>
+    private async Task<bool> ResolveX11ForwardingAsync(ServerProfileDto server)
+    {
+        if (!server.SshX11Forwarding)
+        {
+            return false;
+        }
+
+        bool available;
+        try
+        {
+            available = await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"X11 server check failed for {server.DisplayName}: {ex.Message}");
+            available = false;
+        }
+
+        if (available)
+        {
+            return true;
+        }
+
+        Core.Logging.FileLogger.Warn(
+            $"X11 forwarding requested for {server.DisplayName} but no X11 server is available; launching without it.");
+        SetStatusText?.Invoke(_localizer[SshLocalizationKeys.X11ServerNotFound]);
+        return false;
+    }
 
     private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
     {
@@ -488,21 +611,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 ? $"{server.SshUsername}@{targetHost}"
                 : targetHost;
 
+            bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
             System.Diagnostics.ProcessStartInfo psi = BuildPuttyStartInfo(
                 puttyPath,
                 server.SshKeyPath,
                 server.SshCompression,
                 server.SshAgentForwarding,
-                server.SshX11Forwarding,
+                x11Forwarding,
                 targetPort,
                 target,
                 hostKeyArg);
             Core.Logging.FileLogger.Info($"Launching PuTTY: {puttyPath} for {targetHost}:{targetPort}");
-
-            if (server.SshX11Forwarding)
-            {
-                await _x11ServerManager.EnsureRunningAsync().ConfigureAwait(false);
-            }
 
             System.Diagnostics.Process? process = System.Diagnostics.Process.Start(psi);
 
@@ -731,6 +850,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             // The dialog is over, so the gap between identifying the image and launching it is now
             // bounded by this block alone. The lease pins that exact image; the block closes as soon
             // as the launch has been issued, so a later update is not held off for the whole session.
+            // Resolved before the attestation so a slow X server start does not widen the gap
+            // between identifying the launcher image and launching it.
+            bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
+
             using (PlinkAttestationLease attestation = _plinkAttestation(plinkPath))
             {
                 string? passwordFilePath = CreatePlinkPasswordFile(password);
@@ -739,7 +862,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     server.SshKeyPath,
                     server.SshCompression,
                     server.SshAgentForwarding,
-                    server.SshX11Forwarding,
+                    x11Forwarding,
                     targetPort,
                     target,
                     hostKeyArg,
@@ -767,9 +890,19 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 // stays on the process-exit path.
                 string launchPath = attestation.LaunchPath ?? plinkPath;
 
+                // The pipe transport cannot resize after start, so the launch is the only
+                // moment the size can travel. Resolved as late as possible for that reason.
+                TerminalSize initialSize = ResolveInitialTerminalSizeFor(server);
+
                 try
                 {
-                    await terminalSession.StartAsync(launchPath, args, cancellationToken: ct)
+                    await _startPipeModeSession(
+                            terminalSession,
+                            launchPath,
+                            args,
+                            initialSize.Columns,
+                            initialSize.Rows,
+                            ct)
                         .ConfigureAwait(false);
                     Core.Logging.FileLogger.Info($"Plink SSH session started: PID={terminalSession.ProcessId}");
                 }

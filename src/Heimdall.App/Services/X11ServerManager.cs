@@ -27,7 +27,7 @@ namespace Heimdall.App.Services;
 /// Detects running X servers (VcXsrv, Xming, X410, XWin), starts a
 /// configured server if none is found, and sets the DISPLAY variable.
 /// </summary>
-public sealed class X11ServerManager : IDisposable
+public sealed class X11ServerManager : IX11ServerManager, IDisposable
 {
     private static readonly string DefaultDisplay = "localhost:0.0";
 

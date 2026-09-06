@@ -589,6 +589,7 @@ public partial class App : System.Windows.Application
 
         // Application services
         services.AddSingleton<X11ServerManager>();
+        services.AddSingleton<IX11ServerManager>(sp => sp.GetRequiredService<X11ServerManager>());
         services.AddSingleton<ExternalToolProviderService>();
         services.AddSingleton<ToolRegistry>();
 

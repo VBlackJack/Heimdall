@@ -72,6 +72,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private readonly IPostConnectStepResolver _postConnectStepResolver;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly Dictionary<string, ConnectingSessionCancellation> _connectingCancellations = [];
+
+    /// <summary>
+    /// The SSH views mounted in their "Connecting" state, by session id. Written on the UI
+    /// thread; read by the SSH handler from the connect thread to size the PTY, hence concurrent.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, EmbeddedSshView> _connectingSshViews =
+        new(StringComparer.Ordinal);
     private readonly Dictionary<string, ReconnectChainState> _reconnectChainsBySessionId = [];
     private readonly HashSet<ReconnectChainState> _activeReconnectChains = [];
     private readonly AsyncLocal<ReconnectChainState?> _currentReconnectChain = new AsyncLocal<ReconnectChainState?>();
@@ -161,6 +168,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         // Wire ConnectionService status-text relay
         _main.ServerList.ConnectionService.SetStatusText = s => _main.StatusText = s;
+
+        // Wire the PTY-size relay: the SSH handler asks, just before it creates the PTY, what
+        // size the connecting view's page has already reported.
+        _main.ServerList.ConnectionService.ResolveInitialTerminalSize = ResolveConnectingTerminalSize;
 
         // Wire connect-time execution-trust confirmation relay
         _main.ServerList.ConnectionService.ConfirmExecution =
@@ -661,8 +672,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             EmbeddedSessionManager.QueueReconnectAttempt(tab, reconnectChain.Attempt);
         }
 
-        tab.HostControl = _embeddedSessionManager.CreateConnectingSshHostControl(
+        EmbeddedSshView connectingView = _embeddedSessionManager.CreateConnectingSshHostControl(
             tab, displayName, server, settings);
+        tab.HostControl = connectingView;
+        _connectingSshViews[sessionId] = connectingView;
     }
 
     /// <summary>
@@ -678,6 +691,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
 
         bool cancellationRequested = ReleaseConnectingCancellation(sessionId);
+        _connectingSshViews.TryRemove(sessionId, out _);
         ReconnectChainState? reconnectChain = RemoveReconnectChainSession(sessionId);
         if (reconnectChain is not null)
         {
@@ -782,6 +796,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 existingTab.OriginalServerId = originalServerId;
                 existingTab.FailureDetails = null;
                 ReleaseConnectingCancellation(sessionId);
+                _connectingSshViews.TryRemove(sessionId, out _);
                 _embeddedSessionManager.AttachSshSession(existingTab, session, _main.CurrentSettings);
                 existingTab.Status = SessionStatusTokens.Connected;
                 CompleteReadySession(existingTab, sessionId, originalServerId, displayName, connectionType, session);
@@ -1814,6 +1829,18 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private void InvokeOnUi(Action action)
     {
         _uiDispatcher.Invoke(action);
+    }
+
+    /// <summary>
+    /// The size the connecting SSH view's page has already reported for a session id, or
+    /// <see langword="null"/> when the view is unknown or its page has not measured yet.
+    /// Called from the connect thread; the dictionary and the view's property are safe for it.
+    /// </summary>
+    private TerminalSize? ResolveConnectingTerminalSize(string sessionId)
+    {
+        return _connectingSshViews.TryGetValue(sessionId, out EmbeddedSshView? view)
+            ? view.LastKnownTerminalSize
+            : null;
     }
 
     private void TrackConnectingCancellation(

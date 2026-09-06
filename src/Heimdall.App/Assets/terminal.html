@@ -287,7 +287,11 @@
                     var pasteB64 = message.substring('clipboard-paste:'.length);
                     if (pasteB64) {
                         var pasteText = new TextDecoder().decode(base64ToBytes(pasteB64));
-                        postMessage('input:' + stringToBase64(pasteText));
+                        // Through xterm's own paste path, not as raw keystrokes: it wraps the
+                        // text in bracketed-paste markers when the shell enabled mode 2004 and
+                        // folds CR+LF into a single line ending, so a Windows clipboard does not
+                        // submit an empty line after the pasted one.
+                        term.paste(pasteText);
                     }
                     return;
                 }
@@ -398,6 +402,15 @@
 
                     // Ctrl+Shift+V or Ctrl+V: paste from host clipboard
                     if (event.ctrlKey && (event.code === 'KeyV')) {
+                        event.preventDefault();
+                        postMessage('clipboard-read:');
+                        return false;
+                    }
+
+                    // Shift+Insert: the same host clipboard road as Ctrl+V. Left to the
+                    // browser it becomes a native paste into the hidden textarea, which
+                    // xterm forwards to the shell without the host's paste guard seeing it.
+                    if (event.shiftKey && !event.ctrlKey && !event.altKey && event.code === 'Insert') {
                         event.preventDefault();
                         postMessage('clipboard-read:');
                         return false;

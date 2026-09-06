@@ -144,6 +144,15 @@ public sealed class PipeModeSession : ITerminalSession
     public int? ProcessId => _process?.Id;
     public Dictionary<string, string>? EnvironmentVariables { get; set; }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// <paramref name="columns"/> and <paramref name="rows"/> are the size the caller knows
+    /// before the launch, and this is the only moment the size could matter: the pipe transport
+    /// has no channel to the remote PTY afterwards (see <see cref="Resize"/>). Plink negotiates the
+    /// PTY size from a console this process does not give it, so the remote side sees its own
+    /// default. The parameters are carried so the caller's path is right when the transport ever
+    /// grows a way to pass them; the limit is the transport's, not the caller's.
+    /// </remarks>
     public Task StartAsync(
         string executable,
         string arguments,
@@ -235,10 +244,15 @@ public sealed class PipeModeSession : ITerminalSession
         Write(Encoding.UTF8.GetBytes(text));
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// A no-op by construction, not by omission. The child talks through anonymous pipes, and a
+    /// pipe carries bytes only: there is no console handle to resize and no out-of-band message
+    /// Plink would read for a window change. The remote PTY keeps the size it was created with;
+    /// ConPTY-backed sessions resize, this transport cannot.
+    /// </remarks>
     public void Resize(int columns, int rows)
     {
-        // Pipe mode cannot resize - the remote PTY size is fixed at connection time.
-        // This is a known limitation vs ConPTY.
     }
 
     public void Kill()

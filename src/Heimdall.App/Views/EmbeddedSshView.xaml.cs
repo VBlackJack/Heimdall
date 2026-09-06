@@ -115,6 +115,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgSetConvertEol = "set-convert-eol:";
 
     /// <summary>
+    /// Outbound message: clipboard text the host has confirmed, base64 encoded. The page hands it
+    /// to xterm's own paste path so bracketed paste and newline folding apply.
+    /// </summary>
+    private const string MsgClipboardPaste = "clipboard-paste:";
+
+    /// <summary>
     /// Maps color scheme names to xterm.js theme JSON object literals.
     /// Keys must match the values stored in <see cref="AppSettings.TerminalColorScheme"/>.
     /// </summary>
@@ -274,6 +280,27 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private int _autoReconnectAttempt;
     private int _autoReconnectMaxAttempts;
     private int _autoReconnectSecondsRemaining;
+
+    /// <summary>
+    /// Monotonic clock (<see cref="Environment.TickCount64"/>) of the last real terminal input,
+    /// read by the keepalive tick on the timer thread. Written on the UI thread.
+    /// </summary>
+    private long _lastTerminalInputMilliseconds = TerminalKeepAlivePolicy.NoInputRecorded;
+
+    /// <summary>The interval the keepalive timer runs at, for the tick's idle check.</summary>
+    private int _keepAliveIntervalSeconds;
+
+    /// <summary>
+    /// The last size the page reported (<c>ready:</c> or <c>resize:</c>). Written on the UI
+    /// thread; read by the SSH handler from the connect thread just before it creates the PTY.
+    /// </summary>
+    private TerminalSize? _lastKnownTerminalSize;
+
+    /// <summary>
+    /// The last size the terminal page reported, or <see langword="null"/> before it has spoken.
+    /// The SSH handler creates the PTY at this size when it is known before the connect.
+    /// </summary>
+    internal TerminalSize? LastKnownTerminalSize => Volatile.Read(ref _lastKnownTerminalSize);
 
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
     public Core.Localization.LocalizationManager? Localizer
@@ -470,6 +497,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             StartHealthMonitor();
         }
 
+        // The page usually reports its size before the session exists; that resize went to a
+        // null session. Replayed now that there is one to receive it.
+        ReplayLastKnownTerminalSize();
+
         UpdateStatus("Connected");
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
@@ -519,6 +550,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _terminalSession.DataReceived += _terminalDataHandler;
         _terminalSession.ProcessExited += _terminalExitHandler;
 
+        // Same replay as AttachSession. A no-op on the Plink pipe transport, which cannot
+        // resize after start; that path carries the size into the launch instead.
+        ReplayLastKnownTerminalSize();
+
         // The xterm.js convertEol option is baked at terminal construction time
         // (GetTerminalHtml). For SSH the view is mounted in a "Connecting" state
         // before the session exists, so that early value is always false. Push the
@@ -529,7 +564,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             + (terminalSession is Heimdall.Terminal.PipeModeSession ? "true" : "false"));
 
         UpdateStatus(connectedStatus);
-        StartKeepAliveTimer(keepAliveIntervalSeconds);
+        // Only an SSH shell has a remote TMOUT to reset. The local shell and WinRM sessions share
+        // this view, and for them the reset is nothing but a stray Enter.
+        StartKeepAliveTimer(TerminalKeepAlivePolicy.ResolveIntervalSeconds(_sessionTab?.ConnectionType, keepAliveIntervalSeconds));
         AcquireSleepPrevention();
         // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
@@ -1184,6 +1221,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
             if (TryParseSize(message.AsSpan(MsgReady.Length), out int readyCols, out int readyRows))
             {
+                RememberTerminalSize(readyCols, readyRows);
                 ResizeSession(readyCols, readyRows);
             }
 
@@ -1197,6 +1235,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             if (TryParseSize(message.AsSpan(MsgResize.Length), out int cols, out int rows))
             {
+                RememberTerminalSize(cols, rows);
                 ResizeSession(cols, rows);
             }
             return;
@@ -1308,7 +1347,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                         }
 
                         string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
-                        PostTerminalMessage("clipboard-paste:" + base64);
+                        PostTerminalMessage(MsgClipboardPaste + base64);
                     }
                 }
             }
@@ -1632,6 +1671,26 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         OnDisconnected(disconnectInfo);
     }
 
+    /// <summary>
+    /// Keeps the last size the page reported, for the handler to create the PTY with and for the
+    /// attach to replay. Sizes arrive validated by <see cref="TryParseSize"/>: both positive.
+    /// </summary>
+    private void RememberTerminalSize(int columns, int rows)
+    {
+        Volatile.Write(ref _lastKnownTerminalSize, new TerminalSize(columns, rows));
+    }
+
+    /// <summary>
+    /// Resizes the freshly attached session to the size the page reported before it existed.
+    /// </summary>
+    private void ReplayLastKnownTerminalSize()
+    {
+        if (Volatile.Read(ref _lastKnownTerminalSize) is { } size)
+        {
+            ResizeSession(size.Columns, size.Rows);
+        }
+    }
+
     private void ResizeSession(int columns, int rows)
     {
         if (_disposed || columns <= 0 || rows <= 0)
@@ -1731,9 +1790,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
-        if (_isRecording)
+        if (marksTerminalInput)
         {
-            var delayMs = (int)_macroStopwatch.ElapsedMilliseconds;
+            NoteTerminalInput();
+        }
+
+        // A macro records what the user typed. The keepalive reset is not input, and recording it
+        // would replay a phantom Enter.
+        if (_isRecording && marksTerminalInput)
+        {
+            int delayMs = (int)_macroStopwatch.ElapsedMilliseconds;
             _macroStopwatch.Restart();
 
             _macroEntries.Add(new MacroEntry
@@ -1944,6 +2010,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (marksTerminalInput)
+        {
+            NoteTerminalInput();
+        }
+
         if (_session is not null)
         {
             SshShellSession session = _session;
@@ -1965,6 +2036,15 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _terminalSessionHasInput = true;
         _winRmEarlyOutputDiagnostic?.MarkUserInput();
         _winRmEarlyOutputDiagnostic = null;
+    }
+
+    /// <summary>
+    /// Stamps the clock the keepalive tick reads, so a reset is not written into a shell the user
+    /// is typing into.
+    /// </summary>
+    private void NoteTerminalInput()
+    {
+        Volatile.Write(ref _lastTerminalInputMilliseconds, Environment.TickCount64);
     }
 
     /// <summary>Whether a macro recording is currently in progress.</summary>
@@ -2429,6 +2509,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        _keepAliveIntervalSeconds = intervalSeconds;
         _keepAliveTimer = new System.Threading.Timer(
             _ => SendKeepAlive(),
             null,
@@ -2438,15 +2519,21 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             $"SSH keepalive timer started ({intervalSeconds}s interval)");
     }
 
+    /// <remarks>
+    /// Reached from the timer's own pool thread (a tick that finds the session gone) and from the
+    /// UI thread (dispose, disconnect). The field is taken once, atomically, so two callers racing
+    /// past a null check cannot both dereference it; the same shape as
+    /// <see cref="StopAutoReconnectTimer(AutoReconnectTickScheduler, ref System.Threading.Timer?)"/>.
+    /// </remarks>
     private void StopKeepAliveTimer()
     {
-        if (_keepAliveTimer is null)
+        System.Threading.Timer? stoppedTimer = Interlocked.Exchange(ref _keepAliveTimer, null);
+        if (stoppedTimer is null)
         {
             return;
         }
 
-        _keepAliveTimer.Dispose();
-        _keepAliveTimer = null;
+        stoppedTimer.Dispose();
         Core.Logging.FileLogger.Info("SSH keepalive timer stopped");
     }
 
@@ -2461,6 +2548,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             Core.Logging.FileLogger.Warn("SSH keepalive skipped: session not connected");
             StopKeepAliveTimer();
+            return;
+        }
+
+        // A bare CR is a keystroke. Into a shell the user is typing into it submits a half-typed
+        // line; the user's own input has already reset TMOUT, so the tick has nothing to do.
+        if (!TerminalKeepAlivePolicy.ShouldSendTick(
+            Environment.TickCount64,
+            Volatile.Read(ref _lastTerminalInputMilliseconds),
+            _keepAliveIntervalSeconds))
+        {
             return;
         }
 

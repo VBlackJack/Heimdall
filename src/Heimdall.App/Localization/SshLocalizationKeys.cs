@@ -65,5 +65,6 @@ internal static class SshLocalizationKeys
     public const string StatusSshDirectCompressionUnavailable = "StatusSshDirectCompressionUnavailable";
     public const string StatusSshDirectX11AndCompressionUnavailable = "StatusSshDirectX11AndCompressionUnavailable";
     public const string StatusSshDirectX11Unavailable = "StatusSshDirectX11Unavailable";
+    public const string X11ServerNotFound = "X11ServerNotFound";
     public const string StatusSshRetryingViaPlink = "StatusSshRetryingViaPlink";
 }
