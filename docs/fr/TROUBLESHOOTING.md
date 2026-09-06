@@ -961,3 +961,19 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 2. Ou retirer le proxy SOCKS / la redirection distante du profil si la session n'en a pas besoin.
 
 **Fichiers** : `Services/TunnelService.cs` (`EstablishPlinkTunnelAsync`), `Heimdall.Ssh/Plink/PlinkTunnelRunner.cs`
+
+---
+
+## 53. Mise à jour - la bannière dit que la mise à jour ne s'est pas appliquée {#update-did-not-apply}
+
+**Symptôme** : après avoir accepté une mise à jour, Heimdall revient sur la version précédente et la bannière signale que la mise à jour ne s'est pas appliquée, a été annulée, ou n'a pas pu démarrer parce que Heimdall tournait encore.
+
+**Cause racine** : le relanceur enregistre l'étape atteinte avant de s'arrêter, et le démarrage suivant la rapporte. Les trois causes les plus fréquentes, chacune avec sa formulation : l'invite d'élévation a été refusée (rapportée comme une annulation, pas un échec) ; Heimdall n'était pas sorti au bout de deux minutes, et le relanceur a refusé d'exécuter l'installateur sur un processus vivant ; ou l'installateur lui-même a signalé une erreur. Une copie que l'installateur n'a pas mise en place (zip portable, MSI) ne se voit plus proposer d'installateur et est renvoyée vers la page de publication.
+
+**Solution** :
+
+1. Lire la transcription du relanceur : `Heimdall_relaunch_<date>.log` dans le dossier de journaux indiqué dans le panneau À propos. Elle nomme l'étape et, pour une erreur de l'installateur, le code de sortie.
+2. Si Heimdall tournait encore, fermer toutes les fenêtres (fenêtres de session détachées comprises) et réessayer ; une invite de fermeture de session restée ouverte est la raison habituelle.
+3. Si la copie est un zip portable ou un déploiement MSI, télécharger la nouvelle archive ou le nouveau paquet depuis la page de publication.
+
+**Fichiers** : `Heimdall.Core/Updates/UpdateRelaunchScript.cs`, `Heimdall.Core/Updates/UpdateOutcomeClassifier.cs`, `Services/UpdateRelaunchOutcomeText.cs`

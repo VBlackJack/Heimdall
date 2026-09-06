@@ -625,6 +625,43 @@ affectations token / bearer jusqu'à la fin de ligne, ainsi que les options
 `-pw` / `-pwfile`, afin qu'un écho inattendu de plink sur stderr ne puisse pas
 faire fuiter des identifiants dans le journal applicatif.
 
+### Source des mises à jour intégrées et relance
+
+Le dépôt que le programme de mise à jour interroge est une constante de
+compilation (`UpdateSource`), pas un réglage. C'était une paire de chaînes
+dans le `settings.json` de l'utilisateur, non validées et affichées dans
+aucune interface : quiconque pouvait écrire ce fichier pouvait rediriger le
+programme de mise à jour vers un dépôt à lui, et le contrôle SHA-256 passait
+parce qu'il est calculé contre le fichier de sommes de ce même dépôt. SHA-256
+est un contrôle d'intégrité contre un transfert corrompu, pas un contrôle
+d'authenticité ; tant que l'installateur n'est pas signé, la source est le
+seul contrôle d'authenticité, elle est donc fixée. Les URL d'actifs et de
+sommes lues dans le JSON de la release sont refusées si elles ne sont pas en
+`https` sur `github.com`, `githubusercontent.com` ou un sous-domaine de l'un
+des deux.
+
+Le relanceur détaché tourne sous Windows PowerShell via un amorçage en mémoire
+qui relit le script sous un handle interdisant l'écriture et vérifie son
+SHA-256 épinglé avant de l'exécuter. L'amorçage a son propre chemin d'échec :
+un script altéré ou impossible à analyser est refusé, enregistré comme un
+échec de préparation, et l'application est relancée. Le script refuse
+d'exécuter l'installateur tant que l'application tourne encore (un
+installateur lancé sur un processus vivant le ferme de force en pleine
+session), passe à l'installateur le répertoire de la copie en cours, et
+enregistre une invite d'élévation refusée comme une annulation plutôt qu'un
+échec. Un installateur n'est proposé qu'à une copie que l'installateur a
+enregistrée en place ; une archive portable ou un déploiement MSI se voit
+présenter la page de publication à la place.
+
+Risque résiduel connu, consigné plutôt que corrigé : sur le chemin élevé,
+l'installateur s'exécute en administrateur depuis un répertoire de
+préparation que l'utilisateur non privilégié peut écrire. Le fichier
+installateur lui-même est maintenu sous un bail interdisant l'écriture de la
+vérification au lancement, il ne peut donc pas être substitué ; un fichier
+voisin déposé à côté pourrait encore être résolu par le chargeur de
+l'installateur. Dans le modèle énoncé par Microsoft, l'UAC n'est pas une
+frontière de sécurité : c'est un durcissement, pas une brèche.
+
 ### Entrées distantes dont le type ne peut pas être déterminé
 
 Un listage classe chaque entrée distante : fichier régulier, répertoire, lien symbolique, tube,

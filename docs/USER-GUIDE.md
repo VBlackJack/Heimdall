@@ -190,7 +190,15 @@ install themselves, in which case it says so and points you at the release page 
 hand.
 
 If you installed from the zip rather than the installer, replace the folder contents with the new
-version. Your sessions and settings live outside the program folder and are not affected.
+version. Your sessions and settings live outside the program folder and are not affected. Heimdall
+recognises such a copy and does not offer to install over it; it shows the release page instead.
+
+If you chose **Skip this version** on the banner and change your mind, the skipped version is listed
+under **Settings** -> **Updates** with a button that offers it again.
+
+Installing an update saves your unsaved settings, the tree's expand state and the window position
+before Heimdall exits, exactly as closing the window would. If an update did not apply, the banner
+says so at the next start and the relauncher's log is in the log folder shown in the About panel.
 
 ---
 

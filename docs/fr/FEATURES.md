@@ -302,6 +302,11 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Section **Updates** dans les Paramètres, avec un bouton **Vérifier maintenant** manuel et la version installée
 - Chaque release publie un fichier `SHA256SUMS.txt` afin de vérifier l'intégrité de l'installateur avant de l'exécuter
 - L'installateur téléchargé est déposé dans un répertoire à ACL restrictives et maintenu sous un handle interdisant l'écriture, de la vérification jusqu'au lancement ; son SHA-256 (ainsi que l'Authenticode lorsque l'installateur est signé) est revérifié juste avant le lancement élevé, ce qui interdit toute substitution entre vérification et exécution
+- La source des mises à jour est fixée au dépôt GitHub du projet à la compilation, et les téléchargements d'actifs sont confinés aux origines GitHub ; rien dans les réglages de l'utilisateur ne peut rediriger le programme de mise à jour
+- Une copie que l'installateur n'a pas mise en place (zip portable, déploiement MSI, build lancé depuis son dossier de sortie) est informée qu'une release existe et renvoyée vers la page de publication, au lieu de se voir proposer un installateur qui installerait une seconde copie ailleurs
+- Le relanceur refuse d'exécuter l'installateur tant que l'application tourne encore, enregistre pourquoi il s'est arrêté à chaque étape (y compris une invite d'élévation refusée), et ramène l'application même quand son propre amorçage échoue avant le démarrage du script
+- Un téléchargement qui cale est interrompu après soixante secondes sans données et signalé comme un échec de téléchargement ; **Ignorer cette version** est affiché dans la section Mises à jour des Réglages avec un bouton pour proposer cette version à nouveau
+- Installer une mise à jour enregistre les réglages non sauvegardés, l'état de dépliage de l'arbre des sessions et les bornes de la fenêtre avant la sortie de l'application, comme une fermeture normale
 
 ---
 
