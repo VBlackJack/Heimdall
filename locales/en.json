@@ -3166,6 +3166,9 @@
 
   "SshDisconnectedMessage": "Session disconnected unexpectedly.",
   "SshTerminalDisconnectMarker": "[Session ended: {0}]",
+  "SshDisconnectRemoteShellExited": "Remote shell exited.",
+  "SshDisconnectProcessExited": "Process exited with code {0}",
+  "StatusMacroExpectTimedOut": "Macro expect timed out after {0} ms",
   "SshConnectingTitle": "Connecting...",
   "SshConnectingTitleWithName": "Connecting to {0}...",
   "BtnCloseOverlay": "_Close",

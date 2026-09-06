@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Localization;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Services;
@@ -52,15 +53,21 @@ internal static class TerminalReconnectPolicy
         bool autoReconnectOnProcessExit,
         bool suppressAutoReconnect = false)
     {
-        string message = $"Process exited with code {exitCode}";
+        // The detail is named by locale key and carries the exit code; the view formats it,
+        // so the terminal marker reads in the user's language instead of composed English.
+        SshSessionDisconnectInfo disconnect;
         if (exitCode == 0)
         {
-            return SshSessionDisconnectInfo.Clean(message);
+            disconnect = SshSessionDisconnectInfo.Clean();
+        }
+        else
+        {
+            disconnect = autoReconnectOnProcessExit && !suppressAutoReconnect
+                ? SshSessionDisconnectInfo.Unclassified(null)
+                : SshSessionDisconnectInfo.TerminalEnded(null);
         }
 
-        return autoReconnectOnProcessExit && !suppressAutoReconnect
-            ? SshSessionDisconnectInfo.Unclassified(message)
-            : SshSessionDisconnectInfo.TerminalEnded(message);
+        return disconnect.WithMessageKey(SshLocalizationKeys.SshDisconnectProcessExited, exitCode);
     }
 
     public static bool SuppressesConnectTimeProcessExit(

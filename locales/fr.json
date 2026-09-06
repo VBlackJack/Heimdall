@@ -3163,6 +3163,9 @@
 
   "SshDisconnectedMessage": "Session d\u00e9connect\u00e9e de mani\u00e8re inattendue.",
   "SshTerminalDisconnectMarker": "[Session termin\u00e9e : {0}]",
+  "SshDisconnectRemoteShellExited": "Le shell distant s'est termin\u00e9.",
+  "SshDisconnectProcessExited": "Le processus s'est termin\u00e9 avec le code {0}",
+  "StatusMacroExpectTimedOut": "Attente de macro expir\u00e9e apr\u00e8s {0} ms",
   "SshConnectingTitle": "Connexion en cours...",
   "SshConnectingTitleWithName": "Connexion \u00e0 {0}...",
   "BtnCloseOverlay": "_Fermer",

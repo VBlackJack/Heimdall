@@ -400,7 +400,8 @@ public sealed class SshShellSession : IDisposable
     {
         if (transportConnected)
         {
-            return SshSessionDisconnectInfo.Clean("Remote shell exited.");
+            return SshSessionDisconnectInfo.Clean()
+                .WithMessageKey(SshDisconnectMessageKeys.MessageKeyRemoteShellExited);
         }
 
         var failure = new SshFailureInfo(

@@ -62,6 +62,11 @@ internal static class SshLocalizationKeys
     public const string ErrorTunnelFailed = "ErrorTunnelFailed";
     public const string ErrorTunnelNoLoopbackAlias = "ErrorTunnelNoLoopbackAlias";
     public const string ErrorTunnelPortConcurrent = "ErrorTunnelPortConcurrent";
+    /// <summary>Disconnect detail of a process-backed terminal whose process exited; {0} is the exit code.</summary>
+    public const string SshDisconnectProcessExited = "SshDisconnectProcessExited";
+
+    /// <summary>Status shown when a macro expect step times out; {0} is the timeout in milliseconds.</summary>
+    public const string StatusMacroExpectTimedOut = "StatusMacroExpectTimedOut";
     public const string StatusSshDirectCompressionUnavailable = "StatusSshDirectCompressionUnavailable";
     public const string StatusSshDirectX11AndCompressionUnavailable = "StatusSshDirectX11AndCompressionUnavailable";
     public const string StatusSshDirectX11Unavailable = "StatusSshDirectX11Unavailable";
