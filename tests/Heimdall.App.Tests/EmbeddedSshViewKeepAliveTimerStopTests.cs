@@ -27,7 +27,8 @@ namespace Heimdall.App.Tests;
 /// the process down.</para>
 /// <para>The auto-reconnect timer next to it already exchanges the field atomically. This pins the
 /// keepalive stop to the same shape. Read from source because the view needs a desktop to
-/// construct; the assertion is on the executable statement, not on a comment.</para>
+/// construct; each anchor is carried through the statement predicate, so a statement folded
+/// behind a false term does not keep this green.</para>
 /// </remarks>
 public sealed class EmbeddedSshViewKeepAliveTimerStopTests
 {
@@ -36,18 +37,13 @@ public sealed class EmbeddedSshViewKeepAliveTimerStopTests
     [Fact]
     public void TheStopTakesTheTimerOutOfTheFieldAtomically()
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            StopSignature);
-        string[] lines = EmbeddedSshViewSourceReader.ExecutableLines(body);
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), StopSignature);
 
-        Assert.Contains(
-            lines,
-            line => line == "System.Threading.Timer? stoppedTimer = Interlocked.Exchange(ref _keepAliveTimer, null);");
-        Assert.DoesNotContain(
-            lines,
-            line => line.StartsWith("_keepAliveTimer.Dispose()", StringComparison.Ordinal));
-        Assert.DoesNotContain(lines, line => line == "_keepAliveTimer = null;");
+        SourceStatements.AssertStatementChain(
+            logic,
+            "System.Threading.Timer? stoppedTimer = Interlocked.Exchange(ref _keepAliveTimer, null);");
+        Assert.DoesNotContain("_keepAliveTimer.Dispose()", logic, StringComparison.Ordinal);
+        Assert.DoesNotContain("_keepAliveTimer = null", logic, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -56,23 +52,25 @@ public sealed class EmbeddedSshViewKeepAliveTimerStopTests
     [Fact]
     public void TheExchangedTimerIsTheOneDisposed()
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            StopSignature);
-        string[] lines = EmbeddedSshViewSourceReader.ExecutableLines(body);
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), StopSignature);
 
-        Assert.Contains(lines, line => line == "stoppedTimer.Dispose();");
+        SourceStatements.AssertStatementChain(logic, "stoppedTimer.Dispose();");
     }
 
     /// <summary>
-    /// Guards the guard: the source being read carries the method and the field.
+    /// Guards the guard: the field the statement exchanges is the view's timer field, and the
+    /// method being read exists (the reader asserts that itself).
     /// </summary>
     [Fact]
     public void TheSourceBeingReadCarriesTheKeepAliveTimer()
     {
-        string source = EmbeddedSshViewSourceReader.ReadViewSource();
+        _ = SourceStatements.Method(SourceStatements.ViewLogic(), StopSignature);
 
-        Assert.Contains(StopSignature, source, StringComparison.Ordinal);
-        Assert.Contains("private System.Threading.Timer? _keepAliveTimer;", source, StringComparison.Ordinal);
+        System.Reflection.FieldInfo? field = typeof(Heimdall.App.Views.EmbeddedSshView).GetField(
+            "_keepAliveTimer",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(field);
+        Assert.Equal(typeof(System.Threading.Timer), field.FieldType);
     }
 }

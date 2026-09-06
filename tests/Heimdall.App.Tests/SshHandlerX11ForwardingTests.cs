@@ -18,6 +18,7 @@ using System.IO;
 using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -111,18 +112,26 @@ public sealed class SshHandlerX11ForwardingTests
 
     /// <summary>
     /// The external PuTTY path launches a real process, so its wiring is read from source: the
-    /// flag it passes has to be the resolved answer, not the profile's wish.
+    /// answer is resolved as a step of the launch, and the profile's wish is not consulted for
+    /// the flag any more.
     /// </summary>
+    /// <remarks>
+    /// What this cannot say is which value reaches <c>BuildPuttyStartInfo</c>; that would need
+    /// the launch behind a seam. It says the resolver is written as a step of the launch's
+    /// <c>try</c> block and that the only forwarding flag left in the method is the resolved one.
+    /// </remarks>
     [Fact]
     public void TheExternalPuttyLaunchPassesTheResolvedAnswer()
     {
-        string body = ExtractMethodBody(
-            ReadHandlerSource(),
+        string logic = SourceStatements.Method(
+            SourceStatements.SshHandlerLogic(),
             "private async Task<ConnectionResult> ConnectSshExternal(");
-        string text = ExecutableText(body);
 
-        Assert.Contains("bool x11Forwarding = await ResolveX11ForwardingAsync(server)", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("server.SshX11Forwarding", text, StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(
+            logic,
+            "try",
+            "bool x11Forwarding = await ResolveX11ForwardingAsync(server)");
+        Assert.DoesNotContain("server.SshX11Forwarding", logic, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -131,78 +140,20 @@ public sealed class SshHandlerX11ForwardingTests
     [Fact]
     public void TheResolverSurfacesTheNoticeThroughTheStatusText()
     {
-        string body = ExtractMethodBody(
-            ReadHandlerSource(),
+        string logic = SourceStatements.Method(
+            SourceStatements.SshHandlerLogic(),
             "private async Task<bool> ResolveX11ForwardingAsync(ServerProfileDto server)");
-        string text = ExecutableText(body);
 
-        Assert.Contains("SetStatusText?.Invoke(_localizer[SshLocalizationKeys.X11ServerNotFound]);", text, StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(
+            logic,
+            "SetStatusText?.Invoke(_localizer[SshLocalizationKeys.X11ServerNotFound]);");
     }
 
     private static async Task<LocalizationManager> LoadEnglishAsync()
     {
         LocalizationManager localizer = new LocalizationManager();
-        await localizer.LoadAsync(Path.Combine(FindRepoRoot(), "locales"), "en");
+        await localizer.LoadAsync(Path.Combine(ViewSource.RepoRoot(), "locales"), "en");
         return localizer;
-    }
-
-    private static string ReadHandlerSource() => File.ReadAllText(Path.Combine(
-        FindRepoRoot(),
-        "src",
-        "Heimdall.App",
-        "Services",
-        "Handlers",
-        "SshHandler.cs"));
-
-    private static string ExecutableText(string body) => string.Join(
-        ' ',
-        body.Split('\n')
-            .Select(static line => line.Trim())
-            .Where(static line => line.Length > 0 && !line.StartsWith("//", StringComparison.Ordinal)));
-
-    private static string ExtractMethodBody(string source, string signature)
-    {
-        int start = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(start >= 0, $"Signature not found: {signature}");
-
-        int open = source.IndexOf('{', start + signature.Length);
-        Assert.True(open >= 0, $"No body for: {signature}");
-
-        int depth = 0;
-        for (int index = open; index < source.Length; index++)
-        {
-            if (source[index] == '{')
-            {
-                depth++;
-            }
-            else if (source[index] == '}')
-            {
-                depth--;
-                if (depth == 0)
-                {
-                    return source[open..(index + 1)];
-                }
-            }
-        }
-
-        throw new InvalidOperationException($"Unbalanced body for: {signature}");
-    }
-
-    private static string FindRepoRoot()
-    {
-        string? dir = AppContext.BaseDirectory;
-        while (dir is not null)
-        {
-            if (File.Exists(Path.Combine(dir, "Heimdall.slnx")))
-            {
-                return dir;
-            }
-
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        throw new DirectoryNotFoundException(
-            $"Cannot find repository root containing Heimdall.slnx from: {AppContext.BaseDirectory}");
     }
 
     /// <summary>

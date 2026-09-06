@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.Reflection;
 using Heimdall.App.Services;
+using Heimdall.App.Views;
 
 namespace Heimdall.App.Tests;
 
@@ -27,24 +29,36 @@ namespace Heimdall.App.Tests;
 /// a null session and was lost, so the PTY stayed at 80x24 until the user resized the window.</para>
 /// <para>The view now remembers the last size it heard, from <c>ready:</c> and from <c>resize:</c>,
 /// exposes it for the handler to create the PTY with, and replays it on both attach paths. Read
-/// from source because the view needs a desktop to construct; every assertion is on an executable
-/// line.</para>
+/// from source because the view needs a desktop to construct; each anchor is carried through the
+/// statement predicate, nested sites as a chain.</para>
 /// </remarks>
 public sealed class EmbeddedSshViewTerminalSizeReplayTests
 {
     private const string MessageHandlerSignature =
         "private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)";
 
-    [Theory]
-    [InlineData("RememberTerminalSize(readyCols, readyRows);")]
-    [InlineData("RememberTerminalSize(cols, rows);")]
-    public void TheSizeThePageReportsIsRemembered(string statement)
+    [Fact]
+    public void TheReadySizeIsRemembered()
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            MessageHandlerSignature);
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), MessageHandlerSignature);
 
-        Assert.Contains(EmbeddedSshViewSourceReader.ExecutableLines(body), line => line == statement);
+        SourceStatements.AssertStatementChain(
+            logic,
+            "if (message.StartsWith(MsgReady, StringComparison.Ordinal))",
+            "if (TryParseSize(message.AsSpan(MsgReady.Length), out int readyCols, out int readyRows))",
+            "RememberTerminalSize(readyCols, readyRows);");
+    }
+
+    [Fact]
+    public void TheResizeSizeIsRemembered()
+    {
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), MessageHandlerSignature);
+
+        SourceStatements.AssertStatementChain(
+            logic,
+            "if (message.StartsWith(MsgResize, StringComparison.Ordinal))",
+            "if (TryParseSize(message.AsSpan(MsgResize.Length), out int cols, out int rows))",
+            "RememberTerminalSize(cols, rows);");
     }
 
     [Theory]
@@ -52,26 +66,22 @@ public sealed class EmbeddedSshViewTerminalSizeReplayTests
     [InlineData("public void AttachTerminalSession(")]
     public void EveryAttachReplaysTheRememberedSize(string signature)
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            signature);
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), signature);
 
-        Assert.Contains(
-            EmbeddedSshViewSourceReader.ExecutableLines(body),
-            line => line == "ReplayLastKnownTerminalSize();");
+        SourceStatements.AssertStatementChain(logic, "ReplayLastKnownTerminalSize();");
     }
 
     [Fact]
     public void TheReplayResizesTheSessionToTheRememberedSize()
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
+        string logic = SourceStatements.Method(
+            SourceStatements.ViewLogic(),
             "private void ReplayLastKnownTerminalSize()");
 
-        Assert.Contains(
-            "ResizeSession(size.Columns, size.Rows);",
-            EmbeddedSshViewSourceReader.ExecutableText(body),
-            StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(
+            logic,
+            "if (Volatile.Read(ref _lastKnownTerminalSize) is { } size)",
+            "ResizeSession(size.Columns, size.Rows);");
     }
 
     /// <summary>
@@ -80,9 +90,12 @@ public sealed class EmbeddedSshViewTerminalSizeReplayTests
     [Fact]
     public void TheRememberedSizeIsExposedForTheHandler()
     {
-        string source = EmbeddedSshViewSourceReader.ReadViewSource();
+        PropertyInfo? property = typeof(EmbeddedSshView).GetProperty(
+            "LastKnownTerminalSize",
+            BindingFlags.Instance | BindingFlags.NonPublic);
 
-        Assert.Contains("internal TerminalSize? LastKnownTerminalSize", source, StringComparison.Ordinal);
+        Assert.NotNull(property);
+        Assert.Equal(typeof(TerminalSize), property.PropertyType);
     }
 
     [Fact]
@@ -100,18 +113,5 @@ public sealed class EmbeddedSshViewTerminalSizeReplayTests
     public void ASizeWithoutAPositiveDimensionIsRefused(int columns, int rows)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new TerminalSize(columns, rows));
-    }
-
-    /// <summary>
-    /// Guards the guards above: the source being read carries the members they extract.
-    /// </summary>
-    [Fact]
-    public void TheSourceBeingReadCarriesTheMessageHandlerAndBothAttaches()
-    {
-        string source = EmbeddedSshViewSourceReader.ReadViewSource();
-
-        Assert.Contains(MessageHandlerSignature, source, StringComparison.Ordinal);
-        Assert.Contains("public void AttachSession(", source, StringComparison.Ordinal);
-        Assert.Contains("public void AttachTerminalSession(", source, StringComparison.Ordinal);
     }
 }

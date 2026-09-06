@@ -28,13 +28,15 @@ namespace Heimdall.App.Tests;
 /// session it is a stray Enter with no <c>TMOUT</c> to reset. And while a macro was being recorded
 /// it was captured as an entry, so the replay carried a phantom Enter.</para>
 /// <para>The decision lives in <see cref="TerminalKeepAlivePolicy"/> and is pinned directly. The
-/// view needs a desktop to construct, so its use of the policy is read from source, on executable
-/// lines only.</para>
+/// view needs a desktop to construct, so its use of the policy is read from source, with each
+/// anchor carried through the statement predicate.</para>
 /// </remarks>
 public sealed class TerminalKeepAlivePolicyTests
 {
     private const int Interval = 240;
     private const long Second = 1000;
+    private const string ByteWriteSignature = "private void WriteToSession(byte[] data, bool marksTerminalInput = true)";
+    private const string TextWriteSignature = "private void WriteToSession(string text, bool marksTerminalInput = true)";
 
     [Theory]
     [InlineData("SSH")]
@@ -96,31 +98,22 @@ public sealed class TerminalKeepAlivePolicyTests
     [Fact]
     public void TheTickConsultsThePolicy()
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            "private void SendKeepAlive()");
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), "private void SendKeepAlive()");
 
-        Assert.Contains(
-            "TerminalKeepAlivePolicy.ShouldSendTick(",
-            EmbeddedSshViewSourceReader.ExecutableText(body),
-            StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(logic, "if (!TerminalKeepAlivePolicy.ShouldSendTick(");
     }
 
     /// <summary>
     /// Every write that is real input stamps the clock the policy reads.
     /// </summary>
     [Theory]
-    [InlineData("private void WriteToSession(byte[] data, bool marksTerminalInput = true)")]
-    [InlineData("private void WriteToSession(string text, bool marksTerminalInput = true)")]
+    [InlineData(ByteWriteSignature)]
+    [InlineData(TextWriteSignature)]
     public void RealInputStampsTheClockTheTickReads(string signature)
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            signature);
-        string[] lines = EmbeddedSshViewSourceReader.ExecutableLines(body);
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), signature);
 
-        Assert.Contains(lines, line => line == "if (marksTerminalInput)");
-        Assert.Contains(lines, line => line == "NoteTerminalInput();");
+        SourceStatements.AssertStatementChain(logic, "if (marksTerminalInput)", "NoteTerminalInput();");
     }
 
     /// <summary>
@@ -129,13 +122,10 @@ public sealed class TerminalKeepAlivePolicyTests
     [Fact]
     public void TheResetIsNeverRecordedIntoAMacro()
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            "private void WriteToSession(byte[] data, bool marksTerminalInput = true)");
-        string[] lines = EmbeddedSshViewSourceReader.ExecutableLines(body);
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), ByteWriteSignature);
 
-        Assert.Contains(lines, line => line == "if (_isRecording && marksTerminalInput)");
-        Assert.DoesNotContain(lines, line => line == "if (_isRecording)");
+        SourceStatements.AssertStatementChain(logic, "if (_isRecording && marksTerminalInput)", "_macroEntries.Add(");
+        Assert.DoesNotContain("if (_isRecording)", logic, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -144,27 +134,10 @@ public sealed class TerminalKeepAlivePolicyTests
     [Fact]
     public void AProcessBackedSessionAsksThePolicyBeforeStartingTheTimer()
     {
-        string body = EmbeddedSshViewSourceReader.ExtractMethodBody(
-            EmbeddedSshViewSourceReader.ReadViewSource(),
-            "public void AttachTerminalSession(");
+        string logic = SourceStatements.Method(SourceStatements.ViewLogic(), "public void AttachTerminalSession(");
 
-        Assert.Contains(
-            "StartKeepAliveTimer(TerminalKeepAlivePolicy.ResolveIntervalSeconds(_sessionTab?.ConnectionType, keepAliveIntervalSeconds));",
-            EmbeddedSshViewSourceReader.ExecutableText(body),
-            StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// Guards the guards above: the source being read carries the members they extract.
-    /// </summary>
-    [Fact]
-    public void TheSourceBeingReadCarriesTheKeepAliveMembers()
-    {
-        string source = EmbeddedSshViewSourceReader.ReadViewSource();
-
-        Assert.Contains("private void SendKeepAlive()", source, StringComparison.Ordinal);
-        Assert.Contains("public void AttachTerminalSession(", source, StringComparison.Ordinal);
-        Assert.Contains("private void WriteToSession(byte[] data", source, StringComparison.Ordinal);
-        Assert.Contains("private void WriteToSession(string text", source, StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(
+            logic,
+            "StartKeepAliveTimer(TerminalKeepAlivePolicy.ResolveIntervalSeconds(_sessionTab?.ConnectionType, keepAliveIntervalSeconds));");
     }
 }
