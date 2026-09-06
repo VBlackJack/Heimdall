@@ -573,8 +573,7 @@ public sealed class SplitService : ISplitService
             Core.Logging.ConnectionHistory.RecordDisconnect(
                 historyId, pane.Title, pane.ConnectionType);
 
-            var stateData = _connectionSm.GetStateData(pane.ServerId);
-            if (stateData?.TunnelLocalPort is int localPort)
+            if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort))
                 _tunnelManager.ReleaseReference(localPort);
 
             // Guarded for the reason TearDownPaneState gives: a state observer that throws must
@@ -894,8 +893,7 @@ public sealed class SplitService : ISplitService
     {
         if (string.IsNullOrEmpty(serverId)) return;
 
-        var stateData = _connectionSm.GetStateData(serverId);
-        if (stateData?.TunnelLocalPort is int port)
+        if (_connectionSm.TryTakeTunnelLocalPort(serverId, out int port))
             _tunnelManager.ReleaseReference(port);
 
         // Same guard, same reason. This one runs while tidying up after a pane that is already
@@ -985,8 +983,7 @@ public sealed class SplitService : ISplitService
                 Core.Logging.ConnectionHistory.RecordDisconnect(
                     historyId, pane.Title, pane.ConnectionType);
 
-                var stateData = _connectionSm.GetStateData(pane.ServerId);
-                if (stateData?.TunnelLocalPort is int localPort)
+                if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort))
                     _tunnelManager.ReleaseReference(localPort);
 
                 TearDownPaneState(pane);
@@ -1165,8 +1162,7 @@ public sealed class SplitService : ISplitService
     {
         if (string.IsNullOrEmpty(oldServerId)) return;
 
-        var stateData = _connectionSm.GetStateData(oldServerId);
-        if (stateData?.TunnelLocalPort is int port)
+        if (_connectionSm.TryTakeTunnelLocalPort(oldServerId, out int port))
             _tunnelManager.ReleaseReference(port);
         _connectionSm.Teardown(oldServerId);
     }

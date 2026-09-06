@@ -18,7 +18,9 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
@@ -43,6 +45,116 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialDialogPasswordDirtyCollection.Name)]
 public sealed class EmbeddedSessionManagerDisconnectTests
 {
+    /// <summary>
+    /// Reproduction for the parked finding C-07 of the SSH audit of 2026-09-06. The WinRM
+    /// process-exit handler runs on the process's exit thread and the pane close runs on the
+    /// UI thread; both read the pane's tunnel port, release it, and only then tear the state
+    /// down. When the close lands between the exit handler's read and its teardown, one
+    /// acquisition is released twice and a tunnel another pane still holds is closed.
+    /// </summary>
+    /// <remarks>
+    /// The interleaving is forced, not raced: the tunnel service double parks the exit
+    /// handler inside its release call, after the read, until the close has run.
+    /// </remarks>
+    [Fact]
+    public void C07_WinRmProcessExitRacingAPaneClose_ReleasesOneAcquisitionOnce()
+    {
+        RunOnStaThread(() =>
+        {
+            App application = CreateApplication();
+            string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"heimdall-c07-{Guid.NewGuid():N}");
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(tempDir, "config"));
+            try
+            {
+                const string serverId = "winrm-shared-tunnel";
+                const int localPort = 45140;
+                const string chainKey = "chain-c07";
+                const string remoteHost = "10.0.0.9";
+                const int remotePort = 5985;
+                ConnectionStateMachine stateMachine = new ConnectionStateMachine();
+                SeedWinRmHandedOffState(stateMachine, serverId, localPort);
+
+                using TunnelManager tunnelManager = new TunnelManager();
+                TunnelInfo info = TunnelManager.BuildTunnelInfo(
+                    "gateway", localPort, remoteHost, remotePort,
+                    socksProxyPort: 0, remoteBindPort: 0, remoteLocalPort: 0,
+                    gatewayRoute: null, gatewayChainKey: chainKey);
+                // Reference 1: this pane. Reference 2: another pane sharing the tunnel.
+                Assert.True(tunnelManager.TryRegisterExternalTunnel(info, new NoopDisposable(), () => true));
+                Assert.NotNull(tunnelManager.AcquireReusableTunnel(chainKey, remoteHost, remotePort, 0, 0, 0));
+
+                GatedTunnelService tunnelService = new GatedTunnelService(tunnelManager);
+                RaisingTerminalSession terminalSession = new RaisingTerminalSession();
+                EmbeddedSessionManager manager = CreateManager(stateMachine, tunnelService);
+                SessionPaneModel pane = new SessionPaneModel
+                {
+                    PaneId = "winrm-shared-pane",
+                    ServerId = serverId,
+                    OriginalServerId = "winrm-inventory",
+                    Title = "WinRM shared",
+                    ConnectionType = "WINRM",
+                    Status = "RemoteSessionHandedOff"
+                };
+                SessionPaneModel sibling = new SessionPaneModel
+                {
+                    PaneId = "sibling-tool",
+                    ConnectionType = "TOOL:NOTES"
+                };
+                SessionTabViewModel tab = new SessionTabViewModel
+                {
+                    RootContent = new SplitContainerModel
+                    {
+                        First = pane,
+                        Second = sibling,
+                        Orientation = SplitOrientation.Horizontal
+                    }
+                };
+                object host = manager.CreateHostControl(
+                    tab,
+                    pane.Title,
+                    pane.ConnectionType,
+                    new TerminalSessionResult(terminalSession));
+                pane.HostControl = host;
+                ((EmbeddedSshView)host).SetOwningPane(pane);
+
+                SplitService split = new SplitService(
+                    new ConfigManager(tempDir),
+                    new LocalizationManager(),
+                    stateMachine,
+                    tunnelManager,
+                    manager,
+                    null!,
+                    new ToolRegistry(),
+                    null!,
+                    new PaneCloseArbiter());
+
+                // The process exits: its handler reads the port and enters the release.
+                Thread exitThread = new Thread(() => terminalSession.RaiseProcessExited(0));
+                exitThread.Start();
+                Assert.True(tunnelService.ReadDone.Wait(TimeSpan.FromSeconds(10)), "the exit handler never reached its release");
+
+                // Meanwhile the user closes the pane: the state still carries the port.
+                split.ClosePane(tab, pane.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
+
+                tunnelService.Proceed.Set();
+                Assert.True(exitThread.Join(TimeSpan.FromSeconds(10)), "the exit handler never finished");
+
+                Assert.NotNull(tunnelManager.GetTunnel(localPort));
+            }
+            finally
+            {
+                ResetApplicationSingletonForTest(application);
+                try
+                {
+                    System.IO.Directory.Delete(tempDir, recursive: true);
+                }
+                catch (System.IO.IOException)
+                {
+                }
+            }
+        });
+    }
+
     [Fact]
     public void WinRmProcessExit_ReleasesTunnelAndTearsDownRuntimeState()
     {
@@ -454,6 +566,48 @@ public sealed class EmbeddedSessionManagerDisconnectTests
         {
             IsRunning = false;
             ProcessExited?.Invoke(exitCode);
+        }
+    }
+
+    /// <summary>
+    /// Forwards releases to a real <see cref="TunnelManager"/>, but parks the first caller
+    /// between its read of the port and the release until the test lets it proceed.
+    /// </summary>
+    private sealed class GatedTunnelService(TunnelManager tunnelManager) : ITunnelService
+    {
+        public ManualResetEventSlim ReadDone { get; } = new(false);
+
+        public ManualResetEventSlim Proceed { get; } = new(false);
+
+        public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
+            ServerProfileDto server,
+            int remotePort,
+            AppSettings settings,
+            CancellationToken ct = default,
+            bool useOsAssignedLocalPort = false)
+        {
+            throw new NotSupportedException();
+        }
+
+        public void UpdateSettings(AppSettings settings)
+        {
+        }
+
+        public TunnelForwardedPortFailure? GetRecentForwardedPortFailure(int localPort)
+            => null;
+
+        public void ReleaseTunnelReference(int localPort)
+        {
+            ReadDone.Set();
+            Assert.True(Proceed.Wait(TimeSpan.FromSeconds(10)), "the test never released the exit handler");
+            tunnelManager.ReleaseReference(localPort);
+        }
+    }
+
+    private sealed class NoopDisposable : IDisposable
+    {
+        public void Dispose()
+        {
         }
     }
 }

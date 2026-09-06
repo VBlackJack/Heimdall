@@ -892,15 +892,16 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 return;
             }
 
-            ConnectionStateData? state = _connectionSm.GetStateData(pane.ServerId);
-            if (state is null)
+            if (_connectionSm.GetStateData(pane.ServerId) is null)
             {
                 return;
             }
 
             try
             {
-                if (state.TunnelLocalPort is int localPort && localPort > 0)
+                // Taken, not read: this runs on the process's exit thread while a pane close
+                // may be releasing the same port on the UI thread, and only one of them may.
+                if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort))
                 {
                     _tunnelService.ReleaseTunnelReference(localPort);
                 }
