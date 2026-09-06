@@ -220,6 +220,30 @@ public class TunnelManagerTests : IDisposable
         }
     }
 
+    [Fact]
+    public void AcquireReusableTunnel_PreferDistinctLoopback_SkipsADefaultLoopbackTunnel()
+    {
+        Assert.True(RegisterFake(MakeInfo(45160, gatewayChainKey: "chain", localBindHost: LoopbackBinding.DefaultHost)));
+
+        TunnelInfo? reused = _manager.AcquireReusableTunnel(
+            "chain", "target.internal", 3389, 0, 0, 0, preferDistinctLoopback: true);
+
+        Assert.Null(reused);
+        Assert.NotNull(_manager.AcquireReusableTunnel("chain", "target.internal", 3389, 0, 0, 0));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_PreferDistinctLoopback_AcceptsAnAliasedTunnel()
+    {
+        Assert.True(RegisterFake(MakeInfo(45161, gatewayChainKey: "chain", localBindHost: LoopbackBinding.FormatAlias(2))));
+
+        TunnelInfo? reused = _manager.AcquireReusableTunnel(
+            "chain", "target.internal", 3389, 0, 0, 0, preferDistinctLoopback: true);
+
+        Assert.NotNull(reused);
+        Assert.Equal(LoopbackBinding.FormatAlias(2), reused.LocalBindHost);
+    }
+
     private bool RegisterFake(int localPort, IDisposable? handle = null, Func<bool>? isAlive = null)
     {
         return RegisterFake(MakeInfo(localPort), handle, isAlive);

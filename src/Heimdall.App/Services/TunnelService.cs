@@ -228,7 +228,8 @@ public sealed class TunnelService : ITunnelService
             remotePort,
             socksProxyPort,
             remoteBindPort,
-            remoteLocalPort);
+            remoteLocalPort,
+            preferDistinctLoopback);
 
         if (existing is not null)
         {

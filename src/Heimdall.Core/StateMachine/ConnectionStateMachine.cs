@@ -216,6 +216,34 @@ public sealed class ConnectionStateMachine
     }
 
     /// <summary>
+    /// Hands the tunnel port recorded for a server to exactly one caller and clears it,
+    /// so a release decided from it can only happen once. Two paths release a pane's
+    /// tunnel (its process exit, on the exit thread, and its close, on the UI thread);
+    /// each used to read the port, release it and tear the state down, so a close landing
+    /// between another path's read and teardown released one acquisition twice and closed
+    /// a tunnel a third holder still used.
+    /// </summary>
+    /// <returns>True when a port was recorded and is now the caller's to release.</returns>
+    public bool TryTakeTunnelLocalPort(string serverId, out int localPort)
+    {
+        lock (_lock)
+        {
+            if (_connections.TryGetValue(serverId, out ConnectionStateData? data)
+                && data.TunnelLocalPort is int port
+                && port > 0)
+            {
+                data.TunnelLocalPort = null;
+                data.TunnelProcessId = null;
+                localPort = port;
+                return true;
+            }
+        }
+
+        localPort = 0;
+        return false;
+    }
+
+    /// <summary>
     /// Resets a server to Disconnected, clearing all associated data.
     /// Performs intermediate transitions (Disconnecting) when required by the state table.
     /// </summary>
