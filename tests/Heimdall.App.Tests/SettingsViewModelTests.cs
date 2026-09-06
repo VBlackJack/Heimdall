@@ -2977,6 +2977,23 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.False(viewModel.IsDirty);
     }
 
+    /// <remarks>
+    /// The startup check catches everything; this command caught nothing, so the same
+    /// fault crashed the application from one button and was logged from the other.
+    /// </remarks>
+    [Fact]
+    public async Task CheckNowAsync_ServiceThrows_ShowsFailedStatusAndDoesNotPropagate()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService { CheckException = new UriFormatException("bad owner") };
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer.Format("SettingsUpdateStatusFailed"), viewModel.UpdateStatusText);
+        Assert.False(viewModel.IsCheckingUpdate);
+    }
+
     [Fact]
     public async Task CheckNowAsync_UpdateAvailable_IncludesVersionWithoutMarkingDirty()
     {
@@ -3137,6 +3154,8 @@ public sealed class SettingsViewModelTests : IDisposable
     {
         public UpdateCheckResult Result { get; set; } = new(UpdateCheckStatus.UpToDate, null);
 
+        public Exception? CheckException { get; set; }
+
         public string DownloadResultPath { get; set; } = @"C:\Temp\HeimdallSetup.exe";
 
         public Exception? DownloadException { get; set; }
@@ -3144,7 +3163,7 @@ public sealed class SettingsViewModelTests : IDisposable
         public int DownloadCallCount { get; private set; }
 
         public Task<UpdateCheckResult> CheckForUpdatesAsync(HeimdallVersion current, string owner, string repo, CancellationToken cancellationToken)
-            => Task.FromResult(Result);
+            => CheckException is null ? Task.FromResult(Result) : throw CheckException;
 
         public Task<IVerifiedUpdatePackage> DownloadVerifiedAsync(
             UpdateInfo update,

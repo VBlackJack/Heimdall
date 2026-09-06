@@ -28,6 +28,18 @@ namespace Heimdall.Core.Updates;
 public sealed class GitHubReleaseClient : IGitHubReleaseClient
 {
     private const string ApiBaseUrl = "https://api.github.com";
+
+    /// <summary>
+    /// The only hosts an asset may be fetched from. The release JSON names every asset
+    /// URL, and until now that URL was dispatched as found: only the API origin was
+    /// pinned, every later hop was whatever the JSON said. Release assets live on
+    /// github.com and redirect to githubusercontent.com; nothing else is expected.
+    /// </summary>
+    private static readonly string[] AllowedAssetHostSuffixes =
+    [
+        "github.com",
+        "githubusercontent.com",
+    ];
     private const string GitHubAcceptHeader = "application/vnd.github+json";
     private const string UserAgentProduct = "Heimdall";
 
@@ -100,6 +112,11 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
     public async Task<string?> GetAssetTextAsync(string url, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        if (!IsAllowedAssetUrl(url))
+        {
+            FileLogger.Warn($"Refusing to fetch update asset text from an unexpected origin: {url}");
+            return null;
+        }
 
         try
         {
@@ -130,16 +147,54 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
     public async Task<Stream> OpenAssetStreamAsync(string url, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        if (!IsAllowedAssetUrl(url))
+        {
+            throw new InvalidOperationException($"Refusing to download an update asset from an unexpected origin: {url}");
+        }
 
         using var request = CreateRequest(url, acceptGitHubJson: false);
         var response = await _httpClient
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        try
+        {
+            response.EnsureSuccessStatusCode();
+        }
+        catch
+        {
+            // The response is not returned, so nobody else can release its connection.
+            response.Dispose();
+            throw;
+        }
 
         // The caller owns the returned stream; disposing it releases the
         // underlying connection, and the response wrapper is collected with it.
         return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether an asset URL names an origin releases are actually served from: an
+    /// absolute https URL on github.com, githubusercontent.com or a subdomain of either.
+    /// </summary>
+    internal static bool IsAllowedAssetUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string host = uri.Host;
+        foreach (string suffix in AllowedAssetHostSuffixes)
+        {
+            if (string.Equals(host, suffix, StringComparison.OrdinalIgnoreCase)
+                || host.EndsWith("." + suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private HttpRequestMessage CreateRequest(string url, bool acceptGitHubJson)

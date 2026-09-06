@@ -113,9 +113,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _updateReleaseUrl = string.Empty;
     private bool _disposed;
 
-    // Repository coordinates for the update check, captured from settings on load.
-    private string _updateOwner = "";
-    private string _updateRepo = "";
     private int _mobaStoredCredentialCount;
 
     private string _originalTheme = "";
@@ -1092,7 +1089,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 return;
             }
 
-            var result = await _updateService.CheckForUpdatesAsync(current.Value, _updateOwner, _updateRepo, cancellationToken);
+            // The source is pinned, never read from settings: see UpdateSource.
+            var result = await _updateService.CheckForUpdatesAsync(
+                current.Value,
+                UpdateSource.RepositoryOwner,
+                UpdateSource.RepositoryName,
+                cancellationToken);
             if (result.Status == UpdateCheckStatus.UpdateAvailable)
             {
                 _availableUpdate = result.Update;
@@ -1113,6 +1115,18 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 UpdateCheckStatus.UpdateNotInstallable => _localizer.Format("SettingsUpdateStatusNotInstallable", result.Release!.Version.ToString()),
                 _ => _localizer.Format("SettingsUpdateStatusFailed"),
             };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            UpdateStatusText = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            // The startup check catches everything; this command used to catch nothing, so
+            // the same fault crashed the application from one button and was logged from
+            // the other. An AsyncRelayCommand rethrows on the UI context.
+            FileLogger.WarnDetailed("[Updates] manual check failed", ex);
+            UpdateStatusText = _localizer.Format("SettingsUpdateStatusFailed");
         }
         finally
         {
@@ -1304,8 +1318,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Updates
         UpdateCheckEnabled = settings.UpdateCheckEnabled;
         UpdateCheckIntervalHours = settings.UpdateCheckIntervalHours;
-        _updateOwner = settings.UpdateRepositoryOwner;
-        _updateRepo = settings.UpdateRepositoryName;
         LegacyMigrationReofferAvailable =
             LegacyMigrationDecisionPolicy.HasDeclineMarker(settings);
 
