@@ -91,6 +91,40 @@ before. The relauncher host and the outcome store resolve the same data root. A 
 compared as a version rather than as text. Update staging in tests no longer touches the
 operator's profile.
 
+### An update install no longer discards what the ordinary close would have saved
+
+The shutdown an update install requests marks the application as shutting down before it
+closes the main window, which is what keeps the close confirmation from blocking the relauncher.
+It also made the close pass return before it saved anything: settings edited on the very screen
+that holds the install button were gone after the restart, the session tree came back collapsed
+and the window jumped to its previously saved bounds. The install flow now persists those three
+things silently before it requests the shutdown, through the same steps the close gesture uses.
+
+### Floating session windows no longer prompt during shutdown, and their sessions are restored
+
+A detached session's window had no shutting-down guard: at exit it polled its close guards
+interactively, so a prompt could appear while the application was leaving and hold the process,
+and it disposed the session without handing it back, so a detached session was missing from the
+snapshot restored at the next launch. Both close paths now consult the same shared decision the
+main window already applied. The "N sessions open" confirmation counts detached sessions too;
+detaching removed a session from the collection it counted, so three detached sessions produced
+no question at all.
+
+### Other exit-path fixes
+
+On a Windows logoff or shutdown the application now marks itself as shutting down and persists
+its state instead of taking the interactive close pass. An unhandled exception raised while
+shutting down is logged and flushed without a modal dialog, which used to keep the process alive
+until someone clicked it. The RDP view's dispose runs its COM teardown in a `finally`, so an
+exception in the forty statements ahead of it can no longer leak the ActiveX control and its
+handles; the teardown's own catch now logs the whole exception with its stack, the last place on
+that path that still threw the stack away. The service container's disposal at exit is bounded,
+the only unbounded await the exit path had. Every cleanup that touches something outside the
+process runs before the first await of the exit, in an application that still exists, and the
+log is flushed there too. The trusted host key coalescer's asynchronous disposal awaits its final
+write. A second launch no longer flashes a splash window before handing over to the running
+instance.
+
 ## 2026-09-06: the Plink port probe no longer waits first, a disposed connect is abandoned, keyboard-interactive is honest, the known_hosts sync stops hashing hashed tokens (v2026.090603)
 
 ### The Plink port probe runs before the first wait
