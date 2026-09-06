@@ -76,7 +76,7 @@ public sealed class ConnectionService : IConnectionService
         set
         {
             _resolveInitialTerminalSize = value;
-            if (_handlers.TryGetValue("SSH", out var handler) && handler is SshHandler sshHandler)
+            if (_handlers.TryGetValue("SSH", out IProtocolHandler? handler) && handler is SshHandler sshHandler)
             {
                 sshHandler.ResolveInitialTerminalSize = value;
             }
