@@ -14,6 +14,22 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A server-side copy no longer stages under a name the server can guess
+
+Copying a file on the remote server without downloading it works by copying to a sibling
+name and then hard-linking that to the destination, so the destination never exists
+half-written. That sibling name was built from the remote shell's process id, which gives a
+few thousand candidates in a directory the attacker may write to: a hostile local user on
+the server could plant a symlink at every one of them in advance and wait for the copy to
+open through it, with no race to win. The name is now drawn by Heimdall, per copy, from the
+same generator the upload path already used.
+
+This narrows the finding rather than closing it, and the code says so where the next reader
+will find it. An attacker who can write to that directory can still unlink the staging file
+and put a symlink in its place while the copy runs. Closing that needs the staging file to
+be created exclusively before the copy writes, which would move mode preservation onto the
+remote `cp` in a way that can only be measured against a live server.
+
 ### Cancelling an SFTP connection now reaches the handshake
 
 Connecting to an SFTP server ran the blocking SSH.NET connect on a pool thread with the

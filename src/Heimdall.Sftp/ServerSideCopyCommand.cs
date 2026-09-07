@@ -18,14 +18,35 @@ namespace Heimdall.Sftp;
 
 /// <summary>
 /// Builds a non-clobbering server-side SFTP copy command run over an SSH exec channel.
-/// Pure string construction with no I/O, so the shell-escaping contract is unit-testable in isolation.
+/// String construction with no I/O; the file branch draws a fresh staging name per call, so
+/// only the directory branch is deterministic and only it can be asserted by equality.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Both paths are single-quoted through <see cref="PathEscaper.EscapeForShell(string)"/> (CWE-78),
 /// and a <c>--</c> end-of-options guard prevents a path that begins with <c>-</c> from being parsed as
 /// a flag. File copies use a sibling temp followed by <c>ln</c>, so the final path appears complete and
 /// link creation fails atomically on collision. Directory copies reserve the root with <c>mkdir</c> before
 /// filling it. Metadata remains preserved through <c>-p</c> for files and <c>-a</c> for directory trees.
+/// </para>
+/// <para>
+/// What the unpredictable staging name buys, and what it does not. It removes the
+/// pre-plantable write-through: the name used to be the remote shell's PID, so a user with
+/// write access to the destination directory could plant a symlink at every plausible name
+/// in advance and wait for <c>cp</c> to open through one. That is gone.
+/// </para>
+/// <para>
+/// It does NOT make the staging file exclusive. The same attacker can unlink the staging
+/// file and put a symlink in its place at any point between <c>cp</c> creating it and
+/// <c>ln</c> publishing it - a window as long as the copy itself, needing no advance
+/// knowledge - after which <c>ln</c> hard-links that symlink into the destination and the
+/// chain exits 0. Closing that needs an exclusive reservation (<c>set -C</c> with a
+/// redirection, or <c>mktemp</c>), and it is deliberately not done here: the destination is
+/// a hard link to the staging inode, so the staging file's mode IS the published mode, and
+/// pre-creating that file moves mode preservation from "cp creates it" to "cp -p must chmod
+/// a file that already exists". Whether it does is a property of the remote cp, measurable
+/// only against a live server. The finding stays OPEN-NARROWED until that measurement.
+/// </para>
 /// </remarks>
 internal static class ServerSideCopyCommand
 {
@@ -53,7 +74,13 @@ internal static class ServerSideCopyCommand
                 + $"status=$?; if [ $status -ne 0 ]; then rm -rf -- {destination}; fi; exit $status";
         }
 
-        string tempDestination = $"{destination}.$$.part";
+        // The staging name is drawn client-side, by the same generator the upload path
+        // uses, and never from a remote expansion. It used to be `$$`, the remote shell's
+        // own PID: a few thousand possible names in a directory the attacker can write to,
+        // so a local user on the server could plant a symlink at every one of them ahead of
+        // time and have `cp -p` open through it. No race to win, only patience.
+        string tempDestination = PathEscaper.EscapeForShell(
+            SftpAtomicUpload.CreateRemoteTempPath(destinationPath));
         return $"cp -p -- {source} {tempDestination} && ln -- {tempDestination} {destination}; "
             + $"status=$?; rm -f -- {tempDestination}; exit $status";
     }

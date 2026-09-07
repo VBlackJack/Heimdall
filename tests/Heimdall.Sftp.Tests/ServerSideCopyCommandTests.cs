@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text.RegularExpressions;
 using Heimdall.Sftp;
 
 namespace Heimdall.Sftp.Tests;
@@ -31,8 +32,8 @@ public sealed class ServerSideCopyCommandTests
         string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
 
         Assert.Equal(
-            "cp -p -- '/srv/a.txt' '/srv/b.txt'.$$.part && ln -- '/srv/b.txt'.$$.part '/srv/b.txt'; "
-            + "status=$?; rm -f -- '/srv/b.txt'.$$.part; exit $status",
+            $"cp -p -- '/srv/a.txt' {StagingToken(command)} && ln -- {StagingToken(command)} '/srv/b.txt'; "
+            + $"status=$?; rm -f -- {StagingToken(command)}; exit $status",
             command);
     }
 
@@ -78,10 +79,14 @@ public sealed class ServerSideCopyCommandTests
             recursive: false);
 
         // EscapeShellArg wraps in single quotes and rewrites each embedded ' as '\'' .
+        // The staging token is read back from the command because it now carries a fresh
+        // GUID; what this still pins exactly is that the rewriting reaches inside it, which
+        // matters more than before since the token embeds the destination's own quote.
+        string escapedTemp = StagingToken(command);
         Assert.Equal(
-            "cp -p -- '/srv/my dir/it'\\''s a file.txt' '/dst/o'\\''brien'.$$.part "
-            + "&& ln -- '/dst/o'\\''brien'.$$.part '/dst/o'\\''brien'; status=$?; "
-            + "rm -f -- '/dst/o'\\''brien'.$$.part; exit $status",
+            $"cp -p -- '/srv/my dir/it'\\''s a file.txt' {escapedTemp} "
+            + $"&& ln -- {escapedTemp} '/dst/o'\\''brien'; status=$?; "
+            + $"rm -f -- {escapedTemp}; exit $status",
             command);
     }
 
@@ -101,7 +106,7 @@ public sealed class ServerSideCopyCommandTests
             "/srv/source.txt",
             "/srv/destination.txt",
             recursive: false);
-        string tempPath = "'/srv/destination.txt'.$$.part";
+        string tempPath = StagingToken(command);
 
         Assert.Contains($"cp -p -- '/srv/source.txt' {tempPath}", command, StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -118,7 +123,7 @@ public sealed class ServerSideCopyCommandTests
             "/srv/source.txt",
             "/srv/destination.txt",
             recursive: false);
-        string tempPath = "'/srv/destination.txt'.$$.part";
+        string tempPath = StagingToken(command);
         int linkIndex = command.IndexOf($"ln -- {tempPath}", StringComparison.Ordinal);
         int statusIndex = command.IndexOf("; status=$?;", StringComparison.Ordinal);
         int cleanupIndex = command.IndexOf($"rm -f -- {tempPath}", StringComparison.Ordinal);
@@ -139,7 +144,7 @@ public sealed class ServerSideCopyCommandTests
             recursive: false);
         string escapedSource = "'/srv/my dir/it'\\''s.txt'";
         string escapedDestination = "'/dst/o'\\''brien.txt'";
-        string escapedTemp = $"{escapedDestination}.$$.part";
+        string escapedTemp = StagingToken(command);
         string copyCommand = command[..command.IndexOf(" && ", StringComparison.Ordinal)];
         int linkStart = command.IndexOf("ln ", StringComparison.Ordinal);
         int linkEnd = command.IndexOf(';', linkStart);
@@ -169,5 +174,57 @@ public sealed class ServerSideCopyCommandTests
 
         Assert.Equal(0, reserveIndex);
         Assert.True(copyIndex > reserveIndex);
+    }
+
+    /// <remarks>
+    /// The staging name used to be `$$`, the remote shell's own PID. A user with write
+    /// access to the destination directory had a few thousand candidate names, so they did
+    /// not need to win a race: they could plant a symlink at each one in advance and wait
+    /// for `cp -p` to open through it. The name is now drawn client-side, per call.
+    /// </remarks>
+    [Fact]
+    public void Build_File_StagesUnderANameTheRemoteShellCannotPredictOrExpand()
+    {
+        string first = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
+        string second = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
+
+        // Both halves are needed. Two different strings rule out every remote expansion at
+        // once - `$$`, `$RANDOM`, `$(date)` - because those produce two identical commands
+        // and are resolved by the far end. The literal check names the historical form; the
+        // chain legitimately contains `$?` and `$status`, never `$$`.
+        Assert.NotEqual(first, second);
+        Assert.DoesNotContain("$$", first, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_File_UsesOneStagingNameForTheCopyTheLinkAndTheCleanup()
+    {
+        string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
+
+        // The backreference is the load-bearing part: one expression pins the sibling
+        // directory, the 32 hex digits of a GUID, the SAME token in all three commands,
+        // both `--` guards, the ordering and the exit-status capture. Drawing the name
+        // three times instead of once passes every other assertion in this file and leaves
+        // cp writing one path, ln linking a path that does not exist, and rm deleting
+        // nothing.
+        Assert.Matches(
+            @"^cp -p -- '/srv/a\.txt' '(/srv/b\.txt\.[0-9a-f]{32}\.part)' && ln -- '\1' '/srv/b\.txt'; "
+                + @"status=\$\?; rm -f -- '\1'; exit \$status$",
+            command);
+    }
+
+    /// <summary>
+    /// The staging token of a built file command, read back from the command itself.
+    /// </summary>
+    /// <remarks>
+    /// The name carries a fresh GUID per call, so a test cannot spell it in advance. It is
+    /// read back rather than regenerated: a helper that built its own would agree with a
+    /// broken implementation.
+    /// </remarks>
+    private static string StagingToken(string command)
+    {
+        Match match = Regex.Match(command, @"'[^']*(?:'\\''[^']*)*\.[0-9a-f]{32}\.part'");
+        Assert.True(match.Success, $"no staging token in: {command}");
+        return match.Value;
     }
 }
