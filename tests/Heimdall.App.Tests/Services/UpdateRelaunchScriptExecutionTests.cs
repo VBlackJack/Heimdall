@@ -21,6 +21,8 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.Core.Security;
 using Heimdall.Core.Updates;
 
@@ -92,6 +94,26 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// poll for.
     /// </summary>
     private static readonly TimeSpan SettleAfterHostExit = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Bound on waiting for the stand-in to announce that its marker write was refused.
+    /// </summary>
+    /// <remarks>
+    /// Not a timing assumption: the announcement is guaranteed by construction, because the
+    /// competing handle is open before the stand-in starts and is not released until the
+    /// announcement arrives. This only stops a broken fixture from hanging the lane.
+    /// </remarks>
+    private static readonly TimeSpan CollisionDeadline = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// What the stand-in prints the first time a marker write has to be retried.
+    /// </summary>
+    /// <remarks>
+    /// A second copy of the stand-in's own constant, because the fixture is referenced with
+    /// <c>ReferenceOutputAssembly="false"</c> and its types are not visible here. Drift
+    /// announces itself: the wait above ends at its ceiling and says what was actually said.
+    /// </remarks>
+    private const string StandInMarkerBusyNotice = "heimdall-stub: marker busy, retrying";
 
     private const string InstallerRole = "installer";
 
@@ -213,7 +235,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
             sandbox.SequenceContainsRole(InstallerRole),
             "an installer whose bytes are not the ones verified must never run");
 
-        string recorded = await File.ReadAllTextAsync(sandbox.FailureRecordPath);
+        string recorded = UpdateScriptSandbox.ReadSharedText(sandbox.FailureRecordPath);
         UpdateFailureRecord? record = JsonSerializer.Deserialize<UpdateFailureRecord>(
             recorded,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -561,7 +583,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         await sandbox.WaitForRoleAsync(InstallerRole);
 
-        string recorded = await File.ReadAllTextAsync(sandbox.FailureRecordPath);
+        string recorded = UpdateScriptSandbox.ReadSharedText(sandbox.FailureRecordPath);
         UpdateFailureRecord? record = JsonSerializer.Deserialize<UpdateFailureRecord>(
             recorded,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -647,6 +669,190 @@ public sealed class UpdateRelaunchScriptExecutionTests
         }
 
         return found;
+    }
+
+    /// <summary>
+    /// The stand-in records its marker even while a reader holds the file against writers.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is BL-0067, reproduced deterministically. The wait loop polls the marker file
+    /// every 25 ms, and its poll used <c>File.ReadAllText</c>, which asks for
+    /// <see cref="FileShare.Read"/> - denying writers. The stand-in appended with
+    /// <c>File.AppendAllText</c>, with no retry and nothing catching. Landing inside one of
+    /// those windows killed it: no marker, no message, and a host that had already exited 0.
+    /// Five CI occurrences carried exactly that signature before the cause was found, and
+    /// the last of them said "id 7776 is gone, so it exited before this was read".
+    /// </para>
+    /// <para>
+    /// The reader now shares the handle, so this collision should no longer arise in the
+    /// harness. The stand-in is hardened anyway, because a stand-in that dies silently when
+    /// somebody else opens the file can only be diagnosed once - and this test is what
+    /// proves it survives, rather than an argument that the reader will always behave.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task StandIn_RecordsItsMarker_WhileAReaderHoldsTheFileAgainstWriters()
+    {
+        string marker = Path.Combine(
+            Path.GetTempPath(),
+            $"heimdall-bl0067-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(marker, $"installer|0{Environment.NewLine}");
+
+        using CancellationTokenSource release = new();
+        TaskCompletionSource held = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task holder = Task.Run(
+            async () =>
+            {
+                // Exactly the share mode the old poll used.
+                using FileStream denyingWriters = new(
+                    marker, FileMode.Open, FileAccess.Read, FileShare.Read);
+                held.SetResult();
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, release.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Released on purpose.
+                }
+            },
+            CancellationToken.None);
+
+        // The handle has to be open before the stand-in starts. Start them in the other
+        // order and the stand-in can win the race, writing its marker without ever meeting
+        // the collision this test exists to reproduce.
+        await held.Task;
+
+        try
+        {
+            using Process stub = Process.Start(new ProcessStartInfo(StubPath())
+            {
+                ArgumentList = { "--marker", marker, "--role", RelaunchRole, "--exit-code", "0" },
+                UseShellExecute = false,
+                RedirectStandardError = true,
+            }) ?? throw new InvalidOperationException("the stand-in did not start");
+
+            // Waited for, not assumed. The stand-in says so the first time it is refused,
+            // and only then is the handle released - so the contention this test exists to
+            // reproduce is proved to have happened rather than inferred from a delay that a
+            // slow start could sit outside. It also means no clock decides the verdict, so
+            // the case belongs in the blocking lane rather than the informational one.
+            string announcement = await ReadUntilAsync(
+                stub.StandardError, StandInMarkerBusyNotice, CollisionDeadline);
+
+            await release.CancelAsync();
+            await holder;
+
+            string stderr = announcement + await stub.StandardError.ReadToEndAsync();
+            await stub.WaitForExitAsync();
+
+            Assert.True(
+                stub.ExitCode == 0,
+                $"the stand-in died instead of waiting for the reader (exit {stub.ExitCode}): {stderr}");
+            Assert.Contains(
+                $"{RelaunchRole}|0",
+                UpdateScriptSandbox.ReadSharedText(marker),
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            await release.CancelAsync();
+            File.Delete(marker);
+        }
+    }
+
+    /// <summary>
+    /// Reads <paramref name="reader"/> until <paramref name="needle"/> has been seen.
+    /// </summary>
+    /// <remarks>
+    /// Fails rather than waits when the stream ends first, which is what a stand-in that
+    /// never retried looks like: it writes its refusal and exits, closing the pipe. That is
+    /// how the <c>MarkerWriteBudget</c> mutant is killed structurally instead of by timing.
+    /// </remarks>
+    private static async Task<string> ReadUntilAsync(
+        StreamReader reader,
+        string needle,
+        TimeSpan ceiling)
+    {
+        using CancellationTokenSource bound = new(ceiling);
+        StringBuilder seen = new();
+
+        while (!seen.ToString().Contains(needle, StringComparison.Ordinal))
+        {
+            string? line;
+            try
+            {
+                line = await reader.ReadLineAsync(bound.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Assert.Fail(
+                    $"the stand-in never said it had been refused within {ceiling.TotalSeconds:F0} s. "
+                    + $"It said: {seen}");
+                throw;
+            }
+
+            if (line is null)
+            {
+                Assert.Fail(
+                    "the stand-in ended without ever being refused, so the collision this "
+                    + $"test reproduces did not happen. It said: {seen}");
+            }
+
+            seen.AppendLine(line);
+        }
+
+        return seen.ToString();
+    }
+
+    /// <summary>
+    /// No read of a file the PowerShell host writes may ask for the default share mode.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the oracle for the reader's half of BL-0067, and it is a guard rather than a
+    /// case because the defect is a call site, not a behaviour: <c>File.ReadAllText</c> asks
+    /// for <see cref="FileShare.Read"/>, which DENIES writers, so a poll taken with it kills
+    /// the stand-in that is trying to append. Reverting any of those reads turns this red.
+    /// </para>
+    /// <para>
+    /// It exists because the same lesson has now been learned twice and travelled only
+    /// partway both times. On 2026-08-26 three cold reads of the sequence file were moved to
+    /// the shared handle and the wait loop's poll - the one read that runs concurrently with
+    /// a writer by construction - was left behind. The failure record reads were left behind
+    /// again after that. A guard is the only instrument that stops a third round.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void EveryReadOfAFileTheHostWrites_AsksForTheSharedHandle()
+    {
+        var forbidden = new Regex(
+            @"File\.ReadAll(?:Text|Lines|Bytes)(?:Async)?\(\s*(?:sandbox\.)?(?:SequencePath|LogPath|FailureRecordPath)\b",
+            RegexOptions.CultureInvariant);
+
+        // The matcher is checked against a sample it must match, so this absence assertion
+        // cannot pass because the pattern quietly stopped matching anything at all. The
+        // sample is a literal, and literals are blanked out of the scanned text below, so
+        // it cannot match itself.
+        Assert.Matches(forbidden, "await File.ReadAllTextAsync(SequencePath)");
+
+        string path = Path.Combine(
+            ViewSource.RepoRoot(),
+            "tests",
+            "Heimdall.App.Tests",
+            "Services",
+            "UpdateRelaunchScriptExecutionTests.cs");
+        Assert.True(File.Exists(path), $"the harness source was not found at {path}");
+
+        string source = ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(path));
+        MatchCollection offenders = forbidden.Matches(source);
+
+        Assert.True(
+            offenders.Count == 0,
+            "a file the PowerShell host writes is read with the default share mode, which "
+            + "denies the writer and kills it: "
+            + string.Join(", ", offenders.Select(m => m.Value)));
     }
 
     private static string StubPath()
@@ -979,7 +1185,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
         /// sequence failed on the reading of it. Sharing the handle removes the race instead of
         /// retrying around it.
         /// </remarks>
-        private static string ReadSharedText(string path)
+        internal static string ReadSharedText(string path)
         {
             using FileStream stream = new(
                 path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
@@ -1092,7 +1298,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 return null;
             }
 
-            string recorded = await File.ReadAllTextAsync(FailureRecordPath);
+            string recorded = ReadSharedText(FailureRecordPath);
             return JsonSerializer.Deserialize<UpdateFailureRecord>(
                 recorded,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -1143,8 +1349,15 @@ public sealed class UpdateRelaunchScriptExecutionTests
             {
                 try
                 {
+                    // Through the shared handle, and this is the hot one: it runs every
+                    // 25 ms for the whole wait, which makes it the most frequent reader in
+                    // the harness by a wide margin. File.ReadAllText asks for
+                    // FileShare.Read, which DENIES writers - so every one of those polls
+                    // was a window in which the stand-in's own append failed. The 2026-08-26
+                    // lesson reached the three cold reads of this file and never reached
+                    // this one; BL-0067 is what that cost.
                     if (File.Exists(SequencePath)
-                        && (await File.ReadAllTextAsync(SequencePath)).Contains(marker, StringComparison.Ordinal))
+                        && ReadSharedText(SequencePath).Contains(marker, StringComparison.Ordinal))
                     {
                         return;
                     }
