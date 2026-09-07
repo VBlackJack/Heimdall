@@ -41,6 +41,34 @@ internal static class Program
     /// </remarks>
     private const int UsageExitCode = 64;
 
+    /// <summary>Returned when the marker could not be recorded within the budget.</summary>
+    /// <remarks>
+    /// Distinct from <see cref="UsageExitCode"/> and from every Inno Setup code the harness
+    /// drives, so "the stand-in ran but could not write" is never mistaken for the installer
+    /// failure under test - or, as happened for a fortnight, for silence.
+    /// </remarks>
+    private const int MarkerExitCode = 65;
+
+    /// <summary>How long a marker write may keep retrying against a competing handle.</summary>
+    /// <remarks>
+    /// Generous next to the harness's 25 ms poll and far below its 20 second deadline: the
+    /// contended window is one read of a file of a few dozen bytes.
+    /// </remarks>
+    private static readonly TimeSpan MarkerWriteBudget = TimeSpan.FromSeconds(5);
+
+    private const int MarkerWriteRetryDelayMilliseconds = 20;
+
+    /// <summary>
+    /// Printed to stderr once, the first time a marker write has to be retried.
+    /// </summary>
+    /// <remarks>
+    /// The one observable that says the contention under test actually occurred. A test
+    /// that waits for this line, rather than for a wall-clock delay, cannot pass on a
+    /// collision that never happened - and cannot fail a stand-in that merely started
+    /// slowly. Kept as a constant so the harness matches on the same text.
+    /// </remarks>
+    internal const string MarkerBusyNotice = "heimdall-stub: marker busy, retrying";
+
     /// <summary>
     /// Marker path used when no <c>--marker</c> is given.
     /// </summary>
@@ -110,9 +138,83 @@ internal static class Program
             }
 
             // Appended, so one marker file can carry the whole sequence in order.
-            File.AppendAllText(markerPath, $"{role}|{exitCode}{Environment.NewLine}");
+            if (!TryAppendMarker(markerPath, $"{role}|{exitCode}{Environment.NewLine}"))
+            {
+                Console.Error.WriteLine($"could not record the '{role}' marker at {markerPath}.");
+                return MarkerExitCode;
+            }
         }
 
         return exitCode;
+    }
+
+    /// <summary>
+    /// Appends one marker line, retrying while the file is held by somebody else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The writer's half of BL-0067. The harness polls the marker file every 25
+    /// milliseconds, and its poll used <c>File.ReadAllText</c>, which asks for
+    /// <see cref="FileShare.Read"/> and therefore DENIES writers. A plain
+    /// <c>File.AppendAllText</c> here threw the moment it landed inside one of those
+    /// windows, nothing caught it, and this process died without recording anything -
+    /// leaving a test waiting for a marker that would never come, with the host having
+    /// exited 0 and no error anywhere. The reader was fixed in the same change, which is
+    /// what removes the collision; this side survives one that happens anyway.
+    /// </para>
+    /// <para>
+    /// The share mode is deliberately narrow. Readers are admitted, a second WRITER is
+    /// not, and that refusal is load bearing: two stand-ins appending at once would each
+    /// have captured the end offset at open time and could overwrite each other's line,
+    /// which is exactly the double-relaunch defect <c>CountRole</c> exists to catch. A
+    /// competing writer is made to wait by the retry below rather than let through.
+    /// </para>
+    /// <para>
+    /// Bounded and reported. Returning a distinct exit code rather than throwing keeps the
+    /// installer role - the one the script waits on and whose code is read - able to say
+    /// that it ran but could not write. The relaunch role is started without <c>-Wait</c>
+    /// and with no redirection, so nothing observes its code or its stderr; for that role
+    /// this is a bound and a clean death, not a diagnostic.
+    /// </para>
+    /// </remarks>
+    private static bool TryAppendMarker(string markerPath, string line)
+    {
+        DateTime deadline = DateTime.UtcNow + MarkerWriteBudget;
+        bool announced = false;
+
+        while (true)
+        {
+            try
+            {
+                using FileStream stream = new(
+                    markerPath,
+                    FileMode.Append,
+                    FileAccess.Write,
+                    FileShare.Read | FileShare.Delete);
+                using StreamWriter writer = new(stream);
+                writer.Write(line);
+                return true;
+            }
+            catch (Exception ex)
+                when (ex is IOException or UnauthorizedAccessException
+                    && DateTime.UtcNow < deadline)
+            {
+                // Said once, on the first retry only. This is what lets a test wait for
+                // the collision to have happened rather than assume it did after a fixed
+                // delay: without it, a stand-in that started slowly would write after the
+                // competing handle was gone and the test would pass having proved nothing.
+                if (!announced)
+                {
+                    announced = true;
+                    Console.Error.WriteLine(MarkerBusyNotice);
+                }
+
+                Thread.Sleep(MarkerWriteRetryDelayMilliseconds);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
     }
 }
