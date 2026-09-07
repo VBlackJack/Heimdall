@@ -1445,9 +1445,67 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 $"sequence file: {(File.Exists(SequencePath) ? ReadSharedText(SequencePath) : "absent")}");
             sb.AppendLine(
                 $"marker directory: {string.Join(", ", Directory.GetFiles(MarkerDirectory))}");
-            sb.AppendLine(
-                $"transcript: {(File.Exists(LogPath) ? ReadSharedText(LogPath) : "absent")}");
+
+            string transcript = File.Exists(LogPath) ? ReadSharedText(LogPath) : "absent";
+            sb.AppendLine($"relaunch child: {DescribeRelaunchChild(transcript)}");
+            sb.AppendLine($"transcript: {transcript}");
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// What became of the process the relaunch started, read back from the transcript.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The instrumentation shipped with the relaunch answers the first question - the
+        /// launch was reached, and the operating system created a process. On 2026-09-07 a
+        /// CI failure carried "relaunch started process id 4416" and no marker, which moves
+        /// the question one step downstream: a process existed and never wrote.
+        /// </para>
+        /// <para>
+        /// So this reads the id back and says what became of it. "exited with code N" and
+        /// "still running" have different causes: the first is a child that ran and failed,
+        /// the second is a child that never got as far as its first write. Neither can be
+        /// inferred from the marker's absence, which is why the last two occurrences were
+        /// indecidable.
+        /// </para>
+        /// </remarks>
+        private static string DescribeRelaunchChild(string transcript)
+        {
+            Match match = Regex.Match(
+                transcript,
+                @"relaunch started process id (?<id>\d+)",
+                RegexOptions.None,
+                TimeSpan.FromSeconds(5));
+
+            if (!match.Success)
+            {
+                return "the transcript names no launched process";
+            }
+
+            string id = match.Groups["id"].Value;
+            if (id == "0")
+            {
+                return "the launch returned no process at all (id 0)";
+            }
+
+            try
+            {
+                using Process child = Process.GetProcessById(int.Parse(id, CultureInfo.InvariantCulture));
+                return child.HasExited
+                    ? $"id {id} exited with code {child.ExitCode.ToString(CultureInfo.InvariantCulture)}"
+                    : $"id {id} is still running";
+            }
+            catch (ArgumentException)
+            {
+                // The id is not a live process any more, and Windows keeps no record once
+                // the last handle to it is gone. That is itself the answer: it ran and left.
+                return $"id {id} is gone, so it exited before this was read";
+            }
+            catch (InvalidOperationException ex)
+            {
+                return $"id {id} could not be read: {ex.Message}";
+            }
         }
 
         public void Dispose()
