@@ -14,6 +14,23 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A release tag Heimdall cannot read no longer reads as a failed update check
+
+Two unrelated things reported the same thing. "GitHub could not be reached" is transient and
+must be retried on the next launch. "GitHub answered, and the newest release is tagged in a
+way this client cannot act on" is not: nothing about it will change by asking again. Both
+said the check had failed, which blamed the network for a decision the maintainer had made,
+and suppressed the daily throttle, so every single launch asked GitHub again for an answer
+that could not change.
+
+The second case now reports what is true for the user: there is nothing to install. The log
+still carries the tag, because a tag the client cannot read is a mistake somebody has to see.
+
+The tag parser is deliberately not taught to ignore a suffix. `v2026.031601-next` was a real
+published release of this project, and a release candidate has to stay distinguishable from
+its final: inventing a version identity for a tag whose whole purpose is to say "not that
+version" would offer the candidate as the update.
+
 ### The update relauncher writes down what it decided
 
 When an update finishes, a detached PowerShell script installs it and starts Heimdall again.

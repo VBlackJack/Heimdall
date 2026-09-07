@@ -90,8 +90,25 @@ public sealed class UpdateService : IUpdateService
 
         if (!HeimdallVersion.TryParse(release.TagName, out var releaseVersion))
         {
+            // The maintainer's signal stays: a tag this client cannot read is a mistake
+            // somebody has to see, and the log is where they see it.
             FileLogger.Warn($"Update check: release tag '{release.TagName}' is not a valid Heimdall version.");
-            return new UpdateCheckResult(UpdateCheckStatus.CheckFailed, null);
+
+            // But the USER is told the truth, which is that there is nothing to install -
+            // not that the check failed. Two unrelated conditions used to share one status:
+            // "the source could not be reached", which is transient and must be retried on
+            // the next launch, and this one, a well-formed answer naming a release this
+            // client cannot act on. Reporting the second as a failure both blamed the
+            // network and suppressed the throttle, so every launch asked GitHub again for
+            // an answer that would not change.
+            //
+            // The repository already produced exactly this for an unofferable latest: v1.0.0
+            // was the latest release for seventeen hours on 2026-03-17, it parses, it
+            // compares below every 2026.x, and every user was told they were up to date.
+            // The parser keeps refusing a tag with a suffix, deliberately - inventing a
+            // version identity for a tag whose whole purpose is to say "not that version"
+            // would make a release candidate indistinguishable from its final.
+            return new UpdateCheckResult(UpdateCheckStatus.UpToDate, null);
         }
 
         if (releaseVersion <= current)

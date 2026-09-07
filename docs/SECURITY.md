@@ -613,8 +613,24 @@ installer runs as administrator from a staging directory the unprivileged
 user can write. The installer file itself is held under a deny-write lease
 from verification through launch, so it cannot be swapped; a sibling file
 planted beside it could still be resolved by the installer's own loader.
-Under Microsoft's stated model UAC is not a security boundary, so this is a
-hardening item, not a break.
+
+The framing this paragraph used to end on was wrong and is corrected here.
+"UAC is not a security boundary" does not settle it, because elevation is
+chosen only when the install directory is not writable - which is the
+per-machine install. When the person running Heimdall is not an administrator,
+the consent they see is an over-the-shoulder credential prompt and the
+installer runs as a *different, more privileged account*. That is a boundary
+Microsoft does service.
+
+Two remedies were measured on 2026-09-07 and both are recorded because their
+costs are the reason this stays a residual risk rather than a fix. A DACL
+granting only Administrators and SYSTEM is rewritten by its own unprivileged
+creator, who owns the directory and keeps `WRITE_DAC` (measured twice
+unelevated, against a passing positive control). A `Deny` entry on `OWNER
+RIGHTS` does hold - and its real cost is not that it can be bypassed but that
+it takes away the updater's own ability to remove the staging directory and
+delete its script in the `finally`, which would trade a hardening item for a
+directory left behind after every update.
 
 ### Remote entries whose type cannot be determined
 

@@ -231,18 +231,75 @@ public sealed class UpdateServiceTests : IDisposable
         Assert.Null(result.Release);
     }
 
+    /// <summary>
+    /// A tag this client cannot read is not a failed check, and this test's expectation was
+    /// changed on purpose.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Built from the shape that really occurred rather than from "not-a-version":
+    /// <c>v2026.031601-next</c> was a PUBLISHED release of this repository, not a prerelease
+    /// and not a draft, and it was what <c>/releases/latest</c> answered. Two unrelated
+    /// conditions used to share one status - the source could not be reached, which is
+    /// transient, and this one, a well-formed answer naming a release this client cannot act
+    /// on. The second reported a failure the user could do nothing about, blamed the network,
+    /// and suppressed the throttle, so every launch asked GitHub again for an answer that
+    /// would not change.
+    /// </para>
+    /// <para>
+    /// The control that must stay green beside this one is
+    /// <see cref="CheckForUpdatesAsync_NullRelease_CheckFailed"/>: the transient case keeps
+    /// its status, and if both tests ever agree, the distinction has been lost again.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task CheckForUpdatesAsync_UnparseableTag_CheckFailed()
+    public async Task CheckForUpdatesAsync_TagThisClientCannotRead_IsNotAFailedCheck()
     {
         var client = new StubReleaseClient
         {
-            Release = new GitHubRelease("not-a-version", "https://example.test", "notes", []),
+            Release = new GitHubRelease(
+                "v2026.031601-next",
+                "https://example.test",
+                "notes",
+                [new UpdateAsset("Heimdall.Next_build.2026.031601.zip", "https://example.test/next.zip", StandardSize)]),
         };
         var service = CreateService(client, BuildVariant.Standard);
 
         var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
 
-        Assert.Equal(UpdateCheckStatus.CheckFailed, result.Status);
+        Assert.NotEqual(UpdateCheckStatus.CheckFailed, result.Status);
+        Assert.Null(result.Update);
+
+        Assert.Null(result.Release);
+    }
+
+    /// <summary>
+    /// The same shape, dated ahead of the running version, which is what makes it a test of
+    /// the remedy rather than of the status.
+    /// </summary>
+    /// <remarks>
+    /// The historical tag above is OLDER than any current build, so teaching the parser to
+    /// strip at the hyphen would leave every assertion there green - it would simply be
+    /// "up to date" for a second reason. Dated ahead, stripping produces a version that
+    /// compares NEWER, the check proceeds into asset selection, and the release stops being
+    /// null. That is the discriminator: this test fails the moment the suffix is stripped,
+    /// and a release candidate must stay distinguishable from its final.
+    /// </remarks>
+    [Fact]
+    public async Task CheckForUpdatesAsync_NewerTagWithASuffix_IsNotOfferedAndTheSuffixIsNotStripped()
+    {
+        var client = new StubReleaseClient
+        {
+            Release = new GitHubRelease(
+                "v2026.091501-next",
+                "https://example.test",
+                "notes",
+                [new UpdateAsset("Heimdall_2026.091501_Standard_Setup.exe", "https://example.test/setup.exe", StandardSize)]),
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var result = await service.CheckForUpdatesAsync(HeimdallVersion.Parse(CurrentTag), "o", "r", CancellationToken.None);
+
         Assert.Null(result.Update);
         Assert.Null(result.Release);
     }
