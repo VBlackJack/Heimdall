@@ -515,7 +515,7 @@ public sealed class UpdateServiceTests : IDisposable
         Assert.Empty(StagingSnapshot(tag).Except(before));
     }
 
-    private UpdateService CreateService(StubReleaseClient client, BuildVariant variant)
+    private UpdateService CreateService(IGitHubReleaseClient client, BuildVariant variant)
         => new(client, new StubVariantDetector(variant), _dataRoot);
 
     private static void AssertReleaseRef(UpdateCheckResult result, string tag = NewerTag)
@@ -549,6 +549,320 @@ public sealed class UpdateServiceTests : IDisposable
         return
             $"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  Heimdall_{version}_Standard_Setup.exe\n" +
             $"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  Heimdall_{version}_SelfContained_Setup.exe\n";
+    }
+
+    /// <summary>
+    /// The check carries the checksum document's URL forward to the install.
+    /// </summary>
+    /// <remarks>
+    /// The install is handed an <see cref="UpdateInfo"/> and nothing else - no owner, no
+    /// repository, no release. Without this the republication check has nothing to ask and
+    /// silently degrades to doing nothing, which is a refusal that never fires rather than
+    /// a visible failure. Dropping the assignment turns this red.
+    /// </remarks>
+    [Fact]
+    public async Task CheckForUpdatesAsync_UpdateAvailable_CarriesTheChecksumUrlForTheInstall()
+    {
+        const string checksumUrl = "https://example.test/SHA256SUMS.txt";
+        var version = HeimdallVersion.Parse(NewerTag);
+        var installerName = $"Heimdall_{version}_Standard_Setup.exe";
+        var client = new StubReleaseClient
+        {
+            Release = new GitHubRelease(
+                NewerTag,
+                "https://example.test/release",
+                "notes",
+                [
+                    new UpdateAsset(installerName, "https://example.test/standard.exe", 1024),
+                    new UpdateAsset("SHA256SUMS.txt", checksumUrl, 128),
+                ]),
+            ChecksumText = $"{new string('c', 64)}  {installerName}",
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var result = await service.CheckForUpdatesAsync(
+            HeimdallVersion.Parse(CurrentTag), "owner", "repo", CancellationToken.None);
+
+        Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+        Assert.Equal(checksumUrl, result.Update?.ChecksumUrl);
+    }
+
+    /// <summary>
+    /// A release republished between the check and the install is refused as superseded.
+    /// </summary>
+    /// <remarks>
+    /// A-06. The checksum is frozen at check time. A maintainer who re-uploads an asset
+    /// over an existing release publishes new bytes and a new checksum beside them, and the
+    /// install used to download the new bytes, compare them against the old checksum, and
+    /// report a verification failure - the same words it uses for a tampered download. The
+    /// refusal is unchanged; what changes is that the two causes are now told apart.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_ReleaseRepublishedSinceTheCheck_IsRefusedAsSuperseded()
+    {
+        var payload = Encoding.ASCII.GetBytes("republished-payload");
+        var frozen = new string('a', 64);
+        var publishedNow = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        const string tag = "v2026.061591";
+        var update = UpdateWithSha(frozen, payload.Length, tag) with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new MemoryStream(payload),
+            ChecksumText = $"{publishedNow}  {update.Asset.Name}",
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var before = StagingSnapshot(tag);
+        var refusal = await Assert.ThrowsAsync<UpdateSupersededException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Equal(tag, refusal.TagName);
+        Assert.Equal(frozen, refusal.AuthorisedSha256);
+        Assert.Equal(publishedNow, refusal.PublishedSha256);
+
+        // Refused BEFORE a byte was fetched. Asserted on the download count, not on the
+        // staging directory: staging is removed on any throw, so an empty staging directory
+        // would hold just as well if the refusal came after a completed download.
+        Assert.Equal(0, client.AssetStreamOpenCount);
+        Assert.Empty(StagingSnapshot(tag).Except(before));
+
+        // The checksum DOCUMENT is what gets re-read, not the installer. Reading the
+        // installer's URL as text would trip the client's size bound and return null,
+        // turning this refusal into one that never fires.
+        Assert.Equal(update.ChecksumUrl, Assert.Single(client.AssetTextRequests));
+    }
+
+    /// <summary>
+    /// The newly published checksum is compared and discarded, never adopted.
+    /// </summary>
+    /// <remarks>
+    /// The obvious repair for A-06 - install against whatever the source publishes now -
+    /// would let the source decide at install time what this application runs, which is the
+    /// exact property freezing the checksum exists to deny. Here the downloaded bytes match
+    /// the newly published checksum perfectly, and the install is still refused.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_BytesMatchingTheNewlyPublishedChecksum_AreStillRefused()
+    {
+        var payload = Encoding.ASCII.GetBytes("bytes-that-match-the-new-checksum");
+        var publishedNow = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        const string tag = "v2026.061592";
+        var update = UpdateWithSha(new string('b', 64), payload.Length, tag) with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new MemoryStream(payload),
+            ChecksumText = $"{publishedNow}  {update.Asset.Name}",
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        await Assert.ThrowsAsync<UpdateSupersededException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// A release republished DURING the download is named, not called an integrity failure.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The window the pre-download check cannot see. A republication is not atomic: the
+    /// installer and its checksum document are clobbered in one upload but do not land
+    /// together, so the check before the download can read the old document while the new
+    /// bytes are already being served. Here that is exactly what happens, and the frozen
+    /// hash then fails against bytes that are perfectly good.
+    /// </para>
+    /// <para>
+    /// The evidence is stronger than the pre-download check's, not weaker: the bytes on disk
+    /// ARE what the source vouches for right now. The install is still refused; what changes
+    /// is that the user is told to check again rather than to distrust a sound download.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_ReleaseRepublishedDuringTheDownload_IsNamedNotCalledCorruption()
+    {
+        var payload = Encoding.ASCII.GetBytes("bytes-that-landed-mid-republication");
+        var arrived = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        var frozen = new string('d', 64);
+        const string tag = "v2026.061595";
+        var update = UpdateWithSha(frozen, payload.Length, tag) with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+
+        // The document still says what it said at check time on the first read, and the new
+        // value on the second: the installer was clobbered, its checksum document not yet.
+        var client = new ChecksumChangingClient(
+            () => new MemoryStream(payload),
+            [$"{frozen}  {update.Asset.Name}", $"{arrived}  {update.Asset.Name}"]);
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var before = StagingSnapshot(tag);
+        var refusal = await Assert.ThrowsAsync<UpdateSupersededException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Equal(arrived, refusal.PublishedSha256);
+        Assert.Equal(frozen, refusal.AuthorisedSha256);
+
+        // Downloaded, so this really is the post-download path and not the earlier refusal.
+        Assert.Equal(1, client.AssetStreamOpenCount);
+        Assert.Empty(StagingSnapshot(tag).Except(before));
+    }
+
+    /// <summary>
+    /// Bytes that match neither checksum stay an integrity failure.
+    /// </summary>
+    /// <remarks>
+    /// The control for the case above, and the one that keeps the new answer honest: a
+    /// republication check that named every mismatch would make the verification failure
+    /// unreachable, which is worse than the confusion it set out to fix.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_BytesMatchingNeitherChecksum_StayAVerificationFailure()
+    {
+        var payload = Encoding.ASCII.GetBytes("bytes-that-match-nothing");
+        var frozen = new string('e', 64);
+        var publishedNow = new string('f', 64);
+        const string tag = "v2026.061596";
+        var update = UpdateWithSha(frozen, payload.Length, tag) with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+        var client = new ChecksumChangingClient(
+            () => new MemoryStream(payload),
+            [$"{frozen}  {update.Asset.Name}", $"{publishedNow}  {update.Asset.Name}"]);
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.IsNotType<UpdateSupersededException>(failure);
+        Assert.Contains("SHA-256", failure.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A published checksum in another case, or a frozen one with stray whitespace, is the
+    /// same checksum.
+    /// </summary>
+    /// <remarks>
+    /// Both tolerances are deliberate and neither is exercised by the production path, where
+    /// every value is trimmed and lowercased before it gets here. Without this an
+    /// UpdateInfo assembled anywhere else would be refused as a republication of itself.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_SameChecksumInAnotherCaseOrPadded_IsNotARepublication()
+    {
+        var payload = Encoding.ASCII.GetBytes("case-and-padding-payload");
+        var frozen = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        var update = UpdateWithSha($"  {frozen.ToUpperInvariant()}  ", payload.Length, "v2026.061598") with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new MemoryStream(payload),
+            ChecksumText = $"{frozen}  {update.Asset.Name}",
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        using IVerifiedUpdatePackage package = await service.DownloadVerifiedAsync(
+            update, null, CancellationToken.None);
+
+        Assert.Equal(frozen, package.ExpectedSha256);
+    }
+
+    /// <summary>
+    /// A published value of the right length but the wrong alphabet is not a checksum.
+    /// </summary>
+    /// <remarks>
+    /// A document serving 64 characters of prose - a proxy error page, a truncated write -
+    /// must read as "cannot be established", not as a different checksum. Weakening the hex
+    /// test to a length test turns this into a refusal of a perfectly good install.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_PublishedValueIsNotHex_IsNotARepublication()
+    {
+        var payload = Encoding.ASCII.GetBytes("not-hex-payload");
+        var frozen = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        var update = UpdateWithSha(frozen, payload.Length, "v2026.061599") with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new MemoryStream(payload),
+            ChecksumText = $"{new string('z', 64)}  {update.Asset.Name}",
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        using IVerifiedUpdatePackage package = await service.DownloadVerifiedAsync(
+            update, null, CancellationToken.None);
+
+        Assert.Equal(frozen, package.ExpectedSha256);
+    }
+
+    /// <summary>
+    /// A checksum that cannot be re-read does not refuse the install.
+    /// </summary>
+    /// <remarks>
+    /// Silence is not evidence of republication. The frozen checksum still decides what may
+    /// be installed, so a network blip on this diagnostic read must not turn into a failed
+    /// update - which is what treating "unknown" as "changed" would produce.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_PublishedChecksumUnreadable_InstallsAgainstTheFrozenHash()
+    {
+        var payload = Encoding.ASCII.GetBytes("unreadable-checksum-payload");
+        var frozen = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new MemoryStream(payload),
+            ChecksumText = null,
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+        var update = UpdateWithSha(frozen, payload.Length, "v2026.061593") with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+
+        using IVerifiedUpdatePackage package = await service.DownloadVerifiedAsync(
+            update, null, CancellationToken.None);
+
+        Assert.Equal(frozen, package.ExpectedSha256);
+    }
+
+    /// <summary>
+    /// A release still publishing the checksum the check froze installs normally.
+    /// </summary>
+    /// <remarks>
+    /// The control for the refusal above. Without it, a comparison that refused everything
+    /// would pass every other case in this file, because they carry no checksum URL at all.
+    /// </remarks>
+    [Fact]
+    public async Task DownloadVerifiedAsync_PublishedChecksumUnchanged_Installs()
+    {
+        var payload = Encoding.ASCII.GetBytes("unchanged-checksum-payload");
+        var frozen = Sha256Verifier.ComputeHex(new MemoryStream(payload));
+        const string tag = "v2026.061594";
+        var update = UpdateWithSha(frozen, payload.Length, tag) with
+        {
+            ChecksumUrl = "https://example.test/SHA256SUMS.txt",
+        };
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new MemoryStream(payload),
+            ChecksumText = $"{frozen}  {update.Asset.Name}",
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        using IVerifiedUpdatePackage package = await service.DownloadVerifiedAsync(
+            update, null, CancellationToken.None);
+
+        Assert.Equal(frozen, package.ExpectedSha256);
     }
 
     private static UpdateInfo UpdateWithSha(string? sha256, long sizeBytes, string versionTag = NewerTag)
@@ -597,11 +911,69 @@ public sealed class UpdateServiceTests : IDisposable
                 : GitHubReleaseResult.Succeeded(Release));
         }
 
+        /// <summary>Every URL passed to <see cref="GetAssetTextAsync"/>, in order.</summary>
+        /// <remarks>
+        /// Recorded because the stub answers any URL with the same text, so a caller that
+        /// asks for the WRONG document is indistinguishable from one that asks for the right
+        /// one unless the request itself is observed. In production that mistake is not
+        /// harmless: reading the installer's URL as text trips the client's one megabyte
+        /// bound, returns null, and silently disables the republication diagnosis.
+        /// </remarks>
+        public List<string> AssetTextRequests { get; } = [];
+
+        /// <summary>How many times a binary asset stream was opened.</summary>
+        /// <remarks>
+        /// The only way to assert that a refusal happened BEFORE the download. Staging is
+        /// cleaned up on any throw, so an empty staging directory says the cleanup ran, not
+        /// that nothing was downloaded.
+        /// </remarks>
+        public int AssetStreamOpenCount { get; private set; }
+
         public Task<string?> GetAssetTextAsync(string url, CancellationToken cancellationToken)
-            => Task.FromResult(ChecksumText);
+        {
+            AssetTextRequests.Add(url);
+            return Task.FromResult(ChecksumText);
+        }
 
         public Task<Stream> OpenAssetStreamAsync(string url, CancellationToken cancellationToken)
-            => Task.FromResult(StreamFactory?.Invoke() ?? Stream.Null);
+        {
+            AssetStreamOpenCount++;
+            return Task.FromResult(StreamFactory?.Invoke() ?? Stream.Null);
+        }
+    }
+
+    /// <summary>
+    /// A release client whose checksum document changes between reads.
+    /// </summary>
+    /// <remarks>
+    /// The only way to model a republication that lands mid-install: the pre-download read
+    /// sees the old document, the post-download read sees the new one. A single fixed answer
+    /// cannot express it, and without it the post-download branch has no oracle at all.
+    /// </remarks>
+    private sealed class ChecksumChangingClient(Func<Stream> streamFactory, IReadOnlyList<string> answers)
+        : IGitHubReleaseClient
+    {
+        private int _reads;
+
+        public int AssetStreamOpenCount { get; private set; }
+
+        public Task<GitHubRelease?> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
+            => Task.FromResult<GitHubRelease?>(null);
+
+        public Task<string?> GetAssetTextAsync(string url, CancellationToken cancellationToken)
+        {
+            // The last answer stands for every read past the end, so a caller that reads
+            // once more than expected sees the settled state rather than an exception.
+            var answer = answers[Math.Min(_reads, answers.Count - 1)];
+            _reads++;
+            return Task.FromResult<string?>(answer);
+        }
+
+        public Task<Stream> OpenAssetStreamAsync(string url, CancellationToken cancellationToken)
+        {
+            AssetStreamOpenCount++;
+            return Task.FromResult(streamFactory());
+        }
     }
 
     private sealed class StubVariantDetector(BuildVariant variant, bool installedInPlace = true) : IVariantDetector

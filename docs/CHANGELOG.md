@@ -14,6 +14,29 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A republished release is no longer reported as a corrupted download
+
+The checksum of an update is settled when Heimdall checks for one, and the download is
+verified against that value. If the maintainer replaces the release in between - uploading
+a rebuilt installer over the same tag - the bytes that arrive are sound, freshly published
+and correctly signed, but they do not match the checksum that was written down earlier.
+Heimdall said "Update verification failed", which is what it also says when a download has
+been truncated or tampered with. Same words, two events with nothing in common, and the one
+that just needed a second look was dressed up as a security incident.
+
+Heimdall now asks the source what it publishes before downloading, and again if the download
+does not match. When the answer shows the release was replaced, it says so and asks you to
+check for updates again; the next check picks up the new release honestly, from its own tag
+and its own checksum. A download that matches neither the old checksum nor the new one is
+still reported as a verification failure, because that is what it is.
+
+The newly published checksum is never adopted. Installing against whatever the source serves
+at install time would give away the only thing writing the checksum down buys, and anyone who
+could replace the installer could replace the checksum beside it. Asking again tells the two
+failures apart; it does not decide what may be installed. If the question cannot be answered
+at all - the document is gone, the network is down - the install goes ahead against the
+checksum from the check, because an unanswered question is not evidence of anything.
+
 ### A release tag Heimdall cannot read no longer reads as a failed update check
 
 Two unrelated things reported the same thing. "GitHub could not be reached" is transient and

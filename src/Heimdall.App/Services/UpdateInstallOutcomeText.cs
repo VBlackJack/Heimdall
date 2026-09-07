@@ -32,6 +32,7 @@ public static class UpdateInstallOutcomeText
         UpdateInstallOutcome.InstallLaunchFailed => "SettingsUpdateStatusInstallFailed",
         UpdateInstallOutcome.Cancelled => "SettingsUpdateStatusCancelled",
         UpdateInstallOutcome.VerificationFailed => "SettingsUpdateStatusVerificationFailed",
+        UpdateInstallOutcome.ReleaseSuperseded => "SettingsUpdateStatusReleaseSuperseded",
         UpdateInstallOutcome.DownloadFailed => "SettingsUpdateStatusDownloadFailed",
 
         // Total, and silent: an unknown outcome must not invent a cause. The default arm
