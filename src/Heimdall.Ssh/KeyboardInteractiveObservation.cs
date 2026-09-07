@@ -18,11 +18,17 @@ namespace Heimdall.Ssh;
 
 /// <summary>
 /// What the keyboard-interactive exchange of one connection attempt asked for and
-/// could not be answered. Heimdall answers a password prompt with the stored
-/// password and nothing else; a server that goes on to ask for a verification code
-/// or any other second factor gets an empty answer, and the refusal that follows
-/// must be reported as that unanswered question rather than as a wrong password.
+/// could not be answered.
 /// </summary>
+/// <remarks>
+/// The handler answers a round that asks a SINGLE question with the stored password,
+/// whatever that question is, and in a round that asks several it answers only the
+/// prompts that read as a password request, leaving the rest empty and recording the
+/// first of them here. So this observation is made on the multi-prompt shape only: a
+/// server whose sole question is a verification code receives the stored password as
+/// the answer to it and nothing is recorded, which is why this class cannot be read as
+/// evidence that a second factor was never answered wrongly.
+/// </remarks>
 public sealed class KeyboardInteractiveObservation
 {
     private string? _unansweredPrompt;

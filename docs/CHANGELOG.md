@@ -14,6 +14,27 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Corrected: what Heimdall does with a server's interactive questions
+
+The security notes and the troubleshooting guide both said that Heimdall answers only a password
+prompt with your stored password, and leaves any other question - a verification code, a challenge
+- empty. That was not true, and the true behaviour is the one worth knowing about.
+
+When a server asks a single question, Heimdall answers it with the stored password whatever the
+question is. Only when a server asks several at once does it pick out the one that reads as a
+password request and leave the rest empty. A server whose only question is a verification code
+therefore receives your password as the answer to it: the attempt fails, and the server records a
+failed second-factor attempt. Second-factor entry is still not supported, and this release does not
+change that behaviour - it changes the four places that described it wrongly.
+
+### A refused interactive login is filed as an authentication failure
+
+When a server refused a login because it asked something Heimdall could not answer, the session
+diagnostic panel filed it as a generic failure rather than under SSH authentication. It was the
+only authentication outcome missing from that list. The panel now says what kind of failure it was;
+nothing about the connection attempt itself changes.
+
+
 ### An update check that fails now says what stopped it
 
 "Update check failed. See the log for details." was the answer to five different questions.

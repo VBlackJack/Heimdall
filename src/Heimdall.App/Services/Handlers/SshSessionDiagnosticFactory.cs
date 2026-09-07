@@ -153,6 +153,7 @@ internal static class SshSessionDiagnosticFactory
                 or SshFailureCode.NoSupportedAuth
                 or SshFailureCode.TooManyAuthFailures
                 or SshFailureCode.KeyboardInteractiveNoPassword
+                or SshFailureCode.KeyboardInteractiveUnsupportedPrompt
                 or SshFailureCode.AuthTimeout
                 => SessionFailureStage.SshAuth,
 
