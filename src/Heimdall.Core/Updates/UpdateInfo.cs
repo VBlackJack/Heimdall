@@ -26,4 +26,16 @@ public sealed record UpdateInfo(
     string ReleaseUrl,
     string ReleaseNotes,
     UpdateAsset Asset,
-    string? Sha256);
+    string? Sha256)
+{
+    /// <summary>
+    /// Where <see cref="Sha256"/> was read from, so it can be read again at install time.
+    /// </summary>
+    /// <remarks>
+    /// Carried rather than re-derived because the install has no repository coordinates:
+    /// it is handed an <see cref="UpdateInfo"/> and nothing else. Optional, and an install
+    /// proceeds without it - the frozen checksum still governs what may be installed. Its
+    /// only job is to tell a republished release apart from a corrupted download.
+    /// </remarks>
+    public string? ChecksumUrl { get; init; }
+}

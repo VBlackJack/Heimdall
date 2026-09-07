@@ -718,6 +718,7 @@
   "SettingsUpdateStatusInstallFailed": "Could not start the installer.",
   "SettingsUpdateStatusDownloadFailed": "Download failed.",
   "SettingsUpdateStatusVerificationFailed": "Update verification failed.",
+  "SettingsUpdateStatusReleaseSuperseded": "This release was republished while the update was being prepared. Check for updates again to install the current one.",
   "SettingsUpdateStatusCancelled": "Update cancelled.",
   "SettingsUpdateConfirmTitle": "Install update",
   "SettingsUpdateConfirmMessage": "Heimdall will close active sessions and restart to install v{0}. Continue?",

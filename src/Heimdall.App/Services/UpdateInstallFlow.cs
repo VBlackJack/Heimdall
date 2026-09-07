@@ -112,6 +112,15 @@ internal sealed class UpdateInstallFlow : IUpdateInstallFlow
         {
             return UpdateInstallOutcome.Cancelled;
         }
+        catch (UpdateSupersededException ex)
+        {
+            // Ahead of the InvalidOperationException arm it derives from. The compiler
+            // enforces that order - the reverse is CS0160 - so what needs guarding is not
+            // the order but the arm's existence: delete it and a republished release goes
+            // back to being reported as a failed integrity check.
+            FileLogger.Warn($"Update install refused: {ex.Message}");
+            return UpdateInstallOutcome.ReleaseSuperseded;
+        }
         catch (InvalidOperationException ex)
         {
             FileLogger.Warn($"Update verification failed: {ex.Message}");

@@ -234,6 +234,36 @@ public sealed class UpdateInstallFlowTests
         lifecycle.RequestShutdownCallCount.Should().Be(0);
     }
 
+    /// <summary>
+    /// A republished release is reported as superseded, not as a verification failure.
+    /// </summary>
+    /// <remarks>
+    /// A-06. <see cref="UpdateSupersededException"/> derives from
+    /// <see cref="InvalidOperationException"/>, so it reaches this method through the same
+    /// door as a genuine integrity failure. Reversing the two catch arms is not the mutant
+    /// this kills - that does not compile, CS0160 - deleting the superseded arm is: the
+    /// exception then lands in the arm below and the user is told to look at a download
+    /// that is fine, rather than to check again.
+    /// </remarks>
+    [Fact]
+    public async Task RunAsync_DownloadThrowsSuperseded_ReturnsReleaseSupersededNotVerificationFailed()
+    {
+        var updateService = new FakeUpdateService
+        {
+            DownloadException = new UpdateSupersededException(
+                "v2026.061590", new string('a', 64), new string('b', 64)),
+        };
+        var installer = new FakeUpdateInstaller();
+        var lifecycle = new FakeApplicationLifecycle();
+        var flow = new UpdateInstallFlow(updateService, installer, lifecycle, new FakeUpdateOutcomeStore());
+
+        var outcome = await flow.RunAsync(SampleUpdate(), null, CancellationToken.None);
+
+        outcome.Should().Be(UpdateInstallOutcome.ReleaseSuperseded);
+        installer.BeginInstallCallCount.Should().Be(0);
+        lifecycle.RequestShutdownCallCount.Should().Be(0);
+    }
+
     [Fact]
     public async Task RunAsync_DownloadThrowsInvalidOperation_ReturnsVerificationFailed()
     {
