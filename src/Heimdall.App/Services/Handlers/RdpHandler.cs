@@ -656,11 +656,29 @@ internal sealed class RdpHandler : IProtocolHandler
     }
 
     /// <summary>
-    /// Cleans up the temporary .rdp file and CredMan entry after a delay. The delay is
-    /// deliberately not bound to the connect-scoped token: that token is cancelled when the
-    /// command is re-executed, and cancelling it used to bring the deletion forward instead
-    /// of holding it back, pulling the credential out from under a client still negotiating.
+    /// Cleans up the temporary .rdp file and CredMan entry after a delay.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The delay takes no cancellation token, deliberately. The cleanup has to outlive
+    /// the connect scope that started it: mstsc is still reading the file and still
+    /// negotiating with the credential when the handler returns, so a deletion brought
+    /// forward pulls both out from under a live client.
+    /// </para>
+    /// <para>
+    /// Cancellation is the wrong shape for that, whichever way it is wired. Awaiting the
+    /// delay with a token makes a cancel run the cleanup EARLIER, which is the failure
+    /// it is meant to prevent; skipping the cleanup on cancel leaves the credential in
+    /// CredMan instead. The only teardown that must be prompt is the exit flush, and it
+    /// reaches this work by removing the entry from <c>_pendingCleanups</c>, not by
+    /// cancelling anything.
+    /// </para>
+    /// <para>
+    /// The previous wording justified this with a token "cancelled when the command is
+    /// re-executed". No such cancellation exists anywhere on this path; the reason above
+    /// is the real one.
+    /// </para>
+    /// </remarks>
     private async Task CleanupRdpArtifactsAsync(PendingRdpCleanup pending, TimeSpan cleanupDelay)
     {
         await _artifactCleanupDelay(cleanupDelay).ConfigureAwait(false);

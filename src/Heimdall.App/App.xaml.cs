@@ -70,6 +70,13 @@ public partial class App : System.Windows.Application
     // Timeout for the single long-lived updater HttpClient (no magic number inline).
     private static readonly TimeSpan UpdateHttpTimeout = TimeSpan.FromSeconds(30);
 
+    // How long a pooled connection of that client may be reused before it is
+    // re-established. A singleton HttpClient keeps its sockets, and with them the DNS
+    // answer they were opened against, for the life of the process: a session left open
+    // across a GitHub DNS change would keep dialling an address that has moved. Two
+    // minutes is the documented remedy for a long-lived client and costs one handshake.
+    private static readonly TimeSpan UpdateConnectionLifetime = TimeSpan.FromMinutes(2);
+
     // Vault unlock-gate brute-force lockout (defense-in-depth on top of Argon2id,
     // which is the primary per-attempt rate-limiter). Mirrors the PIN gate defaults.
     private const int VaultUnlockMaxAttempts = 5;
@@ -629,7 +636,7 @@ public partial class App : System.Windows.Application
 
         // Updater services (no UI wiring yet)
         services.AddSingleton<IAppVersionProvider, AppVersionProvider>();
-        services.AddSingleton(_ => new HttpClient { Timeout = UpdateHttpTimeout });
+        services.AddSingleton(_ => CreateUpdateHttpClient());
         services.AddSingleton<IGitHubReleaseClient>(sp => new GitHubReleaseClient(
             sp.GetRequiredService<HttpClient>(),
             sp.GetRequiredService<IAppVersionProvider>().Current?.ToString() ?? "unknown"));
@@ -821,6 +828,23 @@ public partial class App : System.Windows.Application
 
         // Windows
         services.AddTransient<MainWindow>();
+    }
+
+    /// <summary>
+    /// The single long-lived HTTP client of the updater.
+    /// </summary>
+    /// <remarks>
+    /// A named factory rather than an object initialiser in the container build, so the
+    /// handler and its lifetime are two statements a test can read as steps of a method
+    /// body instead of a fragment of text that a false branch could hide.
+    /// </remarks>
+    private static HttpClient CreateUpdateHttpClient()
+    {
+        // The handler is the whole point: a singleton client keeps its pooled sockets, and
+        // with them the DNS answer they were opened against, for the life of the process.
+        var handler = new SocketsHttpHandler { PooledConnectionLifetime = UpdateConnectionLifetime };
+
+        return new HttpClient(handler) { Timeout = UpdateHttpTimeout };
     }
 
     internal static string ResolveNotesStoragePath(AppSettings settings, string basePath)

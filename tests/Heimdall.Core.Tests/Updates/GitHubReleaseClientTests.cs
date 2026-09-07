@@ -261,6 +261,85 @@ public sealed class GitHubReleaseClientTests
         Assert.True(content.Disposed, "the response content must be disposed when it is not returned");
     }
 
+    // The asset text path is the checksum list: a few hundred bytes from the
+    // application's own release. It used to be buffered whole with no ceiling, so an
+    // allowed host serving an unbounded body would have been read into memory until
+    // something else stopped it. The bound has two halves and each is tested on its own,
+    // because either one alone leaves a way through.
+
+    [Fact]
+    public async Task GetAssetTextAsync_DeclaredLengthPastTheBound_IsRefusedWithoutReadingTheBody()
+    {
+        // A small body behind a header that claims two megabytes. Only the declared
+        // length can catch this one: the body itself is well under the bound, so a
+        // reader that trusts what it receives would accept it and never notice the lie.
+        var content = new StringContent("chunk-of-checksums", Encoding.UTF8);
+        content.Headers.ContentLength = 2 * 1024 * 1024;
+
+        var client = CreateClient((_, _) => new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+
+        string? text = await client.GetAssetTextAsync(ChecksumUrl, CancellationToken.None);
+
+        Assert.Null(text);
+    }
+
+    [Fact]
+    public async Task GetAssetTextAsync_UndeclaredBodyPastTheBound_IsRefusedWhileReading()
+    {
+        // No Content-Length at all, which is what a chunked response looks like, and a
+        // body over the bound. Only the copy can catch this one.
+        var client = CreateClient((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new UnsizedContent(2 * 1024 * 1024),
+        });
+
+        string? text = await client.GetAssetTextAsync(ChecksumUrl, CancellationToken.None);
+
+        Assert.Null(text);
+    }
+
+    [Fact]
+    public async Task GetAssetTextAsync_OrdinaryChecksumList_IsReturnedWhole()
+    {
+        // The control that keeps the two refusals honest: a bound that rejected
+        // everything would satisfy both of them and break the updater completely.
+        const string Body = "a1b2c3  Heimdall_2026.061502_Standard_Setup.exe\nd4e5f6  Heimdall_build.zip\n";
+        var client = CreateClient((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(Body, Encoding.UTF8),
+        });
+
+        string? text = await client.GetAssetTextAsync(ChecksumUrl, CancellationToken.None);
+
+        Assert.Equal(Body, text);
+    }
+
+    /// <summary>A body whose length is not known in advance, as a chunked response is.</summary>
+    private sealed class UnsizedContent(int byteCount) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            byte[] chunk = new byte[8192];
+            Array.Fill(chunk, (byte)'x');
+
+            int written = 0;
+            while (written < byteCount)
+            {
+                int size = Math.Min(chunk.Length, byteCount - written);
+                stream.Write(chunk, 0, size);
+                written += size;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
     private sealed class DisposeTrackingContent() : ByteArrayContent([0])
     {
         public bool Disposed { get; private set; }
