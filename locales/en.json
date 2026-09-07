@@ -2157,6 +2157,8 @@
   "WarnUploadTargetsSkippedUnsupported": "Skipped {0} upload(s): the destination already exists and is not a regular file. See the log for details.",
   "WarnUploadSourcesSkippedReparsePoints": "Skipped {0} local link(s), selected as upload sources or found inside the selected tree. See the log for details.",
   "WarnRemoteReplacementNonAtomic": "Destination '{0}' was replaced without an atomic guarantee.",
+  "WarnFtpBackupResidueOriginalMissing": "Heimdall found '{0}' on the server: a copy set aside while replacing a file, whose replacement never arrived. The file it was made from is not in this folder, so this copy holds its only contents. Heimdall left it where it is.",
+  "WarnFtpBackupResidueOriginalPresent": "Heimdall found '{0}' on the server: a copy set aside while replacing a file, which should have been deleted afterwards. The file it was made from is in this folder, so nothing is missing; this copy holds the previous version. Heimdall left it where it is.",
   "WarnFtpReplacementNonAtomicMetadataNotPreserved": "Destination '{0}' was replaced without an atomic guarantee, and Heimdall did not preserve the replaced file's owner, permissions, timestamps, ACLs, extended attributes or capabilities.",
   "WarnRdpFileAclFailed": "The temporary .rdp file could not be locked down with a restricted ACL. It contains the host and username, but no password; the session was still launched.",
   "ErrorTelnetConnectionFailed": "Telnet connection failed: {0}",

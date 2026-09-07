@@ -62,6 +62,9 @@ public sealed class FtpBrowser : IRemoteBrowser
 
     private readonly SemaphoreSlim _opLock = new SemaphoreSlim(1, 1);
 
+    /// <summary>Remembers which set-aside copies this connection has already named.</summary>
+    private readonly FtpBackupResidueReporter _residueReporter = new();
+
     /// <summary>Token the certificate callback honours while a connect is in flight; none afterwards.</summary>
     private CancellationToken _certificateValidationToken = CancellationToken.None;
 
@@ -211,13 +214,21 @@ public sealed class FtpBrowser : IRemoteBrowser
         string? path = null,
         CancellationToken ct = default)
     {
+        List<SftpFileInfo> result;
+        List<string> rawNames;
+
         await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             AsyncFtpClient client = GetConnectedClient();
             string targetPath = NormalizePath(path ?? CurrentDirectory);
             FtpListItem[] items = await client.GetListing(targetPath, ct).ConfigureAwait(false);
-            List<SftpFileInfo> result = new List<SftpFileInfo>();
+            result = new List<SftpFileInfo>();
+
+            // Presence is read from the RAW listing, not from the mapped one. The mapper
+            // drops entries whose name fails the path guard, so a residue whose original is
+            // sitting right there, unmapped, would otherwise be reported as orphaned.
+            rawNames = new List<string>(items.Length);
 
             foreach (FtpListItem item in items)
             {
@@ -226,6 +237,8 @@ public sealed class FtpBrowser : IRemoteBrowser
                     continue;
                 }
 
+                rawNames.Add(item.Name);
+
                 SftpFileInfo? mapped = MapFtpItemToFileInfo(item, targetPath);
                 if (mapped is not null)
                 {
@@ -233,11 +246,35 @@ public sealed class FtpBrowser : IRemoteBrowser
                 }
             }
 
-            return result;
         }
         finally
         {
             _opLock.Release();
+        }
+
+        // Outside the lock on purpose. A subscriber runs on this thread, and the one in the
+        // product marshals to the dispatcher, but raising an event while holding the
+        // operation lock invites a subscriber that calls straight back into the browser and
+        // waits for a lock its own caller is holding.
+        RaiseBackupResidueWarnings(result, rawNames);
+        return result;
+    }
+
+    /// <summary>
+    /// Names the set-aside copies this listing carries, once each per connection.
+    /// </summary>
+    /// <remarks>
+    /// Reporting only, and that is the whole decision. Moving a residue back would race
+    /// another client's replacement, which is happening right now in exactly the case the
+    /// user most wants fixed, so Heimdall says what it found and touches nothing.
+    /// </remarks>
+    private void RaiseBackupResidueWarnings(
+        IReadOnlyList<SftpFileInfo> entries,
+        IReadOnlyCollection<string> rawNames)
+    {
+        foreach (FtpBackupResidueFinding finding in _residueReporter.Report(entries, rawNames))
+        {
+            OperationWarningRaised?.Invoke(RemoteOperationWarning.ForBackupResidue(finding));
         }
     }
 
@@ -587,6 +624,11 @@ public sealed class FtpBrowser : IRemoteBrowser
         _host = null;
         _username = null;
         _port = 0;
+
+        // A reconnect is where the user gets a fresh chance to act on a residue, and where
+        // the server may have changed under them. Staying silent across it would make the
+        // warning depend on how long the application had been running.
+        _residueReporter.Reset();
         return true;
     }
 
