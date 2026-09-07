@@ -681,8 +681,27 @@ préparation que l'utilisateur non privilégié peut écrire. Le fichier
 installateur lui-même est maintenu sous un bail interdisant l'écriture de la
 vérification au lancement, il ne peut donc pas être substitué ; un fichier
 voisin déposé à côté pourrait encore être résolu par le chargeur de
-l'installateur. Dans le modèle énoncé par Microsoft, l'UAC n'est pas une
-frontière de sécurité : c'est un durcissement, pas une brèche.
+l'installateur.
+
+La formule sur laquelle ce paragraphe se terminait était fausse et elle est
+corrigée ici. "L'UAC n'est pas une frontière de sécurité" ne tranche pas la
+question, parce que l'élévation n'est choisie que lorsque le répertoire
+d'installation n'est pas accessible en écriture, c'est-à-dire pour une
+installation par machine. Quand la personne qui exécute Heimdall n'est pas
+administratrice, le consentement qu'elle voit est une demande d'identifiants
+et l'installateur s'exécute sous un *autre compte, plus privilégié*. Cette
+frontière-là, Microsoft la maintient.
+
+Deux remèdes ont été mesurés le 2026-09-07 et les deux sont consignés, parce
+que leur coût est la raison pour laquelle ceci reste un risque résiduel et non
+un correctif. Une DACL n'accordant l'accès qu'aux administrateurs et à SYSTEM
+est réécrite par son propre créateur non privilégié, qui possède le répertoire
+et conserve `WRITE_DAC` (mesuré deux fois sans élévation, avec un contrôle
+positif qui passe). Une entrée `Deny` sur `OWNER RIGHTS` tient - et son vrai
+coût n'est pas d'être contournable, mais de retirer à la mise à jour sa propre
+capacité à supprimer le répertoire de préparation et son script dans le
+`finally`, ce qui échangerait un durcissement contre un répertoire abandonné
+après chaque mise à jour.
 
 ### Entrées distantes dont le type ne peut pas être déterminé
 
