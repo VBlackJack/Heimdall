@@ -60,6 +60,15 @@ jobs:
           # that leaves the gate depending on runner behaviour invisible in this file.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The rule that decides which files of the installer directory a publish uploads.
+      # A release writes its own notes into that directory, so a second publish of one
+      # build number used to carry the release body into the asset list.
+      - name: Check the publish artifact selection
+        shell: pwsh
+        run: |
+          ./scripts/Test-PublishArtifactSelection.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Pure PowerShell over Build.ps1 and a temporary notes sandbox. Keep this
       # fail-fast gate beside the typography guard: a missing hand-written notes
       # file must stop a release before the .NET setup and long build/test job.

@@ -83,6 +83,8 @@ $ProjectRoot = $PSScriptRoot
 . (Join-Path $ProjectRoot 'scripts\ReleaseNotesResolution.ps1')
 # Version stamping, and the rule that a dry run never writes the project file.
 . (Join-Path $ProjectRoot 'scripts\BuildVersioning.ps1')
+
+. (Join-Path $ProjectRoot 'scripts\PublishArtifactSelection.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
 $SolutionFile = Get-ChildItem -Path $ProjectRoot -Filter '*.slnx' | Select-Object -First 1
 $distDir = Join-Path $ProjectRoot "Dist\$($Mode.ToLower())"
@@ -513,9 +515,12 @@ foreach ($o in $outputs) {
 if ($Mode -eq 'Release') {
     $installerDir = Join-Path $ProjectRoot 'Dist\installers'
     if (Test-Path $installerDir) {
-        Get-ChildItem $installerDir -File -Filter "*${buildNumber}*" | ForEach-Object {
-            $sz = [math]::Round($_.Length / 1MB, 0)
-            Write-Host "  Installer: $($_.Name) (~${sz} MB)" -ForegroundColor Cyan
+        # Through the same rule as the publish list below: this line says "Installer",
+        # and a generated release-notes file left in the directory is not one.
+        $summaryFiles = @(Get-ChildItem $installerDir -File -Filter "*${buildNumber}*")
+        foreach ($file in (Select-PublishArtifact -Candidate $summaryFiles)) {
+            $sz = [math]::Round($file.Length / 1MB, 0)
+            Write-Host "  Installer: $($file.Name) (~${sz} MB)" -ForegroundColor Cyan
         }
     }
 }
@@ -540,8 +545,13 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     }
     $installerDir = Join-Path $ProjectRoot 'Dist\installers'
     if (Test-Path $installerDir) {
-        Get-ChildItem $installerDir -File -Filter "*${buildNumber}*" | ForEach-Object {
-            $artifacts += $_.FullName
+        # Not everything carrying the build number is an asset: this run writes its
+        # release notes into the same directory, so a second publish of one build
+        # number would upload the release body as a downloadable file. The rule lives
+        # in scripts/PublishArtifactSelection.ps1 and is tested there.
+        $candidates = @(Get-ChildItem $installerDir -File -Filter "*${buildNumber}*")
+        foreach ($file in (Select-PublishArtifact -Candidate $candidates)) {
+            $artifacts += $file.FullName
         }
     }
 

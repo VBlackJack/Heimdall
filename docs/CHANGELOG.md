@@ -14,6 +14,39 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The updater refuses a checksum list that does not fit, and stops reusing a stale route
+
+Four residues of the 2026-09-06 updater audit, parked then as having no real case and
+closed now that they were re-measured against the code.
+
+The checksum list fetched before an update was buffered whole with no ceiling: an allowed
+host serving an unbounded body would have been read into memory until something else
+stopped it. The response is now read headers-first and refused past one megabyte, which is
+three orders of magnitude above the few hundred bytes a real list holds. Both halves of
+the bound matter and both are tested: a declared length past the bound is refused before a
+byte of body is read, and the copy stops at the bound as well, because a chunked response
+declares no length and a declared one can lie.
+
+The updater's HTTP client is a process-lifetime singleton, so its pooled sockets kept the
+DNS answer they were opened against for as long as Heimdall ran. A session left open
+across a GitHub address change would have kept dialling the old one, and the update check
+would have failed for a reason no log explained. Connections are now recycled every two
+minutes.
+
+Digest verification states its contract instead of leaving it to be guessed: false means
+the file was read and does not match, never that it could not be read. A file that cannot
+be opened throws, and a test pins it, because the one caller reports false as tampering
+and would otherwise show an antivirus holding the installer as a corrupted download.
+
+### A release no longer risks publishing its own release notes as a download
+
+A publish collects the files of the installer directory carrying the build number. That
+directory is also where the run writes the release notes it generates, so publishing the
+same build number a second time, from a working copy where the first run left its notes
+behind, would have uploaded the release body as a downloadable file. The selection rule
+now lives in one place, is shared by the publish list and the build summary, and refuses
+generated documents.
+
 ### CI says out loud when a test fails in a lane that cannot turn a run red
 
 Two test steps run with `continue-on-error: true`, the `CIUnstable` lane and the

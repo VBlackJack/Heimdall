@@ -992,8 +992,20 @@ public sealed class ServerDialogViewModelRdpOptionsTests
         direct.ApplyReachabilityResult(answered);
         throughGateway.ApplyReachabilityResult(answered);
 
-        Assert.Contains(RdGatewayHost, throughGateway.TestChipText, StringComparison.Ordinal);
-        Assert.StartsWith(direct.TestChipText, throughGateway.TestChipText, StringComparison.Ordinal);
+        // Both chip texts go into the failure message on purpose. This test failed once
+        // under full-suite load on 2026-09-06 and was green in isolation; its message said
+        // only that a substring was missing, so the run that could have explained it is
+        // gone. Instrumented rather than fixed, because there is nothing yet to fix: the
+        // next occurrence has to print what was actually produced.
+        string produced =
+            $"direct chip: '{direct.TestChipText}' | gateway chip: '{throughGateway.TestChipText}'";
+
+        Assert.True(
+            throughGateway.TestChipText.Contains(RdGatewayHost, StringComparison.Ordinal),
+            $"the gateway verdict must name {RdGatewayHost}. {produced}");
+        Assert.True(
+            throughGateway.TestChipText.StartsWith(direct.TestChipText, StringComparison.Ordinal),
+            $"the gateway verdict must open with the direct verdict. {produced}");
     }
 
     private const string RdGatewayHost = "rdgw.example.com";

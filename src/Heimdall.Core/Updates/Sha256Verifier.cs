@@ -26,12 +26,17 @@ public static class Sha256Verifier
     /// <summary>
     /// Computes the lowercase hexadecimal SHA-256 digest of a stream.
     /// </summary>
+    /// <remarks>
+    /// <see cref="SHA256.HashData(Stream)"/> rather than an owned
+    /// <see cref="SHA256"/> instance: it reads the stream in bounded chunks instead of
+    /// materialising the file, and there is no algorithm object to dispose or to leak
+    /// when a caller forgets.
+    /// </remarks>
     public static string ComputeHex(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        using var sha256 = SHA256.Create();
-        var hash = sha256.ComputeHash(stream);
+        byte[] hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
@@ -39,6 +44,24 @@ public static class Sha256Verifier
     /// Verifies that the file at <paramref name="filePath"/> matches the expected
     /// hexadecimal SHA-256 digest, comparing case-insensitively.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// False means one thing only: the file was read and its digest is not the expected
+    /// one. It never means the file could not be read.
+    /// </para>
+    /// <para>
+    /// A file that cannot be opened throws, deliberately, and the contract is pinned by
+    /// a test. Swallowing that into false would turn "locked, missing or unreadable"
+    /// into "the digest does not match", and the one production caller reports a
+    /// mismatch as tampering: an antivirus holding the freshly written installer would
+    /// be reported to the user as a corrupted download. Callers that must survive an
+    /// unreadable file catch <see cref="IOException"/> and
+    /// <see cref="UnauthorizedAccessException"/> around this call, as
+    /// <c>UpdateInstaller</c> does.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="IOException">The file cannot be opened or read.</exception>
+    /// <exception cref="UnauthorizedAccessException">The file cannot be accessed.</exception>
     public static bool Verify(string filePath, string expectedHex)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);

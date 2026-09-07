@@ -71,4 +71,38 @@ public sealed class Sha256VerifierTests
             File.Delete(filePath);
         }
     }
+
+    [Fact]
+    public void Verify_UnreadableFile_Throws_RatherThanReportingAMismatch()
+    {
+        // False has one meaning and it must keep it: the file was read and its digest is
+        // not the expected one. The single production caller reports false as tampering,
+        // so an antivirus holding the freshly written installer would otherwise be shown
+        // to the user as a corrupted download. This pins the contract the doc comment
+        // states: a file that cannot be read throws, and the caller decides what that is.
+        string missing = Path.Combine(Path.GetTempPath(), $"heimdall-absent-{Guid.NewGuid():N}.bin");
+        string expected = new('a', 64);
+
+        Assert.Throws<FileNotFoundException>(() => Sha256Verifier.Verify(missing, expected));
+    }
+
+    [Fact]
+    public void ComputeHex_ReadsTheWholeStreamFromWhereItStands()
+    {
+        // ComputeHex moved to SHA256.HashData, which reads the stream in bounded chunks
+        // instead of materialising it. The digest must not change with that, and it must
+        // still consume from the current position, since Verify hands it a fresh handle.
+        byte[] payload = Encoding.ASCII.GetBytes("heimdall-update-payload");
+        using var stream = new MemoryStream(payload);
+
+        string first = Sha256Verifier.ComputeHex(stream);
+
+        stream.Position = 0;
+        string second = Sha256Verifier.ComputeHex(stream);
+
+        Assert.Equal(64, first.Length);
+        Assert.Equal(first, second);
+        Assert.Equal(first, first.ToLowerInvariant());
+        Assert.Equal(payload.Length, stream.Position);
+    }
 }

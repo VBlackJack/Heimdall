@@ -43,6 +43,21 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
     private const string GitHubAcceptHeader = "application/vnd.github+json";
     private const string UserAgentProduct = "Heimdall";
 
+    /// <summary>
+    /// The most an asset text response may hold before it is refused. The only asset
+    /// read as text is the checksum list of the application's own release, a few
+    /// hundred bytes; a megabyte is already three orders of magnitude of headroom.
+    /// </summary>
+    /// <remarks>
+    /// The bound exists because the response used to be buffered whole with no ceiling
+    /// at all: an allowed host serving an unbounded body would have been read into
+    /// memory until something else stopped it. Both halves of the check are load
+    /// bearing. A declared <c>Content-Length</c> past the bound is refused before a
+    /// byte of body is read, and the copy itself stops at the bound as well, because a
+    /// chunked response declares no length and a declared one can simply lie.
+    /// </remarks>
+    private const int MaxAssetTextBytes = 1024 * 1024;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -121,7 +136,12 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         try
         {
             using var request = CreateRequest(url, acceptGitHubJson: false);
-            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            // Headers first: a body past the bound must be refused before it is read,
+            // not after it has already been buffered.
+            using var response = await _httpClient
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -129,7 +149,7 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
                 return null;
             }
 
-            return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            return await ReadBoundedTextAsync(response.Content, url, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {
@@ -142,6 +162,54 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
             FileLogger.Warn($"Fetching update asset text timed out for {url}.");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Reads a response body as text, refusing anything past <see cref="MaxAssetTextBytes"/>.
+    /// </summary>
+    /// <remarks>
+    /// Returns null rather than throwing, because every other failure on this path
+    /// already degrades to null and the caller treats a missing checksum list as a
+    /// reason to stop, not as an error to report.
+    /// </remarks>
+    private static async Task<string?> ReadBoundedTextAsync(
+        HttpContent content,
+        string url,
+        CancellationToken cancellationToken)
+    {
+        long? declaredLength = content.Headers.ContentLength;
+        if (declaredLength > MaxAssetTextBytes)
+        {
+            FileLogger.Warn(
+                $"Refusing update asset text for {url}: declared {declaredLength} bytes, over the {MaxAssetTextBytes} byte bound.");
+            return null;
+        }
+
+        using Stream stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        byte[] chunk = new byte[8192];
+
+        while (true)
+        {
+            int read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false);
+            if (read == 0)
+            {
+                break;
+            }
+
+            // Past the bound the body is refused, not truncated: half a checksum list
+            // is worse than none, since it would fail verification for the wrong reason.
+            if (buffer.Length + read > MaxAssetTextBytes)
+            {
+                FileLogger.Warn(
+                    $"Refusing update asset text for {url}: body exceeds the {MaxAssetTextBytes} byte bound.");
+                return null;
+            }
+
+            buffer.Write(chunk, 0, read);
+        }
+
+        return System.Text.Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
     }
 
     public async Task<Stream> OpenAssetStreamAsync(string url, CancellationToken cancellationToken)
