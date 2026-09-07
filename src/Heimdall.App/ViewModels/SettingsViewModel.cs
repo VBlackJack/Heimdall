@@ -1138,7 +1138,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 UpdateCheckStatus.UpToDate => _localizer.Format("SettingsUpdateStatusUpToDate"),
                 UpdateCheckStatus.UpdateAvailable => _localizer.Format("SettingsUpdateStatusAvailable", result.Update!.Version.ToString()),
                 UpdateCheckStatus.UpdateNotInstallable => _localizer.Format("SettingsUpdateStatusNotInstallable", result.Release!.Version.ToString()),
-                _ => _localizer.Format("SettingsUpdateStatusFailed"),
+                _ => DescribeFailedCheck(result),
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1151,12 +1151,37 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             // the same fault crashed the application from one button and was logged from
             // the other. An AsyncRelayCommand rethrows on the UI context.
             FileLogger.WarnDetailed("[Updates] manual check failed", ex);
-            UpdateStatusText = _localizer.Format("SettingsUpdateStatusFailed");
+
+            // Deliberately the generic wording: a throw that got past the service is not one
+            // of the causes the service classified, and guessing at one here would put a
+            // confident sentence in front of the user on the one path nobody understood.
+            UpdateStatusText = _localizer.Format(UpdateCheckFailureText.UnknownCauseKey);
         }
         finally
         {
             IsCheckingUpdate = false;
         }
+    }
+
+    /// <summary>
+    /// The sentence for a check that failed, naming the cause when one is known.
+    /// </summary>
+    /// <remarks>
+    /// The waiting time is shown only when the source volunteered one. Inventing a duration
+    /// would be worse than saying nothing: a number that turns out to be wrong teaches the
+    /// user to ignore every number the application shows afterwards.
+    /// </remarks>
+    private string DescribeFailedCheck(UpdateCheckResult result)
+    {
+        var hintKey = UpdateCheckFailureText.RetryHintKey(result.Failure, result.RetryAfter);
+        if (hintKey is not null && result.RetryAfter is { } wait)
+        {
+            return _localizer.Format(
+                hintKey,
+                UpdateCheckFailureText.WholeMinutesToWait(wait).ToString(CultureInfo.InvariantCulture));
+        }
+
+        return _localizer.Format(UpdateCheckFailureText.StatusKey(result.Failure));
     }
 
     private void ClearUpdateActions()

@@ -161,17 +161,60 @@ public sealed class UpdateBannerViewModelTests
         Assert.False(string.IsNullOrEmpty(settings.UpdateLastCheckUtc));
     }
 
-    [Fact]
-    public async Task CheckOnStartup_CheckFailed_DoesNotPersistLastCheck()
+    /// <summary>
+    /// Every cause but a spent quota is retried on the next launch.
+    /// </summary>
+    /// <remarks>
+    /// Not because the rest are transient: SourceNotFound covers a 451, which the classifier
+    /// itself calls permanent. Because one GET per launch reaches nobody and costs nothing,
+    /// while a spent quota is counted per address and retrying it keeps the bucket pinned.
+    /// </remarks>
+    [Theory]
+    [InlineData(UpdateCheckFailure.NetworkUnreachable)]
+    [InlineData(UpdateCheckFailure.SecureChannelFailed)]
+    [InlineData(UpdateCheckFailure.ProxyRefused)]
+    [InlineData(UpdateCheckFailure.SourceNotFound)]
+    [InlineData(UpdateCheckFailure.MalformedResponse)]
+    [InlineData(UpdateCheckFailure.AccessDenied)]
+    [InlineData(UpdateCheckFailure.SourceUnavailable)]
+    [InlineData(UpdateCheckFailure.TimedOut)]
+    public async Task CheckOnStartup_AnyCauseButASpentQuota_DoesNotPersistLastCheck(UpdateCheckFailure cause)
     {
         var settings = BaseSettings();
-        var update = new StubUpdateService { Result = new UpdateCheckResult(UpdateCheckStatus.CheckFailed, null) };
+        var update = new StubUpdateService { Result = UpdateCheckResult.Failed(cause) };
         var vm = CreateViewModel(settings, update, Current);
 
         await vm.CheckOnStartupAsync(CancellationToken.None);
 
         Assert.False(vm.IsBannerVisible);
         Assert.Null(settings.UpdateLastCheckUtc);
+    }
+
+    /// <summary>
+    /// A spent quota backs off instead of asking again on the next launch.
+    /// </summary>
+    /// <remarks>
+    /// The one cause retrying makes worse. GitHub counts the unauthenticated quota per
+    /// ADDRESS, so an office behind one address shares a bucket; checking again every launch
+    /// while it reads zero keeps that bucket pinned, which is how the secondary limit is
+    /// tripped. Stamping the check falls back to the ordinary daily throttle - longer than
+    /// the quoted reset, which is the safe side of a trade whose alternative is a stored
+    /// resume-at time, a settings field and a migration.
+    /// </remarks>
+    [Fact]
+    public async Task CheckOnStartup_RateLimited_PersistsLastCheckSoTheNextLaunchBacksOff()
+    {
+        var settings = BaseSettings();
+        var update = new StubUpdateService
+        {
+            Result = UpdateCheckResult.Failed(UpdateCheckFailure.RateLimited, TimeSpan.FromMinutes(30)),
+        };
+        var vm = CreateViewModel(settings, update, Current);
+
+        await vm.CheckOnStartupAsync(CancellationToken.None);
+
+        Assert.False(vm.IsBannerVisible);
+        Assert.False(string.IsNullOrEmpty(settings.UpdateLastCheckUtc));
     }
 
     [Fact]

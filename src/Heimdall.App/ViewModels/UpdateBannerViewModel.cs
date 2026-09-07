@@ -224,7 +224,32 @@ public partial class UpdateBannerViewModel : ObservableObject
 
         if (result.Status == UpdateCheckStatus.CheckFailed)
         {
-            // Do not stamp UpdateLastCheckUtc on failure so an offline launch retries next time.
+            // An offline launch retries next time. Not because every other cause is
+            // transient - SourceNotFound covers a 451 that this client's own classifier calls
+            // permanent - but because one GET per launch reaches nobody and costs nothing, and
+            // a cause that is permanent today may not be tomorrow.
+            //
+            // A spent quota is the exception, and retrying makes it worse. The unauthenticated
+            // GitHub quota is counted per ADDRESS, so an office behind one address shares a
+            // single bucket; checking again on every launch while the quota reads zero keeps
+            // that bucket pinned and is how the secondary limit gets tripped. Stamping the
+            // check falls back to the ordinary check interval instead.
+            //
+            // Two costs, stated rather than hidden. That interval is UpdateCheckIntervalHours,
+            // 24 hours by default but settable down to 1, and usually longer than the reset the
+            // source quoted; honouring the quoted time needs a stored resume-at value, a
+            // settings field and a migration, and waiting too long is the safe side of that.
+            // And the backoff only reaches a quota this client RECOGNISED: GitHub's secondary
+            // limit can answer 403 with neither a spent X-RateLimit-Remaining nor a Retry-After,
+            // which reads as AccessDenied and still retries every launch. Adding AccessDenied to
+            // this condition would close that, and would also back off a corporate proxy's 403
+            // and a 401, delaying recovery once the rule is fixed; it is a costed option on the
+            // update and security-fix notification path, not a change to make unattended.
+            if (result.Failure == UpdateCheckFailure.RateLimited)
+            {
+                await PersistLastCheckAsync();
+            }
+
             return;
         }
 

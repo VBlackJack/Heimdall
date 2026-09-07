@@ -82,11 +82,17 @@ public sealed class UpdateService : IUpdateService
         string repo,
         CancellationToken cancellationToken)
     {
-        var release = await _client.GetLatestReleaseAsync(owner, repo, cancellationToken).ConfigureAwait(false);
-        if (release is null)
+        var lookup = await _client.GetLatestReleaseAsync(owner, repo, cancellationToken).ConfigureAwait(false);
+        if (lookup.Release is null)
         {
-            return new UpdateCheckResult(UpdateCheckStatus.CheckFailed, null);
+            // The status stays CheckFailed - what a caller does about it has not changed -
+            // and the cause rides alongside so the user can be told which of five very
+            // different things happened. Through the factory, which refuses a failed check
+            // that declines to say why.
+            return UpdateCheckResult.Failed(lookup.Failure, lookup.RetryAfter);
         }
+
+        var release = lookup.Release;
 
         if (!HeimdallVersion.TryParse(release.TagName, out var releaseVersion))
         {
