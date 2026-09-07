@@ -936,7 +936,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 **Symptom**: Connecting with a password fails with a message saying the server asked an interactive question this client cannot answer, naming the question (for example `Verification code:`).
 
-**Root cause**: The server authenticates through keyboard-interactive and asks for a second factor after the password. Heimdall answers only a password prompt with the stored password; any other prompt is left empty and recorded, and the refusal that follows is reported as that unanswered question (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) rather than as a rejected password. Before this classification existed the same refusal was blamed on the password.
+**Root cause**: The server authenticates through keyboard-interactive and asks for a second factor after the password. Heimdall answers a round that asks a single question with the stored password whatever that question is, and in a round that asks several it answers only the prompts that read as a password request, leaving the rest empty and recorded; the refusal that follows an unanswered prompt is reported as that unanswered question (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) rather than as a rejected password. A server whose only question is the second factor therefore receives the stored password as its answer. Before this classification existed the same refusal was blamed on the password.
 
 **Solution**:
 

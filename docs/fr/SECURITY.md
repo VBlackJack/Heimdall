@@ -176,12 +176,19 @@ n'est pas à l'origine (y compris `@cert-authority`, `@revoked`, les entrées
 hachées et toute ligne multi-hôtes dont les alias ne sont pas tous gérés).
 
 L'authentification par mot de passe enregistre à la fois `password` et
-`keyboard-interactive`. Le handler keyboard-interactive ne répond qu'à une
-demande de mot de passe avec le mot de passe stocké ; toute autre demande (un
-code de vérification, un défi) est laissée vide et enregistrée, et le refus qui
-suit est signalé comme une question sans réponse
-(`KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un mot de passe
-rejeté. La saisie d'un second facteur n'est pas prise en charge.
+`keyboard-interactive`. Le handler keyboard-interactive répond avec le mot de passe
+stocké à un tour qui ne pose qu'une seule question, quelle que soit cette question ;
+dans un tour qui en pose plusieurs, seules les demandes qui se lisent comme une
+demande de mot de passe reçoivent une réponse, les autres sont laissées vides et
+enregistrées. Le refus qui suit une demande sans réponse est signalé comme une
+question sans réponse (`KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un
+mot de passe rejeté.
+
+Une conséquence mérite d'être dite clairement, car la formulation précédente la
+masquait : un serveur dont la seule question est un code de vérification reçoit le
+mot de passe stocké en réponse à cette question. La tentative échoue et le serveur
+enregistre un second facteur en échec. La saisie d'un second facteur n'est pas prise
+en charge.
 
 Le générateur de clés écrit les deux fichiers en UTF-8 sans marque d'ordre des
 octets avec des fins de ligne LF, et crée la clé privée par le même écrivain à

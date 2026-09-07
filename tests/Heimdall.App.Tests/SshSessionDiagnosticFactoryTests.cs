@@ -131,4 +131,36 @@ public sealed class SshSessionDiagnosticFactoryTests
         Assert.Equal("ErrorSshTunnelPortOwnershipUnattested", diagnostic.MessageKey);
         Assert.Equal((int)code, diagnostic.Code);
     }
+
+    /// <summary>
+    /// A server's unanswerable interactive question is filed under SSH authentication.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// P-01 change 3. <see cref="SshFailureCode.KeyboardInteractiveUnsupportedPrompt"/> was the
+    /// only authentication code missing from MapStage's SshAuth arm, so it fell to the catch-all
+    /// and the diagnostic panel filed a refused login under a generic failure.
+    /// </para>
+    /// <para>
+    /// A Theory over usedGateway rather than a Fact, and that is not decoration: the obvious
+    /// wrong fix is a separate arm reading `usedGateway ? SshGateway : SshAuth`, which compiles,
+    /// is a defect, and passes any oracle that only ever calls the factory with the default. The
+    /// stage is a property of the failure, not of the route taken to it.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FromClassifiedFailure_ForAnUnanswerableInteractivePrompt_UsesAuthStage(bool usedGateway)
+    {
+        var diagnostic = SshSessionDiagnosticFactory.FromClassifiedFailure(
+            new SshFailureInfo(
+                SshFailureCode.KeyboardInteractiveUnsupportedPrompt,
+                "Permission denied (keyboard-interactive).",
+                true),
+            usedGateway);
+
+        Assert.Equal(SessionFailureStage.SshAuth, diagnostic.Stage);
+        Assert.Equal((int)SshFailureCode.KeyboardInteractiveUnsupportedPrompt, diagnostic.Code);
+    }
 }

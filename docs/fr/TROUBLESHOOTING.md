@@ -936,7 +936,7 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 
 **Symptôme** : une connexion par mot de passe échoue avec un message disant que le serveur a posé une question interactive à laquelle ce client ne peut pas répondre, en nommant la question (par exemple `Verification code:`).
 
-**Cause racine** : le serveur authentifie par keyboard-interactive et demande un second facteur après le mot de passe. Heimdall ne répond qu'à une demande de mot de passe avec le mot de passe stocké ; toute autre demande est laissée vide et enregistrée, et le refus qui suit est signalé comme cette question sans réponse (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un mot de passe rejeté. Avant cette classification, le même refus était imputé au mot de passe.
+**Cause racine** : le serveur authentifie par keyboard-interactive et demande un second facteur après le mot de passe. Heimdall répond avec le mot de passe stocké à un tour qui ne pose qu'une seule question, quelle que soit cette question, et dans un tour qui en pose plusieurs il ne répond qu'aux demandes qui se lisent comme une demande de mot de passe, laissant les autres vides et enregistrées ; le refus qui suit une demande sans réponse est signalé comme cette question sans réponse (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un mot de passe rejeté. Un serveur dont la seule question est le second facteur reçoit donc le mot de passe stocké en réponse. Avant cette classification, le même refus était imputé au mot de passe.
 
 **Solution** :
 

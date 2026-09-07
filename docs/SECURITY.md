@@ -161,11 +161,17 @@ strip, and preserves every line Heimdall did not originate (including
 aliases are not all managed) verbatim.
 
 Password authentication registers both `password` and `keyboard-interactive`.
-The keyboard-interactive handler answers only a password prompt with the stored
-password; any other prompt (a verification code, a challenge) is left empty and
-recorded, and the refusal that follows is reported as an unanswered question
-(`KeyboardInteractiveUnsupportedPrompt`) rather than as a rejected password.
-Second-factor entry is not supported.
+The keyboard-interactive handler answers a round that asks a single question with
+the stored password, whatever that question is; in a round that asks several, only
+the prompts that read as a password request are answered, and the rest are left
+empty and recorded. The refusal that follows an unanswered prompt is reported as an
+unanswered question (`KeyboardInteractiveUnsupportedPrompt`) rather than as a
+rejected password.
+
+One consequence is worth stating plainly, because the wording above used to hide
+it: a server whose only question is a verification code receives the stored
+password as the answer to that question. The attempt fails and the server records a
+failed second-factor attempt. Second-factor entry is not supported.
 
 The key generator writes both files as UTF-8 without a byte order mark with LF
 line endings, and creates the private key through the same restrictive-ACL
